@@ -1,17 +1,29 @@
 use anyhow::Result;
-use std::sync::Arc;
-use vello::kurbo::Affine;
-use vello::peniko::color::palette;
-use vello::peniko::{self, Fill, FontData};
-use vello::util::{RenderContext, RenderSurface};
-use vello::wgpu;
-use vello::{AaConfig, Glyph, Renderer, RendererOptions, Scene};
-use winit::application::ApplicationHandler;
-use winit::dpi::LogicalSize;
-use winit::event::{ElementState, MouseButton, MouseScrollDelta, WindowEvent};
-use winit::event_loop::{ActiveEventLoop, EventLoop};
-use winit::keyboard::{Key, NamedKey};
-use winit::window::Window;
+use std::ffi::CString;
+use std::num::NonZeroU32;
+
+use gl::types::*;
+use glutin::{
+    config::{ConfigTemplateBuilder, GlConfig},
+    context::{ContextApi, ContextAttributesBuilder, PossiblyCurrentContext},
+    display::{GetGlDisplay, GlDisplay},
+    prelude::{GlSurface, NotCurrentGlContext},
+    surface::{Surface as GlutinSurface, SurfaceAttributesBuilder, WindowSurface},
+};
+use glutin_winit::DisplayBuilder;
+use raw_window_handle::HasWindowHandle;
+use skia_safe::{
+    gpu::{self, backend_render_targets, gl::FramebufferInfo, SurfaceOrigin},
+    Color, ColorType, Font, FontStyle, Paint, Rect, Surface,
+};
+use winit::{
+    application::ApplicationHandler,
+    dpi::LogicalSize,
+    event::{ElementState, MouseButton, MouseScrollDelta, WindowEvent},
+    event_loop::EventLoop,
+    keyboard::{Key, NamedKey},
+    window::Window,
+};
 
 struct Camera {
     offset_x: f64,
@@ -27,127 +39,159 @@ impl Camera {
             zoom: 1.0,
         }
     }
+}
 
-    fn transform(&self) -> Affine {
-        Affine::translate((self.offset_x, self.offset_y)) * Affine::scale(self.zoom)
+/// Ensures DirectContext drops before Window (prevents AMD GPU segfaults).
+struct Env {
+    surface: Surface,
+    gl_surface: GlutinSurface<WindowSurface>,
+    gr_context: gpu::DirectContext,
+    gl_context: PossiblyCurrentContext,
+    window: Window,
+    fb_info: FramebufferInfo,
+    num_samples: usize,
+    stencil_size: usize,
+}
+
+impl Drop for Env {
+    fn drop(&mut self) {
+        self.gr_context.release_resources_and_abandon();
     }
 }
 
-#[derive(Debug)]
-enum RenderState {
-    Active {
-        surface: Box<RenderSurface<'static>>,
-        valid_surface: bool,
-        window: Arc<Window>,
-    },
-    Suspended(Option<Arc<Window>>),
-}
-
 struct App {
-    context: RenderContext,
-    renderers: Vec<Option<Renderer>>,
-    state: RenderState,
-    pdf_scene: Scene,
+    env: Env,
+    doc: mupdf::Document,
+    current_page: i32,
+    page_count: i32,
+    svg_dom: Option<skia_safe::svg::Dom>,
     page_width: f64,
     page_height: f64,
     camera: Camera,
     dragging: bool,
     last_cursor: Option<(f64, f64)>,
-    doc: lopdf::Document,
-    current_page: u32,
-    page_count: u32,
-    status_font: FontData,
+    status_font: Font,
 }
 
 impl App {
-    fn render_current_page(&mut self) {
-        match railreader2::render_page(&self.doc, self.current_page) {
-            Ok((scene, w, h)) => {
-                self.pdf_scene = scene;
+    fn load_page(&mut self) {
+        match railreader2::render_page_svg(&self.doc, self.current_page) {
+            Ok((svg_string, w, h)) => {
                 self.page_width = w;
                 self.page_height = h;
+                let font_mgr = skia_safe::FontMgr::default();
+                self.svg_dom = skia_safe::svg::Dom::from_str(svg_string, font_mgr).ok();
             }
             Err(e) => {
                 log::error!("Failed to render page {}: {}", self.current_page, e);
+                self.svg_dom = None;
             }
         }
     }
 
-    fn go_to_page(&mut self, page: u32) {
-        let page = page.clamp(1, self.page_count);
+    fn go_to_page(&mut self, page: i32) {
+        let page = page.clamp(0, self.page_count - 1);
         if page != self.current_page {
             self.current_page = page;
-            self.render_current_page();
-            // Reset pan but keep zoom
+            self.load_page();
             self.camera.offset_x = 0.0;
             self.camera.offset_y = 0.0;
         }
     }
 }
 
+fn create_surface(
+    window: &Window,
+    fb_info: FramebufferInfo,
+    gr_context: &mut gpu::DirectContext,
+    num_samples: usize,
+    stencil_size: usize,
+) -> Surface {
+    let size = window.inner_size();
+    let size = (
+        size.width.try_into().expect("Could not convert width"),
+        size.height.try_into().expect("Could not convert height"),
+    );
+    let backend_render_target =
+        backend_render_targets::make_gl(size, num_samples, stencil_size, fb_info);
+
+    gpu::surfaces::wrap_backend_render_target(
+        gr_context,
+        &backend_render_target,
+        SurfaceOrigin::BottomLeft,
+        ColorType::RGBA8888,
+        None,
+        None,
+    )
+    .expect("Could not create skia surface")
+}
+
+fn draw_status_bar(
+    canvas: &skia_safe::Canvas,
+    width: u32,
+    height: u32,
+    font: &Font,
+    camera: &Camera,
+    current_page: i32,
+    page_count: i32,
+) {
+    let bar_height = 28.0_f32;
+    let bar_y = height as f32 - bar_height;
+
+    let mut bg_paint = Paint::default();
+    bg_paint.set_color(Color::from_argb(180, 0, 0, 0));
+    canvas.draw_rect(
+        Rect::from_xywh(0.0, bar_y, width as f32, bar_height),
+        &bg_paint,
+    );
+
+    let zoom_pct = (camera.zoom * 100.0).round() as i32;
+    let status = format!(
+        "Page {}/{} | Zoom: {}%",
+        current_page + 1,
+        page_count,
+        zoom_pct
+    );
+
+    let mut text_paint = Paint::default();
+    text_paint.set_color(Color::WHITE);
+    text_paint.set_anti_alias(true);
+
+    canvas.draw_str(
+        &status,
+        (10.0, bar_y + bar_height * 0.72),
+        font,
+        &text_paint,
+    );
+}
+
 impl ApplicationHandler for App {
-    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        let RenderState::Suspended(cached_window) = &mut self.state else {
-            return;
-        };
-
-        let window = cached_window
-            .take()
-            .unwrap_or_else(|| create_window(event_loop, self.page_width, self.page_height));
-
-        let size = window.inner_size();
-        let surface_future = self.context.create_surface(
-            window.clone(),
-            size.width,
-            size.height,
-            wgpu::PresentMode::AutoVsync,
-        );
-        let surface = pollster::block_on(surface_future).expect("Error creating surface");
-
-        self.renderers
-            .resize_with(self.context.devices.len(), || None);
-        self.renderers[surface.dev_id]
-            .get_or_insert_with(|| create_renderer(&self.context, &surface));
-
-        self.state = RenderState::Active {
-            surface: Box::new(surface),
-            valid_surface: true,
-            window,
-        };
-    }
-
-    fn suspended(&mut self, _event_loop: &ActiveEventLoop) {
-        if let RenderState::Active { window, .. } = &self.state {
-            self.state = RenderState::Suspended(Some(window.clone()));
-        }
-    }
+    fn resumed(&mut self, _event_loop: &winit::event_loop::ActiveEventLoop) {}
 
     fn window_event(
         &mut self,
-        event_loop: &ActiveEventLoop,
-        window_id: winit::window::WindowId,
+        event_loop: &winit::event_loop::ActiveEventLoop,
+        _window_id: winit::window::WindowId,
         event: WindowEvent,
     ) {
-        let (surface, valid_surface, window) = match &mut self.state {
-            RenderState::Active {
-                surface,
-                valid_surface,
-                window,
-            } if window.id() == window_id => (surface, valid_surface, window.clone()),
-            _ => return,
-        };
-
         match event {
             WindowEvent::CloseRequested => event_loop.exit(),
 
-            WindowEvent::Resized(size) => {
-                if size.width != 0 && size.height != 0 {
-                    self.context
-                        .resize_surface(surface, size.width, size.height);
-                    *valid_surface = true;
-                } else {
-                    *valid_surface = false;
-                }
+            WindowEvent::Resized(physical_size) => {
+                self.env.surface = create_surface(
+                    &self.env.window,
+                    self.env.fb_info,
+                    &mut self.env.gr_context,
+                    self.env.num_samples,
+                    self.env.stencil_size,
+                );
+                let (width, height): (u32, u32) = physical_size.into();
+                self.env.gl_surface.resize(
+                    &self.env.gl_context,
+                    NonZeroU32::new(width.max(1)).unwrap(),
+                    NonZeroU32::new(height.max(1)).unwrap(),
+                );
+                self.env.window.request_redraw();
             }
 
             WindowEvent::MouseWheel { delta, .. } => {
@@ -157,7 +201,7 @@ impl ApplicationHandler for App {
                 };
                 let factor = 1.0 + scroll_y * 0.003;
                 self.camera.zoom = (self.camera.zoom * factor).clamp(0.1, 20.0);
-                window.request_redraw();
+                self.env.window.request_redraw();
             }
 
             WindowEvent::MouseInput { state, button, .. } => {
@@ -176,7 +220,7 @@ impl ApplicationHandler for App {
                         let dy = position.y - ly;
                         self.camera.offset_x += dx;
                         self.camera.offset_y += dy;
-                        window.request_redraw();
+                        self.env.window.request_redraw();
                     }
                     self.last_cursor = Some((position.x, position.y));
                 }
@@ -187,56 +231,52 @@ impl ApplicationHandler for App {
                     return;
                 }
                 match &event.logical_key {
-                    // Page navigation
                     Key::Named(NamedKey::PageDown) => {
                         self.go_to_page(self.current_page + 1);
-                        window.request_redraw();
+                        self.env.window.request_redraw();
                     }
                     Key::Named(NamedKey::PageUp) => {
-                        self.go_to_page(self.current_page.saturating_sub(1));
-                        window.request_redraw();
+                        self.go_to_page(self.current_page - 1);
+                        self.env.window.request_redraw();
                     }
                     Key::Named(NamedKey::Home) => {
-                        self.go_to_page(1);
-                        window.request_redraw();
+                        self.go_to_page(0);
+                        self.env.window.request_redraw();
                     }
                     Key::Named(NamedKey::End) => {
-                        self.go_to_page(self.page_count);
-                        window.request_redraw();
+                        self.go_to_page(self.page_count - 1);
+                        self.env.window.request_redraw();
                     }
-                    // Zoom
                     Key::Character(c) if c.as_str() == "+" || c.as_str() == "=" => {
                         self.camera.zoom = (self.camera.zoom * 1.25).clamp(0.1, 20.0);
-                        window.request_redraw();
+                        self.env.window.request_redraw();
                     }
                     Key::Character(c) if c.as_str() == "-" => {
                         self.camera.zoom = (self.camera.zoom / 1.25).clamp(0.1, 20.0);
-                        window.request_redraw();
+                        self.env.window.request_redraw();
                     }
                     Key::Character(c) if c.as_str() == "0" => {
                         self.camera.zoom = 1.0;
                         self.camera.offset_x = 0.0;
                         self.camera.offset_y = 0.0;
-                        window.request_redraw();
+                        self.env.window.request_redraw();
                     }
-                    // Pan with arrow keys
                     Key::Named(NamedKey::ArrowUp) => {
                         self.camera.offset_y += 50.0;
-                        window.request_redraw();
+                        self.env.window.request_redraw();
                     }
                     Key::Named(NamedKey::ArrowDown) => {
                         self.camera.offset_y -= 50.0;
-                        window.request_redraw();
+                        self.env.window.request_redraw();
                     }
                     Key::Named(NamedKey::ArrowLeft) => {
                         self.camera.offset_x += 50.0;
-                        window.request_redraw();
+                        self.env.window.request_redraw();
                     }
                     Key::Named(NamedKey::ArrowRight) => {
                         self.camera.offset_x -= 50.0;
-                        window.request_redraw();
+                        self.env.window.request_redraw();
                     }
-                    // Quit
                     Key::Named(NamedKey::Escape) => event_loop.exit(),
                     Key::Character(c) if c.as_str() == "q" => event_loop.exit(),
                     _ => {}
@@ -244,174 +284,54 @@ impl ApplicationHandler for App {
             }
 
             WindowEvent::RedrawRequested => {
-                if !*valid_surface {
+                let size = self.env.window.inner_size();
+                if size.width == 0 || size.height == 0 {
                     return;
                 }
 
-                let width = surface.config.width;
-                let height = surface.config.height;
-                let dev_id = surface.dev_id;
+                let canvas = self.env.surface.canvas();
+                canvas.clear(Color::from_argb(255, 128, 128, 128));
 
-                // Build final scene: white background rect + PDF scene with camera transform
-                let mut scene = Scene::new();
-                let page_rect =
-                    vello::kurbo::Rect::new(0.0, 0.0, self.page_width, self.page_height);
-                let camera_transform = self.camera.transform();
-                scene.fill(
-                    Fill::NonZero,
-                    camera_transform,
-                    peniko::Color::new([1.0, 1.0, 1.0, 1.0]),
-                    None,
-                    &page_rect,
+                canvas.save();
+                canvas.translate((self.camera.offset_x as f32, self.camera.offset_y as f32));
+                canvas.scale((self.camera.zoom as f32, self.camera.zoom as f32));
+
+                // White page background
+                let mut white_paint = Paint::default();
+                white_paint.set_color(Color::WHITE);
+                canvas.draw_rect(
+                    Rect::from_wh(self.page_width as f32, self.page_height as f32),
+                    &white_paint,
                 );
-                scene.append(&self.pdf_scene, Some(camera_transform));
 
-                // Draw status bar on top (screen coordinates)
+                // SVG content
+                if let Some(dom) = &mut self.svg_dom {
+                    dom.render(canvas);
+                }
+
+                canvas.restore();
+
+                // Status bar (drawn in screen space)
                 draw_status_bar(
-                    &mut scene,
-                    width,
-                    height,
+                    canvas,
+                    size.width,
+                    size.height,
                     &self.status_font,
                     &self.camera,
                     self.current_page,
                     self.page_count,
                 );
 
-                let surface = match &mut self.state {
-                    RenderState::Active { surface, .. } => surface,
-                    _ => return,
-                };
-                let device_handle = &self.context.devices[dev_id];
-
-                self.renderers[dev_id]
-                    .as_mut()
-                    .unwrap()
-                    .render_to_texture(
-                        &device_handle.device,
-                        &device_handle.queue,
-                        &scene,
-                        &surface.target_view,
-                        &vello::RenderParams {
-                            base_color: palette::css::GRAY,
-                            width,
-                            height,
-                            antialiasing_method: AaConfig::Msaa16,
-                        },
-                    )
-                    .expect("failed to render");
-
-                let surface_texture = surface
-                    .surface
-                    .get_current_texture()
-                    .expect("failed to get surface texture");
-
-                let mut encoder =
-                    device_handle
-                        .device
-                        .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                            label: Some("Surface Blit"),
-                        });
-                surface.blitter.copy(
-                    &device_handle.device,
-                    &mut encoder,
-                    &surface.target_view,
-                    &surface_texture
-                        .texture
-                        .create_view(&wgpu::TextureViewDescriptor::default()),
-                );
-                device_handle.queue.submit([encoder.finish()]);
-                surface_texture.present();
-                device_handle.device.poll(wgpu::PollType::Poll).unwrap();
+                self.env.gr_context.flush_and_submit();
+                self.env
+                    .gl_surface
+                    .swap_buffers(&self.env.gl_context)
+                    .unwrap();
             }
 
             _ => {}
         }
     }
-}
-
-fn draw_status_bar(
-    scene: &mut Scene,
-    window_width: u32,
-    window_height: u32,
-    status_font: &FontData,
-    camera: &Camera,
-    current_page: u32,
-    page_count: u32,
-) {
-    let bar_height = 28.0;
-    let bar_y = window_height as f64 - bar_height;
-
-    let bar_rect = vello::kurbo::Rect::new(0.0, bar_y, window_width as f64, window_height as f64);
-    scene.fill(
-        Fill::NonZero,
-        Affine::IDENTITY,
-        peniko::Color::new([0.0, 0.0, 0.0, 0.7]),
-        None,
-        &bar_rect,
-    );
-
-    let zoom_pct = (camera.zoom * 100.0).round() as i32;
-    let status = format!("Page {}/{} | Zoom: {}%", current_page, page_count, zoom_pct);
-
-    let font_size = 14.0_f32;
-    let text_x = 10.0_f32;
-    let text_y = (bar_y + bar_height * 0.72) as f32;
-
-    let font_ref = skrifa::FontRef::new(status_font.data.as_ref()).ok();
-
-    let mut glyphs = Vec::new();
-    let mut cursor_x = text_x;
-
-    if let Some(fref) = &font_ref {
-        use skrifa::raw::TableProvider;
-        use skrifa::MetadataProvider;
-        let charmap = fref.charmap();
-        let upem = fref.head().map(|h| h.units_per_em()).unwrap_or(1000) as f32;
-        let scale = font_size / upem;
-        let glyph_metrics = fref.glyph_metrics(
-            skrifa::instance::Size::new(upem),
-            skrifa::instance::LocationRef::default(),
-        );
-
-        for ch in status.chars() {
-            let gid = charmap.map(ch).unwrap_or_default();
-            glyphs.push(Glyph {
-                id: gid.to_u32(),
-                x: cursor_x,
-                y: text_y,
-            });
-            let advance = glyph_metrics.advance_width(gid).unwrap_or(upem * 0.5);
-            cursor_x += advance * scale;
-        }
-    }
-
-    if !glyphs.is_empty() {
-        scene
-            .draw_glyphs(status_font)
-            .font_size(font_size)
-            .transform(Affine::IDENTITY)
-            .brush(peniko::Color::new([1.0, 1.0, 1.0, 1.0]))
-            .draw(Fill::NonZero, glyphs.into_iter());
-    }
-}
-
-fn create_window(event_loop: &ActiveEventLoop, page_width: f64, page_height: f64) -> Arc<Window> {
-    let attr = Window::default_attributes()
-        .with_inner_size(LogicalSize::new(
-            page_width.min(1200.0),
-            page_height.min(900.0),
-        ))
-        .with_resizable(true)
-        .with_title("railreader2");
-    Arc::new(event_loop.create_window(attr).unwrap())
-}
-
-fn create_renderer(render_cx: &RenderContext, surface: &RenderSurface<'_>) -> Renderer {
-    Renderer::new(
-        &render_cx.devices[surface.dev_id].device,
-        RendererOptions::default(),
-    )
-    .expect("Couldn't create renderer")
 }
 
 fn main() -> Result<()> {
@@ -426,38 +346,156 @@ fn main() -> Result<()> {
     let pdf_path = &args[1];
     log::info!("Loading PDF: {}", pdf_path);
 
-    let doc = lopdf::Document::load(pdf_path)
-        .map_err(|e| anyhow::anyhow!("Failed to load PDF '{}': {}", pdf_path, e))?;
-
-    let page_count = doc.get_pages().len() as u32;
+    let doc = mupdf::Document::open(pdf_path)?;
+    let page_count = doc.page_count()?;
     log::info!("PDF has {} page(s)", page_count);
 
-    let (pdf_scene, page_width, page_height) = railreader2::render_page(&doc, 1)?;
+    let (svg_string, page_width, page_height) = railreader2::render_page_svg(&doc, 0)?;
     log::info!("Page dimensions: {}x{}", page_width, page_height);
 
-    // Load fallback font for status bar
-    let status_font = railreader2::fonts::fallback_font();
+    // Set up winit + glutin + skia
+    let el = EventLoop::new()?;
+
+    let window_attributes = Window::default_attributes()
+        .with_inner_size(LogicalSize::new(
+            page_width.min(1200.0),
+            page_height.min(900.0),
+        ))
+        .with_resizable(true)
+        .with_title("railreader2");
+
+    let template = ConfigTemplateBuilder::new()
+        .with_alpha_size(8)
+        .with_transparency(true);
+
+    let display_builder = DisplayBuilder::new().with_window_attributes(Some(window_attributes));
+    let (window, gl_config) = display_builder
+        .build(&el, template, |configs| {
+            configs
+                .reduce(|accum, config| {
+                    let transparency_check = config.supports_transparency().unwrap_or(false)
+                        & !accum.supports_transparency().unwrap_or(false);
+                    if transparency_check || config.num_samples() < accum.num_samples() {
+                        config
+                    } else {
+                        accum
+                    }
+                })
+                .unwrap()
+        })
+        .unwrap();
+    let window = window.expect("Could not create window with OpenGL context");
+    let window_handle = window
+        .window_handle()
+        .expect("Failed to retrieve window handle");
+    let raw_window_handle = window_handle.as_raw();
+
+    let context_attributes = ContextAttributesBuilder::new().build(Some(raw_window_handle));
+    let fallback_context_attributes = ContextAttributesBuilder::new()
+        .with_context_api(ContextApi::Gles(None))
+        .build(Some(raw_window_handle));
+
+    let not_current_gl_context = unsafe {
+        gl_config
+            .display()
+            .create_context(&gl_config, &context_attributes)
+            .unwrap_or_else(|_| {
+                gl_config
+                    .display()
+                    .create_context(&gl_config, &fallback_context_attributes)
+                    .expect("failed to create context")
+            })
+    };
+
+    let (width, height): (u32, u32) = window.inner_size().into();
+    let attrs = SurfaceAttributesBuilder::<WindowSurface>::new().build(
+        raw_window_handle,
+        NonZeroU32::new(width).unwrap(),
+        NonZeroU32::new(height).unwrap(),
+    );
+
+    let gl_surface = unsafe {
+        gl_config
+            .display()
+            .create_window_surface(&gl_config, &attrs)
+            .expect("Could not create gl window surface")
+    };
+
+    let gl_context = not_current_gl_context
+        .make_current(&gl_surface)
+        .expect("Could not make GL context current");
+
+    gl::load_with(|s| {
+        gl_config
+            .display()
+            .get_proc_address(CString::new(s).unwrap().as_c_str())
+    });
+    let interface = skia_safe::gpu::gl::Interface::new_load_with(|name| {
+        if name == "eglGetCurrentDisplay" {
+            return std::ptr::null();
+        }
+        gl_config
+            .display()
+            .get_proc_address(CString::new(name).unwrap().as_c_str())
+    })
+    .expect("Could not create interface");
+
+    let mut gr_context = skia_safe::gpu::direct_contexts::make_gl(interface, None)
+        .expect("Could not create direct context");
+
+    let fb_info = {
+        let mut fboid: GLint = 0;
+        unsafe { gl::GetIntegerv(gl::FRAMEBUFFER_BINDING, &mut fboid) };
+        FramebufferInfo {
+            fboid: fboid.try_into().unwrap(),
+            format: skia_safe::gpu::gl::Format::RGBA8.into(),
+            ..Default::default()
+        }
+    };
+
+    let num_samples = gl_config.num_samples() as usize;
+    let stencil_size = gl_config.stencil_size() as usize;
+
+    let surface = create_surface(&window, fb_info, &mut gr_context, num_samples, stencil_size);
+
+    // Parse SVG for page 0
+    let font_mgr = skia_safe::FontMgr::default();
+    let svg_dom = skia_safe::svg::Dom::from_str(svg_string, font_mgr).ok();
+
+    // Status bar font
+    let font_mgr_for_font = skia_safe::FontMgr::default();
+    let typeface = font_mgr_for_font
+        .match_family_style("DejaVu Sans", FontStyle::default())
+        .or_else(|| font_mgr_for_font.match_family_style("sans-serif", FontStyle::default()))
+        .expect("Could not find any sans-serif font");
+    let status_font = Font::from_typeface(typeface, 14.0);
+
+    let env = Env {
+        surface,
+        gl_surface,
+        gr_context,
+        gl_context,
+        window,
+        fb_info,
+        num_samples,
+        stencil_size,
+    };
 
     let mut app = App {
-        context: RenderContext::new(),
-        renderers: vec![],
-        state: RenderState::Suspended(None),
-        pdf_scene,
+        env,
+        doc,
+        current_page: 0,
+        page_count,
+        svg_dom,
         page_width,
         page_height,
         camera: Camera::new(),
         dragging: false,
         last_cursor: None,
-        doc,
-        current_page: 1,
-        page_count,
         status_font,
     };
 
-    let event_loop = EventLoop::new()?;
-    event_loop
-        .run_app(&mut app)
-        .expect("Couldn't run event loop");
+    el.run_app(&mut app).expect("Couldn't run event loop");
 
     Ok(())
 }

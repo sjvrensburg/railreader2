@@ -4,12 +4,13 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-vello = "0.6"
+skia-safe = { version = "0.93", features = ["gl", "svg"] }
+glutin = "0.32"
+glutin-winit = "0.5"
+gl = "0.14"
+raw-window-handle = "0.6"
 winit = "0.30"
-lopdf = "0.34"
-pollster = "0.4"
+mupdf = "0.6"
 anyhow = "1"
 log = "0.4"
 env_logger = "0.11"
-skrifa = "0.37"
-image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
