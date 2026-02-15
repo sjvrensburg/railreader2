@@ -2,13 +2,15 @@ use anyhow::Result;
 use std::sync::Arc;
 use vello::kurbo::Affine;
 use vello::peniko::color::palette;
+use vello::peniko::{self, Fill, FontData};
 use vello::util::{RenderContext, RenderSurface};
 use vello::wgpu;
-use vello::{AaConfig, Renderer, RendererOptions, Scene};
+use vello::{AaConfig, Glyph, Renderer, RendererOptions, Scene};
 use winit::application::ApplicationHandler;
 use winit::dpi::LogicalSize;
 use winit::event::{ElementState, MouseButton, MouseScrollDelta, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, EventLoop};
+use winit::keyboard::{Key, NamedKey};
 use winit::window::Window;
 
 struct Camera {
@@ -51,6 +53,36 @@ struct App {
     camera: Camera,
     dragging: bool,
     last_cursor: Option<(f64, f64)>,
+    doc: lopdf::Document,
+    current_page: u32,
+    page_count: u32,
+    status_font: FontData,
+}
+
+impl App {
+    fn render_current_page(&mut self) {
+        match railreader2::render_page(&self.doc, self.current_page) {
+            Ok((scene, w, h)) => {
+                self.pdf_scene = scene;
+                self.page_width = w;
+                self.page_height = h;
+            }
+            Err(e) => {
+                log::error!("Failed to render page {}: {}", self.current_page, e);
+            }
+        }
+    }
+
+    fn go_to_page(&mut self, page: u32) {
+        let page = page.clamp(1, self.page_count);
+        if page != self.current_page {
+            self.current_page = page;
+            self.render_current_page();
+            // Reset pan but keep zoom
+            self.camera.offset_x = 0.0;
+            self.camera.offset_y = 0.0;
+        }
+    }
 }
 
 impl ApplicationHandler for App {
@@ -150,6 +182,67 @@ impl ApplicationHandler for App {
                 }
             }
 
+            WindowEvent::KeyboardInput { event, .. } => {
+                if event.state != ElementState::Pressed {
+                    return;
+                }
+                match &event.logical_key {
+                    // Page navigation
+                    Key::Named(NamedKey::PageDown) => {
+                        self.go_to_page(self.current_page + 1);
+                        window.request_redraw();
+                    }
+                    Key::Named(NamedKey::PageUp) => {
+                        self.go_to_page(self.current_page.saturating_sub(1));
+                        window.request_redraw();
+                    }
+                    Key::Named(NamedKey::Home) => {
+                        self.go_to_page(1);
+                        window.request_redraw();
+                    }
+                    Key::Named(NamedKey::End) => {
+                        self.go_to_page(self.page_count);
+                        window.request_redraw();
+                    }
+                    // Zoom
+                    Key::Character(c) if c.as_str() == "+" || c.as_str() == "=" => {
+                        self.camera.zoom = (self.camera.zoom * 1.25).clamp(0.1, 20.0);
+                        window.request_redraw();
+                    }
+                    Key::Character(c) if c.as_str() == "-" => {
+                        self.camera.zoom = (self.camera.zoom / 1.25).clamp(0.1, 20.0);
+                        window.request_redraw();
+                    }
+                    Key::Character(c) if c.as_str() == "0" => {
+                        self.camera.zoom = 1.0;
+                        self.camera.offset_x = 0.0;
+                        self.camera.offset_y = 0.0;
+                        window.request_redraw();
+                    }
+                    // Pan with arrow keys
+                    Key::Named(NamedKey::ArrowUp) => {
+                        self.camera.offset_y += 50.0;
+                        window.request_redraw();
+                    }
+                    Key::Named(NamedKey::ArrowDown) => {
+                        self.camera.offset_y -= 50.0;
+                        window.request_redraw();
+                    }
+                    Key::Named(NamedKey::ArrowLeft) => {
+                        self.camera.offset_x += 50.0;
+                        window.request_redraw();
+                    }
+                    Key::Named(NamedKey::ArrowRight) => {
+                        self.camera.offset_x -= 50.0;
+                        window.request_redraw();
+                    }
+                    // Quit
+                    Key::Named(NamedKey::Escape) => event_loop.exit(),
+                    Key::Character(c) if c.as_str() == "q" => event_loop.exit(),
+                    _ => {}
+                }
+            }
+
             WindowEvent::RedrawRequested => {
                 if !*valid_surface {
                     return;
@@ -157,25 +250,40 @@ impl ApplicationHandler for App {
 
                 let width = surface.config.width;
                 let height = surface.config.height;
+                let dev_id = surface.dev_id;
 
                 // Build final scene: white background rect + PDF scene with camera transform
                 let mut scene = Scene::new();
-                // Draw white page background
                 let page_rect =
                     vello::kurbo::Rect::new(0.0, 0.0, self.page_width, self.page_height);
                 let camera_transform = self.camera.transform();
                 scene.fill(
-                    vello::peniko::Fill::NonZero,
+                    Fill::NonZero,
                     camera_transform,
-                    vello::peniko::Color::new([1.0, 1.0, 1.0, 1.0]),
+                    peniko::Color::new([1.0, 1.0, 1.0, 1.0]),
                     None,
                     &page_rect,
                 );
                 scene.append(&self.pdf_scene, Some(camera_transform));
 
-                let device_handle = &self.context.devices[surface.dev_id];
+                // Draw status bar on top (screen coordinates)
+                draw_status_bar(
+                    &mut scene,
+                    width,
+                    height,
+                    &self.status_font,
+                    &self.camera,
+                    self.current_page,
+                    self.page_count,
+                );
 
-                self.renderers[surface.dev_id]
+                let surface = match &mut self.state {
+                    RenderState::Active { surface, .. } => surface,
+                    _ => return,
+                };
+                let device_handle = &self.context.devices[dev_id];
+
+                self.renderers[dev_id]
                     .as_mut()
                     .unwrap()
                     .render_to_texture(
@@ -221,6 +329,72 @@ impl ApplicationHandler for App {
     }
 }
 
+fn draw_status_bar(
+    scene: &mut Scene,
+    window_width: u32,
+    window_height: u32,
+    status_font: &FontData,
+    camera: &Camera,
+    current_page: u32,
+    page_count: u32,
+) {
+    let bar_height = 28.0;
+    let bar_y = window_height as f64 - bar_height;
+
+    let bar_rect = vello::kurbo::Rect::new(0.0, bar_y, window_width as f64, window_height as f64);
+    scene.fill(
+        Fill::NonZero,
+        Affine::IDENTITY,
+        peniko::Color::new([0.0, 0.0, 0.0, 0.7]),
+        None,
+        &bar_rect,
+    );
+
+    let zoom_pct = (camera.zoom * 100.0).round() as i32;
+    let status = format!("Page {}/{} | Zoom: {}%", current_page, page_count, zoom_pct);
+
+    let font_size = 14.0_f32;
+    let text_x = 10.0_f32;
+    let text_y = (bar_y + bar_height * 0.72) as f32;
+
+    let font_ref = skrifa::FontRef::new(status_font.data.as_ref()).ok();
+
+    let mut glyphs = Vec::new();
+    let mut cursor_x = text_x;
+
+    if let Some(fref) = &font_ref {
+        use skrifa::raw::TableProvider;
+        use skrifa::MetadataProvider;
+        let charmap = fref.charmap();
+        let upem = fref.head().map(|h| h.units_per_em()).unwrap_or(1000) as f32;
+        let scale = font_size / upem;
+        let glyph_metrics = fref.glyph_metrics(
+            skrifa::instance::Size::new(upem),
+            skrifa::instance::LocationRef::default(),
+        );
+
+        for ch in status.chars() {
+            let gid = charmap.map(ch).unwrap_or_default();
+            glyphs.push(Glyph {
+                id: gid.to_u32(),
+                x: cursor_x,
+                y: text_y,
+            });
+            let advance = glyph_metrics.advance_width(gid).unwrap_or(upem * 0.5);
+            cursor_x += advance * scale;
+        }
+    }
+
+    if !glyphs.is_empty() {
+        scene
+            .draw_glyphs(status_font)
+            .font_size(font_size)
+            .transform(Affine::IDENTITY)
+            .brush(peniko::Color::new([1.0, 1.0, 1.0, 1.0]))
+            .draw(Fill::NonZero, glyphs.into_iter());
+    }
+}
+
 fn create_window(event_loop: &ActiveEventLoop, page_width: f64, page_height: f64) -> Arc<Window> {
     let attr = Window::default_attributes()
         .with_inner_size(LogicalSize::new(
@@ -255,11 +429,14 @@ fn main() -> Result<()> {
     let doc = lopdf::Document::load(pdf_path)
         .map_err(|e| anyhow::anyhow!("Failed to load PDF '{}': {}", pdf_path, e))?;
 
-    let page_count = doc.get_pages().len();
+    let page_count = doc.get_pages().len() as u32;
     log::info!("PDF has {} page(s)", page_count);
 
     let (pdf_scene, page_width, page_height) = railreader2::render_page(&doc, 1)?;
     log::info!("Page dimensions: {}x{}", page_width, page_height);
+
+    // Load fallback font for status bar
+    let status_font = railreader2::fonts::fallback_font();
 
     let mut app = App {
         context: RenderContext::new(),
@@ -271,6 +448,10 @@ fn main() -> Result<()> {
         camera: Camera::new(),
         dragging: false,
         last_cursor: None,
+        doc,
+        current_page: 1,
+        page_count,
+        status_font,
     };
 
     let event_loop = EventLoop::new()?;

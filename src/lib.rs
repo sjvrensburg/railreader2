@@ -1,3 +1,5 @@
+pub mod fonts;
+pub mod images;
 pub mod interpreter;
 
 use anyhow::{anyhow, Result};
@@ -28,7 +30,7 @@ pub fn render_page(doc: &Document, page_number: u32) -> Result<(Scene, f64, f64)
         .operations;
 
     let mut scene = Scene::new();
-    let mut interp = VelloPdfInterpreter::new(width, height);
+    let mut interp = VelloPdfInterpreter::new(doc, page_id, width, height);
     interp.run(&mut scene, &operations)?;
 
     Ok((scene, width, height))

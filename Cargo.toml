@@ -11,3 +11,5 @@ pollster = "0.4"
 anyhow = "1"
 log = "0.4"
 env_logger = "0.11"
+skrifa = "0.37"
+image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
