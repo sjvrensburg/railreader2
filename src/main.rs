@@ -19,7 +19,7 @@ use skia_safe::{
 use winit::{
     application::ApplicationHandler,
     dpi::LogicalSize,
-    event::{ElementState, MouseButton, MouseScrollDelta, WindowEvent},
+    event::{ElementState, Modifiers, MouseButton, MouseScrollDelta, WindowEvent},
     event_loop::EventLoop,
     keyboard::{Key, NamedKey},
     window::Window,
@@ -74,10 +74,12 @@ struct App {
     dragging: bool,
     last_cursor: Option<(f64, f64)>,
     cursor_pos: (f64, f64),
+    modifiers: Modifiers,
     status_font: Font,
     ort_session: Option<ort::session::Session>,
     rail: RailNav,
     debug_overlay: bool,
+    loading: bool,
 }
 
 impl App {
@@ -136,9 +138,15 @@ impl App {
     fn go_to_page(&mut self, page: i32) {
         let page = page.clamp(0, self.page_count - 1);
         if page != self.current_page {
+            self.loading = true;
+            self.env.window.request_redraw(); // Show loading state immediately
             self.current_page = page;
+            let old_zoom = self.camera.zoom;
             self.load_page();
-            self.center_page();
+            // Preserve zoom level, just re-center at the same zoom
+            self.camera.zoom = old_zoom;
+            self.clamp_camera();
+            self.loading = false;
         }
     }
 
@@ -445,8 +453,47 @@ impl ApplicationHandler for App {
         _window_id: winit::window::WindowId,
         event: WindowEvent,
     ) {
+        // Track modifier keys
+        if let WindowEvent::ModifiersChanged(mods) = &event {
+            self.modifiers = *mods;
+        }
+
+        // Block input while loading (except close/redraw)
+        if self.loading {
+            match event {
+                WindowEvent::CloseRequested => event_loop.exit(),
+                WindowEvent::RedrawRequested => {
+                    // Draw loading indicator
+                    let size = self.env.window.inner_size();
+                    if size.width > 0 && size.height > 0 {
+                        let canvas = self.env.surface.canvas();
+                        canvas.clear(Color::from_argb(255, 128, 128, 128));
+
+                        let mut paint = Paint::default();
+                        paint.set_color(Color::WHITE);
+                        paint.set_anti_alias(true);
+                        canvas.draw_str(
+                            "Loading...",
+                            (size.width as f32 / 2.0 - 40.0, size.height as f32 / 2.0),
+                            &self.status_font,
+                            &paint,
+                        );
+
+                        self.env.gr_context.flush_and_submit();
+                        self.env
+                            .gl_surface
+                            .swap_buffers(&self.env.gl_context)
+                            .unwrap();
+                    }
+                }
+                _ => {}
+            }
+            return;
+        }
+
         match event {
             WindowEvent::CloseRequested => event_loop.exit(),
+            WindowEvent::ModifiersChanged(_) => {} // Already handled above
 
             WindowEvent::Resized(physical_size) => {
                 self.env.surface = create_surface(
@@ -472,31 +519,46 @@ impl ApplicationHandler for App {
                     MouseScrollDelta::PixelDelta(pos) => pos.y,
                 };
 
-                // Mouse wheel always zooms towards cursor position
-                let old_zoom = self.camera.zoom;
-                let factor = 1.0 + scroll_y * 0.003;
-                let new_zoom = (old_zoom * factor).clamp(0.1, 20.0);
+                let ctrl_held = self.modifiers.state().control_key();
 
-                // Zoom towards cursor: keep the page point under cursor fixed
-                let (cx, cy) = self.cursor_pos;
-                self.camera.offset_x = cx - (cx - self.camera.offset_x) * (new_zoom / old_zoom);
-                self.camera.offset_y = cy - (cy - self.camera.offset_y) * (new_zoom / old_zoom);
-                self.camera.zoom = new_zoom;
+                if ctrl_held && self.rail.active {
+                    // Ctrl+scroll = smooth horizontal scroll along line
+                    let size = self.env.window.inner_size();
+                    let forward = scroll_y < 0.0;
+                    self.rail.scroll_along_line(
+                        self.camera.offset_x,
+                        self.camera.offset_y,
+                        self.camera.zoom,
+                        size.width as f64,
+                        forward,
+                    );
+                } else {
+                    // Normal scroll = zoom towards cursor position
+                    let old_zoom = self.camera.zoom;
+                    let factor = 1.0 + scroll_y * 0.003;
+                    let new_zoom = (old_zoom * factor).clamp(0.1, 20.0);
 
-                let size = self.env.window.inner_size();
-                self.rail.update_zoom(
-                    self.camera.zoom,
-                    self.camera.offset_x,
-                    self.camera.offset_y,
-                    size.width as f64,
-                    size.height as f64,
-                );
+                    // Zoom towards cursor: keep the page point under cursor fixed
+                    let (cx, cy) = self.cursor_pos;
+                    self.camera.offset_x = cx - (cx - self.camera.offset_x) * (new_zoom / old_zoom);
+                    self.camera.offset_y = cy - (cy - self.camera.offset_y) * (new_zoom / old_zoom);
+                    self.camera.zoom = new_zoom;
 
-                if self.rail.active {
-                    self.start_snap();
+                    let size = self.env.window.inner_size();
+                    self.rail.update_zoom(
+                        self.camera.zoom,
+                        self.camera.offset_x,
+                        self.camera.offset_y,
+                        size.width as f64,
+                        size.height as f64,
+                    );
+
+                    if self.rail.active {
+                        self.start_snap();
+                    }
+
+                    self.clamp_camera();
                 }
-
-                self.clamp_camera();
                 self.env.window.request_redraw();
             }
 
@@ -973,7 +1035,9 @@ fn main() -> Result<()> {
         status_font,
         ort_session,
         rail,
+        modifiers: Modifiers::default(),
         debug_overlay: false,
+        loading: false,
     };
 
     app.center_page();
