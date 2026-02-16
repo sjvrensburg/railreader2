@@ -54,7 +54,7 @@ scripts/
 ### Key concepts
 
 - **Rendering pipeline**: PDF → SVG (MuPDF) → Skia SVG DOM → OpenGL canvas. Zoom/pan are canvas transforms, text stays vector-sharp.
-- **Layout analysis**: PDF page → 800px pixmap → ImageNet-normalized CHW tensor → PP-DocLayoutV3 ONNX → NMS-filtered blocks with 23 class types → overlap-based column clustering for reading order → horizontal projection profiling for line detection.
+- **Layout analysis**: PDF page → 800px pixmap → ImageNet-normalized CHW tensor → PP-DocLayoutV3 ONNX → NMS-filtered blocks with 23 class types. Reading order comes from the model's native output (Global Pointer Mechanism, column 7 of `[N,7]` tensor). Line detection uses horizontal projection profiling on pixmap crops.
 - **Rail mode**: Activates above configurable zoom threshold. Navigation locks to detected text blocks, advances line-by-line with snap animations. Horizontal scrolling is continuous hold-to-scroll with speed ramping.
 - **Config**: User parameters in `config.json` (auto-created on first run, gitignored). Loaded at startup via `Config::load()`.
 
@@ -70,6 +70,5 @@ scripts/
 
 - First build is slow (~15min) due to Skia C++ compilation. Subsequent builds are fast.
 - The `target/debug/` directory can grow very large (10GB+) due to Skia build artifacts. Use `cargo clean` cautiously.
-- ONNX model outputs `[N, 7]` tensors (not `[N, 6]`). Always use `shape[1]` as stride when reading output.
+- ONNX model outputs `[N, 7]` tensors: `[class_id, confidence, xmin, ymin, xmax, ymax, reading_order]`. The 7th column is the model's predicted reading order via its Global Pointer Mechanism.
 - Layout analysis runs synchronously on page load (~100-200ms). Input is blocked during analysis.
-- Reading order uses overlap-based union-find column clustering (not center-x), to correctly handle blocks of different widths in the same visual column.

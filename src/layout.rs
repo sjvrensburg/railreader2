@@ -5,7 +5,6 @@ use ort::value::TensorRef;
 pub const INPUT_SIZE: u32 = 800;
 const CONFIDENCE_THRESHOLD: f32 = 0.4;
 const NMS_IOU_THRESHOLD: f32 = 0.5;
-const COLUMN_THRESHOLD_RATIO: f32 = 0.15;
 
 /// 23 layout classes from PP-DocLayoutV3.
 pub const LAYOUT_CLASSES: [&str; 23] = [
@@ -220,6 +219,8 @@ pub fn analyze_page(
     let scale_y = page_h as f32 / orig_h as f32;
 
     // Parse detections
+    // Column 7 (if present) contains the model's predicted reading order
+    let has_reading_order = cols >= 7;
     let mut raw_blocks: Vec<LayoutBlock> = Vec::new();
     for i in 0..n_detections {
         let base = i * cols;
@@ -229,6 +230,11 @@ pub fn analyze_page(
         let ymin = data[base + 3];
         let xmax = data[base + 4];
         let ymax = data[base + 5];
+        let model_order = if has_reading_order {
+            data[base + 6] as usize
+        } else {
+            0
+        };
 
         if confidence < CONFIDENCE_THRESHOLD {
             continue;
@@ -263,7 +269,7 @@ pub fn analyze_page(
             },
             class_id,
             confidence,
-            order: 0,
+            order: model_order,
             lines: Vec::new(),
         });
     }
@@ -271,11 +277,16 @@ pub fn analyze_page(
     // NMS
     nms(&mut raw_blocks, NMS_IOU_THRESHOLD);
 
-    // Reading order
-    assign_reading_order(&mut raw_blocks, page_w as f32);
-
-    // Sort by reading order
-    raw_blocks.sort_by_key(|b| b.order);
+    // Use model's native reading order (column 7), re-index to sequential 0..N
+    // Falls back to top-to-bottom if model doesn't output reading order
+    raw_blocks.sort_by(|a, b| {
+        a.order
+            .cmp(&b.order)
+            .then(a.bbox.y.partial_cmp(&b.bbox.y).unwrap())
+    });
+    for (i, block) in raw_blocks.iter_mut().enumerate() {
+        block.order = i;
+    }
 
     // Line detection for navigable blocks
     detect_lines_for_blocks(
@@ -366,82 +377,6 @@ fn nms(blocks: &mut Vec<LayoutBlock>, threshold: f32) {
         idx += 1;
         k
     });
-}
-
-fn assign_reading_order(blocks: &mut [LayoutBlock], page_width: f32) {
-    if blocks.is_empty() {
-        return;
-    }
-
-    let column_threshold = page_width * COLUMN_THRESHOLD_RATIO;
-
-    // Use overlap-based column clustering: two blocks are in the same column if
-    // their horizontal extents overlap significantly, or their left edges are close.
-    // This avoids splitting blocks of different widths (e.g., full-width text vs
-    // narrow footnotes) into separate columns.
-
-    // Union-find for column assignment
-    let n = blocks.len();
-    let mut parent: Vec<usize> = (0..n).collect();
-    fn find(parent: &mut [usize], i: usize) -> usize {
-        if parent[i] != i {
-            parent[i] = find(parent, parent[i]);
-        }
-        parent[i]
-    }
-    fn union(parent: &mut [usize], a: usize, b: usize) {
-        let ra = find(parent, a);
-        let rb = find(parent, b);
-        if ra != rb {
-            parent[ra] = rb;
-        }
-    }
-
-    for i in 0..n {
-        for j in (i + 1)..n {
-            let a = &blocks[i].bbox;
-            let b = &blocks[j].bbox;
-
-            // Check if left edges are close (within column threshold)
-            let left_close = (a.x - b.x).abs() < column_threshold;
-
-            // Check horizontal overlap
-            let overlap_start = a.x.max(b.x);
-            let overlap_end = (a.x + a.w).min(b.x + b.w);
-            let overlap = (overlap_end - overlap_start).max(0.0);
-            let min_width = a.w.min(b.w);
-            let has_overlap = min_width > 0.0 && overlap / min_width > 0.3;
-
-            if left_close || has_overlap {
-                union(&mut parent, i, j);
-            }
-        }
-    }
-
-    // Group into columns
-    let mut column_map: std::collections::HashMap<usize, Vec<usize>> =
-        std::collections::HashMap::new();
-    for i in 0..n {
-        let root = find(&mut parent, i);
-        column_map.entry(root).or_default().push(i);
-    }
-    let mut columns: Vec<Vec<usize>> = column_map.into_values().collect();
-
-    // Sort columns left-to-right by minimum x
-    columns.sort_by(|a, b| {
-        let min_x_a = a.iter().map(|&i| blocks[i].bbox.x).fold(f32::MAX, f32::min);
-        let min_x_b = b.iter().map(|&i| blocks[i].bbox.x).fold(f32::MAX, f32::min);
-        min_x_a.partial_cmp(&min_x_b).unwrap()
-    });
-
-    let mut order = 0;
-    for col in &mut columns {
-        col.sort_by(|&a, &b| blocks[a].bbox.y.partial_cmp(&blocks[b].bbox.y).unwrap());
-        for &idx in col.iter() {
-            blocks[idx].order = order;
-            order += 1;
-        }
-    }
 }
 
 fn detect_lines_for_blocks(

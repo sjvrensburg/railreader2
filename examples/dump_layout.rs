@@ -2,7 +2,9 @@ use anyhow::Result;
 use railreader2::layout;
 
 fn main() -> Result<()> {
-    let pdf_path = std::env::args().nth(1).expect("Usage: dump_layout <pdf> [page]");
+    let pdf_path = std::env::args()
+        .nth(1)
+        .expect("Usage: dump_layout <pdf> [page]");
     let page: i32 = std::env::args()
         .nth(2)
         .and_then(|s| s.parse().ok())
