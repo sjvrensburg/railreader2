@@ -1,8 +1,10 @@
 use crate::layout::{is_navigable, LayoutBlock, LineInfo, PageAnalysis};
 
-const RAIL_ZOOM_THRESHOLD: f64 = 1.5;
-const VERTICAL_SWIPE_THRESHOLD: f64 = 20.0;
+const RAIL_ZOOM_THRESHOLD: f64 = 3.0;
 const SNAP_DURATION_MS: f64 = 300.0;
+const SCROLL_DURATION_MS: f64 = 150.0;
+/// How many page-coord points to scroll per arrow key press along a line.
+const LINE_SCROLL_STEP: f64 = 40.0;
 
 #[derive(Debug)]
 pub enum NavResult {
@@ -17,6 +19,7 @@ struct SnapAnimation {
     target_x: f64,
     target_y: f64,
     start_time: std::time::Instant,
+    duration_ms: f64,
 }
 
 pub struct RailNav {
@@ -25,7 +28,6 @@ pub struct RailNav {
     pub current_block: usize,
     pub current_line: usize,
     pub active: bool,
-    accumulated_dy: f64,
     snap: Option<SnapAnimation>,
 }
 
@@ -43,7 +45,6 @@ impl RailNav {
             current_block: 0,
             current_line: 0,
             active: false,
-            accumulated_dy: 0.0,
             snap: None,
         }
     }
@@ -59,7 +60,6 @@ impl RailNav {
         self.analysis = Some(analysis);
         self.current_block = 0;
         self.current_line = 0;
-        self.accumulated_dy = 0.0;
         self.snap = None;
     }
 
@@ -78,7 +78,6 @@ impl RailNav {
         let should_be_active = zoom >= RAIL_ZOOM_THRESHOLD && self.has_analysis();
 
         if should_be_active && !self.active {
-            // Activating - find nearest block to viewport center
             self.active = true;
             self.find_nearest_block(camera_x, camera_y, zoom, window_width, window_height);
         } else if !should_be_active && self.active {
@@ -122,6 +121,7 @@ impl RailNav {
         self.current_line = 0;
     }
 
+    /// Move to next line within block, or next block, or signal page boundary.
     pub fn next_line(&mut self) -> NavResult {
         if !self.active || self.navigable_indices.is_empty() {
             return NavResult::Ok;
@@ -142,6 +142,7 @@ impl RailNav {
         }
     }
 
+    /// Move to previous line, or previous block (last line), or signal page boundary.
     pub fn prev_line(&mut self) -> NavResult {
         if !self.active || self.navigable_indices.is_empty() {
             return NavResult::Ok;
@@ -160,55 +161,42 @@ impl RailNav {
         }
     }
 
-    pub fn next_block(&mut self) -> NavResult {
-        if !self.active || self.navigable_indices.is_empty() {
-            return NavResult::Ok;
-        }
-
-        if self.current_block + 1 < self.navigable_indices.len() {
-            self.current_block += 1;
-            self.current_line = 0;
-            NavResult::Ok
-        } else {
-            NavResult::PageBoundaryNext
-        }
-    }
-
-    pub fn prev_block(&mut self) -> NavResult {
-        if !self.active || self.navigable_indices.is_empty() {
-            return NavResult::Ok;
-        }
-
-        if self.current_block > 0 {
-            self.current_block -= 1;
-            self.current_line = 0;
-            NavResult::Ok
-        } else {
-            NavResult::PageBoundaryPrev
-        }
-    }
-
-    pub fn handle_scroll(&mut self, dy: f64) -> Option<NavResult> {
-        if !self.active {
-            return None;
-        }
-
-        self.accumulated_dy += dy;
-
-        if self.accumulated_dy > VERTICAL_SWIPE_THRESHOLD {
-            self.accumulated_dy = 0.0;
-            Some(self.prev_line())
-        } else if self.accumulated_dy < -VERTICAL_SWIPE_THRESHOLD {
-            self.accumulated_dy = 0.0;
-            Some(self.next_line())
-        } else {
-            None
-        }
-    }
-
-    pub fn constrain_pan(&self, camera_x: &mut f64, zoom: f64, window_width: f64) {
+    /// Scroll along the current line with smooth animation.
+    /// Forward = advance reading direction, backward = go back.
+    pub fn scroll_along_line(
+        &mut self,
+        camera_x: f64,
+        camera_y: f64,
+        zoom: f64,
+        window_width: f64,
+        forward: bool,
+    ) {
         if !self.active || self.navigable_indices.is_empty() {
             return;
+        }
+
+        let step = LINE_SCROLL_STEP * zoom;
+        let new_x = if forward {
+            camera_x - step
+        } else {
+            camera_x + step
+        };
+        let target_x = self.clamp_x(new_x, zoom, window_width);
+
+        self.snap = Some(SnapAnimation {
+            start_x: camera_x,
+            start_y: camera_y,
+            target_x,
+            target_y: camera_y,
+            start_time: std::time::Instant::now(),
+            duration_ms: SCROLL_DURATION_MS,
+        });
+    }
+
+    /// Clamp camera X so the viewport stays within the current block bounds.
+    fn clamp_x(&self, camera_x: f64, zoom: f64, window_width: f64) -> f64 {
+        if self.navigable_indices.is_empty() {
+            return camera_x;
         }
 
         let block = self.current_navigable_block();
@@ -216,13 +204,15 @@ impl RailNav {
         let block_left = block.bbox.x as f64 - margin;
         let block_right = block.bbox.x as f64 + block.bbox.w as f64 + margin;
 
-        // Camera offset such that block edges are visible
-        let max_offset_x = -block_left * zoom + window_width * 0.05;
-        let min_offset_x = -(block_right * zoom) + window_width * 0.95;
+        // offset_x such that left edge of block is at left edge of window
+        let max_x = -block_left * zoom;
+        // offset_x such that right edge of block is at right edge of window
+        let min_x = window_width - block_right * zoom;
 
-        *camera_x = camera_x.clamp(min_offset_x, max_offset_x);
+        camera_x.clamp(min_x, max_x)
     }
 
+    /// Start a snap animation to the current line's start (left edge of block).
     pub fn start_snap_to_current(
         &mut self,
         camera_x: f64,
@@ -243,9 +233,12 @@ impl RailNav {
             target_x,
             target_y,
             start_time: std::time::Instant::now(),
+            duration_ms: SNAP_DURATION_MS,
         });
     }
 
+    /// Compute camera position that shows the START of the current line.
+    /// Left edge of block with small margin, line centered vertically.
     fn compute_target_camera(
         &self,
         zoom: f64,
@@ -258,9 +251,8 @@ impl RailNav {
         // Center the current line vertically
         let target_y = window_height / 2.0 - line.y as f64 * zoom;
 
-        // Center the block horizontally
-        let block_cx = block.bbox.x as f64 + block.bbox.w as f64 / 2.0;
-        let target_x = window_width / 2.0 - block_cx * zoom;
+        // Position at LEFT edge of block with a 5% window margin
+        let target_x = window_width * 0.05 - block.bbox.x as f64 * zoom;
 
         (target_x, target_y)
     }
@@ -273,7 +265,7 @@ impl RailNav {
         };
 
         let elapsed = snap.start_time.elapsed().as_secs_f64() * 1000.0;
-        let t = (elapsed / SNAP_DURATION_MS).min(1.0);
+        let t = (elapsed / snap.duration_ms).min(1.0);
         let eased = 1.0 - (1.0 - t).powi(3); // cubic ease-out
 
         *camera_x = snap.start_x + (snap.target_x - snap.start_x) * eased;

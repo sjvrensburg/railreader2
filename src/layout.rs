@@ -34,19 +34,15 @@ pub const LAYOUT_CLASSES: [&str; 23] = [
     "aside_text",        // 22
 ];
 
-/// Classes that are navigable in rail mode.
-const NAVIGABLE_CLASSES: [usize; 12] = [
+/// Classes that are navigable in rail mode (readable text only).
+const NAVIGABLE_CLASSES: [usize; 8] = [
     0,  // document_title
     1,  // paragraph_title
     2,  // text
     4,  // abstract
     6,  // references
     7,  // footnote
-    8,  // table
     11, // algorithm
-    12, // formula
-    15, // figure_caption
-    16, // table_caption
     22, // aside_text
 ];
 
@@ -89,6 +85,75 @@ pub fn load_model(path: &str) -> Result<Session> {
         .with_optimization_level(ort::session::builder::GraphOptimizationLevel::Level3)?
         .commit_from_file(path)?;
     Ok(session)
+}
+
+/// Dump raw model output for debugging.
+pub fn dump_raw_detections(
+    session: &mut Session,
+    doc: &mupdf::Document,
+    page_number: i32,
+) -> Result<()> {
+    let (rgb_bytes, px_w, px_h, _page_w, _page_h) =
+        crate::render_page_pixmap(doc, page_number, INPUT_SIZE)?;
+
+    let orig_h = px_h as usize;
+    let orig_w = px_w as usize;
+    let target = INPUT_SIZE as usize;
+    let scale_h = target as f32 / orig_h as f32;
+    let scale_w = target as f32 / orig_w as f32;
+
+    let mean = [0.485f32, 0.456, 0.406];
+    let std_val = [0.229f32, 0.224, 0.225];
+    let pixel_count = target * target;
+    let mut chw_data = vec![0.0f32; 3 * pixel_count];
+    for y in 0..target {
+        for x in 0..target {
+            let src_y = ((y as f32 / scale_h) as usize).min(orig_h - 1);
+            let src_x = ((x as f32 / scale_w) as usize).min(orig_w - 1);
+            let src_idx = (src_y * orig_w + src_x) * 3;
+            let dst_idx = y * target + x;
+            for c in 0..3 {
+                let val = rgb_bytes[src_idx + c] as f32 / 255.0;
+                chw_data[c * pixel_count + dst_idx] = (val - mean[c]) / std_val[c];
+            }
+        }
+    }
+
+    let im_shape_data = vec![target as f32, target as f32];
+    let scale_factor_data = vec![scale_h, scale_w];
+    let im_shape = TensorRef::from_array_view(([1i64, 2], im_shape_data.as_slice()))?;
+    let image =
+        TensorRef::from_array_view(([1i64, 3, target as i64, target as i64], chw_data.as_slice()))?;
+    let scale_factor = TensorRef::from_array_view(([1i64, 2], scale_factor_data.as_slice()))?;
+
+    let outputs = session.run(ort::inputs![im_shape, image, scale_factor])?;
+    let (shape, data) = outputs[0].try_extract_tensor::<f32>()?;
+
+    println!("Output shape: {:?}", shape);
+    println!(
+        "Pixel dims: {}x{}, scale_h={:.3}, scale_w={:.3}",
+        orig_w, orig_h, scale_h, scale_w
+    );
+
+    let n = if shape.len() == 2 {
+        shape[0] as usize
+    } else {
+        0
+    };
+    let cols = if shape.len() == 2 {
+        shape[1] as usize
+    } else {
+        6
+    };
+
+    println!("\nRaw detections ({} rows, {} cols):", n, cols);
+    for i in 0..n {
+        let base = i * cols;
+        let row: Vec<f32> = (0..cols).map(|c| data[base + c]).collect();
+        println!("  [{}] {:?}", i, row);
+    }
+
+    Ok(())
 }
 
 pub fn analyze_page(
@@ -141,13 +206,13 @@ pub fn analyze_page(
     // Run inference
     let outputs = session.run(ort::inputs![im_shape, image, scale_factor])?;
 
-    // Output: [N, 6] -> [class_id, confidence, xmin, ymin, xmax, ymax]
+    // Output: [N, cols] -> [class_id, confidence, xmin, ymin, xmax, ymax, ...]
     // Coordinates are in original pixel space (model applies scale_factor internally)
     let (shape, data) = outputs[0].try_extract_tensor::<f32>()?;
-    let n_detections = if shape.len() == 2 {
-        shape[0] as usize
+    let (n_detections, cols) = if shape.len() == 2 {
+        (shape[0] as usize, shape[1] as usize)
     } else {
-        0
+        (0, 6)
     };
 
     // Scale from original pixel coords to page points
@@ -157,7 +222,7 @@ pub fn analyze_page(
     // Parse detections
     let mut raw_blocks: Vec<LayoutBlock> = Vec::new();
     for i in 0..n_detections {
-        let base = i * 6;
+        let base = i * cols;
         let class_id = data[base] as usize;
         let confidence = data[base + 1];
         let xmin = data[base + 2];
@@ -180,6 +245,12 @@ pub fn analyze_page(
         let h = ymax.min(orig_h as f32) - y;
 
         if w <= 0.0 || h <= 0.0 {
+            continue;
+        }
+
+        // Skip tiny detections (likely spurious)
+        let min_dim = 5.0; // minimum 5 pixels
+        if w < min_dim || h < min_dim {
             continue;
         }
 

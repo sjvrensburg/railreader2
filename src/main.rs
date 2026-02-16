@@ -73,6 +73,7 @@ struct App {
     camera: Camera,
     dragging: bool,
     last_cursor: Option<(f64, f64)>,
+    cursor_pos: (f64, f64),
     status_font: Font,
     ort_session: Option<ort::session::Session>,
     rail: RailNav,
@@ -137,8 +138,7 @@ impl App {
         if page != self.current_page {
             self.current_page = page;
             self.load_page();
-            self.camera.offset_x = 0.0;
-            self.camera.offset_y = 0.0;
+            self.center_page();
         }
     }
 
@@ -151,6 +151,52 @@ impl App {
             size.width as f64,
             size.height as f64,
         );
+    }
+
+    /// Center the page in the window (fit-to-window zoom).
+    fn center_page(&mut self) {
+        let size = self.env.window.inner_size();
+        let ww = size.width as f64;
+        let wh = size.height as f64;
+        if self.page_width <= 0.0 || self.page_height <= 0.0 || ww <= 0.0 || wh <= 0.0 {
+            return;
+        }
+        // Fit page in window
+        let scale_x = ww / self.page_width;
+        let scale_y = wh / self.page_height;
+        self.camera.zoom = scale_x.min(scale_y);
+        // Center
+        let scaled_w = self.page_width * self.camera.zoom;
+        let scaled_h = self.page_height * self.camera.zoom;
+        self.camera.offset_x = (ww - scaled_w) / 2.0;
+        self.camera.offset_y = (wh - scaled_h) / 2.0;
+    }
+
+    /// Clamp camera so the page can't be scrolled out of view.
+    fn clamp_camera(&mut self) {
+        let size = self.env.window.inner_size();
+        let ww = size.width as f64;
+        let wh = size.height as f64;
+        let scaled_w = self.page_width * self.camera.zoom;
+        let scaled_h = self.page_height * self.camera.zoom;
+
+        // If page is smaller than window, center it
+        if scaled_w <= ww {
+            self.camera.offset_x = (ww - scaled_w) / 2.0;
+        } else {
+            // Clamp: don't scroll past left or right edge
+            let min_x = ww - scaled_w;
+            let max_x = 0.0;
+            self.camera.offset_x = self.camera.offset_x.clamp(min_x, max_x);
+        }
+
+        if scaled_h <= wh {
+            self.camera.offset_y = (wh - scaled_h) / 2.0;
+        } else {
+            let min_y = wh - scaled_h;
+            let max_y = 0.0;
+            self.camera.offset_y = self.camera.offset_y.clamp(min_y, max_y);
+        }
     }
 }
 
@@ -416,6 +462,7 @@ impl ApplicationHandler for App {
                     NonZeroU32::new(width.max(1)).unwrap(),
                     NonZeroU32::new(height.max(1)).unwrap(),
                 );
+                self.clamp_camera();
                 self.env.window.request_redraw();
             }
 
@@ -425,40 +472,31 @@ impl ApplicationHandler for App {
                     MouseScrollDelta::PixelDelta(pos) => pos.y,
                 };
 
+                // Mouse wheel always zooms towards cursor position
+                let old_zoom = self.camera.zoom;
+                let factor = 1.0 + scroll_y * 0.003;
+                let new_zoom = (old_zoom * factor).clamp(0.1, 20.0);
+
+                // Zoom towards cursor: keep the page point under cursor fixed
+                let (cx, cy) = self.cursor_pos;
+                self.camera.offset_x = cx - (cx - self.camera.offset_x) * (new_zoom / old_zoom);
+                self.camera.offset_y = cy - (cy - self.camera.offset_y) * (new_zoom / old_zoom);
+                self.camera.zoom = new_zoom;
+
+                let size = self.env.window.inner_size();
+                self.rail.update_zoom(
+                    self.camera.zoom,
+                    self.camera.offset_x,
+                    self.camera.offset_y,
+                    size.width as f64,
+                    size.height as f64,
+                );
+
                 if self.rail.active {
-                    // In rail mode, scroll triggers line navigation
-                    if let Some(result) = self.rail.handle_scroll(scroll_y) {
-                        match result {
-                            NavResult::PageBoundaryNext => {
-                                self.go_to_page(self.current_page + 1);
-                            }
-                            NavResult::PageBoundaryPrev => {
-                                self.go_to_page(self.current_page - 1);
-                            }
-                            NavResult::Ok => {
-                                self.start_snap();
-                            }
-                        }
-                    }
-                } else {
-                    // Free zoom
-                    let factor = 1.0 + scroll_y * 0.003;
-                    self.camera.zoom = (self.camera.zoom * factor).clamp(0.1, 20.0);
-
-                    // Check if we should activate rail mode
-                    let size = self.env.window.inner_size();
-                    self.rail.update_zoom(
-                        self.camera.zoom,
-                        self.camera.offset_x,
-                        self.camera.offset_y,
-                        size.width as f64,
-                        size.height as f64,
-                    );
-
-                    if self.rail.active {
-                        self.start_snap();
-                    }
+                    self.start_snap();
                 }
+
+                self.clamp_camera();
                 self.env.window.request_redraw();
             }
 
@@ -472,38 +510,15 @@ impl ApplicationHandler for App {
             }
 
             WindowEvent::CursorMoved { position, .. } => {
+                self.cursor_pos = (position.x, position.y);
                 if self.dragging {
                     if let Some((lx, ly)) = self.last_cursor {
                         let dx = position.x - lx;
                         let dy = position.y - ly;
 
-                        if self.rail.active {
-                            // Horizontal pan constrained to block
-                            self.camera.offset_x += dx;
-                            let size = self.env.window.inner_size();
-                            self.rail.constrain_pan(
-                                &mut self.camera.offset_x,
-                                self.camera.zoom,
-                                size.width as f64,
-                            );
-                            // Vertical drag triggers line navigation
-                            if let Some(result) = self.rail.handle_scroll(dy) {
-                                match result {
-                                    NavResult::PageBoundaryNext => {
-                                        self.go_to_page(self.current_page + 1);
-                                    }
-                                    NavResult::PageBoundaryPrev => {
-                                        self.go_to_page(self.current_page - 1);
-                                    }
-                                    NavResult::Ok => {
-                                        self.start_snap();
-                                    }
-                                }
-                            }
-                        } else {
-                            self.camera.offset_x += dx;
-                            self.camera.offset_y += dy;
-                        }
+                        self.camera.offset_x += dx;
+                        self.camera.offset_y += dy;
+                        self.clamp_camera();
                         self.env.window.request_redraw();
                     }
                     self.last_cursor = Some((position.x, position.y));
@@ -514,6 +529,95 @@ impl ApplicationHandler for App {
                 if event.state != ElementState::Pressed {
                     return;
                 }
+
+                // Map key to direction for arrow keys and WASD
+                let direction = match &event.logical_key {
+                    Key::Named(NamedKey::ArrowDown) => Some("down"),
+                    Key::Named(NamedKey::ArrowUp) => Some("up"),
+                    Key::Named(NamedKey::ArrowRight) => Some("right"),
+                    Key::Named(NamedKey::ArrowLeft) => Some("left"),
+                    Key::Character(s) => match s.as_str() {
+                        "s" => Some("down"),
+                        "w" => Some("up"),
+                        "d" => Some("right"),
+                        "a" => Some("left"),
+                        _ => None,
+                    },
+                    _ => None,
+                };
+
+                if let Some(dir) = direction {
+                    match dir {
+                        "down" => {
+                            if self.rail.active {
+                                match self.rail.next_line() {
+                                    NavResult::PageBoundaryNext => {
+                                        self.go_to_page(self.current_page + 1);
+                                    }
+                                    NavResult::Ok => {
+                                        self.start_snap();
+                                    }
+                                    _ => {}
+                                }
+                            } else {
+                                self.camera.offset_y -= 50.0;
+                                self.clamp_camera();
+                            }
+                        }
+                        "up" => {
+                            if self.rail.active {
+                                match self.rail.prev_line() {
+                                    NavResult::PageBoundaryPrev => {
+                                        self.go_to_page(self.current_page - 1);
+                                    }
+                                    NavResult::Ok => {
+                                        self.start_snap();
+                                    }
+                                    _ => {}
+                                }
+                            } else {
+                                self.camera.offset_y += 50.0;
+                                self.clamp_camera();
+                            }
+                        }
+                        "right" => {
+                            if self.rail.active {
+                                // Right = advance reading along the line
+                                let size = self.env.window.inner_size();
+                                self.rail.scroll_along_line(
+                                    self.camera.offset_x,
+                                    self.camera.offset_y,
+                                    self.camera.zoom,
+                                    size.width as f64,
+                                    true,
+                                );
+                            } else {
+                                self.camera.offset_x -= 50.0;
+                                self.clamp_camera();
+                            }
+                        }
+                        "left" => {
+                            if self.rail.active {
+                                // Left = go back along the line
+                                let size = self.env.window.inner_size();
+                                self.rail.scroll_along_line(
+                                    self.camera.offset_x,
+                                    self.camera.offset_y,
+                                    self.camera.zoom,
+                                    size.width as f64,
+                                    false,
+                                );
+                            } else {
+                                self.camera.offset_x += 50.0;
+                                self.clamp_camera();
+                            }
+                        }
+                        _ => {}
+                    }
+                    self.env.window.request_redraw();
+                    return;
+                }
+
                 match &event.logical_key {
                     Key::Named(NamedKey::PageDown) => {
                         self.go_to_page(self.current_page + 1);
@@ -544,6 +648,7 @@ impl ApplicationHandler for App {
                         if self.rail.active {
                             self.start_snap();
                         }
+                        self.clamp_camera();
                         self.env.window.request_redraw();
                     }
                     Key::Character(c) if c.as_str() == "-" => {
@@ -556,12 +661,11 @@ impl ApplicationHandler for App {
                             size.width as f64,
                             size.height as f64,
                         );
+                        self.clamp_camera();
                         self.env.window.request_redraw();
                     }
                     Key::Character(c) if c.as_str() == "0" => {
-                        self.camera.zoom = 1.0;
-                        self.camera.offset_x = 0.0;
-                        self.camera.offset_y = 0.0;
+                        self.center_page();
                         let size = self.env.window.inner_size();
                         self.rail.update_zoom(
                             self.camera.zoom,
@@ -572,71 +676,7 @@ impl ApplicationHandler for App {
                         );
                         self.env.window.request_redraw();
                     }
-                    Key::Named(NamedKey::ArrowDown) => {
-                        if self.rail.active {
-                            match self.rail.next_line() {
-                                NavResult::PageBoundaryNext => {
-                                    self.go_to_page(self.current_page + 1);
-                                }
-                                NavResult::Ok => {
-                                    self.start_snap();
-                                }
-                                _ => {}
-                            }
-                        } else {
-                            self.camera.offset_y -= 50.0;
-                        }
-                        self.env.window.request_redraw();
-                    }
-                    Key::Named(NamedKey::ArrowUp) => {
-                        if self.rail.active {
-                            match self.rail.prev_line() {
-                                NavResult::PageBoundaryPrev => {
-                                    self.go_to_page(self.current_page - 1);
-                                }
-                                NavResult::Ok => {
-                                    self.start_snap();
-                                }
-                                _ => {}
-                            }
-                        } else {
-                            self.camera.offset_y += 50.0;
-                        }
-                        self.env.window.request_redraw();
-                    }
-                    Key::Named(NamedKey::ArrowRight) => {
-                        if self.rail.active {
-                            match self.rail.next_block() {
-                                NavResult::PageBoundaryNext => {
-                                    self.go_to_page(self.current_page + 1);
-                                }
-                                NavResult::Ok => {
-                                    self.start_snap();
-                                }
-                                _ => {}
-                            }
-                        } else {
-                            self.camera.offset_x -= 50.0;
-                        }
-                        self.env.window.request_redraw();
-                    }
-                    Key::Named(NamedKey::ArrowLeft) => {
-                        if self.rail.active {
-                            match self.rail.prev_block() {
-                                NavResult::PageBoundaryPrev => {
-                                    self.go_to_page(self.current_page - 1);
-                                }
-                                NavResult::Ok => {
-                                    self.start_snap();
-                                }
-                                _ => {}
-                            }
-                        } else {
-                            self.camera.offset_x += 50.0;
-                        }
-                        self.env.window.request_redraw();
-                    }
-                    Key::Character(c) if c.as_str() == "d" || c.as_str() == "D" => {
+                    Key::Character(c) if c.as_str() == "D" => {
                         self.debug_overlay = !self.debug_overlay;
                         log::info!("Debug overlay: {}", self.debug_overlay);
                         self.env.window.request_redraw();
@@ -921,11 +961,14 @@ fn main() -> Result<()> {
         camera: Camera::new(),
         dragging: false,
         last_cursor: None,
+        cursor_pos: (0.0, 0.0),
         status_font,
         ort_session,
         rail,
         debug_overlay: false,
     };
+
+    app.center_page();
 
     el.run_app(&mut app).expect("Couldn't run event loop");
 
