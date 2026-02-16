@@ -6,6 +6,20 @@ pub const INPUT_SIZE: u32 = 800;
 const CONFIDENCE_THRESHOLD: f32 = 0.4;
 const NMS_IOU_THRESHOLD: f32 = 0.5;
 
+// Luminance threshold for "dark" pixels in line detection. Pixels with luminance
+// below this value (on a 0–255 scale) are considered ink/text. Derived empirically
+// for typical black-on-white document pages.
+const DARK_LUMINANCE_THRESHOLD: f32 = 160.0;
+
+// Fraction of mean row density used as the adaptive threshold for line detection.
+// Rows with density above (mean_density * this factor) are considered part of a
+// text line. Lower values detect fainter lines; higher values are more selective.
+const DENSITY_THRESHOLD_FRACTION: f32 = 0.15;
+
+// Minimum height in pixels for a contiguous dark run to qualify as a text line.
+// Runs shorter than this are treated as noise (e.g. underlines, specks).
+const MIN_LINE_HEIGHT_PX: usize = 3;
+
 /// 23 layout classes from PP-DocLayoutV3.
 pub const LAYOUT_CLASSES: [&str; 23] = [
     "document_title",    // 0
@@ -86,25 +100,21 @@ pub fn load_model(path: &str) -> Result<Session> {
     Ok(session)
 }
 
-/// Dump raw model output for debugging.
-pub fn dump_raw_detections(
-    session: &mut Session,
-    doc: &mupdf::Document,
-    page_number: i32,
-) -> Result<()> {
-    let (rgb_bytes, px_w, px_h, _page_w, _page_h) =
-        crate::render_page_pixmap(doc, page_number, INPUT_SIZE)?;
+/// Nearest-neighbor resize to `target x target` with ImageNet normalization, HWC→CHW.
+///
+/// ImageNet mean/std are the channel-wise statistics of the ImageNet-1K training set.
+/// Most vision models (including PP-DocLayoutV3) expect inputs normalized this way
+/// so activations are centered around zero with unit variance.
+fn preprocess_image(rgb_bytes: &[u8], orig_w: usize, orig_h: usize, target: usize) -> Vec<f32> {
+    // ImageNet-1K per-channel mean and standard deviation (RGB order).
+    const MEAN: [f32; 3] = [0.485, 0.456, 0.406];
+    const STD: [f32; 3] = [0.229, 0.224, 0.225];
 
-    let orig_h = px_h as usize;
-    let orig_w = px_w as usize;
-    let target = INPUT_SIZE as usize;
     let scale_h = target as f32 / orig_h as f32;
     let scale_w = target as f32 / orig_w as f32;
-
-    let mean = [0.485f32, 0.456, 0.406];
-    let std_val = [0.229f32, 0.224, 0.225];
     let pixel_count = target * target;
     let mut chw_data = vec![0.0f32; 3 * pixel_count];
+
     for y in 0..target {
         for x in 0..target {
             let src_y = ((y as f32 / scale_h) as usize).min(orig_h - 1);
@@ -113,46 +123,12 @@ pub fn dump_raw_detections(
             let dst_idx = y * target + x;
             for c in 0..3 {
                 let val = rgb_bytes[src_idx + c] as f32 / 255.0;
-                chw_data[c * pixel_count + dst_idx] = (val - mean[c]) / std_val[c];
+                chw_data[c * pixel_count + dst_idx] = (val - MEAN[c]) / STD[c];
             }
         }
     }
 
-    let im_shape_data = vec![target as f32, target as f32];
-    let scale_factor_data = vec![scale_h, scale_w];
-    let im_shape = TensorRef::from_array_view(([1i64, 2], im_shape_data.as_slice()))?;
-    let image =
-        TensorRef::from_array_view(([1i64, 3, target as i64, target as i64], chw_data.as_slice()))?;
-    let scale_factor = TensorRef::from_array_view(([1i64, 2], scale_factor_data.as_slice()))?;
-
-    let outputs = session.run(ort::inputs![im_shape, image, scale_factor])?;
-    let (shape, data) = outputs[0].try_extract_tensor::<f32>()?;
-
-    println!("Output shape: {:?}", shape);
-    println!(
-        "Pixel dims: {}x{}, scale_h={:.3}, scale_w={:.3}",
-        orig_w, orig_h, scale_h, scale_w
-    );
-
-    let n = if shape.len() == 2 {
-        shape[0] as usize
-    } else {
-        0
-    };
-    let cols = if shape.len() == 2 {
-        shape[1] as usize
-    } else {
-        6
-    };
-
-    println!("\nRaw detections ({} rows, {} cols):", n, cols);
-    for i in 0..n {
-        let base = i * cols;
-        let row: Vec<f32> = (0..cols).map(|c| data[base + c]).collect();
-        println!("  [{}] {:?}", i, row);
-    }
-
-    Ok(())
+    chw_data
 }
 
 pub fn analyze_page(
@@ -167,34 +143,12 @@ pub fn analyze_page(
     let orig_w = px_w as usize;
     let target = INPUT_SIZE as usize;
 
-    // Stretch-resize to 800x800 (matching reference implementation)
     let scale_h = target as f32 / orig_h as f32;
     let scale_w = target as f32 / orig_w as f32;
 
-    let mean = [0.485f32, 0.456, 0.406];
-    let std_val = [0.229f32, 0.224, 0.225];
+    let chw_data = preprocess_image(&rgb_bytes, orig_w, orig_h, target);
 
-    let pixel_count = target * target;
-    let mut chw_data = vec![0.0f32; 3 * pixel_count];
-
-    // Nearest-neighbor resize to 800x800 and ImageNet normalize, HWC→CHW
-    for y in 0..target {
-        for x in 0..target {
-            let src_y = ((y as f32 / scale_h) as usize).min(orig_h - 1);
-            let src_x = ((x as f32 / scale_w) as usize).min(orig_w - 1);
-            let src_idx = (src_y * orig_w + src_x) * 3;
-            let dst_idx = y * target + x;
-            for c in 0..3 {
-                let val = rgb_bytes[src_idx + c] as f32 / 255.0;
-                chw_data[c * pixel_count + dst_idx] = (val - mean[c]) / std_val[c];
-            }
-        }
-    }
-
-    // Build input tensors matching reference implementation:
-    // im_shape: [resized_h, resized_w] = [800, 800]
     let im_shape_data = vec![target as f32, target as f32];
-    // scale_factor: [800/orig_h, 800/orig_w]
     let scale_factor_data = vec![scale_h, scale_w];
 
     let im_shape = TensorRef::from_array_view(([1i64, 2], im_shape_data.as_slice()))?;
@@ -379,6 +333,92 @@ fn nms(blocks: &mut Vec<LayoutBlock>, threshold: f32) {
     });
 }
 
+/// Compute per-row dark pixel density for a crop of the RGB image.
+///
+/// Returns a smoothed density profile (one value per row) where each value is
+/// the fraction of pixels in that row whose luminance falls below
+/// `DARK_LUMINANCE_THRESHOLD`. A radius-1 moving average is applied to reduce noise.
+fn compute_row_densities(
+    rgb_bytes: &[u8],
+    img_w: usize,
+    crop_x: usize,
+    crop_y: usize,
+    crop_w: usize,
+    crop_h: usize,
+) -> Vec<f32> {
+    let mut profile = vec![0.0f32; crop_h];
+    #[allow(clippy::needless_range_loop)]
+    for row in 0..crop_h {
+        let mut dark_count = 0u32;
+        for col in 0..crop_w {
+            let pixel_idx = ((crop_y + row) * img_w + (crop_x + col)) * 3;
+            if pixel_idx + 2 < rgb_bytes.len() {
+                let r = rgb_bytes[pixel_idx] as f32;
+                let g = rgb_bytes[pixel_idx + 1] as f32;
+                let b = rgb_bytes[pixel_idx + 2] as f32;
+                let lum = r * 0.299 + g * 0.587 + b * 0.114;
+                if lum < DARK_LUMINANCE_THRESHOLD {
+                    dark_count += 1;
+                }
+            }
+        }
+        profile[row] = dark_count as f32 / crop_w as f32;
+    }
+
+    // Smooth with radius-1 moving average
+    let mut smoothed = vec![0.0f32; crop_h];
+    #[allow(clippy::needless_range_loop)]
+    for r in 0..crop_h {
+        let start = r.saturating_sub(1);
+        let end = (r + 2).min(crop_h);
+        let sum: f32 = profile[start..end].iter().sum();
+        smoothed[r] = sum / (end - start) as f32;
+    }
+
+    smoothed
+}
+
+/// Find contiguous runs of rows whose density exceeds an adaptive threshold.
+///
+/// Returns `(start_row, height)` pairs in pixel coordinates. Runs shorter than
+/// `MIN_LINE_HEIGHT_PX` are discarded as noise.
+fn find_line_runs(densities: &[f32]) -> Vec<(usize, usize)> {
+    // Adaptive threshold: DENSITY_THRESHOLD_FRACTION of mean non-zero density
+    let non_zero: Vec<f32> = densities.iter().copied().filter(|&v| v > 0.005).collect();
+    let threshold = if non_zero.is_empty() {
+        0.005
+    } else {
+        let mean_density: f32 = non_zero.iter().sum::<f32>() / non_zero.len() as f32;
+        (mean_density * DENSITY_THRESHOLD_FRACTION).max(0.005)
+    };
+
+    let mut runs = Vec::new();
+    let mut run_start: Option<usize> = None;
+
+    for (r, &density) in densities.iter().enumerate() {
+        if density > threshold {
+            if run_start.is_none() {
+                run_start = Some(r);
+            }
+        } else if let Some(start) = run_start {
+            let run_h = r - start;
+            if run_h >= MIN_LINE_HEIGHT_PX {
+                runs.push((start, run_h));
+            }
+            run_start = None;
+        }
+    }
+    // Handle run that extends to end
+    if let Some(start) = run_start {
+        let run_h = densities.len() - start;
+        if run_h >= MIN_LINE_HEIGHT_PX {
+            runs.push((start, run_h));
+        }
+    }
+
+    runs
+}
+
 fn detect_lines_for_blocks(
     blocks: &mut [LayoutBlock],
     rgb_bytes: &[u8],
@@ -412,78 +452,19 @@ fn detect_lines_for_blocks(
             continue;
         }
 
-        // Horizontal projection profiling
-        let mut profile = vec![0.0f32; px_h];
-        #[allow(clippy::needless_range_loop)]
-        for row in 0..px_h {
-            let mut dark_count = 0u32;
-            for col in 0..px_w {
-                let pixel_idx = ((px_y + row) * img_w + (px_x + col)) * 3;
-                if pixel_idx + 2 < rgb_bytes.len() {
-                    let r = rgb_bytes[pixel_idx] as f32;
-                    let g = rgb_bytes[pixel_idx + 1] as f32;
-                    let b = rgb_bytes[pixel_idx + 2] as f32;
-                    let lum = r * 0.299 + g * 0.587 + b * 0.114;
-                    if lum < 160.0 {
-                        dark_count += 1;
-                    }
-                }
-            }
-            profile[row] = dark_count as f32 / px_w as f32;
-        }
+        let densities = compute_row_densities(rgb_bytes, img_w, px_x, px_y, px_w, px_h);
+        let runs = find_line_runs(&densities);
 
-        // Smooth with radius-1 moving average
-        let mut smoothed = vec![0.0f32; px_h];
-        #[allow(clippy::needless_range_loop)]
-        for r in 0..px_h {
-            let start = r.saturating_sub(1);
-            let end = (r + 2).min(px_h);
-            let sum: f32 = profile[start..end].iter().sum();
-            smoothed[r] = sum / (end - start) as f32;
-        }
-
-        // Adaptive threshold: 15% of mean non-zero density
-        let non_zero: Vec<f32> = smoothed.iter().copied().filter(|&v| v > 0.005).collect();
-        let threshold = if non_zero.is_empty() {
-            0.005
-        } else {
-            let mean_density: f32 = non_zero.iter().sum::<f32>() / non_zero.len() as f32;
-            (mean_density * 0.15).max(0.005)
-        };
-
-        // Find contiguous dark runs
-        let mut lines = Vec::new();
-        let mut run_start: Option<usize> = None;
-
-        #[allow(clippy::needless_range_loop)]
-        for r in 0..px_h {
-            if smoothed[r] > threshold {
-                if run_start.is_none() {
-                    run_start = Some(r);
-                }
-            } else if let Some(start) = run_start {
-                let run_h = r - start;
-                if run_h >= 3 {
-                    let center_y_px = start as f32 + run_h as f32 / 2.0;
-                    lines.push(LineInfo {
-                        y: block.bbox.y + center_y_px * scale_y,
-                        height: run_h as f32 * scale_y,
-                    });
-                }
-                run_start = None;
-            }
-        }
-        // Handle run that extends to end
-        if let Some(start) = run_start {
-            let run_h = px_h - start;
-            if run_h >= 3 {
+        let mut lines: Vec<LineInfo> = runs
+            .into_iter()
+            .map(|(start, run_h)| {
                 let center_y_px = start as f32 + run_h as f32 / 2.0;
-                lines.push(LineInfo {
+                LineInfo {
                     y: block.bbox.y + center_y_px * scale_y,
                     height: run_h as f32 * scale_y,
-                });
-            }
-        }
+                }
+            })
+            .collect();
 
         // Fallback: single line spanning block
         if lines.is_empty() {
