@@ -66,9 +66,25 @@ scripts/
 - `ort` 2.0.0-rc.11 — ONNX Runtime for layout inference
 - `serde` + `serde_json` — Config serialization
 
+## Configuration
+
+Default `config.json` values (created on first run, gitignored):
+
+```json
+{
+  "rail_zoom_threshold": 3.0,
+  "snap_duration_ms": 300.0,
+  "scroll_speed_start": 60.0,
+  "scroll_speed_max": 400.0,
+  "scroll_ramp_time": 1.5
+}
+```
+
 ## Key Development Notes
 
 - First build is slow (~15min) due to Skia C++ compilation. Subsequent builds are fast.
 - The `target/debug/` directory can grow very large (10GB+) due to Skia build artifacts. Use `cargo clean` cautiously.
 - ONNX model outputs `[N, 7]` tensors: `[class_id, confidence, xmin, ymin, xmax, ymax, reading_order]`. The 7th column is the model's predicted reading order via its Global Pointer Mechanism.
 - Layout analysis runs synchronously on page load (~100-200ms). Input is blocked during analysis.
+- Debug SVG dumping: Set `DUMP_SVG=1` environment variable to write each page's SVG to `/tmp/pageN.svg` for inspection.
+- No unit tests currently exist in the project.
