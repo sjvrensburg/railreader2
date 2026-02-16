@@ -29,6 +29,23 @@ use railreader2::config::Config;
 use railreader2::layout::{self, LAYOUT_CLASSES};
 use railreader2::rail::{NavResult, RailNav, ScrollDir};
 
+const ZOOM_MIN: f64 = 0.1;
+const ZOOM_MAX: f64 = 20.0;
+const ZOOM_STEP: f64 = 1.25;
+const SCROLL_PIXELS_PER_LINE: f64 = 30.0;
+const ZOOM_SCROLL_SENSITIVITY: f64 = 0.003;
+const PAN_STEP: f64 = 50.0;
+const STATUS_BAR_HEIGHT: f32 = 28.0;
+const DEFAULT_WINDOW_WIDTH: f64 = 1200.0;
+const DEFAULT_WINDOW_HEIGHT: f64 = 900.0;
+
+enum Direction {
+    Up,
+    Down,
+    Left,
+    Right,
+}
+
 struct Camera {
     offset_x: f64,
     offset_y: f64,
@@ -125,8 +142,10 @@ impl App {
         };
 
         self.rail.set_analysis(analysis);
+        self.update_rail_zoom();
+    }
 
-        // Update rail activation based on current zoom
+    fn update_rail_zoom(&mut self) {
         let size = self.env.window.inner_size();
         self.rail.update_zoom(
             self.camera.zoom,
@@ -135,6 +154,15 @@ impl App {
             size.width as f64,
             size.height as f64,
         );
+    }
+
+    fn apply_zoom(&mut self, new_zoom: f64) {
+        self.camera.zoom = new_zoom.clamp(ZOOM_MIN, ZOOM_MAX);
+        self.update_rail_zoom();
+        if self.rail.active {
+            self.start_snap();
+        }
+        self.clamp_camera();
     }
 
     fn go_to_page(&mut self, page: i32) {
@@ -247,13 +275,12 @@ fn draw_status_bar(
     page_count: i32,
     rail: &RailNav,
 ) {
-    let bar_height = 28.0_f32;
-    let bar_y = height as f32 - bar_height;
+    let bar_y = height as f32 - STATUS_BAR_HEIGHT;
 
     let mut bg_paint = Paint::default();
     bg_paint.set_color(Color::from_argb(180, 0, 0, 0));
     canvas.draw_rect(
-        Rect::from_xywh(0.0, bar_y, width as f32, bar_height),
+        Rect::from_xywh(0.0, bar_y, width as f32, STATUS_BAR_HEIGHT),
         &bg_paint,
     );
 
@@ -284,7 +311,7 @@ fn draw_status_bar(
 
     canvas.draw_str(
         &status,
-        (10.0, bar_y + bar_height * 0.72),
+        (10.0, bar_y + STATUS_BAR_HEIGHT * 0.72),
         font,
         &text_paint,
     );
@@ -446,6 +473,293 @@ fn draw_debug_overlay(canvas: &skia_safe::Canvas, rail: &RailNav) {
     }
 }
 
+impl App {
+    fn handle_resize(&mut self, physical_size: winit::dpi::PhysicalSize<u32>) {
+        self.env.surface = create_surface(
+            &self.env.window,
+            self.env.fb_info,
+            &mut self.env.gr_context,
+            self.env.num_samples,
+            self.env.stencil_size,
+        );
+        let (width, height): (u32, u32) = physical_size.into();
+        self.env.gl_surface.resize(
+            &self.env.gl_context,
+            NonZeroU32::new(width.max(1)).unwrap(),
+            NonZeroU32::new(height.max(1)).unwrap(),
+        );
+        self.clamp_camera();
+        self.env.window.request_redraw();
+    }
+
+    fn handle_mouse_wheel(&mut self, delta: MouseScrollDelta) {
+        let scroll_y = match delta {
+            MouseScrollDelta::LineDelta(_, y) => y as f64 * SCROLL_PIXELS_PER_LINE,
+            MouseScrollDelta::PixelDelta(pos) => pos.y,
+        };
+
+        let ctrl_held = self.modifiers.state().control_key();
+
+        if ctrl_held && self.rail.active {
+            // Ctrl+scroll = horizontal nudge along line
+            let step = scroll_y * 2.0 * self.camera.zoom;
+            self.camera.offset_x += step;
+            self.clamp_camera();
+        } else {
+            // Normal scroll = zoom towards cursor position
+            let old_zoom = self.camera.zoom;
+            let factor = 1.0 + scroll_y * ZOOM_SCROLL_SENSITIVITY;
+            let new_zoom = (old_zoom * factor).clamp(ZOOM_MIN, ZOOM_MAX);
+
+            // Zoom towards cursor: keep the page point under cursor fixed
+            let (cx, cy) = self.cursor_pos;
+            self.camera.offset_x = cx - (cx - self.camera.offset_x) * (new_zoom / old_zoom);
+            self.camera.offset_y = cy - (cy - self.camera.offset_y) * (new_zoom / old_zoom);
+            self.camera.zoom = new_zoom;
+
+            self.update_rail_zoom();
+            if self.rail.active {
+                self.start_snap();
+            }
+            self.clamp_camera();
+        }
+        self.env.window.request_redraw();
+    }
+
+    fn handle_mouse_input(&mut self, state: ElementState, button: MouseButton) {
+        if button == MouseButton::Left {
+            self.dragging = state == ElementState::Pressed;
+            if !self.dragging {
+                self.last_cursor = None;
+            }
+        }
+    }
+
+    fn handle_cursor_moved(&mut self, position: winit::dpi::PhysicalPosition<f64>) {
+        self.cursor_pos = (position.x, position.y);
+        if self.dragging {
+            if let Some((lx, ly)) = self.last_cursor {
+                let dx = position.x - lx;
+                let dy = position.y - ly;
+
+                self.camera.offset_x += dx;
+                self.camera.offset_y += dy;
+                self.clamp_camera();
+                self.env.window.request_redraw();
+            }
+            self.last_cursor = Some((position.x, position.y));
+        }
+    }
+
+    fn handle_key_release(&mut self, event: &winit::event::KeyEvent) {
+        let direction = key_to_direction(&event.logical_key);
+        if let Some(Direction::Left | Direction::Right) = direction {
+            self.rail.stop_scroll();
+            self.env.window.request_redraw();
+        }
+    }
+
+    fn handle_key_press(
+        &mut self,
+        event: &winit::event::KeyEvent,
+        event_loop: &winit::event_loop::ActiveEventLoop,
+    ) {
+        if let Some(dir) = key_to_direction(&event.logical_key) {
+            match dir {
+                Direction::Down => {
+                    if self.rail.active {
+                        match self.rail.next_line() {
+                            NavResult::PageBoundaryNext => {
+                                self.go_to_page(self.current_page + 1);
+                                if self.rail.active {
+                                    self.start_snap();
+                                }
+                            }
+                            NavResult::Ok => {
+                                self.start_snap();
+                            }
+                            _ => {}
+                        }
+                    } else {
+                        self.camera.offset_y -= PAN_STEP;
+                        self.clamp_camera();
+                    }
+                }
+                Direction::Up => {
+                    if self.rail.active {
+                        match self.rail.prev_line() {
+                            NavResult::PageBoundaryPrev => {
+                                self.go_to_page(self.current_page - 1);
+                                if self.rail.active {
+                                    self.rail.jump_to_end();
+                                    self.start_snap();
+                                }
+                            }
+                            NavResult::Ok => {
+                                self.start_snap();
+                            }
+                            _ => {}
+                        }
+                    } else {
+                        self.camera.offset_y += PAN_STEP;
+                        self.clamp_camera();
+                    }
+                }
+                Direction::Right => {
+                    if self.rail.active {
+                        self.rail.start_scroll(ScrollDir::Forward);
+                    } else {
+                        self.camera.offset_x -= PAN_STEP;
+                        self.clamp_camera();
+                    }
+                }
+                Direction::Left => {
+                    if self.rail.active {
+                        self.rail.start_scroll(ScrollDir::Backward);
+                    } else {
+                        self.camera.offset_x += PAN_STEP;
+                        self.clamp_camera();
+                    }
+                }
+            }
+            self.env.window.request_redraw();
+            return;
+        }
+
+        match &event.logical_key {
+            Key::Named(NamedKey::PageDown) => {
+                self.go_to_page(self.current_page + 1);
+                self.env.window.request_redraw();
+            }
+            Key::Named(NamedKey::PageUp) => {
+                self.go_to_page(self.current_page - 1);
+                self.env.window.request_redraw();
+            }
+            Key::Named(NamedKey::Home) => {
+                self.go_to_page(0);
+                self.env.window.request_redraw();
+            }
+            Key::Named(NamedKey::End) => {
+                self.go_to_page(self.page_count - 1);
+                self.env.window.request_redraw();
+            }
+            Key::Character(c) if c.as_str() == "+" || c.as_str() == "=" => {
+                self.apply_zoom(self.camera.zoom * ZOOM_STEP);
+                self.env.window.request_redraw();
+            }
+            Key::Character(c) if c.as_str() == "-" => {
+                self.apply_zoom(self.camera.zoom / ZOOM_STEP);
+                self.env.window.request_redraw();
+            }
+            Key::Character(c) if c.as_str() == "0" => {
+                self.center_page();
+                self.update_rail_zoom();
+                self.env.window.request_redraw();
+            }
+            Key::Character(c) if c.as_str() == "D" => {
+                self.debug_overlay = !self.debug_overlay;
+                log::info!("Debug overlay: {}", self.debug_overlay);
+                self.env.window.request_redraw();
+            }
+            Key::Named(NamedKey::Escape) => event_loop.exit(),
+            Key::Character(c) if c.as_str() == "q" => event_loop.exit(),
+            _ => {}
+        }
+    }
+
+    fn handle_redraw(&mut self) {
+        let size = self.env.window.inner_size();
+        if size.width == 0 || size.height == 0 {
+            return;
+        }
+
+        // Compute frame delta time
+        let now = std::time::Instant::now();
+        let dt_secs = now.duration_since(self.last_frame).as_secs_f64().min(0.1);
+        self.last_frame = now;
+
+        // Advance animations and continuous scroll
+        let animating = self.rail.tick(
+            &mut self.camera.offset_x,
+            &mut self.camera.offset_y,
+            dt_secs,
+            self.camera.zoom,
+            size.width as f64,
+        );
+
+        let canvas = self.env.surface.canvas();
+        canvas.clear(Color::from_argb(255, 128, 128, 128));
+
+        canvas.save();
+        canvas.translate((self.camera.offset_x as f32, self.camera.offset_y as f32));
+        canvas.scale((self.camera.zoom as f32, self.camera.zoom as f32));
+
+        // White page background
+        let mut white_paint = Paint::default();
+        white_paint.set_color(Color::WHITE);
+        canvas.draw_rect(
+            Rect::from_wh(self.page_width as f32, self.page_height as f32),
+            &white_paint,
+        );
+
+        // SVG content
+        if let Some(dom) = &mut self.svg_dom {
+            dom.render(canvas);
+        }
+
+        // Rail overlays (drawn in page coordinate space)
+        draw_rail_overlays(
+            canvas,
+            &self.rail,
+            self.page_width,
+            self.page_height,
+            self.debug_overlay,
+        );
+
+        canvas.restore();
+
+        // Status bar (drawn in screen space)
+        draw_status_bar(
+            canvas,
+            size.width,
+            size.height,
+            &self.status_font,
+            &self.camera,
+            self.current_page,
+            self.page_count,
+            &self.rail,
+        );
+
+        self.env.gr_context.flush_and_submit();
+        self.env
+            .gl_surface
+            .swap_buffers(&self.env.gl_context)
+            .unwrap();
+
+        // Request another frame if animating
+        if animating {
+            self.env.window.request_redraw();
+        }
+    }
+}
+
+fn key_to_direction(key: &Key) -> Option<Direction> {
+    match key {
+        Key::Named(NamedKey::ArrowDown) => Some(Direction::Down),
+        Key::Named(NamedKey::ArrowUp) => Some(Direction::Up),
+        Key::Named(NamedKey::ArrowRight) => Some(Direction::Right),
+        Key::Named(NamedKey::ArrowLeft) => Some(Direction::Left),
+        Key::Character(s) => match s.as_str() {
+            "s" => Some(Direction::Down),
+            "w" => Some(Direction::Up),
+            "d" => Some(Direction::Right),
+            "a" => Some(Direction::Left),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
 impl ApplicationHandler for App {
     fn resumed(&mut self, _event_loop: &winit::event_loop::ActiveEventLoop) {}
 
@@ -455,7 +769,6 @@ impl ApplicationHandler for App {
         _window_id: winit::window::WindowId,
         event: WindowEvent,
     ) {
-        // Track modifier keys
         if let WindowEvent::ModifiersChanged(mods) = &event {
             self.modifiers = *mods;
         }
@@ -465,7 +778,6 @@ impl ApplicationHandler for App {
             match event {
                 WindowEvent::CloseRequested => event_loop.exit(),
                 WindowEvent::RedrawRequested => {
-                    // Draw loading indicator
                     let size = self.env.window.inner_size();
                     if size.width > 0 && size.height > 0 {
                         let canvas = self.env.surface.canvas();
@@ -495,328 +807,19 @@ impl ApplicationHandler for App {
 
         match event {
             WindowEvent::CloseRequested => event_loop.exit(),
-            WindowEvent::ModifiersChanged(_) => {} // Already handled above
-
-            WindowEvent::Resized(physical_size) => {
-                self.env.surface = create_surface(
-                    &self.env.window,
-                    self.env.fb_info,
-                    &mut self.env.gr_context,
-                    self.env.num_samples,
-                    self.env.stencil_size,
-                );
-                let (width, height): (u32, u32) = physical_size.into();
-                self.env.gl_surface.resize(
-                    &self.env.gl_context,
-                    NonZeroU32::new(width.max(1)).unwrap(),
-                    NonZeroU32::new(height.max(1)).unwrap(),
-                );
-                self.clamp_camera();
-                self.env.window.request_redraw();
-            }
-
-            WindowEvent::MouseWheel { delta, .. } => {
-                let scroll_y = match delta {
-                    MouseScrollDelta::LineDelta(_, y) => y as f64 * 30.0,
-                    MouseScrollDelta::PixelDelta(pos) => pos.y,
-                };
-
-                let ctrl_held = self.modifiers.state().control_key();
-
-                if ctrl_held && self.rail.active {
-                    // Ctrl+scroll = horizontal nudge along line
-                    let step = scroll_y * 2.0 * self.camera.zoom;
-                    self.camera.offset_x += step;
-                    self.clamp_camera();
-                } else {
-                    // Normal scroll = zoom towards cursor position
-                    let old_zoom = self.camera.zoom;
-                    let factor = 1.0 + scroll_y * 0.003;
-                    let new_zoom = (old_zoom * factor).clamp(0.1, 20.0);
-
-                    // Zoom towards cursor: keep the page point under cursor fixed
-                    let (cx, cy) = self.cursor_pos;
-                    self.camera.offset_x = cx - (cx - self.camera.offset_x) * (new_zoom / old_zoom);
-                    self.camera.offset_y = cy - (cy - self.camera.offset_y) * (new_zoom / old_zoom);
-                    self.camera.zoom = new_zoom;
-
-                    let size = self.env.window.inner_size();
-                    self.rail.update_zoom(
-                        self.camera.zoom,
-                        self.camera.offset_x,
-                        self.camera.offset_y,
-                        size.width as f64,
-                        size.height as f64,
-                    );
-
-                    if self.rail.active {
-                        self.start_snap();
-                    }
-
-                    self.clamp_camera();
-                }
-                self.env.window.request_redraw();
-            }
-
-            WindowEvent::MouseInput { state, button, .. } => {
-                if button == MouseButton::Left {
-                    self.dragging = state == ElementState::Pressed;
-                    if !self.dragging {
-                        self.last_cursor = None;
-                    }
-                }
-            }
-
-            WindowEvent::CursorMoved { position, .. } => {
-                self.cursor_pos = (position.x, position.y);
-                if self.dragging {
-                    if let Some((lx, ly)) = self.last_cursor {
-                        let dx = position.x - lx;
-                        let dy = position.y - ly;
-
-                        self.camera.offset_x += dx;
-                        self.camera.offset_y += dy;
-                        self.clamp_camera();
-                        self.env.window.request_redraw();
-                    }
-                    self.last_cursor = Some((position.x, position.y));
-                }
-            }
-
-            WindowEvent::KeyboardInput { event, .. } => {
-                // Map key to direction for arrow keys and WASD
-                let direction = match &event.logical_key {
-                    Key::Named(NamedKey::ArrowDown) => Some("down"),
-                    Key::Named(NamedKey::ArrowUp) => Some("up"),
-                    Key::Named(NamedKey::ArrowRight) => Some("right"),
-                    Key::Named(NamedKey::ArrowLeft) => Some("left"),
-                    Key::Character(s) => match s.as_str() {
-                        "s" => Some("down"),
-                        "w" => Some("up"),
-                        "d" => Some("right"),
-                        "a" => Some("left"),
-                        _ => None,
-                    },
-                    _ => None,
-                };
-
-                // Handle horizontal scroll key release (stop scrolling)
+            WindowEvent::ModifiersChanged(_) => {}
+            WindowEvent::Resized(physical_size) => self.handle_resize(physical_size),
+            WindowEvent::MouseWheel { delta, .. } => self.handle_mouse_wheel(delta),
+            WindowEvent::MouseInput { state, button, .. } => self.handle_mouse_input(state, button),
+            WindowEvent::CursorMoved { position, .. } => self.handle_cursor_moved(position),
+            WindowEvent::KeyboardInput { ref event, .. } => {
                 if event.state == ElementState::Released {
-                    if let Some("right" | "left") = direction {
-                        self.rail.stop_scroll();
-                        self.env.window.request_redraw();
-                    }
-                    return;
-                }
-
-                // Everything below is key press handling
-                if let Some(dir) = direction {
-                    match dir {
-                        "down" => {
-                            if self.rail.active {
-                                match self.rail.next_line() {
-                                    NavResult::PageBoundaryNext => {
-                                        self.go_to_page(self.current_page + 1);
-                                        if self.rail.active {
-                                            self.start_snap();
-                                        }
-                                    }
-                                    NavResult::Ok => {
-                                        self.start_snap();
-                                    }
-                                    _ => {}
-                                }
-                            } else {
-                                self.camera.offset_y -= 50.0;
-                                self.clamp_camera();
-                            }
-                        }
-                        "up" => {
-                            if self.rail.active {
-                                match self.rail.prev_line() {
-                                    NavResult::PageBoundaryPrev => {
-                                        self.go_to_page(self.current_page - 1);
-                                        if self.rail.active {
-                                            self.rail.jump_to_end();
-                                            self.start_snap();
-                                        }
-                                    }
-                                    NavResult::Ok => {
-                                        self.start_snap();
-                                    }
-                                    _ => {}
-                                }
-                            } else {
-                                self.camera.offset_y += 50.0;
-                                self.clamp_camera();
-                            }
-                        }
-                        "right" => {
-                            if self.rail.active {
-                                self.rail.start_scroll(ScrollDir::Forward);
-                            } else {
-                                self.camera.offset_x -= 50.0;
-                                self.clamp_camera();
-                            }
-                        }
-                        "left" => {
-                            if self.rail.active {
-                                self.rail.start_scroll(ScrollDir::Backward);
-                            } else {
-                                self.camera.offset_x += 50.0;
-                                self.clamp_camera();
-                            }
-                        }
-                        _ => {}
-                    }
-                    self.env.window.request_redraw();
-                    return;
-                }
-
-                match &event.logical_key {
-                    Key::Named(NamedKey::PageDown) => {
-                        self.go_to_page(self.current_page + 1);
-                        self.env.window.request_redraw();
-                    }
-                    Key::Named(NamedKey::PageUp) => {
-                        self.go_to_page(self.current_page - 1);
-                        self.env.window.request_redraw();
-                    }
-                    Key::Named(NamedKey::Home) => {
-                        self.go_to_page(0);
-                        self.env.window.request_redraw();
-                    }
-                    Key::Named(NamedKey::End) => {
-                        self.go_to_page(self.page_count - 1);
-                        self.env.window.request_redraw();
-                    }
-                    Key::Character(c) if c.as_str() == "+" || c.as_str() == "=" => {
-                        self.camera.zoom = (self.camera.zoom * 1.25).clamp(0.1, 20.0);
-                        let size = self.env.window.inner_size();
-                        self.rail.update_zoom(
-                            self.camera.zoom,
-                            self.camera.offset_x,
-                            self.camera.offset_y,
-                            size.width as f64,
-                            size.height as f64,
-                        );
-                        if self.rail.active {
-                            self.start_snap();
-                        }
-                        self.clamp_camera();
-                        self.env.window.request_redraw();
-                    }
-                    Key::Character(c) if c.as_str() == "-" => {
-                        self.camera.zoom = (self.camera.zoom / 1.25).clamp(0.1, 20.0);
-                        let size = self.env.window.inner_size();
-                        self.rail.update_zoom(
-                            self.camera.zoom,
-                            self.camera.offset_x,
-                            self.camera.offset_y,
-                            size.width as f64,
-                            size.height as f64,
-                        );
-                        self.clamp_camera();
-                        self.env.window.request_redraw();
-                    }
-                    Key::Character(c) if c.as_str() == "0" => {
-                        self.center_page();
-                        let size = self.env.window.inner_size();
-                        self.rail.update_zoom(
-                            self.camera.zoom,
-                            self.camera.offset_x,
-                            self.camera.offset_y,
-                            size.width as f64,
-                            size.height as f64,
-                        );
-                        self.env.window.request_redraw();
-                    }
-                    Key::Character(c) if c.as_str() == "D" => {
-                        self.debug_overlay = !self.debug_overlay;
-                        log::info!("Debug overlay: {}", self.debug_overlay);
-                        self.env.window.request_redraw();
-                    }
-                    Key::Named(NamedKey::Escape) => event_loop.exit(),
-                    Key::Character(c) if c.as_str() == "q" => event_loop.exit(),
-                    _ => {}
+                    self.handle_key_release(event);
+                } else {
+                    self.handle_key_press(event, event_loop);
                 }
             }
-
-            WindowEvent::RedrawRequested => {
-                let size = self.env.window.inner_size();
-                if size.width == 0 || size.height == 0 {
-                    return;
-                }
-
-                // Compute frame delta time
-                let now = std::time::Instant::now();
-                let dt_secs = now.duration_since(self.last_frame).as_secs_f64().min(0.1);
-                self.last_frame = now;
-
-                // Advance animations and continuous scroll
-                let animating = self.rail.tick(
-                    &mut self.camera.offset_x,
-                    &mut self.camera.offset_y,
-                    dt_secs,
-                    self.camera.zoom,
-                    size.width as f64,
-                );
-
-                let canvas = self.env.surface.canvas();
-                canvas.clear(Color::from_argb(255, 128, 128, 128));
-
-                canvas.save();
-                canvas.translate((self.camera.offset_x as f32, self.camera.offset_y as f32));
-                canvas.scale((self.camera.zoom as f32, self.camera.zoom as f32));
-
-                // White page background
-                let mut white_paint = Paint::default();
-                white_paint.set_color(Color::WHITE);
-                canvas.draw_rect(
-                    Rect::from_wh(self.page_width as f32, self.page_height as f32),
-                    &white_paint,
-                );
-
-                // SVG content
-                if let Some(dom) = &mut self.svg_dom {
-                    dom.render(canvas);
-                }
-
-                // Rail overlays (drawn in page coordinate space)
-                draw_rail_overlays(
-                    canvas,
-                    &self.rail,
-                    self.page_width,
-                    self.page_height,
-                    self.debug_overlay,
-                );
-
-                canvas.restore();
-
-                // Status bar (drawn in screen space)
-                draw_status_bar(
-                    canvas,
-                    size.width,
-                    size.height,
-                    &self.status_font,
-                    &self.camera,
-                    self.current_page,
-                    self.page_count,
-                    &self.rail,
-                );
-
-                self.env.gr_context.flush_and_submit();
-                self.env
-                    .gl_surface
-                    .swap_buffers(&self.env.gl_context)
-                    .unwrap();
-
-                // Request another frame if animating
-                if animating {
-                    self.env.window.request_redraw();
-                }
-            }
-
+            WindowEvent::RedrawRequested => self.handle_redraw(),
             _ => {}
         }
     }
@@ -884,8 +887,8 @@ fn main() -> Result<()> {
 
     let window_attributes = Window::default_attributes()
         .with_inner_size(LogicalSize::new(
-            page_width.min(1200.0),
-            page_height.min(900.0),
+            page_width.min(DEFAULT_WINDOW_WIDTH),
+            page_height.min(DEFAULT_WINDOW_HEIGHT),
         ))
         .with_resizable(true)
         .with_title("railreader2");
