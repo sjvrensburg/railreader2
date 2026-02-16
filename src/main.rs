@@ -26,7 +26,7 @@ use winit::{
 };
 
 use railreader2::layout::{self, LAYOUT_CLASSES};
-use railreader2::rail::{NavResult, RailNav};
+use railreader2::rail::{NavResult, RailNav, ScrollDir};
 
 struct Camera {
     offset_x: f64,
@@ -80,6 +80,7 @@ struct App {
     rail: RailNav,
     debug_overlay: bool,
     loading: bool,
+    last_frame: std::time::Instant,
 }
 
 impl App {
@@ -522,16 +523,10 @@ impl ApplicationHandler for App {
                 let ctrl_held = self.modifiers.state().control_key();
 
                 if ctrl_held && self.rail.active {
-                    // Ctrl+scroll = smooth horizontal scroll along line
-                    let size = self.env.window.inner_size();
-                    let forward = scroll_y < 0.0;
-                    self.rail.scroll_along_line(
-                        self.camera.offset_x,
-                        self.camera.offset_y,
-                        self.camera.zoom,
-                        size.width as f64,
-                        forward,
-                    );
+                    // Ctrl+scroll = horizontal nudge along line
+                    let step = scroll_y * 2.0 * self.camera.zoom;
+                    self.camera.offset_x += step;
+                    self.clamp_camera();
                 } else {
                     // Normal scroll = zoom towards cursor position
                     let old_zoom = self.camera.zoom;
@@ -588,10 +583,6 @@ impl ApplicationHandler for App {
             }
 
             WindowEvent::KeyboardInput { event, .. } => {
-                if event.state != ElementState::Pressed {
-                    return;
-                }
-
                 // Map key to direction for arrow keys and WASD
                 let direction = match &event.logical_key {
                     Key::Named(NamedKey::ArrowDown) => Some("down"),
@@ -608,6 +599,16 @@ impl ApplicationHandler for App {
                     _ => None,
                 };
 
+                // Handle horizontal scroll key release (stop scrolling)
+                if event.state == ElementState::Released {
+                    if let Some("right" | "left") = direction {
+                        self.rail.stop_scroll();
+                        self.env.window.request_redraw();
+                    }
+                    return;
+                }
+
+                // Everything below is key press handling
                 if let Some(dir) = direction {
                     match dir {
                         "down" => {
@@ -635,7 +636,6 @@ impl ApplicationHandler for App {
                                     NavResult::PageBoundaryPrev => {
                                         self.go_to_page(self.current_page - 1);
                                         if self.rail.active {
-                                            // Jump to last block/line on previous page
                                             self.rail.jump_to_end();
                                             self.start_snap();
                                         }
@@ -652,15 +652,7 @@ impl ApplicationHandler for App {
                         }
                         "right" => {
                             if self.rail.active {
-                                // Right = advance reading along the line
-                                let size = self.env.window.inner_size();
-                                self.rail.scroll_along_line(
-                                    self.camera.offset_x,
-                                    self.camera.offset_y,
-                                    self.camera.zoom,
-                                    size.width as f64,
-                                    true,
-                                );
+                                self.rail.start_scroll(ScrollDir::Forward);
                             } else {
                                 self.camera.offset_x -= 50.0;
                                 self.clamp_camera();
@@ -668,15 +660,7 @@ impl ApplicationHandler for App {
                         }
                         "left" => {
                             if self.rail.active {
-                                // Left = go back along the line
-                                let size = self.env.window.inner_size();
-                                self.rail.scroll_along_line(
-                                    self.camera.offset_x,
-                                    self.camera.offset_y,
-                                    self.camera.zoom,
-                                    size.width as f64,
-                                    false,
-                                );
+                                self.rail.start_scroll(ScrollDir::Backward);
                             } else {
                                 self.camera.offset_x += 50.0;
                                 self.clamp_camera();
@@ -763,10 +747,19 @@ impl ApplicationHandler for App {
                     return;
                 }
 
-                // Advance snap animation
-                let animating = self
-                    .rail
-                    .tick(&mut self.camera.offset_x, &mut self.camera.offset_y);
+                // Compute frame delta time
+                let now = std::time::Instant::now();
+                let dt_secs = now.duration_since(self.last_frame).as_secs_f64().min(0.1);
+                self.last_frame = now;
+
+                // Advance animations and continuous scroll
+                let animating = self.rail.tick(
+                    &mut self.camera.offset_x,
+                    &mut self.camera.offset_y,
+                    dt_secs,
+                    self.camera.zoom,
+                    size.width as f64,
+                );
 
                 let canvas = self.env.surface.canvas();
                 canvas.clear(Color::from_argb(255, 128, 128, 128));
@@ -1038,6 +1031,7 @@ fn main() -> Result<()> {
         modifiers: Modifiers::default(),
         debug_overlay: false,
         loading: false,
+        last_frame: std::time::Instant::now(),
     };
 
     app.center_page();

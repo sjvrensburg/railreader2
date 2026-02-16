@@ -2,21 +2,26 @@ use crate::layout::{is_navigable, LayoutBlock, LineInfo, PageAnalysis};
 
 const RAIL_ZOOM_THRESHOLD: f64 = 3.0;
 const SNAP_DURATION_MS: f64 = 300.0;
-const SCROLL_DURATION_MS: f64 = 120.0;
-/// Base scroll step in page-coord points (small for smooth feel).
-const LINE_SCROLL_STEP: f64 = 15.0;
-/// Maximum scroll step after momentum builds up.
-const LINE_SCROLL_MAX: f64 = 80.0;
-/// How quickly momentum builds (multiplier increase per repeated press).
-const MOMENTUM_ACCEL: f64 = 1.4;
-/// Reset momentum after this many ms without a scroll.
-const MOMENTUM_RESET_MS: f64 = 300.0;
+
+/// Horizontal scroll speed in page-coord points per second (initial).
+const SCROLL_SPEED_START: f64 = 60.0;
+/// Maximum scroll speed after holding for a while.
+const SCROLL_SPEED_MAX: f64 = 400.0;
+/// Time in seconds to reach max speed from start.
+const SCROLL_RAMP_TIME: f64 = 1.5;
 
 #[derive(Debug)]
 pub enum NavResult {
     Ok,
     PageBoundaryNext,
     PageBoundaryPrev,
+}
+
+/// Horizontal scroll direction while key is held.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum ScrollDir {
+    Forward,
+    Backward,
 }
 
 struct SnapAnimation {
@@ -35,8 +40,10 @@ pub struct RailNav {
     pub current_line: usize,
     pub active: bool,
     snap: Option<SnapAnimation>,
-    scroll_momentum: f64,
-    last_scroll_time: Option<std::time::Instant>,
+    /// Current held-scroll direction (None = not scrolling).
+    scroll_dir: Option<ScrollDir>,
+    /// When the current scroll hold started.
+    scroll_hold_start: Option<std::time::Instant>,
 }
 
 impl Default for RailNav {
@@ -54,8 +61,8 @@ impl RailNav {
             current_line: 0,
             active: false,
             snap: None,
-            scroll_momentum: 1.0,
-            last_scroll_time: None,
+            scroll_dir: None,
+            scroll_hold_start: None,
         }
     }
 
@@ -71,6 +78,8 @@ impl RailNav {
         self.current_block = 0;
         self.current_line = 0;
         self.snap = None;
+        self.scroll_dir = None;
+        self.scroll_hold_start = None;
     }
 
     pub fn has_analysis(&self) -> bool {
@@ -93,6 +102,7 @@ impl RailNav {
         } else if !should_be_active && self.active {
             self.active = false;
             self.snap = None;
+            self.scroll_dir = None;
         }
     }
 
@@ -171,51 +181,21 @@ impl RailNav {
         }
     }
 
-    /// Scroll along the current line with smooth animation and momentum.
-    /// Repeated presses build up speed; pausing resets momentum.
-    pub fn scroll_along_line(
-        &mut self,
-        camera_x: f64,
-        camera_y: f64,
-        zoom: f64,
-        window_width: f64,
-        forward: bool,
-    ) {
+    /// Start continuous horizontal scrolling (called on key press).
+    pub fn start_scroll(&mut self, dir: ScrollDir) {
         if !self.active || self.navigable_indices.is_empty() {
             return;
         }
-
-        // Update momentum: accelerate on rapid repeats, reset on pause
-        let now = std::time::Instant::now();
-        if let Some(last) = self.last_scroll_time {
-            let elapsed = now.duration_since(last).as_secs_f64() * 1000.0;
-            if elapsed < MOMENTUM_RESET_MS {
-                self.scroll_momentum =
-                    (self.scroll_momentum * MOMENTUM_ACCEL).min(LINE_SCROLL_MAX / LINE_SCROLL_STEP);
-            } else {
-                self.scroll_momentum = 1.0;
-            }
-        } else {
-            self.scroll_momentum = 1.0;
+        if self.scroll_dir != Some(dir) {
+            self.scroll_dir = Some(dir);
+            self.scroll_hold_start = Some(std::time::Instant::now());
         }
-        self.last_scroll_time = Some(now);
+    }
 
-        let step = LINE_SCROLL_STEP * self.scroll_momentum * zoom;
-        let new_x = if forward {
-            camera_x - step
-        } else {
-            camera_x + step
-        };
-        let target_x = self.clamp_x(new_x, zoom, window_width);
-
-        self.snap = Some(SnapAnimation {
-            start_x: camera_x,
-            start_y: camera_y,
-            target_x,
-            target_y: camera_y,
-            start_time: now,
-            duration_ms: SCROLL_DURATION_MS,
-        });
+    /// Stop continuous horizontal scrolling (called on key release).
+    pub fn stop_scroll(&mut self) {
+        self.scroll_dir = None;
+        self.scroll_hold_start = None;
     }
 
     /// Clamp camera X so the viewport stays within the current block bounds.
@@ -288,30 +268,54 @@ impl RailNav {
         (target_x, target_y)
     }
 
-    /// Advance snap animation. Returns true if still animating.
-    pub fn tick(&mut self, camera_x: &mut f64, camera_y: &mut f64) -> bool {
-        let snap = match &self.snap {
-            Some(s) => s,
-            None => return false,
-        };
+    /// Advance animations and continuous scroll. Returns true if still animating.
+    pub fn tick(
+        &mut self,
+        camera_x: &mut f64,
+        camera_y: &mut f64,
+        dt_secs: f64,
+        zoom: f64,
+        window_width: f64,
+    ) -> bool {
+        let mut animating = false;
 
-        let elapsed = snap.start_time.elapsed().as_secs_f64() * 1000.0;
-        let t = (elapsed / snap.duration_ms).min(1.0);
-        let eased = 1.0 - (1.0 - t).powi(3); // cubic ease-out
+        // Handle snap animation (for vertical line snaps)
+        if let Some(snap) = &self.snap {
+            let elapsed = snap.start_time.elapsed().as_secs_f64() * 1000.0;
+            let t = (elapsed / snap.duration_ms).min(1.0);
+            let eased = 1.0 - (1.0 - t).powi(3); // cubic ease-out
 
-        *camera_x = snap.start_x + (snap.target_x - snap.start_x) * eased;
-        *camera_y = snap.start_y + (snap.target_y - snap.start_y) * eased;
+            *camera_x = snap.start_x + (snap.target_x - snap.start_x) * eased;
+            *camera_y = snap.start_y + (snap.target_y - snap.start_y) * eased;
 
-        if t >= 1.0 {
-            self.snap = None;
-            false
-        } else {
-            true
+            if t >= 1.0 {
+                self.snap = None;
+            } else {
+                animating = true;
+            }
         }
+
+        // Handle continuous horizontal scrolling
+        if let (Some(dir), Some(hold_start)) = (self.scroll_dir, self.scroll_hold_start) {
+            let hold_secs = hold_start.elapsed().as_secs_f64();
+            // Ramp from start speed to max speed over SCROLL_RAMP_TIME
+            let t = (hold_secs / SCROLL_RAMP_TIME).min(1.0);
+            let speed = SCROLL_SPEED_START + (SCROLL_SPEED_MAX - SCROLL_SPEED_START) * t * t;
+
+            let delta = speed * dt_secs * zoom;
+            let new_x = match dir {
+                ScrollDir::Forward => *camera_x - delta,
+                ScrollDir::Backward => *camera_x + delta,
+            };
+            *camera_x = self.clamp_x(new_x, zoom, window_width);
+            animating = true;
+        }
+
+        animating
     }
 
     pub fn is_animating(&self) -> bool {
-        self.snap.is_some()
+        self.snap.is_some() || self.scroll_dir.is_some()
     }
 
     /// Jump to the last block and last line (for navigating back from next page).
