@@ -38,13 +38,25 @@ cargo clippy
 
 ```
 src/
-├── lib.rs          # Module exports, render_page_svg(), render_page_pixmap()
-├── config.rs       # User-configurable parameters (config.json, serde)
-├── layout.rs       # ONNX inference, NMS, reading order, line detection
-├── rail.rs         # Rail navigation state machine (snap, scroll, clamp)
-├── main.rs         # Winit/glutin/skia event loop, rendering, input handling
+├── lib.rs               # Module exports, render_page_svg(), render_page_pixmap()
+├── main.rs              # Winit/glutin/skia event loop, App orchestrator, rendering
+├── config.rs            # User-configurable parameters (config.json, serde)
+├── layout.rs            # ONNX inference, NMS, reading order, line detection
+├── rail.rs              # Rail navigation state machine (snap, scroll, clamp)
+├── tab.rs               # Camera, TabState (per-document state), outline loading
+├── egui_integration.rs  # egui UI framework integration
+└── ui/
+    ├── mod.rs           # UiState, UiAction enum, top-level build_ui()
+    ├── menu.rs          # Menu bar (File, View, Navigation, Help)
+    ├── tab_bar.rs       # Custom tab bar widget
+    ├── settings.rs      # Settings window
+    ├── minimap.rs       # Minimap overlay with viewport indicator
+    ├── outline.rs       # Outline/TOC side panel
+    ├── status_bar.rs    # Status bar (egui-native, replaces Skia-drawn one)
+    ├── loading.rs       # Loading overlay with spinner
+    └── icons.rs         # Icon helpers (placeholder for Fluent UI icons)
 examples/
-└── dump_layout.rs  # CLI tool to inspect layout analysis output
+└── dump_layout.rs       # CLI tool to inspect layout analysis output
 models/
 └── PP-DocLayoutV3.onnx  # Layout model (gitignored, ~50MB)
 scripts/
@@ -64,6 +76,8 @@ scripts/
 - `glutin` 0.32 + `winit` 0.30 — OpenGL context and windowing
 - `mupdf` 0.6 — PDF parsing, SVG export, pixmap rendering
 - `ort` 2.0.0-rc.11 — ONNX Runtime for layout inference
+- `egui` 0.31 + `egui-winit` 0.31 + `egui_glow` 0.31 — Immediate mode GUI framework
+- `rfd` 0.15 — Native file dialog
 - `serde` + `serde_json` — Config serialization
 
 ## Configuration
@@ -72,11 +86,11 @@ Default `config.json` values (created on first run, gitignored):
 
 ```json
 {
-  "rail_zoom_threshold": 3.0,
+  "rail_zoom_threshold": 7.0,
   "snap_duration_ms": 300.0,
-  "scroll_speed_start": 60.0,
-  "scroll_speed_max": 400.0,
-  "scroll_ramp_time": 1.5
+  "scroll_speed_start": 30.0,
+  "scroll_speed_max": 100.0,
+  "scroll_ramp_time": 3.0
 }
 ```
 
@@ -87,4 +101,7 @@ Default `config.json` values (created on first run, gitignored):
 - ONNX model outputs `[N, 7]` tensors: `[class_id, confidence, xmin, ymin, xmax, ymax, reading_order]`. The 7th column is the model's predicted reading order via its Global Pointer Mechanism.
 - Layout analysis runs synchronously on page load (~100-200ms). Input is blocked during analysis.
 - Debug SVG dumping: Set `DUMP_SVG=1` environment variable to write each page's SVG to `/tmp/pageN.svg` for inspection.
+- **Modern GUI**: Full egui UI with menu bar, tab bar, outline panel, minimap, settings window, and status bar. Multi-tab support with independent per-tab state. Rendering pipeline: egui `build_ui()` → capture `content_rect` → Skia renders PDF into content area with GL scissor → egui `paint()` on top.
+- **Multi-tab architecture**: Per-tab state (`TabState` in `tab.rs`) holds document, camera, rail nav, SVG DOM, outline, and minimap texture. Shared state: `ort::Session`, `Config`, `EguiIntegration`, `Env`.
+- App can run without CLI arguments — shows welcome screen with "Open a PDF file (Ctrl+O)" prompt.
 - No unit tests currently exist in the project.

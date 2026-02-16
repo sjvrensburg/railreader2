@@ -341,4 +341,8 @@ impl RailNav {
     pub fn analysis(&self) -> Option<&PageAnalysis> {
         self.analysis.as_ref()
     }
+
+    pub fn update_config(&mut self, config: Config) {
+        self.config = config;
+    }
 }
