@@ -553,6 +553,9 @@ impl ApplicationHandler for App {
                                 match self.rail.next_line() {
                                     NavResult::PageBoundaryNext => {
                                         self.go_to_page(self.current_page + 1);
+                                        if self.rail.active {
+                                            self.start_snap();
+                                        }
                                     }
                                     NavResult::Ok => {
                                         self.start_snap();
@@ -569,6 +572,11 @@ impl ApplicationHandler for App {
                                 match self.rail.prev_line() {
                                     NavResult::PageBoundaryPrev => {
                                         self.go_to_page(self.current_page - 1);
+                                        if self.rail.active {
+                                            // Jump to last block/line on previous page
+                                            self.rail.jump_to_end();
+                                            self.start_snap();
+                                        }
                                     }
                                     NavResult::Ok => {
                                         self.start_snap();

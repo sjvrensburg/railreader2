@@ -2,9 +2,15 @@ use crate::layout::{is_navigable, LayoutBlock, LineInfo, PageAnalysis};
 
 const RAIL_ZOOM_THRESHOLD: f64 = 3.0;
 const SNAP_DURATION_MS: f64 = 300.0;
-const SCROLL_DURATION_MS: f64 = 150.0;
-/// How many page-coord points to scroll per arrow key press along a line.
-const LINE_SCROLL_STEP: f64 = 40.0;
+const SCROLL_DURATION_MS: f64 = 120.0;
+/// Base scroll step in page-coord points (small for smooth feel).
+const LINE_SCROLL_STEP: f64 = 15.0;
+/// Maximum scroll step after momentum builds up.
+const LINE_SCROLL_MAX: f64 = 80.0;
+/// How quickly momentum builds (multiplier increase per repeated press).
+const MOMENTUM_ACCEL: f64 = 1.4;
+/// Reset momentum after this many ms without a scroll.
+const MOMENTUM_RESET_MS: f64 = 300.0;
 
 #[derive(Debug)]
 pub enum NavResult {
@@ -29,6 +35,8 @@ pub struct RailNav {
     pub current_line: usize,
     pub active: bool,
     snap: Option<SnapAnimation>,
+    scroll_momentum: f64,
+    last_scroll_time: Option<std::time::Instant>,
 }
 
 impl Default for RailNav {
@@ -46,6 +54,8 @@ impl RailNav {
             current_line: 0,
             active: false,
             snap: None,
+            scroll_momentum: 1.0,
+            last_scroll_time: None,
         }
     }
 
@@ -161,8 +171,8 @@ impl RailNav {
         }
     }
 
-    /// Scroll along the current line with smooth animation.
-    /// Forward = advance reading direction, backward = go back.
+    /// Scroll along the current line with smooth animation and momentum.
+    /// Repeated presses build up speed; pausing resets momentum.
     pub fn scroll_along_line(
         &mut self,
         camera_x: f64,
@@ -175,7 +185,22 @@ impl RailNav {
             return;
         }
 
-        let step = LINE_SCROLL_STEP * zoom;
+        // Update momentum: accelerate on rapid repeats, reset on pause
+        let now = std::time::Instant::now();
+        if let Some(last) = self.last_scroll_time {
+            let elapsed = now.duration_since(last).as_secs_f64() * 1000.0;
+            if elapsed < MOMENTUM_RESET_MS {
+                self.scroll_momentum =
+                    (self.scroll_momentum * MOMENTUM_ACCEL).min(LINE_SCROLL_MAX / LINE_SCROLL_STEP);
+            } else {
+                self.scroll_momentum = 1.0;
+            }
+        } else {
+            self.scroll_momentum = 1.0;
+        }
+        self.last_scroll_time = Some(now);
+
+        let step = LINE_SCROLL_STEP * self.scroll_momentum * zoom;
         let new_x = if forward {
             camera_x - step
         } else {
@@ -188,7 +213,7 @@ impl RailNav {
             start_y: camera_y,
             target_x,
             target_y: camera_y,
-            start_time: std::time::Instant::now(),
+            start_time: now,
             duration_ms: SCROLL_DURATION_MS,
         });
     }
@@ -203,13 +228,19 @@ impl RailNav {
         let margin = block.bbox.w as f64 * 0.05;
         let block_left = block.bbox.x as f64 - margin;
         let block_right = block.bbox.x as f64 + block.bbox.w as f64 + margin;
+        let block_width_px = (block_right - block_left) * zoom;
 
-        // offset_x such that left edge of block is at left edge of window
-        let max_x = -block_left * zoom;
-        // offset_x such that right edge of block is at right edge of window
-        let min_x = window_width - block_right * zoom;
-
-        camera_x.clamp(min_x, max_x)
+        if block_width_px <= window_width {
+            // Block fits in viewport — center it
+            let center = (block_left + block_right) / 2.0;
+            window_width / 2.0 - center * zoom
+        } else {
+            // offset_x such that left edge of block is at left edge of window
+            let max_x = -block_left * zoom;
+            // offset_x such that right edge of block is at right edge of window
+            let min_x = window_width - block_right * zoom;
+            camera_x.clamp(min_x, max_x)
+        }
     }
 
     /// Start a snap animation to the current line's start (left edge of block).
@@ -281,6 +312,16 @@ impl RailNav {
 
     pub fn is_animating(&self) -> bool {
         self.snap.is_some()
+    }
+
+    /// Jump to the last block and last line (for navigating back from next page).
+    pub fn jump_to_end(&mut self) {
+        if self.navigable_indices.is_empty() {
+            return;
+        }
+        self.current_block = self.navigable_indices.len() - 1;
+        let block = self.current_navigable_block();
+        self.current_line = block.lines.len().saturating_sub(1);
     }
 
     pub fn current_navigable_block(&self) -> &LayoutBlock {
