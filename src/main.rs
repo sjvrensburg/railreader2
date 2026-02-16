@@ -25,6 +25,7 @@ use winit::{
     window::Window,
 };
 
+use railreader2::config::Config;
 use railreader2::layout::{self, LAYOUT_CLASSES};
 use railreader2::rail::{NavResult, RailNav, ScrollDir};
 
@@ -1006,7 +1007,8 @@ fn main() -> Result<()> {
         stencil_size,
     };
 
-    let mut rail = RailNav::new();
+    let config = Config::load();
+    let mut rail = RailNav::new(config);
     if let Some(analysis) = initial_analysis {
         rail.set_analysis(analysis);
     } else {

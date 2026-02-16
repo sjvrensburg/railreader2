@@ -22,3 +22,6 @@ target
 
 # ONNX model files
 models/*.onnx
+
+# User config (generated on first run)
+config.json

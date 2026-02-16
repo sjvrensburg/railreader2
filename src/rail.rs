@@ -1,14 +1,5 @@
+use crate::config::Config;
 use crate::layout::{is_navigable, LayoutBlock, LineInfo, PageAnalysis};
-
-const RAIL_ZOOM_THRESHOLD: f64 = 3.0;
-const SNAP_DURATION_MS: f64 = 300.0;
-
-/// Horizontal scroll speed in page-coord points per second (initial).
-const SCROLL_SPEED_START: f64 = 60.0;
-/// Maximum scroll speed after holding for a while.
-const SCROLL_SPEED_MAX: f64 = 400.0;
-/// Time in seconds to reach max speed from start.
-const SCROLL_RAMP_TIME: f64 = 1.5;
 
 #[derive(Debug)]
 pub enum NavResult {
@@ -34,6 +25,7 @@ struct SnapAnimation {
 }
 
 pub struct RailNav {
+    config: Config,
     analysis: Option<PageAnalysis>,
     navigable_indices: Vec<usize>,
     pub current_block: usize,
@@ -46,15 +38,10 @@ pub struct RailNav {
     scroll_hold_start: Option<std::time::Instant>,
 }
 
-impl Default for RailNav {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl RailNav {
-    pub fn new() -> Self {
+    pub fn new(config: Config) -> Self {
         Self {
+            config,
             analysis: None,
             navigable_indices: Vec::new(),
             current_block: 0,
@@ -94,7 +81,7 @@ impl RailNav {
         window_width: f64,
         window_height: f64,
     ) {
-        let should_be_active = zoom >= RAIL_ZOOM_THRESHOLD && self.has_analysis();
+        let should_be_active = zoom >= self.config.rail_zoom_threshold && self.has_analysis();
 
         if should_be_active && !self.active {
             self.active = true;
@@ -244,7 +231,7 @@ impl RailNav {
             target_x,
             target_y,
             start_time: std::time::Instant::now(),
-            duration_ms: SNAP_DURATION_MS,
+            duration_ms: self.config.snap_duration_ms,
         });
     }
 
@@ -298,9 +285,10 @@ impl RailNav {
         // Handle continuous horizontal scrolling
         if let (Some(dir), Some(hold_start)) = (self.scroll_dir, self.scroll_hold_start) {
             let hold_secs = hold_start.elapsed().as_secs_f64();
-            // Ramp from start speed to max speed over SCROLL_RAMP_TIME
-            let t = (hold_secs / SCROLL_RAMP_TIME).min(1.0);
-            let speed = SCROLL_SPEED_START + (SCROLL_SPEED_MAX - SCROLL_SPEED_START) * t * t;
+            // Ramp from start speed to max speed over ramp time
+            let t = (hold_secs / self.config.scroll_ramp_time).min(1.0);
+            let speed = self.config.scroll_speed_start
+                + (self.config.scroll_speed_max - self.config.scroll_speed_start) * t * t;
 
             let delta = speed * dt_secs * zoom;
             let new_x = match dir {

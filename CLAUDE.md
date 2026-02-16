@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**railreader2** is a desktop PDF viewer optimized for high magnification viewing. The application is built in Rust.
+**railreader2** is a desktop PDF viewer with AI-guided "rail reading" for high magnification viewing. Built in Rust with MuPDF (PDF parsing), Skia (GPU rendering via OpenGL), and PP-DocLayoutV3 (ONNX layout detection).
 
 ## Build and Development Commands
 
@@ -15,49 +15,61 @@ cargo build
 # Build optimized release binary
 cargo build --release
 
-# Run the application (debug build)
-cargo run
+# Run the application
+cargo run --release -- <path-to-pdf>
 
-# Run the application (release build)
-cargo run --release
+# Run layout analysis diagnostic
+cargo run --example dump_layout -- <pdf> [page_number]
 
 # Run tests
 cargo test
 
-# Run a specific test
-cargo test test_name -- --nocapture
-
-# Run tests with all output shown
-cargo test -- --nocapture
-
 # Format code
 cargo fmt
-
-# Check code without building
-cargo check
 
 # Lint with clippy
 cargo clippy
 
-# Generate documentation
-cargo doc --open
+# Download ONNX model (required for AI layout)
+./scripts/download-model.sh
 ```
 
-## Project Structure
+## Architecture
 
-The project uses standard Rust/Cargo layout:
-- `src/` - Source code
-- `Cargo.toml` - Project manifest with dependencies
-- `target/` - Build output (gitignored)
+```
+src/
+├── lib.rs          # Module exports, render_page_svg(), render_page_pixmap()
+├── config.rs       # User-configurable parameters (config.json, serde)
+├── layout.rs       # ONNX inference, NMS, reading order, line detection
+├── rail.rs         # Rail navigation state machine (snap, scroll, clamp)
+├── main.rs         # Winit/glutin/skia event loop, rendering, input handling
+examples/
+└── dump_layout.rs  # CLI tool to inspect layout analysis output
+models/
+└── PP-DocLayoutV3.onnx  # Layout model (gitignored, ~50MB)
+scripts/
+└── download-model.sh    # Downloads ONNX model from HuggingFace
+```
 
-Expected high-level architecture for a PDF viewer:
-- **PDF handling**: Dependency on a PDF library (e.g., `pdfium-render`, `mupdf-rs`)
-- **UI framework**: Desktop GUI framework (e.g., `druid`, `iced`, `gtk-rs`)
-- **Rendering**: High-quality PDF rendering optimized for zoom/magnification
-- **Event handling**: Input handling for panning, zooming, navigation
+### Key concepts
+
+- **Rendering pipeline**: PDF → SVG (MuPDF) → Skia SVG DOM → OpenGL canvas. Zoom/pan are canvas transforms, text stays vector-sharp.
+- **Layout analysis**: PDF page → 800px pixmap → ImageNet-normalized CHW tensor → PP-DocLayoutV3 ONNX → NMS-filtered blocks with 23 class types → overlap-based column clustering for reading order → horizontal projection profiling for line detection.
+- **Rail mode**: Activates above configurable zoom threshold. Navigation locks to detected text blocks, advances line-by-line with snap animations. Horizontal scrolling is continuous hold-to-scroll with speed ramping.
+- **Config**: User parameters in `config.json` (auto-created on first run, gitignored). Loaded at startup via `Config::load()`.
+
+### Dependencies
+
+- `skia-safe` 0.93 (GL + SVG features) — GPU rendering
+- `glutin` 0.32 + `winit` 0.30 — OpenGL context and windowing
+- `mupdf` 0.6 — PDF parsing, SVG export, pixmap rendering
+- `ort` 2.0.0-rc.11 — ONNX Runtime for layout inference
+- `serde` + `serde_json` — Config serialization
 
 ## Key Development Notes
 
-- The project is configured with Rust best practices (rustfmt, clippy, mutation testing support in .gitignore)
-- Focus on accessibility and rendering quality for high magnification viewing
-- Consider performance optimization for large PDF files with zoom capabilities
+- First build is slow (~15min) due to Skia C++ compilation. Subsequent builds are fast.
+- The `target/debug/` directory can grow very large (10GB+) due to Skia build artifacts. Use `cargo clean` cautiously.
+- ONNX model outputs `[N, 7]` tensors (not `[N, 6]`). Always use `shape[1]` as stride when reading output.
+- Layout analysis runs synchronously on page load (~100-200ms). Input is blocked during analysis.
+- Reading order uses overlap-based union-find column clustering (not center-x), to correctly handle blocks of different widths in the same visual column.

@@ -375,37 +375,63 @@ fn assign_reading_order(blocks: &mut [LayoutBlock], page_width: f32) {
 
     let column_threshold = page_width * COLUMN_THRESHOLD_RATIO;
 
-    // Sort by x-center
-    let mut indices: Vec<usize> = (0..blocks.len()).collect();
-    indices.sort_by(|&a, &b| {
-        let cx_a = blocks[a].bbox.x + blocks[a].bbox.w / 2.0;
-        let cx_b = blocks[b].bbox.x + blocks[b].bbox.w / 2.0;
-        cx_a.partial_cmp(&cx_b).unwrap()
-    });
+    // Use overlap-based column clustering: two blocks are in the same column if
+    // their horizontal extents overlap significantly, or their left edges are close.
+    // This avoids splitting blocks of different widths (e.g., full-width text vs
+    // narrow footnotes) into separate columns.
 
-    // Cluster into columns
-    let mut columns: Vec<Vec<usize>> = Vec::new();
-    for &idx in &indices {
-        let cx = blocks[idx].bbox.x + blocks[idx].bbox.w / 2.0;
-        let mut found = false;
-        for col in &mut columns {
-            let col_cx = blocks[col[0]].bbox.x + blocks[col[0]].bbox.w / 2.0;
-            if (cx - col_cx).abs() < column_threshold {
-                col.push(idx);
-                found = true;
-                break;
-            }
+    // Union-find for column assignment
+    let n = blocks.len();
+    let mut parent: Vec<usize> = (0..n).collect();
+    fn find(parent: &mut [usize], i: usize) -> usize {
+        if parent[i] != i {
+            parent[i] = find(parent, parent[i]);
         }
-        if !found {
-            columns.push(vec![idx]);
+        parent[i]
+    }
+    fn union(parent: &mut [usize], a: usize, b: usize) {
+        let ra = find(parent, a);
+        let rb = find(parent, b);
+        if ra != rb {
+            parent[ra] = rb;
         }
     }
 
-    // Sort columns left-to-right, blocks within columns top-to-bottom
+    for i in 0..n {
+        for j in (i + 1)..n {
+            let a = &blocks[i].bbox;
+            let b = &blocks[j].bbox;
+
+            // Check if left edges are close (within column threshold)
+            let left_close = (a.x - b.x).abs() < column_threshold;
+
+            // Check horizontal overlap
+            let overlap_start = a.x.max(b.x);
+            let overlap_end = (a.x + a.w).min(b.x + b.w);
+            let overlap = (overlap_end - overlap_start).max(0.0);
+            let min_width = a.w.min(b.w);
+            let has_overlap = min_width > 0.0 && overlap / min_width > 0.3;
+
+            if left_close || has_overlap {
+                union(&mut parent, i, j);
+            }
+        }
+    }
+
+    // Group into columns
+    let mut column_map: std::collections::HashMap<usize, Vec<usize>> =
+        std::collections::HashMap::new();
+    for i in 0..n {
+        let root = find(&mut parent, i);
+        column_map.entry(root).or_default().push(i);
+    }
+    let mut columns: Vec<Vec<usize>> = column_map.into_values().collect();
+
+    // Sort columns left-to-right by minimum x
     columns.sort_by(|a, b| {
-        let cx_a = blocks[a[0]].bbox.x + blocks[a[0]].bbox.w / 2.0;
-        let cx_b = blocks[b[0]].bbox.x + blocks[b[0]].bbox.w / 2.0;
-        cx_a.partial_cmp(&cx_b).unwrap()
+        let min_x_a = a.iter().map(|&i| blocks[i].bbox.x).fold(f32::MAX, f32::min);
+        let min_x_b = b.iter().map(|&i| blocks[i].bbox.x).fold(f32::MAX, f32::min);
+        min_x_a.partial_cmp(&min_x_b).unwrap()
     });
 
     let mut order = 0;

@@ -2,19 +2,19 @@ use anyhow::Result;
 use railreader2::layout;
 
 fn main() -> Result<()> {
-    let pdf_path = std::env::args().nth(1).expect("Usage: dump_layout <pdf>");
+    let pdf_path = std::env::args().nth(1).expect("Usage: dump_layout <pdf> [page]");
+    let page: i32 = std::env::args()
+        .nth(2)
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(0);
     let doc = mupdf::Document::open(&pdf_path)?;
 
     let model_path =
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("models/PP-DocLayoutV3.onnx");
     let mut session = layout::load_model(model_path.to_str().unwrap())?;
 
-    // First, dump raw tensor output
-    println!("=== Raw tensor output ===");
-    layout::dump_raw_detections(&mut session, &doc, 0)?;
-
-    println!("\n=== Processed analysis ===");
-    let analysis = layout::analyze_page(&mut session, &doc, 0)?;
+    println!("=== Processed analysis (page {}) ===", page);
+    let analysis = layout::analyze_page(&mut session, &doc, page)?;
 
     println!(
         "Page: {:.1} x {:.1} pts",
