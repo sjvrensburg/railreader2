@@ -768,11 +768,79 @@ impl App {
 
         // 5. Skia renders PDF into content_rect area
         let content_rect = self.ui_state.content_rect;
+
+        // Pre-render rail cache if needed (before borrowing main canvas)
+        let effect_key = self.colour_effect_state.effect as u8;
+        if let Some(tab) = self.tabs.get_mut(self.active_tab) {
+            let use_rail_cache = tab.rail.active && tab.svg_dom.is_some();
+            if use_rail_cache {
+                let cache_valid = tab.rail_cache.as_ref().is_some_and(|c| {
+                    c.page == tab.current_page
+                        && (c.zoom - tab.camera.zoom).abs() < 1e-6
+                        && c.effect_key == effect_key
+                });
+                if !cache_valid {
+                    let pw = (tab.page_width * tab.camera.zoom).ceil() as i32;
+                    let ph = (tab.page_height * tab.camera.zoom).ceil() as i32;
+                    if pw > 0 && ph > 0 {
+                        let image_info = skia_safe::ImageInfo::new(
+                            (pw, ph),
+                            ColorType::RGBA8888,
+                            skia_safe::AlphaType::Premul,
+                            None,
+                        );
+                        if let Some(ref mut off) =
+                            self.env.surface.new_surface(&image_info)
+                        {
+                            let oc = off.canvas();
+                            oc.scale((tab.camera.zoom as f32, tab.camera.zoom as f32));
+
+                            let eff_layer = if self.colour_effect_state.has_active_effect() {
+                                if let Some(paint) = self.colour_effect_state.create_paint() {
+                                    oc.save_layer(
+                                        &skia_safe::canvas::SaveLayerRec::default().paint(&paint),
+                                    );
+                                    true
+                                } else {
+                                    false
+                                }
+                            } else {
+                                false
+                            };
+
+                            let mut white_paint = Paint::default();
+                            white_paint.set_color(Color::WHITE);
+                            oc.draw_rect(
+                                Rect::from_wh(tab.page_width as f32, tab.page_height as f32),
+                                &white_paint,
+                            );
+
+                            if let Some(dom) = &mut tab.svg_dom {
+                                dom.render(oc);
+                            }
+
+                            if eff_layer {
+                                oc.restore();
+                            }
+
+                            let image = off.image_snapshot();
+                            tab.rail_cache = Some(railreader2::tab::RailCache {
+                                image,
+                                zoom: tab.camera.zoom,
+                                page: tab.current_page,
+                                effect_key,
+                            });
+                        }
+                    }
+                }
+            }
+        }
+
+        // Now draw to the main canvas
         let canvas = self.env.surface.canvas();
         canvas.clear(Color::from_argb(255, 128, 128, 128));
 
         if let Some(tab) = self.tabs.get_mut(self.active_tab) {
-            // Set up GL scissor to prevent Skia from bleeding into panel areas
             let scale = self.env.window.scale_factor() as f32;
             let scissor_x = (content_rect.min.x * scale) as i32;
             let scissor_y = (size.height as f32 - content_rect.max.y * scale) as i32;
@@ -783,44 +851,54 @@ impl App {
                 gl::Scissor(scissor_x, scissor_y, scissor_w, scissor_h);
             }
 
-            // Offset canvas by content_rect origin
+            let use_rail_cache = tab.rail.active && tab.rail_cache.is_some();
+
             canvas.save();
             canvas.translate((content_rect.min.x, content_rect.min.y));
             canvas.translate((tab.camera.offset_x as f32, tab.camera.offset_y as f32));
-            canvas.scale((tab.camera.zoom as f32, tab.camera.zoom as f32));
 
-            // Apply colour effect as a save layer so it filters all PDF content
-            let effect_layer = if self.colour_effect_state.has_active_effect() {
-                if let Some(paint) = self.colour_effect_state.create_paint() {
-                    canvas.save_layer(&skia_safe::canvas::SaveLayerRec::default().paint(&paint));
-                    true
+            if use_rail_cache {
+                // Fast path: blit cached texture (zoom is baked into the image)
+                let image = &tab.rail_cache.as_ref().unwrap().image;
+                canvas.draw_image(image, (0.0, 0.0), None);
+            } else {
+                // Normal path: full SVG render
+                canvas.scale((tab.camera.zoom as f32, tab.camera.zoom as f32));
+
+                let effect_layer = if self.colour_effect_state.has_active_effect() {
+                    if let Some(paint) = self.colour_effect_state.create_paint() {
+                        canvas.save_layer(
+                            &skia_safe::canvas::SaveLayerRec::default().paint(&paint),
+                        );
+                        true
+                    } else {
+                        false
+                    }
                 } else {
                     false
+                };
+
+                let mut white_paint = Paint::default();
+                white_paint.set_color(Color::WHITE);
+                canvas.draw_rect(
+                    Rect::from_wh(tab.page_width as f32, tab.page_height as f32),
+                    &white_paint,
+                );
+
+                if let Some(dom) = &mut tab.svg_dom {
+                    dom.render(canvas);
                 }
-            } else {
-                false
-            };
 
-            // White page background
-            let mut white_paint = Paint::default();
-            white_paint.set_color(Color::WHITE);
-            canvas.draw_rect(
-                Rect::from_wh(tab.page_width as f32, tab.page_height as f32),
-                &white_paint,
-            );
-
-            // SVG content
-            if let Some(dom) = &mut tab.svg_dom {
-                dom.render(canvas);
+                if effect_layer {
+                    canvas.restore();
+                }
             }
 
-            // Close the colour effect layer before drawing overlays,
-            // so the filter applies only to PDF content (white bg + SVG).
-            if effect_layer {
-                canvas.restore(); // composites filtered layer
+            // Rail overlays in page coordinate space — apply zoom in cached path
+            if use_rail_cache {
+                canvas.scale((tab.camera.zoom as f32, tab.camera.zoom as f32));
             }
 
-            // Rail overlays drawn outside the filter layer with effect-aware colours
             let palette = self.colour_effect_state.effect.overlay_palette();
             draw_rail_overlays(
                 canvas,
@@ -837,7 +915,6 @@ impl App {
                 gl::Disable(gl::SCISSOR_TEST);
             }
         } else {
-            // No tabs open — show welcome
             draw_welcome(canvas, size.width, size.height, &self.status_font);
         }
 
@@ -1115,6 +1192,11 @@ fn main() -> Result<()> {
     let gl_context = not_current_gl_context
         .make_current(&gl_surface)
         .expect("Could not make GL context current");
+
+    // Enable VSync to eliminate tearing during rail-mode scrolling
+    gl_surface
+        .set_swap_interval(&gl_context, glutin::surface::SwapInterval::Wait(NonZeroU32::new(1).unwrap()))
+        .unwrap_or_else(|e| log::warn!("Failed to set VSync: {}", e));
 
     gl::load_with(|s| {
         gl_config

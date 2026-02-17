@@ -59,6 +59,17 @@ pub struct TabState {
     pub minimap_dirty: bool,
     pub analysis_cache: HashMap<i32, PageAnalysis>,
     pub pending_analysis: VecDeque<i32>,
+    /// Cached GPU texture of the page content (white bg + SVG + colour effect)
+    /// used during rail-mode scrolling to avoid re-rendering the SVG DOM every frame.
+    pub rail_cache: Option<RailCache>,
+}
+
+/// Pre-rendered page texture for fast rail-mode scrolling.
+pub struct RailCache {
+    pub image: skia_safe::Image,
+    pub zoom: f64,
+    pub page: i32,
+    pub effect_key: u8,
 }
 
 impl TabState {
@@ -91,6 +102,7 @@ impl TabState {
             minimap_dirty: true,
             analysis_cache: HashMap::new(),
             pending_analysis: VecDeque::new(),
+            rail_cache: None,
         })
     }
 
@@ -114,6 +126,7 @@ impl TabState {
 
         self.analyze_current_page(ort_session, navigable);
         self.minimap_dirty = true;
+        self.rail_cache = None;
     }
 
     pub fn analyze_current_page(
