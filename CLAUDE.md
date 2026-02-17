@@ -37,6 +37,7 @@ cargo clippy
 src/
 ├── lib.rs               # Module exports, render_page_svg(), render_page_pixmap()
 ├── main.rs              # Winit/glutin/skia event loop, App orchestrator, rendering
+├── colour_effect.rs     # SkSL GPU shaders for accessibility colour effects
 ├── config.rs            # User-configurable parameters (config.json, serde)
 ├── cleanup.rs           # Disk cleanup (cache, old logs, temp files)
 ├── layout.rs            # ONNX inference, NMS, reading order, line detection
@@ -70,6 +71,7 @@ scripts/
 - **Config**: User parameters in `config.json` (auto-created on first run, gitignored). Loaded at startup via `Config::load()`. Editable live via Settings panel; changes auto-save and propagate to all tabs.
 - **Analysis caching**: Per-tab `analysis_cache: HashMap<i32, PageAnalysis>` avoids re-running ONNX inference on revisited pages. Lookahead analysis pre-processes upcoming pages one-per-frame in `handle_redraw()`.
 - **Action dispatch**: UI returns `Vec<UiAction>` from `build_ui()`, processed by `App::process_actions()`. Actions include `SetCamera`, `ConfigChanged`, `RunCleanup`, etc.
+- **Colour effects**: GPU-accelerated SkSL colour filters (`ColourEffect` enum) applied via `RuntimeEffect::make_for_color_filter()` and Skia save layers. Effects filter only PDF content (inside GL scissor), not egui panels. Rail-mode overlays use per-effect `OverlayPalette` colours so highlighting complements each scheme. Configurable via View → Colour Effects menu or Settings panel; effect + intensity persisted in `config.json`.
 
 ### Dependencies
 
@@ -92,7 +94,9 @@ Default `config.json` values (created on first run, gitignored):
   "scroll_speed_start": 60.0,
   "scroll_speed_max": 400.0,
   "scroll_ramp_time": 1.5,
-  "analysis_lookahead_pages": 2
+  "analysis_lookahead_pages": 2,
+  "colour_effect": "None",
+  "colour_effect_intensity": 1.0
 }
 ```
 
