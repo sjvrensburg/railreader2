@@ -1,6 +1,6 @@
 # railreader2
 
-Desktop PDF viewer optimised for high magnification viewing with AI-guided "rail reading". Built in Rust with MuPDF for PDF parsing and Skia for GPU-accelerated vector rendering.
+Desktop PDF viewer optimised for high magnification viewing with AI-guided "rail reading". Built in Rust with MuPDF for PDF parsing, Skia for GPU-accelerated vector rendering, and a modern egui-based GUI.
 
 ## How it works
 
@@ -10,16 +10,36 @@ PDF pages are converted to SVG via MuPDF, then rendered by Skia's SVG DOM render
 
 At high zoom levels, navigation switches to "rail mode" — the viewer locks onto detected text blocks and advances line-by-line, like a typewriter carriage return. This is powered by PP-DocLayoutV3 (ONNX), which detects document regions (text, titles, footnotes, etc.) and predicts reading order natively via its Global Pointer Mechanism — correctly handling multi-column layouts, headers, footnotes, etc. Non-active regions are dimmed so you can focus on the current block and line.
 
+### Features
+
+- **Multi-tab support** — open multiple PDFs with independent per-tab state
+- **Menu bar** — File, View, Navigation, Help menus with keyboard shortcuts
+- **Interactive minimap** — click or drag to navigate the page
+- **Outline panel** — table of contents with collapsible hierarchy
+- **Settings panel** — live-editable rail reading parameters with persistence
+- **About dialog** — version info and credits (Help → About)
+- **Disk cleanup** — removes cache, old logs, temp files (Help → Clean Up Temp Files)
+- **Analysis lookahead** — pre-analyzes upcoming pages in the background for instant navigation
+- **Debug overlay** — visualise detected layout blocks with class labels and confidence
+
 ## Usage
 
 ```bash
+# Open a specific PDF
 cargo run --release -- <path-to-pdf>
+
+# Or launch without arguments and use File → Open (Ctrl+O)
+cargo run --release
 ```
 
 ### Controls
 
 | Key | Action |
 |-----|--------|
+| Ctrl+O | Open file |
+| Ctrl+W | Close tab |
+| Ctrl+Tab | Next tab |
+| Ctrl+Q / Esc | Quit |
 | PgDown / PgUp | Next / previous page |
 | Home / End | First / last page |
 | +/- | Zoom in / out |
@@ -30,19 +50,19 @@ cargo run --release -- <path-to-pdf>
 | Mouse drag | Pan |
 | Mouse wheel | Zoom towards cursor |
 | D (shift) | Toggle debug overlay (shows detected blocks) |
-| q / Esc | Quit |
 
 ### Configuration
 
-Rail reading parameters are stored in `config.json` (created on first run). Edit to taste:
+Rail reading parameters are editable via the Settings panel (gear icon in menu bar) and persisted to `config.json`:
 
 ```json
 {
-  "rail_zoom_threshold": 7.0,
+  "rail_zoom_threshold": 3.0,
   "snap_duration_ms": 300.0,
-  "scroll_speed_start": 30.0,
-  "scroll_speed_max": 100.0,
-  "scroll_ramp_time": 3.0
+  "scroll_speed_start": 60.0,
+  "scroll_speed_max": 400.0,
+  "scroll_ramp_time": 1.5,
+  "analysis_lookahead_pages": 2
 }
 ```
 
@@ -53,6 +73,7 @@ Rail reading parameters are stored in `config.json` (created on first run). Edit
 | `scroll_speed_start` | Initial horizontal scroll speed (page points/sec) |
 | `scroll_speed_max` | Maximum scroll speed after holding (page points/sec) |
 | `scroll_ramp_time` | Seconds to reach max speed from start |
+| `analysis_lookahead_pages` | Number of pages to pre-analyze ahead (0 to disable) |
 
 ## Building
 
