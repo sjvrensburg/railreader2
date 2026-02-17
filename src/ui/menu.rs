@@ -124,6 +124,12 @@ pub fn show_menu_bar(
             // Help menu
             ui.menu_button("Help", |ui| {
                 if ui.button("About").clicked() {
+                    ui_state.show_about = true;
+                    ui.close_menu();
+                }
+                ui.separator();
+                if ui.button("Clean Up Temp Files...").clicked() {
+                    actions.push(UiAction::RunCleanup);
                     ui.close_menu();
                 }
             });

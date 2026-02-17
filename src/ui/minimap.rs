@@ -1,8 +1,11 @@
 use crate::tab::TabState;
+use crate::ui::UiAction;
 
-pub fn show_minimap(ctx: &egui::Context, show: &mut bool, tab: &TabState) {
+pub fn show_minimap(ctx: &egui::Context, show: &mut bool, tab: &TabState) -> Vec<UiAction> {
+    let mut actions = Vec::new();
+
     if !*show {
-        return;
+        return actions;
     }
 
     egui::Window::new("Minimap")
@@ -18,7 +21,8 @@ pub fn show_minimap(ctx: &egui::Context, show: &mut bool, tab: &TabState) {
                 let scale = max_width / size.x;
                 let display_size = egui::vec2(size.x * scale, size.y * scale);
 
-                let (response, painter) = ui.allocate_painter(display_size, egui::Sense::click());
+                let (response, painter) =
+                    ui.allocate_painter(display_size, egui::Sense::click_and_drag());
 
                 // Draw the page thumbnail
                 painter.image(
@@ -28,8 +32,31 @@ pub fn show_minimap(ctx: &egui::Context, show: &mut bool, tab: &TabState) {
                     egui::Color32::WHITE,
                 );
 
-                // Draw viewport rectangle
+                // Handle click/drag on minimap
                 if tab.page_width > 0.0 && tab.page_height > 0.0 {
+                    if let Some(pos) = response.interact_pointer_pos() {
+                        let rect = response.rect;
+                        // Convert minimap position to normalized page coordinates (0.0-1.0)
+                        let norm_x =
+                            ((pos.x - rect.min.x) / rect.width()).clamp(0.0, 1.0) as f64;
+                        let norm_y =
+                            ((pos.y - rect.min.y) / rect.height()).clamp(0.0, 1.0) as f64;
+
+                        // Compute target camera offset to center the clicked point
+                        // We use content_rect width/height as approximation of viewport
+                        let screen = ctx.screen_rect();
+                        let vp_w = screen.width() as f64;
+                        let vp_h = screen.height() as f64;
+
+                        let offset_x =
+                            -(norm_x * tab.page_width * tab.camera.zoom) + vp_w / 2.0;
+                        let offset_y =
+                            -(norm_y * tab.page_height * tab.camera.zoom) + vp_h / 2.0;
+
+                        actions.push(UiAction::SetCamera(offset_x, offset_y));
+                    }
+
+                    // Draw viewport rectangle
                     let vp_x = -tab.camera.offset_x / (tab.page_width * tab.camera.zoom);
                     let vp_y = -tab.camera.offset_y / (tab.page_height * tab.camera.zoom);
                     // We don't know the window size here, so estimate viewport fraction
@@ -62,4 +89,6 @@ pub fn show_minimap(ctx: &egui::Context, show: &mut bool, tab: &TabState) {
                 ui.label("Loading...");
             }
         });
+
+    actions
 }

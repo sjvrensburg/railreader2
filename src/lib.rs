@@ -1,3 +1,4 @@
+pub mod cleanup;
 pub mod config;
 pub mod egui_integration;
 pub mod layout;

@@ -1,3 +1,4 @@
+pub mod about;
 pub mod icons;
 pub mod loading;
 pub mod menu;
@@ -17,10 +18,13 @@ pub enum UiAction {
     DuplicateTab,
     GoToPage(i32),
     SetZoom(f64),
+    SetCamera(f64, f64),
     FitPage,
     ToggleDebug,
     ToggleOutline,
     ToggleMinimap,
+    ConfigChanged,
+    RunCleanup,
     Quit,
     None,
 }
@@ -29,6 +33,8 @@ pub struct UiState {
     pub show_outline: bool,
     pub show_minimap: bool,
     pub show_settings: bool,
+    pub show_about: bool,
+    pub cleanup_message: Option<String>,
     pub content_rect: egui::Rect,
 }
 
@@ -38,6 +44,8 @@ impl Default for UiState {
             show_outline: false,
             show_minimap: false,
             show_settings: false,
+            show_about: false,
+            cleanup_message: None,
             content_rect: egui::Rect::EVERYTHING,
         }
     }
@@ -49,7 +57,7 @@ pub fn build_ui(
     ui_state: &mut UiState,
     tabs: &[TabState],
     active_tab: usize,
-    config: &crate::config::Config,
+    config: &mut crate::config::Config,
 ) -> Vec<UiAction> {
     let mut actions = Vec::new();
 
@@ -73,12 +81,39 @@ pub fn build_ui(
 
     // Settings window
     if let Some(tab) = tabs.get(active_tab) {
-        settings::show_settings_window(ctx, &mut ui_state.show_settings, config, tab);
+        actions.extend(settings::show_settings_window(
+            ctx,
+            &mut ui_state.show_settings,
+            config,
+            tab,
+        ));
     }
 
     // Minimap
     if let Some(tab) = tabs.get(active_tab) {
-        minimap::show_minimap(ctx, &mut ui_state.show_minimap, tab);
+        actions.extend(minimap::show_minimap(ctx, &mut ui_state.show_minimap, tab));
+    }
+
+    // About window
+    about::show_about_window(ctx, &mut ui_state.show_about);
+
+    // Cleanup notification toast
+    if ui_state.cleanup_message.is_some() {
+        let msg = ui_state.cleanup_message.clone().unwrap();
+        let mut dismiss = false;
+        egui::Window::new("Cleanup")
+            .collapsible(false)
+            .resizable(false)
+            .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+            .show(ctx, |ui| {
+                ui.label(&msg);
+                if ui.button("OK").clicked() {
+                    dismiss = true;
+                }
+            });
+        if dismiss {
+            ui_state.cleanup_message = None;
+        }
     }
 
     // Loading overlay

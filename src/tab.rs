@@ -1,7 +1,8 @@
+use std::collections::{HashMap, VecDeque};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::config::Config;
-use crate::layout;
+use crate::layout::{self, PageAnalysis};
 use crate::rail::RailNav;
 
 const ZOOM_MIN: f64 = 0.1;
@@ -62,6 +63,8 @@ pub struct TabState {
     pub outline: Vec<Outline>,
     pub minimap_texture: Option<egui::TextureHandle>,
     pub minimap_dirty: bool,
+    pub analysis_cache: HashMap<i32, PageAnalysis>,
+    pub pending_analysis: VecDeque<i32>,
 }
 
 impl TabState {
@@ -92,6 +95,8 @@ impl TabState {
             outline,
             minimap_texture: None,
             minimap_dirty: true,
+            analysis_cache: HashMap::new(),
+            pending_analysis: VecDeque::new(),
         })
     }
 
@@ -114,6 +119,17 @@ impl TabState {
     }
 
     pub fn analyze_current_page(&mut self, ort_session: &mut Option<ort::session::Session>) {
+        // Check cache first
+        if let Some(cached) = self.analysis_cache.get(&self.current_page) {
+            log::info!(
+                "Using cached analysis for page {} ({} blocks)",
+                self.current_page + 1,
+                cached.blocks.len()
+            );
+            self.rail.set_analysis(cached.clone());
+            return;
+        }
+
         let analysis = if let Some(session) = ort_session {
             match layout::analyze_page(session, &self.doc, self.current_page) {
                 Ok(a) => {
@@ -134,7 +150,57 @@ impl TabState {
             layout::fallback_analysis(self.page_width, self.page_height)
         };
 
+        self.analysis_cache
+            .insert(self.current_page, analysis.clone());
         self.rail.set_analysis(analysis);
+    }
+
+    /// Queue lookahead pages for background analysis.
+    pub fn queue_lookahead(&mut self, lookahead_count: usize) {
+        self.pending_analysis.clear();
+        for i in 1..=lookahead_count {
+            let page = self.current_page + i as i32;
+            if page < self.page_count && !self.analysis_cache.contains_key(&page) {
+                self.pending_analysis.push_back(page);
+            }
+        }
+    }
+
+    /// Process one pending lookahead analysis. Returns true if work was done.
+    pub fn process_pending_analysis(
+        &mut self,
+        ort_session: &mut Option<ort::session::Session>,
+    ) -> bool {
+        let page = match self.pending_analysis.pop_front() {
+            Some(p) => p,
+            None => return false,
+        };
+
+        // Skip if already cached
+        if self.analysis_cache.contains_key(&page) {
+            return !self.pending_analysis.is_empty();
+        }
+
+        let session = match ort_session {
+            Some(s) => s,
+            None => return false,
+        };
+
+        match layout::analyze_page(session, &self.doc, page) {
+            Ok(analysis) => {
+                log::info!(
+                    "Lookahead analysis: {} blocks on page {}",
+                    analysis.blocks.len(),
+                    page + 1
+                );
+                self.analysis_cache.insert(page, analysis);
+            }
+            Err(e) => {
+                log::warn!("Lookahead analysis failed for page {}: {}", page + 1, e);
+            }
+        }
+
+        true
     }
 
     pub fn update_rail_zoom(&mut self, window_width: f64, window_height: f64) {

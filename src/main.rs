@@ -25,6 +25,7 @@ use winit::{
     window::Window,
 };
 
+use railreader2::cleanup;
 use railreader2::config::Config;
 use railreader2::egui_integration::EguiIntegration;
 use railreader2::layout::{self, LAYOUT_CLASSES};
@@ -143,6 +144,9 @@ impl App {
             }
         }
 
+        let lookahead = self.config.analysis_lookahead_pages;
+        tab.queue_lookahead(lookahead);
+
         self.tabs.push(tab);
         self.active_tab = self.tabs.len() - 1;
     }
@@ -182,6 +186,7 @@ impl App {
                 UiAction::OpenFile => {
                     if let Some(path) = rfd::FileDialog::new()
                         .add_filter("PDF", &["pdf"])
+                        .set_parent(&self.env.window)
                         .pick_file()
                     {
                         self.open_document(path.to_string_lossy().to_string());
@@ -196,6 +201,8 @@ impl App {
                     if idx < self.tabs.len() {
                         self.tabs[idx].go_to_page(page, &mut self.ort_session, ww, wh);
                         self.tabs[idx].minimap_dirty = true;
+                        let lookahead = self.config.analysis_lookahead_pages;
+                        self.tabs[idx].queue_lookahead(lookahead);
                     }
                     self.update_minimap_for_active_tab();
                 }
@@ -222,6 +229,25 @@ impl App {
                 }
                 UiAction::ToggleMinimap => {
                     self.ui_state.show_minimap = !self.ui_state.show_minimap;
+                }
+                UiAction::SetCamera(ox, oy) => {
+                    let (ww, wh) = self.window_size();
+                    if let Some(tab) = self.active_tab_mut() {
+                        tab.camera.offset_x = ox;
+                        tab.camera.offset_y = oy;
+                        tab.clamp_camera(ww, wh);
+                    }
+                    self.env.window.request_redraw();
+                }
+                UiAction::ConfigChanged => {
+                    let config = self.config.clone();
+                    for tab in &mut self.tabs {
+                        tab.rail.update_config(config.clone());
+                    }
+                }
+                UiAction::RunCleanup => {
+                    let report = cleanup::run_cleanup();
+                    self.ui_state.cleanup_message = Some(report.to_string());
                 }
                 UiAction::Quit => {
                     if let Some(el) = event_loop {
@@ -578,6 +604,7 @@ impl App {
         let (ww, wh) = self.window_size();
 
         let idx = self.active_tab;
+        let lookahead = self.config.analysis_lookahead_pages;
         let ort = &mut self.ort_session;
         let tabs = &mut self.tabs;
         if let Some(dir) = key_to_direction(&event.logical_key) {
@@ -592,6 +619,7 @@ impl App {
                         match tab.rail.next_line() {
                             NavResult::PageBoundaryNext => {
                                 tab.go_to_page(current_page + 1, ort, ww, wh);
+                                tab.queue_lookahead(lookahead);
                                 if tab.rail.active {
                                     tab.start_snap(ww, wh);
                                 }
@@ -612,6 +640,7 @@ impl App {
                         match tab.rail.prev_line() {
                             NavResult::PageBoundaryPrev => {
                                 tab.go_to_page(current_page - 1, ort, ww, wh);
+                                tab.queue_lookahead(lookahead);
                                 if tab.rail.active {
                                     tab.rail.jump_to_end();
                                     tab.start_snap(ww, wh);
@@ -653,6 +682,8 @@ impl App {
                 if idx < tabs.len() {
                     let p = tabs[idx].current_page + 1;
                     tabs[idx].go_to_page(p, ort, ww, wh);
+                    let la = self.config.analysis_lookahead_pages;
+                    tabs[idx].queue_lookahead(la);
                 }
                 self.env.window.request_redraw();
             }
@@ -660,12 +691,16 @@ impl App {
                 if idx < tabs.len() {
                     let p = tabs[idx].current_page - 1;
                     tabs[idx].go_to_page(p, ort, ww, wh);
+                    let la = self.config.analysis_lookahead_pages;
+                    tabs[idx].queue_lookahead(la);
                 }
                 self.env.window.request_redraw();
             }
             Key::Named(NamedKey::Home) => {
                 if idx < tabs.len() {
                     tabs[idx].go_to_page(0, ort, ww, wh);
+                    let la = self.config.analysis_lookahead_pages;
+                    tabs[idx].queue_lookahead(la);
                 }
                 self.env.window.request_redraw();
             }
@@ -673,6 +708,8 @@ impl App {
                 if idx < tabs.len() {
                     let last = tabs[idx].page_count - 1;
                     tabs[idx].go_to_page(last, ort, ww, wh);
+                    let la = self.config.analysis_lookahead_pages;
+                    tabs[idx].queue_lookahead(la);
                 }
                 self.env.window.request_redraw();
             }
@@ -752,7 +789,7 @@ impl App {
                 &mut self.ui_state,
                 &self.tabs,
                 self.active_tab,
-                &self.config,
+                &mut self.config,
             );
 
             // End frame (captures shapes, does NOT paint yet)
@@ -841,13 +878,25 @@ impl App {
         // Process UI actions
         self.process_actions(actions, None);
 
+        // Process one pending lookahead analysis per frame (avoid blocking)
+        let has_pending = if !animating {
+            let idx = self.active_tab;
+            if idx < self.tabs.len() {
+                self.tabs[idx].process_pending_analysis(&mut self.ort_session)
+            } else {
+                false
+            }
+        } else {
+            false
+        };
+
         // Request another frame if animating
         let egui_wants_repaint = self
             .egui_integration
             .as_ref()
             .map(|e| e.wants_continuous_repaint())
             .unwrap_or(false);
-        if animating || egui_wants_repaint {
+        if animating || egui_wants_repaint || has_pending {
             self.env.window.request_redraw();
         }
     }
@@ -1126,6 +1175,12 @@ fn main() -> Result<()> {
     };
 
     let config = Config::load();
+
+    // Run cleanup on startup
+    let report = cleanup::run_cleanup();
+    if report.files_removed > 0 {
+        log::info!("Startup cleanup: {}", report);
+    }
 
     let mut app = App {
         env,
