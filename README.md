@@ -65,7 +65,11 @@ Rail reading parameters are editable via the Settings panel (gear icon in menu b
   "scroll_ramp_time": 1.5,
   "analysis_lookahead_pages": 2,
   "colour_effect": "None",
-  "colour_effect_intensity": 1.0
+  "colour_effect_intensity": 1.0,
+  "navigable_classes": [
+    "abstract", "algorithm", "aside_text", "document_title",
+    "footnote", "paragraph_title", "references", "text"
+  ]
 }
 ```
 
@@ -79,6 +83,7 @@ Rail reading parameters are editable via the Settings panel (gear icon in menu b
 | `analysis_lookahead_pages` | Number of pages to pre-analyze ahead (0 to disable) |
 | `colour_effect` | Colour filter: `None`, `HighContrast`, `HighVisibility`, `Amber`, `Invert` |
 | `colour_effect_intensity` | Effect intensity from 0.0 (off) to 1.0 (full) |
+| `navigable_classes` | Which block types rail mode navigates (array of class names). Configurable via Settings → Advanced. Add `"formula"` to include formulas, remove `"document_title"` to skip headings, etc. |
 
 ## Building
 
