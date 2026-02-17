@@ -39,12 +39,6 @@ impl Default for Camera {
     }
 }
 
-impl Camera {
-    pub fn new() -> Self {
-        Self::default()
-    }
-}
-
 pub struct TabState {
     pub id: TabId,
     pub title: String,
@@ -87,7 +81,7 @@ impl TabState {
             svg_dom: None,
             page_width: 0.0,
             page_height: 0.0,
-            camera: Camera::new(),
+            camera: Camera::default(),
             rail: RailNav::new(config.clone()),
             debug_overlay: false,
             loading: false,
@@ -317,17 +311,10 @@ fn load_outline(doc: &mupdf::Document) -> Vec<Outline> {
 fn convert_outlines(outlines: Vec<mupdf::Outline>) -> Vec<Outline> {
     outlines
         .into_iter()
-        .map(|o| {
-            let page = o.dest.map(|d| d.loc.page_number as i32);
-            Outline {
-                title: o.title,
-                page,
-                children: if o.down.is_empty() {
-                    Vec::new()
-                } else {
-                    convert_outlines(o.down)
-                },
-            }
+        .map(|o| Outline {
+            title: o.title,
+            page: o.dest.map(|d| d.loc.page_number as i32),
+            children: convert_outlines(o.down),
         })
         .collect()
 }

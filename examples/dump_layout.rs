@@ -24,8 +24,8 @@ fn main() -> Result<()> {
     );
     println!("\n{} blocks detected:\n", analysis.blocks.len());
     println!(
-        "{:<6} {:<20} {:<8} {:<40} {:<6} {}",
-        "Order", "Class", "Conf", "BBox (x, y, w, h)", "Lines", "Navigable"
+        "{:<6} {:<20} {:<8} {:<40} {:<6} Navigable",
+        "Order", "Class", "Conf", "BBox (x, y, w, h)", "Lines"
     );
     println!("{}", "-".repeat(100));
 

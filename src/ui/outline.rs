@@ -28,33 +28,31 @@ pub fn show_outline_panel(
     actions
 }
 
+fn outline_label(entry: &Outline) -> String {
+    if let Some(page) = entry.page {
+        format!("{} (p.{})", entry.title, page + 1)
+    } else {
+        entry.title.clone()
+    }
+}
+
+fn outline_link(ui: &mut egui::Ui, entry: &Outline, actions: &mut Vec<UiAction>) {
+    if ui.link(outline_label(entry)).clicked() {
+        if let Some(page) = entry.page {
+            actions.push(UiAction::GoToPage(page));
+        }
+    }
+}
+
 fn render_outline_entries(ui: &mut egui::Ui, entries: &[Outline], actions: &mut Vec<UiAction>) {
     for entry in entries {
         if entry.children.is_empty() {
-            let label = if let Some(page) = entry.page {
-                format!("{} (p.{})", entry.title, page + 1)
-            } else {
-                entry.title.clone()
-            };
-            if ui.link(&label).clicked() {
-                if let Some(page) = entry.page {
-                    actions.push(UiAction::GoToPage(page));
-                }
-            }
+            outline_link(ui, entry, actions);
         } else {
             let id = ui.make_persistent_id(&entry.title);
             egui::collapsing_header::CollapsingState::load_with_default_open(ui.ctx(), id, false)
                 .show_header(ui, |ui| {
-                    let label = if let Some(page) = entry.page {
-                        format!("{} (p.{})", entry.title, page + 1)
-                    } else {
-                        entry.title.clone()
-                    };
-                    if ui.link(&label).clicked() {
-                        if let Some(page) = entry.page {
-                            actions.push(UiAction::GoToPage(page));
-                        }
-                    }
+                    outline_link(ui, entry, actions);
                 })
                 .body(|ui| {
                     render_outline_entries(ui, &entry.children, actions);

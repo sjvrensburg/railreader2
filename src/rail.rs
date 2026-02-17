@@ -303,10 +303,6 @@ impl RailNav {
         animating
     }
 
-    pub fn is_animating(&self) -> bool {
-        self.snap.is_some() || self.scroll_dir.is_some()
-    }
-
     /// Jump to the last block and last line (for navigating back from next page).
     pub fn jump_to_end(&mut self) {
         if self.navigable_indices.is_empty() {

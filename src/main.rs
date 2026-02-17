@@ -121,29 +121,8 @@ impl App {
         tab.center_page(ww, wh);
         tab.update_rail_zoom(ww, wh);
 
-        // Update minimap texture inline (can't use update_minimap_for_active_tab before push)
         if let Some(egui_int) = &self.egui_integration {
-            match railreader2::render_page_pixmap(&tab.doc, tab.current_page, 200) {
-                Ok((rgb_bytes, px_w, px_h, _, _)) => {
-                    let pixels: Vec<egui::Color32> = rgb_bytes
-                        .chunks_exact(3)
-                        .map(|c| egui::Color32::from_rgb(c[0], c[1], c[2]))
-                        .collect();
-                    let image = egui::ColorImage {
-                        size: [px_w as usize, px_h as usize],
-                        pixels,
-                    };
-                    tab.minimap_texture = Some(egui_int.ctx.load_texture(
-                        format!("minimap_{}", tab.id),
-                        image,
-                        egui::TextureOptions::LINEAR,
-                    ));
-                    tab.minimap_dirty = false;
-                }
-                Err(e) => {
-                    log::warn!("Failed to render minimap: {}", e);
-                }
-            }
+            update_minimap_texture(&mut tab, &egui_int.ctx);
         }
 
         let lookahead = self.config.analysis_lookahead_pages;
@@ -266,38 +245,15 @@ impl App {
                         el.exit();
                     }
                 }
-                UiAction::None => {}
             }
         }
     }
 
     fn update_minimap_for_active_tab(&mut self) {
-        // Can't easily do this with borrow checker — inline the logic
         let active = self.active_tab;
         if let (Some(egui_int), Some(tab)) = (&self.egui_integration, self.tabs.get_mut(active)) {
-            if !tab.minimap_dirty {
-                return;
-            }
-            match railreader2::render_page_pixmap(&tab.doc, tab.current_page, 200) {
-                Ok((rgb_bytes, px_w, px_h, _, _)) => {
-                    let pixels: Vec<egui::Color32> = rgb_bytes
-                        .chunks_exact(3)
-                        .map(|c| egui::Color32::from_rgb(c[0], c[1], c[2]))
-                        .collect();
-                    let image = egui::ColorImage {
-                        size: [px_w as usize, px_h as usize],
-                        pixels,
-                    };
-                    tab.minimap_texture = Some(egui_int.ctx.load_texture(
-                        format!("minimap_{}", tab.id),
-                        image,
-                        egui::TextureOptions::LINEAR,
-                    ));
-                    tab.minimap_dirty = false;
-                }
-                Err(e) => {
-                    log::warn!("Failed to render minimap: {}", e);
-                }
+            if tab.minimap_dirty {
+                update_minimap_texture(tab, &egui_int.ctx);
             }
         }
     }
@@ -697,42 +653,22 @@ impl App {
             return;
         }
 
+        // Page navigation keys
+        let nav_page = match &event.logical_key {
+            Key::Named(NamedKey::PageDown) if idx < tabs.len() => Some(tabs[idx].current_page + 1),
+            Key::Named(NamedKey::PageUp) if idx < tabs.len() => Some(tabs[idx].current_page - 1),
+            Key::Named(NamedKey::Home) if idx < tabs.len() => Some(0),
+            Key::Named(NamedKey::End) if idx < tabs.len() => Some(tabs[idx].page_count - 1),
+            _ => None,
+        };
+        if let Some(page) = nav_page {
+            tabs[idx].go_to_page(page, ort, &navigable, ww, wh);
+            tabs[idx].queue_lookahead(lookahead);
+            self.env.window.request_redraw();
+            return;
+        }
+
         match &event.logical_key {
-            Key::Named(NamedKey::PageDown) => {
-                if idx < tabs.len() {
-                    let p = tabs[idx].current_page + 1;
-                    tabs[idx].go_to_page(p, ort, &navigable, ww, wh);
-                    let la = self.config.analysis_lookahead_pages;
-                    tabs[idx].queue_lookahead(la);
-                }
-                self.env.window.request_redraw();
-            }
-            Key::Named(NamedKey::PageUp) => {
-                if idx < tabs.len() {
-                    let p = tabs[idx].current_page - 1;
-                    tabs[idx].go_to_page(p, ort, &navigable, ww, wh);
-                    let la = self.config.analysis_lookahead_pages;
-                    tabs[idx].queue_lookahead(la);
-                }
-                self.env.window.request_redraw();
-            }
-            Key::Named(NamedKey::Home) => {
-                if idx < tabs.len() {
-                    tabs[idx].go_to_page(0, ort, &navigable, ww, wh);
-                    let la = self.config.analysis_lookahead_pages;
-                    tabs[idx].queue_lookahead(la);
-                }
-                self.env.window.request_redraw();
-            }
-            Key::Named(NamedKey::End) => {
-                if idx < tabs.len() {
-                    let last = tabs[idx].page_count - 1;
-                    tabs[idx].go_to_page(last, ort, &navigable, ww, wh);
-                    let la = self.config.analysis_lookahead_pages;
-                    tabs[idx].queue_lookahead(la);
-                }
-                self.env.window.request_redraw();
-            }
             Key::Character(c) if c.as_str() == "+" || c.as_str() == "=" => {
                 if idx < self.tabs.len() {
                     let new_zoom = self.tabs[idx].camera.zoom * ZOOM_STEP;
@@ -796,13 +732,17 @@ impl App {
         // 1. Reset Skia's cached GL state
         self.env.gr_context.reset(None);
 
-        // 2-4. egui: begin_frame, build_ui, capture content_rect
+        // egui: begin_frame, build_ui, end_frame
+        // Clone the egui::Context (cheap Arc clone) to release the mutable borrow
+        // on self.egui_integration, allowing build_ui to borrow other App fields.
+        #[allow(clippy::unnecessary_unwrap)]
         let actions = if self.egui_integration.is_some() {
-            let ctx = {
-                let egui_int = self.egui_integration.as_mut().unwrap();
-                let ctx = egui_int.begin_frame(&self.env.window);
-                ctx.clone()
-            };
+            let ctx = self
+                .egui_integration
+                .as_mut()
+                .unwrap()
+                .begin_frame(&self.env.window)
+                .clone();
 
             let actions = ui::build_ui(
                 &ctx,
@@ -812,10 +752,10 @@ impl App {
                 &mut self.config,
             );
 
-            // End frame (captures shapes, does NOT paint yet)
-            if let Some(egui_int) = &mut self.egui_integration {
-                egui_int.end_frame(&self.env.window);
-            }
+            self.egui_integration
+                .as_mut()
+                .unwrap()
+                .end_frame(&self.env.window);
 
             actions
         } else {
@@ -934,8 +874,7 @@ impl App {
         let egui_wants_repaint = self
             .egui_integration
             .as_ref()
-            .map(|e| e.wants_continuous_repaint())
-            .unwrap_or(false);
+            .is_some_and(|e| e.wants_continuous_repaint());
         if animating || egui_wants_repaint || has_pending {
             self.env.window.request_redraw();
         }
@@ -954,6 +893,30 @@ fn draw_welcome(canvas: &skia_safe::Canvas, width: u32, height: u32, font: &Font
         font,
         &paint,
     );
+}
+
+fn update_minimap_texture(tab: &mut TabState, ctx: &egui::Context) {
+    match railreader2::render_page_pixmap(&tab.doc, tab.current_page, 200) {
+        Ok((rgb_bytes, px_w, px_h, _, _)) => {
+            let pixels: Vec<egui::Color32> = rgb_bytes
+                .chunks_exact(3)
+                .map(|c| egui::Color32::from_rgb(c[0], c[1], c[2]))
+                .collect();
+            let image = egui::ColorImage {
+                size: [px_w as usize, px_h as usize],
+                pixels,
+            };
+            tab.minimap_texture = Some(ctx.load_texture(
+                format!("minimap_{}", tab.id),
+                image,
+                egui::TextureOptions::LINEAR,
+            ));
+            tab.minimap_dirty = false;
+        }
+        Err(e) => {
+            log::warn!("Failed to render minimap: {}", e);
+        }
+    }
 }
 
 fn key_to_direction(key: &Key) -> Option<Direction> {
@@ -1006,8 +969,8 @@ impl ApplicationHandler for App {
         } else {
             None
         };
-        let egui_consumed = egui_response.as_ref().map(|r| r.consumed).unwrap_or(false);
-        let egui_repaint = egui_response.as_ref().map(|r| r.repaint).unwrap_or(false);
+        let egui_consumed = egui_response.as_ref().is_some_and(|r| r.consumed);
+        let egui_repaint = egui_response.as_ref().is_some_and(|r| r.repaint);
 
         match event {
             WindowEvent::CloseRequested => event_loop.exit(),
@@ -1033,8 +996,7 @@ impl ApplicationHandler for App {
                     || self
                         .egui_integration
                         .as_ref()
-                        .map(|e| e.ctx.wants_keyboard_input())
-                        .unwrap_or(false);
+                        .is_some_and(|e| e.ctx.wants_keyboard_input());
                 if !consumed {
                     if event.state == ElementState::Released {
                         self.handle_key_release(event);
