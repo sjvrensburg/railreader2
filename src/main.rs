@@ -33,6 +33,7 @@ use railreader2::layout::{self, LAYOUT_CLASSES};
 use railreader2::rail::{NavResult, RailNav, ScrollDir};
 use railreader2::tab::TabState;
 use railreader2::ui::{self, UiAction, UiState};
+use railreader2::worker::AnalysisWorker;
 
 const ZOOM_MIN: f64 = 0.1;
 const ZOOM_MAX: f64 = 20.0;
@@ -72,7 +73,7 @@ struct App {
     env: Env,
     tabs: Vec<TabState>,
     active_tab: usize,
-    ort_session: Option<ort::session::Session>,
+    worker: Option<AnalysisWorker>,
     config: Config,
     egui_integration: Option<EguiIntegration>,
     ui_state: UiState,
@@ -116,7 +117,7 @@ impl App {
             }
         };
 
-        tab.load_page(&mut self.ort_session, &self.config.navigable_classes);
+        tab.load_page(&mut self.worker, &self.config.navigable_classes);
         let (ww, wh) = self.window_size();
         tab.center_page(ww, wh);
         tab.update_rail_zoom(ww, wh);
@@ -181,7 +182,7 @@ impl App {
                     let idx = self.active_tab;
                     if idx < self.tabs.len() {
                         let navigable = self.config.navigable_classes.clone();
-                        self.tabs[idx].go_to_page(page, &mut self.ort_session, &navigable, ww, wh);
+                        self.tabs[idx].go_to_page(page, &mut self.worker, &navigable, ww, wh);
                         self.tabs[idx].minimap_dirty = true;
                         let lookahead = self.config.analysis_lookahead_pages;
                         self.tabs[idx].queue_lookahead(lookahead);
@@ -581,7 +582,7 @@ impl App {
         let idx = self.active_tab;
         let lookahead = self.config.analysis_lookahead_pages;
         let navigable = self.config.navigable_classes.clone();
-        let ort = &mut self.ort_session;
+        let ort = &mut self.worker;
         let tabs = &mut self.tabs;
         if let Some(dir) = key_to_direction(&event.logical_key) {
             if idx >= tabs.len() {
@@ -725,8 +726,11 @@ impl App {
             false
         };
 
-        // Update minimap if dirty
-        self.update_minimap_for_active_tab();
+        // Defer minimap rendering to non-animating frames to avoid stacking
+        // with other expensive operations
+        if !animating {
+            self.update_minimap_for_active_tab();
+        }
 
         // --- Phase 2: Reordered rendering pipeline ---
         // 1. Reset Skia's cached GL state
@@ -935,11 +939,37 @@ impl App {
         // Process UI actions
         self.process_actions(actions, None);
 
-        // Process one pending lookahead analysis per frame (avoid blocking)
+        // Poll for completed analysis results from the worker
+        let mut got_results = false;
+        let (ww, wh) = self.window_size();
+        if let Some(worker) = &mut self.worker {
+            while let Some(result) = worker.poll() {
+                got_results = true;
+                log::info!(
+                    "Received analysis result for page {} ({} blocks)",
+                    result.page + 1,
+                    result.analysis.blocks.len()
+                );
+                let navigable = self.config.navigable_classes.clone();
+                for tab in &mut self.tabs {
+                    tab.analysis_cache
+                        .insert(result.page, result.analysis.clone());
+                    if tab.current_page == result.page && tab.pending_rail_setup {
+                        tab.rail.set_analysis(result.analysis.clone(), &navigable);
+                        tab.pending_rail_setup = false;
+                        if tab.rail.active {
+                            tab.start_snap(ww, wh);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Submit one pending lookahead per frame (non-blocking)
         let has_pending = if !animating {
             let idx = self.active_tab;
             if idx < self.tabs.len() {
-                self.tabs[idx].process_pending_analysis(&mut self.ort_session)
+                self.tabs[idx].submit_pending_lookahead(&mut self.worker)
             } else {
                 false
             }
@@ -947,12 +977,15 @@ impl App {
             false
         };
 
-        // Request another frame if animating
+        // Track if worker has in-flight requests (need to keep polling)
+        let worker_busy = self.worker.as_ref().is_some_and(|w| !w.is_idle());
+
+        // Request another frame if animating or worker has pending work
         let egui_wants_repaint = self
             .egui_integration
             .as_ref()
             .is_some_and(|e| e.wants_continuous_repaint());
-        if animating || egui_wants_repaint || has_pending {
+        if animating || egui_wants_repaint || has_pending || worker_busy || got_results {
             self.env.window.request_redraw();
         }
     }
@@ -1032,7 +1065,7 @@ impl ApplicationHandler for App {
             if let Some(page) = self.tabs[idx].pending_page_load.take() {
                 let (ww, wh) = self.window_size();
                 let navigable = self.config.navigable_classes.clone();
-                self.tabs[idx].go_to_page(page, &mut self.ort_session, &navigable, ww, wh);
+                self.tabs[idx].go_to_page(page, &mut self.worker, &navigable, ww, wh);
                 self.env.window.request_redraw();
                 return;
             }
@@ -1102,11 +1135,11 @@ fn main() -> Result<()> {
     // Try to load ONNX model
     let model_path =
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("models/PP-DocLayoutV3.onnx");
-    let ort_session = if model_path.exists() {
+    let worker = if model_path.exists() {
         match layout::load_model(model_path.to_str().unwrap()) {
             Ok(session) => {
                 log::info!("Loaded ONNX model from {}", model_path.display());
-                Some(session)
+                Some(AnalysisWorker::new(session))
             }
             Err(e) => {
                 log::warn!("Failed to load ONNX model: {}", e);
@@ -1275,7 +1308,7 @@ fn main() -> Result<()> {
         env,
         tabs: Vec::new(),
         active_tab: 0,
-        ort_session,
+        worker,
         config,
         egui_integration,
         ui_state: UiState::default(),
