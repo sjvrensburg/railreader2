@@ -30,6 +30,8 @@ impl AnalysisWorker {
             .spawn(move || {
                 while let Ok(request) = req_rx.recv() {
                     let page = request.page;
+                    let page_w = request.input.page_w;
+                    let page_h = request.input.page_h;
                     match layout::run_analysis(&mut session, request.input) {
                         Ok(analysis) => {
                             if res_tx.send(AnalysisResult { page, analysis }).is_err() {
@@ -39,7 +41,7 @@ impl AnalysisWorker {
                         Err(e) => {
                             log::warn!("Worker analysis failed for page {}: {}", page + 1, e);
                             // Send a fallback so the main thread knows this page is done
-                            let fallback = layout::fallback_analysis(0.0, 0.0);
+                            let fallback = layout::fallback_analysis(page_w, page_h);
                             if res_tx
                                 .send(AnalysisResult {
                                     page,

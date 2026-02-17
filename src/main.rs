@@ -35,8 +35,8 @@ use railreader2::tab::TabState;
 use railreader2::ui::{self, UiAction, UiState};
 use railreader2::worker::AnalysisWorker;
 
-const ZOOM_MIN: f64 = 0.1;
-const ZOOM_MAX: f64 = 20.0;
+use railreader2::tab::{ZOOM_MAX, ZOOM_MIN};
+
 const ZOOM_STEP: f64 = 1.25;
 const SCROLL_PIXELS_PER_LINE: f64 = 30.0;
 const ZOOM_SCROLL_SENSITIVITY: f64 = 0.003;
@@ -1017,7 +1017,7 @@ fn update_minimap_texture(tab: &mut TabState, ctx: &egui::Context) {
                 pixels,
             };
             tab.minimap_texture = Some(ctx.load_texture(
-                format!("minimap_{}", tab.id),
+                format!("minimap_{}_{}", tab.file_path, tab.current_page),
                 image,
                 egui::TextureOptions::LINEAR,
             ));

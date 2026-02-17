@@ -1,4 +1,4 @@
-use crate::colour_effect::ColourEffect;
+use crate::colour_effect::COLOUR_EFFECTS;
 use crate::config::Config;
 use crate::tab::TabState;
 use crate::ui::{UiAction, UiState};
@@ -89,20 +89,7 @@ pub fn show_menu_bar(
                 }
                 ui.separator();
                 ui.menu_button("Colour Effects", |ui| {
-                    let effects = [
-                        (ColourEffect::None, "No colour effect"),
-                        (
-                            ColourEffect::HighContrast,
-                            "White on black for glare reduction",
-                        ),
-                        (
-                            ColourEffect::HighVisibility,
-                            "Yellow on black for maximum legibility",
-                        ),
-                        (ColourEffect::Amber, "Warm amber tint for haze reduction"),
-                        (ColourEffect::Invert, "Invert colours for eye strain relief"),
-                    ];
-                    for (effect, hover) in effects {
+                    for &(effect, hover) in COLOUR_EFFECTS {
                         let selected = config.colour_effect == effect;
                         let resp = ui.selectable_label(selected, effect.to_string());
                         if resp.on_hover_text(hover).clicked() {

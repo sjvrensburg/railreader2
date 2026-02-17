@@ -19,7 +19,7 @@ pub fn show_loading_overlay(ctx: &egui::Context) {
                     let center_y = screen.height() / 2.0 - 20.0;
                     ui.add_space(center_y);
                     ui.spinner();
-                    ui.label("Analyzing layout...");
+                    ui.label("Loading page...");
                 });
             });
         });

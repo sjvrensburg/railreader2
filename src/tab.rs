@@ -1,21 +1,12 @@
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::config::Config;
 use crate::layout::{self, PageAnalysis};
 use crate::rail::RailNav;
 use crate::worker::{AnalysisRequest, AnalysisWorker};
 
-const ZOOM_MIN: f64 = 0.1;
-const ZOOM_MAX: f64 = 20.0;
-
-static NEXT_TAB_ID: AtomicU64 = AtomicU64::new(1);
-
-pub type TabId = u64;
-
-fn next_tab_id() -> TabId {
-    NEXT_TAB_ID.fetch_add(1, Ordering::Relaxed)
-}
+pub const ZOOM_MIN: f64 = 0.1;
+pub const ZOOM_MAX: f64 = 20.0;
 
 #[derive(Debug, Clone)]
 pub struct Outline {
@@ -41,7 +32,6 @@ impl Default for Camera {
 }
 
 pub struct TabState {
-    pub id: TabId,
     pub title: String,
     pub file_path: String,
     pub doc: mupdf::Document,
@@ -87,7 +77,6 @@ impl TabState {
         let outline = load_outline(&doc);
 
         Ok(Self {
-            id: next_tab_id(),
             title,
             file_path,
             doc,

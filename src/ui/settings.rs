@@ -1,4 +1,4 @@
-use crate::colour_effect::ColourEffect;
+use crate::colour_effect::COLOUR_EFFECTS;
 use crate::config::Config;
 use crate::layout::{default_navigable_classes, LAYOUT_CLASSES};
 use crate::tab::TabState;
@@ -102,14 +102,7 @@ pub fn show_settings_window(
                 egui::ComboBox::from_id_salt("colour_effect_combo")
                     .selected_text(current_label)
                     .show_ui(ui, |ui| {
-                        let effects = [
-                            ColourEffect::None,
-                            ColourEffect::HighContrast,
-                            ColourEffect::HighVisibility,
-                            ColourEffect::Amber,
-                            ColourEffect::Invert,
-                        ];
-                        for effect in effects {
+                        for &(effect, _) in COLOUR_EFFECTS {
                             if ui
                                 .selectable_label(
                                     config.colour_effect == effect,
