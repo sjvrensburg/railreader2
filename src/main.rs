@@ -25,9 +25,13 @@ use winit::{
     window::Window,
 };
 
+use railreader2::cleanup;
 use railreader2::config::Config;
+use railreader2::egui_integration::EguiIntegration;
 use railreader2::layout::{self, LAYOUT_CLASSES};
 use railreader2::rail::{NavResult, RailNav, ScrollDir};
+use railreader2::tab::TabState;
+use railreader2::ui::{self, UiAction, UiState};
 
 const ZOOM_MIN: f64 = 0.1;
 const ZOOM_MAX: f64 = 20.0;
@@ -35,7 +39,6 @@ const ZOOM_STEP: f64 = 1.25;
 const SCROLL_PIXELS_PER_LINE: f64 = 30.0;
 const ZOOM_SCROLL_SENSITIVITY: f64 = 0.003;
 const PAN_STEP: f64 = 50.0;
-const STATUS_BAR_HEIGHT: f32 = 28.0;
 const DEFAULT_WINDOW_WIDTH: f64 = 1200.0;
 const DEFAULT_WINDOW_HEIGHT: f64 = 900.0;
 
@@ -44,22 +47,6 @@ enum Direction {
     Down,
     Left,
     Right,
-}
-
-struct Camera {
-    offset_x: f64,
-    offset_y: f64,
-    zoom: f64,
-}
-
-impl Camera {
-    fn new() -> Self {
-        Self {
-            offset_x: 0.0,
-            offset_y: 0.0,
-            zoom: 1.0,
-        }
-    }
 }
 
 /// Ensures DirectContext drops before Window (prevents AMD GPU segfaults).
@@ -82,158 +69,224 @@ impl Drop for Env {
 
 struct App {
     env: Env,
-    doc: mupdf::Document,
-    current_page: i32,
-    page_count: i32,
-    svg_dom: Option<skia_safe::svg::Dom>,
-    page_width: f64,
-    page_height: f64,
-    camera: Camera,
+    tabs: Vec<TabState>,
+    active_tab: usize,
+    ort_session: Option<ort::session::Session>,
+    config: Config,
+    egui_integration: Option<EguiIntegration>,
+    ui_state: UiState,
+    modifiers: Modifiers,
     dragging: bool,
     last_cursor: Option<(f64, f64)>,
     cursor_pos: (f64, f64),
-    modifiers: Modifiers,
-    status_font: Font,
-    ort_session: Option<ort::session::Session>,
-    rail: RailNav,
-    debug_overlay: bool,
-    loading: bool,
     last_frame: std::time::Instant,
+    status_font: Font,
 }
 
 impl App {
-    fn load_page(&mut self) {
-        match railreader2::render_page_svg(&self.doc, self.current_page) {
-            Ok((svg_string, w, h)) => {
-                self.page_width = w;
-                self.page_height = h;
-                let font_mgr = skia_safe::FontMgr::default();
-                self.svg_dom = skia_safe::svg::Dom::from_str(svg_string, font_mgr).ok();
-            }
-            Err(e) => {
-                log::error!("Failed to render page {}: {}", self.current_page, e);
-                self.svg_dom = None;
-            }
-        }
-
-        // Run layout analysis
-        self.analyze_current_page();
+    fn window_size(&self) -> (f64, f64) {
+        let size = self.env.window.inner_size();
+        (size.width as f64, size.height as f64)
     }
 
-    fn analyze_current_page(&mut self) {
-        let analysis = if let Some(session) = &mut self.ort_session {
-            match layout::analyze_page(session, &self.doc, self.current_page) {
-                Ok(a) => {
-                    log::info!(
-                        "Layout analysis: {} blocks detected on page {}",
-                        a.blocks.len(),
-                        self.current_page + 1
-                    );
-                    a
-                }
-                Err(e) => {
-                    log::warn!("Layout analysis failed: {}, using fallback", e);
-                    layout::fallback_analysis(self.page_width, self.page_height)
-                }
+    fn active_tab(&self) -> Option<&TabState> {
+        self.tabs.get(self.active_tab)
+    }
+
+    fn active_tab_mut(&mut self) -> Option<&mut TabState> {
+        self.tabs.get_mut(self.active_tab)
+    }
+
+    fn open_document(&mut self, path: String) {
+        let doc = match mupdf::Document::open(&path) {
+            Ok(d) => d,
+            Err(e) => {
+                log::error!("Failed to open {}: {}", path, e);
+                return;
             }
-        } else {
-            log::info!("No ONNX model loaded, using fallback layout");
-            layout::fallback_analysis(self.page_width, self.page_height)
         };
 
-        self.rail.set_analysis(analysis);
-        self.update_rail_zoom();
-    }
+        let mut tab = match TabState::new(path, doc, &self.config) {
+            Ok(t) => t,
+            Err(e) => {
+                log::error!("Failed to create tab: {}", e);
+                return;
+            }
+        };
 
-    fn update_rail_zoom(&mut self) {
-        let size = self.env.window.inner_size();
-        self.rail.update_zoom(
-            self.camera.zoom,
-            self.camera.offset_x,
-            self.camera.offset_y,
-            size.width as f64,
-            size.height as f64,
-        );
-    }
+        tab.load_page(&mut self.ort_session);
+        let (ww, wh) = self.window_size();
+        tab.center_page(ww, wh);
+        tab.update_rail_zoom(ww, wh);
 
-    fn apply_zoom(&mut self, new_zoom: f64) {
-        self.camera.zoom = new_zoom.clamp(ZOOM_MIN, ZOOM_MAX);
-        self.update_rail_zoom();
-        if self.rail.active {
-            self.start_snap();
+        // Update minimap texture inline (can't use update_minimap_for_active_tab before push)
+        if let Some(egui_int) = &self.egui_integration {
+            match railreader2::render_page_pixmap(&tab.doc, tab.current_page, 200) {
+                Ok((rgb_bytes, px_w, px_h, _, _)) => {
+                    let pixels: Vec<egui::Color32> = rgb_bytes
+                        .chunks_exact(3)
+                        .map(|c| egui::Color32::from_rgb(c[0], c[1], c[2]))
+                        .collect();
+                    let image = egui::ColorImage {
+                        size: [px_w as usize, px_h as usize],
+                        pixels,
+                    };
+                    tab.minimap_texture = Some(egui_int.ctx.load_texture(
+                        format!("minimap_{}", tab.id),
+                        image,
+                        egui::TextureOptions::LINEAR,
+                    ));
+                    tab.minimap_dirty = false;
+                }
+                Err(e) => {
+                    log::warn!("Failed to render minimap: {}", e);
+                }
+            }
         }
-        self.clamp_camera();
+
+        let lookahead = self.config.analysis_lookahead_pages;
+        tab.queue_lookahead(lookahead);
+
+        self.tabs.push(tab);
+        self.active_tab = self.tabs.len() - 1;
     }
 
-    fn go_to_page(&mut self, page: i32) {
-        let page = page.clamp(0, self.page_count - 1);
-        if page != self.current_page {
-            self.loading = true;
-            self.env.window.request_redraw(); // Show loading state immediately
-            self.current_page = page;
-            let old_zoom = self.camera.zoom;
-            self.load_page();
-            // Preserve zoom level, just re-center at the same zoom
-            self.camera.zoom = old_zoom;
-            self.clamp_camera();
-            self.loading = false;
-        }
-    }
-
-    fn start_snap(&mut self) {
-        let size = self.env.window.inner_size();
-        self.rail.start_snap_to_current(
-            self.camera.offset_x,
-            self.camera.offset_y,
-            self.camera.zoom,
-            size.width as f64,
-            size.height as f64,
-        );
-    }
-
-    /// Center the page in the window (fit-to-window zoom).
-    fn center_page(&mut self) {
-        let size = self.env.window.inner_size();
-        let ww = size.width as f64;
-        let wh = size.height as f64;
-        if self.page_width <= 0.0 || self.page_height <= 0.0 || ww <= 0.0 || wh <= 0.0 {
+    fn close_tab(&mut self, index: usize) {
+        if index >= self.tabs.len() {
             return;
         }
-        // Fit page in window
-        let scale_x = ww / self.page_width;
-        let scale_y = wh / self.page_height;
-        self.camera.zoom = scale_x.min(scale_y);
-        // Center
-        let scaled_w = self.page_width * self.camera.zoom;
-        let scaled_h = self.page_height * self.camera.zoom;
-        self.camera.offset_x = (ww - scaled_w) / 2.0;
-        self.camera.offset_y = (wh - scaled_h) / 2.0;
+        self.tabs.remove(index);
+        if self.tabs.is_empty() {
+            self.active_tab = 0;
+        } else if self.active_tab >= self.tabs.len() {
+            self.active_tab = self.tabs.len() - 1;
+        }
     }
 
-    /// Clamp camera so the page can't be scrolled out of view.
-    fn clamp_camera(&mut self) {
-        let size = self.env.window.inner_size();
-        let ww = size.width as f64;
-        let wh = size.height as f64;
-        let scaled_w = self.page_width * self.camera.zoom;
-        let scaled_h = self.page_height * self.camera.zoom;
-
-        // If page is smaller than window, center it
-        if scaled_w <= ww {
-            self.camera.offset_x = (ww - scaled_w) / 2.0;
-        } else {
-            // Clamp: don't scroll past left or right edge
-            let min_x = ww - scaled_w;
-            let max_x = 0.0;
-            self.camera.offset_x = self.camera.offset_x.clamp(min_x, max_x);
+    fn select_tab(&mut self, index: usize) {
+        if index < self.tabs.len() {
+            self.active_tab = index;
         }
+    }
 
-        if scaled_h <= wh {
-            self.camera.offset_y = (wh - scaled_h) / 2.0;
-        } else {
-            let min_y = wh - scaled_h;
-            let max_y = 0.0;
-            self.camera.offset_y = self.camera.offset_y.clamp(min_y, max_y);
+    fn duplicate_tab(&mut self) {
+        if let Some(tab) = self.active_tab() {
+            let path = tab.file_path.clone();
+            self.open_document(path);
+        }
+    }
+
+    fn process_actions(
+        &mut self,
+        actions: Vec<UiAction>,
+        event_loop: Option<&winit::event_loop::ActiveEventLoop>,
+    ) {
+        for action in actions {
+            match action {
+                UiAction::OpenFile => {
+                    if let Some(path) = rfd::FileDialog::new()
+                        .add_filter("PDF", &["pdf"])
+                        .set_parent(&self.env.window)
+                        .pick_file()
+                    {
+                        self.open_document(path.to_string_lossy().to_string());
+                    }
+                }
+                UiAction::CloseTab(idx) => self.close_tab(idx),
+                UiAction::SelectTab(idx) => self.select_tab(idx),
+                UiAction::DuplicateTab => self.duplicate_tab(),
+                UiAction::GoToPage(page) => {
+                    let (ww, wh) = self.window_size();
+                    let idx = self.active_tab;
+                    if idx < self.tabs.len() {
+                        self.tabs[idx].go_to_page(page, &mut self.ort_session, ww, wh);
+                        self.tabs[idx].minimap_dirty = true;
+                        let lookahead = self.config.analysis_lookahead_pages;
+                        self.tabs[idx].queue_lookahead(lookahead);
+                    }
+                    self.update_minimap_for_active_tab();
+                }
+                UiAction::SetZoom(zoom) => {
+                    let (ww, wh) = self.window_size();
+                    if let Some(tab) = self.active_tab_mut() {
+                        tab.apply_zoom(zoom, ww, wh);
+                    }
+                }
+                UiAction::FitPage => {
+                    let (ww, wh) = self.window_size();
+                    if let Some(tab) = self.active_tab_mut() {
+                        tab.center_page(ww, wh);
+                        tab.update_rail_zoom(ww, wh);
+                    }
+                }
+                UiAction::ToggleDebug => {
+                    if let Some(tab) = self.active_tab_mut() {
+                        tab.debug_overlay = !tab.debug_overlay;
+                    }
+                }
+                UiAction::ToggleOutline => {
+                    self.ui_state.show_outline = !self.ui_state.show_outline;
+                }
+                UiAction::ToggleMinimap => {
+                    self.ui_state.show_minimap = !self.ui_state.show_minimap;
+                }
+                UiAction::SetCamera(ox, oy) => {
+                    let (ww, wh) = self.window_size();
+                    if let Some(tab) = self.active_tab_mut() {
+                        tab.camera.offset_x = ox;
+                        tab.camera.offset_y = oy;
+                        tab.clamp_camera(ww, wh);
+                    }
+                    self.env.window.request_redraw();
+                }
+                UiAction::ConfigChanged => {
+                    let config = self.config.clone();
+                    for tab in &mut self.tabs {
+                        tab.rail.update_config(config.clone());
+                    }
+                }
+                UiAction::RunCleanup => {
+                    let report = cleanup::run_cleanup();
+                    self.ui_state.cleanup_message = Some(report.to_string());
+                }
+                UiAction::Quit => {
+                    if let Some(el) = event_loop {
+                        el.exit();
+                    }
+                }
+                UiAction::None => {}
+            }
+        }
+    }
+
+    fn update_minimap_for_active_tab(&mut self) {
+        // Can't easily do this with borrow checker — inline the logic
+        let active = self.active_tab;
+        if let (Some(egui_int), Some(tab)) = (&self.egui_integration, self.tabs.get_mut(active)) {
+            if !tab.minimap_dirty {
+                return;
+            }
+            match railreader2::render_page_pixmap(&tab.doc, tab.current_page, 200) {
+                Ok((rgb_bytes, px_w, px_h, _, _)) => {
+                    let pixels: Vec<egui::Color32> = rgb_bytes
+                        .chunks_exact(3)
+                        .map(|c| egui::Color32::from_rgb(c[0], c[1], c[2]))
+                        .collect();
+                    let image = egui::ColorImage {
+                        size: [px_w as usize, px_h as usize],
+                        pixels,
+                    };
+                    tab.minimap_texture = Some(egui_int.ctx.load_texture(
+                        format!("minimap_{}", tab.id),
+                        image,
+                        egui::TextureOptions::LINEAR,
+                    ));
+                    tab.minimap_dirty = false;
+                }
+                Err(e) => {
+                    log::warn!("Failed to render minimap: {}", e);
+                }
+            }
         }
     }
 }
@@ -264,59 +317,6 @@ fn create_surface(
     .expect("Could not create skia surface")
 }
 
-#[allow(clippy::too_many_arguments)]
-fn draw_status_bar(
-    canvas: &skia_safe::Canvas,
-    width: u32,
-    height: u32,
-    font: &Font,
-    camera: &Camera,
-    current_page: i32,
-    page_count: i32,
-    rail: &RailNav,
-) {
-    let bar_y = height as f32 - STATUS_BAR_HEIGHT;
-
-    let mut bg_paint = Paint::default();
-    bg_paint.set_color(Color::from_argb(180, 0, 0, 0));
-    canvas.draw_rect(
-        Rect::from_xywh(0.0, bar_y, width as f32, STATUS_BAR_HEIGHT),
-        &bg_paint,
-    );
-
-    let zoom_pct = (camera.zoom * 100.0).round() as i32;
-    let status = if rail.active {
-        format!(
-            "Page {}/{} | Zoom: {}% | Block {}/{} | Line {}/{}",
-            current_page + 1,
-            page_count,
-            zoom_pct,
-            rail.current_block + 1,
-            rail.navigable_count(),
-            rail.current_line + 1,
-            rail.current_line_count(),
-        )
-    } else {
-        format!(
-            "Page {}/{} | Zoom: {}%",
-            current_page + 1,
-            page_count,
-            zoom_pct
-        )
-    };
-
-    let mut text_paint = Paint::default();
-    text_paint.set_color(Color::WHITE);
-    text_paint.set_anti_alias(true);
-
-    canvas.draw_str(
-        &status,
-        (10.0, bar_y + STATUS_BAR_HEIGHT * 0.72),
-        font,
-        &text_paint,
-    );
-}
-
 fn draw_rail_overlays(
     canvas: &skia_safe::Canvas,
     rail: &RailNav,
@@ -331,7 +331,6 @@ fn draw_rail_overlays(
         return;
     }
 
-    // Dimming: semi-transparent overlay over entire page
     let mut dim_paint = Paint::default();
     dim_paint.set_color(Color::from_argb(120, 0, 0, 0));
     canvas.draw_rect(
@@ -339,7 +338,6 @@ fn draw_rail_overlays(
         &dim_paint,
     );
 
-    // Draw current block area back to full brightness (clear the dimming)
     let block = rail.current_navigable_block();
     let margin = 4.0f32;
     let block_rect = Rect::from_xywh(
@@ -349,17 +347,14 @@ fn draw_rail_overlays(
         block.bbox.h + margin * 2.0,
     );
 
-    // Save, clip to block area, and draw white + restore effect
     canvas.save();
     canvas.clip_rect(block_rect, skia_safe::ClipOp::Intersect, false);
-    // Undo the dimming by drawing the inverse
     let mut clear_paint = Paint::default();
     clear_paint.set_color(Color::from_argb(120, 255, 255, 255));
     clear_paint.set_blend_mode(skia_safe::BlendMode::Plus);
     canvas.draw_rect(block_rect, &clear_paint);
     canvas.restore();
 
-    // Block outline
     let mut outline_paint = Paint::default();
     outline_paint.set_color(Color::from_argb(80, 66, 133, 244));
     outline_paint.set_style(skia_safe::paint::Style::Stroke);
@@ -370,7 +365,6 @@ fn draw_rail_overlays(
         &outline_paint,
     );
 
-    // Line highlight
     let line = rail.current_line_info();
     let mut line_paint = Paint::default();
     line_paint.set_color(Color::from_argb(40, 66, 133, 244));
@@ -396,12 +390,12 @@ fn draw_debug_overlay(canvas: &skia_safe::Canvas, rail: &RailNav) {
     };
 
     let colors: [(u8, u8, u8); 6] = [
-        (244, 67, 54),  // red
-        (33, 150, 243), // blue
-        (76, 175, 80),  // green
-        (255, 152, 0),  // orange
-        (156, 39, 176), // purple
-        (0, 188, 212),  // cyan
+        (244, 67, 54),
+        (33, 150, 243),
+        (76, 175, 80),
+        (255, 152, 0),
+        (156, 39, 176),
+        (0, 188, 212),
     ];
 
     let font_mgr = skia_safe::FontMgr::default();
@@ -436,7 +430,6 @@ fn draw_debug_overlay(canvas: &skia_safe::Canvas, rail: &RailNav) {
             &stroke_paint,
         );
 
-        // Label
         let class_name = if block.class_id < LAYOUT_CLASSES.len() {
             LAYOUT_CLASSES[block.class_id]
         } else {
@@ -488,7 +481,10 @@ impl App {
             NonZeroU32::new(width.max(1)).unwrap(),
             NonZeroU32::new(height.max(1)).unwrap(),
         );
-        self.clamp_camera();
+        let (ww, wh) = self.window_size();
+        if let Some(tab) = self.active_tab_mut() {
+            tab.clamp_camera(ww, wh);
+        }
         self.env.window.request_redraw();
     }
 
@@ -498,30 +494,35 @@ impl App {
             MouseScrollDelta::PixelDelta(pos) => pos.y,
         };
 
-        let ctrl_held = self.modifiers.state().control_key();
+        let idx = self.active_tab;
+        if idx >= self.tabs.len() {
+            return;
+        }
 
-        if ctrl_held && self.rail.active {
-            // Ctrl+scroll = horizontal nudge along line
-            let step = scroll_y * 2.0 * self.camera.zoom;
-            self.camera.offset_x += step;
-            self.clamp_camera();
+        let ctrl_held = self.modifiers.state().control_key();
+        let (ww, wh) = self.window_size();
+        let cursor_pos = self.cursor_pos;
+
+        let tab = &mut self.tabs[idx];
+        if ctrl_held && tab.rail.active {
+            let step = scroll_y * 2.0 * tab.camera.zoom;
+            tab.camera.offset_x += step;
+            tab.clamp_camera(ww, wh);
         } else {
-            // Normal scroll = zoom towards cursor position
-            let old_zoom = self.camera.zoom;
+            let old_zoom = tab.camera.zoom;
             let factor = 1.0 + scroll_y * ZOOM_SCROLL_SENSITIVITY;
             let new_zoom = (old_zoom * factor).clamp(ZOOM_MIN, ZOOM_MAX);
 
-            // Zoom towards cursor: keep the page point under cursor fixed
-            let (cx, cy) = self.cursor_pos;
-            self.camera.offset_x = cx - (cx - self.camera.offset_x) * (new_zoom / old_zoom);
-            self.camera.offset_y = cy - (cy - self.camera.offset_y) * (new_zoom / old_zoom);
-            self.camera.zoom = new_zoom;
+            let (cx, cy) = cursor_pos;
+            tab.camera.offset_x = cx - (cx - tab.camera.offset_x) * (new_zoom / old_zoom);
+            tab.camera.offset_y = cy - (cy - tab.camera.offset_y) * (new_zoom / old_zoom);
+            tab.camera.zoom = new_zoom;
 
-            self.update_rail_zoom();
-            if self.rail.active {
-                self.start_snap();
+            tab.update_rail_zoom(ww, wh);
+            if tab.rail.active {
+                tab.start_snap(ww, wh);
             }
-            self.clamp_camera();
+            tab.clamp_camera(ww, wh);
         }
         self.env.window.request_redraw();
     }
@@ -542,9 +543,12 @@ impl App {
                 let dx = position.x - lx;
                 let dy = position.y - ly;
 
-                self.camera.offset_x += dx;
-                self.camera.offset_y += dy;
-                self.clamp_camera();
+                let (ww, wh) = self.window_size();
+                if let Some(tab) = self.active_tab_mut() {
+                    tab.camera.offset_x += dx;
+                    tab.camera.offset_y += dy;
+                    tab.clamp_camera(ww, wh);
+                }
                 self.env.window.request_redraw();
             }
             self.last_cursor = Some((position.x, position.y));
@@ -554,7 +558,9 @@ impl App {
     fn handle_key_release(&mut self, event: &winit::event::KeyEvent) {
         let direction = key_to_direction(&event.logical_key);
         if let Some(Direction::Left | Direction::Right) = direction {
-            self.rail.stop_scroll();
+            if let Some(tab) = self.active_tab_mut() {
+                tab.rail.stop_scroll();
+            }
             self.env.window.request_redraw();
         }
     }
@@ -564,61 +570,106 @@ impl App {
         event: &winit::event::KeyEvent,
         event_loop: &winit::event_loop::ActiveEventLoop,
     ) {
+        let ctrl = self.modifiers.state().control_key();
+
+        // Ctrl shortcuts
+        if ctrl {
+            match &event.logical_key {
+                Key::Character(c) if c.as_str() == "o" => {
+                    self.process_actions(vec![UiAction::OpenFile], Some(event_loop));
+                    return;
+                }
+                Key::Character(c) if c.as_str() == "w" => {
+                    let idx = self.active_tab;
+                    self.process_actions(vec![UiAction::CloseTab(idx)], Some(event_loop));
+                    return;
+                }
+                Key::Character(c) if c.as_str() == "q" => {
+                    event_loop.exit();
+                    return;
+                }
+                Key::Named(NamedKey::Tab) => {
+                    // Ctrl+Tab: next tab
+                    if !self.tabs.is_empty() {
+                        let next = (self.active_tab + 1) % self.tabs.len();
+                        self.select_tab(next);
+                        self.env.window.request_redraw();
+                    }
+                    return;
+                }
+                _ => {}
+            }
+        }
+
+        let (ww, wh) = self.window_size();
+
+        let idx = self.active_tab;
+        let lookahead = self.config.analysis_lookahead_pages;
+        let ort = &mut self.ort_session;
+        let tabs = &mut self.tabs;
         if let Some(dir) = key_to_direction(&event.logical_key) {
+            if idx >= tabs.len() {
+                return;
+            }
+            let tab = &mut tabs[idx];
             match dir {
                 Direction::Down => {
-                    if self.rail.active {
-                        match self.rail.next_line() {
+                    if tab.rail.active {
+                        let current_page = tab.current_page;
+                        match tab.rail.next_line() {
                             NavResult::PageBoundaryNext => {
-                                self.go_to_page(self.current_page + 1);
-                                if self.rail.active {
-                                    self.start_snap();
+                                tab.go_to_page(current_page + 1, ort, ww, wh);
+                                tab.queue_lookahead(lookahead);
+                                if tab.rail.active {
+                                    tab.start_snap(ww, wh);
                                 }
                             }
                             NavResult::Ok => {
-                                self.start_snap();
+                                tab.start_snap(ww, wh);
                             }
                             _ => {}
                         }
                     } else {
-                        self.camera.offset_y -= PAN_STEP;
-                        self.clamp_camera();
+                        tab.camera.offset_y -= PAN_STEP;
+                        tab.clamp_camera(ww, wh);
                     }
                 }
                 Direction::Up => {
-                    if self.rail.active {
-                        match self.rail.prev_line() {
+                    if tab.rail.active {
+                        let current_page = tab.current_page;
+                        match tab.rail.prev_line() {
                             NavResult::PageBoundaryPrev => {
-                                self.go_to_page(self.current_page - 1);
-                                if self.rail.active {
-                                    self.rail.jump_to_end();
-                                    self.start_snap();
+                                tab.go_to_page(current_page - 1, ort, ww, wh);
+                                tab.queue_lookahead(lookahead);
+                                if tab.rail.active {
+                                    tab.rail.jump_to_end();
+                                    tab.start_snap(ww, wh);
                                 }
                             }
                             NavResult::Ok => {
-                                self.start_snap();
+                                tab.start_snap(ww, wh);
                             }
                             _ => {}
                         }
                     } else {
-                        self.camera.offset_y += PAN_STEP;
-                        self.clamp_camera();
+                        tab.camera.offset_y += PAN_STEP;
+                        tab.clamp_camera(ww, wh);
                     }
                 }
                 Direction::Right => {
-                    if self.rail.active {
-                        self.rail.start_scroll(ScrollDir::Forward);
+                    if tab.rail.active {
+                        tab.rail.start_scroll(ScrollDir::Forward);
                     } else {
-                        self.camera.offset_x -= PAN_STEP;
-                        self.clamp_camera();
+                        tab.camera.offset_x -= PAN_STEP;
+                        tab.clamp_camera(ww, wh);
                     }
                 }
                 Direction::Left => {
-                    if self.rail.active {
-                        self.rail.start_scroll(ScrollDir::Backward);
+                    if tab.rail.active {
+                        tab.rail.start_scroll(ScrollDir::Backward);
                     } else {
-                        self.camera.offset_x += PAN_STEP;
-                        self.clamp_camera();
+                        tab.camera.offset_x += PAN_STEP;
+                        tab.clamp_camera(ww, wh);
                     }
                 }
             }
@@ -628,41 +679,69 @@ impl App {
 
         match &event.logical_key {
             Key::Named(NamedKey::PageDown) => {
-                self.go_to_page(self.current_page + 1);
+                if idx < tabs.len() {
+                    let p = tabs[idx].current_page + 1;
+                    tabs[idx].go_to_page(p, ort, ww, wh);
+                    let la = self.config.analysis_lookahead_pages;
+                    tabs[idx].queue_lookahead(la);
+                }
                 self.env.window.request_redraw();
             }
             Key::Named(NamedKey::PageUp) => {
-                self.go_to_page(self.current_page - 1);
+                if idx < tabs.len() {
+                    let p = tabs[idx].current_page - 1;
+                    tabs[idx].go_to_page(p, ort, ww, wh);
+                    let la = self.config.analysis_lookahead_pages;
+                    tabs[idx].queue_lookahead(la);
+                }
                 self.env.window.request_redraw();
             }
             Key::Named(NamedKey::Home) => {
-                self.go_to_page(0);
+                if idx < tabs.len() {
+                    tabs[idx].go_to_page(0, ort, ww, wh);
+                    let la = self.config.analysis_lookahead_pages;
+                    tabs[idx].queue_lookahead(la);
+                }
                 self.env.window.request_redraw();
             }
             Key::Named(NamedKey::End) => {
-                self.go_to_page(self.page_count - 1);
+                if idx < tabs.len() {
+                    let last = tabs[idx].page_count - 1;
+                    tabs[idx].go_to_page(last, ort, ww, wh);
+                    let la = self.config.analysis_lookahead_pages;
+                    tabs[idx].queue_lookahead(la);
+                }
                 self.env.window.request_redraw();
             }
             Key::Character(c) if c.as_str() == "+" || c.as_str() == "=" => {
-                self.apply_zoom(self.camera.zoom * ZOOM_STEP);
+                if idx < self.tabs.len() {
+                    let new_zoom = self.tabs[idx].camera.zoom * ZOOM_STEP;
+                    self.tabs[idx].apply_zoom(new_zoom, ww, wh);
+                }
                 self.env.window.request_redraw();
             }
             Key::Character(c) if c.as_str() == "-" => {
-                self.apply_zoom(self.camera.zoom / ZOOM_STEP);
+                if idx < self.tabs.len() {
+                    let new_zoom = self.tabs[idx].camera.zoom / ZOOM_STEP;
+                    self.tabs[idx].apply_zoom(new_zoom, ww, wh);
+                }
                 self.env.window.request_redraw();
             }
             Key::Character(c) if c.as_str() == "0" => {
-                self.center_page();
-                self.update_rail_zoom();
+                if idx < self.tabs.len() {
+                    self.tabs[idx].center_page(ww, wh);
+                    self.tabs[idx].update_rail_zoom(ww, wh);
+                }
                 self.env.window.request_redraw();
             }
             Key::Character(c) if c.as_str() == "D" => {
-                self.debug_overlay = !self.debug_overlay;
-                log::info!("Debug overlay: {}", self.debug_overlay);
+                if idx < self.tabs.len() {
+                    self.tabs[idx].debug_overlay = !self.tabs[idx].debug_overlay;
+                    log::info!("Debug overlay: {}", self.tabs[idx].debug_overlay);
+                }
                 self.env.window.request_redraw();
             }
             Key::Named(NamedKey::Escape) => event_loop.exit(),
-            Key::Character(c) if c.as_str() == "q" => event_loop.exit(),
             _ => {}
         }
     }
@@ -673,74 +752,168 @@ impl App {
             return;
         }
 
-        // Compute frame delta time
         let now = std::time::Instant::now();
         let dt_secs = now.duration_since(self.last_frame).as_secs_f64().min(0.1);
         self.last_frame = now;
 
-        // Advance animations and continuous scroll
-        let animating = self.rail.tick(
-            &mut self.camera.offset_x,
-            &mut self.camera.offset_y,
-            dt_secs,
-            self.camera.zoom,
-            size.width as f64,
-        );
+        // Advance animations for active tab
+        let animating = if let Some(tab) = self.active_tab_mut() {
+            tab.rail.tick(
+                &mut tab.camera.offset_x,
+                &mut tab.camera.offset_y,
+                dt_secs,
+                tab.camera.zoom,
+                size.width as f64,
+            )
+        } else {
+            false
+        };
 
+        // Update minimap if dirty
+        self.update_minimap_for_active_tab();
+
+        // --- Phase 2: Reordered rendering pipeline ---
+        // 1. Reset Skia's cached GL state
+        self.env.gr_context.reset(None);
+
+        // 2-4. egui: begin_frame, build_ui, capture content_rect
+        let actions = if self.egui_integration.is_some() {
+            let ctx = {
+                let egui_int = self.egui_integration.as_mut().unwrap();
+                let ctx = egui_int.begin_frame(&self.env.window);
+                ctx.clone()
+            };
+
+            let actions = ui::build_ui(
+                &ctx,
+                &mut self.ui_state,
+                &self.tabs,
+                self.active_tab,
+                &mut self.config,
+            );
+
+            // End frame (captures shapes, does NOT paint yet)
+            if let Some(egui_int) = &mut self.egui_integration {
+                egui_int.end_frame(&self.env.window);
+            }
+
+            actions
+        } else {
+            self.ui_state.content_rect = egui::Rect::from_min_size(
+                egui::pos2(0.0, 0.0),
+                egui::vec2(size.width as f32, size.height as f32),
+            );
+            Vec::new()
+        };
+
+        // 5. Skia renders PDF into content_rect area
+        let content_rect = self.ui_state.content_rect;
         let canvas = self.env.surface.canvas();
         canvas.clear(Color::from_argb(255, 128, 128, 128));
 
-        canvas.save();
-        canvas.translate((self.camera.offset_x as f32, self.camera.offset_y as f32));
-        canvas.scale((self.camera.zoom as f32, self.camera.zoom as f32));
+        if let Some(tab) = self.tabs.get_mut(self.active_tab) {
+            // Set up GL scissor to prevent Skia from bleeding into panel areas
+            let scale = self.env.window.scale_factor() as f32;
+            let scissor_x = (content_rect.min.x * scale) as i32;
+            let scissor_y = (size.height as f32 - content_rect.max.y * scale) as i32;
+            let scissor_w = (content_rect.width() * scale) as i32;
+            let scissor_h = (content_rect.height() * scale) as i32;
+            unsafe {
+                gl::Enable(gl::SCISSOR_TEST);
+                gl::Scissor(scissor_x, scissor_y, scissor_w, scissor_h);
+            }
 
-        // White page background
-        let mut white_paint = Paint::default();
-        white_paint.set_color(Color::WHITE);
-        canvas.draw_rect(
-            Rect::from_wh(self.page_width as f32, self.page_height as f32),
-            &white_paint,
-        );
+            // Offset canvas by content_rect origin
+            canvas.save();
+            canvas.translate((content_rect.min.x, content_rect.min.y));
+            canvas.translate((tab.camera.offset_x as f32, tab.camera.offset_y as f32));
+            canvas.scale((tab.camera.zoom as f32, tab.camera.zoom as f32));
 
-        // SVG content
-        if let Some(dom) = &mut self.svg_dom {
-            dom.render(canvas);
+            // White page background
+            let mut white_paint = Paint::default();
+            white_paint.set_color(Color::WHITE);
+            canvas.draw_rect(
+                Rect::from_wh(tab.page_width as f32, tab.page_height as f32),
+                &white_paint,
+            );
+
+            // SVG content
+            if let Some(dom) = &mut tab.svg_dom {
+                dom.render(canvas);
+            }
+
+            // Rail overlays
+            draw_rail_overlays(
+                canvas,
+                &tab.rail,
+                tab.page_width,
+                tab.page_height,
+                tab.debug_overlay,
+            );
+
+            canvas.restore();
+
+            unsafe {
+                gl::Disable(gl::SCISSOR_TEST);
+            }
+        } else {
+            // No tabs open — show welcome
+            draw_welcome(canvas, size.width, size.height, &self.status_font);
         }
 
-        // Rail overlays (drawn in page coordinate space)
-        draw_rail_overlays(
-            canvas,
-            &self.rail,
-            self.page_width,
-            self.page_height,
-            self.debug_overlay,
-        );
-
-        canvas.restore();
-
-        // Status bar (drawn in screen space)
-        draw_status_bar(
-            canvas,
-            size.width,
-            size.height,
-            &self.status_font,
-            &self.camera,
-            self.current_page,
-            self.page_count,
-            &self.rail,
-        );
-
+        // 6. Flush Skia
         self.env.gr_context.flush_and_submit();
+
+        // 7. egui paint (overlays panels/menus on top)
+        if let Some(egui_int) = &mut self.egui_integration {
+            egui_int.paint(&self.env.window);
+        }
+
+        // 8. Swap buffers
         self.env
             .gl_surface
             .swap_buffers(&self.env.gl_context)
             .unwrap();
 
+        // Process UI actions
+        self.process_actions(actions, None);
+
+        // Process one pending lookahead analysis per frame (avoid blocking)
+        let has_pending = if !animating {
+            let idx = self.active_tab;
+            if idx < self.tabs.len() {
+                self.tabs[idx].process_pending_analysis(&mut self.ort_session)
+            } else {
+                false
+            }
+        } else {
+            false
+        };
+
         // Request another frame if animating
-        if animating {
+        let egui_wants_repaint = self
+            .egui_integration
+            .as_ref()
+            .map(|e| e.wants_continuous_repaint())
+            .unwrap_or(false);
+        if animating || egui_wants_repaint || has_pending {
             self.env.window.request_redraw();
         }
     }
+}
+
+fn draw_welcome(canvas: &skia_safe::Canvas, width: u32, height: u32, font: &Font) {
+    let mut paint = Paint::default();
+    paint.set_color(Color::WHITE);
+    paint.set_anti_alias(true);
+
+    let text = "Open a PDF file (Ctrl+O)";
+    canvas.draw_str(
+        text,
+        (width as f32 / 2.0 - 80.0, height as f32 / 2.0),
+        font,
+        &paint,
+    );
 }
 
 fn key_to_direction(key: &Key) -> Option<Direction> {
@@ -773,54 +946,69 @@ impl ApplicationHandler for App {
             self.modifiers = *mods;
         }
 
-        // Block input while loading (except close/redraw)
-        if self.loading {
-            match event {
-                WindowEvent::CloseRequested => event_loop.exit(),
-                WindowEvent::RedrawRequested => {
-                    let size = self.env.window.inner_size();
-                    if size.width > 0 && size.height > 0 {
-                        let canvas = self.env.surface.canvas();
-                        canvas.clear(Color::from_argb(255, 128, 128, 128));
-
-                        let mut paint = Paint::default();
-                        paint.set_color(Color::WHITE);
-                        paint.set_anti_alias(true);
-                        canvas.draw_str(
-                            "Loading...",
-                            (size.width as f32 / 2.0 - 40.0, size.height as f32 / 2.0),
-                            &self.status_font,
-                            &paint,
-                        );
-
-                        self.env.gr_context.flush_and_submit();
-                        self.env
-                            .gl_surface
-                            .swap_buffers(&self.env.gl_context)
-                            .unwrap();
-                    }
-                }
-                _ => {}
+        // Handle pending page loads (deferred loading for spinner visibility)
+        let idx = self.active_tab;
+        if idx < self.tabs.len() {
+            if let Some(page) = self.tabs[idx].pending_page_load.take() {
+                let (ww, wh) = self.window_size();
+                self.tabs[idx].go_to_page(page, &mut self.ort_session, ww, wh);
+                self.env.window.request_redraw();
+                return;
             }
-            return;
         }
+
+        // Pass all events (except RedrawRequested) to egui first
+        let egui_response = if !matches!(event, WindowEvent::RedrawRequested) {
+            self.egui_integration
+                .as_mut()
+                .map(|e| e.handle_event(&self.env.window, &event))
+        } else {
+            None
+        };
+        let egui_consumed = egui_response.as_ref().map(|r| r.consumed).unwrap_or(false);
+        let egui_repaint = egui_response.as_ref().map(|r| r.repaint).unwrap_or(false);
 
         match event {
             WindowEvent::CloseRequested => event_loop.exit(),
             WindowEvent::ModifiersChanged(_) => {}
-            WindowEvent::Resized(physical_size) => self.handle_resize(physical_size),
-            WindowEvent::MouseWheel { delta, .. } => self.handle_mouse_wheel(delta),
-            WindowEvent::MouseInput { state, button, .. } => self.handle_mouse_input(state, button),
-            WindowEvent::CursorMoved { position, .. } => self.handle_cursor_moved(position),
+            WindowEvent::Resized(physical_size) => {
+                self.handle_resize(physical_size);
+            }
+            WindowEvent::MouseWheel { delta, .. } => {
+                if !egui_consumed {
+                    self.handle_mouse_wheel(delta);
+                }
+            }
+            WindowEvent::MouseInput { state, button, .. } => {
+                if !egui_consumed {
+                    self.handle_mouse_input(state, button);
+                }
+            }
+            WindowEvent::CursorMoved { position, .. } => {
+                self.handle_cursor_moved(position);
+            }
             WindowEvent::KeyboardInput { ref event, .. } => {
-                if event.state == ElementState::Released {
-                    self.handle_key_release(event);
-                } else {
-                    self.handle_key_press(event, event_loop);
+                let consumed = egui_consumed
+                    || self
+                        .egui_integration
+                        .as_ref()
+                        .map(|e| e.ctx.wants_keyboard_input())
+                        .unwrap_or(false);
+                if !consumed {
+                    if event.state == ElementState::Released {
+                        self.handle_key_release(event);
+                    } else {
+                        self.handle_key_press(event, event_loop);
+                    }
                 }
             }
             WindowEvent::RedrawRequested => self.handle_redraw(),
             _ => {}
+        }
+
+        // Request redraw when egui needs it (e.g., after mouse clicks on menus)
+        if egui_repaint {
+            self.env.window.request_redraw();
         }
     }
 }
@@ -829,22 +1017,12 @@ fn main() -> Result<()> {
     env_logger::init();
 
     let args: Vec<String> = std::env::args().collect();
-    if args.len() < 2 {
-        eprintln!("Usage: {} <path-to-pdf>", args[0]);
-        std::process::exit(1);
-    }
-
-    let pdf_path = &args[1];
-    log::info!("Loading PDF: {}", pdf_path);
-
-    let doc = mupdf::Document::open(pdf_path)?;
-    let page_count = doc.page_count()?;
-    log::info!("PDF has {} page(s)", page_count);
+    let pdf_path = args.get(1).cloned();
 
     // Try to load ONNX model
     let model_path =
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("models/PP-DocLayoutV3.onnx");
-    let mut ort_session = if model_path.exists() {
+    let ort_session = if model_path.exists() {
         match layout::load_model(model_path.to_str().unwrap()) {
             Ok(session) => {
                 log::info!("Loaded ONNX model from {}", model_path.display());
@@ -863,32 +1041,13 @@ fn main() -> Result<()> {
         None
     };
 
-    let (svg_string, page_width, page_height) = railreader2::render_page_svg(&doc, 0)?;
-    log::info!("Page dimensions: {}x{}", page_width, page_height);
-
-    // Run initial layout analysis
-    let initial_analysis = if let Some(session) = &mut ort_session {
-        match layout::analyze_page(session, &doc, 0) {
-            Ok(a) => {
-                log::info!("Initial layout: {} blocks detected", a.blocks.len());
-                Some(a)
-            }
-            Err(e) => {
-                log::warn!("Initial layout analysis failed: {}", e);
-                None
-            }
-        }
-    } else {
-        None
-    };
-
     // Set up winit + glutin + skia
     let el = EventLoop::new()?;
 
     let window_attributes = Window::default_attributes()
         .with_inner_size(LogicalSize::new(
-            page_width.min(DEFAULT_WINDOW_WIDTH),
-            page_height.min(DEFAULT_WINDOW_HEIGHT),
+            DEFAULT_WINDOW_WIDTH,
+            DEFAULT_WINDOW_HEIGHT,
         ))
         .with_resizable(true)
         .with_title("railreader2");
@@ -987,10 +1146,6 @@ fn main() -> Result<()> {
 
     let surface = create_surface(&window, fb_info, &mut gr_context, num_samples, stencil_size);
 
-    // Parse SVG for page 0
-    let font_mgr = skia_safe::FontMgr::default();
-    let svg_dom = skia_safe::svg::Dom::from_str(svg_string, font_mgr).ok();
-
     // Status bar font
     let font_mgr_for_font = skia_safe::FontMgr::default();
     let typeface = font_mgr_for_font
@@ -1010,36 +1165,44 @@ fn main() -> Result<()> {
         stencil_size,
     };
 
+    // Initialize egui integration
+    let egui_integration = match EguiIntegration::new(&env.window, &env.gl_context) {
+        Ok(e) => Some(e),
+        Err(e) => {
+            log::warn!("Failed to initialize egui: {}", e);
+            None
+        }
+    };
+
     let config = Config::load();
-    let mut rail = RailNav::new(config);
-    if let Some(analysis) = initial_analysis {
-        rail.set_analysis(analysis);
-    } else {
-        rail.set_analysis(layout::fallback_analysis(page_width, page_height));
+
+    // Run cleanup on startup
+    let report = cleanup::run_cleanup();
+    if report.files_removed > 0 {
+        log::info!("Startup cleanup: {}", report);
     }
 
     let mut app = App {
         env,
-        doc,
-        current_page: 0,
-        page_count,
-        svg_dom,
-        page_width,
-        page_height,
-        camera: Camera::new(),
+        tabs: Vec::new(),
+        active_tab: 0,
+        ort_session,
+        config,
+        egui_integration,
+        ui_state: UiState::default(),
+        modifiers: Modifiers::default(),
         dragging: false,
         last_cursor: None,
         cursor_pos: (0.0, 0.0),
-        status_font,
-        ort_session,
-        rail,
-        modifiers: Modifiers::default(),
-        debug_overlay: false,
-        loading: false,
         last_frame: std::time::Instant::now(),
+        status_font,
     };
 
-    app.center_page();
+    // Open initial PDF if provided
+    if let Some(path) = pdf_path {
+        log::info!("Loading PDF: {}", path);
+        app.open_document(path);
+    }
 
     el.run_app(&mut app).expect("Couldn't run event loop");
 

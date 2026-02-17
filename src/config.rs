@@ -16,6 +16,8 @@ pub struct Config {
     pub scroll_speed_max: f64,
     /// Time in seconds to reach max scroll speed from start.
     pub scroll_ramp_time: f64,
+    /// Number of pages ahead to pre-analyze for layout (0 = disabled).
+    pub analysis_lookahead_pages: usize,
 }
 
 impl Default for Config {
@@ -26,6 +28,7 @@ impl Default for Config {
             scroll_speed_start: 60.0,
             scroll_speed_max: 400.0,
             scroll_ramp_time: 1.5,
+            analysis_lookahead_pages: 2,
         }
     }
 }

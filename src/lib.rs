@@ -1,6 +1,10 @@
+pub mod cleanup;
 pub mod config;
+pub mod egui_integration;
 pub mod layout;
 pub mod rail;
+pub mod tab;
+pub mod ui;
 
 use anyhow::Result;
 use mupdf::{Colorspace, Matrix};
