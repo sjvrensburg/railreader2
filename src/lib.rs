@@ -1,4 +1,5 @@
 pub mod cleanup;
+pub mod colour_effect;
 pub mod config;
 pub mod egui_integration;
 pub mod layout;

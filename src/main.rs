@@ -26,6 +26,7 @@ use winit::{
 };
 
 use railreader2::cleanup;
+use railreader2::colour_effect::ColourEffectState;
 use railreader2::config::Config;
 use railreader2::egui_integration::EguiIntegration;
 use railreader2::layout::{self, LAYOUT_CLASSES};
@@ -75,6 +76,7 @@ struct App {
     config: Config,
     egui_integration: Option<EguiIntegration>,
     ui_state: UiState,
+    colour_effect_state: ColourEffectState,
     modifiers: Modifiers,
     dragging: bool,
     last_cursor: Option<(f64, f64)>,
@@ -239,7 +241,15 @@ impl App {
                     }
                     self.env.window.request_redraw();
                 }
+                UiAction::SetColourEffect(effect) => {
+                    self.config.colour_effect = effect;
+                    self.config.save();
+                    self.colour_effect_state.effect = effect;
+                    self.env.window.request_redraw();
+                }
                 UiAction::ConfigChanged => {
+                    self.colour_effect_state.effect = self.config.colour_effect;
+                    self.colour_effect_state.intensity = self.config.colour_effect_intensity as f32;
                     let config = self.config.clone();
                     for tab in &mut self.tabs {
                         tab.rail.update_config(config.clone());
@@ -323,6 +333,7 @@ fn draw_rail_overlays(
     page_width: f64,
     page_height: f64,
     debug_overlay: bool,
+    palette: &railreader2::colour_effect::OverlayPalette,
 ) {
     if !rail.active || !rail.has_analysis() {
         if debug_overlay {
@@ -331,8 +342,9 @@ fn draw_rail_overlays(
         return;
     }
 
+    // Dim the entire page
     let mut dim_paint = Paint::default();
-    dim_paint.set_color(Color::from_argb(120, 0, 0, 0));
+    dim_paint.set_color(palette.dim);
     canvas.draw_rect(
         Rect::from_wh(page_width as f32, page_height as f32),
         &dim_paint,
@@ -347,27 +359,32 @@ fn draw_rail_overlays(
         block.bbox.h + margin * 2.0,
     );
 
-    canvas.save();
-    canvas.clip_rect(block_rect, skia_safe::ClipOp::Intersect, false);
-    let mut clear_paint = Paint::default();
-    clear_paint.set_color(Color::from_argb(120, 255, 255, 255));
-    clear_paint.set_blend_mode(skia_safe::BlendMode::Plus);
-    canvas.draw_rect(block_rect, &clear_paint);
-    canvas.restore();
+    // Reveal the active block (skipped for dark-background effects)
+    if let Some((color, blend_mode)) = palette.block_reveal {
+        canvas.save();
+        canvas.clip_rect(block_rect, skia_safe::ClipOp::Intersect, false);
+        let mut clear_paint = Paint::default();
+        clear_paint.set_color(color);
+        clear_paint.set_blend_mode(blend_mode);
+        canvas.draw_rect(block_rect, &clear_paint);
+        canvas.restore();
+    }
 
+    // Block outline
     let mut outline_paint = Paint::default();
-    outline_paint.set_color(Color::from_argb(80, 66, 133, 244));
+    outline_paint.set_color(palette.block_outline);
     outline_paint.set_style(skia_safe::paint::Style::Stroke);
-    outline_paint.set_stroke_width(1.5);
+    outline_paint.set_stroke_width(palette.block_outline_width);
     outline_paint.set_anti_alias(true);
     canvas.draw_rect(
         Rect::from_xywh(block.bbox.x, block.bbox.y, block.bbox.w, block.bbox.h),
         &outline_paint,
     );
 
+    // Current line highlight
     let line = rail.current_line_info();
     let mut line_paint = Paint::default();
-    line_paint.set_color(Color::from_argb(40, 66, 133, 244));
+    line_paint.set_color(palette.line_highlight);
     canvas.draw_rect(
         Rect::from_xywh(
             block.bbox.x,
@@ -829,6 +846,18 @@ impl App {
             canvas.translate((tab.camera.offset_x as f32, tab.camera.offset_y as f32));
             canvas.scale((tab.camera.zoom as f32, tab.camera.zoom as f32));
 
+            // Apply colour effect as a save layer so it filters all PDF content
+            let effect_layer = if self.colour_effect_state.has_active_effect() {
+                if let Some(paint) = self.colour_effect_state.create_paint() {
+                    canvas.save_layer(&skia_safe::canvas::SaveLayerRec::default().paint(&paint));
+                    true
+                } else {
+                    false
+                }
+            } else {
+                false
+            };
+
             // White page background
             let mut white_paint = Paint::default();
             white_paint.set_color(Color::WHITE);
@@ -842,13 +871,21 @@ impl App {
                 dom.render(canvas);
             }
 
-            // Rail overlays
+            // Close the colour effect layer before drawing overlays,
+            // so the filter applies only to PDF content (white bg + SVG).
+            if effect_layer {
+                canvas.restore(); // composites filtered layer
+            }
+
+            // Rail overlays drawn outside the filter layer with effect-aware colours
+            let palette = self.colour_effect_state.effect.overlay_palette();
             draw_rail_overlays(
                 canvas,
                 &tab.rail,
                 tab.page_width,
                 tab.page_height,
                 tab.debug_overlay,
+                &palette,
             );
 
             canvas.restore();
@@ -1182,6 +1219,10 @@ fn main() -> Result<()> {
         log::info!("Startup cleanup: {}", report);
     }
 
+    let mut colour_effect_state = ColourEffectState::new();
+    colour_effect_state.effect = config.colour_effect;
+    colour_effect_state.intensity = config.colour_effect_intensity as f32;
+
     let mut app = App {
         env,
         tabs: Vec::new(),
@@ -1190,6 +1231,7 @@ fn main() -> Result<()> {
         config,
         egui_integration,
         ui_state: UiState::default(),
+        colour_effect_state,
         modifiers: Modifiers::default(),
         dragging: false,
         last_cursor: None,

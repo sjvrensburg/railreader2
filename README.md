@@ -20,6 +20,7 @@ At high zoom levels, navigation switches to "rail mode" — the viewer locks ont
 - **About dialog** — version info and credits (Help → About)
 - **Disk cleanup** — removes cache, old logs, temp files (Help → Clean Up Temp Files)
 - **Analysis lookahead** — pre-analyzes upcoming pages in the background for instant navigation
+- **Colour effects** — GPU-accelerated accessibility filters (High Contrast, High Visibility, Amber, Invert) with adjustable intensity
 - **Debug overlay** — visualise detected layout blocks with class labels and confidence
 
 ## Usage
@@ -62,7 +63,9 @@ Rail reading parameters are editable via the Settings panel (gear icon in menu b
   "scroll_speed_start": 60.0,
   "scroll_speed_max": 400.0,
   "scroll_ramp_time": 1.5,
-  "analysis_lookahead_pages": 2
+  "analysis_lookahead_pages": 2,
+  "colour_effect": "None",
+  "colour_effect_intensity": 1.0
 }
 ```
 
@@ -74,6 +77,8 @@ Rail reading parameters are editable via the Settings panel (gear icon in menu b
 | `scroll_speed_max` | Maximum scroll speed after holding (page points/sec) |
 | `scroll_ramp_time` | Seconds to reach max speed from start |
 | `analysis_lookahead_pages` | Number of pages to pre-analyze ahead (0 to disable) |
+| `colour_effect` | Colour filter: `None`, `HighContrast`, `HighVisibility`, `Amber`, `Invert` |
+| `colour_effect_intensity` | Effect intensity from 0.0 (off) to 1.0 (full) |
 
 ## Building
 

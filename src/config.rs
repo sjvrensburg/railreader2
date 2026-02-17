@@ -1,3 +1,4 @@
+use crate::colour_effect::ColourEffect;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -18,6 +19,10 @@ pub struct Config {
     pub scroll_ramp_time: f64,
     /// Number of pages ahead to pre-analyze for layout (0 = disabled).
     pub analysis_lookahead_pages: usize,
+    /// Colour effect applied to PDF content for visual impairment accessibility.
+    pub colour_effect: ColourEffect,
+    /// Intensity of the colour effect (0.0–1.0).
+    pub colour_effect_intensity: f64,
 }
 
 impl Default for Config {
@@ -29,6 +34,8 @@ impl Default for Config {
             scroll_speed_max: 400.0,
             scroll_ramp_time: 1.5,
             analysis_lookahead_pages: 2,
+            colour_effect: ColourEffect::None,
+            colour_effect_intensity: 1.0,
         }
     }
 }

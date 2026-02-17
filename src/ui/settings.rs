@@ -1,3 +1,4 @@
+use crate::colour_effect::ColourEffect;
 use crate::config::Config;
 use crate::tab::TabState;
 use crate::ui::UiAction;
@@ -88,6 +89,48 @@ pub fn show_settings_window(
                     config.analysis_lookahead_pages = val as usize;
                     changed = true;
                 }
+            });
+
+            ui.add_space(16.0);
+            ui.heading("Colour Effects");
+            ui.separator();
+
+            ui.horizontal(|ui| {
+                ui.label("Effect:");
+                let current_label = config.colour_effect.to_string();
+                egui::ComboBox::from_id_salt("colour_effect_combo")
+                    .selected_text(current_label)
+                    .show_ui(ui, |ui| {
+                        let effects = [
+                            ColourEffect::None,
+                            ColourEffect::HighContrast,
+                            ColourEffect::HighVisibility,
+                            ColourEffect::Amber,
+                            ColourEffect::Invert,
+                        ];
+                        for effect in effects {
+                            if ui
+                                .selectable_label(
+                                    config.colour_effect == effect,
+                                    effect.to_string(),
+                                )
+                                .clicked()
+                            {
+                                config.colour_effect = effect;
+                                changed = true;
+                            }
+                        }
+                    });
+            });
+
+            ui.horizontal(|ui| {
+                ui.label("Intensity:");
+                changed |= ui
+                    .add(egui::Slider::new(
+                        &mut config.colour_effect_intensity,
+                        0.0..=1.0,
+                    ))
+                    .changed();
             });
 
             ui.add_space(8.0);

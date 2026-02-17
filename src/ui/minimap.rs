@@ -37,10 +37,8 @@ pub fn show_minimap(ctx: &egui::Context, show: &mut bool, tab: &TabState) -> Vec
                     if let Some(pos) = response.interact_pointer_pos() {
                         let rect = response.rect;
                         // Convert minimap position to normalized page coordinates (0.0-1.0)
-                        let norm_x =
-                            ((pos.x - rect.min.x) / rect.width()).clamp(0.0, 1.0) as f64;
-                        let norm_y =
-                            ((pos.y - rect.min.y) / rect.height()).clamp(0.0, 1.0) as f64;
+                        let norm_x = ((pos.x - rect.min.x) / rect.width()).clamp(0.0, 1.0) as f64;
+                        let norm_y = ((pos.y - rect.min.y) / rect.height()).clamp(0.0, 1.0) as f64;
 
                         // Compute target camera offset to center the clicked point
                         // We use content_rect width/height as approximation of viewport
@@ -48,10 +46,8 @@ pub fn show_minimap(ctx: &egui::Context, show: &mut bool, tab: &TabState) -> Vec
                         let vp_w = screen.width() as f64;
                         let vp_h = screen.height() as f64;
 
-                        let offset_x =
-                            -(norm_x * tab.page_width * tab.camera.zoom) + vp_w / 2.0;
-                        let offset_y =
-                            -(norm_y * tab.page_height * tab.camera.zoom) + vp_h / 2.0;
+                        let offset_x = -(norm_x * tab.page_width * tab.camera.zoom) + vp_w / 2.0;
+                        let offset_y = -(norm_y * tab.page_height * tab.camera.zoom) + vp_h / 2.0;
 
                         actions.push(UiAction::SetCamera(offset_x, offset_y));
                     }
