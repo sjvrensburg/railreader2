@@ -96,9 +96,15 @@ Default `config.json` values (created on first run, gitignored):
   "scroll_ramp_time": 1.5,
   "analysis_lookahead_pages": 2,
   "colour_effect": "None",
-  "colour_effect_intensity": 1.0
+  "colour_effect_intensity": 1.0,
+  "navigable_classes": [
+    "abstract", "algorithm", "aside_text", "document_title",
+    "footnote", "paragraph_title", "references", "text"
+  ]
 }
 ```
+
+The `navigable_classes` array controls which of the 23 PP-DocLayoutV3 block types are navigable in rail mode. Values are class name strings (see `LAYOUT_CLASSES` in `layout.rs`). Adding e.g. `"formula"` enables formula blocks; removing `"document_title"` skips headings. Configurable live via Settings → Advanced: Navigable Block Types. Line detection runs for all blocks regardless of this setting, so toggling classes doesn't require ONNX re-inference.
 
 ## Key Development Notes
 
