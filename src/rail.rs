@@ -1,5 +1,6 @@
 use crate::config::Config;
-use crate::layout::{is_navigable, LayoutBlock, LineInfo, PageAnalysis};
+use crate::layout::{LayoutBlock, LineInfo, PageAnalysis};
+use std::collections::HashSet;
 
 #[derive(Debug)]
 pub enum NavResult {
@@ -53,12 +54,12 @@ impl RailNav {
         }
     }
 
-    pub fn set_analysis(&mut self, analysis: PageAnalysis) {
+    pub fn set_analysis(&mut self, analysis: PageAnalysis, navigable: &HashSet<usize>) {
         self.navigable_indices = analysis
             .blocks
             .iter()
             .enumerate()
-            .filter(|(_, b)| is_navigable(b.class_id))
+            .filter(|(_, b)| navigable.contains(&b.class_id))
             .map(|(i, _)| i)
             .collect();
         self.analysis = Some(analysis);

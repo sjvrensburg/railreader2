@@ -1,4 +1,4 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::config::Config;
@@ -100,7 +100,11 @@ impl TabState {
         })
     }
 
-    pub fn load_page(&mut self, ort_session: &mut Option<ort::session::Session>) {
+    pub fn load_page(
+        &mut self,
+        ort_session: &mut Option<ort::session::Session>,
+        navigable: &HashSet<usize>,
+    ) {
         match crate::render_page_svg(&self.doc, self.current_page) {
             Ok((svg_string, w, h)) => {
                 self.page_width = w;
@@ -114,11 +118,15 @@ impl TabState {
             }
         }
 
-        self.analyze_current_page(ort_session);
+        self.analyze_current_page(ort_session, navigable);
         self.minimap_dirty = true;
     }
 
-    pub fn analyze_current_page(&mut self, ort_session: &mut Option<ort::session::Session>) {
+    pub fn analyze_current_page(
+        &mut self,
+        ort_session: &mut Option<ort::session::Session>,
+        navigable: &HashSet<usize>,
+    ) {
         // Check cache first
         if let Some(cached) = self.analysis_cache.get(&self.current_page) {
             log::info!(
@@ -126,7 +134,7 @@ impl TabState {
                 self.current_page + 1,
                 cached.blocks.len()
             );
-            self.rail.set_analysis(cached.clone());
+            self.rail.set_analysis(cached.clone(), navigable);
             return;
         }
 
@@ -152,7 +160,14 @@ impl TabState {
 
         self.analysis_cache
             .insert(self.current_page, analysis.clone());
-        self.rail.set_analysis(analysis);
+        self.rail.set_analysis(analysis, navigable);
+    }
+
+    /// Re-apply navigable class filter from cached analysis (no ONNX re-run).
+    pub fn reapply_navigable_classes(&mut self, navigable: &HashSet<usize>) {
+        if let Some(cached) = self.analysis_cache.get(&self.current_page) {
+            self.rail.set_analysis(cached.clone(), navigable);
+        }
     }
 
     /// Queue lookahead pages for background analysis.
@@ -226,6 +241,7 @@ impl TabState {
         &mut self,
         page: i32,
         ort_session: &mut Option<ort::session::Session>,
+        navigable: &HashSet<usize>,
         window_width: f64,
         window_height: f64,
     ) {
@@ -233,7 +249,7 @@ impl TabState {
         if page != self.current_page {
             self.current_page = page;
             let old_zoom = self.camera.zoom;
-            self.load_page(ort_session);
+            self.load_page(ort_session, navigable);
             self.camera.zoom = old_zoom;
             self.clamp_camera(window_width, window_height);
         }

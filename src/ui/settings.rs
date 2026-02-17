@@ -1,5 +1,6 @@
 use crate::colour_effect::ColourEffect;
 use crate::config::Config;
+use crate::layout::{default_navigable_classes, LAYOUT_CLASSES};
 use crate::tab::TabState;
 use crate::ui::UiAction;
 
@@ -133,8 +134,32 @@ pub fn show_settings_window(
                     .changed();
             });
 
+            ui.add_space(16.0);
+            egui::CollapsingHeader::new("Advanced: Navigable Block Types")
+                .default_open(false)
+                .show(ui, |ui| {
+                    ui.label("Select which block types are navigable in rail mode:");
+                    ui.add_space(4.0);
+                    for (id, &name) in LAYOUT_CLASSES.iter().enumerate() {
+                        let mut enabled = config.navigable_classes.contains(&id);
+                        if ui.checkbox(&mut enabled, name).changed() {
+                            if enabled {
+                                config.navigable_classes.insert(id);
+                            } else {
+                                config.navigable_classes.remove(&id);
+                            }
+                            changed = true;
+                        }
+                    }
+                    ui.add_space(4.0);
+                    if ui.small_button("Reset to Defaults").clicked() {
+                        config.navigable_classes = default_navigable_classes();
+                        changed = true;
+                    }
+                });
+
             ui.add_space(8.0);
-            if ui.button("Reset to Defaults").clicked() {
+            if ui.button("Reset All to Defaults").clicked() {
                 *config = Config::default();
                 changed = true;
             }

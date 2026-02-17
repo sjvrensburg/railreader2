@@ -35,7 +35,8 @@ fn main() -> Result<()> {
         } else {
             "unknown"
         };
-        let navigable = layout::is_navigable(block.class_id);
+        let defaults = layout::default_navigable_classes();
+        let navigable = defaults.contains(&block.class_id);
         println!(
             "{:<6} {:<20} {:<8.2} ({:>6.1}, {:>6.1}, {:>6.1}, {:>6.1})          {:<6} {}",
             block.order,

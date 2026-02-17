@@ -1,5 +1,7 @@
 use crate::colour_effect::ColourEffect;
+use crate::layout::{default_navigable_classes, LAYOUT_CLASSES};
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::path::PathBuf;
 
 /// User-configurable parameters for rail reading.
@@ -23,6 +25,34 @@ pub struct Config {
     pub colour_effect: ColourEffect,
     /// Intensity of the colour effect (0.0–1.0).
     pub colour_effect_intensity: f64,
+    /// Which layout block classes are navigable in rail mode.
+    #[serde(
+        serialize_with = "serialize_navigable_classes",
+        deserialize_with = "deserialize_navigable_classes"
+    )]
+    pub navigable_classes: HashSet<usize>,
+}
+
+fn serialize_navigable_classes<S: serde::Serializer>(
+    classes: &HashSet<usize>,
+    serializer: S,
+) -> Result<S::Ok, S::Error> {
+    let mut names: Vec<&str> = classes
+        .iter()
+        .filter_map(|&id| LAYOUT_CLASSES.get(id).copied())
+        .collect();
+    names.sort();
+    names.serialize(serializer)
+}
+
+fn deserialize_navigable_classes<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<HashSet<usize>, D::Error> {
+    let names: Vec<String> = Vec::deserialize(deserializer)?;
+    Ok(names
+        .iter()
+        .filter_map(|name| LAYOUT_CLASSES.iter().position(|&c| c == name.as_str()))
+        .collect())
 }
 
 impl Default for Config {
@@ -36,6 +66,7 @@ impl Default for Config {
             analysis_lookahead_pages: 2,
             colour_effect: ColourEffect::None,
             colour_effect_intensity: 1.0,
+            navigable_classes: default_navigable_classes(),
         }
     }
 }

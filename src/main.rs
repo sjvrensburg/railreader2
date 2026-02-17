@@ -116,7 +116,7 @@ impl App {
             }
         };
 
-        tab.load_page(&mut self.ort_session);
+        tab.load_page(&mut self.ort_session, &self.config.navigable_classes);
         let (ww, wh) = self.window_size();
         tab.center_page(ww, wh);
         tab.update_rail_zoom(ww, wh);
@@ -201,7 +201,8 @@ impl App {
                     let (ww, wh) = self.window_size();
                     let idx = self.active_tab;
                     if idx < self.tabs.len() {
-                        self.tabs[idx].go_to_page(page, &mut self.ort_session, ww, wh);
+                        let navigable = self.config.navigable_classes.clone();
+                        self.tabs[idx].go_to_page(page, &mut self.ort_session, &navigable, ww, wh);
                         self.tabs[idx].minimap_dirty = true;
                         let lookahead = self.config.analysis_lookahead_pages;
                         self.tabs[idx].queue_lookahead(lookahead);
@@ -253,6 +254,7 @@ impl App {
                     let config = self.config.clone();
                     for tab in &mut self.tabs {
                         tab.rail.update_config(config.clone());
+                        tab.reapply_navigable_classes(&config.navigable_classes);
                     }
                 }
                 UiAction::RunCleanup => {
@@ -622,6 +624,7 @@ impl App {
 
         let idx = self.active_tab;
         let lookahead = self.config.analysis_lookahead_pages;
+        let navigable = self.config.navigable_classes.clone();
         let ort = &mut self.ort_session;
         let tabs = &mut self.tabs;
         if let Some(dir) = key_to_direction(&event.logical_key) {
@@ -635,7 +638,7 @@ impl App {
                         let current_page = tab.current_page;
                         match tab.rail.next_line() {
                             NavResult::PageBoundaryNext => {
-                                tab.go_to_page(current_page + 1, ort, ww, wh);
+                                tab.go_to_page(current_page + 1, ort, &navigable, ww, wh);
                                 tab.queue_lookahead(lookahead);
                                 if tab.rail.active {
                                     tab.start_snap(ww, wh);
@@ -656,7 +659,7 @@ impl App {
                         let current_page = tab.current_page;
                         match tab.rail.prev_line() {
                             NavResult::PageBoundaryPrev => {
-                                tab.go_to_page(current_page - 1, ort, ww, wh);
+                                tab.go_to_page(current_page - 1, ort, &navigable, ww, wh);
                                 tab.queue_lookahead(lookahead);
                                 if tab.rail.active {
                                     tab.rail.jump_to_end();
@@ -698,7 +701,7 @@ impl App {
             Key::Named(NamedKey::PageDown) => {
                 if idx < tabs.len() {
                     let p = tabs[idx].current_page + 1;
-                    tabs[idx].go_to_page(p, ort, ww, wh);
+                    tabs[idx].go_to_page(p, ort, &navigable, ww, wh);
                     let la = self.config.analysis_lookahead_pages;
                     tabs[idx].queue_lookahead(la);
                 }
@@ -707,7 +710,7 @@ impl App {
             Key::Named(NamedKey::PageUp) => {
                 if idx < tabs.len() {
                     let p = tabs[idx].current_page - 1;
-                    tabs[idx].go_to_page(p, ort, ww, wh);
+                    tabs[idx].go_to_page(p, ort, &navigable, ww, wh);
                     let la = self.config.analysis_lookahead_pages;
                     tabs[idx].queue_lookahead(la);
                 }
@@ -715,7 +718,7 @@ impl App {
             }
             Key::Named(NamedKey::Home) => {
                 if idx < tabs.len() {
-                    tabs[idx].go_to_page(0, ort, ww, wh);
+                    tabs[idx].go_to_page(0, ort, &navigable, ww, wh);
                     let la = self.config.analysis_lookahead_pages;
                     tabs[idx].queue_lookahead(la);
                 }
@@ -724,7 +727,7 @@ impl App {
             Key::Named(NamedKey::End) => {
                 if idx < tabs.len() {
                     let last = tabs[idx].page_count - 1;
-                    tabs[idx].go_to_page(last, ort, ww, wh);
+                    tabs[idx].go_to_page(last, ort, &navigable, ww, wh);
                     let la = self.config.analysis_lookahead_pages;
                     tabs[idx].queue_lookahead(la);
                 }
@@ -988,7 +991,8 @@ impl ApplicationHandler for App {
         if idx < self.tabs.len() {
             if let Some(page) = self.tabs[idx].pending_page_load.take() {
                 let (ww, wh) = self.window_size();
-                self.tabs[idx].go_to_page(page, &mut self.ort_session, ww, wh);
+                let navigable = self.config.navigable_classes.clone();
+                self.tabs[idx].go_to_page(page, &mut self.ort_session, &navigable, ww, wh);
                 self.env.window.request_redraw();
                 return;
             }

@@ -1,6 +1,7 @@
 use anyhow::Result;
 use ort::session::Session;
 use ort::value::TensorRef;
+use std::collections::HashSet;
 
 pub const INPUT_SIZE: u32 = 800;
 const CONFIDENCE_THRESHOLD: f32 = 0.4;
@@ -47,20 +48,20 @@ pub const LAYOUT_CLASSES: [&str; 23] = [
     "aside_text",        // 22
 ];
 
-/// Classes that are navigable in rail mode (readable text only).
-const NAVIGABLE_CLASSES: [usize; 8] = [
-    0,  // document_title
-    1,  // paragraph_title
-    2,  // text
-    4,  // abstract
-    6,  // references
-    7,  // footnote
-    11, // algorithm
-    22, // aside_text
-];
-
-pub fn is_navigable(class_id: usize) -> bool {
-    NAVIGABLE_CLASSES.contains(&class_id)
+/// Returns the default set of navigable class IDs for rail mode (readable text only).
+pub fn default_navigable_classes() -> HashSet<usize> {
+    [
+        0,  // document_title
+        1,  // paragraph_title
+        2,  // text
+        4,  // abstract
+        6,  // references
+        7,  // footnote
+        11, // algorithm
+        22, // aside_text
+    ]
+    .into_iter()
+    .collect()
 }
 
 #[derive(Debug, Clone)]
@@ -428,10 +429,6 @@ fn detect_lines_for_blocks(
     scale_y: f32,
 ) {
     for block in blocks.iter_mut() {
-        if !is_navigable(block.class_id) {
-            continue;
-        }
-
         // Convert block bbox back to pixel coordinates
         let px_x = (block.bbox.x / scale_x).round() as usize;
         let px_y = (block.bbox.y / scale_y).round() as usize;
