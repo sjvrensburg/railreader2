@@ -6,6 +6,7 @@ pub mod layout;
 pub mod rail;
 pub mod tab;
 pub mod ui;
+pub mod worker;
 
 use anyhow::Result;
 use mupdf::{Colorspace, Matrix};

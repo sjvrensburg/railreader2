@@ -51,7 +51,7 @@ pub fn run_cleanup() -> CleanupReport {
     report
 }
 
-fn clean_directory(dir: &PathBuf, report: &mut CleanupReport) {
+fn clean_directory(dir: &std::path::Path, report: &mut CleanupReport) {
     let entries = match std::fs::read_dir(dir) {
         Ok(e) => e,
         Err(_) => return,
@@ -82,7 +82,7 @@ fn clean_directory(dir: &PathBuf, report: &mut CleanupReport) {
 }
 
 fn remove_matching_files(
-    dir: &PathBuf,
+    dir: &std::path::Path,
     extension: &str,
     max_age_days: Option<u64>,
     report: &mut CleanupReport,
@@ -100,9 +100,7 @@ fn remove_matching_files(
             continue;
         }
 
-        let matches_ext = path.extension().map(|e| e == extension).unwrap_or(false);
-
-        if !matches_ext {
+        if path.extension().is_none_or(|e| e != extension) {
             continue;
         }
 

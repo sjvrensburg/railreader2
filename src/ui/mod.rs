@@ -1,5 +1,4 @@
 pub mod about;
-pub mod icons;
 pub mod loading;
 pub mod menu;
 pub mod minimap;
@@ -27,7 +26,6 @@ pub enum UiAction {
     ConfigChanged,
     RunCleanup,
     Quit,
-    None,
 }
 
 pub struct UiState {
@@ -99,15 +97,14 @@ pub fn build_ui(
     about::show_about_window(ctx, &mut ui_state.show_about);
 
     // Cleanup notification toast
-    if ui_state.cleanup_message.is_some() {
-        let msg = ui_state.cleanup_message.clone().unwrap();
+    if let Some(msg) = &ui_state.cleanup_message {
         let mut dismiss = false;
         egui::Window::new("Cleanup")
             .collapsible(false)
             .resizable(false)
             .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
             .show(ctx, |ui| {
-                ui.label(&msg);
+                ui.label(msg.as_str());
                 if ui.button("OK").clicked() {
                     dismiss = true;
                 }

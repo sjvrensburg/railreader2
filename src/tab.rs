@@ -1,20 +1,12 @@
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::config::Config;
 use crate::layout::{self, PageAnalysis};
 use crate::rail::RailNav;
+use crate::worker::{AnalysisRequest, AnalysisWorker};
 
-const ZOOM_MIN: f64 = 0.1;
-const ZOOM_MAX: f64 = 20.0;
-
-static NEXT_TAB_ID: AtomicU64 = AtomicU64::new(1);
-
-pub type TabId = u64;
-
-fn next_tab_id() -> TabId {
-    NEXT_TAB_ID.fetch_add(1, Ordering::Relaxed)
-}
+pub const ZOOM_MIN: f64 = 0.1;
+pub const ZOOM_MAX: f64 = 20.0;
 
 #[derive(Debug, Clone)]
 pub struct Outline {
@@ -39,14 +31,7 @@ impl Default for Camera {
     }
 }
 
-impl Camera {
-    pub fn new() -> Self {
-        Self::default()
-    }
-}
-
 pub struct TabState {
-    pub id: TabId,
     pub title: String,
     pub file_path: String,
     pub doc: mupdf::Document,
@@ -65,6 +50,20 @@ pub struct TabState {
     pub minimap_dirty: bool,
     pub analysis_cache: HashMap<i32, PageAnalysis>,
     pub pending_analysis: VecDeque<i32>,
+    /// True when analysis for the current page has been submitted to the worker
+    /// but results haven't arrived yet. Rail mode activation is deferred.
+    pub pending_rail_setup: bool,
+    /// Cached GPU texture of the page content (white bg + SVG + colour effect)
+    /// used during rail-mode scrolling to avoid re-rendering the SVG DOM every frame.
+    pub rail_cache: Option<RailCache>,
+}
+
+/// Pre-rendered page texture for fast rail-mode scrolling.
+pub struct RailCache {
+    pub image: skia_safe::Image,
+    pub zoom: f64,
+    pub page: i32,
+    pub effect_key: u8,
 }
 
 impl TabState {
@@ -78,7 +77,6 @@ impl TabState {
         let outline = load_outline(&doc);
 
         Ok(Self {
-            id: next_tab_id(),
             title,
             file_path,
             doc,
@@ -87,7 +85,7 @@ impl TabState {
             svg_dom: None,
             page_width: 0.0,
             page_height: 0.0,
-            camera: Camera::new(),
+            camera: Camera::default(),
             rail: RailNav::new(config.clone()),
             debug_overlay: false,
             loading: false,
@@ -97,12 +95,14 @@ impl TabState {
             minimap_dirty: true,
             analysis_cache: HashMap::new(),
             pending_analysis: VecDeque::new(),
+            pending_rail_setup: false,
+            rail_cache: None,
         })
     }
 
     pub fn load_page(
         &mut self,
-        ort_session: &mut Option<ort::session::Session>,
+        worker: &mut Option<AnalysisWorker>,
         navigable: &HashSet<usize>,
     ) {
         match crate::render_page_svg(&self.doc, self.current_page) {
@@ -118,13 +118,16 @@ impl TabState {
             }
         }
 
-        self.analyze_current_page(ort_session, navigable);
+        self.submit_analysis(worker, navigable);
         self.minimap_dirty = true;
+        self.rail_cache = None;
     }
 
-    pub fn analyze_current_page(
+    /// Submit analysis for the current page. Uses cache if available,
+    /// otherwise prepares input on the main thread and sends to the worker.
+    pub fn submit_analysis(
         &mut self,
-        ort_session: &mut Option<ort::session::Session>,
+        worker: &mut Option<AnalysisWorker>,
         navigable: &HashSet<usize>,
     ) {
         // Check cache first
@@ -135,32 +138,45 @@ impl TabState {
                 cached.blocks.len()
             );
             self.rail.set_analysis(cached.clone(), navigable);
+            self.pending_rail_setup = false;
             return;
         }
 
-        let analysis = if let Some(session) = ort_session {
-            match layout::analyze_page(session, &self.doc, self.current_page) {
-                Ok(a) => {
-                    log::info!(
-                        "Layout analysis: {} blocks detected on page {}",
-                        a.blocks.len(),
-                        self.current_page + 1
-                    );
-                    a
-                }
-                Err(e) => {
-                    log::warn!("Layout analysis failed: {}, using fallback", e);
-                    layout::fallback_analysis(self.page_width, self.page_height)
-                }
+        let worker = match worker {
+            Some(w) => w,
+            None => {
+                log::info!("No ONNX model loaded, using fallback layout");
+                let fallback = layout::fallback_analysis(self.page_width, self.page_height);
+                self.analysis_cache
+                    .insert(self.current_page, fallback.clone());
+                self.rail.set_analysis(fallback, navigable);
+                self.pending_rail_setup = false;
+                return;
             }
-        } else {
-            log::info!("No ONNX model loaded, using fallback layout");
-            layout::fallback_analysis(self.page_width, self.page_height)
         };
 
-        self.analysis_cache
-            .insert(self.current_page, analysis.clone());
-        self.rail.set_analysis(analysis, navigable);
+        // Already in flight — don't re-submit
+        if worker.is_in_flight(self.current_page) {
+            self.pending_rail_setup = true;
+            return;
+        }
+
+        match layout::prepare_analysis_input(&self.doc, self.current_page) {
+            Ok(input) => {
+                let page = self.current_page;
+                worker.submit(AnalysisRequest { page, input });
+                self.pending_rail_setup = true;
+                log::info!("Submitted analysis for page {} to worker", page + 1);
+            }
+            Err(e) => {
+                log::warn!("Failed to prepare analysis input: {}, using fallback", e);
+                let fallback = layout::fallback_analysis(self.page_width, self.page_height);
+                self.analysis_cache
+                    .insert(self.current_page, fallback.clone());
+                self.rail.set_analysis(fallback, navigable);
+                self.pending_rail_setup = false;
+            }
+        }
     }
 
     /// Re-apply navigable class filter from cached analysis (no ONNX re-run).
@@ -181,41 +197,40 @@ impl TabState {
         }
     }
 
-    /// Process one pending lookahead analysis. Returns true if work was done.
-    pub fn process_pending_analysis(
+    /// Submit one pending lookahead page to the worker. Returns true if a request was submitted.
+    pub fn submit_pending_lookahead(
         &mut self,
-        ort_session: &mut Option<ort::session::Session>,
+        worker: &mut Option<AnalysisWorker>,
     ) -> bool {
-        let page = match self.pending_analysis.pop_front() {
-            Some(p) => p,
+        let worker = match worker {
+            Some(w) => w,
             None => return false,
         };
 
-        // Skip if already cached
-        if self.analysis_cache.contains_key(&page) {
-            return !self.pending_analysis.is_empty();
+        // Only submit if the worker is idle (one at a time)
+        if !worker.is_idle() {
+            return false;
         }
 
-        let session = match ort_session {
-            Some(s) => s,
-            None => return false,
-        };
-
-        match layout::analyze_page(session, &self.doc, page) {
-            Ok(analysis) => {
-                log::info!(
-                    "Lookahead analysis: {} blocks on page {}",
-                    analysis.blocks.len(),
-                    page + 1
-                );
-                self.analysis_cache.insert(page, analysis);
+        while let Some(page) = self.pending_analysis.pop_front() {
+            // Skip if already cached or in flight
+            if self.analysis_cache.contains_key(&page) || worker.is_in_flight(page) {
+                continue;
             }
-            Err(e) => {
-                log::warn!("Lookahead analysis failed for page {}: {}", page + 1, e);
+
+            match layout::prepare_analysis_input(&self.doc, page) {
+                Ok(input) => {
+                    worker.submit(AnalysisRequest { page, input });
+                    log::info!("Submitted lookahead analysis for page {} to worker", page + 1);
+                    return true;
+                }
+                Err(e) => {
+                    log::warn!("Lookahead prepare failed for page {}: {}", page + 1, e);
+                }
             }
         }
 
-        true
+        false
     }
 
     pub fn update_rail_zoom(&mut self, window_width: f64, window_height: f64) {
@@ -240,7 +255,7 @@ impl TabState {
     pub fn go_to_page(
         &mut self,
         page: i32,
-        ort_session: &mut Option<ort::session::Session>,
+        worker: &mut Option<AnalysisWorker>,
         navigable: &HashSet<usize>,
         window_width: f64,
         window_height: f64,
@@ -249,7 +264,7 @@ impl TabState {
         if page != self.current_page {
             self.current_page = page;
             let old_zoom = self.camera.zoom;
-            self.load_page(ort_session, navigable);
+            self.load_page(worker, navigable);
             self.camera.zoom = old_zoom;
             self.clamp_camera(window_width, window_height);
         }
@@ -317,17 +332,10 @@ fn load_outline(doc: &mupdf::Document) -> Vec<Outline> {
 fn convert_outlines(outlines: Vec<mupdf::Outline>) -> Vec<Outline> {
     outlines
         .into_iter()
-        .map(|o| {
-            let page = o.dest.map(|d| d.loc.page_number as i32);
-            Outline {
-                title: o.title,
-                page,
-                children: if o.down.is_empty() {
-                    Vec::new()
-                } else {
-                    convert_outlines(o.down)
-                },
-            }
+        .map(|o| Outline {
+            title: o.title,
+            page: o.dest.map(|d| d.loc.page_number as i32),
+            children: convert_outlines(o.down),
         })
         .collect()
 }

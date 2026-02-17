@@ -35,32 +35,16 @@ impl EguiIntegration {
         };
         let glow_context = Arc::new(glow_context);
 
-        // Determine the framebuffer info for the glow painter
-        let mut fboid: i32 = 0;
-        unsafe { gl::GetIntegerv(gl::FRAMEBUFFER_BINDING, &mut fboid) };
+        let painter = egui_glow::Painter::new(glow_context.clone(), "", None, false)?;
 
-        // Create painter with correct signature for egui_glow 0.31
-        let painter = egui_glow::Painter::new(
-            glow_context.clone(),
-            "",
-            None,  // shader_version
-            false, // srgb
-        )?;
-
-        // Create egui context
         let ctx = egui::Context::default();
-
-        // Use ROOT viewport ID for the main window
-        let viewport_id = egui::ViewportId::ROOT;
-
-        // Create winit state with correct signature for egui-winit 0.31
         let winit_state = egui_winit::State::new(
             ctx.clone(),
-            viewport_id,
+            egui::ViewportId::ROOT,
             window,
-            None, // theme
-            None, // max_texture_side
-            None, // icon_scale
+            None,
+            None,
+            None,
         );
 
         Ok(Self {
@@ -73,9 +57,7 @@ impl EguiIntegration {
         })
     }
 
-    /// Handle a winit window event.
-    ///
-    /// Returns `true` if egui consumed the event (it should not be processed further).
+    /// Handle a winit window event, returning whether egui consumed or wants repaint.
     pub fn handle_event(
         &mut self,
         window: &winit::window::Window,
@@ -113,38 +95,17 @@ impl EguiIntegration {
     /// Call this after `end_frame()`. This will render the UI on top of whatever
     /// is currently in the framebuffer (your Skia-rendered PDF).
     pub fn paint(&mut self, window: &winit::window::Window) {
-        // Use the stored pixels_per_point (captured in end_frame before end_pass cleared it)
-        let pixels_per_point = self.pixels_per_point;
-
-        // Collect shapes and textures
         let shapes = std::mem::take(&mut self.shapes);
         let textures_delta = std::mem::take(&mut self.textures_delta);
-
-        // Tessellate shapes with correct DPI scale
-        let meshes = self.ctx.tessellate(shapes, pixels_per_point);
-
-        // Get the window size for the painter
+        let meshes = self.ctx.tessellate(shapes, self.pixels_per_point);
         let size = window.inner_size();
-        let max_texture_size = [size.width, size.height];
 
-        // Paint the meshes with correct pixels_per_point
         self.painter.paint_and_update_textures(
-            max_texture_size,
-            pixels_per_point,
+            [size.width, size.height],
+            self.pixels_per_point,
             &meshes,
             &textures_delta,
         );
-    }
-
-    /// Get the current pixels per point (DPI scaling factor).
-    pub fn pixels_per_point(&self) -> f32 {
-        // Use the input state to get pixels_per_point
-        self.ctx.input(|i| i.pixels_per_point)
-    }
-
-    /// Request a redraw from egui (e.g., when animations are running).
-    pub fn request_redraw(&self) {
-        self.ctx.request_repaint();
     }
 
     /// Check if egui wants to continuously repaint (e.g., due to animations).

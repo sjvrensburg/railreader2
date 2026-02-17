@@ -55,9 +55,9 @@ pub fn show_minimap(ctx: &egui::Context, show: &mut bool, tab: &TabState) -> Vec
                     // Draw viewport rectangle
                     let vp_x = -tab.camera.offset_x / (tab.page_width * tab.camera.zoom);
                     let vp_y = -tab.camera.offset_y / (tab.page_height * tab.camera.zoom);
-                    // We don't know the window size here, so estimate viewport fraction
-                    let vp_w = 1.0 / tab.camera.zoom;
-                    let vp_h = 1.0 / tab.camera.zoom;
+                    let screen = ctx.screen_rect();
+                    let vp_w = screen.width() as f64 / (tab.page_width * tab.camera.zoom);
+                    let vp_h = screen.height() as f64 / (tab.page_height * tab.camera.zoom);
 
                     let rect = response.rect;
                     let vp_rect = egui::Rect::from_min_size(

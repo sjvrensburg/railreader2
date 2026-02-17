@@ -43,6 +43,7 @@ src/
 ├── layout.rs            # ONNX inference, NMS, reading order, line detection
 ├── rail.rs              # Rail navigation state machine (snap, scroll, clamp)
 ├── tab.rs               # Camera, TabState (per-document state), outline, analysis cache
+├── worker.rs            # Background thread for async ONNX layout analysis
 ├── egui_integration.rs  # egui UI framework integration
 └── ui/
     ├── mod.rs           # UiState, UiAction enum, top-level build_ui()
@@ -53,8 +54,7 @@ src/
     ├── outline.rs       # Outline/TOC side panel
     ├── about.rs         # About dialog with version info
     ├── status_bar.rs    # Status bar (page, zoom, rail mode info)
-    ├── loading.rs       # Loading overlay with spinner
-    └── icons.rs         # Icon helpers (placeholder for Fluent UI icons)
+    └── loading.rs       # Loading overlay with spinner
 examples/
 └── dump_layout.rs       # CLI tool to inspect layout analysis output
 models/
@@ -66,7 +66,7 @@ scripts/
 ### Key concepts
 
 - **Rendering pipeline**: PDF → SVG (MuPDF) → Skia SVG DOM → OpenGL canvas. Zoom/pan are canvas transforms, text stays vector-sharp.
-- **Layout analysis**: PDF page → 800px pixmap → ImageNet-normalized CHW tensor → PP-DocLayoutV3 ONNX → NMS-filtered blocks with 23 class types. Reading order comes from the model's native output (Global Pointer Mechanism, column 7 of `[N,7]` tensor). Line detection uses horizontal projection profiling on pixmap crops.
+- **Layout analysis**: PDF page → 800px pixmap → ImageNet-normalized CHW tensor → PP-DocLayoutV3 ONNX → NMS-filtered blocks with 23 class types. Reading order comes from the model's native output (Global Pointer Mechanism, column 7 of `[N,7]` tensor). Line detection uses horizontal projection profiling on pixmap crops. Input preparation runs on the main thread; ONNX inference runs on a dedicated background worker thread (`worker.rs`) to avoid blocking the UI.
 - **Rail mode**: Activates above configurable zoom threshold. Navigation locks to detected text blocks, advances line-by-line with snap animations. Horizontal scrolling is continuous hold-to-scroll with speed ramping.
 - **Config**: User parameters in `config.json` (auto-created on first run, gitignored). Loaded at startup via `Config::load()`. Editable live via Settings panel; changes auto-save and propagate to all tabs.
 - **Analysis caching**: Per-tab `analysis_cache: HashMap<i32, PageAnalysis>` avoids re-running ONNX inference on revisited pages. Lookahead analysis pre-processes upcoming pages one-per-frame in `handle_redraw()`.
@@ -110,7 +110,7 @@ The `navigable_classes` array controls which of the 23 PP-DocLayoutV3 block type
 
 - **Prefer release builds.** Debug builds compile Skia from source (~15-20 min) and produce 10GB+ artifacts. Use `cargo build --release` and `cargo check` for fast iteration.
 - ONNX model outputs `[N, 7]` tensors: `[class_id, confidence, xmin, ymin, xmax, ymax, reading_order]`. The 7th column is the model's predicted reading order via its Global Pointer Mechanism.
-- Layout analysis runs synchronously on page load (~100-200ms). Lookahead pages are analyzed one-per-frame to avoid blocking.
+- Layout analysis runs asynchronously via `AnalysisWorker` (background thread). Input preparation (pixmap render + tensor build) happens on the main thread; ONNX inference runs on the worker. Results are polled each frame in `handle_redraw()`. Lookahead pages are submitted one-per-frame when the worker is idle.
 - Debug SVG dumping: Set `DUMP_SVG=1` environment variable to write each page's SVG to `/tmp/pageN.svg` for inspection.
 - **Modern GUI**: Full egui UI with menu bar, tab bar, outline panel, interactive minimap, settings window, about dialog, and status bar. Multi-tab support with independent per-tab state. Rendering pipeline: egui `build_ui()` → capture `content_rect` → Skia renders PDF into content area with GL scissor → egui `paint()` on top.
 - **Multi-tab architecture**: Per-tab state (`TabState` in `tab.rs`) holds document, camera, rail nav, SVG DOM, outline, minimap texture, analysis cache, and pending lookahead queue. Shared state: `ort::Session`, `Config`, `EguiIntegration`, `Env`.

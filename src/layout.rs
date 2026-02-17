@@ -94,11 +94,151 @@ pub struct PageAnalysis {
     pub page_height: f64,
 }
 
+/// Input data for the analysis worker thread. Contains the raw RGB pixmap bytes
+/// rendered on the main thread (MuPDF requirement) plus dimensions needed for
+/// preprocessing, inference, and coordinate mapping.
+pub struct AnalysisInput {
+    pub rgb_bytes: Vec<u8>,
+    pub px_w: u32,
+    pub px_h: u32,
+    pub page_w: f64,
+    pub page_h: f64,
+    pub page_number: i32,
+}
+
 pub fn load_model(path: &str) -> Result<Session> {
     let session = Session::builder()?
         .with_optimization_level(ort::session::builder::GraphOptimizationLevel::Level3)?
         .commit_from_file(path)?;
     Ok(session)
+}
+
+/// Main-thread: render pixmap via MuPDF and package for the worker thread.
+pub fn prepare_analysis_input(
+    doc: &mupdf::Document,
+    page_number: i32,
+) -> Result<AnalysisInput> {
+    let (rgb_bytes, px_w, px_h, page_w, page_h) =
+        crate::render_page_pixmap(doc, page_number, INPUT_SIZE)?;
+    Ok(AnalysisInput {
+        rgb_bytes,
+        px_w,
+        px_h,
+        page_w,
+        page_h,
+        page_number,
+    })
+}
+
+/// Worker-thread: preprocess + ONNX inference + NMS + line detection.
+/// No MuPDF needed — operates entirely on the raw RGB bytes.
+pub fn run_analysis(session: &mut Session, input: AnalysisInput) -> Result<PageAnalysis> {
+    let orig_h = input.px_h as usize;
+    let orig_w = input.px_w as usize;
+    let target = INPUT_SIZE as usize;
+
+    let scale_h = target as f32 / orig_h as f32;
+    let scale_w = target as f32 / orig_w as f32;
+
+    let chw_data = preprocess_image(&input.rgb_bytes, orig_w, orig_h, target);
+
+    let im_shape_data = vec![target as f32, target as f32];
+    let scale_factor_data = vec![scale_h, scale_w];
+
+    let im_shape = TensorRef::from_array_view(([1i64, 2], im_shape_data.as_slice()))?;
+    let image =
+        TensorRef::from_array_view(([1i64, 3, target as i64, target as i64], chw_data.as_slice()))?;
+    let scale_factor = TensorRef::from_array_view(([1i64, 2], scale_factor_data.as_slice()))?;
+
+    let outputs = session.run(ort::inputs![im_shape, image, scale_factor])?;
+
+    let (shape, data) = outputs[0].try_extract_tensor::<f32>()?;
+    let (n_detections, cols) = if shape.len() == 2 {
+        (shape[0] as usize, shape[1] as usize)
+    } else {
+        (0, 6)
+    };
+
+    let scale_x = input.page_w as f32 / orig_w as f32;
+    let scale_y = input.page_h as f32 / orig_h as f32;
+
+    let has_reading_order = cols >= 7;
+    let mut raw_blocks: Vec<LayoutBlock> = Vec::new();
+    for i in 0..n_detections {
+        let base = i * cols;
+        let class_id = data[base] as usize;
+        let confidence = data[base + 1];
+        let xmin = data[base + 2];
+        let ymin = data[base + 3];
+        let xmax = data[base + 4];
+        let ymax = data[base + 5];
+        let model_order = if has_reading_order {
+            data[base + 6] as usize
+        } else {
+            0
+        };
+
+        if confidence < CONFIDENCE_THRESHOLD {
+            continue;
+        }
+
+        if class_id >= LAYOUT_CLASSES.len() {
+            continue;
+        }
+
+        let x = xmin.max(0.0);
+        let y = ymin.max(0.0);
+        let w = xmax.min(orig_w as f32) - x;
+        let h = ymax.min(orig_h as f32) - y;
+
+        if w <= 0.0 || h <= 0.0 {
+            continue;
+        }
+
+        let min_dim = 5.0;
+        if w < min_dim || h < min_dim {
+            continue;
+        }
+
+        raw_blocks.push(LayoutBlock {
+            bbox: BBox {
+                x: x * scale_x,
+                y: y * scale_y,
+                w: w * scale_x,
+                h: h * scale_y,
+            },
+            class_id,
+            confidence,
+            order: model_order,
+            lines: Vec::new(),
+        });
+    }
+
+    nms(&mut raw_blocks, NMS_IOU_THRESHOLD);
+
+    raw_blocks.sort_by(|a, b| {
+        a.order
+            .cmp(&b.order)
+            .then(a.bbox.y.partial_cmp(&b.bbox.y).unwrap())
+    });
+    for (i, block) in raw_blocks.iter_mut().enumerate() {
+        block.order = i;
+    }
+
+    detect_lines_for_blocks(
+        &mut raw_blocks,
+        &input.rgb_bytes,
+        orig_w,
+        orig_h,
+        scale_x,
+        scale_y,
+    );
+
+    Ok(PageAnalysis {
+        blocks: raw_blocks,
+        page_width: input.page_w,
+        page_height: input.page_h,
+    })
 }
 
 /// Nearest-neighbor resize to `target x target` with ImageNet normalization, HWC→CHW.
@@ -132,132 +272,16 @@ fn preprocess_image(rgb_bytes: &[u8], orig_w: usize, orig_h: usize, target: usiz
     chw_data
 }
 
+/// Combined analyze: renders pixmap + runs ONNX inference in one call.
+/// Used by the `dump_layout` example. For the main app, use
+/// `prepare_analysis_input` + `run_analysis` separately.
 pub fn analyze_page(
     session: &mut Session,
     doc: &mupdf::Document,
     page_number: i32,
 ) -> Result<PageAnalysis> {
-    let (rgb_bytes, px_w, px_h, page_w, page_h) =
-        crate::render_page_pixmap(doc, page_number, INPUT_SIZE)?;
-
-    let orig_h = px_h as usize;
-    let orig_w = px_w as usize;
-    let target = INPUT_SIZE as usize;
-
-    let scale_h = target as f32 / orig_h as f32;
-    let scale_w = target as f32 / orig_w as f32;
-
-    let chw_data = preprocess_image(&rgb_bytes, orig_w, orig_h, target);
-
-    let im_shape_data = vec![target as f32, target as f32];
-    let scale_factor_data = vec![scale_h, scale_w];
-
-    let im_shape = TensorRef::from_array_view(([1i64, 2], im_shape_data.as_slice()))?;
-    let image =
-        TensorRef::from_array_view(([1i64, 3, target as i64, target as i64], chw_data.as_slice()))?;
-    let scale_factor = TensorRef::from_array_view(([1i64, 2], scale_factor_data.as_slice()))?;
-
-    // Run inference
-    let outputs = session.run(ort::inputs![im_shape, image, scale_factor])?;
-
-    // Output: [N, cols] -> [class_id, confidence, xmin, ymin, xmax, ymax, ...]
-    // Coordinates are in original pixel space (model applies scale_factor internally)
-    let (shape, data) = outputs[0].try_extract_tensor::<f32>()?;
-    let (n_detections, cols) = if shape.len() == 2 {
-        (shape[0] as usize, shape[1] as usize)
-    } else {
-        (0, 6)
-    };
-
-    // Scale from original pixel coords to page points
-    let scale_x = page_w as f32 / orig_w as f32;
-    let scale_y = page_h as f32 / orig_h as f32;
-
-    // Parse detections
-    // Column 7 (if present) contains the model's predicted reading order
-    let has_reading_order = cols >= 7;
-    let mut raw_blocks: Vec<LayoutBlock> = Vec::new();
-    for i in 0..n_detections {
-        let base = i * cols;
-        let class_id = data[base] as usize;
-        let confidence = data[base + 1];
-        let xmin = data[base + 2];
-        let ymin = data[base + 3];
-        let xmax = data[base + 4];
-        let ymax = data[base + 5];
-        let model_order = if has_reading_order {
-            data[base + 6] as usize
-        } else {
-            0
-        };
-
-        if confidence < CONFIDENCE_THRESHOLD {
-            continue;
-        }
-
-        if class_id >= LAYOUT_CLASSES.len() {
-            continue;
-        }
-
-        // Clamp to page bounds (output is in original pixel coords)
-        let x = xmin.max(0.0);
-        let y = ymin.max(0.0);
-        let w = xmax.min(orig_w as f32) - x;
-        let h = ymax.min(orig_h as f32) - y;
-
-        if w <= 0.0 || h <= 0.0 {
-            continue;
-        }
-
-        // Skip tiny detections (likely spurious)
-        let min_dim = 5.0; // minimum 5 pixels
-        if w < min_dim || h < min_dim {
-            continue;
-        }
-
-        raw_blocks.push(LayoutBlock {
-            bbox: BBox {
-                x: x * scale_x,
-                y: y * scale_y,
-                w: w * scale_x,
-                h: h * scale_y,
-            },
-            class_id,
-            confidence,
-            order: model_order,
-            lines: Vec::new(),
-        });
-    }
-
-    // NMS
-    nms(&mut raw_blocks, NMS_IOU_THRESHOLD);
-
-    // Use model's native reading order (column 7), re-index to sequential 0..N
-    // Falls back to top-to-bottom if model doesn't output reading order
-    raw_blocks.sort_by(|a, b| {
-        a.order
-            .cmp(&b.order)
-            .then(a.bbox.y.partial_cmp(&b.bbox.y).unwrap())
-    });
-    for (i, block) in raw_blocks.iter_mut().enumerate() {
-        block.order = i;
-    }
-
-    // Line detection for navigable blocks
-    detect_lines_for_blocks(
-        &mut raw_blocks,
-        &rgb_bytes,
-        orig_w,
-        orig_h,
-        scale_x,
-        scale_y,
-    );
-
-    Ok(PageAnalysis {
-        blocks: raw_blocks,
-        page_width: page_w,
-        page_height: page_h,
-    })
+    let input = prepare_analysis_input(doc, page_number)?;
+    run_analysis(session, input)
 }
 
 pub fn fallback_analysis(page_width: f64, page_height: f64) -> PageAnalysis {

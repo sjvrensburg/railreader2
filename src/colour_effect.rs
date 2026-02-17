@@ -25,6 +25,15 @@ impl fmt::Display for ColourEffect {
     }
 }
 
+/// Canonical list of all colour effects with descriptions for UI display.
+pub const COLOUR_EFFECTS: &[(ColourEffect, &str)] = &[
+    (ColourEffect::None, "No colour effect"),
+    (ColourEffect::HighContrast, "White on black for glare reduction"),
+    (ColourEffect::HighVisibility, "Yellow on black for maximum legibility"),
+    (ColourEffect::Amber, "Warm amber tint for haze reduction"),
+    (ColourEffect::Invert, "Invert colours for eye strain relief"),
+];
+
 /// Colours used by rail-mode overlays, adapted per colour effect so they
 /// complement rather than fight the filtered content.
 pub struct OverlayPalette {

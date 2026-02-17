@@ -33,9 +33,10 @@ use railreader2::layout::{self, LAYOUT_CLASSES};
 use railreader2::rail::{NavResult, RailNav, ScrollDir};
 use railreader2::tab::TabState;
 use railreader2::ui::{self, UiAction, UiState};
+use railreader2::worker::AnalysisWorker;
 
-const ZOOM_MIN: f64 = 0.1;
-const ZOOM_MAX: f64 = 20.0;
+use railreader2::tab::{ZOOM_MAX, ZOOM_MIN};
+
 const ZOOM_STEP: f64 = 1.25;
 const SCROLL_PIXELS_PER_LINE: f64 = 30.0;
 const ZOOM_SCROLL_SENSITIVITY: f64 = 0.003;
@@ -72,7 +73,7 @@ struct App {
     env: Env,
     tabs: Vec<TabState>,
     active_tab: usize,
-    ort_session: Option<ort::session::Session>,
+    worker: Option<AnalysisWorker>,
     config: Config,
     egui_integration: Option<EguiIntegration>,
     ui_state: UiState,
@@ -116,34 +117,13 @@ impl App {
             }
         };
 
-        tab.load_page(&mut self.ort_session, &self.config.navigable_classes);
+        tab.load_page(&mut self.worker, &self.config.navigable_classes);
         let (ww, wh) = self.window_size();
         tab.center_page(ww, wh);
         tab.update_rail_zoom(ww, wh);
 
-        // Update minimap texture inline (can't use update_minimap_for_active_tab before push)
         if let Some(egui_int) = &self.egui_integration {
-            match railreader2::render_page_pixmap(&tab.doc, tab.current_page, 200) {
-                Ok((rgb_bytes, px_w, px_h, _, _)) => {
-                    let pixels: Vec<egui::Color32> = rgb_bytes
-                        .chunks_exact(3)
-                        .map(|c| egui::Color32::from_rgb(c[0], c[1], c[2]))
-                        .collect();
-                    let image = egui::ColorImage {
-                        size: [px_w as usize, px_h as usize],
-                        pixels,
-                    };
-                    tab.minimap_texture = Some(egui_int.ctx.load_texture(
-                        format!("minimap_{}", tab.id),
-                        image,
-                        egui::TextureOptions::LINEAR,
-                    ));
-                    tab.minimap_dirty = false;
-                }
-                Err(e) => {
-                    log::warn!("Failed to render minimap: {}", e);
-                }
-            }
+            update_minimap_texture(&mut tab, &egui_int.ctx);
         }
 
         let lookahead = self.config.analysis_lookahead_pages;
@@ -202,7 +182,7 @@ impl App {
                     let idx = self.active_tab;
                     if idx < self.tabs.len() {
                         let navigable = self.config.navigable_classes.clone();
-                        self.tabs[idx].go_to_page(page, &mut self.ort_session, &navigable, ww, wh);
+                        self.tabs[idx].go_to_page(page, &mut self.worker, &navigable, ww, wh);
                         self.tabs[idx].minimap_dirty = true;
                         let lookahead = self.config.analysis_lookahead_pages;
                         self.tabs[idx].queue_lookahead(lookahead);
@@ -266,38 +246,15 @@ impl App {
                         el.exit();
                     }
                 }
-                UiAction::None => {}
             }
         }
     }
 
     fn update_minimap_for_active_tab(&mut self) {
-        // Can't easily do this with borrow checker — inline the logic
         let active = self.active_tab;
         if let (Some(egui_int), Some(tab)) = (&self.egui_integration, self.tabs.get_mut(active)) {
-            if !tab.minimap_dirty {
-                return;
-            }
-            match railreader2::render_page_pixmap(&tab.doc, tab.current_page, 200) {
-                Ok((rgb_bytes, px_w, px_h, _, _)) => {
-                    let pixels: Vec<egui::Color32> = rgb_bytes
-                        .chunks_exact(3)
-                        .map(|c| egui::Color32::from_rgb(c[0], c[1], c[2]))
-                        .collect();
-                    let image = egui::ColorImage {
-                        size: [px_w as usize, px_h as usize],
-                        pixels,
-                    };
-                    tab.minimap_texture = Some(egui_int.ctx.load_texture(
-                        format!("minimap_{}", tab.id),
-                        image,
-                        egui::TextureOptions::LINEAR,
-                    ));
-                    tab.minimap_dirty = false;
-                }
-                Err(e) => {
-                    log::warn!("Failed to render minimap: {}", e);
-                }
+            if tab.minimap_dirty {
+                update_minimap_texture(tab, &egui_int.ctx);
             }
         }
     }
@@ -625,7 +582,7 @@ impl App {
         let idx = self.active_tab;
         let lookahead = self.config.analysis_lookahead_pages;
         let navigable = self.config.navigable_classes.clone();
-        let ort = &mut self.ort_session;
+        let ort = &mut self.worker;
         let tabs = &mut self.tabs;
         if let Some(dir) = key_to_direction(&event.logical_key) {
             if idx >= tabs.len() {
@@ -697,42 +654,22 @@ impl App {
             return;
         }
 
+        // Page navigation keys
+        let nav_page = match &event.logical_key {
+            Key::Named(NamedKey::PageDown) if idx < tabs.len() => Some(tabs[idx].current_page + 1),
+            Key::Named(NamedKey::PageUp) if idx < tabs.len() => Some(tabs[idx].current_page - 1),
+            Key::Named(NamedKey::Home) if idx < tabs.len() => Some(0),
+            Key::Named(NamedKey::End) if idx < tabs.len() => Some(tabs[idx].page_count - 1),
+            _ => None,
+        };
+        if let Some(page) = nav_page {
+            tabs[idx].go_to_page(page, ort, &navigable, ww, wh);
+            tabs[idx].queue_lookahead(lookahead);
+            self.env.window.request_redraw();
+            return;
+        }
+
         match &event.logical_key {
-            Key::Named(NamedKey::PageDown) => {
-                if idx < tabs.len() {
-                    let p = tabs[idx].current_page + 1;
-                    tabs[idx].go_to_page(p, ort, &navigable, ww, wh);
-                    let la = self.config.analysis_lookahead_pages;
-                    tabs[idx].queue_lookahead(la);
-                }
-                self.env.window.request_redraw();
-            }
-            Key::Named(NamedKey::PageUp) => {
-                if idx < tabs.len() {
-                    let p = tabs[idx].current_page - 1;
-                    tabs[idx].go_to_page(p, ort, &navigable, ww, wh);
-                    let la = self.config.analysis_lookahead_pages;
-                    tabs[idx].queue_lookahead(la);
-                }
-                self.env.window.request_redraw();
-            }
-            Key::Named(NamedKey::Home) => {
-                if idx < tabs.len() {
-                    tabs[idx].go_to_page(0, ort, &navigable, ww, wh);
-                    let la = self.config.analysis_lookahead_pages;
-                    tabs[idx].queue_lookahead(la);
-                }
-                self.env.window.request_redraw();
-            }
-            Key::Named(NamedKey::End) => {
-                if idx < tabs.len() {
-                    let last = tabs[idx].page_count - 1;
-                    tabs[idx].go_to_page(last, ort, &navigable, ww, wh);
-                    let la = self.config.analysis_lookahead_pages;
-                    tabs[idx].queue_lookahead(la);
-                }
-                self.env.window.request_redraw();
-            }
             Key::Character(c) if c.as_str() == "+" || c.as_str() == "=" => {
                 if idx < self.tabs.len() {
                     let new_zoom = self.tabs[idx].camera.zoom * ZOOM_STEP;
@@ -789,20 +726,27 @@ impl App {
             false
         };
 
-        // Update minimap if dirty
-        self.update_minimap_for_active_tab();
+        // Defer minimap rendering to non-animating frames to avoid stacking
+        // with other expensive operations
+        if !animating {
+            self.update_minimap_for_active_tab();
+        }
 
         // --- Phase 2: Reordered rendering pipeline ---
         // 1. Reset Skia's cached GL state
         self.env.gr_context.reset(None);
 
-        // 2-4. egui: begin_frame, build_ui, capture content_rect
+        // egui: begin_frame, build_ui, end_frame
+        // Clone the egui::Context (cheap Arc clone) to release the mutable borrow
+        // on self.egui_integration, allowing build_ui to borrow other App fields.
+        #[allow(clippy::unnecessary_unwrap)]
         let actions = if self.egui_integration.is_some() {
-            let ctx = {
-                let egui_int = self.egui_integration.as_mut().unwrap();
-                let ctx = egui_int.begin_frame(&self.env.window);
-                ctx.clone()
-            };
+            let ctx = self
+                .egui_integration
+                .as_mut()
+                .unwrap()
+                .begin_frame(&self.env.window)
+                .clone();
 
             let actions = ui::build_ui(
                 &ctx,
@@ -812,10 +756,10 @@ impl App {
                 &mut self.config,
             );
 
-            // End frame (captures shapes, does NOT paint yet)
-            if let Some(egui_int) = &mut self.egui_integration {
-                egui_int.end_frame(&self.env.window);
-            }
+            self.egui_integration
+                .as_mut()
+                .unwrap()
+                .end_frame(&self.env.window);
 
             actions
         } else {
@@ -828,11 +772,79 @@ impl App {
 
         // 5. Skia renders PDF into content_rect area
         let content_rect = self.ui_state.content_rect;
+
+        // Pre-render rail cache if needed (before borrowing main canvas)
+        let effect_key = self.colour_effect_state.effect as u8;
+        if let Some(tab) = self.tabs.get_mut(self.active_tab) {
+            let use_rail_cache = tab.rail.active && tab.svg_dom.is_some();
+            if use_rail_cache {
+                let cache_valid = tab.rail_cache.as_ref().is_some_and(|c| {
+                    c.page == tab.current_page
+                        && (c.zoom - tab.camera.zoom).abs() < 1e-6
+                        && c.effect_key == effect_key
+                });
+                if !cache_valid {
+                    let pw = (tab.page_width * tab.camera.zoom).ceil() as i32;
+                    let ph = (tab.page_height * tab.camera.zoom).ceil() as i32;
+                    if pw > 0 && ph > 0 {
+                        let image_info = skia_safe::ImageInfo::new(
+                            (pw, ph),
+                            ColorType::RGBA8888,
+                            skia_safe::AlphaType::Premul,
+                            None,
+                        );
+                        if let Some(ref mut off) =
+                            self.env.surface.new_surface(&image_info)
+                        {
+                            let oc = off.canvas();
+                            oc.scale((tab.camera.zoom as f32, tab.camera.zoom as f32));
+
+                            let eff_layer = if self.colour_effect_state.has_active_effect() {
+                                if let Some(paint) = self.colour_effect_state.create_paint() {
+                                    oc.save_layer(
+                                        &skia_safe::canvas::SaveLayerRec::default().paint(&paint),
+                                    );
+                                    true
+                                } else {
+                                    false
+                                }
+                            } else {
+                                false
+                            };
+
+                            let mut white_paint = Paint::default();
+                            white_paint.set_color(Color::WHITE);
+                            oc.draw_rect(
+                                Rect::from_wh(tab.page_width as f32, tab.page_height as f32),
+                                &white_paint,
+                            );
+
+                            if let Some(dom) = &mut tab.svg_dom {
+                                dom.render(oc);
+                            }
+
+                            if eff_layer {
+                                oc.restore();
+                            }
+
+                            let image = off.image_snapshot();
+                            tab.rail_cache = Some(railreader2::tab::RailCache {
+                                image,
+                                zoom: tab.camera.zoom,
+                                page: tab.current_page,
+                                effect_key,
+                            });
+                        }
+                    }
+                }
+            }
+        }
+
+        // Now draw to the main canvas
         let canvas = self.env.surface.canvas();
         canvas.clear(Color::from_argb(255, 128, 128, 128));
 
         if let Some(tab) = self.tabs.get_mut(self.active_tab) {
-            // Set up GL scissor to prevent Skia from bleeding into panel areas
             let scale = self.env.window.scale_factor() as f32;
             let scissor_x = (content_rect.min.x * scale) as i32;
             let scissor_y = (size.height as f32 - content_rect.max.y * scale) as i32;
@@ -843,44 +855,54 @@ impl App {
                 gl::Scissor(scissor_x, scissor_y, scissor_w, scissor_h);
             }
 
-            // Offset canvas by content_rect origin
+            let use_rail_cache = tab.rail.active && tab.rail_cache.is_some();
+
             canvas.save();
             canvas.translate((content_rect.min.x, content_rect.min.y));
             canvas.translate((tab.camera.offset_x as f32, tab.camera.offset_y as f32));
-            canvas.scale((tab.camera.zoom as f32, tab.camera.zoom as f32));
 
-            // Apply colour effect as a save layer so it filters all PDF content
-            let effect_layer = if self.colour_effect_state.has_active_effect() {
-                if let Some(paint) = self.colour_effect_state.create_paint() {
-                    canvas.save_layer(&skia_safe::canvas::SaveLayerRec::default().paint(&paint));
-                    true
+            if use_rail_cache {
+                // Fast path: blit cached texture (zoom is baked into the image)
+                let image = &tab.rail_cache.as_ref().unwrap().image;
+                canvas.draw_image(image, (0.0, 0.0), None);
+            } else {
+                // Normal path: full SVG render
+                canvas.scale((tab.camera.zoom as f32, tab.camera.zoom as f32));
+
+                let effect_layer = if self.colour_effect_state.has_active_effect() {
+                    if let Some(paint) = self.colour_effect_state.create_paint() {
+                        canvas.save_layer(
+                            &skia_safe::canvas::SaveLayerRec::default().paint(&paint),
+                        );
+                        true
+                    } else {
+                        false
+                    }
                 } else {
                     false
+                };
+
+                let mut white_paint = Paint::default();
+                white_paint.set_color(Color::WHITE);
+                canvas.draw_rect(
+                    Rect::from_wh(tab.page_width as f32, tab.page_height as f32),
+                    &white_paint,
+                );
+
+                if let Some(dom) = &mut tab.svg_dom {
+                    dom.render(canvas);
                 }
-            } else {
-                false
-            };
 
-            // White page background
-            let mut white_paint = Paint::default();
-            white_paint.set_color(Color::WHITE);
-            canvas.draw_rect(
-                Rect::from_wh(tab.page_width as f32, tab.page_height as f32),
-                &white_paint,
-            );
-
-            // SVG content
-            if let Some(dom) = &mut tab.svg_dom {
-                dom.render(canvas);
+                if effect_layer {
+                    canvas.restore();
+                }
             }
 
-            // Close the colour effect layer before drawing overlays,
-            // so the filter applies only to PDF content (white bg + SVG).
-            if effect_layer {
-                canvas.restore(); // composites filtered layer
+            // Rail overlays in page coordinate space — apply zoom in cached path
+            if use_rail_cache {
+                canvas.scale((tab.camera.zoom as f32, tab.camera.zoom as f32));
             }
 
-            // Rail overlays drawn outside the filter layer with effect-aware colours
             let palette = self.colour_effect_state.effect.overlay_palette();
             draw_rail_overlays(
                 canvas,
@@ -897,7 +919,6 @@ impl App {
                 gl::Disable(gl::SCISSOR_TEST);
             }
         } else {
-            // No tabs open — show welcome
             draw_welcome(canvas, size.width, size.height, &self.status_font);
         }
 
@@ -918,11 +939,37 @@ impl App {
         // Process UI actions
         self.process_actions(actions, None);
 
-        // Process one pending lookahead analysis per frame (avoid blocking)
+        // Poll for completed analysis results from the worker
+        let mut got_results = false;
+        let (ww, wh) = self.window_size();
+        if let Some(worker) = &mut self.worker {
+            while let Some(result) = worker.poll() {
+                got_results = true;
+                log::info!(
+                    "Received analysis result for page {} ({} blocks)",
+                    result.page + 1,
+                    result.analysis.blocks.len()
+                );
+                let navigable = self.config.navigable_classes.clone();
+                for tab in &mut self.tabs {
+                    tab.analysis_cache
+                        .insert(result.page, result.analysis.clone());
+                    if tab.current_page == result.page && tab.pending_rail_setup {
+                        tab.rail.set_analysis(result.analysis.clone(), &navigable);
+                        tab.pending_rail_setup = false;
+                        if tab.rail.active {
+                            tab.start_snap(ww, wh);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Submit one pending lookahead per frame (non-blocking)
         let has_pending = if !animating {
             let idx = self.active_tab;
             if idx < self.tabs.len() {
-                self.tabs[idx].process_pending_analysis(&mut self.ort_session)
+                self.tabs[idx].submit_pending_lookahead(&mut self.worker)
             } else {
                 false
             }
@@ -930,13 +977,15 @@ impl App {
             false
         };
 
-        // Request another frame if animating
+        // Track if worker has in-flight requests (need to keep polling)
+        let worker_busy = self.worker.as_ref().is_some_and(|w| !w.is_idle());
+
+        // Request another frame if animating or worker has pending work
         let egui_wants_repaint = self
             .egui_integration
             .as_ref()
-            .map(|e| e.wants_continuous_repaint())
-            .unwrap_or(false);
-        if animating || egui_wants_repaint || has_pending {
+            .is_some_and(|e| e.wants_continuous_repaint());
+        if animating || egui_wants_repaint || has_pending || worker_busy || got_results {
             self.env.window.request_redraw();
         }
     }
@@ -954,6 +1003,30 @@ fn draw_welcome(canvas: &skia_safe::Canvas, width: u32, height: u32, font: &Font
         font,
         &paint,
     );
+}
+
+fn update_minimap_texture(tab: &mut TabState, ctx: &egui::Context) {
+    match railreader2::render_page_pixmap(&tab.doc, tab.current_page, 200) {
+        Ok((rgb_bytes, px_w, px_h, _, _)) => {
+            let pixels: Vec<egui::Color32> = rgb_bytes
+                .chunks_exact(3)
+                .map(|c| egui::Color32::from_rgb(c[0], c[1], c[2]))
+                .collect();
+            let image = egui::ColorImage {
+                size: [px_w as usize, px_h as usize],
+                pixels,
+            };
+            tab.minimap_texture = Some(ctx.load_texture(
+                format!("minimap_{}_{}", tab.file_path, tab.current_page),
+                image,
+                egui::TextureOptions::LINEAR,
+            ));
+            tab.minimap_dirty = false;
+        }
+        Err(e) => {
+            log::warn!("Failed to render minimap: {}", e);
+        }
+    }
 }
 
 fn key_to_direction(key: &Key) -> Option<Direction> {
@@ -992,7 +1065,7 @@ impl ApplicationHandler for App {
             if let Some(page) = self.tabs[idx].pending_page_load.take() {
                 let (ww, wh) = self.window_size();
                 let navigable = self.config.navigable_classes.clone();
-                self.tabs[idx].go_to_page(page, &mut self.ort_session, &navigable, ww, wh);
+                self.tabs[idx].go_to_page(page, &mut self.worker, &navigable, ww, wh);
                 self.env.window.request_redraw();
                 return;
             }
@@ -1006,8 +1079,8 @@ impl ApplicationHandler for App {
         } else {
             None
         };
-        let egui_consumed = egui_response.as_ref().map(|r| r.consumed).unwrap_or(false);
-        let egui_repaint = egui_response.as_ref().map(|r| r.repaint).unwrap_or(false);
+        let egui_consumed = egui_response.as_ref().is_some_and(|r| r.consumed);
+        let egui_repaint = egui_response.as_ref().is_some_and(|r| r.repaint);
 
         match event {
             WindowEvent::CloseRequested => event_loop.exit(),
@@ -1033,8 +1106,7 @@ impl ApplicationHandler for App {
                     || self
                         .egui_integration
                         .as_ref()
-                        .map(|e| e.ctx.wants_keyboard_input())
-                        .unwrap_or(false);
+                        .is_some_and(|e| e.ctx.wants_keyboard_input());
                 if !consumed {
                     if event.state == ElementState::Released {
                         self.handle_key_release(event);
@@ -1063,11 +1135,11 @@ fn main() -> Result<()> {
     // Try to load ONNX model
     let model_path =
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("models/PP-DocLayoutV3.onnx");
-    let ort_session = if model_path.exists() {
+    let worker = if model_path.exists() {
         match layout::load_model(model_path.to_str().unwrap()) {
             Ok(session) => {
                 log::info!("Loaded ONNX model from {}", model_path.display());
-                Some(session)
+                Some(AnalysisWorker::new(session))
             }
             Err(e) => {
                 log::warn!("Failed to load ONNX model: {}", e);
@@ -1154,6 +1226,11 @@ fn main() -> Result<()> {
         .make_current(&gl_surface)
         .expect("Could not make GL context current");
 
+    // Enable VSync to eliminate tearing during rail-mode scrolling
+    gl_surface
+        .set_swap_interval(&gl_context, glutin::surface::SwapInterval::Wait(NonZeroU32::new(1).unwrap()))
+        .unwrap_or_else(|e| log::warn!("Failed to set VSync: {}", e));
+
     gl::load_with(|s| {
         gl_config
             .display()
@@ -1231,7 +1308,7 @@ fn main() -> Result<()> {
         env,
         tabs: Vec::new(),
         active_tab: 0,
-        ort_session,
+        worker,
         config,
         egui_integration,
         ui_state: UiState::default(),
