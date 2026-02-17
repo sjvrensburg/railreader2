@@ -23,6 +23,7 @@ pub enum UiAction {
     ToggleDebug,
     ToggleOutline,
     ToggleMinimap,
+    SetColourEffect(crate::colour_effect::ColourEffect),
     ConfigChanged,
     RunCleanup,
     Quit,
@@ -62,7 +63,7 @@ pub fn build_ui(
     let mut actions = Vec::new();
 
     // Menu bar
-    actions.extend(menu::show_menu_bar(ctx, ui_state, tabs, active_tab));
+    actions.extend(menu::show_menu_bar(ctx, ui_state, tabs, active_tab, config));
 
     // Tab bar
     actions.extend(tab_bar::show_tab_bar(ctx, tabs, active_tab));

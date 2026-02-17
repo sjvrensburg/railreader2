@@ -100,10 +100,7 @@ fn remove_matching_files(
             continue;
         }
 
-        let matches_ext = path
-            .extension()
-            .map(|e| e == extension)
-            .unwrap_or(false);
+        let matches_ext = path.extension().map(|e| e == extension).unwrap_or(false);
 
         if !matches_ext {
             continue;
