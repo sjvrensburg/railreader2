@@ -83,6 +83,7 @@ struct App {
     press_pos: Option<(f64, f64)>,
     last_cursor: Option<(f64, f64)>,
     cursor_pos: (f64, f64),
+    quit_requested: bool,
     last_frame: std::time::Instant,
     status_font: Font,
 }
@@ -182,11 +183,15 @@ impl App {
                     let (ww, wh) = self.window_size();
                     let idx = self.active_tab;
                     if idx < self.tabs.len() {
-                        let navigable = self.config.navigable_classes.clone();
-                        self.tabs[idx].go_to_page(page, &mut self.worker, &navigable, ww, wh);
+                        self.tabs[idx].go_to_page(
+                            page,
+                            &mut self.worker,
+                            &self.config.navigable_classes,
+                            ww,
+                            wh,
+                        );
                         self.tabs[idx].minimap_dirty = true;
-                        let lookahead = self.config.analysis_lookahead_pages;
-                        self.tabs[idx].queue_lookahead(lookahead);
+                        self.tabs[idx].queue_lookahead(self.config.analysis_lookahead_pages);
                     }
                     self.update_minimap_for_active_tab();
                 }
@@ -245,10 +250,9 @@ impl App {
                     if let Some(egui_int) = &self.egui_integration {
                         egui_int.set_font_scale(self.config.ui_font_scale);
                     }
-                    let config = self.config.clone();
                     for tab in &mut self.tabs {
-                        tab.rail.update_config(config.clone());
-                        tab.reapply_navigable_classes(&config.navigable_classes);
+                        tab.rail.update_config(self.config.clone());
+                        tab.reapply_navigable_classes(&self.config.navigable_classes);
                     }
                 }
                 UiAction::RunCleanup => {
@@ -258,6 +262,8 @@ impl App {
                 UiAction::Quit => {
                     if let Some(el) = event_loop {
                         el.exit();
+                    } else {
+                        self.quit_requested = true;
                     }
                 }
             }
@@ -381,12 +387,11 @@ fn draw_rail_overlays(
 }
 
 fn draw_debug_overlay(canvas: &skia_safe::Canvas, rail: &RailNav) {
-    let analysis = match rail.analysis() {
-        Some(a) => a,
-        None => return,
+    let Some(analysis) = rail.analysis() else {
+        return;
     };
 
-    let colors: [(u8, u8, u8); 6] = [
+    let colors = [
         (244, 67, 54),
         (33, 150, 243),
         (76, 175, 80),
@@ -549,9 +554,8 @@ impl App {
         let content_rect = self.ui_state.content_rect;
         let (ww, wh) = self.window_size();
 
-        let tab = match self.active_tab_mut() {
-            Some(t) => t,
-            None => return,
+        let Some(tab) = self.active_tab_mut() else {
+            return;
         };
 
         if !tab.rail.active || !tab.rail.has_analysis() {
@@ -637,32 +641,29 @@ impl App {
         }
 
         let (ww, wh) = self.window_size();
-
         let idx = self.active_tab;
-        let lookahead = self.config.analysis_lookahead_pages;
-        let navigable = self.config.navigable_classes.clone();
-        let ort = &mut self.worker;
-        let tabs = &mut self.tabs;
+
         if let Some(dir) = key_to_direction(&event.logical_key) {
-            if idx >= tabs.len() {
+            if idx >= self.tabs.len() {
                 return;
             }
-            let tab = &mut tabs[idx];
+            let lookahead = self.config.analysis_lookahead_pages;
+            let navigable = &self.config.navigable_classes;
+            let ort = &mut self.worker;
+            let tab = &mut self.tabs[idx];
             match dir {
                 Direction::Down => {
                     if tab.rail.active {
                         let current_page = tab.current_page;
                         match tab.rail.next_line() {
                             NavResult::PageBoundaryNext => {
-                                tab.go_to_page(current_page + 1, ort, &navigable, ww, wh);
+                                tab.go_to_page(current_page + 1, ort, navigable, ww, wh);
                                 tab.queue_lookahead(lookahead);
                                 if tab.rail.active {
                                     tab.start_snap(ww, wh);
                                 }
                             }
-                            NavResult::Ok => {
-                                tab.start_snap(ww, wh);
-                            }
+                            NavResult::Ok => tab.start_snap(ww, wh),
                             _ => {}
                         }
                     } else {
@@ -675,16 +676,14 @@ impl App {
                         let current_page = tab.current_page;
                         match tab.rail.prev_line() {
                             NavResult::PageBoundaryPrev => {
-                                tab.go_to_page(current_page - 1, ort, &navigable, ww, wh);
+                                tab.go_to_page(current_page - 1, ort, navigable, ww, wh);
                                 tab.queue_lookahead(lookahead);
                                 if tab.rail.active {
                                     tab.rail.jump_to_end();
                                     tab.start_snap(ww, wh);
                                 }
                             }
-                            NavResult::Ok => {
-                                tab.start_snap(ww, wh);
-                            }
+                            NavResult::Ok => tab.start_snap(ww, wh),
                             _ => {}
                         }
                     } else {
@@ -715,45 +714,57 @@ impl App {
 
         // Page navigation keys
         let nav_page = match &event.logical_key {
-            Key::Named(NamedKey::PageDown) if idx < tabs.len() => Some(tabs[idx].current_page + 1),
-            Key::Named(NamedKey::PageUp) if idx < tabs.len() => Some(tabs[idx].current_page - 1),
-            Key::Named(NamedKey::Home) if idx < tabs.len() => Some(0),
-            Key::Named(NamedKey::End) if idx < tabs.len() => Some(tabs[idx].page_count - 1),
+            Key::Named(NamedKey::PageDown) if idx < self.tabs.len() => {
+                Some(self.tabs[idx].current_page + 1)
+            }
+            Key::Named(NamedKey::PageUp) if idx < self.tabs.len() => {
+                Some(self.tabs[idx].current_page - 1)
+            }
+            Key::Named(NamedKey::Home) if idx < self.tabs.len() => Some(0),
+            Key::Named(NamedKey::End) if idx < self.tabs.len() => {
+                Some(self.tabs[idx].page_count - 1)
+            }
             _ => None,
         };
         if let Some(page) = nav_page {
-            tabs[idx].go_to_page(page, ort, &navigable, ww, wh);
-            tabs[idx].queue_lookahead(lookahead);
+            self.tabs[idx].go_to_page(
+                page,
+                &mut self.worker,
+                &self.config.navigable_classes,
+                ww,
+                wh,
+            );
+            self.tabs[idx].queue_lookahead(self.config.analysis_lookahead_pages);
             self.env.window.request_redraw();
             return;
         }
 
         match &event.logical_key {
             Key::Character(c) if c.as_str() == "+" || c.as_str() == "=" => {
-                if idx < self.tabs.len() {
-                    let new_zoom = self.tabs[idx].camera.zoom * ZOOM_STEP;
-                    self.tabs[idx].apply_zoom(new_zoom, ww, wh);
+                if let Some(tab) = self.active_tab_mut() {
+                    let new_zoom = tab.camera.zoom * ZOOM_STEP;
+                    tab.apply_zoom(new_zoom, ww, wh);
                 }
                 self.env.window.request_redraw();
             }
             Key::Character(c) if c.as_str() == "-" => {
-                if idx < self.tabs.len() {
-                    let new_zoom = self.tabs[idx].camera.zoom / ZOOM_STEP;
-                    self.tabs[idx].apply_zoom(new_zoom, ww, wh);
+                if let Some(tab) = self.active_tab_mut() {
+                    let new_zoom = tab.camera.zoom / ZOOM_STEP;
+                    tab.apply_zoom(new_zoom, ww, wh);
                 }
                 self.env.window.request_redraw();
             }
             Key::Character(c) if c.as_str() == "0" => {
-                if idx < self.tabs.len() {
-                    self.tabs[idx].center_page(ww, wh);
-                    self.tabs[idx].update_rail_zoom(ww, wh);
+                if let Some(tab) = self.active_tab_mut() {
+                    tab.center_page(ww, wh);
+                    tab.update_rail_zoom(ww, wh);
                 }
                 self.env.window.request_redraw();
             }
             Key::Character(c) if c.as_str() == "D" => {
-                if idx < self.tabs.len() {
-                    self.tabs[idx].debug_overlay = !self.tabs[idx].debug_overlay;
-                    log::info!("Debug overlay: {}", self.tabs[idx].debug_overlay);
+                if let Some(tab) = self.active_tab_mut() {
+                    tab.debug_overlay = !tab.debug_overlay;
+                    log::info!("Debug overlay: {}", tab.debug_overlay);
                 }
                 self.env.window.request_redraw();
             }
@@ -800,31 +811,21 @@ impl App {
         self.env.gr_context.reset(None);
 
         // egui: begin_frame, build_ui, end_frame
-        // Clone the egui::Context (cheap Arc clone) to release the mutable borrow
-        // on self.egui_integration, allowing build_ui to borrow other App fields.
-        #[allow(clippy::unnecessary_unwrap)]
-        let actions = if self.egui_integration.is_some() {
-            let ctx = self
-                .egui_integration
-                .as_mut()
-                .unwrap()
-                .begin_frame(&self.env.window)
-                .clone();
+        // The Arc-clone of egui::Context releases the mutable borrow on
+        // self.egui_integration so build_ui can borrow other App fields.
+        let ctx = self
+            .egui_integration
+            .as_mut()
+            .map(|e| e.begin_frame(&self.env.window).clone());
 
-            let actions = ui::build_ui(
-                &ctx,
+        let actions = if let Some(ctx) = &ctx {
+            ui::build_ui(
+                ctx,
                 &mut self.ui_state,
                 &self.tabs,
                 self.active_tab,
                 &mut self.config,
-            );
-
-            self.egui_integration
-                .as_mut()
-                .unwrap()
-                .end_frame(&self.env.window);
-
-            actions
+            )
         } else {
             self.ui_state.content_rect = egui::Rect::from_min_size(
                 egui::pos2(0.0, 0.0),
@@ -832,6 +833,10 @@ impl App {
             );
             Vec::new()
         };
+
+        if let Some(egui_int) = &mut self.egui_integration {
+            egui_int.end_frame(&self.env.window);
+        }
 
         // 5. Skia renders PDF into content_rect area
         let content_rect = self.ui_state.content_rect;
@@ -862,7 +867,7 @@ impl App {
                             let oc = off.canvas();
                             oc.scale((tab.camera.zoom as f32, tab.camera.zoom as f32));
 
-                            let eff_layer = if self.colour_effect_state.has_active_effect() {
+                            let eff_layer =
                                 if let Some(paint) = self.colour_effect_state.create_paint() {
                                     oc.save_layer(
                                         &skia_safe::canvas::SaveLayerRec::default().paint(&paint),
@@ -870,10 +875,7 @@ impl App {
                                     true
                                 } else {
                                     false
-                                }
-                            } else {
-                                false
-                            };
+                                };
 
                             let mut white_paint = Paint::default();
                             white_paint.set_color(Color::WHITE);
@@ -932,7 +934,7 @@ impl App {
                 // Normal path: full SVG render
                 canvas.scale((tab.camera.zoom as f32, tab.camera.zoom as f32));
 
-                let effect_layer = if self.colour_effect_state.has_active_effect() {
+                let effect_layer =
                     if let Some(paint) = self.colour_effect_state.create_paint() {
                         canvas.save_layer(
                             &skia_safe::canvas::SaveLayerRec::default().paint(&paint),
@@ -940,10 +942,7 @@ impl App {
                         true
                     } else {
                         false
-                    }
-                } else {
-                    false
-                };
+                    };
 
                 let mut white_paint = Paint::default();
                 white_paint.set_color(Color::WHITE);
@@ -1013,12 +1012,12 @@ impl App {
                     result.page + 1,
                     result.analysis.blocks.len()
                 );
-                let navigable = self.config.navigable_classes.clone();
                 for tab in &mut self.tabs {
                     tab.analysis_cache
                         .insert(result.page, result.analysis.clone());
                     if tab.current_page == result.page && tab.pending_rail_setup {
-                        tab.rail.set_analysis(result.analysis.clone(), &navigable);
+                        tab.rail
+                            .set_analysis(result.analysis.clone(), &self.config.navigable_classes);
                         tab.pending_rail_setup = false;
                         if tab.rail.active {
                             tab.start_snap(ww, wh);
@@ -1118,6 +1117,11 @@ impl ApplicationHandler for App {
         _window_id: winit::window::WindowId,
         event: WindowEvent,
     ) {
+        if self.quit_requested {
+            event_loop.exit();
+            return;
+        }
+
         if let WindowEvent::ModifiersChanged(mods) = &event {
             self.modifiers = *mods;
         }
@@ -1127,8 +1131,13 @@ impl ApplicationHandler for App {
         if idx < self.tabs.len() {
             if let Some(page) = self.tabs[idx].pending_page_load.take() {
                 let (ww, wh) = self.window_size();
-                let navigable = self.config.navigable_classes.clone();
-                self.tabs[idx].go_to_page(page, &mut self.worker, &navigable, ww, wh);
+                self.tabs[idx].go_to_page(
+                    page,
+                    &mut self.worker,
+                    &self.config.navigable_classes,
+                    ww,
+                    wh,
+                );
                 self.env.window.request_redraw();
                 return;
             }
@@ -1386,6 +1395,7 @@ fn main() -> Result<()> {
         press_pos: None,
         last_cursor: None,
         cursor_pos: (0.0, 0.0),
+        quit_requested: false,
         last_frame: std::time::Instant::now(),
         status_font,
     };

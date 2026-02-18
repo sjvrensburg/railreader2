@@ -102,9 +102,8 @@ impl RailNav {
         window_width: f64,
         window_height: f64,
     ) {
-        let analysis = match &self.analysis {
-            Some(a) => a,
-            None => return,
+        let Some(analysis) = &self.analysis else {
+            return;
         };
 
         // Viewport center in page coordinates
