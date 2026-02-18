@@ -1,0 +1,136 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+  MODEL_URL: "https://huggingface.co/alex-dinh/PP-DocLayoutV3-ONNX/resolve/main/PP-DocLayoutV3.onnx"
+  MODEL_NAME: "PP-DocLayoutV3.onnx"
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            pkg-config libssl-dev curl \
+            libgl1-mesa-dev libgles2-mesa-dev mesa-common-dev \
+            libfontconfig1-dev libfreetype-dev \
+            python3 ninja-build clang \
+            fuse libfuse2
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry and build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: linux-release-${{ hashFiles('Cargo.lock') }}
+          restore-keys: linux-release-
+
+      - name: Build release binary
+        run: cargo build --release
+
+      - name: Download ONNX model
+        run: |
+          mkdir -p models
+          curl -L -o "models/$MODEL_NAME" "$MODEL_URL"
+
+      - name: Download linuxdeploy
+        run: |
+          curl -L -o linuxdeploy https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+          chmod +x linuxdeploy
+
+      - name: Build AppImage
+        run: |
+          mkdir -p AppDir/usr/bin AppDir/models
+          cp target/release/railreader2 AppDir/usr/bin/
+          cp models/$MODEL_NAME AppDir/models/
+          ./linuxdeploy \
+            --appdir AppDir \
+            --executable AppDir/usr/bin/railreader2 \
+            --desktop-file assets/railreader2.desktop \
+            --icon-file assets/icon.png \
+            --output appimage
+          mv railreader2-*.AppImage railreader2-linux-x86_64.AppImage
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-appimage
+          path: railreader2-linux-x86_64.AppImage
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build tools
+        run: |
+          choco upgrade llvm -y
+          choco install ninja -y
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry and build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~\.cargo\registry
+            ~\.cargo\git
+            target
+          key: windows-release-${{ hashFiles('Cargo.lock') }}
+          restore-keys: windows-release-
+
+      - name: Build release binary
+        run: cargo build --release
+
+      - name: Download ONNX model
+        run: |
+          New-Item -ItemType Directory -Force -Path models
+          Invoke-WebRequest -Uri "$env:MODEL_URL" -OutFile "models\$env:MODEL_NAME"
+
+      - name: Package ZIP
+        run: |
+          New-Item -ItemType Directory -Force -Path package
+          Copy-Item target\release\railreader2.exe package\
+          Copy-Item "models\$env:MODEL_NAME" package\
+          Compress-Archive -Path package\* -DestinationPath railreader2-windows-x86_64.zip
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-zip
+          path: railreader2-windows-x86_64.zip
+
+  release:
+    needs: [build-linux, build-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            railreader2-linux-x86_64.AppImage
+            railreader2-windows-x86_64.zip
