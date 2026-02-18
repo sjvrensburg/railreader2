@@ -17,6 +17,8 @@ At high zoom levels, navigation switches to "rail mode" — the viewer locks ont
 - **Interactive minimap** — click or drag to navigate the page
 - **Outline panel** — table of contents with collapsible hierarchy
 - **Settings panel** — live-editable rail reading parameters with persistence
+- **Keyboard shortcuts dialog** — press F1 or Help → Keyboard Shortcuts for a complete reference
+- **Click-to-select block** — click on any detected block in rail mode to jump to it
 - **About dialog** — version info and credits (Help → About)
 - **Disk cleanup** — removes cache, old logs, temp files (Help → Clean Up Temp Files)
 - **Analysis lookahead** — pre-analyzes upcoming pages in the background for instant navigation
@@ -50,7 +52,9 @@ cargo run --release
 | Ctrl + Mouse wheel | Horizontal scroll along line (rail mode) |
 | Mouse drag | Pan |
 | Mouse wheel | Zoom towards cursor |
+| Click on block | Jump to block (rail mode) |
 | D (shift) | Toggle debug overlay (shows detected blocks) |
+| F1 | Keyboard shortcuts dialog |
 
 ### Configuration
 

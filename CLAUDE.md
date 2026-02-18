@@ -52,6 +52,7 @@ src/
     ├── settings.rs      # Interactive settings window with DragValue controls
     ├── minimap.rs       # Interactive minimap overlay (click/drag to navigate)
     ├── outline.rs       # Outline/TOC side panel
+    ├── shortcuts.rs     # Keyboard shortcuts help dialog (F1)
     ├── about.rs         # About dialog with version info
     ├── status_bar.rs    # Status bar (page, zoom, rail mode info)
     └── loading.rs       # Loading overlay with spinner
@@ -95,6 +96,7 @@ Default `config.json` values (created on first run, gitignored):
   "scroll_speed_max": 400.0,
   "scroll_ramp_time": 1.5,
   "analysis_lookahead_pages": 2,
+  "ui_font_scale": 1.0,
   "colour_effect": "None",
   "colour_effect_intensity": 1.0,
   "navigable_classes": [
@@ -112,7 +114,7 @@ The `navigable_classes` array controls which of the 23 PP-DocLayoutV3 block type
 - ONNX model outputs `[N, 7]` tensors: `[class_id, confidence, xmin, ymin, xmax, ymax, reading_order]`. The 7th column is the model's predicted reading order via its Global Pointer Mechanism.
 - Layout analysis runs asynchronously via `AnalysisWorker` (background thread). Input preparation (pixmap render + tensor build) happens on the main thread; ONNX inference runs on the worker. Results are polled each frame in `handle_redraw()`. Lookahead pages are submitted one-per-frame when the worker is idle.
 - Debug SVG dumping: Set `DUMP_SVG=1` environment variable to write each page's SVG to `/tmp/pageN.svg` for inspection.
-- **Modern GUI**: Full egui UI with menu bar, tab bar, outline panel, interactive minimap, settings window, about dialog, and status bar. Multi-tab support with independent per-tab state. Rendering pipeline: egui `build_ui()` → capture `content_rect` → Skia renders PDF into content area with GL scissor → egui `paint()` on top.
+- **Modern GUI**: Full egui UI with menu bar, tab bar, outline panel, interactive minimap, settings window, keyboard shortcuts dialog (F1), about dialog, and status bar. Multi-tab support with independent per-tab state. Rendering pipeline: egui `build_ui()` → capture `content_rect` → Skia renders PDF into content area with GL scissor → egui `paint()` on top.
 - **Multi-tab architecture**: Per-tab state (`TabState` in `tab.rs`) holds document, camera, rail nav, SVG DOM, outline, minimap texture, analysis cache, and pending lookahead queue. Shared state: `ort::Session`, `Config`, `EguiIntegration`, `Env`.
 - App can run without CLI arguments — shows welcome screen with "Open a PDF file (Ctrl+O)" prompt.
 - **Cleanup**: `cleanup::run_cleanup()` runs on startup and on-demand via Help menu. Removes `cache/` contents, `.tmp` files, and `.log` files older than 7 days. Skips `config.json`, `.lock`, and `.onnx` files.
