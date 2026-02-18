@@ -12,6 +12,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # Build optimized release binary (preferred — debug builds are slow and large)
 cargo build --release
 
+# Fast syntax/type check without linking
+cargo check
+
 # Run the application
 cargo run --release -- <path-to-pdf>
 
@@ -30,6 +33,10 @@ cargo clippy
 # Download ONNX model (required for AI layout)
 ./scripts/download-model.sh
 ```
+
+**Prefer release builds.** Debug builds compile Skia from source (~15-20 min) and produce 10GB+ artifacts. Use `cargo check` for fast iteration without a full build.
+
+On Windows, release builds suppress the console window (`windows_subsystem = "windows"`). For `println!`/logging output while debugging on Windows, use a debug build or redirect output.
 
 ## Architecture
 
@@ -69,10 +76,11 @@ scripts/
 - **Rendering pipeline**: PDF → SVG (MuPDF) → Skia SVG DOM → OpenGL canvas. Zoom/pan are canvas transforms, text stays vector-sharp.
 - **Layout analysis**: PDF page → 800px pixmap → ImageNet-normalized CHW tensor → PP-DocLayoutV3 ONNX → NMS-filtered blocks with 23 class types. Reading order comes from the model's native output (Global Pointer Mechanism, column 7 of `[N,7]` tensor). Line detection uses horizontal projection profiling on pixmap crops. Input preparation runs on the main thread; ONNX inference runs on a dedicated background worker thread (`worker.rs`) to avoid blocking the UI.
 - **Rail mode**: Activates above configurable zoom threshold. Navigation locks to detected text blocks, advances line-by-line with snap animations. Horizontal scrolling is continuous hold-to-scroll with speed ramping.
-- **Config**: User parameters in `config.json` (auto-created on first run, gitignored). Loaded at startup via `Config::load()`. Editable live via Settings panel; changes auto-save and propagate to all tabs.
+- **Config**: User parameters stored in the platform config directory (`~/.config/railreader2/config.json` on Linux, `%APPDATA%\railreader2\config.json` on Windows). Loaded at startup via `Config::load()`. Editable live via Settings panel; changes auto-save and propagate to all tabs.
 - **Analysis caching**: Per-tab `analysis_cache: HashMap<i32, PageAnalysis>` avoids re-running ONNX inference on revisited pages. Lookahead analysis pre-processes upcoming pages one-per-frame in `handle_redraw()`.
-- **Action dispatch**: UI returns `Vec<UiAction>` from `build_ui()`, processed by `App::process_actions()`. Actions include `SetCamera`, `ConfigChanged`, `RunCleanup`, etc.
+- **Action dispatch**: UI returns `Vec<UiAction>` from `build_ui()`, processed by `App::process_actions()`. Full `UiAction` enum: `OpenFile`, `CloseTab(usize)`, `SelectTab(usize)`, `DuplicateTab`, `GoToPage(i32)`, `SetZoom(f64)`, `SetCamera(f64, f64)`, `FitPage`, `ToggleDebug`, `ToggleOutline`, `ToggleMinimap`, `SetColourEffect(ColourEffect)`, `ConfigChanged`, `RunCleanup`, `Quit`.
 - **Colour effects**: GPU-accelerated SkSL colour filters (`ColourEffect` enum) applied via `RuntimeEffect::make_for_color_filter()` and Skia save layers. Effects filter only PDF content (inside GL scissor), not egui panels. Rail-mode overlays use per-effect `OverlayPalette` colours so highlighting complements each scheme. Configurable via View → Colour Effects menu or Settings panel; effect + intensity persisted in `config.json`.
+- **Multi-tab architecture**: Per-tab state (`TabState` in `tab.rs`) holds document, camera, rail nav, SVG DOM, outline, minimap texture, analysis cache, and pending lookahead queue. Shared state: `ort::Session`, `Config`, `EguiIntegration`, `Env`. The `Env` struct drop order is intentional — `DirectContext` must drop before `Window` to avoid AMD GPU segfaults.
 
 ### Dependencies
 
@@ -86,7 +94,7 @@ scripts/
 
 ## Configuration
 
-Default `config.json` values (created on first run, gitignored):
+Config file location: `~/.config/railreader2/config.json` (Linux) or `%APPDATA%\railreader2\config.json` (Windows). Auto-created on first run with defaults.
 
 ```json
 {
@@ -106,16 +114,13 @@ Default `config.json` values (created on first run, gitignored):
 }
 ```
 
-The `navigable_classes` array controls which of the 23 PP-DocLayoutV3 block types are navigable in rail mode. Values are class name strings (see `LAYOUT_CLASSES` in `layout.rs`). Adding e.g. `"formula"` enables formula blocks; removing `"document_title"` skips headings. Configurable live via Settings → Advanced: Navigable Block Types. Line detection runs for all blocks regardless of this setting, so toggling classes doesn't require ONNX re-inference.
+The `navigable_classes` array controls which PP-DocLayoutV3 block types are navigable in rail mode. All 23 class names: `document_title`, `paragraph_title`, `text`, `page_number`, `abstract`, `table_of_contents`, `references`, `footnote`, `table`, `header`, `footer`, `algorithm`, `formula`, `formula_number`, `image`, `figure_caption`, `table_caption`, `seal`, `figure_title`, `figure`, `header_image`, `footer_image`, `aside_text`. Configurable live via Settings → Advanced. Line detection runs for all blocks regardless, so toggling classes doesn't require ONNX re-inference.
 
 ## Key Development Notes
 
-- **Prefer release builds.** Debug builds compile Skia from source (~15-20 min) and produce 10GB+ artifacts. Use `cargo build --release` and `cargo check` for fast iteration.
 - ONNX model outputs `[N, 7]` tensors: `[class_id, confidence, xmin, ymin, xmax, ymax, reading_order]`. The 7th column is the model's predicted reading order via its Global Pointer Mechanism.
 - Layout analysis runs asynchronously via `AnalysisWorker` (background thread). Input preparation (pixmap render + tensor build) happens on the main thread; ONNX inference runs on the worker. Results are polled each frame in `handle_redraw()`. Lookahead pages are submitted one-per-frame when the worker is idle.
 - Debug SVG dumping: Set `DUMP_SVG=1` environment variable to write each page's SVG to `/tmp/pageN.svg` for inspection.
-- **Modern GUI**: Full egui UI with menu bar, tab bar, outline panel, interactive minimap, settings window, keyboard shortcuts dialog (F1), about dialog, and status bar. Multi-tab support with independent per-tab state. Rendering pipeline: egui `build_ui()` → capture `content_rect` → Skia renders PDF into content area with GL scissor → egui `paint()` on top.
-- **Multi-tab architecture**: Per-tab state (`TabState` in `tab.rs`) holds document, camera, rail nav, SVG DOM, outline, minimap texture, analysis cache, and pending lookahead queue. Shared state: `ort::Session`, `Config`, `EguiIntegration`, `Env`.
 - App can run without CLI arguments — shows welcome screen with "Open a PDF file (Ctrl+O)" prompt.
 - **Cleanup**: `cleanup::run_cleanup()` runs on startup and on-demand via Help menu. Removes `cache/` contents, `.tmp` files, and `.log` files older than 7 days. Skips `config.json`, `.lock`, and `.onnx` files.
 - No unit tests currently exist in the project.
