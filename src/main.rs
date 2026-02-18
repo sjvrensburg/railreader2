@@ -757,6 +757,10 @@ impl App {
                 }
                 self.env.window.request_redraw();
             }
+            Key::Named(NamedKey::F1) => {
+                self.ui_state.show_shortcuts = !self.ui_state.show_shortcuts;
+                self.env.window.request_redraw();
+            }
             Key::Named(NamedKey::Escape) => event_loop.exit(),
             _ => {}
         }

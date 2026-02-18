@@ -137,6 +137,13 @@ pub fn show_menu_bar(
 
             // Help menu
             ui.menu_button("Help", |ui| {
+                if ui
+                    .add(egui::Button::new("Keyboard Shortcuts").shortcut_text("F1"))
+                    .clicked()
+                {
+                    ui_state.show_shortcuts = true;
+                    ui.close_menu();
+                }
                 if ui.button("About").clicked() {
                     ui_state.show_about = true;
                     ui.close_menu();
