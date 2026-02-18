@@ -1,7 +1,7 @@
 [package]
 name = "railreader2"
 version = "1.2.3"
-edition = "2021"
+edition = "2024"
 
 [dependencies]
 skia-safe = { version = "0.93", features = ["gl", "svg"] }

@@ -870,15 +870,15 @@ impl App {
                             let oc = off.canvas();
                             oc.scale((tab.camera.zoom as f32, tab.camera.zoom as f32));
 
-                            let eff_layer =
-                                if let Some(paint) = self.colour_effect_state.create_paint() {
+                            let eff_layer = match self.colour_effect_state.create_paint() {
+                                Some(paint) => {
                                     oc.save_layer(
                                         &skia_safe::canvas::SaveLayerRec::default().paint(&paint),
                                     );
                                     true
-                                } else {
-                                    false
-                                };
+                                }
+                                _ => false,
+                            };
 
                             let mut white_paint = Paint::default();
                             white_paint.set_color(Color::WHITE);
@@ -937,15 +937,15 @@ impl App {
                 // Normal path: full SVG render
                 canvas.scale((tab.camera.zoom as f32, tab.camera.zoom as f32));
 
-                let effect_layer =
-                    if let Some(paint) = self.colour_effect_state.create_paint() {
+                let effect_layer = match self.colour_effect_state.create_paint() {
+                    Some(paint) => {
                         canvas.save_layer(
                             &skia_safe::canvas::SaveLayerRec::default().paint(&paint),
                         );
                         true
-                    } else {
-                        false
-                    };
+                    }
+                    _ => false,
+                };
 
                 let mut white_paint = Paint::default();
                 white_paint.set_color(Color::WHITE);
