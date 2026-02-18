@@ -17,6 +17,29 @@ pub fn show_settings_window(
         .resizable(false)
         .default_width(300.0)
         .show(ctx, |ui| {
+            ui.heading("Appearance");
+            ui.separator();
+
+            let mut changed_appearance = false;
+
+            ui.horizontal(|ui| {
+                ui.label("UI Font Scale:");
+                changed_appearance |= ui
+                    .add(
+                        egui::DragValue::new(&mut config.ui_font_scale)
+                            .range(0.75..=2.0)
+                            .speed(0.05)
+                            .suffix("x"),
+                    )
+                    .changed();
+            });
+
+            if changed_appearance {
+                config.save();
+                actions.push(UiAction::ConfigChanged);
+            }
+
+            ui.add_space(16.0);
             ui.heading("Rail Reading");
             ui.separator();
 

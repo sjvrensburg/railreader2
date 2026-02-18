@@ -231,6 +231,9 @@ impl App {
                 UiAction::ConfigChanged => {
                     self.colour_effect_state.effect = self.config.colour_effect;
                     self.colour_effect_state.intensity = self.config.colour_effect_intensity as f32;
+                    if let Some(egui_int) = &self.egui_integration {
+                        egui_int.set_font_scale(self.config.ui_font_scale);
+                    }
                     let config = self.config.clone();
                     for tab in &mut self.tabs {
                         tab.rail.update_config(config.clone());
@@ -1300,6 +1303,11 @@ fn main() -> Result<()> {
     };
 
     let config = Config::load();
+
+    // Apply initial UI font scale
+    if let Some(egui_int) = &egui_integration {
+        egui_int.set_font_scale(config.ui_font_scale);
+    }
 
     // Run cleanup on startup
     let report = cleanup::run_cleanup();

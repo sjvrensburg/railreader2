@@ -108,6 +108,19 @@ impl EguiIntegration {
         );
     }
 
+    /// Scale all egui text sizes by the given multiplier.
+    pub fn set_font_scale(&self, scale: f32) {
+        let scale = scale.clamp(0.75, 2.0);
+        let mut style = (*self.ctx.style()).clone();
+        let defaults = egui::Style::default();
+        for (text_style, font_id) in style.text_styles.iter_mut() {
+            if let Some(default_font) = defaults.text_styles.get(text_style) {
+                font_id.size = default_font.size * scale;
+            }
+        }
+        self.ctx.set_style(style);
+    }
+
     /// Check if egui wants to continuously repaint (e.g., due to animations).
     pub fn wants_continuous_repaint(&self) -> bool {
         self.ctx.has_requested_repaint()

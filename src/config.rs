@@ -25,6 +25,8 @@ pub struct Config {
     pub colour_effect: ColourEffect,
     /// Intensity of the colour effect (0.0–1.0).
     pub colour_effect_intensity: f64,
+    /// UI font scale multiplier (0.75–2.0). Scales all egui text sizes.
+    pub ui_font_scale: f32,
     /// Which layout block classes are navigable in rail mode.
     #[serde(
         serialize_with = "serialize_navigable_classes",
@@ -64,6 +66,7 @@ impl Default for Config {
             scroll_speed_max: 400.0,
             scroll_ramp_time: 1.5,
             analysis_lookahead_pages: 2,
+            ui_font_scale: 1.0,
             colour_effect: ColourEffect::None,
             colour_effect_intensity: 1.0,
             navigable_classes: default_navigable_classes(),
