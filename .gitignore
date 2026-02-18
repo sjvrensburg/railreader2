@@ -25,3 +25,6 @@ models/*.onnx
 
 # User config (generated on first run)
 config.json
+
+# DISTRIBUTION.md file with our POA for distribution
+DISTRIBUTION.md
