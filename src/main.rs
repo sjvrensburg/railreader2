@@ -1198,6 +1198,45 @@ impl ApplicationHandler for App {
     }
 }
 
+const MODEL_FILENAME: &str = "PP-DocLayoutV3.onnx";
+
+/// Search for the ONNX model at runtime in order of priority:
+/// 1. `models/` next to the executable (packaged/portable installs)
+/// 2. `$APPDIR/models/` (AppImage)
+/// 3. `$XDG_DATA_HOME/railreader2/models/` or `%APPDATA%\railreader2\models\` (user data dir)
+/// 4. `models/` in the current working directory (development)
+fn find_model_path() -> Option<std::path::PathBuf> {
+    let candidates: Vec<std::path::PathBuf> = [
+        // Next to executable
+        std::env::current_exe()
+            .ok()
+            .and_then(|p| p.parent().map(|d| d.join("models").join(MODEL_FILENAME))),
+        // AppImage: $APPDIR/models/
+        std::env::var_os("APPDIR")
+            .map(|d| std::path::PathBuf::from(d).join("models").join(MODEL_FILENAME)),
+        // Platform user data directory
+        dirs::data_dir().map(|d| d.join("railreader2").join("models").join(MODEL_FILENAME)),
+        // Current working directory (dev builds)
+        Some(std::path::PathBuf::from("models").join(MODEL_FILENAME)),
+    ]
+    .into_iter()
+    .flatten()
+    .collect();
+
+    for path in &candidates {
+        log::debug!("Checking for model at {}", path.display());
+        if path.exists() {
+            return Some(path.clone());
+        }
+    }
+
+    log::info!(
+        "Model not found in any of: {:?}",
+        candidates.iter().map(|p| p.display().to_string()).collect::<Vec<_>>()
+    );
+    None
+}
+
 fn main() -> Result<()> {
     env_logger::init();
 
@@ -1205,9 +1244,7 @@ fn main() -> Result<()> {
     let pdf_path = args.get(1).cloned();
 
     // Try to load ONNX model
-    let model_path =
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("models/PP-DocLayoutV3.onnx");
-    let worker = if model_path.exists() {
+    let worker = if let Some(model_path) = find_model_path() {
         match layout::load_model(model_path.to_str().unwrap()) {
             Ok(session) => {
                 log::info!("Loaded ONNX model from {}", model_path.display());
@@ -1220,8 +1257,7 @@ fn main() -> Result<()> {
         }
     } else {
         log::info!(
-            "ONNX model not found at {}. Run scripts/download-model.sh to enable AI layout analysis.",
-            model_path.display()
+            "ONNX model not found. Run scripts/download-model.sh to enable AI layout analysis."
         );
         None
     };

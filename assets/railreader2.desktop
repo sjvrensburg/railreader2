@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=railreader2
+Comment=AI-guided rail reading PDF viewer
+Exec=railreader2 %f
+Icon=railreader2
+Categories=Office;Viewer;
+MimeType=application/pdf;
+Terminal=false
