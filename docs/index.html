@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>railreader2 — AI-Guided Rail Reading PDF Viewer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;600;700&family=Fira+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #141c2b;
+      --fg: #fff;
+      --fg-muted: #a0aec0;
+      --accent: #63b3ed;
+      --accent-hover: #90cdf4;
+      --card-bg: #1a2435;
+      --card-border: #2d3a4e;
+      --stripe-color: #fff;
+      --max-width: 860px;
+      --font-body: 'Nunito Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'Fira Mono', 'Consolas', 'Courier New', monospace;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background-color: var(--bg);
+      color: var(--fg);
+      font-family: var(--font-body);
+      font-size: 16px;
+      line-height: 1.7;
+    }
+
+    a {
+      color: var(--accent);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+
+    a:hover {
+      color: var(--accent-hover);
+    }
+
+    /* ---- Header ---- */
+    .header {
+      padding: 2rem 1.5rem 0;
+      max-width: var(--max-width);
+      margin: 0 auto;
+    }
+
+    .header__logo {
+      display: inline-block;
+      padding: 0.3rem 0.8rem;
+      background-color: var(--fg);
+      color: var(--bg);
+      font-family: var(--font-mono);
+      font-weight: 700;
+      font-size: 1.1rem;
+      position: relative;
+      margin-right: 0.5rem;
+    }
+
+    .header__logo::after {
+      content: '';
+      display: block;
+      position: absolute;
+      top: 0;
+      right: -10px;
+      bottom: 0;
+      width: 40px;
+      background: repeating-linear-gradient(
+        90deg,
+        var(--stripe-color),
+        var(--stripe-color) 2px,
+        transparent 0,
+        transparent 10px
+      );
+    }
+
+    .header nav {
+      margin-top: 1rem;
+      font-family: var(--font-mono);
+      font-size: 0.9rem;
+    }
+
+    .header nav a {
+      margin-right: 1.5rem;
+      color: var(--accent);
+    }
+
+    /* ---- Hero ---- */
+    .hero {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: 3rem 1.5rem 2rem;
+    }
+
+    .hero h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      margin-bottom: 0.75rem;
+    }
+
+    .hero p {
+      color: var(--fg-muted);
+      font-size: 1.1rem;
+      max-width: 600px;
+      margin-bottom: 1.5rem;
+    }
+
+    .hero__buttons {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      display: inline-block;
+      padding: 0.6rem 1.4rem;
+      font-family: var(--font-mono);
+      font-size: 0.9rem;
+      font-weight: 500;
+      border: 2px solid var(--fg);
+      color: var(--fg);
+      transition: background-color 0.2s, color 0.2s;
+    }
+
+    .btn:hover {
+      background-color: var(--fg);
+      color: var(--bg);
+    }
+
+    .btn--primary {
+      background-color: var(--fg);
+      color: var(--bg);
+    }
+
+    .btn--primary:hover {
+      background-color: transparent;
+      color: var(--fg);
+    }
+
+    /* ---- Sections ---- */
+    .section {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: 2rem 1.5rem;
+    }
+
+    .section h2 {
+      font-size: 1.3rem;
+      font-weight: 700;
+      margin-bottom: 1.5rem;
+      font-family: var(--font-mono);
+    }
+
+    .section h2::before {
+      content: '# ';
+      color: var(--accent);
+    }
+
+    /* ---- Screenshots ---- */
+    .screenshots {
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .screenshots__row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+    }
+
+    .screenshot {
+      background-color: var(--card-bg);
+      border: 1px solid var(--card-border);
+      overflow: hidden;
+    }
+
+    .screenshot img {
+      width: 100%;
+      display: block;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+
+    .screenshot img:hover {
+      opacity: 0.9;
+    }
+
+    .screenshot figcaption {
+      padding: 0.6rem 0.8rem;
+      font-size: 0.85rem;
+      color: var(--fg-muted);
+    }
+
+    /* ---- Lightbox ---- */
+    .lightbox {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      background: rgba(0, 0, 0, 0.85);
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+
+    .lightbox.active {
+      display: flex;
+    }
+
+    .lightbox img {
+      max-width: 90vw;
+      max-height: 90vh;
+      object-fit: contain;
+      border: 1px solid var(--card-border);
+    }
+
+    /* ---- Features ---- */
+    .features {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+    }
+
+    .feature {
+      background-color: var(--card-bg);
+      border: 1px solid var(--card-border);
+      padding: 1.2rem;
+    }
+
+    .feature h3 {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 0.4rem;
+      font-family: var(--font-mono);
+    }
+
+    .feature p {
+      color: var(--fg-muted);
+      font-size: 0.9rem;
+      line-height: 1.6;
+    }
+
+    /* ---- Getting Started ---- */
+    .steps {
+      counter-reset: step;
+      list-style: none;
+    }
+
+    .steps li {
+      counter-increment: step;
+      margin-bottom: 1rem;
+      padding-left: 2rem;
+      position: relative;
+    }
+
+    .steps li::before {
+      content: counter(step) '.';
+      position: absolute;
+      left: 0;
+      font-family: var(--font-mono);
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    code {
+      font-family: var(--font-mono);
+      background-color: var(--card-bg);
+      padding: 0.15rem 0.4rem;
+      font-size: 0.85em;
+      border: 1px solid var(--card-border);
+    }
+
+    /* ---- Keyboard shortcuts table ---- */
+    .shortcuts-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+      margin-bottom: 1rem;
+    }
+
+    .shortcuts-table th {
+      text-align: left;
+      font-family: var(--font-mono);
+      color: var(--accent);
+      padding: 0.5rem 0.8rem;
+      border-bottom: 1px solid var(--card-border);
+    }
+
+    .shortcuts-table td {
+      padding: 0.4rem 0.8rem;
+      border-bottom: 1px solid var(--card-border);
+    }
+
+    .shortcuts-table td:first-child {
+      font-family: var(--font-mono);
+      white-space: nowrap;
+      width: 140px;
+    }
+
+    .shortcuts-table td:last-child {
+      color: var(--fg-muted);
+    }
+
+    /* ---- Footer ---- */
+    .footer {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: 2rem 1.5rem 3rem;
+      font-size: 0.85rem;
+      color: var(--fg-muted);
+      font-family: var(--font-mono);
+      border-top: 1px solid var(--card-border);
+    }
+
+    .footer a {
+      color: var(--fg-muted);
+    }
+
+    .footer a:hover {
+      color: var(--fg);
+    }
+
+    /* ---- Responsive ---- */
+    @media (max-width: 600px) {
+      .screenshots__row,
+      .features {
+        grid-template-columns: 1fr;
+      }
+
+      .hero h1 {
+        font-size: 1.5rem;
+      }
+
+      .hero__buttons {
+        flex-direction: column;
+      }
+
+      .btn {
+        text-align: center;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="header">
+    <span class="header__logo">railreader2</span>
+    <nav>
+      <a href="#features">Features</a>
+      <a href="#screenshots">Screenshots</a>
+      <a href="#getting-started">Get Started</a>
+      <a href="#shortcuts">Shortcuts</a>
+      <a href="https://github.com/sjvrensburg/railreader2">GitHub</a>
+    </nav>
+  </header>
+
+  <!-- Hero -->
+  <section class="hero">
+    <h1>AI-guided rail reading for PDFs</h1>
+    <p>
+      A desktop PDF viewer that uses deep learning layout analysis to guide
+      high-magnification reading &mdash; line by line, block by block.
+      Built for accessibility and comfort.
+    </p>
+    <div class="hero__buttons">
+      <a href="https://github.com/sjvrensburg/railreader2/releases/latest" class="btn btn--primary">Download Latest Release</a>
+      <a href="https://github.com/sjvrensburg/railreader2" class="btn">View Source</a>
+    </div>
+  </section>
+
+  <!-- Screenshots -->
+  <section class="section" id="screenshots">
+    <h2>Screenshots</h2>
+    <div class="screenshots">
+      <div class="screenshots__row">
+        <figure class="screenshot">
+          <img src="img/full_page_view_no_analysis.png" alt="Full page view of a PDF document" onclick="openLightbox(this)">
+          <figcaption>Full page view &mdash; vector-sharp rendering at any zoom level</figcaption>
+        </figure>
+        <figure class="screenshot">
+          <img src="img/full_page_view_with_analysis.png" alt="Page view with layout analysis overlay" onclick="openLightbox(this)">
+          <figcaption>Layout analysis &mdash; AI-detected blocks with reading order</figcaption>
+        </figure>
+      </div>
+      <div class="screenshots__row">
+        <figure class="screenshot">
+          <img src="img/rail_mode.png" alt="Rail mode reading a text block line by line" onclick="openLightbox(this)">
+          <figcaption>Rail mode &mdash; line-by-line reading at high magnification</figcaption>
+        </figure>
+        <figure class="screenshot">
+          <img src="img/colour_effects.png" alt="Amber colour filter applied to PDF content" onclick="openLightbox(this)">
+          <figcaption>Amber colour filter &mdash; GPU-accelerated, PDF content only</figcaption>
+        </figure>
+      </div>
+      <figure class="screenshot">
+        <img src="img/multiple_tabs.png" alt="Multiple PDF documents open in tabs" onclick="openLightbox(this)">
+        <figcaption>Multi-tab &mdash; independent documents with tab bar navigation</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <!-- Lightbox -->
+  <div class="lightbox" id="lightbox" onclick="closeLightbox()">
+    <img id="lightbox-img" src="" alt="">
+  </div>
+
+  <!-- Features -->
+  <section class="section" id="features">
+    <h2>Features</h2>
+    <div class="features">
+      <div class="feature">
+        <h3>AI Layout Detection</h3>
+        <p>
+          PP-DocLayoutV3 identifies 23 block types &mdash; paragraphs, headings, figures,
+          tables, formulas &mdash; and predicts reading order automatically.
+        </p>
+      </div>
+      <div class="feature">
+        <h3>Rail Mode</h3>
+        <p>
+          Zoom in past the threshold and navigation locks to detected text blocks.
+          Advance line by line with arrow keys or WASD. Hold left/right to scroll
+          continuously with speed ramping.
+        </p>
+      </div>
+      <div class="feature">
+        <h3>Colour Effects</h3>
+        <p>
+          GPU-accelerated colour filters &mdash; amber, greyscale, inverted, high
+          contrast &mdash; with adjustable intensity. Applied only to PDF content,
+          not the UI.
+        </p>
+      </div>
+      <div class="feature">
+        <h3>Vector-Sharp Rendering</h3>
+        <p>
+          PDF pages render as SVG through Skia on OpenGL. Text stays crisp at any
+          zoom level &mdash; no blurry bitmaps.
+        </p>
+      </div>
+      <div class="feature">
+        <h3>Multi-Tab &amp; Outline</h3>
+        <p>
+          Open multiple PDFs in tabs with independent state. Navigate via the
+          table of contents panel or the interactive minimap.
+        </p>
+      </div>
+      <div class="feature">
+        <h3>Configurable Navigation</h3>
+        <p>
+          Choose which block types are navigable in rail mode. Adjust zoom
+          thresholds, scroll speeds, and snap animation timing. Settings persist
+          across sessions.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Getting Started -->
+  <section class="section" id="getting-started">
+    <h2>Getting Started</h2>
+    <ol class="steps">
+      <li>
+        Download the latest release for your platform from
+        <a href="https://github.com/sjvrensburg/railreader2/releases/latest">GitHub Releases</a>
+        &mdash; an AppImage for Linux or a ZIP for Windows. The AI layout model is
+        included in both packages.
+      </li>
+      <li>
+        <strong>Linux:</strong> Make the AppImage executable
+        (<code>chmod +x railreader2-linux-x86_64.AppImage</code>) and run it.
+        <strong>Windows:</strong> Extract the ZIP and run <code>railreader2.exe</code>.
+      </li>
+      <li>
+        Open a PDF with <code>Ctrl+O</code> or pass it as a command-line argument.
+        Zoom in to activate rail mode and start reading.
+      </li>
+    </ol>
+  </section>
+
+  <!-- Keyboard Shortcuts -->
+  <section class="section" id="shortcuts">
+    <h2>Keyboard Shortcuts</h2>
+    <table class="shortcuts-table">
+      <tr><th colspan="2">General</th></tr>
+      <tr><td>Ctrl+O</td><td>Open file</td></tr>
+      <tr><td>Ctrl+W</td><td>Close tab</td></tr>
+      <tr><td>Ctrl+Tab</td><td>Next tab</td></tr>
+      <tr><td>Ctrl+Q / Esc</td><td>Quit</td></tr>
+      <tr><td>F1</td><td>Keyboard shortcuts</td></tr>
+      <tr><th colspan="2">Navigation</th></tr>
+      <tr><td>PgDn / PgUp</td><td>Next / previous page</td></tr>
+      <tr><td>Home / End</td><td>First / last page</td></tr>
+      <tr><th colspan="2">View</th></tr>
+      <tr><td>+ / -</td><td>Zoom in / out</td></tr>
+      <tr><td>0</td><td>Fit page to window</td></tr>
+      <tr><td>Shift+D</td><td>Toggle debug overlay</td></tr>
+      <tr><th colspan="2">Rail Mode</th></tr>
+      <tr><td>Down / S</td><td>Next line</td></tr>
+      <tr><td>Up / W</td><td>Previous line</td></tr>
+      <tr><td>Right / D</td><td>Scroll forward (hold)</td></tr>
+      <tr><td>Left / A</td><td>Scroll backward (hold)</td></tr>
+    </table>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <p>
+      railreader2 &mdash;
+      <a href="https://github.com/sjvrensburg/railreader2">source</a> &middot;
+      <a href="https://github.com/sjvrensburg/railreader2/releases">releases</a> &middot;
+      GPL-3.0 License
+    </p>
+  </footer>
+
+  <script>
+    function openLightbox(img) {
+      var lb = document.getElementById('lightbox');
+      document.getElementById('lightbox-img').src = img.src;
+      lb.classList.add('active');
+    }
+    function closeLightbox() {
+      document.getElementById('lightbox').classList.remove('active');
+    }
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') closeLightbox();
+    });
+  </script>
+</body>
+</html>
