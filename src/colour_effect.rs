@@ -80,13 +80,13 @@ impl ColourEffect {
                 line_highlight: Color::from_argb(25, 0, 255, 255),
             },
             ColourEffect::HighVisibility => OverlayPalette {
-                // Yellow-on-black: dim with dark, bright yellow accents
-                dim: Color::from_argb(100, 40, 40, 0),
-                dim_excludes_block: false,
+                // Yellow-on-black: dim with black, excluding active block for full brightness
+                dim: Color::from_argb(120, 0, 0, 0),
+                dim_excludes_block: true,
                 block_reveal: None,
                 block_outline: Color::from_argb(200, 255, 230, 0),
                 block_outline_width: 2.5,
-                line_highlight: Color::from_argb(45, 255, 230, 0),
+                line_highlight: Color::from_argb(30, 255, 230, 0),
             },
             ColourEffect::Amber => OverlayPalette {
                 // Warm tint: keep original structure with amber-shifted accents
