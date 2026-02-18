@@ -4,6 +4,7 @@ pub mod menu;
 pub mod minimap;
 pub mod outline;
 pub mod settings;
+pub mod shortcuts;
 pub mod status_bar;
 pub mod tab_bar;
 
@@ -33,6 +34,7 @@ pub struct UiState {
     pub show_minimap: bool,
     pub show_settings: bool,
     pub show_about: bool,
+    pub show_shortcuts: bool,
     pub cleanup_message: Option<String>,
     pub content_rect: egui::Rect,
 }
@@ -44,6 +46,7 @@ impl Default for UiState {
             show_minimap: false,
             show_settings: false,
             show_about: false,
+            show_shortcuts: false,
             cleanup_message: None,
             content_rect: egui::Rect::EVERYTHING,
         }
@@ -95,6 +98,9 @@ pub fn build_ui(
 
     // About window
     about::show_about_window(ctx, &mut ui_state.show_about);
+
+    // Shortcuts window
+    shortcuts::show_shortcuts_window(ctx, &mut ui_state.show_shortcuts);
 
     // Cleanup notification toast
     if let Some(msg) = &ui_state.cleanup_message {

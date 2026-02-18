@@ -80,6 +80,7 @@ struct App {
     colour_effect_state: ColourEffectState,
     modifiers: Modifiers,
     dragging: bool,
+    press_pos: Option<(f64, f64)>,
     last_cursor: Option<(f64, f64)>,
     cursor_pos: (f64, f64),
     last_frame: std::time::Instant,
@@ -219,6 +220,16 @@ impl App {
                         tab.camera.offset_x = ox;
                         tab.camera.offset_y = oy;
                         tab.clamp_camera(ww, wh);
+                        if tab.rail.active {
+                            tab.rail.find_nearest_block(
+                                tab.camera.offset_x,
+                                tab.camera.offset_y,
+                                tab.camera.zoom,
+                                ww,
+                                wh,
+                            );
+                            tab.start_snap(ww, wh);
+                        }
                     }
                     self.env.window.request_redraw();
                 }
@@ -231,6 +242,9 @@ impl App {
                 UiAction::ConfigChanged => {
                     self.colour_effect_state.effect = self.config.colour_effect;
                     self.colour_effect_state.intensity = self.config.colour_effect_intensity as f32;
+                    if let Some(egui_int) = &self.egui_integration {
+                        egui_int.set_font_scale(self.config.ui_font_scale);
+                    }
                     let config = self.config.clone();
                     for tab in &mut self.tabs {
                         tab.rail.update_config(config.clone());
@@ -301,14 +315,6 @@ fn draw_rail_overlays(
         return;
     }
 
-    // Dim the entire page
-    let mut dim_paint = Paint::default();
-    dim_paint.set_color(palette.dim);
-    canvas.draw_rect(
-        Rect::from_wh(page_width as f32, page_height as f32),
-        &dim_paint,
-    );
-
     let block = rail.current_navigable_block();
     let margin = 4.0f32;
     let block_rect = Rect::from_xywh(
@@ -318,15 +324,30 @@ fn draw_rail_overlays(
         block.bbox.h + margin * 2.0,
     );
 
-    // Reveal the active block (skipped for dark-background effects)
-    if let Some((color, blend_mode)) = palette.block_reveal {
+    // Dim the page (optionally excluding the active block so it stays at full brightness)
+    let page_rect = Rect::from_wh(page_width as f32, page_height as f32);
+    let mut dim_paint = Paint::default();
+    dim_paint.set_color(palette.dim);
+    if palette.dim_excludes_block {
         canvas.save();
-        canvas.clip_rect(block_rect, skia_safe::ClipOp::Intersect, false);
-        let mut clear_paint = Paint::default();
-        clear_paint.set_color(color);
-        clear_paint.set_blend_mode(blend_mode);
-        canvas.draw_rect(block_rect, &clear_paint);
+        canvas.clip_rect(block_rect, skia_safe::ClipOp::Difference, false);
+        canvas.draw_rect(page_rect, &dim_paint);
         canvas.restore();
+    } else {
+        canvas.draw_rect(page_rect, &dim_paint);
+    }
+
+    // Reveal the active block (skipped for dark-background effects or exclude-dim mode)
+    if !palette.dim_excludes_block {
+        if let Some((color, blend_mode)) = palette.block_reveal {
+            canvas.save();
+            canvas.clip_rect(block_rect, skia_safe::ClipOp::Intersect, false);
+            let mut clear_paint = Paint::default();
+            clear_paint.set_color(color);
+            clear_paint.set_blend_mode(blend_mode);
+            canvas.draw_rect(block_rect, &clear_paint);
+            canvas.restore();
+        }
     }
 
     // Block outline
@@ -505,10 +526,48 @@ impl App {
 
     fn handle_mouse_input(&mut self, state: ElementState, button: MouseButton) {
         if button == MouseButton::Left {
-            self.dragging = state == ElementState::Pressed;
-            if !self.dragging {
+            if state == ElementState::Pressed {
+                self.dragging = true;
+                self.press_pos = Some(self.cursor_pos);
+            } else {
+                // On release, check if this was a click (not a drag)
+                if let Some((px, py)) = self.press_pos {
+                    let (cx, cy) = self.cursor_pos;
+                    let dist = ((cx - px).powi(2) + (cy - py).powi(2)).sqrt();
+                    if dist < 5.0 {
+                        self.handle_click(cx, cy);
+                    }
+                }
+                self.dragging = false;
+                self.press_pos = None;
                 self.last_cursor = None;
             }
+        }
+    }
+
+    fn handle_click(&mut self, cursor_x: f64, cursor_y: f64) {
+        let content_rect = self.ui_state.content_rect;
+        let (ww, wh) = self.window_size();
+
+        let tab = match self.active_tab_mut() {
+            Some(t) => t,
+            None => return,
+        };
+
+        if !tab.rail.active || !tab.rail.has_analysis() {
+            return;
+        }
+
+        let page_x =
+            (cursor_x - content_rect.min.x as f64 - tab.camera.offset_x) / tab.camera.zoom;
+        let page_y =
+            (cursor_y - content_rect.min.y as f64 - tab.camera.offset_y) / tab.camera.zoom;
+
+        if let Some(nav_idx) = tab.rail.find_block_at_point(page_x, page_y) {
+            tab.rail.current_block = nav_idx;
+            tab.rail.current_line = 0;
+            tab.start_snap(ww, wh);
+            self.env.window.request_redraw();
         }
     }
 
@@ -696,6 +755,10 @@ impl App {
                     self.tabs[idx].debug_overlay = !self.tabs[idx].debug_overlay;
                     log::info!("Debug overlay: {}", self.tabs[idx].debug_overlay);
                 }
+                self.env.window.request_redraw();
+            }
+            Key::Named(NamedKey::F1) => {
+                self.ui_state.show_shortcuts = !self.ui_state.show_shortcuts;
                 self.env.window.request_redraw();
             }
             Key::Named(NamedKey::Escape) => event_loop.exit(),
@@ -1294,6 +1357,11 @@ fn main() -> Result<()> {
 
     let config = Config::load();
 
+    // Apply initial UI font scale
+    if let Some(egui_int) = &egui_integration {
+        egui_int.set_font_scale(config.ui_font_scale);
+    }
+
     // Run cleanup on startup
     let report = cleanup::run_cleanup();
     if report.files_removed > 0 {
@@ -1315,6 +1383,7 @@ fn main() -> Result<()> {
         colour_effect_state,
         modifiers: Modifiers::default(),
         dragging: false,
+        press_pos: None,
         last_cursor: None,
         cursor_pos: (0.0, 0.0),
         last_frame: std::time::Instant::now(),
