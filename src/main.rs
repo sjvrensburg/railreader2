@@ -219,6 +219,16 @@ impl App {
                         tab.camera.offset_x = ox;
                         tab.camera.offset_y = oy;
                         tab.clamp_camera(ww, wh);
+                        if tab.rail.active {
+                            tab.rail.find_nearest_block(
+                                tab.camera.offset_x,
+                                tab.camera.offset_y,
+                                tab.camera.zoom,
+                                ww,
+                                wh,
+                            );
+                            tab.start_snap(ww, wh);
+                        }
                     }
                     self.env.window.request_redraw();
                 }

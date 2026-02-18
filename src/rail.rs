@@ -94,7 +94,7 @@ impl RailNav {
         }
     }
 
-    fn find_nearest_block(
+    pub fn find_nearest_block(
         &mut self,
         camera_x: f64,
         camera_y: f64,
