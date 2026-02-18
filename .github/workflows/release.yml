@@ -64,7 +64,7 @@ jobs:
             --appdir AppDir \
             --executable AppDir/usr/bin/railreader2 \
             --desktop-file assets/railreader2.desktop \
-            --icon-file assets/icon.png \
+            --icon-file assets/railreader2.png \
             --output appimage
           mv railreader2-*.AppImage railreader2-linux-x86_64.AppImage
 
