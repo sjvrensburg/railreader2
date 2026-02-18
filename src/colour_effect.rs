@@ -141,7 +141,7 @@ half4 main(half4 color) {
 const AMBER_SKSL: &str = r#"
 uniform float intensity;
 half4 main(half4 color) {
-    half3 tinted = clamp(color.rgb * half3(1.15, 1.05, 0.75), half3(0.0), half3(1.0));
+    half3 tinted = clamp(color.rgb * half3(1.09, 1.03, 0.85), half3(0.0), half3(1.0));
     half3 result = mix(color.rgb, tinted, half(intensity));
     return half4(result, color.a);
 }
