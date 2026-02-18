@@ -1,3 +1,6 @@
+// Suppress console window on Windows release builds; keep it in debug for println!/logging.
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 use anyhow::Result;
 use std::ffi::CString;
 use std::num::NonZeroU32;
@@ -1237,7 +1240,52 @@ fn find_model_path() -> Option<std::path::PathBuf> {
     None
 }
 
+fn setup_panic_hook() {
+    let default_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        let msg = format!("railreader2 crashed:\n{}", info);
+
+        // Write to crash log next to config
+        let log_path = dirs::config_dir()
+            .unwrap_or_else(|| std::path::PathBuf::from("."))
+            .join("railreader2")
+            .join("crash.log");
+        let _ = std::fs::write(&log_path, &msg);
+
+        // On Windows, show a message box since stderr is disconnected
+        #[cfg(target_os = "windows")]
+        {
+            use std::ffi::CString;
+            if let (Ok(text), Ok(caption)) = (
+                CString::new(format!("{}\n\nCrash log written to: {}", msg, log_path.display())),
+                CString::new("railreader2 — Fatal Error"),
+            ) {
+                unsafe {
+                    extern "system" {
+                        fn MessageBoxA(
+                            hwnd: *mut std::ffi::c_void,
+                            text: *const i8,
+                            caption: *const i8,
+                            utype: u32,
+                        ) -> i32;
+                    }
+                    MessageBoxA(
+                        std::ptr::null_mut(),
+                        text.as_ptr(),
+                        caption.as_ptr(),
+                        0x10, // MB_ICONERROR
+                    );
+                }
+            }
+        }
+
+        // Still call the default hook (prints to stderr, useful on Linux / debug builds)
+        default_hook(info);
+    }));
+}
+
 fn main() -> Result<()> {
+    setup_panic_hook();
     env_logger::init();
 
     let args: Vec<String> = std::env::args().collect();
