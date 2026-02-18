@@ -142,17 +142,14 @@ impl TabState {
             return;
         }
 
-        let worker = match worker {
-            Some(w) => w,
-            None => {
-                log::info!("No ONNX model loaded, using fallback layout");
-                let fallback = layout::fallback_analysis(self.page_width, self.page_height);
-                self.analysis_cache
-                    .insert(self.current_page, fallback.clone());
-                self.rail.set_analysis(fallback, navigable);
-                self.pending_rail_setup = false;
-                return;
-            }
+        let Some(worker) = worker else {
+            log::info!("No ONNX model loaded, using fallback layout");
+            let fallback = layout::fallback_analysis(self.page_width, self.page_height);
+            self.analysis_cache
+                .insert(self.current_page, fallback.clone());
+            self.rail.set_analysis(fallback, navigable);
+            self.pending_rail_setup = false;
+            return;
         };
 
         // Already in flight — don't re-submit
@@ -202,9 +199,8 @@ impl TabState {
         &mut self,
         worker: &mut Option<AnalysisWorker>,
     ) -> bool {
-        let worker = match worker {
-            Some(w) => w,
-            None => return false,
+        let Some(worker) = worker else {
+            return false;
         };
 
         // Only submit if the worker is idle (one at a time)
