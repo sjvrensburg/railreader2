@@ -80,6 +80,7 @@ struct App {
     colour_effect_state: ColourEffectState,
     modifiers: Modifiers,
     dragging: bool,
+    press_pos: Option<(f64, f64)>,
     last_cursor: Option<(f64, f64)>,
     cursor_pos: (f64, f64),
     last_frame: std::time::Instant,
@@ -525,10 +526,48 @@ impl App {
 
     fn handle_mouse_input(&mut self, state: ElementState, button: MouseButton) {
         if button == MouseButton::Left {
-            self.dragging = state == ElementState::Pressed;
-            if !self.dragging {
+            if state == ElementState::Pressed {
+                self.dragging = true;
+                self.press_pos = Some(self.cursor_pos);
+            } else {
+                // On release, check if this was a click (not a drag)
+                if let Some((px, py)) = self.press_pos {
+                    let (cx, cy) = self.cursor_pos;
+                    let dist = ((cx - px).powi(2) + (cy - py).powi(2)).sqrt();
+                    if dist < 5.0 {
+                        self.handle_click(cx, cy);
+                    }
+                }
+                self.dragging = false;
+                self.press_pos = None;
                 self.last_cursor = None;
             }
+        }
+    }
+
+    fn handle_click(&mut self, cursor_x: f64, cursor_y: f64) {
+        let content_rect = self.ui_state.content_rect;
+        let (ww, wh) = self.window_size();
+
+        let tab = match self.active_tab_mut() {
+            Some(t) => t,
+            None => return,
+        };
+
+        if !tab.rail.active || !tab.rail.has_analysis() {
+            return;
+        }
+
+        let page_x =
+            (cursor_x - content_rect.min.x as f64 - tab.camera.offset_x) / tab.camera.zoom;
+        let page_y =
+            (cursor_y - content_rect.min.y as f64 - tab.camera.offset_y) / tab.camera.zoom;
+
+        if let Some(nav_idx) = tab.rail.find_block_at_point(page_x, page_y) {
+            tab.rail.current_block = nav_idx;
+            tab.rail.current_line = 0;
+            tab.start_snap(ww, wh);
+            self.env.window.request_redraw();
         }
     }
 
@@ -1340,6 +1379,7 @@ fn main() -> Result<()> {
         colour_effect_state,
         modifiers: Modifiers::default(),
         dragging: false,
+        press_pos: None,
         last_cursor: None,
         cursor_pos: (0.0, 0.0),
         last_frame: std::time::Instant::now(),

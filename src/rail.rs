@@ -335,6 +335,23 @@ impl RailNav {
         self.current_navigable_block().lines.len()
     }
 
+    /// Find which navigable block contains the given page-coordinate point.
+    /// Returns the navigable index (index into `navigable_indices`), not the raw block index.
+    pub fn find_block_at_point(&self, page_x: f64, page_y: f64) -> Option<usize> {
+        let analysis = self.analysis.as_ref()?;
+        for (i, &block_idx) in self.navigable_indices.iter().enumerate() {
+            let b = &analysis.blocks[block_idx].bbox;
+            if page_x >= b.x as f64
+                && page_x <= (b.x + b.w) as f64
+                && page_y >= b.y as f64
+                && page_y <= (b.y + b.h) as f64
+            {
+                return Some(i);
+            }
+        }
+        None
+    }
+
     pub fn analysis(&self) -> Option<&PageAnalysis> {
         self.analysis.as_ref()
     }
