@@ -15,7 +15,7 @@ env:
 
 jobs:
   build-linux:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
@@ -98,6 +98,8 @@ jobs:
           restore-keys: windows-release-
 
       - name: Build release binary
+        env:
+          RUSTFLAGS: "-C link-args=/FORCE:MULTIPLE"
         run: cargo build --release
 
       - name: Download ONNX model
