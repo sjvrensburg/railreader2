@@ -1,6 +1,26 @@
-# railreader2
+<p align="center">
+  <img src="assets/railreader2.png" alt="railreader2" width="128">
+</p>
 
-Desktop PDF viewer optimised for high magnification viewing with AI-guided "rail reading". Built in Rust with MuPDF for PDF parsing, Skia for GPU-accelerated vector rendering, and a modern egui-based GUI.
+<h1 align="center">railreader2</h1>
+
+<p align="center">
+  Desktop PDF viewer optimised for high magnification viewing with AI-guided "rail reading".<br>
+  Built in Rust with MuPDF for PDF parsing, Skia for GPU-accelerated vector rendering, and a modern egui-based GUI.
+</p>
+
+<p align="center">
+  <a href="https://github.com/sjvrensburg/railreader2/releases/latest">Download</a> &middot;
+  <a href="https://sjvrensburg.github.io/railreader2/">Website</a>
+</p>
+
+---
+
+<p align="center">
+  <img src="docs/img/full_page_view_with_analysis.png" alt="Layout analysis overlay" width="45%">
+  &nbsp;
+  <img src="docs/img/rail_mode.png" alt="Rail mode" width="45%">
+</p>
 
 ## How it works
 
@@ -58,14 +78,14 @@ cargo run --release
 
 ### Configuration
 
-Rail reading parameters are editable via the Settings panel (gear icon in menu bar) and persisted to `config.json`:
+Rail reading parameters are editable via the Settings panel (gear icon in menu bar) and persisted to the platform config directory (`~/.config/railreader2/config.json` on Linux, `%APPDATA%\railreader2\config.json` on Windows):
 
 ```json
 {
   "rail_zoom_threshold": 3.0,
   "snap_duration_ms": 300.0,
-  "scroll_speed_start": 60.0,
-  "scroll_speed_max": 400.0,
+  "scroll_speed_start": 10.0,
+  "scroll_speed_max": 50.0,
   "scroll_ramp_time": 1.5,
   "analysis_lookahead_pages": 2,
   "colour_effect": "None",
