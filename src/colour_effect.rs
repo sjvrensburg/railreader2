@@ -39,6 +39,9 @@ pub const COLOUR_EFFECTS: &[(ColourEffect, &str)] = &[
 pub struct OverlayPalette {
     /// Semi-transparent fill drawn over the entire page to de-emphasise non-active blocks.
     pub dim: Color,
+    /// When `true`, the dim rect is clipped to exclude the active block so it stays
+    /// at full brightness. `block_reveal` is ignored in this mode.
+    pub dim_excludes_block: bool,
     /// Additive/clear colour drawn over the active block to reveal it. When `None`,
     /// the block reveal step is skipped (outline-only).
     pub block_reveal: Option<(Color, skia_safe::BlendMode)>,
@@ -57,6 +60,7 @@ impl ColourEffect {
             ColourEffect::None => OverlayPalette {
                 // Original behaviour: black dim, white additive reveal, soft blue accents
                 dim: Color::from_argb(120, 0, 0, 0),
+                dim_excludes_block: false,
                 block_reveal: Some((
                     Color::from_argb(120, 255, 255, 255),
                     skia_safe::BlendMode::Plus,
@@ -66,17 +70,19 @@ impl ColourEffect {
                 line_highlight: Color::from_argb(40, 66, 133, 244),
             },
             ColourEffect::HighContrast => OverlayPalette {
-                // Dark backgrounds: light dim to grey out surroundings, no additive reveal,
-                // bright cyan outline + line highlight for maximum contrast
-                dim: Color::from_argb(100, 60, 60, 60),
+                // Inverted content (white-on-black): dim with semi-transparent black,
+                // excluding the active block so filtered content shows at full contrast.
+                dim: Color::from_argb(140, 0, 0, 0),
+                dim_excludes_block: true,
                 block_reveal: None,
                 block_outline: Color::from_argb(200, 0, 255, 255),
                 block_outline_width: 2.5,
-                line_highlight: Color::from_argb(50, 0, 255, 255),
+                line_highlight: Color::from_argb(25, 0, 255, 255),
             },
             ColourEffect::HighVisibility => OverlayPalette {
                 // Yellow-on-black: dim with dark, bright yellow accents
                 dim: Color::from_argb(100, 40, 40, 0),
+                dim_excludes_block: false,
                 block_reveal: None,
                 block_outline: Color::from_argb(200, 255, 230, 0),
                 block_outline_width: 2.5,
@@ -85,6 +91,7 @@ impl ColourEffect {
             ColourEffect::Amber => OverlayPalette {
                 // Warm tint: keep original structure with amber-shifted accents
                 dim: Color::from_argb(110, 20, 10, 0),
+                dim_excludes_block: false,
                 block_reveal: Some((
                     Color::from_argb(100, 255, 220, 160),
                     skia_safe::BlendMode::Plus,
@@ -96,6 +103,7 @@ impl ColourEffect {
             ColourEffect::Invert => OverlayPalette {
                 // Inverted: light dim, no additive reveal, green accent (stands out on inverted)
                 dim: Color::from_argb(100, 60, 60, 60),
+                dim_excludes_block: false,
                 block_reveal: None,
                 block_outline: Color::from_argb(180, 0, 220, 120),
                 block_outline_width: 2.0,
@@ -110,7 +118,9 @@ uniform float intensity;
 half4 main(half4 color) {
     half lum = dot(color.rgb, half3(0.299, 0.587, 0.114));
     half inv = 1.0 - lum;
-    half c = inv < 0.5 ? 2.0 * inv * inv : 1.0 - 2.0 * (1.0 - inv) * (1.0 - inv);
+    // Steep S-curve: clamp to [0.15, 0.85] then Hermite interpolation
+    half t = clamp((inv - 0.15) / 0.7, 0.0, 1.0);
+    half c = t * t * (3.0 - 2.0 * t);
     half3 effect = half3(c, c, c);
     half3 result = mix(color.rgb, effect, half(intensity));
     return half4(result, color.a);

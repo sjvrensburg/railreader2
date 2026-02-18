@@ -301,14 +301,6 @@ fn draw_rail_overlays(
         return;
     }
 
-    // Dim the entire page
-    let mut dim_paint = Paint::default();
-    dim_paint.set_color(palette.dim);
-    canvas.draw_rect(
-        Rect::from_wh(page_width as f32, page_height as f32),
-        &dim_paint,
-    );
-
     let block = rail.current_navigable_block();
     let margin = 4.0f32;
     let block_rect = Rect::from_xywh(
@@ -318,15 +310,30 @@ fn draw_rail_overlays(
         block.bbox.h + margin * 2.0,
     );
 
-    // Reveal the active block (skipped for dark-background effects)
-    if let Some((color, blend_mode)) = palette.block_reveal {
+    // Dim the page (optionally excluding the active block so it stays at full brightness)
+    let page_rect = Rect::from_wh(page_width as f32, page_height as f32);
+    let mut dim_paint = Paint::default();
+    dim_paint.set_color(palette.dim);
+    if palette.dim_excludes_block {
         canvas.save();
-        canvas.clip_rect(block_rect, skia_safe::ClipOp::Intersect, false);
-        let mut clear_paint = Paint::default();
-        clear_paint.set_color(color);
-        clear_paint.set_blend_mode(blend_mode);
-        canvas.draw_rect(block_rect, &clear_paint);
+        canvas.clip_rect(block_rect, skia_safe::ClipOp::Difference, false);
+        canvas.draw_rect(page_rect, &dim_paint);
         canvas.restore();
+    } else {
+        canvas.draw_rect(page_rect, &dim_paint);
+    }
+
+    // Reveal the active block (skipped for dark-background effects or exclude-dim mode)
+    if !palette.dim_excludes_block {
+        if let Some((color, blend_mode)) = palette.block_reveal {
+            canvas.save();
+            canvas.clip_rect(block_rect, skia_safe::ClipOp::Intersect, false);
+            let mut clear_paint = Paint::default();
+            clear_paint.set_color(color);
+            clear_paint.set_blend_mode(blend_mode);
+            canvas.draw_rect(block_rect, &clear_paint);
+            canvas.restore();
+        }
     }
 
     // Block outline
