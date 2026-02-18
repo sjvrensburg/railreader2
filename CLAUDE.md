@@ -92,8 +92,8 @@ Default `config.json` values (created on first run, gitignored):
 {
   "rail_zoom_threshold": 3.0,
   "snap_duration_ms": 300.0,
-  "scroll_speed_start": 60.0,
-  "scroll_speed_max": 400.0,
+  "scroll_speed_start": 10.0,
+  "scroll_speed_max": 50.0,
   "scroll_ramp_time": 1.5,
   "analysis_lookahead_pages": 2,
   "ui_font_scale": 1.0,

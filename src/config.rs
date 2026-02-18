@@ -5,7 +5,7 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 
 /// User-configurable parameters for rail reading.
-/// Loaded from `config.json` next to the executable or in the working directory.
+/// Stored in the platform config directory (`$XDG_CONFIG_HOME/railreader2/` or `%APPDATA%\railreader2\`).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Config {
@@ -62,8 +62,8 @@ impl Default for Config {
         Self {
             rail_zoom_threshold: 3.0,
             snap_duration_ms: 300.0,
-            scroll_speed_start: 60.0,
-            scroll_speed_max: 400.0,
+            scroll_speed_start: 10.0,
+            scroll_speed_max: 50.0,
             scroll_ramp_time: 1.5,
             analysis_lookahead_pages: 2,
             ui_font_scale: 1.0,
@@ -118,5 +118,11 @@ impl Config {
 }
 
 fn config_path() -> PathBuf {
-    PathBuf::from("config.json")
+    let dir = dirs::config_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join("railreader2");
+    if !dir.exists() {
+        std::fs::create_dir_all(&dir).ok();
+    }
+    dir.join("config.json")
 }
