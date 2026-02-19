@@ -76,9 +76,9 @@ public sealed class PdfService : IDisposable
     {
         // Scale DPI with zoom for sharp text at all zoom levels.
         // At zoom=1 → 150 DPI (overview), zoom=3 → 450 DPI (rail mode sharp text).
-        // Cap at 800 DPI to avoid excessively large bitmaps.
+        // Cap at 600 DPI to avoid excessively large bitmaps (~35 MP for A4).
         int dpi = Math.Max(150, (int)(zoom * 150));
-        return Math.Min(dpi, 800);
+        return Math.Min(dpi, 600);
     }
 
     public void Dispose() { }
