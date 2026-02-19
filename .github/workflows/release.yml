@@ -24,23 +24,42 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "10.0.x"
+          include-prerelease: true
+
+      - name: Install AppImage dependencies
+        run: sudo apt-get update && sudo apt-get install -y fuse libfuse2
 
       - name: Publish
         run: dotnet publish src/RailReader2/RailReader2.csproj -c Release -r linux-x64 --self-contained -o publish/
 
       - name: Download ONNX model
         run: |
-          mkdir -p publish/models
-          curl -L -o "publish/models/$MODEL_NAME" "$MODEL_URL"
+          mkdir -p models
+          curl -L -o "models/$MODEL_NAME" "$MODEL_URL"
 
-      - name: Package tarball
-        run: tar -czf railreader2-linux-x64.tar.gz -C publish .
+      - name: Download linuxdeploy
+        run: |
+          curl -L -o linuxdeploy https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+          chmod +x linuxdeploy
+
+      - name: Build AppImage
+        run: |
+          mkdir -p AppDir/usr/bin AppDir/models
+          cp -r publish/* AppDir/usr/bin/
+          cp models/$MODEL_NAME AppDir/models/
+          ./linuxdeploy \
+            --appdir AppDir \
+            --executable AppDir/usr/bin/RailReader2 \
+            --desktop-file assets/railreader2.desktop \
+            --icon-file assets/railreader2.png \
+            --output appimage
+          mv RailReader2-*.AppImage railreader2-linux-x86_64.AppImage || mv railreader2-*.AppImage railreader2-linux-x86_64.AppImage
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: linux-tarball
-          path: railreader2-linux-x64.tar.gz
+          name: linux-appimage
+          path: railreader2-linux-x86_64.AppImage
 
   build-windows:
     runs-on: windows-latest
@@ -51,6 +70,7 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "10.0.x"
+          include-prerelease: true
 
       - name: Publish
         run: dotnet publish src/RailReader2/RailReader2.csproj -c Release -r win-x64 --self-contained -o publish/
@@ -83,5 +103,5 @@ jobs:
         with:
           generate_release_notes: true
           files: |
-            railreader2-linux-x64.tar.gz
+            railreader2-linux-x86_64.AppImage
             railreader2-windows-x64.zip
