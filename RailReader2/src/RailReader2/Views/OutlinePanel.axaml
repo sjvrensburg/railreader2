@@ -1,0 +1,22 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:RailReader2.ViewModels"
+             xmlns:m="using:RailReader2.Models"
+             x:Class="RailReader2.Views.OutlinePanel"
+             x:DataType="vm:MainWindowViewModel">
+    <DockPanel>
+        <TextBlock DockPanel.Dock="Top" Text="Outline" FontWeight="Bold"
+                   Margin="8,8,8,4" />
+        <Separator DockPanel.Dock="Top" />
+        <ScrollViewer>
+            <TreeView Name="OutlineTree"
+                      SelectionChanged="OnOutlineSelectionChanged">
+                <TreeView.ItemTemplate>
+                    <TreeDataTemplate ItemsSource="{Binding Children}" x:DataType="m:OutlineEntry">
+                        <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
+                    </TreeDataTemplate>
+                </TreeView.ItemTemplate>
+            </TreeView>
+        </ScrollViewer>
+    </DockPanel>
+</UserControl>

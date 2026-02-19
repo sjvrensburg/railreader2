@@ -1,0 +1,16 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="RailReader2.Views.AboutDialog"
+        Title="About railreader2"
+        Width="320" Height="220"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False">
+    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8">
+        <TextBlock Text="railreader2" FontSize="24" FontWeight="Bold" HorizontalAlignment="Center" />
+        <TextBlock Text="Version 2.0.0" HorizontalAlignment="Center" Opacity="0.7" />
+        <TextBlock Text="AI-guided rail reading PDF viewer" HorizontalAlignment="Center" Margin="0,8,0,0" />
+        <Separator Margin="0,8" />
+        <TextBlock Text="Built with Avalonia, SkiaSharp, ONNX Runtime" HorizontalAlignment="Center" FontSize="11" Opacity="0.6" />
+        <TextBlock Text="Layout detection: PP-DocLayoutV3" HorizontalAlignment="Center" FontSize="11" Opacity="0.6" />
+    </StackPanel>
+</Window>

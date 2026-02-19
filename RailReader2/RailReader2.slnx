@@ -1,0 +1,5 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/RailReader2/RailReader2.csproj" />
+  </Folder>
+</Solution>

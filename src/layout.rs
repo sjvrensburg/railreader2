@@ -21,44 +21,49 @@ const DENSITY_THRESHOLD_FRACTION: f32 = 0.15;
 // Runs shorter than this are treated as noise (e.g. underlines, specks).
 const MIN_LINE_HEIGHT_PX: usize = 3;
 
-/// 23 layout classes from PP-DocLayoutV3.
-pub const LAYOUT_CLASSES: [&str; 23] = [
-    "document_title",    // 0
-    "paragraph_title",   // 1
-    "text",              // 2
-    "page_number",       // 3
-    "abstract",          // 4
-    "table_of_contents", // 5
-    "references",        // 6
-    "footnote",          // 7
-    "table",             // 8
-    "header",            // 9
-    "footer",            // 10
-    "algorithm",         // 11
-    "formula",           // 12
-    "formula_number",    // 13
+/// 25 layout classes from PP-DocLayoutV3 (alphabetical order).
+/// Source: https://huggingface.co/PaddlePaddle/PP-DocLayoutV3 inference.yml
+pub const LAYOUT_CLASSES: [&str; 25] = [
+    "abstract",          // 0
+    "algorithm",         // 1
+    "aside_text",        // 2
+    "chart",             // 3
+    "content",           // 4
+    "display_formula",   // 5
+    "doc_title",         // 6
+    "figure_title",      // 7
+    "footer",            // 8
+    "footer_image",      // 9
+    "footnote",          // 10
+    "formula_number",    // 11
+    "header",            // 12
+    "header_image",      // 13
     "image",             // 14
-    "figure_caption",    // 15
-    "table_caption",     // 16
-    "seal",              // 17
-    "figure_title",      // 18
-    "figure",            // 19
-    "header_image",      // 20
-    "footer_image",      // 21
-    "aside_text",        // 22
+    "inline_formula",    // 15
+    "number",            // 16
+    "paragraph_title",   // 17
+    "reference",         // 18
+    "reference_content", // 19
+    "seal",              // 20
+    "table",             // 21
+    "text",              // 22
+    "vertical_text",     // 23
+    "vision_footnote",   // 24
 ];
 
 /// Returns the default set of navigable class IDs for rail mode (readable text only).
 pub fn default_navigable_classes() -> HashSet<usize> {
     [
-        0,  // document_title
-        1,  // paragraph_title
-        2,  // text
-        4,  // abstract
-        6,  // references
-        7,  // footnote
-        11, // algorithm
-        22, // aside_text
+        0,  // abstract
+        1,  // algorithm
+        2,  // aside_text
+        4,  // content
+        6,  // doc_title
+        10, // footnote
+        17, // paragraph_title
+        18, // reference
+        19, // reference_content
+        22, // text
     ]
     .into_iter()
     .collect()
@@ -247,10 +252,8 @@ pub fn run_analysis(session: &mut Session, input: AnalysisInput) -> Result<PageA
 /// Most vision models (including PP-DocLayoutV3) expect inputs normalized this way
 /// so activations are centered around zero with unit variance.
 fn preprocess_image(rgb_bytes: &[u8], orig_w: usize, orig_h: usize, target: usize) -> Vec<f32> {
-    // ImageNet-1K per-channel mean and standard deviation (RGB order).
-    const MEAN: [f32; 3] = [0.485, 0.456, 0.406];
-    const STD: [f32; 3] = [0.229, 0.224, 0.225];
-
+    // PP-DocLayoutV3 uses mean=[0,0,0] std=[1,1,1] (no ImageNet normalization).
+    // Just scale pixels to [0, 1] and convert to CHW layout.
     let scale_h = target as f32 / orig_h as f32;
     let scale_w = target as f32 / orig_w as f32;
     let pixel_count = target * target;
@@ -263,8 +266,7 @@ fn preprocess_image(rgb_bytes: &[u8], orig_w: usize, orig_h: usize, target: usiz
             let src_idx = (src_y * orig_w + src_x) * 3;
             let dst_idx = y * target + x;
             for c in 0..3 {
-                let val = rgb_bytes[src_idx + c] as f32 / 255.0;
-                chw_data[c * pixel_count + dst_idx] = (val - MEAN[c]) / STD[c];
+                chw_data[c * pixel_count + dst_idx] = rgb_bytes[src_idx + c] as f32 / 255.0;
             }
         }
     }

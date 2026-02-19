@@ -1,0 +1,12 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:RailReader2.ViewModels"
+             x:Class="RailReader2.Views.StatusBarView"
+             x:DataType="vm:MainWindowViewModel">
+    <Border Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}"
+            Padding="8,4">
+        <StackPanel Orientation="Horizontal" Spacing="16" Name="StatusPanel">
+            <!-- Content is set in code-behind based on active tab -->
+        </StackPanel>
+    </Border>
+</UserControl>
