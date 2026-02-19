@@ -72,6 +72,10 @@ src/RailReader2/
     ├── ShortcutsDialog.axaml/.cs   # Keyboard shortcuts help dialog (F1)
     ├── AboutDialog.axaml/.cs       # Version info and credits
     └── LoadingOverlay.axaml/.cs    # Loading spinner overlay
+installer/
+├── railreader2.iss             # Inno Setup script for Windows installer
+├── icon.ico                    # Generated from PNG at CI time (gitignored)
+└── output/                     # ISCC output directory (gitignored)
 models/
 └── PP-DocLayoutV3.onnx         # Layout model (gitignored, ~50MB)
 scripts/
@@ -131,3 +135,37 @@ The `navigable_classes` array controls which PP-DocLayoutV3 block types are navi
 - **PdfOutlineExtractor** uses direct PDFium P/Invoke (`FPDF_*` / `FPDFBookmark_*`) since `PDFtoImage` doesn't expose the bookmark API.
 - SkiaSharp 3.x is explicitly referenced to override Avalonia 11's bundled SkiaSharp 2.88 — required for `SKRuntimeEffect.CreateColorFilter()` used by colour effect shaders.
 - No unit tests currently exist in the project.
+
+## CI / Release Packaging
+
+Releases are triggered by pushing a `v*` tag. The workflow (`.github/workflows/release.yml`) builds for both platforms and creates a GitHub Release.
+
+### Linux — AppImage
+
+Uses `appimagetool` (not `linuxdeploy`) to package the self-contained .NET publish output. A custom `AppRun` script in the AppDir launches the .NET executable. The ONNX model is placed at `AppDir/models/` — found at runtime via the `$APPDIR` environment variable (`FindModelPath()` candidate #2 in `MainWindowViewModel`).
+
+`linuxdeploy` was deliberately avoided because it traces ELF shared library dependencies, which fails for .NET self-contained apps (`libcoreclrtraceptprovider.so` links against `liblttng-ust.so.0` which doesn't exist on Ubuntu 24.04's ABI v1). Since `dotnet publish --self-contained` already bundles all required runtime libraries, `appimagetool` just packages the AppDir without dependency resolution.
+
+### Windows — Inno Setup installer
+
+`installer/railreader2.iss` defines the installer. CI installs Inno Setup via `choco`, converts `assets/railreader2.png` to `installer/icon.ico` with ImageMagick (`magick`), then compiles with `ISCC`. The version is extracted from the git tag and passed via `/DAPP_VERSION`.
+
+The installer provides:
+- Install to `Program Files\railreader2` (or per-user via `PrivilegesRequired=lowest`)
+- Start Menu shortcuts (app + uninstaller)
+- Optional Desktop shortcut (unchecked by default)
+- Optional `.pdf` file association via `OpenWithProgids` registry (unchecked by default)
+- Add/Remove Programs entry with icon and publisher info
+- "Launch railreader2" checkbox on final page
+- LZMA2 solid compression
+
+**Inno Setup path resolution**: All paths in the `.iss` file are relative to the `.iss` file's own directory (`installer/`), not the working directory. Source files reference `"..\publish\*"` to reach the repo root's `publish/` directory. `OutputDir=output` produces `installer/output/`. This is a common gotcha — ISCC does not use the current working directory for relative paths.
+
+### Model loading at runtime
+
+`FindModelPath()` in `MainWindowViewModel` searches these locations in order:
+1. `AppContext.BaseDirectory/models/` — works for Windows installer (model installed alongside exe) and bare `dotnet publish` output
+2. `$APPDIR/models/` — works for Linux AppImage (model at AppImage root)
+3. `LocalApplicationData/railreader2/models/` — user data directory
+4. `CWD/models/` — works for `dotnet run` from repo root during development
+5. `../models/`, `../../models/`, `../../../models/` — walk-up for nested `dotnet run`
