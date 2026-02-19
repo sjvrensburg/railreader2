@@ -86,13 +86,8 @@ public partial class SettingsWindow : Window
     private void OnNavigableClassChanged()
     {
         if (Vm is not { } vm || _loading) return;
-        var classes = new HashSet<int>();
-        foreach (var item in _classItems)
-        {
-            if (item.IsChecked)
-                classes.Add(item.ClassId);
-        }
-        vm.Config.NavigableClasses = classes;
+        vm.Config.NavigableClasses = new HashSet<int>(
+            _classItems.Where(item => item.IsChecked).Select(item => item.ClassId));
         vm.OnConfigChanged();
     }
 

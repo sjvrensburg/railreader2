@@ -456,31 +456,18 @@ public sealed partial class MainWindowViewModel : ObservableObject
         RequestAnimationFrame();
     }
 
-    public void HandleArrowRight()
-    {
-        if (ActiveTab is not { } tab) return;
-        if (tab.Rail.Active)
-            tab.Rail.StartScroll(ScrollDirection.Forward, tab.Camera.OffsetX);
-        else
-        {
-            var (ww, wh) = GetWindowSize();
-            tab.Camera.OffsetX -= PanStep;
-            tab.ClampCamera(ww, wh);
-        }
-        InvalidateCamera();
-        OnPropertyChanged(nameof(ActiveTab));
-        RequestAnimationFrame();
-    }
+    public void HandleArrowRight() => HandleHorizontalArrow(ScrollDirection.Forward, -PanStep);
+    public void HandleArrowLeft() => HandleHorizontalArrow(ScrollDirection.Backward, PanStep);
 
-    public void HandleArrowLeft()
+    private void HandleHorizontalArrow(ScrollDirection direction, double panDelta)
     {
         if (ActiveTab is not { } tab) return;
         if (tab.Rail.Active)
-            tab.Rail.StartScroll(ScrollDirection.Backward, tab.Camera.OffsetX);
+            tab.Rail.StartScroll(direction, tab.Camera.OffsetX);
         else
         {
             var (ww, wh) = GetWindowSize();
-            tab.Camera.OffsetX += PanStep;
+            tab.Camera.OffsetX += panDelta;
             tab.ClampCamera(ww, wh);
         }
         InvalidateCamera();
@@ -526,15 +513,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(ActiveTab));
     }
 
-    public void HandleResetZoom()
-    {
-        if (ActiveTab is not { } tab) return;
-        var (ww, wh) = GetWindowSize();
-        tab.CenterPage(ww, wh);
-        tab.UpdateRailZoom(ww, wh);
-        InvalidateCamera();
-        OnPropertyChanged(nameof(ActiveTab));
-    }
+    public void HandleResetZoom() => FitPage();
 
     private double _vpWidth = 1200;
     private double _vpHeight = 900;
@@ -584,42 +563,23 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     // --- Granular invalidation helpers ---
 
-    private void InvalidateCamera()
+    private void Invalidate(Action? target)
     {
         if (_invalidation is not null)
-            _invalidation.InvalidateCamera?.Invoke();
+            target?.Invoke();
         else
             _invalidateCanvas?.Invoke();
     }
 
-    private void InvalidatePage()
-    {
-        if (_invalidation is not null)
-            _invalidation.InvalidatePage?.Invoke();
-        else
-            _invalidateCanvas?.Invoke();
-    }
-
-    private void InvalidateOverlay()
-    {
-        if (_invalidation is not null)
-            _invalidation.InvalidateOverlay?.Invoke();
-        else
-            _invalidateCanvas?.Invoke();
-    }
+    private void InvalidateCamera() => Invalidate(_invalidation?.InvalidateCamera);
+    private void InvalidatePage() => Invalidate(_invalidation?.InvalidatePage);
+    private void InvalidateOverlay() => Invalidate(_invalidation?.InvalidateOverlay);
 
     private void InvalidateAll()
     {
-        if (_invalidation is not null)
-        {
-            _invalidation.InvalidateCamera?.Invoke();
-            _invalidation.InvalidatePage?.Invoke();
-            _invalidation.InvalidateOverlay?.Invoke();
-        }
-        else
-        {
-            _invalidateCanvas?.Invoke();
-        }
+        InvalidateCamera();
+        InvalidatePage();
+        InvalidateOverlay();
     }
 
     /// <summary>

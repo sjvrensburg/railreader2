@@ -145,18 +145,14 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
         if (AnalysisCache.TryGetValue(CurrentPage, out var cached))
         {
             Console.Error.WriteLine($"[SubmitAnalysis] Page {CurrentPage}: cache hit, {cached.Blocks.Count} blocks");
-            Rail.SetAnalysis(cached, _config.NavigableClasses);
-            PendingRailSetup = false;
+            ApplyAnalysis(cached);
             return;
         }
 
         if (worker is null)
         {
             Console.Error.WriteLine($"[SubmitAnalysis] Page {CurrentPage}: no worker, using fallback");
-            var fallback = LayoutAnalyzer.FallbackAnalysis(PageWidth, PageHeight);
-            AnalysisCache[CurrentPage] = fallback;
-            Rail.SetAnalysis(fallback, _config.NavigableClasses);
-            PendingRailSetup = false;
+            ApplyAnalysis(CurrentPage, PageWidth, PageHeight);
             return;
         }
 
@@ -203,10 +199,7 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
                 Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                 {
                     if (CurrentPage != page) return;
-                    var fallback = LayoutAnalyzer.FallbackAnalysis(pageW, pageH);
-                    AnalysisCache[page] = fallback;
-                    Rail.SetAnalysis(fallback, _config.NavigableClasses);
-                    PendingRailSetup = false;
+                    ApplyAnalysis(page, pageW, pageH);
                 });
             }
         });
@@ -216,6 +209,19 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
     {
         if (AnalysisCache.TryGetValue(CurrentPage, out var cached))
             Rail.SetAnalysis(cached, _config.NavigableClasses);
+    }
+
+    private void ApplyAnalysis(PageAnalysis analysis)
+    {
+        Rail.SetAnalysis(analysis, _config.NavigableClasses);
+        PendingRailSetup = false;
+    }
+
+    private void ApplyAnalysis(int page, double pageW, double pageH)
+    {
+        var fallback = LayoutAnalyzer.FallbackAnalysis(pageW, pageH);
+        AnalysisCache[page] = fallback;
+        ApplyAnalysis(fallback);
     }
 
     public void QueueLookahead(int count)

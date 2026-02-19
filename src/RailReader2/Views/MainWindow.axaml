@@ -6,7 +6,7 @@
         x:DataType="vm:MainWindowViewModel"
         Title="railreader2"
         Width="1200" Height="900"
-        KeyUp="OnKeyUp">
+>
 
     <Design.DataContext>
         <vm:MainWindowViewModel />
