@@ -149,6 +149,11 @@ public partial class MainWindow : Window
                     vm.ShowMinimap = !vm.ShowMinimap; e.Handled = true; return;
                 case Key.OemComma:
                     vm.ShowSettings = true; e.Handled = true; return;
+                case Key.Home:
+                    vm.GoToPage(0); e.Handled = true; return;
+                case Key.End:
+                    if (vm.ActiveTab is { } tEnd) vm.GoToPage(tEnd.PageCount - 1);
+                    e.Handled = true; return;
                 case Key.Tab:
                     if (vm.Tabs.Count > 0)
                         vm.SelectTab((vm.ActiveTabIndex + 1) % vm.Tabs.Count);
@@ -184,10 +189,10 @@ public partial class MainWindow : Window
                 vm.HandleZoomKey(false); e.Handled = true; break;
             case Key.D0 or Key.NumPad0:
                 vm.HandleResetZoom(); e.Handled = true; break;
+            case Key.Space:
+                vm.HandleArrowDown(); e.Handled = true; break;
             case Key.F1:
                 vm.ShowShortcuts = true; e.Handled = true; break;
-            case Key.Escape:
-                Close(); e.Handled = true; break;
         }
 
         if (e.Key == Key.D && e.KeyModifiers.HasFlag(KeyModifiers.Shift))

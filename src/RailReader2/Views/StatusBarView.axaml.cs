@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using Avalonia.Interactivity;
 using Avalonia.Media;
 using RailReader2.ViewModels;
 
@@ -12,6 +13,8 @@ public partial class StatusBarView : UserControl
         DataContextChanged += (_, _) => UpdateStatus();
     }
 
+    private TabViewModel? _subscribedTab;
+
     protected override void OnLoaded(Avalonia.Interactivity.RoutedEventArgs e)
     {
         base.OnLoaded(e);
@@ -21,9 +24,40 @@ public partial class StatusBarView : UserControl
             {
                 if (args.PropertyName is nameof(MainWindowViewModel.ActiveTab) or
                     nameof(MainWindowViewModel.ActiveTabIndex))
+                {
+                    SubscribeToTab(vm.ActiveTab);
                     UpdateStatus();
+                }
             };
+            SubscribeToTab(vm.ActiveTab);
         }
+    }
+
+    private void SubscribeToTab(TabViewModel? tab)
+    {
+        if (_subscribedTab is not null)
+            _subscribedTab.PropertyChanged -= OnTabPropertyChanged;
+        _subscribedTab = tab;
+        if (tab is not null)
+            tab.PropertyChanged += OnTabPropertyChanged;
+    }
+
+    private void OnTabPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs args)
+    {
+        if (args.PropertyName is nameof(TabViewModel.CurrentPage))
+            UpdateStatus();
+    }
+
+    private static Button MakeNavButton(string text, EventHandler<RoutedEventArgs> handler)
+    {
+        var btn = new Button
+        {
+            Content = text,
+            Padding = new Avalonia.Thickness(6, 0),
+            MinWidth = 0,
+        };
+        btn.Click += handler;
+        return btn;
     }
 
     private void UpdateStatus()
@@ -38,7 +72,15 @@ public partial class StatusBarView : UserControl
         }
 
         int zoomPct = (int)Math.Round(tab.Camera.Zoom * 100);
-        StatusPanel.Children.Add(new TextBlock { Text = $"Page {tab.CurrentPage + 1}/{tab.PageCount}" });
+        StatusPanel.Children.Add(MakeNavButton("◀", (_, _) =>
+        { if (vm?.ActiveTab is { } t) vm.GoToPage(t.CurrentPage - 1); }));
+        StatusPanel.Children.Add(new TextBlock
+        {
+            Text = $"Page {tab.CurrentPage + 1}/{tab.PageCount}",
+            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+        });
+        StatusPanel.Children.Add(MakeNavButton("▶", (_, _) =>
+        { if (vm?.ActiveTab is { } t) vm.GoToPage(t.CurrentPage + 1); }));
         StatusPanel.Children.Add(new TextBlock { Text = "|", Opacity = 0.5 });
         StatusPanel.Children.Add(new TextBlock { Text = $"Zoom: {zoomPct}%" });
 

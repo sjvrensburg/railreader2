@@ -63,7 +63,7 @@ public class PdfPageLayer : Control
             // Draw page image scaled to page dimensions (points)
             // No camera transform here — that's handled by the parent's RenderTransform
             var destRect = SKRect.Create(0, 0, (float)tab.PageWidth, (float)tab.PageHeight);
-            var sampling = new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Linear);
+            var sampling = new SKSamplingOptions(SKCubicResampler.Mitchell);
             canvas.DrawImage(image, destRect, sampling);
 
             if (effectPaint is not null)

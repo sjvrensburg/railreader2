@@ -37,8 +37,8 @@
             <MenuItem Header="_Previous Page" InputGesture="PageUp" Click="OnPrevPage" />
             <MenuItem Header="_Next Page" InputGesture="PageDown" Click="OnNextPage" />
             <Separator />
-            <MenuItem Header="_First Page" InputGesture="Home" Click="OnFirstPage" />
-            <MenuItem Header="_Last Page" InputGesture="End" Click="OnLastPage" />
+            <MenuItem Header="_First Page" InputGesture="Ctrl+Home" Click="OnFirstPage" />
+            <MenuItem Header="_Last Page" InputGesture="Ctrl+End" Click="OnLastPage" />
         </MenuItem>
         <MenuItem Header="_Help">
             <MenuItem Header="_Keyboard Shortcuts" InputGesture="F1" Click="OnShowShortcuts" />

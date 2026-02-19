@@ -8,7 +8,7 @@
     <ScrollViewer Padding="16">
         <StackPanel Spacing="12">
             <TextBlock Text="General" FontWeight="Bold" FontSize="14" />
-            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" Margin="8,0">
+            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" Margin="8,0">
                 <TextBlock Grid.Row="0" Grid.Column="0" Text="Ctrl+O" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
                 <TextBlock Grid.Row="0" Grid.Column="1" Text="Open file" Margin="0,2" />
                 <TextBlock Grid.Row="1" Grid.Column="0" Text="Ctrl+W" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
@@ -17,22 +17,24 @@
                 <TextBlock Grid.Row="2" Grid.Column="1" Text="Quit" Margin="0,2" />
                 <TextBlock Grid.Row="3" Grid.Column="0" Text="Ctrl+Tab" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
                 <TextBlock Grid.Row="3" Grid.Column="1" Text="Next tab" Margin="0,2" />
-                <TextBlock Grid.Row="4" Grid.Column="0" Text="Escape" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
-                <TextBlock Grid.Row="4" Grid.Column="1" Text="Quit" Margin="0,2" />
-                <TextBlock Grid.Row="5" Grid.Column="0" Text="F1" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
-                <TextBlock Grid.Row="5" Grid.Column="1" Text="Toggle this dialog" Margin="0,2" />
+                <TextBlock Grid.Row="4" Grid.Column="0" Text="F1" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="4" Grid.Column="1" Text="Toggle this dialog" Margin="0,2" />
             </Grid>
 
             <TextBlock Text="Navigation" FontWeight="Bold" FontSize="14" />
-            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto" Margin="8,0">
-                <TextBlock Grid.Row="0" Grid.Column="0" Text="PgDn" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
-                <TextBlock Grid.Row="0" Grid.Column="1" Text="Next page" Margin="0,2" />
+            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" Margin="8,0">
+                <TextBlock Grid.Row="0" Grid.Column="0" Text="PgDn / Space" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="0" Grid.Column="1" Text="Next page / next line in rail mode" Margin="0,2" />
                 <TextBlock Grid.Row="1" Grid.Column="0" Text="PgUp" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
                 <TextBlock Grid.Row="1" Grid.Column="1" Text="Previous page" Margin="0,2" />
                 <TextBlock Grid.Row="2" Grid.Column="0" Text="Home" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
                 <TextBlock Grid.Row="2" Grid.Column="1" Text="First page" Margin="0,2" />
                 <TextBlock Grid.Row="3" Grid.Column="0" Text="End" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
                 <TextBlock Grid.Row="3" Grid.Column="1" Text="Last page" Margin="0,2" />
+                <TextBlock Grid.Row="4" Grid.Column="0" Text="Ctrl+Home" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="4" Grid.Column="1" Text="First page" Margin="0,2" />
+                <TextBlock Grid.Row="5" Grid.Column="0" Text="Ctrl+End" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="5" Grid.Column="1" Text="Last page" Margin="0,2" />
             </Grid>
 
             <TextBlock Text="View" FontWeight="Bold" FontSize="14" />
