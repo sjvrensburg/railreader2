@@ -38,6 +38,8 @@ At high zoom levels, navigation switches to "rail mode" — the viewer locks ont
 - **Outline panel** — table of contents with collapsible hierarchy
 - **Settings panel** — live-editable rail reading parameters with persistence
 - **Keyboard shortcuts dialog** — press F1 or Help → Keyboard Shortcuts for a complete reference
+- **On-screen nav buttons** — ◀/▶ buttons in the status bar for mouse-only page navigation
+- **UI font scaling** — adjustable font size via Settings for high-DPI or accessibility use
 - **Click-to-select block** — click on any detected block in rail mode to jump to it
 - **About dialog** — version info and credits (Help → About)
 - **Disk cleanup** — removes cache, old logs, temp files (Help → Clean Up Temp Files)
@@ -49,10 +51,10 @@ At high zoom levels, navigation switches to "rail mode" — the viewer locks ont
 
 ```bash
 # Open a specific PDF
-dotnet run --project src/RailReader2 -- <path-to-pdf>
+dotnet run -c Release --project src/RailReader2 -- <path-to-pdf>
 
 # Or launch without arguments and use File → Open (Ctrl+O)
-dotnet run --project src/RailReader2
+dotnet run -c Release --project src/RailReader2 --
 ```
 
 ### Controls
@@ -62,9 +64,11 @@ dotnet run --project src/RailReader2
 | Ctrl+O | Open file |
 | Ctrl+W | Close tab |
 | Ctrl+Tab | Next tab |
-| Ctrl+Q / Esc | Quit |
+| Ctrl+Q | Quit |
 | PgDown / PgUp | Next / previous page |
 | Home / End | First / last page |
+| Ctrl+Home / Ctrl+End | First / last page |
+| Space | Next line (rail mode) or next page |
 | +/- | Zoom in / out |
 | 0 | Reset zoom and position |
 | Arrow Down / Up (S / W) | Next / previous line (rail mode) or pan |
@@ -88,6 +92,7 @@ Rail reading parameters are editable via the Settings panel (gear icon in menu b
   "scroll_speed_max": 50.0,
   "scroll_ramp_time": 1.5,
   "analysis_lookahead_pages": 2,
+  "ui_font_scale": 1.0,
   "colour_effect": "None",
   "colour_effect_intensity": 1.0,
   "navigable_classes": [
@@ -105,6 +110,7 @@ Rail reading parameters are editable via the Settings panel (gear icon in menu b
 | `scroll_speed_max` | Maximum scroll speed after holding (page points/sec) |
 | `scroll_ramp_time` | Seconds to reach max speed from start |
 | `analysis_lookahead_pages` | Number of pages to pre-analyze ahead (0 to disable) |
+| `ui_font_scale` | UI font size multiplier (e.g. `1.25` for 25% larger text) |
 | `colour_effect` | Colour filter: `None`, `HighContrast`, `HighVisibility`, `Amber`, `Invert` |
 | `colour_effect_intensity` | Effect intensity from 0.0 (off) to 1.0 (full) |
 | `navigable_classes` | Which block types rail mode navigates (array of class names). Configurable via Settings → Advanced. Add `"formula"` to include formulas, remove `"document_title"` to skip headings, etc. |
