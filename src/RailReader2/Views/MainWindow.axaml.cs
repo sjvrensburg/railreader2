@@ -44,9 +44,13 @@ public partial class MainWindow : Window
                 Minimap.InvalidateVisual();
             });
 
-            // Re-clamp camera and update transform on viewport resize
+            // Keep ViewModel's viewport size in sync with the actual drawable area.
+            // SizeChanged fires during the initial layout pass (before window.Opened),
+            // so OpenDocument will already see correct dimensions when it runs.
+            vm.SetViewportSize(Viewport.Bounds.Width, Viewport.Bounds.Height);
             Viewport.SizeChanged += (_, _) =>
             {
+                vm.SetViewportSize(Viewport.Bounds.Width, Viewport.Bounds.Height);
                 if (vm.ActiveTab is { } tab)
                 {
                     var (ww, wh) = (Viewport.Bounds.Width, Viewport.Bounds.Height);

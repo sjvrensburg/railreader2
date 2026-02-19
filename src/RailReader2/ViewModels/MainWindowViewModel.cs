@@ -520,11 +520,21 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(ActiveTab));
     }
 
-    private (double Width, double Height) GetWindowSize()
+    private double _vpWidth = 1200;
+    private double _vpHeight = 900;
+
+    /// <summary>
+    /// Called by MainWindow whenever the viewport control is resized.
+    /// Keeps layout calculations consistent with the actual drawable area,
+    /// not the full window ClientSize (which includes menu/tab/status chrome).
+    /// </summary>
+    public void SetViewportSize(double w, double h)
     {
-        if (_window is null) return (1200, 900);
-        return (_window.ClientSize.Width, _window.ClientSize.Height);
+        if (w > 0) _vpWidth = w;
+        if (h > 0) _vpHeight = h;
     }
+
+    private (double Width, double Height) GetWindowSize() => (_vpWidth, _vpHeight);
 
     private static string? FindModelPath()
     {
