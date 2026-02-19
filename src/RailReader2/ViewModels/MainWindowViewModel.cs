@@ -210,6 +210,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
             OnPropertyChanged(nameof(ActiveTab));
             InvalidateAll();
 
+            // PageLayer.Bounds is still zero until Avalonia's layout pass propagates
+            // PagePanel.Width/Height. Post a deferred invalidation that fires after
+            // layout so the custom draw operation sees non-zero bounds.
+            Dispatcher.UIThread.Post(() => InvalidatePage(), DispatcherPriority.Render);
+
             // Submit analysis on UI thread (accesses worker's non-thread-safe state)
             tab.SubmitAnalysis(_worker);
             tab.QueueLookahead(_config.AnalysisLookaheadPages);

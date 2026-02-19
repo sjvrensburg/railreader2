@@ -100,21 +100,24 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
                 {
                     var newBitmap = _pdf.RenderPage(page, neededDpi);
                     // Marshal back to UI thread for the swap
+                    var newImage = SKImage.FromBitmap(newBitmap);
                     Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                     {
                         if (CurrentPage == page) // still on same page
                         {
-                            // Don't dispose the old bitmap/image here — the render thread
-                            // (compositor) may still be drawing it. Let GC collect it
-                            // via finalizer to avoid use-after-free.
-                            CachedImage = null;
+                            // Build the new SKImage before swapping so there is no
+                            // blank frame between clearing the old image and setting
+                            // the new one. The old bitmap/image is not explicitly
+                            // disposed here — let GC collect via finalizer to avoid
+                            // use-after-free with the compositor render thread.
                             CachedBitmap = newBitmap;
-                            CachedImage = SKImage.FromBitmap(newBitmap);
+                            CachedImage = newImage;
                             CachedDpi = neededDpi;
                             OnDpiRenderComplete?.Invoke();
                         }
                         else
                         {
+                            newImage.Dispose();
                             newBitmap.Dispose();
                         }
                         _dpiRenderPending = false;
@@ -158,31 +161,49 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
             return;
         }
 
-        try
+        // Capture page-specific values before the Task.Run closure, since
+        // CurrentPage/PageWidth/PageHeight may change if the user navigates
+        // while the background render is in flight.
+        int page = CurrentPage;
+        double pageW = PageWidth, pageH = PageHeight;
+        string filePath = FilePath;
+        PendingRailSetup = true;
+
+        Console.Error.WriteLine($"[SubmitAnalysis] Page {page}: scheduling pixmap on background thread...");
+        Task.Run(() =>
         {
-            Console.Error.WriteLine($"[SubmitAnalysis] Page {CurrentPage}: preparing pixmap for ONNX...");
-            var (rgb, pxW, pxH) = _pdf.RenderPagePixmap(CurrentPage, LayoutConstants.InputSize);
-            Console.Error.WriteLine($"[SubmitAnalysis] Page {CurrentPage}: submitting {pxW}x{pxH} to worker");
-            worker.Submit(new AnalysisRequest
+            try
             {
-                FilePath = FilePath,
-                Page = CurrentPage,
-                RgbBytes = rgb,
-                PxW = pxW,
-                PxH = pxH,
-                PageW = PageWidth,
-                PageH = PageHeight,
-            });
-            PendingRailSetup = true;
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"Failed to prepare analysis input: {ex.Message}");
-            var fallback = LayoutAnalyzer.FallbackAnalysis(PageWidth, PageHeight);
-            AnalysisCache[CurrentPage] = fallback;
-            Rail.SetAnalysis(fallback, _config.NavigableClasses);
-            PendingRailSetup = false;
-        }
+                var (rgb, pxW, pxH) = _pdf.RenderPagePixmap(page, LayoutConstants.InputSize);
+                Console.Error.WriteLine($"[SubmitAnalysis] Page {page}: pixmap ready {pxW}x{pxH}, submitting...");
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                {
+                    if (CurrentPage != page) return; // user navigated away; discard
+                    worker.Submit(new AnalysisRequest
+                    {
+                        FilePath = filePath,
+                        Page = page,
+                        RgbBytes = rgb,
+                        PxW = pxW,
+                        PxH = pxH,
+                        PageW = pageW,
+                        PageH = pageH,
+                    });
+                });
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Failed to prepare analysis input: {ex.Message}");
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                {
+                    if (CurrentPage != page) return;
+                    var fallback = LayoutAnalyzer.FallbackAnalysis(pageW, pageH);
+                    AnalysisCache[page] = fallback;
+                    Rail.SetAnalysis(fallback, _config.NavigableClasses);
+                    PendingRailSetup = false;
+                });
+            }
+        });
     }
 
     public void ReapplyNavigableClasses()
