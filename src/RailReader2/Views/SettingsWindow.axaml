@@ -1,0 +1,105 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:RailReader2.ViewModels"
+        xmlns:v="using:RailReader2.Views"
+        x:Class="RailReader2.Views.SettingsWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Title="Settings"
+        Width="440" Height="650"
+        WindowStartupLocation="CenterOwner"
+        CanResize="True">
+    <ScrollViewer Padding="16">
+        <StackPanel Spacing="8">
+            <TextBlock Text="Appearance" FontWeight="Bold" FontSize="16" />
+            <Separator />
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="UI Font Scale:" VerticalAlignment="Center" Width="140" />
+                <NumericUpDown Name="FontScale" Value="1.0"
+                               Minimum="0.75" Maximum="2.0" Increment="0.05"
+                               FormatString="F2" Width="130"
+                               ValueChanged="OnSettingChanged" />
+            </StackPanel>
+
+            <TextBlock Text="Colour Effects" FontWeight="Bold" FontSize="16" Margin="0,12,0,0" />
+            <Separator />
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="Effect:" VerticalAlignment="Center" Width="140" />
+                <ComboBox Name="EffectCombo" Width="150" SelectionChanged="OnEffectChanged">
+                    <ComboBoxItem Content="None" />
+                    <ComboBoxItem Content="High Contrast" />
+                    <ComboBoxItem Content="High Visibility" />
+                    <ComboBoxItem Content="Amber Filter" />
+                    <ComboBoxItem Content="Invert" />
+                </ComboBox>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="Intensity:" VerticalAlignment="Center" Width="140" />
+                <Slider Name="IntensitySlider" Minimum="0" Maximum="1"
+                        Value="1.0" Width="150"
+                        PropertyChanged="OnIntensityChanged" />
+            </StackPanel>
+
+            <TextBlock Text="Rail Reading" FontWeight="Bold" FontSize="16" Margin="0,12,0,0" />
+            <Separator />
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="Zoom threshold:" VerticalAlignment="Center" Width="140" />
+                <NumericUpDown Name="ZoomThreshold" Value="3.0"
+                               Minimum="1.0" Maximum="15.0" Increment="0.1"
+                               FormatString="F1" Width="130"
+                               ValueChanged="OnSettingChanged" />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="Snap duration (ms):" VerticalAlignment="Center" Width="140" />
+                <NumericUpDown Name="SnapDuration" Value="300"
+                               Minimum="50" Maximum="1000" Increment="10"
+                               FormatString="F0" Width="130"
+                               ValueChanged="OnSettingChanged" />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="Scroll speed start:" VerticalAlignment="Center" Width="140" />
+                <NumericUpDown Name="ScrollStart" Value="10"
+                               Minimum="10" Maximum="500" Increment="5"
+                               FormatString="F0" Width="130"
+                               ValueChanged="OnSettingChanged" />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="Scroll speed max:" VerticalAlignment="Center" Width="140" />
+                <NumericUpDown Name="ScrollMax" Value="50"
+                               Minimum="10" Maximum="500" Increment="5"
+                               FormatString="F0" Width="130"
+                               ValueChanged="OnSettingChanged" />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="Ramp time (s):" VerticalAlignment="Center" Width="140" />
+                <NumericUpDown Name="RampTime" Value="1.5"
+                               Minimum="0.1" Maximum="5.0" Increment="0.1"
+                               FormatString="F1" Width="130"
+                               ValueChanged="OnSettingChanged" />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="Lookahead pages:" VerticalAlignment="Center" Width="140" />
+                <NumericUpDown Name="Lookahead" Value="2"
+                               Minimum="0" Maximum="10" Increment="1"
+                               FormatString="F0" Width="130"
+                               ValueChanged="OnSettingChanged" />
+            </StackPanel>
+
+            <TextBlock Text="Navigable Block Types" FontWeight="Bold" FontSize="16" Margin="0,12,0,0" />
+            <Separator />
+            <TextBlock Text="Select which layout block types are navigable in rail mode:"
+                       TextWrapping="Wrap" Opacity="0.7" FontSize="12" />
+            <ItemsControl Name="NavigableClassesList">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="v:NavigableClassItem">
+                        <CheckBox Content="{Binding Name}"
+                                  IsChecked="{Binding IsChecked}"
+                                  Margin="0,1" />
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <Separator Margin="0,12,0,0" />
+            <Button Content="Reset All to Defaults" Click="OnResetDefaults" />
+        </StackPanel>
+    </ScrollViewer>
+</Window>

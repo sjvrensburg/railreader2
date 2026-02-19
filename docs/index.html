@@ -445,10 +445,11 @@
         </p>
       </div>
       <div class="feature">
-        <h3>Vector-Sharp Rendering</h3>
+        <h3>High-DPI Rendering</h3>
         <p>
-          PDF pages render as SVG through Skia on OpenGL. Text stays crisp at any
-          zoom level &mdash; no blurry bitmaps.
+          PDF pages are rasterised by PDFium at a DPI proportional to zoom
+          (up to 600&nbsp;DPI). Pan and zoom are compositor-level transforms
+          &mdash; sharp and smooth at any magnification.
         </p>
       </div>
       <div class="feature">
@@ -482,7 +483,7 @@
       <li>
         <strong>Linux:</strong> Make the AppImage executable
         (<code>chmod +x railreader2-linux-x86_64.AppImage</code>) and run it.
-        <strong>Windows:</strong> Extract the ZIP and run <code>railreader2.exe</code>.
+        <strong>Windows:</strong> Extract the ZIP and run <code>RailReader2.exe</code>.
       </li>
       <li>
         Open a PDF with <code>Ctrl+O</code> or pass it as a command-line argument.

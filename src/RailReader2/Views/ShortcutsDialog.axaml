@@ -1,0 +1,79 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="RailReader2.Views.ShortcutsDialog"
+        Title="Keyboard Shortcuts"
+        Width="400" Height="600"
+        WindowStartupLocation="CenterOwner"
+        CanResize="True">
+    <ScrollViewer Padding="16">
+        <StackPanel Spacing="12">
+            <TextBlock Text="General" FontWeight="Bold" FontSize="14" />
+            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" Margin="8,0">
+                <TextBlock Grid.Row="0" Grid.Column="0" Text="Ctrl+O" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="0" Grid.Column="1" Text="Open file" Margin="0,2" />
+                <TextBlock Grid.Row="1" Grid.Column="0" Text="Ctrl+W" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="1" Grid.Column="1" Text="Close tab" Margin="0,2" />
+                <TextBlock Grid.Row="2" Grid.Column="0" Text="Ctrl+Q" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="2" Grid.Column="1" Text="Quit" Margin="0,2" />
+                <TextBlock Grid.Row="3" Grid.Column="0" Text="Ctrl+Tab" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="3" Grid.Column="1" Text="Next tab" Margin="0,2" />
+                <TextBlock Grid.Row="4" Grid.Column="0" Text="Escape" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="4" Grid.Column="1" Text="Quit" Margin="0,2" />
+                <TextBlock Grid.Row="5" Grid.Column="0" Text="F1" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="5" Grid.Column="1" Text="Toggle this dialog" Margin="0,2" />
+            </Grid>
+
+            <TextBlock Text="Navigation" FontWeight="Bold" FontSize="14" />
+            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto" Margin="8,0">
+                <TextBlock Grid.Row="0" Grid.Column="0" Text="PgDn" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="0" Grid.Column="1" Text="Next page" Margin="0,2" />
+                <TextBlock Grid.Row="1" Grid.Column="0" Text="PgUp" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="1" Grid.Column="1" Text="Previous page" Margin="0,2" />
+                <TextBlock Grid.Row="2" Grid.Column="0" Text="Home" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="2" Grid.Column="1" Text="First page" Margin="0,2" />
+                <TextBlock Grid.Row="3" Grid.Column="0" Text="End" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="3" Grid.Column="1" Text="Last page" Margin="0,2" />
+            </Grid>
+
+            <TextBlock Text="View" FontWeight="Bold" FontSize="14" />
+            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto" Margin="8,0">
+                <TextBlock Grid.Row="0" Grid.Column="0" Text="+ / =" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="0" Grid.Column="1" Text="Zoom in" Margin="0,2" />
+                <TextBlock Grid.Row="1" Grid.Column="0" Text="-" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="1" Grid.Column="1" Text="Zoom out" Margin="0,2" />
+                <TextBlock Grid.Row="2" Grid.Column="0" Text="0" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="2" Grid.Column="1" Text="Fit page" Margin="0,2" />
+                <TextBlock Grid.Row="3" Grid.Column="0" Text="Ctrl+Shift+O" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="3" Grid.Column="1" Text="Toggle outline" Margin="0,2" />
+                <TextBlock Grid.Row="4" Grid.Column="0" Text="Ctrl+M" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="4" Grid.Column="1" Text="Toggle minimap" Margin="0,2" />
+                <TextBlock Grid.Row="5" Grid.Column="0" Text="Ctrl+," FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="5" Grid.Column="1" Text="Settings" Margin="0,2" />
+                <TextBlock Grid.Row="6" Grid.Column="0" Text="Shift+D" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="6" Grid.Column="1" Text="Toggle debug overlay" Margin="0,2" />
+            </Grid>
+
+            <TextBlock Text="Rail Mode (active above zoom threshold)" FontWeight="Bold" FontSize="14" />
+            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" Margin="8,0">
+                <TextBlock Grid.Row="0" Grid.Column="0" Text="Down / S" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="0" Grid.Column="1" Text="Next line" Margin="0,2" />
+                <TextBlock Grid.Row="1" Grid.Column="0" Text="Up / W" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="1" Grid.Column="1" Text="Previous line" Margin="0,2" />
+                <TextBlock Grid.Row="2" Grid.Column="0" Text="Right / D" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="2" Grid.Column="1" Text="Scroll forward" Margin="0,2" />
+                <TextBlock Grid.Row="3" Grid.Column="0" Text="Left / A" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="3" Grid.Column="1" Text="Scroll backward" Margin="0,2" />
+                <TextBlock Grid.Row="4" Grid.Column="0" Text="Click" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="4" Grid.Column="1" Text="Jump to block" Margin="0,2" />
+            </Grid>
+
+            <TextBlock Text="Pan (below zoom threshold)" FontWeight="Bold" FontSize="14" />
+            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" Margin="8,0">
+                <TextBlock Grid.Row="0" Grid.Column="0" Text="Arrows/WASD" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="0" Grid.Column="1" Text="Pan" Margin="0,2" />
+                <TextBlock Grid.Row="1" Grid.Column="0" Text="Click+drag" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="1" Grid.Column="1" Text="Pan" Margin="0,2" />
+            </Grid>
+        </StackPanel>
+    </ScrollViewer>
+</Window>

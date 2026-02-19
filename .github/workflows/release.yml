@@ -9,7 +9,8 @@ permissions:
   contents: write
 
 env:
-  CARGO_TERM_COLOR: always
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
   MODEL_URL: "https://huggingface.co/alex-dinh/PP-DocLayoutV3-ONNX/resolve/main/PP-DocLayoutV3.onnx"
   MODEL_NAME: "PP-DocLayoutV3.onnx"
 
@@ -19,31 +20,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            pkg-config libssl-dev curl \
-            libgl1-mesa-dev libgles2-mesa-dev mesa-common-dev \
-            libfontconfig1-dev libfreetype-dev \
-            python3 ninja-build clang \
-            fuse libfuse2
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache cargo registry and build
-        uses: actions/cache@v4
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: linux-release-${{ hashFiles('Cargo.lock') }}
-          restore-keys: linux-release-
+          dotnet-version: "10.0.x"
+          include-prerelease: true
 
-      - name: Build release binary
-        run: cargo build --release
+      - name: Install AppImage dependencies
+        run: sudo apt-get update && sudo apt-get install -y fuse libfuse2
+
+      - name: Publish
+        run: dotnet publish src/RailReader2/RailReader2.csproj -c Release -r linux-x64 --self-contained -o publish/
 
       - name: Download ONNX model
         run: |
@@ -58,15 +45,15 @@ jobs:
       - name: Build AppImage
         run: |
           mkdir -p AppDir/usr/bin AppDir/models
-          cp target/release/railreader2 AppDir/usr/bin/
+          cp -r publish/* AppDir/usr/bin/
           cp models/$MODEL_NAME AppDir/models/
           ./linuxdeploy \
             --appdir AppDir \
-            --executable AppDir/usr/bin/railreader2 \
+            --executable AppDir/usr/bin/RailReader2 \
             --desktop-file assets/railreader2.desktop \
             --icon-file assets/railreader2.png \
             --output appimage
-          mv railreader2-*.AppImage railreader2-linux-x86_64.AppImage
+          mv RailReader2-*.AppImage railreader2-linux-x86_64.AppImage || mv railreader2-*.AppImage railreader2-linux-x86_64.AppImage
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -79,46 +66,28 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install build tools
-        run: |
-          choco upgrade llvm -y
-          choco install ninja -y
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache cargo registry and build
-        uses: actions/cache@v4
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
         with:
-          path: |
-            ~\.cargo\registry
-            ~\.cargo\git
-            target
-          key: windows-release-${{ hashFiles('Cargo.lock') }}
-          restore-keys: windows-release-
+          dotnet-version: "10.0.x"
+          include-prerelease: true
 
-      - name: Build release binary
-        env:
-          RUSTFLAGS: "-C link-args=/FORCE:MULTIPLE"
-        run: cargo build --release
+      - name: Publish
+        run: dotnet publish src/RailReader2/RailReader2.csproj -c Release -r win-x64 --self-contained -o publish/
 
       - name: Download ONNX model
         run: |
-          New-Item -ItemType Directory -Force -Path models
-          Invoke-WebRequest -Uri "$env:MODEL_URL" -OutFile "models\$env:MODEL_NAME"
+          New-Item -ItemType Directory -Force -Path publish\models
+          Invoke-WebRequest -Uri "$env:MODEL_URL" -OutFile "publish\models\$env:MODEL_NAME"
 
       - name: Package ZIP
-        run: |
-          New-Item -ItemType Directory -Force -Path package
-          Copy-Item target\release\railreader2.exe package\
-          Copy-Item "models\$env:MODEL_NAME" package\
-          Compress-Archive -Path package\* -DestinationPath railreader2-windows-x86_64.zip
+        run: Compress-Archive -Path publish\* -DestinationPath railreader2-windows-x64.zip
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: windows-zip
-          path: railreader2-windows-x86_64.zip
+          path: railreader2-windows-x64.zip
 
   release:
     needs: [build-linux, build-windows]
@@ -135,4 +104,4 @@ jobs:
           generate_release_notes: true
           files: |
             railreader2-linux-x86_64.AppImage
-            railreader2-windows-x86_64.zip
+            railreader2-windows-x64.zip

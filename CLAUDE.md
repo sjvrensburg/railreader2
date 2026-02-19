@@ -4,93 +4,99 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**railreader2** is a desktop PDF viewer with AI-guided "rail reading" for high magnification viewing. Built in Rust with MuPDF (PDF parsing), Skia (GPU rendering via OpenGL), and PP-DocLayoutV3 (ONNX layout detection).
+**railreader2** is a desktop PDF viewer with AI-guided "rail reading" for high magnification viewing. Built in C# with .NET 10, Avalonia 11 (UI framework), PDFtoImage/PDFium (PDF rasterisation), SkiaSharp 3 (GPU rendering via Avalonia's Skia backend), and PP-DocLayoutV3 (ONNX layout detection).
 
 ## Build and Development Commands
 
 ```bash
-# Build optimized release binary (preferred — debug builds are slow and large)
-cargo build --release
-
-# Fast syntax/type check without linking
-cargo check
+# Build the project
+dotnet build src/RailReader2
 
 # Run the application
-cargo run --release -- <path-to-pdf>
+dotnet run --project src/RailReader2 -- <path-to-pdf>
 
-# Run layout analysis diagnostic
-cargo run --example dump_layout -- <pdf> [page_number]
+# Run without arguments (shows welcome screen)
+dotnet run --project src/RailReader2
 
-# Run tests
-cargo test
+# Publish self-contained release (Linux)
+dotnet publish src/RailReader2 -c Release -r linux-x64 --self-contained
 
-# Format code
-cargo fmt
-
-# Lint with clippy
-cargo clippy
+# Publish self-contained release (Windows)
+dotnet publish src/RailReader2 -c Release -r win-x64 --self-contained
 
 # Download ONNX model (required for AI layout)
 ./scripts/download-model.sh
 ```
 
-**Prefer release builds.** Debug builds compile Skia from source (~15-20 min) and produce 10GB+ artifacts. Use `cargo check` for fast iteration without a full build.
-
-On Windows, release builds suppress the console window (`windows_subsystem = "windows"`). For `println!`/logging output while debugging on Windows, use a debug build or redirect output.
-
 ## Architecture
 
 ```
-src/
-├── lib.rs               # Module exports, render_page_svg(), render_page_pixmap()
-├── main.rs              # Winit/glutin/skia event loop, App orchestrator, rendering
-├── colour_effect.rs     # SkSL GPU shaders for accessibility colour effects
-├── config.rs            # User-configurable parameters (config.json, serde)
-├── cleanup.rs           # Disk cleanup (cache, old logs, temp files)
-├── layout.rs            # ONNX inference, NMS, reading order, line detection
-├── rail.rs              # Rail navigation state machine (snap, scroll, clamp)
-├── tab.rs               # Camera, TabState (per-document state), outline, analysis cache
-├── worker.rs            # Background thread for async ONNX layout analysis
-├── egui_integration.rs  # egui UI framework integration
-└── ui/
-    ├── mod.rs           # UiState, UiAction enum, top-level build_ui()
-    ├── menu.rs          # Menu bar (File, View, Navigation, Help)
-    ├── tab_bar.rs       # Custom tab bar widget with styled close buttons
-    ├── settings.rs      # Interactive settings window with DragValue controls
-    ├── minimap.rs       # Interactive minimap overlay (click/drag to navigate)
-    ├── outline.rs       # Outline/TOC side panel
-    ├── shortcuts.rs     # Keyboard shortcuts help dialog (F1)
-    ├── about.rs         # About dialog with version info
-    ├── status_bar.rs    # Status bar (page, zoom, rail mode info)
-    └── loading.rs       # Loading overlay with spinner
-examples/
-└── dump_layout.rs       # CLI tool to inspect layout analysis output
+src/RailReader2/
+├── Program.cs                  # Avalonia entry point
+├── App.axaml / App.axaml.cs    # App bootstrap (config load, cleanup, MainWindow creation)
+├── RailReader2.csproj          # Project file (dependencies, target framework)
+├── app.manifest                # Windows application manifest
+├── Models/
+│   ├── BBox.cs                 # Bounding box (X, Y, W, H) in page-point coordinates
+│   ├── Camera.cs               # Viewport state (OffsetX, OffsetY, Zoom)
+│   ├── ColourEffect.cs         # ColourEffect enum, OverlayPalette, display names
+│   ├── LayoutBlock.cs          # Detected layout region (BBox, ClassId, Confidence, Order, Lines)
+│   ├── LineInfo.cs             # Text line within a block (Y center, Height)
+│   ├── NavResult.cs            # Navigation result enum (Ok, PageBoundaryNext/Prev)
+│   ├── OutlineEntry.cs         # PDF bookmark tree node
+│   └── PageAnalysis.cs         # Full analysis for one page (blocks, dimensions)
+├── Services/
+│   ├── AnalysisWorker.cs       # Background thread for ONNX inference (Channel<T> queues)
+│   ├── AppConfig.cs            # Config persistence (~/.config/railreader2/config.json)
+│   ├── CleanupService.cs       # Disk cleanup (cache, temp files, old logs)
+│   ├── ColourEffectShaders.cs  # SkSL GPU shaders for accessibility colour effects
+│   ├── LayoutAnalyzer.cs       # ONNX inference, NMS, reading order, line detection
+│   ├── LayoutConstants.cs      # Class labels, input tensor size, thresholds
+│   ├── PdfOutlineExtractor.cs  # PDFium P/Invoke for bookmark extraction
+│   ├── PdfService.cs           # PDF access (page rendering, DPI scaling, page info)
+│   └── RailNav.cs              # Rail navigation state machine (snap, scroll, clamp)
+├── ViewModels/
+│   ├── MainWindowViewModel.cs  # Central orchestrator (tabs, worker, animation loop, input)
+│   └── TabViewModel.cs         # Per-document state (PDF, camera, rail nav, analysis cache)
+└── Views/
+    ├── MainWindow.axaml/.cs    # Window with compositor camera transforms, keyboard handling
+    ├── ViewportPanel.cs        # Custom panel for zoom/pan/click input handling
+    ├── PdfPageLayer.cs         # Custom draw: renders PDF bitmap via ICustomDrawOperation
+    ├── RailOverlayLayer.cs     # Custom draw: rail mode dim/highlight/debug overlays
+    ├── MinimapControl.axaml/.cs    # Interactive minimap overlay
+    ├── OutlinePanel.axaml/.cs      # TOC/bookmark side panel
+    ├── TabBarView.axaml/.cs        # Custom tab bar with close buttons
+    ├── MenuBarView.axaml/.cs       # File/View/Navigation/Help menus
+    ├── StatusBarView.axaml/.cs     # Page number, zoom level, rail mode status
+    ├── SettingsWindow.axaml/.cs    # Live-editable settings panel
+    ├── ShortcutsDialog.axaml/.cs   # Keyboard shortcuts help dialog (F1)
+    ├── AboutDialog.axaml/.cs       # Version info and credits
+    └── LoadingOverlay.axaml/.cs    # Loading spinner overlay
 models/
-└── PP-DocLayoutV3.onnx  # Layout model (gitignored, ~50MB)
+└── PP-DocLayoutV3.onnx         # Layout model (gitignored, ~50MB)
 scripts/
-└── download-model.sh    # Downloads ONNX model from HuggingFace
+└── download-model.sh           # Downloads ONNX model from HuggingFace
 ```
 
-### Key concepts
+### Key Concepts
 
-- **Rendering pipeline**: PDF → SVG (MuPDF) → Skia SVG DOM → OpenGL canvas. Zoom/pan are canvas transforms, text stays vector-sharp.
-- **Layout analysis**: PDF page → 800px pixmap → ImageNet-normalized CHW tensor → PP-DocLayoutV3 ONNX → NMS-filtered blocks with 23 class types. Reading order comes from the model's native output (Global Pointer Mechanism, column 7 of `[N,7]` tensor). Line detection uses horizontal projection profiling on pixmap crops. Input preparation runs on the main thread; ONNX inference runs on a dedicated background worker thread (`worker.rs`) to avoid blocking the UI.
-- **Rail mode**: Activates above configurable zoom threshold. Navigation locks to detected text blocks, advances line-by-line with snap animations. Horizontal scrolling is continuous hold-to-scroll with speed ramping.
-- **Config**: User parameters stored in the platform config directory (`~/.config/railreader2/config.json` on Linux, `%APPDATA%\railreader2\config.json` on Windows). Loaded at startup via `Config::load()`. Editable live via Settings panel; changes auto-save and propagate to all tabs.
-- **Analysis caching**: Per-tab `analysis_cache: HashMap<i32, PageAnalysis>` avoids re-running ONNX inference on revisited pages. Lookahead analysis pre-processes upcoming pages one-per-frame in `handle_redraw()`.
-- **Action dispatch**: UI returns `Vec<UiAction>` from `build_ui()`, processed by `App::process_actions()`. Full `UiAction` enum: `OpenFile`, `CloseTab(usize)`, `SelectTab(usize)`, `DuplicateTab`, `GoToPage(i32)`, `SetZoom(f64)`, `SetCamera(f64, f64)`, `FitPage`, `ToggleDebug`, `ToggleOutline`, `ToggleMinimap`, `SetColourEffect(ColourEffect)`, `ConfigChanged`, `RunCleanup`, `Quit`.
-- **Colour effects**: GPU-accelerated SkSL colour filters (`ColourEffect` enum) applied via `RuntimeEffect::make_for_color_filter()` and Skia save layers. Effects filter only PDF content (inside GL scissor), not egui panels. Rail-mode overlays use per-effect `OverlayPalette` colours so highlighting complements each scheme. Configurable via View → Colour Effects menu or Settings panel; effect + intensity persisted in `config.json`.
-- **Multi-tab architecture**: Per-tab state (`TabState` in `tab.rs`) holds document, camera, rail nav, SVG DOM, outline, minimap texture, analysis cache, and pending lookahead queue. Shared state: `ort::Session`, `Config`, `EguiIntegration`, `Env`. The `Env` struct drop order is intentional — `DirectContext` must drop before `Window` to avoid AMD GPU segfaults.
+- **Rendering pipeline**: PDF bytes held in memory → PDFtoImage (PDFium) rasterises pages to `SKBitmap` at zoom-proportional DPI (150–600) → `SKImage` uploaded to GPU → drawn via Avalonia's `ICustomDrawOperation` / `ISkiaSharpApiLeaseFeature` → `SKCanvas`. Camera pan/zoom are compositor-level `MatrixTransform` on the `CameraPanel` (no bitmap repaint needed). DPI upgrades happen asynchronously via `Task.Run`.
+- **Layout analysis**: Page bitmap → BGRA-to-RGB → 800×800 bilinear rescale → CHW float tensor (pixels/255) → PP-DocLayoutV3 ONNX (`im_shape`, `image`, `scale_factor` inputs) → `[N,7]` detection tensor `[classId, confidence, xmin, ymin, xmax, ymax, readingOrder]` → confidence filter (0.4) → NMS (IoU 0.5) → sort by reading order → horizontal projection line detection per block. Input preparation runs on the main thread; ONNX inference runs on a dedicated `Channel<T>`-based background worker thread (`AnalysisWorker`).
+- **Rail mode**: Activates above configurable zoom threshold when analysis is available. Navigation locks to detected text blocks, advances line-by-line with cubic ease-out snap animations. Horizontal scrolling uses hold-to-scroll with quadratic speed ramping (integrated for frame-rate-independent displacement). Click-to-select jumps to any navigable block.
+- **Config**: `AppConfig` reads/writes `~/.config/railreader2/config.json` (Linux) or `%APPDATA%\railreader2\config.json` (Windows) via `System.Text.Json` with snake_case naming. Loaded at startup; editable live via Settings panel; changes auto-save.
+- **Analysis caching**: Per-tab `Dictionary<int, PageAnalysis> AnalysisCache` avoids re-running ONNX inference on revisited pages. Lookahead analysis pre-processes upcoming pages when the worker is idle.
+- **MVVM**: CommunityToolkit.Mvvm source generators (`[ObservableProperty]`, `[RelayCommand]`). Performance-sensitive paths (camera transforms, canvas invalidation) use direct method calls and `InvalidationCallbacks` for granular repaint targeting rather than pure data binding.
+- **Colour effects**: Four SkSL shaders compiled at startup via `SKRuntimeEffect.CreateColorFilter()` — HighContrast (luminance inversion + S-curve), HighVisibility (yellow-on-black), Amber (warm tint), Invert. Applied via `canvas.SaveLayer(paint)` around page drawing. Each effect has a matching `OverlayPalette` for rail overlay colours.
+- **Compositor camera**: `MainWindow.UpdateCameraTransform()` applies a `MatrixTransform` to `CameraPanel` for GPU-compositor-level pan/zoom — bitmap doesn't repaint on every frame, only on DPI changes.
+- **Multi-tab**: `TabViewModel` holds per-document state (PDF, camera, rail nav, analysis cache, outline, cached bitmap). `MainWindowViewModel` owns the tab collection and shared resources (ONNX session, config, shaders).
 
 ### Dependencies
 
-- `skia-safe` 0.93 (GL + SVG features) — GPU rendering
-- `glutin` 0.32 + `winit` 0.30 — OpenGL context and windowing
-- `mupdf` 0.6 — PDF parsing, SVG export, pixmap rendering
-- `ort` 2.0.0-rc.11 — ONNX Runtime for layout inference
-- `egui` 0.31 + `egui-winit` 0.31 + `egui_glow` 0.31 — Immediate mode GUI framework
-- `rfd` 0.15 — Native file dialog (parented to main window)
-- `serde` + `serde_json` — Config serialization
+- `Avalonia` 11.* — cross-platform UI framework (Desktop, Fluent theme, Inter font)
+- `CommunityToolkit.Mvvm` 8.* — MVVM source generators
+- `PDFtoImage` 5.* — PDF rasterisation via PDFium
+- `Microsoft.ML.OnnxRuntime` 1.* — ONNX Runtime for layout inference
+- `SkiaSharp` 3.* — GPU-accelerated 2D drawing (overrides Avalonia's bundled 2.88 for `SKRuntimeEffect.CreateColorFilter`)
 
 ## Configuration
 
@@ -114,13 +120,14 @@ Config file location: `~/.config/railreader2/config.json` (Linux) or `%APPDATA%\
 }
 ```
 
-The `navigable_classes` array controls which PP-DocLayoutV3 block types are navigable in rail mode. All 23 class names: `document_title`, `paragraph_title`, `text`, `page_number`, `abstract`, `table_of_contents`, `references`, `footnote`, `table`, `header`, `footer`, `algorithm`, `formula`, `formula_number`, `image`, `figure_caption`, `table_caption`, `seal`, `figure_title`, `figure`, `header_image`, `footer_image`, `aside_text`. Configurable live via Settings → Advanced. Line detection runs for all blocks regardless, so toggling classes doesn't require ONNX re-inference.
+The `navigable_classes` array controls which PP-DocLayoutV3 block types are navigable in rail mode. Configurable live via Settings → Advanced. Line detection runs for all blocks regardless, so toggling classes doesn't require ONNX re-inference.
 
 ## Key Development Notes
 
 - ONNX model outputs `[N, 7]` tensors: `[class_id, confidence, xmin, ymin, xmax, ymax, reading_order]`. The 7th column is the model's predicted reading order via its Global Pointer Mechanism.
-- Layout analysis runs asynchronously via `AnalysisWorker` (background thread). Input preparation (pixmap render + tensor build) happens on the main thread; ONNX inference runs on the worker. Results are polled each frame in `handle_redraw()`. Lookahead pages are submitted one-per-frame when the worker is idle.
-- Debug SVG dumping: Set `DUMP_SVG=1` environment variable to write each page's SVG to `/tmp/pageN.svg` for inspection.
+- Layout analysis runs asynchronously via `AnalysisWorker` (background thread using `System.Threading.Channels`). Input preparation (pixmap render + tensor build) happens on the main thread; ONNX inference runs on the worker. Results are polled each animation frame.
 - App can run without CLI arguments — shows welcome screen with "Open a PDF file (Ctrl+O)" prompt.
-- **Cleanup**: `cleanup::run_cleanup()` runs on startup and on-demand via Help menu. Removes `cache/` contents, `.tmp` files, and `.log` files older than 7 days. Skips `config.json`, `.lock`, and `.onnx` files.
+- **Cleanup**: `CleanupService.RunCleanup()` runs on startup and on-demand via Help menu. Removes `cache/` contents, `.tmp` files, and `.log` files older than 7 days. Skips `config.json`, `.lock`, and `.onnx` files.
+- **PdfOutlineExtractor** uses direct PDFium P/Invoke (`FPDF_*` / `FPDFBookmark_*`) since `PDFtoImage` doesn't expose the bookmark API.
+- SkiaSharp 3.x is explicitly referenced to override Avalonia 11's bundled SkiaSharp 2.88 — required for `SKRuntimeEffect.CreateColorFilter()` used by colour effect shaders.
 - No unit tests currently exist in the project.

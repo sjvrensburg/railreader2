@@ -1,0 +1,66 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:RailReader2.ViewModels"
+        xmlns:v="using:RailReader2.Views"
+        x:Class="RailReader2.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Title="railreader2"
+        Width="1200" Height="900"
+        KeyUp="OnKeyUp">
+
+    <Design.DataContext>
+        <vm:MainWindowViewModel />
+    </Design.DataContext>
+
+    <DockPanel>
+        <!-- Menu Bar -->
+        <v:MenuBarView DockPanel.Dock="Top" DataContext="{Binding}" />
+
+        <!-- Tab Bar -->
+        <v:TabBarView DockPanel.Dock="Top" DataContext="{Binding}" />
+
+        <!-- Status Bar -->
+        <v:StatusBarView DockPanel.Dock="Bottom" DataContext="{Binding}" />
+
+        <!-- Main Content -->
+        <Panel>
+            <!-- Outline Panel -->
+            <SplitView IsPaneOpen="{Binding ShowOutline}"
+                       DisplayMode="Inline"
+                       PanePlacement="Left"
+                       OpenPaneLength="220">
+                <SplitView.Pane>
+                    <v:OutlinePanel DataContext="{Binding}" />
+                </SplitView.Pane>
+                <SplitView.Content>
+                    <Panel>
+                        <!-- Layered PDF viewport with compositor-driven camera -->
+                        <v:ViewportPanel Name="Viewport">
+                            <Panel Name="CameraPanel" RenderTransformOrigin="0%,0%">
+                                <Panel Name="PagePanel"
+                                       HorizontalAlignment="Left"
+                                       VerticalAlignment="Top">
+                                    <v:PdfPageLayer Name="PageLayer" />
+                                    <v:RailOverlayLayer Name="OverlayLayer" />
+                                </Panel>
+                            </Panel>
+                        </v:ViewportPanel>
+
+                        <!-- Minimap overlay -->
+                        <v:MinimapControl Name="Minimap"
+                                          IsVisible="{Binding ShowMinimap}" />
+
+                        <!-- Welcome text when no document open -->
+                        <TextBlock Name="WelcomeText"
+                                   Text="Open a PDF file (Ctrl+O)"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   FontSize="18"
+                                   Foreground="White"
+                                   IsVisible="{Binding !Tabs.Count}" />
+                    </Panel>
+                </SplitView.Content>
+            </SplitView>
+        </Panel>
+    </DockPanel>
+</Window>
