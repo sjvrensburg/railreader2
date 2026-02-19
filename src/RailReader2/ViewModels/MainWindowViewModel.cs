@@ -211,9 +211,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
             InvalidateAll();
 
             // PageLayer.Bounds is still zero until Avalonia's layout pass propagates
-            // PagePanel.Width/Height. Post a deferred invalidation that fires after
-            // layout so the custom draw operation sees non-zero bounds.
-            Dispatcher.UIThread.Post(() => InvalidatePage(), DispatcherPriority.Render);
+            // PagePanel.Width/Height. DispatcherPriority.Background (4) is lower than
+            // Layout (7) and Render (8), so this fires after both passes complete.
+            Dispatcher.UIThread.Post(() => InvalidatePage(), DispatcherPriority.Background);
 
             // Submit analysis on UI thread (accesses worker's non-thread-safe state)
             tab.SubmitAnalysis(_worker);

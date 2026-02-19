@@ -23,7 +23,13 @@ public class PdfPageLayer : Control
     public override void Render(DrawingContext context)
     {
         base.Render(context);
-        context.Custom(new PageDrawOperation(new Rect(0, 0, Bounds.Width, Bounds.Height), Tab, ColourEffects));
+        // Use tab page dimensions for the draw-op bounds so the compositor
+        // does not clip the operation away when PageLayer.Bounds is still
+        // zero (before the first layout pass after a tab is added).
+        var tab = Tab;
+        double w = tab?.PageWidth > 0 ? tab.PageWidth : Bounds.Width;
+        double h = tab?.PageHeight > 0 ? tab.PageHeight : Bounds.Height;
+        context.Custom(new PageDrawOperation(new Rect(0, 0, w, h), tab, ColourEffects));
     }
 
     private sealed class PageDrawOperation : ICustomDrawOperation

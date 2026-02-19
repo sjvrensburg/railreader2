@@ -31,6 +31,10 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
     public SKImage? CachedImage { get; private set; }
     public int CachedDpi { get; private set; }
 
+    // Small pre-scaled thumbnail used by the minimap (≤200×280 px).
+    // Re-rendered only on page change, not on DPI upgrades.
+    public SKBitmap? MinimapBitmap { get; private set; }
+
     public TabViewModel(string filePath, AppConfig config)
     {
         _config = config;
@@ -55,6 +59,7 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
             // then let GC collect the old one safely.
             CachedImage = null;
             CachedBitmap = null;
+            MinimapBitmap = null;
 
             var (w, h) = _pdf.GetPageSize(CurrentPage);
             PageWidth = w;
@@ -64,6 +69,7 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
             CachedBitmap = _pdf.RenderPage(CurrentPage, dpi);
             CachedImage = SKImage.FromBitmap(CachedBitmap);
             CachedDpi = dpi;
+            MinimapBitmap = _pdf.RenderThumbnail(CurrentPage);
         }
         catch (Exception ex)
         {
@@ -320,6 +326,9 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
         var bmp = CachedBitmap;
         CachedBitmap = null;
         bmp?.Dispose();
+        var mmBmp = MinimapBitmap;
+        MinimapBitmap = null;
+        mmBmp?.Dispose();
         _pdf.Dispose();
     }
 }
