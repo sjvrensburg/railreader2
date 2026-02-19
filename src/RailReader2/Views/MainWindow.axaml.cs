@@ -177,17 +177,27 @@ public partial class MainWindow : Window
             }
         }
 
-        // Navigation keys always handled at window level
+        // Navigation keys always handled at window level.
+        // Ctrl cases above already return, so ctrl is never held here.
         switch (e.Key)
         {
-            case Key.Down or Key.S when !ctrl:
+            case Key.Down or Key.S:
                 vm.HandleArrowDown(); e.Handled = true; break;
-            case Key.Up or Key.W when !ctrl:
+            case Key.Up or Key.W:
                 vm.HandleArrowUp(); e.Handled = true; break;
-            case Key.Right or Key.D when !ctrl:
+            case Key.Right:
                 vm.HandleArrowRight(); e.Handled = true; break;
-            case Key.Left or Key.A when !ctrl:
+            case Key.Left or Key.A:
                 vm.HandleArrowLeft(); e.Handled = true; break;
+            case Key.D when e.KeyModifiers.HasFlag(KeyModifiers.Shift):
+                if (vm.ActiveTab is { } dbgTab)
+                {
+                    dbgTab.DebugOverlay = !dbgTab.DebugOverlay;
+                    OverlayLayer.InvalidateVisual();
+                }
+                e.Handled = true; break;
+            case Key.D:
+                vm.HandleArrowRight(); e.Handled = true; break;
             case Key.PageDown:
                 if (vm.ActiveTab is { } t1) vm.GoToPage(t1.CurrentPage + 1);
                 e.Handled = true; break;
@@ -211,27 +221,19 @@ public partial class MainWindow : Window
                 vm.ShowShortcuts = true; e.Handled = true; break;
         }
 
-        if (e.Key == Key.D && e.KeyModifiers.HasFlag(KeyModifiers.Shift))
-        {
-            if (vm.ActiveTab is { } tab)
-            {
-                tab.DebugOverlay = !tab.DebugOverlay;
-                OverlayLayer.InvalidateVisual();
-            }
-            e.Handled = true;
-        }
-
         if (!e.Handled)
             base.OnKeyDown(e);
     }
 
-    private void OnKeyUp(object? sender, KeyEventArgs e)
+    protected override void OnKeyUp(KeyEventArgs e)
     {
-        if (Vm is not { } vm) return;
-        if (e.Key is Key.Left or Key.Right or Key.A or Key.D)
+        if (Vm is { } vm && e.Key is Key.Left or Key.Right or Key.A or Key.D)
         {
             vm.HandleArrowRelease(true);
             e.Handled = true;
         }
+
+        if (!e.Handled)
+            base.OnKeyUp(e);
     }
 }

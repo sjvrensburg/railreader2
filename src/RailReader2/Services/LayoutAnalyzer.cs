@@ -106,17 +106,14 @@ public sealed class LayoutAnalyzer : IDisposable
             return new PageAnalysis { Blocks = [], PageWidth = pageW, PageHeight = pageH };
         }
 
-        int nDetections = detRows;
-        int cols = detCols;
-
         float mapScaleX = (float)(pageW / pxW);
         float mapScaleY = (float)(pageH / pxH);
-        bool hasReadingOrder = cols >= 7;
+        bool hasReadingOrder = detCols >= 7;
 
         var rawBlocks = new List<LayoutBlock>();
-        for (int i = 0; i < nDetections; i++)
+        for (int i = 0; i < detRows; i++)
         {
-            int off = i * cols;
+            int off = i * detCols;
             int classId = (int)detectionData[off];
             float confidence = detectionData[off + 1];
             float xmin = detectionData[off + 2];
@@ -133,7 +130,6 @@ public sealed class LayoutAnalyzer : IDisposable
             float w = Math.Min(xmax, pxW) - x;
             float h = Math.Min(ymax, pxH) - y;
 
-            if (w <= 0 || h <= 0) continue;
             if (w < 5 || h < 5) continue;
 
             rawBlocks.Add(new LayoutBlock

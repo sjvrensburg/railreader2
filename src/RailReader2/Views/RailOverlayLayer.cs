@@ -52,8 +52,8 @@ public class RailOverlayLayer : Control
 
         public void Render(ImmediateDrawingContext context)
         {
-            var leaseFeature = context.TryGetFeature(typeof(ISkiaSharpApiLeaseFeature)) as ISkiaSharpApiLeaseFeature;
-            if (leaseFeature is null) return;
+            if (context.TryGetFeature(typeof(ISkiaSharpApiLeaseFeature)) is not ISkiaSharpApiLeaseFeature leaseFeature)
+                return;
 
             using var lease = leaseFeature.Lease();
             var canvas = lease.SkCanvas;
@@ -108,6 +108,8 @@ public class RailOverlayLayer : Control
                 canvas.Restore();
             }
 
+            var bboxRect = BBoxToRect(block.BBox);
+
             // Block outline
             using var outlinePaint = new SKPaint
             {
@@ -116,7 +118,7 @@ public class RailOverlayLayer : Control
                 StrokeWidth = palette.BlockOutlineWidth,
                 IsAntialias = true,
             };
-            canvas.DrawRect(SKRect.Create(block.BBox.X, block.BBox.Y, block.BBox.W, block.BBox.H), outlinePaint);
+            canvas.DrawRect(bboxRect, outlinePaint);
 
             // Line highlight
             var line = tab.Rail.CurrentLineInfo;
@@ -126,26 +128,27 @@ public class RailOverlayLayer : Control
 
         private static void DrawDebugOverlay(SKCanvas canvas, TabViewModel tab, PageAnalysis analysis)
         {
-            var colors = new[] {
-                (244, 67, 54), (33, 150, 243), (76, 175, 80),
-                (255, 152, 0), (156, 39, 176), (0, 188, 212) };
+            var colors = new SKColor[] {
+                new(244, 67, 54), new(33, 150, 243), new(76, 175, 80),
+                new(255, 152, 0), new(156, 39, 176), new(0, 188, 212) };
 
             using var font = new SKFont(SKTypeface.Default, 8);
 
             foreach (var block in analysis.Blocks)
             {
-                var (cr, cg, cb) = colors[block.ClassId % colors.Length];
+                var color = colors[block.ClassId % colors.Length];
+                var rect = BBoxToRect(block.BBox);
 
-                using var rectPaint = new SKPaint { Color = new SKColor((byte)cr, (byte)cg, (byte)cb, 50) };
-                canvas.DrawRect(SKRect.Create(block.BBox.X, block.BBox.Y, block.BBox.W, block.BBox.H), rectPaint);
+                using var rectPaint = new SKPaint { Color = color.WithAlpha(50) };
+                canvas.DrawRect(rect, rectPaint);
 
                 using var strokePaint = new SKPaint
                 {
-                    Color = new SKColor((byte)cr, (byte)cg, (byte)cb, 180),
+                    Color = color.WithAlpha(180),
                     Style = SKPaintStyle.Stroke,
                     StrokeWidth = 1,
                 };
-                canvas.DrawRect(SKRect.Create(block.BBox.X, block.BBox.Y, block.BBox.W, block.BBox.H), strokePaint);
+                canvas.DrawRect(rect, strokePaint);
 
                 string className = block.ClassId < LayoutConstants.LayoutClasses.Length
                     ? LayoutConstants.LayoutClasses[block.ClassId] : "unknown";
@@ -154,13 +157,12 @@ public class RailOverlayLayer : Control
                 using var bgPaint = new SKPaint { Color = new SKColor(0, 0, 0, 200) };
                 canvas.DrawRect(SKRect.Create(block.BBox.X, block.BBox.Y - 10, label.Length * 5f, 11), bgPaint);
 
-                using var textPaint = new SKPaint
-                {
-                    Color = new SKColor((byte)cr, (byte)cg, (byte)cb),
-                    IsAntialias = true,
-                };
+                using var textPaint = new SKPaint { Color = color, IsAntialias = true };
                 canvas.DrawText(label, block.BBox.X + 1, block.BBox.Y - 1, font, textPaint);
             }
         }
+
+        private static SKRect BBoxToRect(BBox bbox) =>
+            SKRect.Create(bbox.X, bbox.Y, bbox.W, bbox.H);
     }
 }

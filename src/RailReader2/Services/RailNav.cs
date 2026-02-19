@@ -40,14 +40,8 @@ public sealed class RailNav
     public PageAnalysis? Analysis => _analysis;
     public int NavigableCount => _navigableIndices.Count;
 
-    public int CurrentLineCount
-    {
-        get
-        {
-            if (_navigableIndices.Count == 0) return 0;
-            return CurrentNavigableBlock.Lines.Count;
-        }
-    }
+    public int CurrentLineCount =>
+        _navigableIndices.Count == 0 ? 0 : CurrentNavigableBlock.Lines.Count;
 
     public void UpdateZoom(double zoom, double cameraX, double cameraY, double windowWidth, double windowHeight)
     {
@@ -232,11 +226,8 @@ public sealed class RailNav
                 totalDisplacement = rampDisplacement + sMax * (holdSecs - ramp);
             }
 
-            double displacement = totalDisplacement * zoom;
-            double newX = dir == ScrollDirection.Forward
-                ? _scrollStartX - displacement
-                : _scrollStartX + displacement;
-            cameraX = ClampX(newX, zoom, windowWidth);
+            double sign = dir == ScrollDirection.Forward ? -1.0 : 1.0;
+            cameraX = ClampX(_scrollStartX + sign * totalDisplacement * zoom, zoom, windowWidth);
             animating = true;
         }
 
@@ -250,23 +241,11 @@ public sealed class RailNav
         CurrentLine = CurrentNavigableBlock.Lines.Count - 1;
     }
 
-    public LayoutBlock CurrentNavigableBlock
-    {
-        get
-        {
-            var idx = _navigableIndices[CurrentBlock];
-            return _analysis!.Blocks[idx];
-        }
-    }
+    public LayoutBlock CurrentNavigableBlock =>
+        _analysis!.Blocks[_navigableIndices[CurrentBlock]];
 
-    public LineInfo CurrentLineInfo
-    {
-        get
-        {
-            var block = CurrentNavigableBlock;
-            return block.Lines[Math.Min(CurrentLine, block.Lines.Count - 1)];
-        }
-    }
+    public LineInfo CurrentLineInfo =>
+        CurrentNavigableBlock.Lines[Math.Min(CurrentLine, CurrentNavigableBlock.Lines.Count - 1)];
 
     public int? FindBlockAtPoint(double pageX, double pageY)
     {

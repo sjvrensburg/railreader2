@@ -74,16 +74,11 @@ public static class CleanupService
                 if (name is "config.json" || name.EndsWith(".lock") || name.EndsWith(".onnx"))
                     continue;
 
-                if (maxAge is not null)
-                {
-                    var info = new FileInfo(file);
-                    if (DateTime.UtcNow - info.LastWriteTimeUtc < maxAge.Value)
-                        continue;
-                }
-
                 try
                 {
                     var info = new FileInfo(file);
+                    if (maxAge is not null && DateTime.UtcNow - info.LastWriteTimeUtc < maxAge.Value)
+                        continue;
                     bytesFreed += info.Length;
                     File.Delete(file);
                     filesRemoved++;

@@ -15,7 +15,7 @@ public partial class StatusBarView : UserControl
 
     private TabViewModel? _subscribedTab;
 
-    protected override void OnLoaded(Avalonia.Interactivity.RoutedEventArgs e)
+    protected override void OnLoaded(RoutedEventArgs e)
     {
         base.OnLoaded(e);
         if (DataContext is MainWindowViewModel vm)

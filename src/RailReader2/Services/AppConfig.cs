@@ -30,11 +30,10 @@ public sealed class AppConfig
     {
         get
         {
-            string dir;
-            if (OperatingSystem.IsWindows())
-                dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "railreader2");
-            else
-                dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".config", "railreader2");
+            var baseDir = OperatingSystem.IsWindows()
+                ? Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData)
+                : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".config");
+            var dir = Path.Combine(baseDir, "railreader2");
             Directory.CreateDirectory(dir);
             return dir;
         }

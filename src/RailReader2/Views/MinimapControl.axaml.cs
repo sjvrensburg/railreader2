@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.Rendering.SceneGraph;
@@ -35,7 +36,6 @@ public partial class MinimapControl : UserControl
         base.OnPointerPressed(e);
         if (ViewModel?.ActiveTab is not { } tab) return;
         NavigateToPoint(e.GetPosition(this), tab);
-        // Return focus to the main window so keyboard shortcuts continue working
         TopLevel.GetTopLevel(this)?.Focus();
         e.Handled = true;
     }
@@ -53,19 +53,13 @@ public partial class MinimapControl : UserControl
     {
         double controlW = Bounds.Width;
         double controlH = Bounds.Height;
-        if (controlW <= 0 || controlH <= 0 || tab.PageWidth <= 0 || tab.PageHeight <= 0) return;
+        var thumb = ThumbnailGeometry.Compute(controlW, controlH, tab.PageWidth, tab.PageHeight);
+        if (thumb is null) return;
+        var t = thumb.Value;
 
-        double scale = Math.Min(controlW / tab.PageWidth, controlH / tab.PageHeight);
-        double thumbW = tab.PageWidth * scale;
-        double thumbH = tab.PageHeight * scale;
-        double thumbX = (controlW - thumbW) / 2;
-        double thumbY = (controlH - thumbH) / 2;
+        double pageX = (pos.X - t.X) / t.Scale;
+        double pageY = (pos.Y - t.Y) / t.Scale;
 
-        // Convert click position to page coordinates
-        double pageX = (pos.X - thumbX) / scale;
-        double pageY = (pos.Y - thumbY) / scale;
-
-        // Center the window on that page point
         var window = TopLevel.GetTopLevel(this);
         double winW = window?.ClientSize.Width ?? 1200;
         double winH = window?.ClientSize.Height ?? 900;
@@ -74,7 +68,6 @@ public partial class MinimapControl : UserControl
         tab.Camera.OffsetY = winH / 2.0 - pageY * tab.Camera.Zoom;
         tab.ClampCamera(winW, winH);
 
-        // Update rail state: find nearest block at new camera position
         tab.UpdateRailZoom(winW, winH);
         if (tab.Rail.Active)
         {
@@ -85,6 +78,18 @@ public partial class MinimapControl : UserControl
         }
 
         ViewModel?.RequestCameraUpdate();
+    }
+
+    private readonly record struct ThumbnailGeometry(double X, double Y, double W, double H, double Scale)
+    {
+        public static ThumbnailGeometry? Compute(double controlW, double controlH, double pageW, double pageH)
+        {
+            if (controlW <= 0 || controlH <= 0 || pageW <= 0 || pageH <= 0) return null;
+            double scale = Math.Min(controlW / pageW, controlH / pageH);
+            double w = pageW * scale;
+            double h = pageH * scale;
+            return new ThumbnailGeometry((controlW - w) / 2, (controlH - h) / 2, w, h, scale);
+        }
     }
 
     private sealed class MinimapDrawOperation : ICustomDrawOperation
@@ -105,8 +110,8 @@ public partial class MinimapControl : UserControl
 
         public void Render(ImmediateDrawingContext context)
         {
-            var leaseFeature = context.TryGetFeature(typeof(ISkiaSharpApiLeaseFeature)) as ISkiaSharpApiLeaseFeature;
-            if (leaseFeature is null) return;
+            if (context.TryGetFeature(typeof(ISkiaSharpApiLeaseFeature)) is not ISkiaSharpApiLeaseFeature leaseFeature)
+                return;
 
             using var lease = leaseFeature.Lease();
             var canvas = lease.SkCanvas;
@@ -116,39 +121,33 @@ public partial class MinimapControl : UserControl
 
             float controlW = (float)_bounds.Width;
             float controlH = (float)_bounds.Height;
+            var controlRect = new SKRoundRect(SKRect.Create(0, 0, controlW, controlH), 4);
 
-            // Background
             using var bgPaint = new SKPaint { Color = new SKColor(40, 40, 40, 200) };
-            canvas.DrawRoundRect(new SKRoundRect(SKRect.Create(0, 0, controlW, controlH), 4), bgPaint);
+            canvas.DrawRoundRect(controlRect, bgPaint);
 
-            // Scale bitmap to fit
-            float scale = Math.Min(controlW / (float)tab.PageWidth, controlH / (float)tab.PageHeight);
-            float thumbW = (float)tab.PageWidth * scale;
-            float thumbH = (float)tab.PageHeight * scale;
-            float thumbX = (controlW - thumbW) / 2;
-            float thumbY = (controlH - thumbH) / 2;
+            var thumb = ThumbnailGeometry.Compute(controlW, controlH, tab.PageWidth, tab.PageHeight);
+            if (thumb is null) return;
+            var t = thumb.Value;
 
-            var destRect = SKRect.Create(thumbX, thumbY, thumbW, thumbH);
+            var destRect = SKRect.Create((float)t.X, (float)t.Y, (float)t.W, (float)t.H);
             canvas.DrawBitmap(bitmap, destRect);
 
-            // Viewport rectangle
-            var window = Avalonia.Application.Current?.ApplicationLifetime is
-                Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop
+            // Viewport indicator
+            var window = Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop
                 ? desktop.MainWindow : null;
             double winW = window?.ClientSize.Width ?? 1200;
             double winH = window?.ClientSize.Height ?? 900;
+            float scale = (float)t.Scale;
 
-            float vpLeft = (float)(-tab.Camera.OffsetX / tab.Camera.Zoom) * scale + thumbX;
-            float vpTop = (float)(-tab.Camera.OffsetY / tab.Camera.Zoom) * scale + thumbY;
-            float vpW = (float)(winW / tab.Camera.Zoom) * scale;
-            float vpH = (float)(winH / tab.Camera.Zoom) * scale;
+            var vpRect = SKRect.Create(
+                (float)(-tab.Camera.OffsetX / tab.Camera.Zoom) * scale + (float)t.X,
+                (float)(-tab.Camera.OffsetY / tab.Camera.Zoom) * scale + (float)t.Y,
+                (float)(winW / tab.Camera.Zoom) * scale,
+                (float)(winH / tab.Camera.Zoom) * scale);
 
-            using var vpPaint = new SKPaint
-            {
-                Color = new SKColor(100, 180, 255, 120),
-                Style = SKPaintStyle.Fill,
-            };
-            canvas.DrawRect(SKRect.Create(vpLeft, vpTop, vpW, vpH), vpPaint);
+            using var vpFill = new SKPaint { Color = new SKColor(100, 180, 255, 120) };
+            canvas.DrawRect(vpRect, vpFill);
 
             using var vpStroke = new SKPaint
             {
@@ -157,16 +156,15 @@ public partial class MinimapControl : UserControl
                 StrokeWidth = 1.5f,
                 IsAntialias = true,
             };
-            canvas.DrawRect(SKRect.Create(vpLeft, vpTop, vpW, vpH), vpStroke);
+            canvas.DrawRect(vpRect, vpStroke);
 
-            // Border
             using var borderPaint = new SKPaint
             {
                 Color = new SKColor(100, 100, 100),
                 Style = SKPaintStyle.Stroke,
                 StrokeWidth = 1,
             };
-            canvas.DrawRoundRect(new SKRoundRect(SKRect.Create(0, 0, controlW, controlH), 4), borderPaint);
+            canvas.DrawRoundRect(controlRect, borderPaint);
         }
     }
 }
