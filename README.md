@@ -6,7 +6,7 @@
 
 <p align="center">
   Desktop PDF viewer optimised for high magnification viewing with AI-guided "rail reading".<br>
-  Built in Rust with MuPDF for PDF parsing, Skia for GPU-accelerated vector rendering, and a modern egui-based GUI.
+  Built with .NET/Avalonia, PDFtoImage (PDFium) for PDF rasterisation, SkiaSharp for GPU-accelerated rendering, and PP-DocLayoutV3 (ONNX) for layout detection.
 </p>
 
 <p align="center">
@@ -24,7 +24,7 @@
 
 ## How it works
 
-PDF pages are converted to SVG via MuPDF, then rendered by Skia's SVG DOM renderer onto an OpenGL canvas. Zoom and pan are canvas transforms — text stays sharp at any magnification since it's rendered as vector paths with no re-rasterisation needed.
+PDF pages are rasterised by PDFium (via PDFtoImage) at a DPI proportional to the current zoom level (150–600 DPI). The resulting bitmap is uploaded to the GPU as an `SKImage` and drawn on an Avalonia Skia canvas via `ICustomDrawOperation`. Camera pan and zoom are applied as a compositor-level `MatrixTransform` — the bitmap only re-renders when the DPI tier changes, not on every pan/zoom frame.
 
 ### Rail reading
 
@@ -49,10 +49,10 @@ At high zoom levels, navigation switches to "rail mode" — the viewer locks ont
 
 ```bash
 # Open a specific PDF
-cargo run --release -- <path-to-pdf>
+dotnet run --project src/RailReader2 -- <path-to-pdf>
 
 # Or launch without arguments and use File → Open (Ctrl+O)
-cargo run --release
+dotnet run --project src/RailReader2
 ```
 
 ### Controls
@@ -113,16 +113,8 @@ Rail reading parameters are editable via the Settings panel (gear icon in menu b
 
 ### Dependencies
 
-- Rust toolchain
-- clang/clang++ (for skia source build)
-- ninja (for skia source build)
-- pkg-config, fontconfig, freetype (system libraries)
-
-On Ubuntu/Debian:
-
-```bash
-sudo apt install clang ninja-build pkg-config libfontconfig-dev libfreetype-dev
-```
+- .NET 10 SDK
+- ONNX model (see below)
 
 ### ONNX model
 
@@ -137,21 +129,15 @@ The model is placed in `models/PP-DocLayoutV3.onnx`. Without it, a simple fallba
 ### Build
 
 ```bash
-cargo build --release
+dotnet build src/RailReader2
 ```
 
-The first build takes a while as Skia compiles from source. Subsequent builds are fast (incremental).
-
-## Debug
-
-Set `DUMP_SVG=1` to write each page's SVG to `/tmp/pageN.svg` for inspection:
+### Publish self-contained
 
 ```bash
-DUMP_SVG=1 cargo run --release -- document.pdf
-```
+# Linux
+dotnet publish src/RailReader2 -c Release -r linux-x64 --self-contained
 
-Inspect layout analysis output for a specific page:
-
-```bash
-cargo run --example dump_layout -- document.pdf [page_number]
+# Windows
+dotnet publish src/RailReader2 -c Release -r win-x64 --self-contained
 ```
