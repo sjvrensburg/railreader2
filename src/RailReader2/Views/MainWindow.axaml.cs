@@ -62,6 +62,18 @@ public partial class MainWindow : Window
             // Wire up initial tab state
             UpdateLayerBindings(vm.ActiveTab);
 
+            // window.Opened (which calls OpenDocument) can fire before OnLoaded
+            // finishes wiring _invalidation. If a tab is already present, the
+            // camera transform was never applied and CenterPage used the wrong
+            // viewport size. Re-center and apply now that layout is complete.
+            if (vm.ActiveTab is { } earlyTab && Viewport.Bounds.Width > 0)
+            {
+                earlyTab.CenterPage(Viewport.Bounds.Width, Viewport.Bounds.Height);
+                earlyTab.UpdateRailZoom(Viewport.Bounds.Width, Viewport.Bounds.Height);
+                UpdateCameraTransform();
+                PageLayer.InvalidateVisual();
+            }
+
             vm.PropertyChanged += (_, args) =>
             {
                 switch (args.PropertyName)
