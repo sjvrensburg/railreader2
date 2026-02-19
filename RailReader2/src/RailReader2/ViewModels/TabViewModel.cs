@@ -26,8 +26,9 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
     public Queue<int> PendingAnalysis { get; } = new();
     public List<OutlineEntry> Outline { get; }
 
-    // Cached page bitmap and the DPI it was rendered at
+    // Cached page bitmap, GPU-ready image, and the DPI it was rendered at
     public SKBitmap? CachedBitmap { get; private set; }
+    public SKImage? CachedImage { get; private set; }
     public int CachedDpi { get; private set; }
 
     public TabViewModel(string filePath, AppConfig config)
@@ -52,6 +53,7 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
             // Don't dispose old bitmap here — the render thread may still be
             // drawing it. Assign null first so the renderer sees no bitmap,
             // then let GC collect the old one safely.
+            CachedImage = null;
             CachedBitmap = null;
 
             var (w, h) = _pdf.GetPageSize(CurrentPage);
@@ -60,6 +62,7 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
 
             int dpi = PdfService.CalculateRenderDpi(Camera.Zoom);
             CachedBitmap = _pdf.RenderPage(CurrentPage, dpi);
+            CachedImage = SKImage.FromBitmap(CachedBitmap);
             CachedDpi = dpi;
         }
         catch (Exception ex)
@@ -70,6 +73,12 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
     }
 
     private bool _dpiRenderPending;
+
+    /// <summary>
+    /// Called on the UI thread when a DPI re-render completes, so the view can
+    /// invalidate the page layer.
+    /// </summary>
+    public Action? OnDpiRenderComplete { get; set; }
 
     /// <summary>
     /// Checks if the current zoom demands a different DPI and schedules an
@@ -95,11 +104,14 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
                     {
                         if (CurrentPage == page) // still on same page
                         {
-                            // Don't dispose the old bitmap here — the render thread
+                            // Don't dispose the old bitmap/image here — the render thread
                             // (compositor) may still be drawing it. Let GC collect it
-                            // via SKBitmap's finalizer to avoid use-after-free.
+                            // via finalizer to avoid use-after-free.
+                            CachedImage = null;
                             CachedBitmap = newBitmap;
+                            CachedImage = SKImage.FromBitmap(newBitmap);
                             CachedDpi = neededDpi;
+                            OnDpiRenderComplete?.Invoke();
                         }
                         else
                         {
@@ -279,8 +291,11 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
 
     public void Dispose()
     {
-        // Null the bitmap reference first so the render thread sees null,
+        // Null references first so the render thread sees null,
         // then dispose. The tab should already be removed from Tabs by now.
+        var img = CachedImage;
+        CachedImage = null;
+        img?.Dispose();
         var bmp = CachedBitmap;
         CachedBitmap = null;
         bmp?.Dispose();

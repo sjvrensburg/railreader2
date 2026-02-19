@@ -1,6 +1,5 @@
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.Rendering.SceneGraph;
 using Avalonia.Skia;
@@ -11,96 +10,45 @@ using SkiaSharp;
 
 namespace RailReader2.Views;
 
-public class PdfCanvasControl : Control
+public class RailOverlayLayer : Control
 {
-    public MainWindowViewModel? ViewModel { get; set; }
-    private bool _dragging;
-    private Point _lastPos;
-    private Point _pressPos;
+    public TabViewModel? Tab { get; set; }
+    public ColourEffectShaders? ColourEffects { get; set; }
 
-    public PdfCanvasControl()
+    public RailOverlayLayer()
     {
-        ClipToBounds = true;
-        Focusable = true;
+        IsHitTestVisible = false;
+    }
+
+    protected override void OnSizeChanged(SizeChangedEventArgs e)
+    {
+        base.OnSizeChanged(e);
+        InvalidateVisual();
     }
 
     public override void Render(DrawingContext context)
     {
         base.Render(context);
-        context.Custom(new PdfDrawOperation(new Rect(0, 0, Bounds.Width, Bounds.Height), ViewModel));
+        context.Custom(new OverlayDrawOperation(new Rect(0, 0, Bounds.Width, Bounds.Height), Tab, ColourEffects));
     }
 
-    protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
-    {
-        base.OnPointerWheelChanged(e);
-        if (ViewModel is null) return;
-
-        double scrollY = e.Delta.Y * 30.0;
-        var pos = e.GetPosition(this);
-        bool ctrl = e.KeyModifiers.HasFlag(KeyModifiers.Control);
-        ViewModel.HandleZoom(scrollY, pos.X, pos.Y, ctrl);
-        InvalidateVisual();
-        e.Handled = true;
-    }
-
-    protected override void OnPointerPressed(PointerPressedEventArgs e)
-    {
-        base.OnPointerPressed(e);
-        Focus();
-        if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
-        {
-            _dragging = true;
-            _pressPos = e.GetPosition(this);
-            _lastPos = _pressPos;
-            e.Handled = true;
-        }
-    }
-
-    protected override void OnPointerMoved(PointerEventArgs e)
-    {
-        base.OnPointerMoved(e);
-        if (_dragging && ViewModel is not null)
-        {
-            var pos = e.GetPosition(this);
-            double dx = pos.X - _lastPos.X;
-            double dy = pos.Y - _lastPos.Y;
-            ViewModel.HandlePan(dx, dy);
-            _lastPos = pos;
-            InvalidateVisual();
-            e.Handled = true;
-        }
-    }
-
-    protected override void OnPointerReleased(PointerReleasedEventArgs e)
-    {
-        base.OnPointerReleased(e);
-        if (_dragging && ViewModel is not null)
-        {
-            var pos = e.GetPosition(this);
-            double dist = Math.Sqrt(Math.Pow(pos.X - _pressPos.X, 2) + Math.Pow(pos.Y - _pressPos.Y, 2));
-            if (dist < 5.0)
-                ViewModel.HandleClick(pos.X, pos.Y);
-        }
-        _dragging = false;
-        e.Handled = true;
-    }
-
-    private sealed class PdfDrawOperation : ICustomDrawOperation
+    private sealed class OverlayDrawOperation : ICustomDrawOperation
     {
         private readonly Rect _bounds;
-        private readonly MainWindowViewModel? _vm;
+        private readonly TabViewModel? _tab;
+        private readonly ColourEffectShaders? _effects;
 
-        public PdfDrawOperation(Rect bounds, MainWindowViewModel? vm)
+        public OverlayDrawOperation(Rect bounds, TabViewModel? tab, ColourEffectShaders? effects)
         {
             _bounds = bounds;
-            _vm = vm;
+            _tab = tab;
+            _effects = effects;
         }
 
         public Rect Bounds => _bounds;
-
         public void Dispose() { }
         public bool Equals(ICustomDrawOperation? other) => false;
-        public bool HitTest(Point p) => _bounds.Contains(p);
+        public bool HitTest(Point p) => false;
 
         public void Render(ImmediateDrawingContext context)
         {
@@ -110,48 +58,19 @@ public class PdfCanvasControl : Control
             using var lease = leaseFeature.Lease();
             var canvas = lease.SkCanvas;
 
-            // Clear background
-            canvas.Clear(new SKColor(128, 128, 128));
+            var tab = _tab;
+            if (tab is null) return;
 
-            var tab = _vm?.ActiveTab;
-            if (tab?.CachedBitmap is not { } bitmap) return;
-
-            canvas.Save();
-            canvas.Translate((float)tab.Camera.OffsetX, (float)tab.Camera.OffsetY);
-            canvas.Scale((float)tab.Camera.Zoom, (float)tab.Camera.Zoom);
-
-            // Draw colour effect layer
-            var effectPaint = _vm?.ColourEffects.CreatePaint();
-            if (effectPaint is not null)
-            {
-                canvas.SaveLayer(effectPaint);
-            }
-
-            // Draw page bitmap scaled to page dimensions (points)
-            // Use bilinear+mipmap filtering for smooth rendering at any zoom
-            var destRect = SKRect.Create(0, 0, (float)tab.PageWidth, (float)tab.PageHeight);
-            using var image = SKImage.FromBitmap(bitmap);
-            var sampling = new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Linear);
-            canvas.DrawImage(image, destRect, sampling);
-
-            if (effectPaint is not null)
-            {
-                canvas.Restore(); // pop save layer
-                effectPaint.Dispose();
-            }
-
-            // Rail overlays
+            // Rail overlays — drawn in page coordinates (no camera transform)
             if (tab.Rail.Active && tab.Rail.HasAnalysis)
             {
-                var palette = _vm!.ColourEffects.Effect.GetOverlayPalette();
+                var palette = (_effects ?? new ColourEffectShaders()).Effect.GetOverlayPalette();
                 DrawRailOverlays(canvas, tab, palette);
             }
 
-            // Debug overlay — use analysis cache directly so it works before rail activates
+            // Debug overlay
             if (tab.DebugOverlay && tab.AnalysisCache.TryGetValue(tab.CurrentPage, out var debugAnalysis))
                 DrawDebugOverlay(canvas, tab, debugAnalysis);
-
-            canvas.Restore();
         }
 
         private static void DrawRailOverlays(SKCanvas canvas, TabViewModel tab, OverlayPalette palette)

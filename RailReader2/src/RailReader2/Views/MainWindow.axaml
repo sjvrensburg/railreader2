@@ -34,8 +34,17 @@
                 </SplitView.Pane>
                 <SplitView.Content>
                     <Panel>
-                        <!-- PDF Canvas -->
-                        <v:PdfCanvasControl Name="PdfCanvas" />
+                        <!-- Layered PDF viewport with compositor-driven camera -->
+                        <v:ViewportPanel Name="Viewport">
+                            <Panel Name="CameraPanel" RenderTransformOrigin="0%,0%">
+                                <Panel Name="PagePanel"
+                                       HorizontalAlignment="Left"
+                                       VerticalAlignment="Top">
+                                    <v:PdfPageLayer Name="PageLayer" />
+                                    <v:RailOverlayLayer Name="OverlayLayer" />
+                                </Panel>
+                            </Panel>
+                        </v:ViewportPanel>
 
                         <!-- Minimap overlay -->
                         <v:MinimapControl Name="Minimap"

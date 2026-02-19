@@ -1,5 +1,7 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Media;
 using RailReader2.ViewModels;
 
 namespace RailReader2.Views;
@@ -18,19 +20,53 @@ public partial class MainWindow : Window
         base.OnLoaded(e);
         if (Vm is { } vm)
         {
-            PdfCanvas.ViewModel = vm;
+            Viewport.ViewModel = vm;
             Minimap.ViewModel = vm;
+
+            // Wire granular invalidation callbacks
+            vm.SetInvalidation(new InvalidationCallbacks
+            {
+                InvalidateCamera = UpdateCameraTransform,
+                InvalidatePage = () =>
+                {
+                    PageLayer.InvalidateVisual();
+                    Minimap.InvalidateVisual();
+                },
+                InvalidateOverlay = () => OverlayLayer.InvalidateVisual(),
+            });
+
+            // Legacy fallback (for any code still calling SetInvalidateCanvas)
             vm.SetInvalidateCanvas(() =>
             {
-                PdfCanvas.InvalidateVisual();
+                UpdateCameraTransform();
+                PageLayer.InvalidateVisual();
+                OverlayLayer.InvalidateVisual();
                 Minimap.InvalidateVisual();
             });
+
+            // Re-clamp camera and update transform on viewport resize
+            Viewport.SizeChanged += (_, _) =>
+            {
+                if (vm.ActiveTab is { } tab)
+                {
+                    var (ww, wh) = (Viewport.Bounds.Width, Viewport.Bounds.Height);
+                    tab.ClampCamera(ww, wh);
+                    UpdateCameraTransform();
+                }
+            };
+
+            // Wire up initial tab state
+            UpdateLayerBindings(vm.ActiveTab);
+
             vm.PropertyChanged += (_, args) =>
             {
                 switch (args.PropertyName)
                 {
                     case nameof(MainWindowViewModel.ActiveTab):
-                        PdfCanvas.InvalidateVisual();
+                        UpdateLayerBindings(vm.ActiveTab);
+                        UpdateCameraTransform();
+                        PageLayer.InvalidateVisual();
+                        OverlayLayer.InvalidateVisual();
                         Minimap.InvalidateVisual();
                         break;
                     case nameof(MainWindowViewModel.ShowShortcuts) when vm.ShowShortcuts:
@@ -49,6 +85,43 @@ public partial class MainWindow : Window
                 }
             };
         }
+    }
+
+    private void UpdateLayerBindings(TabViewModel? tab)
+    {
+        PageLayer.Tab = tab;
+        PageLayer.ColourEffects = Vm?.ColourEffects;
+        OverlayLayer.Tab = tab;
+        OverlayLayer.ColourEffects = Vm?.ColourEffects;
+
+        // Wire DPI render callback so page layer refreshes when bitmap upgrades
+        if (tab is not null)
+        {
+            tab.OnDpiRenderComplete = () =>
+            {
+                PageLayer.InvalidateVisual();
+                Minimap.InvalidateVisual();
+            };
+        }
+    }
+
+    private void UpdateCameraTransform()
+    {
+        var tab = Vm?.ActiveTab;
+        if (tab is null)
+        {
+            CameraPanel.RenderTransform = null;
+            PagePanel.Width = 0;
+            PagePanel.Height = 0;
+            return;
+        }
+
+        CameraPanel.RenderTransform = new MatrixTransform(
+            new Matrix(tab.Camera.Zoom, 0, 0, tab.Camera.Zoom,
+                       tab.Camera.OffsetX, tab.Camera.OffsetY));
+        PagePanel.Width = tab.PageWidth;
+        PagePanel.Height = tab.PageHeight;
+        Minimap.InvalidateVisual();
     }
 
     /// <summary>
@@ -122,7 +195,7 @@ public partial class MainWindow : Window
             if (vm.ActiveTab is { } tab)
             {
                 tab.DebugOverlay = !tab.DebugOverlay;
-                PdfCanvas.InvalidateVisual();
+                OverlayLayer.InvalidateVisual();
             }
             e.Handled = true;
         }

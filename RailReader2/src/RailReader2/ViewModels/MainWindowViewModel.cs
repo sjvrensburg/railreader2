@@ -23,7 +23,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private Window? _window;
     private DispatcherTimer? _pollTimer;
     private Stopwatch _frameTimer = Stopwatch.StartNew();
-    private Action? _invalidateCanvas;
+    private Action? _invalidateCanvas; // legacy fallback
+    private InvalidationCallbacks? _invalidation;
     private bool _animationRequested;
 
     [ObservableProperty] private int _activeTabIndex;
@@ -53,6 +54,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public void SetWindow(Window window) => _window = window;
     public void SetInvalidateCanvas(Action invalidate) => _invalidateCanvas = invalidate;
+    public void SetInvalidation(InvalidationCallbacks callbacks) => _invalidation = callbacks;
 
     private void InitializeWorker()
     {
@@ -91,7 +93,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             if (tab is not null && !_animationRequested)
                 tab.SubmitPendingLookahead(_worker);
             if (gotResults)
-                _invalidateCanvas?.Invoke();
+                InvalidateOverlay();
             bool workerBusy = _worker is not null && !_worker.IsIdle;
             if (!workerBusy) _pollTimer?.Stop();
         };
@@ -124,8 +126,10 @@ public sealed partial class MainWindowViewModel : ObservableObject
         if (!animating)
             tab.SubmitPendingLookahead(_worker);
 
-        if (animating || gotResults)
-            _invalidateCanvas?.Invoke();
+        if (animating)
+            InvalidateCamera();
+        if (gotResults)
+            InvalidateOverlay();
 
         // Keep the animation loop going while there's motion
         if (animating)
@@ -174,6 +178,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public void InvalidateCanvas()
     {
+        InvalidateAll();
         OnPropertyChanged(nameof(ActiveTab));
     }
 
@@ -203,6 +208,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             Tabs.Add(tab);
             ActiveTabIndex = Tabs.Count - 1;
             OnPropertyChanged(nameof(ActiveTab));
+            InvalidateAll();
 
             // Submit analysis on UI thread (accesses worker's non-thread-safe state)
             tab.SubmitAnalysis(_worker);
@@ -246,6 +252,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         if (Tabs.Count == 0) ActiveTabIndex = 0;
         else if (ActiveTabIndex >= Tabs.Count) ActiveTabIndex = Tabs.Count - 1;
         OnPropertyChanged(nameof(ActiveTab));
+        InvalidateAll();
     }
 
     [RelayCommand]
@@ -255,6 +262,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         {
             ActiveTabIndex = index;
             OnPropertyChanged(nameof(ActiveTab));
+            InvalidateAll();
         }
     }
 
@@ -273,6 +281,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         tab.GoToPage(page, _worker, ww, wh);
         tab.QueueLookahead(_config.AnalysisLookaheadPages);
         OnPropertyChanged(nameof(ActiveTab));
+        InvalidateAll();
         RequestAnimationFrame();
     }
 
@@ -284,6 +293,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         tab.CenterPage(ww, wh);
         tab.UpdateRailZoom(ww, wh);
         OnPropertyChanged(nameof(ActiveTab));
+        InvalidateCamera();
     }
 
     [RelayCommand]
@@ -292,6 +302,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _config.ColourEffect = effect;
         _config.Save();
         _colourEffects.Effect = effect;
+        InvalidatePage();
+        InvalidateOverlay();
         OnPropertyChanged(nameof(ActiveTab));
     }
 
@@ -312,6 +324,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             tab.ReapplyNavigableClasses();
         }
         _config.Save();
+        InvalidateAll();
         OnPropertyChanged(nameof(ActiveTab));
     }
 
@@ -344,6 +357,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             // Re-render at higher DPI if zoomed in significantly
             tab.UpdateRenderDpiIfNeeded();
         }
+        InvalidateCamera();
         OnPropertyChanged(nameof(ActiveTab));
         RequestAnimationFrame();
     }
@@ -355,6 +369,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         tab.Camera.OffsetX += dx;
         tab.Camera.OffsetY += dy;
         tab.ClampCamera(ww, wh);
+        InvalidateCamera();
         OnPropertyChanged(nameof(ActiveTab));
     }
 
@@ -383,6 +398,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
             tab.Camera.OffsetY -= PanStep;
             tab.ClampCamera(ww, wh);
         }
+        InvalidateCamera();
+        InvalidateOverlay();
         OnPropertyChanged(nameof(ActiveTab));
         RequestAnimationFrame();
     }
@@ -412,6 +429,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
             tab.Camera.OffsetY += PanStep;
             tab.ClampCamera(ww, wh);
         }
+        InvalidateCamera();
+        InvalidateOverlay();
         OnPropertyChanged(nameof(ActiveTab));
         RequestAnimationFrame();
     }
@@ -427,6 +446,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             tab.Camera.OffsetX -= PanStep;
             tab.ClampCamera(ww, wh);
         }
+        InvalidateCamera();
         OnPropertyChanged(nameof(ActiveTab));
         RequestAnimationFrame();
     }
@@ -442,6 +462,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             tab.Camera.OffsetX += PanStep;
             tab.ClampCamera(ww, wh);
         }
+        InvalidateCamera();
         OnPropertyChanged(nameof(ActiveTab));
         RequestAnimationFrame();
     }
@@ -466,6 +487,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
             tab.Rail.CurrentLine = 0;
             var (ww, wh) = GetWindowSize();
             tab.StartSnap(ww, wh);
+            InvalidateCamera();
+            InvalidateOverlay();
             OnPropertyChanged(nameof(ActiveTab));
             RequestAnimationFrame();
         }
@@ -478,6 +501,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         double newZoom = zoomIn ? tab.Camera.Zoom * ZoomStep : tab.Camera.Zoom / ZoomStep;
         tab.ApplyZoom(newZoom, ww, wh);
         tab.UpdateRenderDpiIfNeeded();
+        InvalidateCamera();
         OnPropertyChanged(nameof(ActiveTab));
     }
 
@@ -487,6 +511,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         var (ww, wh) = GetWindowSize();
         tab.CenterPage(ww, wh);
         tab.UpdateRailZoom(ww, wh);
+        InvalidateCamera();
         OnPropertyChanged(nameof(ActiveTab));
     }
 
@@ -525,4 +550,59 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
         return null;
     }
+
+    // --- Granular invalidation helpers ---
+
+    private void InvalidateCamera()
+    {
+        if (_invalidation is not null)
+            _invalidation.InvalidateCamera?.Invoke();
+        else
+            _invalidateCanvas?.Invoke();
+    }
+
+    private void InvalidatePage()
+    {
+        if (_invalidation is not null)
+            _invalidation.InvalidatePage?.Invoke();
+        else
+            _invalidateCanvas?.Invoke();
+    }
+
+    private void InvalidateOverlay()
+    {
+        if (_invalidation is not null)
+            _invalidation.InvalidateOverlay?.Invoke();
+        else
+            _invalidateCanvas?.Invoke();
+    }
+
+    private void InvalidateAll()
+    {
+        if (_invalidation is not null)
+        {
+            _invalidation.InvalidateCamera?.Invoke();
+            _invalidation.InvalidatePage?.Invoke();
+            _invalidation.InvalidateOverlay?.Invoke();
+        }
+        else
+        {
+            _invalidateCanvas?.Invoke();
+        }
+    }
+
+    /// <summary>
+    /// Called by MinimapControl to trigger camera-only update.
+    /// </summary>
+    public void RequestCameraUpdate()
+    {
+        InvalidateCamera();
+    }
+}
+
+public sealed class InvalidationCallbacks
+{
+    public Action? InvalidateCamera { get; init; }
+    public Action? InvalidatePage { get; init; }
+    public Action? InvalidateOverlay { get; init; }
 }

@@ -84,7 +84,7 @@ public partial class MinimapControl : UserControl
             ViewModel?.RequestAnimationFrame();
         }
 
-        ViewModel?.InvalidateCanvas();
+        ViewModel?.RequestCameraUpdate();
     }
 
     private sealed class MinimapDrawOperation : ICustomDrawOperation
