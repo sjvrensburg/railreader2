@@ -5,9 +5,8 @@ obj/
 *.suo
 .vs/
 
-# Rust legacy (can be removed once cleaned)
+# Rust legacy build artifacts (local only)
 target/
-debug/
 
 # ONNX model (large, downloaded via script)
 models/*.onnx
@@ -16,6 +15,10 @@ models/*.onnx
 config.json
 DISTRIBUTION.md
 TODO.md
+
+# Installer build artifacts
+installer/output/
+installer/icon.ico
 
 # IDE
 .idea/
