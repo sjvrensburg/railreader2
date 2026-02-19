@@ -52,7 +52,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
         SetupPollTimer();
     }
 
-    public void SetWindow(Window window) => _window = window;
+    public void SetWindow(Window window)
+    {
+        _window = window;
+        ApplyFontScale();
+    }
     public void SetInvalidateCanvas(Action invalidate) => _invalidateCanvas = invalidate;
     public void SetInvalidation(InvalidationCallbacks callbacks) => _invalidation = callbacks;
 
@@ -328,10 +332,22 @@ public sealed partial class MainWindowViewModel : ObservableObject
             tab.Rail.UpdateConfig(_config);
             tab.ReapplyNavigableClasses();
         }
+        ApplyFontScale();
         _config.Save();
         InvalidateAll();
         OnPropertyChanged(nameof(ActiveTab));
     }
+
+    private const double BaseFontSize = 14.0;
+
+    private void ApplyFontScale()
+    {
+        if (_window is not null)
+            _window.FontSize = BaseFontSize * _config.UiFontScale;
+    }
+
+    /// <summary>Returns the current font size for use when creating child windows.</summary>
+    public double CurrentFontSize => BaseFontSize * _config.UiFontScale;
 
     public void HandleZoom(double scrollDelta, double cursorX, double cursorY, bool ctrlHeld)
     {

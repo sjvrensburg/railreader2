@@ -87,15 +87,15 @@ public partial class MainWindow : Window
                         break;
                     case nameof(MainWindowViewModel.ShowShortcuts) when vm.ShowShortcuts:
                         vm.ShowShortcuts = false;
-                        new ShortcutsDialog().ShowDialog(this);
+                        new ShortcutsDialog { FontSize = vm.CurrentFontSize }.ShowDialog(this);
                         break;
                     case nameof(MainWindowViewModel.ShowAbout) when vm.ShowAbout:
                         vm.ShowAbout = false;
-                        new AboutDialog().ShowDialog(this);
+                        new AboutDialog { FontSize = vm.CurrentFontSize }.ShowDialog(this);
                         break;
                     case nameof(MainWindowViewModel.ShowSettings) when vm.ShowSettings:
                         vm.ShowSettings = false;
-                        var settings = new SettingsWindow { DataContext = vm };
+                        var settings = new SettingsWindow { DataContext = vm, FontSize = vm.CurrentFontSize };
                         settings.ShowDialog(this);
                         break;
                 }
