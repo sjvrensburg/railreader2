@@ -69,6 +69,22 @@ public sealed class PdfService : IDisposable
     }
 
     /// <summary>
+    /// Renders a small thumbnail of a page suitable for the minimap (≤200×280 px).
+    /// Caller owns the returned bitmap.
+    /// </summary>
+    public SKBitmap RenderThumbnail(int pageIndex)
+    {
+        // Target a thumbnail that fits within 200×280 at the page's natural aspect.
+        const int TargetSize = 200;
+        var (pageW, pageH) = GetPageSize(pageIndex);
+        double scale = Math.Min(TargetSize / pageW, TargetSize / pageH);
+        int pixW = Math.Max(1, (int)(pageW * scale));
+        int pixH = Math.Max(1, (int)(pageH * scale));
+        return Conversion.ToImage(_pdfBytes, page: pageIndex,
+            options: new RenderOptions(Width: pixW, Height: pixH));
+    }
+
+    /// <summary>
     /// Calculates the appropriate render DPI for the current zoom level.
     /// Higher zoom → higher DPI for sharp text.
     /// </summary>
@@ -76,7 +92,7 @@ public sealed class PdfService : IDisposable
     {
         // Scale DPI with zoom for sharp text at all zoom levels.
         // At zoom=1 → 150 DPI (overview), zoom=3 → 450 DPI (rail mode sharp text).
-        // Cap at 600 DPI to avoid huge bitmaps.
+        // Cap at 600 DPI to avoid excessively large bitmaps (~35 MP for A4).
         int dpi = Math.Max(150, (int)(zoom * 150));
         return Math.Min(dpi, 600);
     }

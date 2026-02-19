@@ -44,9 +44,13 @@ public partial class MainWindow : Window
                 Minimap.InvalidateVisual();
             });
 
-            // Re-clamp camera and update transform on viewport resize
+            // Keep ViewModel's viewport size in sync with the actual drawable area.
+            // SizeChanged fires during the initial layout pass (before window.Opened),
+            // so OpenDocument will already see correct dimensions when it runs.
+            vm.SetViewportSize(Viewport.Bounds.Width, Viewport.Bounds.Height);
             Viewport.SizeChanged += (_, _) =>
             {
+                vm.SetViewportSize(Viewport.Bounds.Width, Viewport.Bounds.Height);
                 if (vm.ActiveTab is { } tab)
                 {
                     var (ww, wh) = (Viewport.Bounds.Width, Viewport.Bounds.Height);
@@ -57,6 +61,18 @@ public partial class MainWindow : Window
 
             // Wire up initial tab state
             UpdateLayerBindings(vm.ActiveTab);
+
+            // window.Opened (which calls OpenDocument) can fire before OnLoaded
+            // finishes wiring _invalidation. If a tab is already present, the
+            // camera transform was never applied and CenterPage used the wrong
+            // viewport size. Re-center and apply now that layout is complete.
+            if (vm.ActiveTab is { } earlyTab && Viewport.Bounds.Width > 0)
+            {
+                earlyTab.CenterPage(Viewport.Bounds.Width, Viewport.Bounds.Height);
+                earlyTab.UpdateRailZoom(Viewport.Bounds.Width, Viewport.Bounds.Height);
+                UpdateCameraTransform();
+                PageLayer.InvalidateVisual();
+            }
 
             vm.PropertyChanged += (_, args) =>
             {
@@ -71,15 +87,15 @@ public partial class MainWindow : Window
                         break;
                     case nameof(MainWindowViewModel.ShowShortcuts) when vm.ShowShortcuts:
                         vm.ShowShortcuts = false;
-                        new ShortcutsDialog().ShowDialog(this);
+                        new ShortcutsDialog { FontSize = vm.CurrentFontSize }.ShowDialog(this);
                         break;
                     case nameof(MainWindowViewModel.ShowAbout) when vm.ShowAbout:
                         vm.ShowAbout = false;
-                        new AboutDialog().ShowDialog(this);
+                        new AboutDialog { FontSize = vm.CurrentFontSize }.ShowDialog(this);
                         break;
                     case nameof(MainWindowViewModel.ShowSettings) when vm.ShowSettings:
                         vm.ShowSettings = false;
-                        var settings = new SettingsWindow { DataContext = vm };
+                        var settings = new SettingsWindow { DataContext = vm, FontSize = vm.CurrentFontSize };
                         settings.ShowDialog(this);
                         break;
                 }
@@ -149,6 +165,11 @@ public partial class MainWindow : Window
                     vm.ShowMinimap = !vm.ShowMinimap; e.Handled = true; return;
                 case Key.OemComma:
                     vm.ShowSettings = true; e.Handled = true; return;
+                case Key.Home:
+                    vm.GoToPage(0); e.Handled = true; return;
+                case Key.End:
+                    if (vm.ActiveTab is { } tEnd) vm.GoToPage(tEnd.PageCount - 1);
+                    e.Handled = true; return;
                 case Key.Tab:
                     if (vm.Tabs.Count > 0)
                         vm.SelectTab((vm.ActiveTabIndex + 1) % vm.Tabs.Count);
@@ -184,10 +205,10 @@ public partial class MainWindow : Window
                 vm.HandleZoomKey(false); e.Handled = true; break;
             case Key.D0 or Key.NumPad0:
                 vm.HandleResetZoom(); e.Handled = true; break;
+            case Key.Space:
+                vm.HandleArrowDown(); e.Handled = true; break;
             case Key.F1:
                 vm.ShowShortcuts = true; e.Handled = true; break;
-            case Key.Escape:
-                Close(); e.Handled = true; break;
         }
 
         if (e.Key == Key.D && e.KeyModifiers.HasFlag(KeyModifiers.Shift))

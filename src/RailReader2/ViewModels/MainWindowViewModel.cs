@@ -52,7 +52,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
         SetupPollTimer();
     }
 
-    public void SetWindow(Window window) => _window = window;
+    public void SetWindow(Window window)
+    {
+        _window = window;
+        ApplyFontScale();
+    }
     public void SetInvalidateCanvas(Action invalidate) => _invalidateCanvas = invalidate;
     public void SetInvalidation(InvalidationCallbacks callbacks) => _invalidation = callbacks;
 
@@ -210,6 +214,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
             OnPropertyChanged(nameof(ActiveTab));
             InvalidateAll();
 
+            // PageLayer.Bounds is still zero until Avalonia's layout pass propagates
+            // PagePanel.Width/Height. DispatcherPriority.Background (4) is lower than
+            // Layout (7) and Render (8), so this fires after both passes complete.
+            Dispatcher.UIThread.Post(() => InvalidatePage(), DispatcherPriority.Background);
+
             // Submit analysis on UI thread (accesses worker's non-thread-safe state)
             tab.SubmitAnalysis(_worker);
             tab.QueueLookahead(_config.AnalysisLookaheadPages);
@@ -323,10 +332,22 @@ public sealed partial class MainWindowViewModel : ObservableObject
             tab.Rail.UpdateConfig(_config);
             tab.ReapplyNavigableClasses();
         }
+        ApplyFontScale();
         _config.Save();
         InvalidateAll();
         OnPropertyChanged(nameof(ActiveTab));
     }
+
+    private const double BaseFontSize = 14.0;
+
+    private void ApplyFontScale()
+    {
+        if (_window is not null)
+            _window.FontSize = BaseFontSize * _config.UiFontScale;
+    }
+
+    /// <summary>Returns the current font size for use when creating child windows.</summary>
+    public double CurrentFontSize => BaseFontSize * _config.UiFontScale;
 
     public void HandleZoom(double scrollDelta, double cursorX, double cursorY, bool ctrlHeld)
     {
@@ -515,11 +536,21 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(ActiveTab));
     }
 
-    private (double Width, double Height) GetWindowSize()
+    private double _vpWidth = 1200;
+    private double _vpHeight = 900;
+
+    /// <summary>
+    /// Called by MainWindow whenever the viewport control is resized.
+    /// Keeps layout calculations consistent with the actual drawable area,
+    /// not the full window ClientSize (which includes menu/tab/status chrome).
+    /// </summary>
+    public void SetViewportSize(double w, double h)
     {
-        if (_window is null) return (1200, 900);
-        return (_window.ClientSize.Width, _window.ClientSize.Height);
+        if (w > 0) _vpWidth = w;
+        if (h > 0) _vpHeight = h;
     }
+
+    private (double Width, double Height) GetWindowSize() => (_vpWidth, _vpHeight);
 
     private static string? FindModelPath()
     {

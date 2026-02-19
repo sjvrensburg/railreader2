@@ -112,7 +112,7 @@ public partial class MinimapControl : UserControl
             var canvas = lease.SkCanvas;
 
             var tab = _vm?.ActiveTab;
-            if (tab?.CachedBitmap is not { } bitmap) return;
+            if (tab?.MinimapBitmap is not { } bitmap) return;
 
             float controlW = (float)_bounds.Width;
             float controlH = (float)_bounds.Height;

@@ -23,7 +23,13 @@ public class PdfPageLayer : Control
     public override void Render(DrawingContext context)
     {
         base.Render(context);
-        context.Custom(new PageDrawOperation(new Rect(0, 0, Bounds.Width, Bounds.Height), Tab, ColourEffects));
+        // Use tab page dimensions for the draw-op bounds so the compositor
+        // does not clip the operation away when PageLayer.Bounds is still
+        // zero (before the first layout pass after a tab is added).
+        var tab = Tab;
+        double w = tab?.PageWidth > 0 ? tab.PageWidth : Bounds.Width;
+        double h = tab?.PageHeight > 0 ? tab.PageHeight : Bounds.Height;
+        context.Custom(new PageDrawOperation(new Rect(0, 0, w, h), tab, ColourEffects));
     }
 
     private sealed class PageDrawOperation : ICustomDrawOperation
@@ -63,7 +69,7 @@ public class PdfPageLayer : Control
             // Draw page image scaled to page dimensions (points)
             // No camera transform here — that's handled by the parent's RenderTransform
             var destRect = SKRect.Create(0, 0, (float)tab.PageWidth, (float)tab.PageHeight);
-            var sampling = new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Linear);
+            var sampling = new SKSamplingOptions(SKCubicResampler.Mitchell);
             canvas.DrawImage(image, destRect, sampling);
 
             if (effectPaint is not null)

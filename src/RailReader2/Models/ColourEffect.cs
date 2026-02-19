@@ -82,12 +82,12 @@ public static class ColourEffectExtensions
         },
         _ => new OverlayPalette // None
         {
-            Dim = new SKColor(0, 0, 0, 120),
-            DimExcludesBlock = false,
-            BlockReveal = (new SKColor(255, 255, 255, 120), SKBlendMode.Plus),
-            BlockOutline = new SKColor(66, 133, 244, 80),
+            Dim = new SKColor(0, 0, 0, 90),
+            DimExcludesBlock = true,
+            BlockReveal = null,
+            BlockOutline = new SKColor(66, 133, 244, 160),
             BlockOutlineWidth = 1.5f,
-            LineHighlight = new SKColor(66, 133, 244, 40),
+            LineHighlight = new SKColor(255, 220, 50, 60),
         },
     };
 }
