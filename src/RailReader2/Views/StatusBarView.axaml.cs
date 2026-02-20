@@ -44,7 +44,7 @@ public partial class StatusBarView : UserControl
 
     private void OnTabPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs args)
     {
-        if (args.PropertyName is nameof(TabViewModel.CurrentPage))
+        if (args.PropertyName is nameof(TabViewModel.CurrentPage) or nameof(TabViewModel.PendingRailSetup))
             UpdateStatus();
     }
 
@@ -84,7 +84,17 @@ public partial class StatusBarView : UserControl
         StatusPanel.Children.Add(new TextBlock { Text = "|", Opacity = 0.5 });
         StatusPanel.Children.Add(new TextBlock { Text = $"Zoom: {zoomPct}%" });
 
-        if (tab.Rail.Active)
+        if (tab.PendingRailSetup)
+        {
+            StatusPanel.Children.Add(new TextBlock { Text = "|", Opacity = 0.5 });
+            StatusPanel.Children.Add(new TextBlock
+            {
+                Text = "Analyzing…",
+                Opacity = 0.6,
+                FontStyle = Avalonia.Media.FontStyle.Italic,
+            });
+        }
+        else if (tab.Rail.Active)
         {
             StatusPanel.Children.Add(new TextBlock { Text = "|", Opacity = 0.5 });
             StatusPanel.Children.Add(new TextBlock

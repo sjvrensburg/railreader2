@@ -8,6 +8,10 @@ namespace RailReader2.Views;
 
 public partial class MainWindow : Window
 {
+    private double _lastMinimapOx;
+    private double _lastMinimapOy;
+    private double _lastMinimapZoom;
+
     public MainWindow()
     {
         InitializeComponent();
@@ -29,6 +33,8 @@ public partial class MainWindow : Window
                 InvalidateCamera = UpdateCameraTransform,
                 InvalidatePage = () =>
                 {
+                    PageLayer.MotionBlurEnabled = vm.Config.MotionBlur;
+                    PageLayer.MotionBlurIntensity = vm.Config.MotionBlurIntensity;
                     PageLayer.InvalidateVisual();
                     Minimap.InvalidateVisual();
                 },
@@ -107,6 +113,8 @@ public partial class MainWindow : Window
     {
         PageLayer.Tab = tab;
         PageLayer.ColourEffects = Vm?.ColourEffects;
+        PageLayer.MotionBlurEnabled = Vm?.Config.MotionBlur ?? true;
+        PageLayer.MotionBlurIntensity = Vm?.Config.MotionBlurIntensity ?? 0.5;
         OverlayLayer.Tab = tab;
         OverlayLayer.ColourEffects = Vm?.ColourEffects;
 
@@ -115,8 +123,7 @@ public partial class MainWindow : Window
         {
             tab.OnDpiRenderComplete = () =>
             {
-                PageLayer.InvalidateVisual();
-                Minimap.InvalidateVisual();
+                Vm?.RequestAnimationFrame();
             };
         }
     }
@@ -137,7 +144,17 @@ public partial class MainWindow : Window
                        tab.Camera.OffsetX, tab.Camera.OffsetY));
         PagePanel.Width = tab.PageWidth;
         PagePanel.Height = tab.PageHeight;
-        Minimap.InvalidateVisual();
+
+        const double threshold = 0.5;
+        if (Math.Abs(tab.Camera.OffsetX - _lastMinimapOx) > threshold ||
+            Math.Abs(tab.Camera.OffsetY - _lastMinimapOy) > threshold ||
+            Math.Abs(tab.Camera.Zoom - _lastMinimapZoom) > 0.001)
+        {
+            _lastMinimapOx = tab.Camera.OffsetX;
+            _lastMinimapOy = tab.Camera.OffsetY;
+            _lastMinimapZoom = tab.Camera.Zoom;
+            Minimap.InvalidateVisual();
+        }
     }
 
     /// <summary>

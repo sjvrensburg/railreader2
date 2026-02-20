@@ -39,6 +39,8 @@ public partial class SettingsWindow : Window
         if (Vm is not { } vm) return;
         var c = vm.Config;
         FontScale.Value = (decimal)c.UiFontScale;
+        MotionBlurCheck.IsChecked = c.MotionBlur;
+        BlurIntensitySlider.Value = c.MotionBlurIntensity;
         ZoomThreshold.Value = (decimal)c.RailZoomThreshold;
         SnapDuration.Value = (decimal)c.SnapDurationMs;
         ScrollStart.Value = (decimal)c.ScrollSpeedStart;
@@ -91,6 +93,22 @@ public partial class SettingsWindow : Window
         vm.OnConfigChanged();
     }
 
+    private void OnMotionBlurChanged(object? sender, RoutedEventArgs e)
+    {
+        if (Vm is not { } vm || _loading) return;
+        vm.Config.MotionBlur = MotionBlurCheck.IsChecked == true;
+        vm.OnConfigChanged();
+    }
+
+    private void OnBlurIntensityChanged(object? sender, Avalonia.AvaloniaPropertyChangedEventArgs e)
+    {
+        if (e.Property.Name == "Value" && Vm is { } vm && !_loading)
+        {
+            vm.Config.MotionBlurIntensity = BlurIntensitySlider.Value;
+            vm.OnConfigChanged();
+        }
+    }
+
     private void OnSettingChanged(object? sender, NumericUpDownValueChangedEventArgs e) => SaveToConfig();
     private void OnEffectChanged(object? sender, SelectionChangedEventArgs e)
     {
@@ -116,6 +134,8 @@ public partial class SettingsWindow : Window
         vm.Config.UiFontScale = defaults.UiFontScale;
         vm.Config.ColourEffect = defaults.ColourEffect;
         vm.Config.ColourEffectIntensity = defaults.ColourEffectIntensity;
+        vm.Config.MotionBlur = defaults.MotionBlur;
+        vm.Config.MotionBlurIntensity = defaults.MotionBlurIntensity;
         vm.Config.NavigableClasses = LayoutConstants.DefaultNavigableClasses();
         _loading = true;
         LoadFromConfig();
