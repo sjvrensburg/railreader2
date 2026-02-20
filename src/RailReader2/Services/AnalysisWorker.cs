@@ -78,8 +78,7 @@ public sealed class AnalysisWorker : IDisposable
             await foreach (var request in _requestChannel.Reader.ReadAllAsync(ct))
             {
                 Console.Error.WriteLine($"[Worker] Running ONNX for {Path.GetFileName(request.FilePath)} page {request.Page}...");
-                PageAnalysis analysis;
-                analysis = analyzer.RunAnalysis(
+                var analysis = analyzer.RunAnalysis(
                     request.RgbBytes, request.PxW, request.PxH, request.PageW, request.PageH);
                 Console.Error.WriteLine($"[Worker] Page {request.Page}: {analysis.Blocks.Count} blocks detected");
 

@@ -14,7 +14,7 @@
             <Separator />
             <StackPanel Orientation="Horizontal" Spacing="8">
                 <TextBlock Text="UI Font Scale:" VerticalAlignment="Center" Width="140" />
-                <NumericUpDown Name="FontScale" Value="1.0"
+                <NumericUpDown Name="FontScale" Value="1.25"
                                Minimum="0.75" Maximum="2.0" Increment="0.05"
                                FormatString="F2" Width="130"
                                ValueChanged="OnSettingChanged" />
@@ -24,7 +24,7 @@
             <StackPanel Orientation="Horizontal" Spacing="8">
                 <TextBlock Text="Blur amount:" VerticalAlignment="Center" Width="140" />
                 <Slider Name="BlurIntensitySlider" Minimum="0" Maximum="1"
-                        Value="0.5" Width="150"
+                        Value="0.33" Width="150"
                         PropertyChanged="OnBlurIntensityChanged" />
             </StackPanel>
 
@@ -72,7 +72,7 @@
             </StackPanel>
             <StackPanel Orientation="Horizontal" Spacing="8">
                 <TextBlock Text="Scroll speed max:" VerticalAlignment="Center" Width="140" />
-                <NumericUpDown Name="ScrollMax" Value="50"
+                <NumericUpDown Name="ScrollMax" Value="30"
                                Minimum="10" Maximum="500" Increment="5"
                                FormatString="F0" Width="130"
                                ValueChanged="OnSettingChanged" />

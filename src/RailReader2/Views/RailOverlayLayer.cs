@@ -29,7 +29,10 @@ public class RailOverlayLayer : Control
     public override void Render(DrawingContext context)
     {
         base.Render(context);
-        context.Custom(new OverlayDrawOperation(new Rect(0, 0, Bounds.Width, Bounds.Height), Tab, ColourEffects));
+        var tab = Tab;
+        double w = tab?.PageWidth > 0 ? tab.PageWidth : Bounds.Width;
+        double h = tab?.PageHeight > 0 ? tab.PageHeight : Bounds.Height;
+        context.Custom(new OverlayDrawOperation(new Rect(0, 0, w, h), tab, ColourEffects));
     }
 
     private sealed class OverlayDrawOperation : ICustomDrawOperation
@@ -61,14 +64,12 @@ public class RailOverlayLayer : Control
             var tab = _tab;
             if (tab is null) return;
 
-            // Rail overlays — drawn in page coordinates (no camera transform)
             if (tab.Rail.Active && tab.Rail.HasAnalysis)
             {
-                var palette = (_effects ?? new ColourEffectShaders()).Effect.GetOverlayPalette();
-                DrawRailOverlays(canvas, tab, palette);
+                var effect = _effects?.Effect ?? ColourEffect.None;
+                DrawRailOverlays(canvas, tab, effect.GetOverlayPalette());
             }
 
-            // Debug overlay
             if (tab.DebugOverlay && tab.AnalysisCache.TryGetValue(tab.CurrentPage, out var debugAnalysis))
                 DrawDebugOverlay(canvas, tab, debugAnalysis);
         }
@@ -84,7 +85,6 @@ public class RailOverlayLayer : Control
 
             var pageRect = SKRect.Create(0, 0, (float)tab.PageWidth, (float)tab.PageHeight);
 
-            // Dim
             using var dimPaint = new SKPaint { Color = palette.Dim };
             if (palette.DimExcludesBlock)
             {
@@ -98,7 +98,6 @@ public class RailOverlayLayer : Control
                 canvas.DrawRect(pageRect, dimPaint);
             }
 
-            // Block reveal
             if (!palette.DimExcludesBlock && palette.BlockReveal is var (revealColor, blendMode))
             {
                 canvas.Save();
@@ -110,7 +109,6 @@ public class RailOverlayLayer : Control
 
             var bboxRect = BBoxToRect(block.BBox);
 
-            // Block outline
             using var outlinePaint = new SKPaint
             {
                 Color = palette.BlockOutline,
@@ -120,7 +118,6 @@ public class RailOverlayLayer : Control
             };
             canvas.DrawRect(bboxRect, outlinePaint);
 
-            // Line highlight
             var line = tab.Rail.CurrentLineInfo;
             using var linePaint = new SKPaint { Color = palette.LineHighlight };
             canvas.DrawRect(SKRect.Create(block.BBox.X, line.Y - line.Height / 2, block.BBox.W, line.Height), linePaint);

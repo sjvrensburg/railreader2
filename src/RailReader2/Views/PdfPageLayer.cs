@@ -62,8 +62,8 @@ public class PdfPageLayer : Control
 
         public void Render(ImmediateDrawingContext context)
         {
-            var leaseFeature = context.TryGetFeature(typeof(ISkiaSharpApiLeaseFeature)) as ISkiaSharpApiLeaseFeature;
-            if (leaseFeature is null) return;
+            if (context.TryGetFeature(typeof(ISkiaSharpApiLeaseFeature)) is not ISkiaSharpApiLeaseFeature leaseFeature)
+                return;
 
             using var lease = leaseFeature.Lease();
             var canvas = lease.SkCanvas;
@@ -71,7 +71,6 @@ public class PdfPageLayer : Control
             var tab = _tab;
             if (tab?.CachedImage is not { } image) return;
 
-            // Apply colour effect via SaveLayer if active
             var effectPaint = _effects?.CreatePaint();
 
             // Motion blur: horizontal during rail scroll, uniform during zoom.
@@ -101,24 +100,23 @@ public class PdfPageLayer : Control
                     blurFilter = SKImageFilter.CreateBlur(sigmaX, sigmaY);
             }
 
+            SKPaint? layerPaint = null;
             if (effectPaint is not null || blurFilter is not null)
             {
-                var layerPaint = effectPaint ?? new SKPaint();
+                layerPaint = effectPaint ?? new SKPaint();
                 if (blurFilter is not null)
                     layerPaint.ImageFilter = blurFilter;
                 canvas.SaveLayer(layerPaint);
             }
 
-            // Draw page image scaled to page dimensions (points)
-            // No camera transform here — that's handled by the parent's RenderTransform
             var destRect = SKRect.Create(0, 0, (float)tab.PageWidth, (float)tab.PageHeight);
             var sampling = new SKSamplingOptions(SKCubicResampler.Mitchell);
             canvas.DrawImage(image, destRect, sampling);
 
-            if (effectPaint is not null || blurFilter is not null)
+            if (layerPaint is not null)
             {
                 canvas.Restore();
-                effectPaint?.Dispose();
+                layerPaint.Dispose();
                 blurFilter?.Dispose();
             }
         }

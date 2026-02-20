@@ -9,14 +9,14 @@ public sealed class AppConfig
     public double RailZoomThreshold { get; set; } = 3.0;
     public double SnapDurationMs { get; set; } = 300.0;
     public double ScrollSpeedStart { get; set; } = 10.0;
-    public double ScrollSpeedMax { get; set; } = 50.0;
+    public double ScrollSpeedMax { get; set; } = 30.0;
     public double ScrollRampTime { get; set; } = 1.5;
     public int AnalysisLookaheadPages { get; set; } = 2;
-    public float UiFontScale { get; set; } = 1.0f;
+    public float UiFontScale { get; set; } = 1.25f;
     public ColourEffect ColourEffect { get; set; } = ColourEffect.None;
     public double ColourEffectIntensity { get; set; } = 1.0;
     public bool MotionBlur { get; set; } = true;
-    public double MotionBlurIntensity { get; set; } = 0.5;
+    public double MotionBlurIntensity { get; set; } = 0.33;
 
     [JsonConverter(typeof(NavigableClassesConverter))]
     public HashSet<int> NavigableClasses { get; set; } = LayoutConstants.DefaultNavigableClasses();

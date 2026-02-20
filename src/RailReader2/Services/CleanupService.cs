@@ -31,14 +31,16 @@ public static class CleanupService
         return $"Removed {filesRemoved} file(s), freed {bytesFreed / 1024.0:F1} KB.";
     }
 
+    private static bool IsProtectedFile(string name) =>
+        name is "config.json" || name.EndsWith(".lock") || name.EndsWith(".onnx");
+
     private static void CleanDirectory(string dir, ref int filesRemoved, ref long bytesFreed)
     {
         try
         {
             foreach (var entry in Directory.EnumerateFileSystemEntries(dir))
             {
-                var name = Path.GetFileName(entry);
-                if (name is "config.json" || name.EndsWith(".lock") || name.EndsWith(".onnx"))
+                if (IsProtectedFile(Path.GetFileName(entry)))
                     continue;
 
                 if (File.Exists(entry))
@@ -70,9 +72,7 @@ public static class CleanupService
             foreach (var file in Directory.EnumerateFiles(dir))
             {
                 if (!file.EndsWith(extension, StringComparison.OrdinalIgnoreCase)) continue;
-                var name = Path.GetFileName(file);
-                if (name is "config.json" || name.EndsWith(".lock") || name.EndsWith(".onnx"))
-                    continue;
+                if (IsProtectedFile(Path.GetFileName(file))) continue;
 
                 try
                 {

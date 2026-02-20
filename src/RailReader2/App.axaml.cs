@@ -18,7 +18,6 @@ public partial class App : Application
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
-            // Show splash screen while heavy initialization runs
             var splash = new SplashWindow();
             desktop.MainWindow = splash;
             splash.Show();
@@ -30,19 +29,11 @@ public partial class App : Application
             var window = new MainWindow { DataContext = vm };
             vm.SetWindow(window);
 
-            // Swap main window in once it's ready
-            window.Opened += (_, _) =>
-            {
-                splash.Close();
-            };
+            window.Opened += (_, _) => splash.Close();
             desktop.MainWindow = window;
 
-            // Open PDF from command line argument (deferred until window is shown)
             if (desktop.Args is { Length: > 0 } && File.Exists(desktop.Args[0]))
-            {
-                var pdfPath = desktop.Args[0];
-                window.Opened += (_, _) => vm.OpenDocument(pdfPath);
-            }
+                window.Opened += (_, _) => vm.OpenDocument(desktop.Args[0]);
 
             window.Show();
         }

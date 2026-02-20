@@ -18,7 +18,7 @@ public partial class NavigableClassItem : ObservableObject
 public partial class SettingsWindow : Window
 {
     private bool _loading = true;
-    private ObservableCollection<NavigableClassItem> _classItems = [];
+    private ObservableCollection<NavigableClassItem> _classItems = new();
 
     public SettingsWindow()
     {
@@ -50,8 +50,7 @@ public partial class SettingsWindow : Window
         EffectCombo.SelectedIndex = (int)c.ColourEffect;
         IntensitySlider.Value = c.ColourEffectIntensity;
 
-        // Navigable classes
-        _classItems = [];
+        _classItems.Clear();
         for (int i = 0; i < LayoutConstants.LayoutClasses.Length; i++)
         {
             var item = new NavigableClassItem
@@ -88,8 +87,10 @@ public partial class SettingsWindow : Window
     private void OnNavigableClassChanged()
     {
         if (Vm is not { } vm || _loading) return;
-        vm.Config.NavigableClasses = new HashSet<int>(
-            _classItems.Where(item => item.IsChecked).Select(item => item.ClassId));
+        vm.Config.NavigableClasses = _classItems
+            .Where(item => item.IsChecked)
+            .Select(item => item.ClassId)
+            .ToHashSet();
         vm.OnConfigChanged();
     }
 

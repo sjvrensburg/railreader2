@@ -197,10 +197,7 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"Failed to prepare analysis input: {ex.Message}");
-                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-                {
-                    PendingRailSetup = false;
-                });
+                Avalonia.Threading.Dispatcher.UIThread.Post(() => PendingRailSetup = false);
             }
         });
     }
