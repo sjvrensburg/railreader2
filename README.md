@@ -45,6 +45,9 @@ At high zoom levels, navigation switches to "rail mode" — the viewer locks ont
 - **Disk cleanup** — removes cache, old logs, temp files (Help → Clean Up Temp Files)
 - **Analysis lookahead** — pre-analyzes upcoming pages in the background for instant navigation
 - **Colour effects** — GPU-accelerated accessibility filters (High Contrast, High Visibility, Amber, Invert) with adjustable intensity
+- **Motion blur** — subtle directional blur during horizontal scroll and zoom for perceptual smoothness, with configurable intensity
+- **Splash screen** — startup splash while ONNX model loads
+- **Analysis indicator** — status bar shows "Analyzing..." during layout inference
 - **Debug overlay** — visualise detected layout blocks with class labels and confidence
 
 ## Usage
@@ -89,15 +92,17 @@ Rail reading parameters are editable via the Settings panel (gear icon in menu b
   "rail_zoom_threshold": 3.0,
   "snap_duration_ms": 300.0,
   "scroll_speed_start": 10.0,
-  "scroll_speed_max": 50.0,
+  "scroll_speed_max": 30.0,
   "scroll_ramp_time": 1.5,
   "analysis_lookahead_pages": 2,
-  "ui_font_scale": 1.0,
+  "ui_font_scale": 1.25,
   "colour_effect": "None",
   "colour_effect_intensity": 1.0,
+  "motion_blur": true,
+  "motion_blur_intensity": 0.33,
   "navigable_classes": [
-    "abstract", "algorithm", "aside_text", "document_title",
-    "footnote", "paragraph_title", "references", "text"
+    "abstract", "algorithm", "display_formula",
+    "footnote", "paragraph_title", "text"
   ]
 }
 ```
@@ -113,7 +118,9 @@ Rail reading parameters are editable via the Settings panel (gear icon in menu b
 | `ui_font_scale` | UI font size multiplier (e.g. `1.25` for 25% larger text) |
 | `colour_effect` | Colour filter: `None`, `HighContrast`, `HighVisibility`, `Amber`, `Invert` |
 | `colour_effect_intensity` | Effect intensity from 0.0 (off) to 1.0 (full) |
-| `navigable_classes` | Which block types rail mode navigates (array of class names). Configurable via Settings → Advanced. Add `"formula"` to include formulas, remove `"document_title"` to skip headings, etc. |
+| `motion_blur` | Enable subtle directional blur during scroll and zoom (`true`/`false`) |
+| `motion_blur_intensity` | Motion blur strength from 0.0 (off) to 1.0 (maximum) |
+| `navigable_classes` | Which block types rail mode navigates (array of class names). Configurable via Settings → Advanced. Add `"display_formula"` to include formulas, remove `"paragraph_title"` to skip headings, etc. |
 
 ## Building
 

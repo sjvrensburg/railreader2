@@ -17,12 +17,6 @@ public partial class MinimapControl : UserControl
     public MinimapControl()
     {
         InitializeComponent();
-        ClipToBounds = true;
-        Width = 180;
-        Height = 240;
-        HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right;
-        VerticalAlignment = Avalonia.Layout.VerticalAlignment.Bottom;
-        Margin = new Thickness(0, 0, 10, 10);
     }
 
     public override void Render(DrawingContext context)

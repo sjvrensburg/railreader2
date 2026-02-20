@@ -71,7 +71,8 @@ src/RailReader2/
     ├── SettingsWindow.axaml/.cs    # Live-editable settings panel
     ├── ShortcutsDialog.axaml/.cs   # Keyboard shortcuts help dialog (F1)
     ├── AboutDialog.axaml/.cs       # Version info and credits
-    └── LoadingOverlay.axaml/.cs    # Loading spinner overlay
+    ├── LoadingOverlay.axaml/.cs    # Loading spinner overlay
+    └── SplashWindow.axaml/.cs      # Startup splash screen
 installer/
 ├── railreader2.iss             # Inno Setup script for Windows installer
 ├── icon.ico                    # Generated from PNG at CI time (gitignored)
@@ -93,6 +94,8 @@ scripts/
 - **MVVM**: CommunityToolkit.Mvvm source generators (`[ObservableProperty]`, `[RelayCommand]`). Performance-sensitive paths (camera transforms, canvas invalidation) use direct method calls and `InvalidationCallbacks` for granular repaint targeting rather than pure data binding.
 - **Colour effects**: Four SkSL shaders compiled at startup via `SKRuntimeEffect.CreateColorFilter()` — HighContrast (luminance inversion + S-curve), HighVisibility (yellow-on-black), Amber (warm tint), Invert. Applied via `canvas.SaveLayer(paint)` around page drawing. Each effect has a matching `OverlayPalette` for rail overlay colours.
 - **Compositor camera**: `MainWindow.UpdateCameraTransform()` applies a `MatrixTransform` to `CameraPanel` for GPU-compositor-level pan/zoom — bitmap doesn't repaint on every frame, only on DPI changes. `GetWindowSize()` returns the actual viewport bounds (fed by `Viewport.SizeChanged`), not the full window `ClientSize`, so `CenterPage` positions correctly.
+- **Motion blur**: Subtle directional blur during rail horizontal scroll (horizontal-only) and zoom (uniform). Uses a cubic speed curve (`speed^3 * maxSigma * intensity`) so blur stays barely perceptible at low/medium speeds. Configurable via `motion_blur` (toggle) and `motion_blur_intensity` (0.0–1.0) in config/Settings. `Camera.ZoomSpeed` tracks zoom velocity with exponential decay (~80ms half-life); `RailNav.ScrollSpeed` is the normalized instantaneous scroll speed. Applied via `SKImageFilter.CreateBlur` in `PdfPageLayer`.
+- **Splash screen**: `SplashWindow` shows immediately on startup while config loads and ONNX worker initializes. Closed when the main window opens. Status bar shows "Analyzing..." while ONNX inference is in progress for the current page (`PendingRailSetup`).
 - **Startup sequencing**: `window.Opened` can fire before `MainWindow.OnLoaded` finishes wiring `_invalidation`. `OnLoaded` guards against this by re-centering and forcing a camera update if a tab is already present. `PdfPageLayer.Render` uses tab page dimensions for the draw-op bounds (not `Bounds.Width/Height`) so the compositor does not cull the draw operation before the first layout pass completes.
 - **Multi-tab**: `TabViewModel` holds per-document state (PDF, camera, rail nav, analysis cache, outline, cached bitmap, minimap thumbnail). `MainWindowViewModel` owns the tab collection and shared resources (ONNX session, config, shaders).
 
@@ -113,15 +116,17 @@ Config file location: `~/.config/railreader2/config.json` (Linux) or `%APPDATA%\
   "rail_zoom_threshold": 3.0,
   "snap_duration_ms": 300.0,
   "scroll_speed_start": 10.0,
-  "scroll_speed_max": 50.0,
+  "scroll_speed_max": 30.0,
   "scroll_ramp_time": 1.5,
   "analysis_lookahead_pages": 2,
-  "ui_font_scale": 1.0,
+  "ui_font_scale": 1.25,
   "colour_effect": "None",
   "colour_effect_intensity": 1.0,
+  "motion_blur": true,
+  "motion_blur_intensity": 0.33,
   "navigable_classes": [
-    "abstract", "algorithm", "aside_text", "document_title",
-    "footnote", "paragraph_title", "references", "text"
+    "abstract", "algorithm", "display_formula",
+    "footnote", "paragraph_title", "text"
   ]
 }
 ```

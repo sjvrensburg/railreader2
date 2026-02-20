@@ -43,10 +43,7 @@ public sealed class PdfService : IDisposable
     /// </summary>
     public (byte[] RgbBytes, int Width, int Height) RenderPagePixmap(int pageIndex, int targetSize)
     {
-        var (pageW, pageH) = GetPageSize(pageIndex);
-        double scale = Math.Min(targetSize / pageW, targetSize / pageH);
-        int pixW = Math.Max(1, (int)(pageW * scale));
-        int pixH = Math.Max(1, (int)(pageH * scale));
+        var (pixW, pixH) = FitPageToTarget(pageIndex, targetSize);
 
         using var bitmap = Conversion.ToImage(_pdfBytes, page: pageIndex,
             options: new RenderOptions(Width: pixW, Height: pixH));
@@ -74,14 +71,16 @@ public sealed class PdfService : IDisposable
     /// </summary>
     public SKBitmap RenderThumbnail(int pageIndex)
     {
-        // Target a thumbnail that fits within 200×280 at the page's natural aspect.
-        const int TargetSize = 200;
-        var (pageW, pageH) = GetPageSize(pageIndex);
-        double scale = Math.Min(TargetSize / pageW, TargetSize / pageH);
-        int pixW = Math.Max(1, (int)(pageW * scale));
-        int pixH = Math.Max(1, (int)(pageH * scale));
+        var (pixW, pixH) = FitPageToTarget(pageIndex, 200);
         return Conversion.ToImage(_pdfBytes, page: pageIndex,
             options: new RenderOptions(Width: pixW, Height: pixH));
+    }
+
+    private (int Width, int Height) FitPageToTarget(int pageIndex, int targetSize)
+    {
+        var (pageW, pageH) = GetPageSize(pageIndex);
+        double scale = Math.Min(targetSize / pageW, targetSize / pageH);
+        return (Math.Max(1, (int)(pageW * scale)), Math.Max(1, (int)(pageH * scale)));
     }
 
     /// <summary>
@@ -90,11 +89,7 @@ public sealed class PdfService : IDisposable
     /// </summary>
     public static int CalculateRenderDpi(double zoom)
     {
-        // Scale DPI with zoom for sharp text at all zoom levels.
-        // At zoom=1 → 150 DPI (overview), zoom=3 → 450 DPI (rail mode sharp text).
-        // Cap at 600 DPI to avoid excessively large bitmaps (~35 MP for A4).
-        int dpi = Math.Max(150, (int)(zoom * 150));
-        return Math.Min(dpi, 600);
+        return Math.Clamp((int)(zoom * 150), 150, 600);
     }
 
     public void Dispose() { }

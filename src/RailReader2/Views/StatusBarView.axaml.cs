@@ -50,15 +50,13 @@ public partial class StatusBarView : UserControl
 
     private static Button MakeNavButton(string text, EventHandler<RoutedEventArgs> handler)
     {
-        var btn = new Button
-        {
-            Content = text,
-            Padding = new Avalonia.Thickness(6, 0),
-            MinWidth = 0,
-        };
+        var btn = new Button { Content = text, Padding = new Avalonia.Thickness(6, 0), MinWidth = 0 };
         btn.Click += handler;
         return btn;
     }
+
+    private void AddSeparator() =>
+        StatusPanel.Children.Add(new TextBlock { Text = "|", Opacity = 0.5 });
 
     private void UpdateStatus()
     {
@@ -81,12 +79,12 @@ public partial class StatusBarView : UserControl
         });
         StatusPanel.Children.Add(MakeNavButton("▶", (_, _) =>
         { if (vm?.ActiveTab is { } t) vm.GoToPage(t.CurrentPage + 1); }));
-        StatusPanel.Children.Add(new TextBlock { Text = "|", Opacity = 0.5 });
+        AddSeparator();
         StatusPanel.Children.Add(new TextBlock { Text = $"Zoom: {zoomPct}%" });
 
         if (tab.PendingRailSetup)
         {
-            StatusPanel.Children.Add(new TextBlock { Text = "|", Opacity = 0.5 });
+            AddSeparator();
             StatusPanel.Children.Add(new TextBlock
             {
                 Text = "Analyzing…",
@@ -96,13 +94,13 @@ public partial class StatusBarView : UserControl
         }
         else if (tab.Rail.Active)
         {
-            StatusPanel.Children.Add(new TextBlock { Text = "|", Opacity = 0.5 });
+            AddSeparator();
             StatusPanel.Children.Add(new TextBlock
             {
                 Text = $"Block {tab.Rail.CurrentBlock + 1}/{tab.Rail.NavigableCount} | " +
                        $"Line {tab.Rail.CurrentLine + 1}/{tab.Rail.CurrentLineCount}"
             });
-            StatusPanel.Children.Add(new TextBlock { Text = "|", Opacity = 0.5 });
+            AddSeparator();
             StatusPanel.Children.Add(new TextBlock
             {
                 Text = "Rail Mode",

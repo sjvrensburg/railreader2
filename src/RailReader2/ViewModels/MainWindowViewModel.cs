@@ -13,7 +13,6 @@ namespace RailReader2.ViewModels;
 public sealed partial class MainWindowViewModel : ObservableObject
 {
     private const double ZoomStep = 1.25;
-    private const double ScrollPixelsPerLine = 30.0;
     private const double ZoomScrollSensitivity = 0.003;
     private const double PanStep = 50.0;
 
@@ -140,14 +139,14 @@ public sealed partial class MainWindowViewModel : ObservableObject
             InvalidatePage();
         }
 
-        if (animating)
-            InvalidateCamera();
         if (gotResults)
             InvalidateOverlay();
 
-        // Keep the animation loop going while there's motion
         if (animating)
+        {
+            InvalidateCamera();
             RequestAnimationFrame();
+        }
 
         _frameTimer.Restart();
     }
@@ -155,11 +154,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private bool PollAnalysisResults()
     {
         bool got = false;
+        var (ww, wh) = GetWindowSize();
         while (_worker.Poll() is { } result)
         {
             got = true;
             Console.Error.WriteLine($"[Analysis] Got result for {Path.GetFileName(result.FilePath)} page {result.Page}: {result.Analysis.Blocks.Count} blocks");
-            var (ww, wh) = GetWindowSize();
             foreach (var tab in Tabs)
             {
                 // Only apply results to the tab that owns this file
@@ -431,10 +430,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             tab.Camera.OffsetY -= PanStep;
             tab.ClampCamera(ww, wh);
         }
-        InvalidateCamera();
-        InvalidateOverlay();
-        OnPropertyChanged(nameof(ActiveTab));
-        RequestAnimationFrame();
+        InvalidateNavigation();
     }
 
     public void HandleArrowUp()
@@ -462,10 +458,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             tab.Camera.OffsetY += PanStep;
             tab.ClampCamera(ww, wh);
         }
-        InvalidateCamera();
-        InvalidateOverlay();
-        OnPropertyChanged(nameof(ActiveTab));
-        RequestAnimationFrame();
+        InvalidateNavigation();
     }
 
     public void HandleArrowRight() => HandleHorizontalArrow(ScrollDirection.Forward, -PanStep);
@@ -507,10 +500,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             tab.Rail.CurrentLine = 0;
             var (ww, wh) = GetWindowSize();
             tab.StartSnap(ww, wh);
-            InvalidateCamera();
-            InvalidateOverlay();
-            OnPropertyChanged(nameof(ActiveTab));
-            RequestAnimationFrame();
+            InvalidateNavigation();
         }
     }
 
@@ -588,6 +578,14 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private void InvalidatePage() => Invalidate(_invalidation?.InvalidatePage);
     private void InvalidateOverlay() => Invalidate(_invalidation?.InvalidateOverlay);
 
+    private void InvalidateNavigation()
+    {
+        InvalidateCamera();
+        InvalidateOverlay();
+        OnPropertyChanged(nameof(ActiveTab));
+        RequestAnimationFrame();
+    }
+
     private void InvalidateAll()
     {
         InvalidateCamera();
@@ -595,13 +593,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         InvalidateOverlay();
     }
 
-    /// <summary>
-    /// Called by MinimapControl to trigger camera-only update.
-    /// </summary>
-    public void RequestCameraUpdate()
-    {
-        InvalidateCamera();
-    }
+    public void RequestCameraUpdate() => InvalidateCamera();
 }
 
 public sealed class InvalidationCallbacks

@@ -44,13 +44,9 @@ public static class LayoutConstants
     [
         0,  // abstract
         1,  // algorithm
-        2,  // aside_text
-        4,  // content
-        6,  // doc_title
+        5,  // display_formula
         10, // footnote
         17, // paragraph_title
-        18, // reference
-        19, // reference_content
         22, // text
     ];
 

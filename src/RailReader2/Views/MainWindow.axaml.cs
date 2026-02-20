@@ -41,7 +41,6 @@ public partial class MainWindow : Window
                 InvalidateOverlay = () => OverlayLayer.InvalidateVisual(),
             });
 
-            // Legacy fallback (for any code still calling SetInvalidateCanvas)
             vm.SetInvalidateCanvas(() =>
             {
                 UpdateCameraTransform();
@@ -65,7 +64,6 @@ public partial class MainWindow : Window
                 }
             };
 
-            // Wire up initial tab state
             UpdateLayerBindings(vm.ActiveTab);
 
             // window.Opened (which calls OpenDocument) can fire before OnLoaded
@@ -101,8 +99,7 @@ public partial class MainWindow : Window
                         break;
                     case nameof(MainWindowViewModel.ShowSettings) when vm.ShowSettings:
                         vm.ShowSettings = false;
-                        var settings = new SettingsWindow { DataContext = vm, FontSize = vm.CurrentFontSize };
-                        settings.ShowDialog(this);
+                        new SettingsWindow { DataContext = vm, FontSize = vm.CurrentFontSize }.ShowDialog(this);
                         break;
                 }
             };
@@ -118,14 +115,8 @@ public partial class MainWindow : Window
         OverlayLayer.Tab = tab;
         OverlayLayer.ColourEffects = Vm?.ColourEffects;
 
-        // Wire DPI render callback so page layer refreshes when bitmap upgrades
         if (tab is not null)
-        {
-            tab.OnDpiRenderComplete = () =>
-            {
-                Vm?.RequestAnimationFrame();
-            };
-        }
+            tab.OnDpiRenderComplete = () => Vm?.RequestAnimationFrame();
     }
 
     private void UpdateCameraTransform()

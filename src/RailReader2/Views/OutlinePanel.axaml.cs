@@ -34,10 +34,7 @@ public partial class OutlinePanel : UserControl
 
     private void OnOutlineSelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
-        if (Vm is not { } vm) return;
-        if (OutlineTree.SelectedItem is OutlineEntry { Page: { } page })
-        {
+        if (Vm is { } vm && OutlineTree.SelectedItem is OutlineEntry { Page: { } page })
             vm.GoToPage(page);
-        }
     }
 }
