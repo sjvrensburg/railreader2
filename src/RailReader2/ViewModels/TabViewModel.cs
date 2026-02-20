@@ -228,6 +228,11 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
     public bool SubmitPendingLookahead(AnalysisWorker worker)
     {
         if (!worker.IsIdle) return false;
+        // Don't steal the worker for lookahead while the current page's
+        // analysis is still being prepared (Task.Run pixmap render → Post).
+        // Without this guard, the lookahead submits synchronously before
+        // the current page's async Post runs, delaying rail setup.
+        if (PendingRailSetup) return false;
 
         while (PendingAnalysis.Count > 0)
         {
