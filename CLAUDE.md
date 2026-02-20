@@ -138,6 +138,159 @@ The `navigable_classes` array controls which PP-DocLayoutV3 block types are navi
 - **PdfOutlineExtractor** uses direct PDFium P/Invoke (`FPDF_*` / `FPDFBookmark_*`) since `PDFtoImage` doesn't expose the bookmark API.
 - SkiaSharp 3.x is explicitly referenced to override Avalonia 11's bundled SkiaSharp 2.88 — required for `SKRuntimeEffect.CreateColorFilter()` used by colour effect shaders.
 - No unit tests currently exist in the project.
+- **Outdated documentation**: TODO.md and DISTRIBUTION.md reference Rust implementation (cargo, rail.rs, config.rs). These are legacy files from a previous Rust version and should be disregarded; the current implementation is C#/.NET.
+
+## Debugging & Development
+
+### Debug Overlay
+
+Press `Shift+D` to toggle the debug overlay, which visualizes:
+- Detected layout blocks with bounding boxes and class labels
+- Confidence scores for each detected region
+- Reading order predictions (numbers within blocks)
+- Navigation anchor points in rail mode
+
+This is invaluable for understanding why rail navigation might skip blocks or for validating ONNX model output on specific PDFs.
+
+### Testing Rail Mode
+
+Rail mode activates at the configurable `rail_zoom_threshold` (default 3.0x). To test:
+1. Open a PDF with a complex layout (multi-column, footnotes, etc.)
+2. Zoom to >3x (use `+` key or mouse wheel)
+3. Press `Shift+D` to see detected blocks
+4. Use arrow keys or `W/A/S/D` to navigate
+
+If blocks are not detected or reading order is incorrect, first check that the ONNX model was downloaded via `./scripts/download-model.sh`.
+
+### Layout Analysis Fallback
+
+If the ONNX model is missing or fails to load, layout analysis falls back to simple horizontal strip detection. This is still usable but provides no reading order or semantic block classification. Watch the startup logs for model loading status.
+
+### Performance Profiling
+
+- **Frame rate**: The animation loop targets the display refresh rate. Monitor CPU/GPU usage in system tools while panning/zooming.
+- **ONNX inference time**: The `AnalysisWorker` logs inference latency. On typical modern hardware, expect ~50-200ms per page (480×800 input).
+- **Memory usage**: PDFs with many pages can accumulate `SKImage` objects. The minimap thumbnail also consumes memory per-tab. Monitor via system tools or Task Manager.
+
+## Common Development Tasks
+
+### Rebuild and test with a specific PDF
+
+```bash
+# Release build is significantly faster than Debug
+dotnet run -c Release --project src/RailReader2 -- /path/to/document.pdf
+```
+
+### Test rail mode parameters without recompiling
+
+Edit `~/.config/railreader2/config.json` (Linux) or `%APPDATA%\railreader2\config.json` (Windows), then restart the app. The Settings panel also provides live editing without restart.
+
+### Iterate on layout detection
+
+1. Open a PDF that shows poor layout detection
+2. Enable debug overlay (`Shift+D`)
+3. If the model is missing, run `./scripts/download-model.sh` and restart
+4. Adjust `navigable_classes` in Settings → Advanced to include/exclude block types
+5. Note: changing which classes are navigable doesn't require ONNX re-inference; line detection runs for all blocks
+
+### Profile DPI scaling behavior
+
+The app automatically selects rasterization DPI based on zoom level (150–600 DPI). To observe DPI tier changes:
+1. Open a PDF at 1x zoom (zoom = 1.0)
+2. Enable debug overlay to watch the bitmap quality
+3. Gradually zoom in; you'll see the bitmap upgrade to higher DPI as you cross thresholds
+4. The 35 MP bitmap cap prevents excessive memory usage on very high zoom levels
+
+### Test multi-tab state isolation
+
+Each tab maintains independent camera position, analysis cache, and outline state. To verify:
+1. Open two PDFs in separate tabs
+2. Zoom and pan the first to a specific location
+3. Switch to the second and zoom/pan differently
+4. Switch back to the first; position should be preserved
+
+### Examine ONNX model output
+
+The `LayoutAnalyzer.InferenceAsync()` method in `Services/LayoutAnalyzer.cs` performs the ONNX inference. The raw `[N, 7]` output tensor is logged before NMS and reading order sorting. Enable application logging to trace model outputs on specific pages.
+
+## Thread Safety & Concurrency
+
+### Thread Model
+
+- **UI thread**: Handles all Avalonia UI updates, keyboard/mouse input, and viewport rendering. Uses standard `InvalidationCallback` for fine-grained repaint targeting.
+- **Analysis Worker thread**: `AnalysisWorker` runs a single dedicated background thread consuming a `Channel<PageAnalysisRequest>`. All ONNX inference happens here, unblocking the UI.
+- **Task Pool threads**: `RenderPagePixmap()` (input pixmap preparation) and DPI upgrades run via `Task.Run()` on the .NET thread pool.
+
+### Safe Cross-Thread Communication
+
+- **Model → UI**: `AnalysisWorker` pushes completed `PageAnalysis` results to `TabViewModel._analysisCache` (a `Dictionary`). This dictionary is accessed only from the UI thread during animation frame polls, avoiding lock contention.
+- **UI → Model**: `MainWindowViewModel.SubmitAnalysisTask()` queues analysis requests on the channel. The channel itself is thread-safe; the marshalling back to the UI thread for dictionary writes is handled inside the worker.
+- **PDFium**: `PdfService` holds a single `PdfDocument` instance per tab. PDFium is not thread-safe for concurrent page access, so all rendering calls must be from the UI thread (they are).
+
+### Avoid Common Pitfalls
+
+- Do not call `PdfService` methods from background threads — PDFium will crash.
+- Do not modify `TabViewModel` properties from the analysis worker — use the `_analysisCache` dictionary or `ObservableProperty` setters only from the UI thread.
+- `InvalidationCallback` delegates execute on the UI thread, so they are safe for property updates.
+
+## Performance Tuning
+
+### DPI Scaling & Bitmap Memory
+
+Rasterization DPI is chosen as: `max(150, min(600, zoom * 150))`, capped to avoid bitmaps exceeding ~35 MP. For a standard A4 PDF (210×297 mm):
+- At 1x zoom: ~150 DPI → ~2 MP
+- At 3x zoom: ~450 DPI → ~18 MP
+- At 5x zoom: 600 DPI (capped) → ~35 MP
+
+If you need to adjust these constants, see `PdfService.RenderPageAsync()` in `Services/PdfService.cs`.
+
+### ONNX Model Cache Efficiency
+
+- **Per-tab analysis cache**: `TabViewModel.AnalysisCache` is a `Dictionary<int, PageAnalysis>` that persists across navigation. Revisiting a previously analyzed page returns the cached result instantly (no re-inference).
+- **Lookahead pre-analysis**: When the analysis worker is idle, it analyzes upcoming pages (controlled by `config.analysis_lookahead_pages`, default 2). Disable lookahead (set to 0) if you need to reduce CPU usage or VRAM pressure on slower machines.
+
+### Minimap Rendering
+
+The minimap draws from `TabViewModel.MinimapBitmap`, a small thumbnail (≤200×280 px) rendered once per page change. This avoids downsampling the full 600 DPI bitmap every frame. If the minimap feels sluggish, the bottleneck is typically `PdfService.RenderThumbnail()` on a slow PDF or large file.
+
+### GPU Colour Effect Shaders
+
+The four colour effect shaders (HighContrast, HighVisibility, Amber, Invert) are compiled once at startup via `SKRuntimeEffect.CreateColorFilter()` and reused. Applying them is GPU-accelerated via `canvas.SaveLayer(paint)`. Performance impact is minimal; the bottleneck is always the PDF rasterization or ONNX inference, not the shader itself.
+
+## Platform-Specific Gotchas
+
+### Windows DPI Scaling
+
+Windows high-DPI displays (125%, 150%, 200%) can interact poorly with PDFium if not handled correctly. The app uses `PdfService.SetupDpiAwareness()` to set process DPI awareness before PDFium initialization. If you see blurry or distorted PDF text on high-DPI monitors:
+1. Check that `app.manifest` includes the DPI awareness declarations
+2. Verify `SetupDpiAwareness()` is called before any PDFium rendering
+3. Test with a simple PDF to isolate whether the issue is app-wide or PDF-specific
+
+### Linux Font Discovery
+
+Avalonia on Linux uses system fontconfig to locate fonts. If the Inter font (specified in the theme) is not installed:
+1. Install via `sudo apt-get install fonts-inter` (Ubuntu/Debian) or equivalent
+2. Alternatively, Avalonia will fall back to the system default serif font (usually acceptable)
+3. In packaged AppImage releases, fontconfig configuration may need adjustment. The AppRun script may need to set `FONTCONFIG_PATH` to point to bundled fonts or system directories.
+
+### macOS (Not Currently Supported)
+
+The CI/Release workflow only builds for Linux (AppImage) and Windows (Inno Setup). macOS support would require:
+- A native macOS runner in CI
+- Testing Avalonia 11, PDFtoImage, and ONNX Runtime on macOS
+- Bundling as a `.app` or `.dmg` via `notarization` if distributing via the App Store
+- Potential code signing and gatekeeper issues
+
+### Model Path Resolution Across Platforms
+
+The model search paths in `FindModelPath()` are tried in order:
+1. `AppContext.BaseDirectory/models/` — works for packaged installers (Windows + Linux AppImage)
+2. `$APPDIR/models/` — Linux AppImage specific
+3. `LocalApplicationData/railreader2/models/` — user data directory (last resort)
+4. `CWD/models/` — development (dotnet run from repo root)
+5. Walk-up (`../models/`, `../../models/`, etc.) — for nested build output directories
+
+If the model is not found, the app logs a warning and falls back to horizontal-strip layout detection. Always run `./scripts/download-model.sh` before first-time use during development.
 
 ## Keyboard Shortcuts
 
