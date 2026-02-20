@@ -13,34 +13,27 @@ public sealed class LayoutAnalyzer : IDisposable
 
     static LayoutAnalyzer()
     {
-        // OnnxRuntime's NativeMethods P/Invokes "onnxruntime" which on Linux resolves
-        // to "onnxruntime.so" or "libonnxruntime.so.dll" etc. — none of which exist.
-        // The actual file is "libonnxruntime.so". Register a resolver to fix this.
-        NativeLibrary.SetDllImportResolver(
-            typeof(InferenceSession).Assembly,
-            (libraryName, assembly, searchPath) =>
-            {
-                if (libraryName is "onnxruntime" or "onnxruntime.dll")
-                {
-                    // Try the standard runtimes directory first
-                    var runtimeDir = Path.Combine(AppContext.BaseDirectory,
-                        "runtimes", RuntimeInformation.RuntimeIdentifier, "native");
-                    var libPath = Path.Combine(runtimeDir, "libonnxruntime.so");
-                    if (File.Exists(libPath) && NativeLibrary.TryLoad(libPath, out var handle))
-                        return handle;
+        // Pre-load the OnnxRuntime native library before OnnxRuntime's own static
+        // initializer runs. NativeLibrary.TryLoad caches the handle so the subsequent
+        // P/Invoke inside OnnxRuntime finds it already loaded — no resolver conflict.
+        // (SetDllImportResolver can only be called once per assembly and OnnxRuntime
+        // registers its own, so we must not use it.)
+        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Linux)) return;
 
-                    // Try linux-x64 explicitly
-                    libPath = Path.Combine(AppContext.BaseDirectory, "runtimes", "linux-x64", "native", "libonnxruntime.so");
-                    if (File.Exists(libPath) && NativeLibrary.TryLoad(libPath, out handle))
-                        return handle;
+        string[] candidates =
+        [
+            Path.Combine(AppContext.BaseDirectory,
+                "runtimes", RuntimeInformation.RuntimeIdentifier, "native", "libonnxruntime.so"),
+            Path.Combine(AppContext.BaseDirectory,
+                "runtimes", "linux-x64", "native", "libonnxruntime.so"),
+            Path.Combine(AppContext.BaseDirectory, "libonnxruntime.so"),
+        ];
 
-                    // Try next to the executable
-                    libPath = Path.Combine(AppContext.BaseDirectory, "libonnxruntime.so");
-                    if (File.Exists(libPath) && NativeLibrary.TryLoad(libPath, out handle))
-                        return handle;
-                }
-                return IntPtr.Zero;
-            });
+        foreach (var path in candidates)
+        {
+            if (File.Exists(path) && NativeLibrary.TryLoad(path, out _))
+                return;
+        }
     }
 
     public LayoutAnalyzer(string modelPath)
@@ -322,25 +315,6 @@ public sealed class LayoutAnalyzer : IDisposable
             if (block.Lines.Count == 0)
                 block.Lines.Add(new LineInfo(block.BBox.Y + block.BBox.H / 2, block.BBox.H));
         }
-    }
-
-    public static PageAnalysis FallbackAnalysis(double pageWidth, double pageHeight)
-    {
-        const int stripCount = 8;
-        float stripH = (float)(pageHeight / stripCount);
-        var blocks = new List<LayoutBlock>();
-        for (int i = 0; i < stripCount; i++)
-        {
-            blocks.Add(new LayoutBlock
-            {
-                BBox = new BBox(0, i * stripH, (float)pageWidth, stripH),
-                ClassId = 2,
-                Confidence = 1.0f,
-                Order = i,
-                Lines = [new LineInfo(i * stripH + stripH / 2, stripH)],
-            });
-        }
-        return new PageAnalysis { Blocks = blocks, PageWidth = pageWidth, PageHeight = pageHeight };
     }
 
     public void Dispose()

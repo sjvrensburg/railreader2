@@ -62,7 +62,6 @@ public sealed class AnalysisWorker : IDisposable
         {
             StartupError = ex.Message;
             Console.Error.WriteLine($"[Worker] FATAL: Failed to create ONNX session: {ex.Message}");
-            // Unwrap inner exceptions for TypeInitializationException etc.
             var inner = ex.InnerException;
             while (inner is not null)
             {
@@ -70,18 +69,7 @@ public sealed class AnalysisWorker : IDisposable
                 inner = inner.InnerException;
             }
             Console.Error.WriteLine($"[Worker] Stack: {ex.StackTrace}");
-            // Drain any pending requests and return fallback results
-            await foreach (var request in _requestChannel.Reader.ReadAllAsync(ct))
-            {
-                Console.Error.WriteLine($"[Worker] Returning fallback for page {request.Page} (no ONNX)");
-                var fallback = LayoutAnalyzer.FallbackAnalysis(request.PageW, request.PageH);
-                await _resultChannel.Writer.WriteAsync(new AnalysisResult
-                {
-                    FilePath = request.FilePath,
-                    Page = request.Page,
-                    Analysis = fallback,
-                }, ct);
-            }
+            _resultChannel.Writer.TryComplete();
             return;
         }
 
@@ -91,17 +79,9 @@ public sealed class AnalysisWorker : IDisposable
             {
                 Console.Error.WriteLine($"[Worker] Running ONNX for {Path.GetFileName(request.FilePath)} page {request.Page}...");
                 PageAnalysis analysis;
-                try
-                {
-                    analysis = analyzer.RunAnalysis(
-                        request.RgbBytes, request.PxW, request.PxH, request.PageW, request.PageH);
-                    Console.Error.WriteLine($"[Worker] Page {request.Page}: {analysis.Blocks.Count} blocks detected");
-                }
-                catch (Exception ex)
-                {
-                    Console.Error.WriteLine($"[Worker] Analysis failed for page {request.Page}: {ex.Message}\n{ex.StackTrace}");
-                    analysis = LayoutAnalyzer.FallbackAnalysis(request.PageW, request.PageH);
-                }
+                analysis = analyzer.RunAnalysis(
+                    request.RgbBytes, request.PxW, request.PxH, request.PageW, request.PageH);
+                Console.Error.WriteLine($"[Worker] Page {request.Page}: {analysis.Blocks.Count} blocks detected");
 
                 await _resultChannel.Writer.WriteAsync(new AnalysisResult
                 {

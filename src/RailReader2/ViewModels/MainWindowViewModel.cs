@@ -18,7 +18,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private const double PanStep = 50.0;
 
     private AppConfig _config;
-    private AnalysisWorker? _worker;
+    private AnalysisWorker _worker = null!; // initialized in InitializeWorker, called from ctor
     private ColourEffectShaders _colourEffects = new();
     private Window? _window;
     private DispatcherTimer? _pollTimer;
@@ -65,25 +65,21 @@ public sealed partial class MainWindowViewModel : ObservableObject
         var modelPath = FindModelPath();
         if (modelPath is null)
         {
-            Console.Error.WriteLine("[ONNX] Model not found. Layout analysis disabled.");
-            Console.Error.WriteLine("[ONNX] Searched paths:");
             const string filename = "PP-DocLayoutV3.onnx";
-            Console.Error.WriteLine($"  - {Path.Combine(AppContext.BaseDirectory, "models", filename)}");
-            Console.Error.WriteLine($"  - {Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "railreader2", "models", filename)}");
-            Console.Error.WriteLine($"  - {Path.GetFullPath(Path.Combine("models", filename))}");
-            return;
+            var searched = new[]
+            {
+                Path.Combine(AppContext.BaseDirectory, "models", filename),
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "railreader2", "models", filename),
+                Path.GetFullPath(Path.Combine("models", filename)),
+            };
+            var msg = $"ONNX model not found ({filename}). Run ./scripts/download-model.sh\nSearched:\n"
+                      + string.Join("\n", searched.Select(p => $"  - {p}"));
+            throw new FileNotFoundException(msg);
         }
 
         Console.Error.WriteLine($"[ONNX] Starting worker with model: {modelPath}");
-        try
-        {
-            _worker = new AnalysisWorker(modelPath);
-            Console.Error.WriteLine("[ONNX] Worker started (ONNX session loading in background)");
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"[ONNX] Failed to start worker: {ex.Message}");
-        }
+        _worker = new AnalysisWorker(modelPath);
+        Console.Error.WriteLine("[ONNX] Worker started (ONNX session loading in background)");
     }
 
     private void SetupPollTimer()
@@ -92,13 +88,16 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _pollTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
         _pollTimer.Tick += (_, _) =>
         {
+            // Animation frame handles polling when active — avoid mid-frame updates
+            if (_animationRequested) return;
+
             bool gotResults = PollAnalysisResults();
             var tab = ActiveTab;
             if (tab is not null && !_animationRequested)
                 tab.SubmitPendingLookahead(_worker);
             if (gotResults)
                 InvalidateOverlay();
-            bool workerBusy = _worker is not null && !_worker.IsIdle;
+            bool workerBusy = !_worker.IsIdle;
             if (!workerBusy) _pollTimer?.Stop();
         };
     }
@@ -112,7 +111,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _animationRequested = false;
 
         double dt = _frameTimer.Elapsed.TotalSeconds;
-        _frameTimer.Restart();
         dt = Math.Min(dt, 0.05); // cap at 50ms to avoid large jumps
 
         var tab = ActiveTab;
@@ -130,6 +128,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
         if (!animating)
             tab.SubmitPendingLookahead(_worker);
 
+        // Batch DPI bitmap swap with this frame's camera update
+        if (tab.DpiRenderReady)
+        {
+            tab.DpiRenderReady = false;
+            InvalidatePage();
+        }
+
         if (animating)
             InvalidateCamera();
         if (gotResults)
@@ -138,11 +143,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
         // Keep the animation loop going while there's motion
         if (animating)
             RequestAnimationFrame();
+
+        _frameTimer.Restart();
     }
 
     private bool PollAnalysisResults()
     {
-        if (_worker is null) return false;
         bool got = false;
         while (_worker.Poll() is { } result)
         {

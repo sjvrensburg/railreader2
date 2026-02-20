@@ -81,8 +81,15 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
     private bool _dpiRenderPending;
 
     /// <summary>
+    /// Set to true when a DPI re-render completes. The next animation frame
+    /// picks this up and invalidates the page layer atomically with the
+    /// camera update, avoiding mid-frame bitmap swaps.
+    /// </summary>
+    public bool DpiRenderReady { get; set; }
+
+    /// <summary>
     /// Called on the UI thread when a DPI re-render completes, so the view can
-    /// invalidate the page layer.
+    /// request an animation frame to pick up the new bitmap.
     /// </summary>
     public Action? OnDpiRenderComplete { get; set; }
 
@@ -119,6 +126,7 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
                             CachedBitmap = newBitmap;
                             CachedImage = newImage;
                             CachedDpi = neededDpi;
+                            DpiRenderReady = true;
                             OnDpiRenderComplete?.Invoke();
                         }
                         else
@@ -140,19 +148,12 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
         return false;
     }
 
-    public void SubmitAnalysis(AnalysisWorker? worker)
+    public void SubmitAnalysis(AnalysisWorker worker)
     {
         if (AnalysisCache.TryGetValue(CurrentPage, out var cached))
         {
             Console.Error.WriteLine($"[SubmitAnalysis] Page {CurrentPage}: cache hit, {cached.Blocks.Count} blocks");
             ApplyAnalysis(cached);
-            return;
-        }
-
-        if (worker is null)
-        {
-            Console.Error.WriteLine($"[SubmitAnalysis] Page {CurrentPage}: no worker, using fallback");
-            ApplyAnalysis(CurrentPage, PageWidth, PageHeight);
             return;
         }
 
@@ -198,8 +199,7 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
                 Console.Error.WriteLine($"Failed to prepare analysis input: {ex.Message}");
                 Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                 {
-                    if (CurrentPage != page) return;
-                    ApplyAnalysis(page, pageW, pageH);
+                    PendingRailSetup = false;
                 });
             }
         });
@@ -217,13 +217,6 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
         PendingRailSetup = false;
     }
 
-    private void ApplyAnalysis(int page, double pageW, double pageH)
-    {
-        var fallback = LayoutAnalyzer.FallbackAnalysis(pageW, pageH);
-        AnalysisCache[page] = fallback;
-        ApplyAnalysis(fallback);
-    }
-
     public void QueueLookahead(int count)
     {
         PendingAnalysis.Clear();
@@ -235,9 +228,9 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
         }
     }
 
-    public bool SubmitPendingLookahead(AnalysisWorker? worker)
+    public bool SubmitPendingLookahead(AnalysisWorker worker)
     {
-        if (worker is null || !worker.IsIdle) return false;
+        if (!worker.IsIdle) return false;
 
         while (PendingAnalysis.Count > 0)
         {
@@ -262,7 +255,7 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
         return false;
     }
 
-    public void GoToPage(int page, AnalysisWorker? worker, double windowWidth, double windowHeight)
+    public void GoToPage(int page, AnalysisWorker worker, double windowWidth, double windowHeight)
     {
         page = Math.Clamp(page, 0, PageCount - 1);
         if (page == CurrentPage) return;
