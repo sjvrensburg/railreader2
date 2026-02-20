@@ -90,12 +90,14 @@ public sealed partial class MainWindowViewModel : ObservableObject
             // Animation frame handles polling when active — avoid mid-frame updates
             if (_animationRequested) return;
 
-            bool gotResults = PollAnalysisResults();
+            var (gotResults, needsAnim) = PollAnalysisResults();
             var tab = ActiveTab;
             if (tab is not null && !_animationRequested)
                 tab.SubmitPendingLookahead(_worker);
             if (gotResults)
                 InvalidateOverlay();
+            if (needsAnim)
+                RequestAnimationFrame();
             bool workerBusy = !_worker.IsIdle;
             if (!workerBusy) _pollTimer?.Stop();
         };
@@ -127,7 +129,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
         if (wasZooming) animating = true;
 
         // Poll analysis results while we're here
-        bool gotResults = PollAnalysisResults();
+        var (gotResults, needsAnim) = PollAnalysisResults();
+        if (needsAnim) animating = true;
 
         if (!animating)
             tab.SubmitPendingLookahead(_worker);
@@ -151,9 +154,16 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _frameTimer.Restart();
     }
 
-    private bool PollAnalysisResults()
+    /// <summary>
+    /// Drains the worker's result queue, caches results, and sets up rail
+    /// navigation when the current page's analysis arrives.
+    /// Returns (gotResults, needsAnimation) so callers can invalidate and
+    /// request animation frames appropriately.
+    /// </summary>
+    private (bool GotResults, bool NeedsAnimation) PollAnalysisResults()
     {
         bool got = false;
+        bool needsAnim = false;
         var (ww, wh) = GetWindowSize();
         while (_worker.Poll() is { } result)
         {
@@ -169,13 +179,19 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 {
                     tab.Rail.SetAnalysis(result.Analysis, _config.NavigableClasses);
                     tab.PendingRailSetup = false;
+                    // Re-check zoom threshold now that HasAnalysis is true —
+                    // without this, rail mode won't activate until the next zoom change.
+                    tab.UpdateRailZoom(ww, wh);
                     Console.Error.WriteLine($"[Analysis] Rail has {tab.Rail.NavigableCount} navigable blocks, Active={tab.Rail.Active}");
                     if (tab.Rail.Active)
+                    {
                         tab.StartSnap(ww, wh);
+                        needsAnim = true;
+                    }
                 }
             }
         }
-        return got;
+        return (got, needsAnim);
     }
 
     public void RequestAnimationFrame()
@@ -514,6 +530,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         tab.UpdateRenderDpiIfNeeded();
         InvalidateCamera();
         OnPropertyChanged(nameof(ActiveTab));
+        RequestAnimationFrame();
     }
 
     public void HandleResetZoom() => FitPage();
