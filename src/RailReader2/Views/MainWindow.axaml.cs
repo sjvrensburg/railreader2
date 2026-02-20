@@ -33,6 +33,8 @@ public partial class MainWindow : Window
                 InvalidateCamera = UpdateCameraTransform,
                 InvalidatePage = () =>
                 {
+                    PageLayer.MotionBlurEnabled = vm.Config.MotionBlur;
+                    PageLayer.MotionBlurIntensity = vm.Config.MotionBlurIntensity;
                     PageLayer.InvalidateVisual();
                     Minimap.InvalidateVisual();
                 },
@@ -111,6 +113,8 @@ public partial class MainWindow : Window
     {
         PageLayer.Tab = tab;
         PageLayer.ColourEffects = Vm?.ColourEffects;
+        PageLayer.MotionBlurEnabled = Vm?.Config.MotionBlur ?? true;
+        PageLayer.MotionBlurIntensity = Vm?.Config.MotionBlurIntensity ?? 0.5;
         OverlayLayer.Tab = tab;
         OverlayLayer.ColourEffects = Vm?.ColourEffects;
 

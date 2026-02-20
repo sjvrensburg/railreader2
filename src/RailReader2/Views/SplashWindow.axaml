@@ -1,0 +1,25 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="RailReader2.Views.SplashWindow"
+        Width="360" Height="200"
+        WindowStartupLocation="CenterScreen"
+        CanResize="False"
+        SystemDecorations="None"
+        Background="#1E1E2E"
+        TransparencyLevelHint="None">
+    <Border CornerRadius="8" ClipToBounds="True">
+        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">
+            <TextBlock Text="railreader2"
+                       FontSize="32" FontWeight="Bold"
+                       Foreground="#CDD6F4"
+                       HorizontalAlignment="Center" />
+            <TextBlock Text="AI-guided rail reading"
+                       FontSize="13"
+                       Foreground="#A6ADC8"
+                       HorizontalAlignment="Center" />
+            <ProgressBar IsIndeterminate="True"
+                         Width="120" Height="3"
+                         Margin="0,8,0,0" />
+        </StackPanel>
+    </Border>
+</Window>

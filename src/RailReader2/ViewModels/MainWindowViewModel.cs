@@ -122,6 +122,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
         tab.Camera.OffsetX = cx;
         tab.Camera.OffsetY = cy;
 
+        // Decay zoom blur speed
+        bool wasZooming = tab.Camera.ZoomSpeed > 0;
+        tab.Camera.DecayZoomSpeed(dt);
+        if (wasZooming) animating = true;
+
         // Poll analysis results while we're here
         bool gotResults = PollAnalysisResults();
 
@@ -375,6 +380,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             tab.Camera.OffsetX = cursorX - (cursorX - tab.Camera.OffsetX) * (newZoom / oldZoom);
             tab.Camera.OffsetY = cursorY - (cursorY - tab.Camera.OffsetY) * (newZoom / oldZoom);
             tab.Camera.Zoom = newZoom;
+            tab.Camera.NotifyZoomChange();
 
             tab.UpdateRailZoom(ww, wh);
             if (tab.Rail.Active)
@@ -514,6 +520,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         var (ww, wh) = GetWindowSize();
         double newZoom = zoomIn ? tab.Camera.Zoom * ZoomStep : tab.Camera.Zoom / ZoomStep;
         tab.ApplyZoom(newZoom, ww, wh);
+        tab.Camera.NotifyZoomChange();
         tab.UpdateRenderDpiIfNeeded();
         InvalidateCamera();
         OnPropertyChanged(nameof(ActiveTab));

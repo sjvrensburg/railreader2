@@ -15,6 +15,8 @@ public sealed class AppConfig
     public float UiFontScale { get; set; } = 1.0f;
     public ColourEffect ColourEffect { get; set; } = ColourEffect.None;
     public double ColourEffectIntensity { get; set; } = 1.0;
+    public bool MotionBlur { get; set; } = true;
+    public double MotionBlurIntensity { get; set; } = 0.5;
 
     [JsonConverter(typeof(NavigableClassesConverter))]
     public HashSet<int> NavigableClasses { get; set; } = LayoutConstants.DefaultNavigableClasses();

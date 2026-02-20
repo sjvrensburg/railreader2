@@ -19,6 +19,14 @@
                                FormatString="F2" Width="130"
                                ValueChanged="OnSettingChanged" />
             </StackPanel>
+            <CheckBox Name="MotionBlurCheck" Content="Motion blur during scroll and zoom"
+                      IsCheckedChanged="OnMotionBlurChanged" />
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="Blur amount:" VerticalAlignment="Center" Width="140" />
+                <Slider Name="BlurIntensitySlider" Minimum="0" Maximum="1"
+                        Value="0.5" Width="150"
+                        PropertyChanged="OnBlurIntensityChanged" />
+            </StackPanel>
 
             <TextBlock Text="Colour Effects" FontWeight="Bold" FontSize="16" Margin="0,12,0,0" />
             <Separator />

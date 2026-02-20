@@ -12,6 +12,7 @@ public sealed class RailNav
     public int CurrentBlock { get; set; }
     public int CurrentLine { get; set; }
     public bool Active { get; set; }
+    public double ScrollSpeed { get; private set; }
 
     private SnapAnimation? _snap;
     private ScrollDirection? _scrollDir;
@@ -135,6 +136,7 @@ public sealed class RailNav
     {
         _scrollDir = null;
         _scrollHoldTimer = null;
+        ScrollSpeed = 0.0;
     }
 
     public void StartSnapToCurrent(double cameraX, double cameraY, double zoom, double windowWidth, double windowHeight)
@@ -226,9 +228,18 @@ public sealed class RailNav
                 totalDisplacement = rampDisplacement + sMax * (holdSecs - ramp);
             }
 
+            double instantSpeed = holdSecs <= ramp
+                ? sStart + (sMax - sStart) * (holdSecs / ramp) * (holdSecs / ramp)
+                : sMax;
+            ScrollSpeed = sMax > 0 ? instantSpeed / sMax : 0.0;
+
             double sign = dir == ScrollDirection.Forward ? -1.0 : 1.0;
             cameraX = ClampX(_scrollStartX + sign * totalDisplacement * zoom, zoom, windowWidth);
             animating = true;
+        }
+        else
+        {
+            ScrollSpeed = 0.0;
         }
 
         return animating;
