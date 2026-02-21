@@ -384,6 +384,12 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
         MarkAnnotationsDirty();
     }
 
+    public void UpdateAnnotationText(int page, TextNoteAnnotation note, string newText)
+    {
+        note.Text = newText;
+        MarkAnnotationsDirty();
+    }
+
     public void RemoveAnnotation(int page, Annotation annotation)
     {
         if (Annotations is null) return;

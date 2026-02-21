@@ -756,17 +756,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 _rectStartY = (float)pageY;
                 break;
             case AnnotationTool.TextNote:
-                // Single click places the note
-                var note = new TextNoteAnnotation
-                {
-                    X = (float)pageX,
-                    Y = (float)pageY,
-                    Color = ActiveAnnotationColor,
-                    Opacity = ActiveAnnotationOpacity,
-                    Text = "Note",
-                };
-                tab.AddAnnotation(tab.CurrentPage, note);
-                InvalidateAnnotations();
+                var hitNote = FindTextNoteAtPoint(tab, (float)pageX, (float)pageY);
+                if (hitNote is not null)
+                    EditTextNote(tab, hitNote);
+                else
+                    CreateTextNote(tab, (float)pageX, (float)pageY);
                 break;
             case AnnotationTool.Eraser:
                 EraseAtPoint(tab, (float)pageX, (float)pageY);
@@ -871,6 +865,49 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 InvalidateAnnotations();
                 break;
         }
+    }
+
+    private TextNoteAnnotation? FindTextNoteAtPoint(TabViewModel tab, float pageX, float pageY)
+    {
+        if (tab.Annotations is null) return null;
+        if (!tab.Annotations.Pages.TryGetValue(tab.CurrentPage, out var list)) return null;
+
+        for (int i = list.Count - 1; i >= 0; i--)
+        {
+            if (list[i] is TextNoteAnnotation tn && AnnotationRenderer.HitTest(tn, pageX, pageY))
+                return tn;
+        }
+        return null;
+    }
+
+    private async void CreateTextNote(TabViewModel tab, float pageX, float pageY)
+    {
+        if (_window is null) return;
+        var dialog = new Views.TextNoteDialog { FontSize = CurrentFontSize };
+        var result = await dialog.ShowDialog<string?>(_window);
+        if (string.IsNullOrEmpty(result)) return;
+
+        var note = new TextNoteAnnotation
+        {
+            X = pageX,
+            Y = pageY,
+            Color = ActiveAnnotationColor,
+            Opacity = ActiveAnnotationOpacity,
+            Text = result,
+        };
+        tab.AddAnnotation(tab.CurrentPage, note);
+        InvalidateAnnotations();
+    }
+
+    private async void EditTextNote(TabViewModel tab, TextNoteAnnotation note)
+    {
+        if (_window is null) return;
+        var dialog = new Views.TextNoteDialog(note.Text) { FontSize = CurrentFontSize };
+        var result = await dialog.ShowDialog<string?>(_window);
+        if (result is null) return;
+
+        tab.UpdateAnnotationText(tab.CurrentPage, note, result);
+        InvalidateAnnotations();
     }
 
     private void EraseAtPoint(TabViewModel tab, float pageX, float pageY)
