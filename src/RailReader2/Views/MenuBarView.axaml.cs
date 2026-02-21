@@ -11,6 +11,45 @@ public partial class MenuBarView : UserControl
 
     private MainWindowViewModel? Vm => DataContext as MainWindowViewModel;
 
+    protected override void OnLoaded(RoutedEventArgs e)
+    {
+        base.OnLoaded(e);
+        UpdateRecentFiles();
+        if (DataContext is MainWindowViewModel vm)
+            vm.PropertyChanged += (_, args) =>
+            {
+                if (args.PropertyName == nameof(MainWindowViewModel.ActiveTab))
+                    UpdateRecentFiles();
+            };
+    }
+
+    private void UpdateRecentFiles()
+    {
+        var menu = this.FindControl<MenuItem>("RecentFilesMenu");
+        if (menu is null) return;
+
+        menu.Items.Clear();
+        var vm = Vm;
+        var files = vm?.Config.RecentFiles;
+        if (files is null || files.Count == 0)
+        {
+            menu.Items.Add(new MenuItem { Header = "(No recent files)", IsEnabled = false });
+            return;
+        }
+        foreach (var filePath in files)
+        {
+            if (!System.IO.File.Exists(filePath)) continue;
+            var name = System.IO.Path.GetFileName(filePath);
+            var dir = System.IO.Path.GetDirectoryName(filePath);
+            var item = new MenuItem { Header = $"{name}  ({dir})" };
+            var captured = filePath;
+            item.Click += (_, _) => vm!.OpenDocument(captured);
+            menu.Items.Add(item);
+        }
+        if (menu.Items.Count == 0)
+            menu.Items.Add(new MenuItem { Header = "(No recent files)", IsEnabled = false });
+    }
+
     private void OnCloseTab(object? s, RoutedEventArgs e) => Vm?.CloseTab(Vm.ActiveTabIndex);
     private void OnQuit(object? s, RoutedEventArgs e) =>
         (VisualRoot as Window)?.Close();
@@ -37,6 +76,9 @@ public partial class MenuBarView : UserControl
     private void OnEffectHighVisibility(object? s, RoutedEventArgs e) => Vm?.SetColourEffect(ColourEffect.HighVisibility);
     private void OnEffectAmber(object? s, RoutedEventArgs e) => Vm?.SetColourEffect(ColourEffect.Amber);
     private void OnEffectInvert(object? s, RoutedEventArgs e) => Vm?.SetColourEffect(ColourEffect.Invert);
+
+    private void OnGoToPage(object? s, RoutedEventArgs e)
+    { if (Vm is { } vm) vm.ShowGoToPage = true; }
 
     private void OnPrevPage(object? s, RoutedEventArgs e)
     { if (Vm?.ActiveTab is { } tab) Vm.GoToPage(tab.CurrentPage - 1); }

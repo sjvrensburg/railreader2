@@ -85,7 +85,7 @@ public partial class MainWindow : Window
                 PageLayer.InvalidateVisual();
             }
 
-            vm.PropertyChanged += (_, args) =>
+            vm.PropertyChanged += async (_, args) =>
             {
                 switch (args.PropertyName)
                 {
@@ -100,15 +100,26 @@ public partial class MainWindow : Window
                         break;
                     case nameof(MainWindowViewModel.ShowShortcuts) when vm.ShowShortcuts:
                         vm.ShowShortcuts = false;
-                        new ShortcutsDialog { FontSize = vm.CurrentFontSize }.ShowDialog(this);
+                        await new ShortcutsDialog { FontSize = vm.CurrentFontSize }.ShowDialog(this);
                         break;
                     case nameof(MainWindowViewModel.ShowAbout) when vm.ShowAbout:
                         vm.ShowAbout = false;
-                        new AboutDialog { FontSize = vm.CurrentFontSize }.ShowDialog(this);
+                        await new AboutDialog { FontSize = vm.CurrentFontSize }.ShowDialog(this);
                         break;
                     case nameof(MainWindowViewModel.ShowSettings) when vm.ShowSettings:
                         vm.ShowSettings = false;
-                        new SettingsWindow { DataContext = vm, FontSize = vm.CurrentFontSize }.ShowDialog(this);
+                        await new SettingsWindow { DataContext = vm, FontSize = vm.CurrentFontSize }.ShowDialog(this);
+                        break;
+                    case nameof(MainWindowViewModel.ShowGoToPage) when vm.ShowGoToPage:
+                        vm.ShowGoToPage = false;
+                        if (vm.ActiveTab is { } gotoTab)
+                        {
+                            var dialog = new GoToPageDialog(gotoTab.CurrentPage + 1, gotoTab.PageCount)
+                                { FontSize = vm.CurrentFontSize };
+                            var result = await dialog.ShowDialog<int>(this);
+                            if (result > 0)
+                                vm.GoToPage(result - 1);
+                        }
                         break;
                 }
             };
@@ -222,6 +233,8 @@ public partial class MainWindow : Window
                     vm.OpenSearch();
                     SearchBar.FocusSearch();
                     e.Handled = true; return;
+                case Key.G:
+                    vm.ShowGoToPage = true; e.Handled = true; return;
                 case Key.Z when shift:
                     vm.RedoAnnotation(); e.Handled = true; return;
                 case Key.Z:

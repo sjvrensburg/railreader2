@@ -18,6 +18,8 @@ public sealed class AppConfig
     public bool MotionBlur { get; set; } = true;
     public double MotionBlurIntensity { get; set; } = 0.33;
 
+    public List<string> RecentFiles { get; set; } = [];
+
     [JsonConverter(typeof(NavigableClassesConverter))]
     public HashSet<int> NavigableClasses { get; set; } = LayoutConstants.DefaultNavigableClasses();
 
@@ -61,6 +63,15 @@ public sealed class AppConfig
         var config = new AppConfig();
         config.Save();
         return config;
+    }
+
+    public void AddRecentFile(string filePath)
+    {
+        RecentFiles.Remove(filePath);
+        RecentFiles.Insert(0, filePath);
+        if (RecentFiles.Count > 10)
+            RecentFiles.RemoveRange(10, RecentFiles.Count - 10);
+        Save();
     }
 
     public void Save()
