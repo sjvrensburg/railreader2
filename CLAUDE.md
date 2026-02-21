@@ -85,6 +85,7 @@ src/RailReader2/
     ├── ShortcutsDialog.axaml/.cs   # Keyboard shortcuts help dialog (F1)
     ├── AboutDialog.axaml/.cs       # Version info and credits
     ├── TextNoteDialog.axaml/.cs    # Modal text input dialog for creating/editing TextNote annotations
+    ├── GoToPageDialog.axaml/.cs    # Modal go-to-page dialog (Ctrl+G)
     ├── LoadingOverlay.axaml/.cs    # Loading spinner overlay
     └── SplashWindow.axaml/.cs      # Startup splash screen
 installer/
@@ -102,7 +103,8 @@ scripts/
 - **Rendering pipeline**: PDF bytes held in memory → PDFtoImage (PDFium) rasterises pages to `SKBitmap` at zoom-proportional DPI (150–600, capped to avoid ~35 MP bitmaps) → `SKImage` uploaded to GPU → drawn via Avalonia's `ICustomDrawOperation` / `ISkiaSharpApiLeaseFeature` → `SKCanvas` using `SKCubicResampler.Mitchell` for sharp text. Camera pan/zoom are compositor-level `MatrixTransform` on the `CameraPanel` (no bitmap repaint needed). DPI upgrades happen asynchronously via `Task.Run`; the swap is atomic (new `SKImage` is built before replacing the old one) to avoid blank frames.
 - **Layout analysis**: Page bitmap → BGRA-to-RGB → 800×800 bilinear rescale → CHW float tensor (pixels/255) → PP-DocLayoutV3 ONNX (`im_shape`, `image`, `scale_factor` inputs) → `[N,7]` detection tensor `[classId, confidence, xmin, ymin, xmax, ymax, readingOrder]` → confidence filter (0.4) → NMS (IoU 0.5) → sort by reading order → horizontal projection line detection per block. Input pixmap preparation (`RenderPagePixmap`) runs on a background thread via `Task.Run`; ONNX inference runs on a dedicated `Channel<T>`-based background worker thread (`AnalysisWorker`).
 - **Rail mode**: Activates above configurable zoom threshold when analysis is available. Navigation locks to detected text blocks, advances line-by-line with cubic ease-out snap animations. Horizontal scrolling uses hold-to-scroll with quadratic speed ramping (integrated for frame-rate-independent displacement). Click-to-select jumps to any navigable block. Rail overlay (None palette) uses `DimExcludesBlock=true` with a yellow highlighter-style line tint for readable contrast.
-- **Config**: `AppConfig` reads/writes `~/.config/railreader2/config.json` (Linux) or `%APPDATA%\railreader2\config.json` (Windows) via `System.Text.Json` with snake_case naming. Loaded at startup; editable live via Settings panel; changes auto-save. `UiFontScale` is applied by setting `Window.FontSize = 14.0 * scale` (inherited by all child controls); dialogs receive the current font size at creation time.
+- **Config**: `AppConfig` reads/writes `~/.config/railreader2/config.json` (Linux) or `%APPDATA%\railreader2\config.json` (Windows) via `System.Text.Json` with snake_case naming. Loaded at startup; editable live via Settings panel; changes auto-save. `UiFontScale` is applied by setting `Window.FontSize = 14.0 * scale` (inherited by all child controls); dialogs receive the current font size at creation time. `RecentFiles` (max 10) tracks recently opened PDFs; updated on each `OpenDocument()` call, persisted in config JSON, and shown in File → Recent Files submenu.
+- **Fit Width**: `TabViewModel.FitWidth()` sets zoom so the page fills the viewport horizontally (top-aligned if taller than viewport). Accessible via View → Fit Width menu. Complements the existing `CenterPage()` (fit-page) which fits both dimensions.
 - **Analysis caching**: Per-tab `Dictionary<int, PageAnalysis> AnalysisCache` avoids re-running ONNX inference on revisited pages. Lookahead analysis pre-processes upcoming pages when the worker is idle.
 - **Minimap**: Draws from `TabViewModel.MinimapBitmap` — a small thumbnail (≤200×280 px) rendered once per page change via `PdfService.RenderThumbnail()`. This avoids downsampling the full 600 DPI bitmap (~35 MP) on every animation frame.
 - **MVVM**: CommunityToolkit.Mvvm source generators (`[ObservableProperty]`, `[RelayCommand]`). Performance-sensitive paths (camera transforms, canvas invalidation) use direct method calls and `InvalidationCallbacks` for granular repaint targeting rather than pure data binding.
@@ -147,7 +149,8 @@ Config file location: `~/.config/railreader2/config.json` (Linux) or `%APPDATA%\
   "navigable_classes": [
     "abstract", "algorithm", "display_formula",
     "footnote", "paragraph_title", "text"
-  ]
+  ],
+  "recent_files": []
 }
 ```
 
@@ -334,6 +337,7 @@ If the model is not found, the app logs a warning and falls back to horizontal-s
 | `Ctrl+End` | Last page |
 | `+` / `-` | Zoom in / out |
 | `0` | Reset zoom / fit page |
+| `Ctrl+G` | Go to page |
 | `Ctrl+Shift+O` | Toggle outline panel |
 | `Ctrl+M` | Toggle minimap |
 | `Ctrl+,` | Settings |

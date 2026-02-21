@@ -291,6 +291,16 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
         Camera.OffsetY = (windowHeight - scaledH) / 2.0;
     }
 
+    public void FitWidth(double windowWidth, double windowHeight)
+    {
+        if (PageWidth <= 0 || windowWidth <= 0) return;
+        Camera.Zoom = Math.Clamp(windowWidth / PageWidth, Camera.ZoomMin, Camera.ZoomMax);
+        double scaledW = PageWidth * Camera.Zoom;
+        double scaledH = PageHeight * Camera.Zoom;
+        Camera.OffsetX = (windowWidth - scaledW) / 2.0;
+        Camera.OffsetY = scaledH <= windowHeight ? (windowHeight - scaledH) / 2.0 : 0;
+    }
+
     public void ClampCamera(double windowWidth, double windowHeight)
     {
         double scaledW = PageWidth * Camera.Zoom;

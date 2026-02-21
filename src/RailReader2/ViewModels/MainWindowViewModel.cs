@@ -35,6 +35,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     [ObservableProperty] private bool _showSettings;
     [ObservableProperty] private bool _showAbout;
     [ObservableProperty] private bool _showShortcuts;
+    [ObservableProperty] private bool _showGoToPage;
     [ObservableProperty] private string? _cleanupMessage;
     [ObservableProperty] private bool _showSearch;
     [ObservableProperty] private bool _isRadialMenuOpen;
@@ -272,6 +273,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             tab.UpdateRailZoom(ww, wh);
 
             Tabs.Add(tab);
+            _config.AddRecentFile(path);
             ActiveTabIndex = Tabs.Count - 1;
             OnPropertyChanged(nameof(ActiveTab));
             InvalidateAll();
@@ -364,6 +366,17 @@ public sealed partial class MainWindowViewModel : ObservableObject
         if (ActiveTab is not { } tab) return;
         var (ww, wh) = GetWindowSize();
         tab.CenterPage(ww, wh);
+        tab.UpdateRailZoom(ww, wh);
+        OnPropertyChanged(nameof(ActiveTab));
+        InvalidateCamera();
+    }
+
+    [RelayCommand]
+    public void FitWidth()
+    {
+        if (ActiveTab is not { } tab) return;
+        var (ww, wh) = GetWindowSize();
+        tab.FitWidth(ww, wh);
         tab.UpdateRailZoom(ww, wh);
         OnPropertyChanged(nameof(ActiveTab));
         InvalidateCamera();

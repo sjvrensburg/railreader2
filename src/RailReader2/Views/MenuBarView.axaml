@@ -8,6 +8,8 @@
             <MenuItem Header="_Open..." InputGesture="Ctrl+O" Command="{Binding OpenFileCommand}" />
             <MenuItem Header="_Duplicate Tab" Command="{Binding DuplicateTabCommand}" />
             <Separator />
+            <MenuItem Header="_Recent Files" x:Name="RecentFilesMenu" />
+            <Separator />
             <MenuItem Header="_Export with Annotations..." Command="{Binding ExportAnnotatedCommand}" />
             <Separator />
             <MenuItem Header="_Close Tab" InputGesture="Ctrl+W" Click="OnCloseTab" />
@@ -28,6 +30,7 @@
             <MenuItem Header="Zoom _In" InputGesture="Ctrl+OemPlus" Click="OnZoomIn" />
             <MenuItem Header="Zoom _Out" InputGesture="Ctrl+OemMinus" Click="OnZoomOut" />
             <MenuItem Header="_Fit Page" Command="{Binding FitPageCommand}" />
+            <MenuItem Header="Fit _Width" Command="{Binding FitWidthCommand}" />
             <MenuItem Header="_Reset Zoom" InputGesture="Ctrl+D0" Click="OnResetZoom" />
             <Separator />
             <MenuItem Header="_Outline" InputGesture="Ctrl+Shift+O" Click="OnToggleOutline" />
@@ -44,6 +47,8 @@
             </MenuItem>
         </MenuItem>
         <MenuItem Header="_Navigation">
+            <MenuItem Header="_Go to Page..." InputGesture="Ctrl+G" Click="OnGoToPage" />
+            <Separator />
             <MenuItem Header="_Previous Page" InputGesture="PageUp" Click="OnPrevPage" />
             <MenuItem Header="_Next Page" InputGesture="PageDown" Click="OnNextPage" />
             <Separator />
