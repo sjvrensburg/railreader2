@@ -49,6 +49,13 @@ At high zoom levels, navigation switches to "rail mode" — the viewer locks ont
 - **Splash screen** — startup splash while ONNX model loads
 - **Analysis indicator** — status bar shows "Analyzing..." during layout inference
 - **Debug overlay** — visualise detected layout blocks with class labels and confidence
+- **Search** — full-text search with regex support, case sensitivity toggle, and match highlighting (Ctrl+F)
+- **Annotations** — highlight, freehand pen, rectangles, text notes, and eraser via radial menu (right-click)
+- **Text selection** — select and copy text from PDF pages via the toolbar
+- **Toolbar** — floating Browse/Text Select/Copy toolbar for quick mode switching
+- **Annotation export** — export PDFs with embedded annotations (File → Export with Annotations)
+- **Undo/redo** — annotation history with Ctrl+Z / Ctrl+Y
+- **Annotation mode indicator** — status bar shows active tool name in amber with a clickable exit button
 
 ## Usage
 
@@ -81,6 +88,12 @@ dotnet run -c Release --project src/RailReader2 --
 | Mouse wheel | Zoom towards cursor |
 | Click on block | Jump to block (rail mode) |
 | D (shift) | Toggle debug overlay (shows detected blocks) |
+| Ctrl+F | Open search bar |
+| F3 / Shift+F3 | Next / previous search match |
+| Right-click | Open annotation radial menu |
+| Ctrl+Z / Ctrl+Y | Undo / redo annotation |
+| Ctrl+C | Copy selected text |
+| Escape | Cancel annotation tool / close search |
 | F1 | Keyboard shortcuts dialog |
 
 ### Configuration
