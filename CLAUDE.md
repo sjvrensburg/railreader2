@@ -84,6 +84,7 @@ src/RailReader2/
     ├── SettingsWindow.axaml/.cs    # Live-editable settings panel
     ├── ShortcutsDialog.axaml/.cs   # Keyboard shortcuts help dialog (F1)
     ├── AboutDialog.axaml/.cs       # Version info and credits
+    ├── TextNoteDialog.axaml/.cs    # Modal text input dialog for creating/editing TextNote annotations
     ├── LoadingOverlay.axaml/.cs    # Loading spinner overlay
     └── SplashWindow.axaml/.cs      # Startup splash screen
 installer/
@@ -112,7 +113,7 @@ scripts/
 - **Startup sequencing**: `window.Opened` can fire before `MainWindow.OnLoaded` finishes wiring `_invalidation`. `OnLoaded` guards against this by re-centering and forcing a camera update if a tab is already present. `PdfPageLayer.Render` uses tab page dimensions for the draw-op bounds (not `Bounds.Width/Height`) so the compositor does not cull the draw operation before the first layout pass completes.
 - **Multi-tab**: `TabViewModel` holds per-document state (PDF, camera, rail nav, analysis cache, outline, cached bitmap, minimap thumbnail). `MainWindowViewModel` owns the tab collection and shared resources (ONNX session, config, shaders).
 - **Search**: Full-text search across all pages with regex and case-sensitivity support. `PdfTextService` extracts text with per-character bounding boxes via PDFium P/Invoke. Matches are highlighted via `SearchHighlightLayer` with the active match emphasized. Search bar overlay (Ctrl+F) with match count and prev/next navigation.
-- **Annotations**: Five annotation tools (Highlight, Pen, Rectangle, TextNote, Eraser) accessible via right-click radial menu. Annotations are persisted as JSON sidecar files (`<pdf>.annotations.json`) via `AnnotationService`. Undo/redo stack per tab. Export to PDF via `AnnotationExportService` which renders annotations into page bitmaps.
+- **Annotations**: Five annotation tools (Highlight, Pen, Rectangle, TextNote, Eraser) accessible via right-click radial menu. Annotations are persisted as JSON sidecar files (`<pdf>.annotations.json`) via `AnnotationService`. Undo/redo stack per tab. Export to PDF via `AnnotationExportService` which renders annotations into page bitmaps. TextNote placement shows a `TextNoteDialog` for user input; clicking an existing TextNote in TextNote mode opens the dialog pre-filled for editing.
 - **Text selection**: Browse/Text Select/Copy toolbar (top-left overlay, `ToolBarView`) provides mode switching. Text select mode uses character-level hit testing from `PdfTextService` to build selection rectangles. Selected text is rendered via `AnnotationLayer` and copied to clipboard via Ctrl+C.
 - **Radial menu**: `RadialMenu` is a Skia-rendered radial context menu with Font Awesome icons (embedded `fa-solid-900.ttf`). Shows annotation tools only. Centre button closes. Segments are static (configured once in `SetupRadialMenu`).
 - **Toolbar**: `ToolBarView` provides Browse (pan mode), Text Select, and Copy buttons as a floating overlay. Uses `avares://` font resource for Font Awesome icons. Copy button appears only when text is selected. Active mode is indicated by a blue toggle highlight.
