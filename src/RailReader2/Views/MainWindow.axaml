@@ -53,6 +53,13 @@
                         <v:MinimapControl Name="Minimap"
                                           IsVisible="{Binding ShowMinimap}" />
 
+                        <!-- Toolbar overlay (Browse/Select/Copy) -->
+                        <v:ToolBarView Name="ToolBar"
+                                       VerticalAlignment="Top"
+                                       HorizontalAlignment="Left"
+                                       Margin="16,4,0,0"
+                                       IsVisible="{Binding Tabs.Count}" />
+
                         <!-- Search bar overlay -->
                         <v:SearchBarView Name="SearchBar"
                                          IsVisible="{Binding ShowSearch}"

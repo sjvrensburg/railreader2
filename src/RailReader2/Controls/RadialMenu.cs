@@ -35,6 +35,7 @@ public class RadialMenu : Control
         public const string Comment     = "\uf075";
         public const string CirclePlus  = "\uf055";
         public const string Palette     = "\uf53f";
+        public const string Hand       = "\uf0b2";
         public const string ICursor    = "\uf246";
         public const string Copy       = "\uf0c5";
     }

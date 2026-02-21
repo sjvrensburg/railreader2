@@ -127,37 +127,23 @@ public partial class MainWindow : Window
                 await clipboard.SetTextAsync(text);
         };
 
-        // Wire dynamic radial menu rebuild
-        vm.OnRadialMenuOpening = () => UpdateRadialMenuSegments(vm);
+        // Wire toolbar
+        ToolBar.ViewModel = vm;
 
-        // Initial segments
-        UpdateRadialMenuSegments(vm);
-    }
-
-    private void UpdateRadialMenuSegments(MainWindowViewModel vm)
-    {
-        var segments = new List<RadialMenu.Segment>();
-
-        segments.Add(new RadialMenu.Segment("Select", RadialMenu.IconChars.ICursor,
-            () => vm.SetAnnotationTool(AnnotationTool.TextSelect)));
-
-        if (vm.SelectedText is not null)
+        // Static annotation-only segments
+        var segments = new List<RadialMenu.Segment>
         {
-            segments.Add(new RadialMenu.Segment("Copy", RadialMenu.IconChars.Copy,
-                () => vm.CopySelectedText()));
-        }
-
-        segments.Add(new RadialMenu.Segment("Highlight", RadialMenu.IconChars.Highlighter,
-            () => vm.SetAnnotationTool(AnnotationTool.Highlight)));
-        segments.Add(new RadialMenu.Segment("Pen", RadialMenu.IconChars.Pen,
-            () => vm.SetAnnotationTool(AnnotationTool.Pen)));
-        segments.Add(new RadialMenu.Segment("Text", RadialMenu.IconChars.TextHeight,
-            () => vm.SetAnnotationTool(AnnotationTool.TextNote)));
-        segments.Add(new RadialMenu.Segment("Rect", RadialMenu.IconChars.Square,
-            () => vm.SetAnnotationTool(AnnotationTool.Rectangle)));
-        segments.Add(new RadialMenu.Segment("Eraser", RadialMenu.IconChars.Eraser,
-            () => vm.SetAnnotationTool(AnnotationTool.Eraser)));
-
+            new("Highlight", RadialMenu.IconChars.Highlighter,
+                () => vm.SetAnnotationTool(AnnotationTool.Highlight)),
+            new("Pen", RadialMenu.IconChars.Pen,
+                () => vm.SetAnnotationTool(AnnotationTool.Pen)),
+            new("Text", RadialMenu.IconChars.TextHeight,
+                () => vm.SetAnnotationTool(AnnotationTool.TextNote)),
+            new("Rect", RadialMenu.IconChars.Square,
+                () => vm.SetAnnotationTool(AnnotationTool.Rectangle)),
+            new("Eraser", RadialMenu.IconChars.Eraser,
+                () => vm.SetAnnotationTool(AnnotationTool.Eraser)),
+        };
         RadialMenuControl.SetSegments(segments, onClose: () => vm.CloseRadialMenu());
     }
 

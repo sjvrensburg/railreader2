@@ -18,9 +18,16 @@
         </Style>
         <Style Selector="ToggleButton:pointerover">
             <Setter Property="Background" Value="#505050" />
+            <Setter Property="Foreground" Value="#FFFFFF" />
+        </Style>
+        <Style Selector="ToggleButton:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Foreground" Value="#FFFFFF" />
         </Style>
         <Style Selector="ToggleButton:checked:pointerover">
             <Setter Property="Background" Value="#1084D8" />
+        </Style>
+        <Style Selector="ToggleButton:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Foreground" Value="#FFFFFF" />
         </Style>
         <Style Selector="Button.searchBtn">
             <Setter Property="Background" Value="#404040" />
@@ -31,6 +38,10 @@
         </Style>
         <Style Selector="Button.searchBtn:pointerover">
             <Setter Property="Background" Value="#505050" />
+            <Setter Property="Foreground" Value="#FFFFFF" />
+        </Style>
+        <Style Selector="Button.searchBtn:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Foreground" Value="#FFFFFF" />
         </Style>
     </UserControl.Styles>
 

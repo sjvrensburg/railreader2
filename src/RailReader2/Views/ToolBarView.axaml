@@ -1,0 +1,92 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="RailReader2.Views.ToolBarView">
+    <UserControl.Resources>
+        <FontFamily x:Key="FaFont">avares://RailReader2/Assets/fa-solid-900.ttf#Font Awesome 6 Free Solid</FontFamily>
+    </UserControl.Resources>
+    <UserControl.Styles>
+        <Style Selector="ToggleButton.toolBtn">
+            <Setter Property="Background" Value="#404040" />
+            <Setter Property="Foreground" Value="#E0E0E0" />
+            <Setter Property="BorderBrush" Value="#606060" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="3" />
+        </Style>
+        <Style Selector="ToggleButton.toolBtn:checked">
+            <Setter Property="Background" Value="#0078D4" />
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="BorderBrush" Value="#0078D4" />
+        </Style>
+        <Style Selector="ToggleButton.toolBtn:pointerover">
+            <Setter Property="Background" Value="#505050" />
+            <Setter Property="Foreground" Value="#FFFFFF" />
+        </Style>
+        <Style Selector="ToggleButton.toolBtn:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Foreground" Value="#FFFFFF" />
+        </Style>
+        <Style Selector="ToggleButton.toolBtn:checked:pointerover">
+            <Setter Property="Background" Value="#1084D8" />
+            <Setter Property="Foreground" Value="#FFFFFF" />
+        </Style>
+        <Style Selector="ToggleButton.toolBtn:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Foreground" Value="#FFFFFF" />
+        </Style>
+        <Style Selector="Button.toolBtn">
+            <Setter Property="Background" Value="#404040" />
+            <Setter Property="Foreground" Value="#E0E0E0" />
+            <Setter Property="BorderBrush" Value="#606060" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="3" />
+        </Style>
+        <Style Selector="Button.toolBtn:pointerover">
+            <Setter Property="Background" Value="#505050" />
+            <Setter Property="Foreground" Value="#FFFFFF" />
+        </Style>
+        <Style Selector="Button.toolBtn:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Foreground" Value="#FFFFFF" />
+        </Style>
+    </UserControl.Styles>
+
+    <Border Background="#252526"
+            BorderBrush="#555555"
+            BorderThickness="1"
+            CornerRadius="4"
+            Padding="4,4">
+        <StackPanel Orientation="Horizontal" Spacing="4">
+            <ToggleButton Name="BrowseButton"
+                          Classes="toolBtn"
+                          ToolTip.Tip="Browse / Pan"
+                          Width="32" Height="28"
+                          HorizontalContentAlignment="Center"
+                          VerticalContentAlignment="Center"
+                          Padding="0">
+                <TextBlock Text="&#xf0b2;"
+                           FontFamily="{StaticResource FaFont}"
+                           FontSize="13" />
+            </ToggleButton>
+            <ToggleButton Name="SelectButton"
+                          Classes="toolBtn"
+                          ToolTip.Tip="Text Select"
+                          Width="32" Height="28"
+                          HorizontalContentAlignment="Center"
+                          VerticalContentAlignment="Center"
+                          Padding="0">
+                <TextBlock Text="&#xf246;"
+                           FontFamily="{StaticResource FaFont}"
+                           FontSize="13" />
+            </ToggleButton>
+            <Button Name="CopyButton"
+                    Classes="toolBtn"
+                    ToolTip.Tip="Copy Selected Text (Ctrl+C)"
+                    Width="32" Height="28"
+                    HorizontalContentAlignment="Center"
+                    VerticalContentAlignment="Center"
+                    Padding="0"
+                    IsVisible="False">
+                <TextBlock Text="&#xf0c5;"
+                           FontFamily="{StaticResource FaFont}"
+                           FontSize="13" />
+            </Button>
+        </StackPanel>
+    </Border>
+</UserControl>

@@ -1,6 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Media;
+using RailReader2.Models;
 using RailReader2.ViewModels;
 
 namespace RailReader2.Views;
@@ -23,7 +24,8 @@ public partial class StatusBarView : UserControl
             vm.PropertyChanged += (_, args) =>
             {
                 if (args.PropertyName is nameof(MainWindowViewModel.ActiveTab) or
-                    nameof(MainWindowViewModel.ActiveTabIndex))
+                    nameof(MainWindowViewModel.ActiveTabIndex) or
+                    nameof(MainWindowViewModel.ActiveTool))
                 {
                     SubscribeToTab(vm.ActiveTab);
                     UpdateStatus();
@@ -107,6 +109,30 @@ public partial class StatusBarView : UserControl
                 Foreground = new SolidColorBrush(Color.FromRgb(66, 133, 244)),
                 FontWeight = FontWeight.Bold,
             });
+        }
+
+        if (vm is not null && vm.IsAnnotating)
+        {
+            AddSeparator();
+            string toolName = vm.ActiveTool switch
+            {
+                AnnotationTool.Highlight => "Highlight",
+                AnnotationTool.Pen => "Pen",
+                AnnotationTool.TextNote => "Text Note",
+                AnnotationTool.Rectangle => "Rectangle",
+                AnnotationTool.Eraser => "Eraser",
+                AnnotationTool.TextSelect => "Text Select",
+                _ => "Annotating",
+            };
+            StatusPanel.Children.Add(new TextBlock
+            {
+                Text = $"{toolName} Tool",
+                Foreground = new SolidColorBrush(Color.FromRgb(255, 170, 0)),
+                FontWeight = FontWeight.Bold,
+            });
+            var exitBtn = MakeNavButton("\u2715", (_, _) => vm.CancelAnnotationTool());
+            exitBtn.Foreground = new SolidColorBrush(Color.FromRgb(255, 100, 100));
+            StatusPanel.Children.Add(exitBtn);
         }
     }
 }

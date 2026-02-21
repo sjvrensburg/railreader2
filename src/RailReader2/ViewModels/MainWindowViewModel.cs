@@ -67,9 +67,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public List<HighlightRect>? TextSelectionRects { get; set; }
     private int _textSelectCharStart = -1;
 
-    // Clipboard and radial menu callbacks wired by MainWindow
+    // Clipboard callback wired by MainWindow
     public Action<string>? CopyToClipboard { get; set; }
-    public Action? OnRadialMenuOpening { get; set; }
 
     public AppConfig Config => _config;
     public ColourEffectShaders ColourEffects => _colourEffects;
@@ -658,7 +657,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
         double menuSize = 210 * (_config?.UiFontScale ?? 1.0);
         RadialMenuX = screenX - menuSize / 2;
         RadialMenuY = screenY - menuSize / 2;
-        OnRadialMenuOpening?.Invoke();
         IsRadialMenuOpen = true;
     }
 
@@ -681,6 +679,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             SelectedText = null;
             TextSelectionRects = null;
             _textSelectCharStart = -1;
+            OnPropertyChanged(nameof(SelectedText));
             InvalidateAnnotations();
         }
 
@@ -727,6 +726,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         TextSelectionRects = null;
         ActiveTool = AnnotationTool.None;
         SelectedAnnotation = null;
+        OnPropertyChanged(nameof(SelectedText));
         OnPropertyChanged(nameof(IsAnnotating));
         OnPropertyChanged(nameof(ActiveTool));
         InvalidateAnnotations();
@@ -742,6 +742,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 _textSelectCharStart = FindNearestCharIndex(tab, (float)pageX, (float)pageY);
                 SelectedText = null;
                 TextSelectionRects = null;
+                OnPropertyChanged(nameof(SelectedText));
                 InvalidateAnnotations();
                 break;
             case AnnotationTool.Highlight:
@@ -792,6 +793,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
                     SelectedText = tsStart < pageText.Text.Length
                         ? pageText.Text[tsStart..textEnd]
                         : null;
+                    OnPropertyChanged(nameof(SelectedText));
                     InvalidateAnnotations();
                 }
                 break;

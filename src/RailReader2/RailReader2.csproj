@@ -15,6 +15,7 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Assets/fa-solid-900.ttf" />
+    <AvaloniaResource Include="Assets/fa-solid-900.ttf" />
   </ItemGroup>
 
   <ItemGroup>
