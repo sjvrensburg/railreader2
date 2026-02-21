@@ -2,6 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:RailReader2.ViewModels"
         xmlns:v="using:RailReader2.Views"
+        xmlns:c="using:RailReader2.Controls"
         x:Class="RailReader2.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Title="railreader2"
@@ -41,6 +42,8 @@
                                        HorizontalAlignment="Left"
                                        VerticalAlignment="Top">
                                     <v:PdfPageLayer Name="PageLayer" />
+                                    <v:SearchHighlightLayer Name="SearchLayer" />
+                                    <v:AnnotationLayer Name="AnnotationLayer" />
                                     <v:RailOverlayLayer Name="OverlayLayer" />
                                 </Panel>
                             </Panel>
@@ -49,6 +52,29 @@
                         <!-- Minimap overlay -->
                         <v:MinimapControl Name="Minimap"
                                           IsVisible="{Binding ShowMinimap}" />
+
+                        <!-- Toolbar overlay (Browse/Select/Copy) -->
+                        <v:ToolBarView Name="ToolBar"
+                                       VerticalAlignment="Top"
+                                       HorizontalAlignment="Left"
+                                       Margin="16,4,0,0"
+                                       IsVisible="{Binding Tabs.Count}" />
+
+                        <!-- Search bar overlay -->
+                        <v:SearchBarView Name="SearchBar"
+                                         IsVisible="{Binding ShowSearch}"
+                                         VerticalAlignment="Top"
+                                         HorizontalAlignment="Right"
+                                         Margin="0,4,16,0" />
+
+                        <!-- Radial annotation menu (screen-space overlay) -->
+                        <Canvas Name="RadialMenuCanvas"
+                                IsHitTestVisible="{Binding IsRadialMenuOpen}"
+                                IsVisible="{Binding IsRadialMenuOpen}">
+                            <c:RadialMenu Name="RadialMenuControl"
+                                          Canvas.Left="{Binding RadialMenuX}"
+                                          Canvas.Top="{Binding RadialMenuY}" />
+                        </Canvas>
 
                         <!-- Welcome text when no document open -->
                         <TextBlock Name="WelcomeText"

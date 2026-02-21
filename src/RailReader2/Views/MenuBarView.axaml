@@ -8,11 +8,21 @@
             <MenuItem Header="_Open..." InputGesture="Ctrl+O" Command="{Binding OpenFileCommand}" />
             <MenuItem Header="_Duplicate Tab" Command="{Binding DuplicateTabCommand}" />
             <Separator />
+            <MenuItem Header="_Export with Annotations..." Command="{Binding ExportAnnotatedCommand}" />
+            <Separator />
             <MenuItem Header="_Close Tab" InputGesture="Ctrl+W" Click="OnCloseTab" />
             <Separator />
             <MenuItem Header="_Settings..." InputGesture="Ctrl+OemComma" Click="OnShowSettings" />
             <Separator />
             <MenuItem Header="_Quit" InputGesture="Ctrl+Q" Click="OnQuit" />
+        </MenuItem>
+        <MenuItem Header="_Edit">
+            <MenuItem Header="_Find..." InputGesture="Ctrl+F" Click="OnShowFind" />
+            <MenuItem Header="Find _Next" InputGesture="F3" Click="OnFindNext" />
+            <MenuItem Header="Find _Previous" InputGesture="Shift+F3" Click="OnFindPrevious" />
+            <Separator />
+            <MenuItem Header="_Undo" InputGesture="Ctrl+Z" Click="OnUndo" />
+            <MenuItem Header="_Redo" InputGesture="Ctrl+Shift+Z" Click="OnRedo" />
         </MenuItem>
         <MenuItem Header="_View">
             <MenuItem Header="Zoom _In" InputGesture="Ctrl+OemPlus" Click="OnZoomIn" />

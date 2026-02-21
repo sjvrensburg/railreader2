@@ -3,7 +3,7 @@
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
-    <Version>2.2.2</Version>
+    <Version>2.3.0</Version>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
@@ -12,6 +12,11 @@
     <!-- PDFtoImage marks APIs as platform-specific; we only target desktop (Win/Linux/macOS) -->
     <NoWarn>CA1416</NoWarn>
   </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Assets/fa-solid-900.ttf" />
+    <AvaloniaResource Include="Assets/fa-solid-900.ttf" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Avalonia" Version="11.*" />

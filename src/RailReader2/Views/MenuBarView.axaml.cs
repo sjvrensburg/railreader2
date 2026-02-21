@@ -52,4 +52,11 @@ public partial class MenuBarView : UserControl
     { if (Vm is { } vm) vm.ShowShortcuts = true; }
     private void OnShowAbout(object? s, RoutedEventArgs e)
     { if (Vm is { } vm) vm.ShowAbout = true; }
+
+    // Edit menu handlers
+    private void OnShowFind(object? s, RoutedEventArgs e) => Vm?.OpenSearch();
+    private void OnFindNext(object? s, RoutedEventArgs e) => Vm?.NextMatch();
+    private void OnFindPrevious(object? s, RoutedEventArgs e) => Vm?.PreviousMatch();
+    private void OnUndo(object? s, RoutedEventArgs e) => Vm?.UndoAnnotation();
+    private void OnRedo(object? s, RoutedEventArgs e) => Vm?.RedoAnnotation();
 }

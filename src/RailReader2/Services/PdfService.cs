@@ -8,6 +8,7 @@ public sealed class PdfService : IDisposable
 {
     private readonly byte[] _pdfBytes;
 
+    public byte[] PdfBytes => _pdfBytes;
     public string FilePath { get; }
     public int PageCount { get; }
     public List<OutlineEntry> Outline { get; }

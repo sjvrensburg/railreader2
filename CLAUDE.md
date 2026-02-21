@@ -37,6 +37,8 @@ src/RailReader2/
 ├── RailReader2.csproj          # Project file (dependencies, target framework)
 ├── app.manifest                # Windows application manifest
 ├── Models/
+│   ├── Annotations.cs          # Annotation data model (Highlight, Freehand, Rect, TextNote, persistence)
+│   ├── AnnotationTool.cs       # AnnotationTool enum (None, TextSelect, Highlight, Pen, TextNote, Rectangle, Eraser)
 │   ├── BBox.cs                 # Bounding box (X, Y, W, H) in page-point coordinates
 │   ├── Camera.cs               # Viewport state (OffsetX, OffsetY, Zoom)
 │   ├── ColourEffect.cs         # ColourEffect enum, OverlayPalette, display names
@@ -44,9 +46,13 @@ src/RailReader2/
 │   ├── LineInfo.cs             # Text line within a block (Y center, Height)
 │   ├── NavResult.cs            # Navigation result enum (Ok, PageBoundaryNext/Prev)
 │   ├── OutlineEntry.cs         # PDF bookmark tree node
-│   └── PageAnalysis.cs         # Full analysis for one page (blocks, dimensions)
+│   ├── PageAnalysis.cs         # Full analysis for one page (blocks, dimensions)
+│   ├── PageText.cs             # Extracted page text with per-character bounding boxes
+│   └── SearchMatch.cs          # Search hit (page, char index, length, visual rects)
 ├── Services/
 │   ├── AnalysisWorker.cs       # Background thread for ONNX inference (Channel<T> queues)
+│   ├── AnnotationExportService.cs # Export PDF with annotations rendered into pages
+│   ├── AnnotationService.cs    # Annotation persistence (JSON sidecar files) and rendering
 │   ├── AppConfig.cs            # Config persistence (~/.config/railreader2/config.json)
 │   ├── CleanupService.cs       # Disk cleanup (cache, temp files, old logs)
 │   ├── ColourEffectShaders.cs  # SkSL GPU shaders for accessibility colour effects
@@ -54,20 +60,27 @@ src/RailReader2/
 │   ├── LayoutConstants.cs      # Class labels, input tensor size, thresholds
 │   ├── PdfOutlineExtractor.cs  # PDFium P/Invoke for bookmark extraction
 │   ├── PdfService.cs           # PDF access (page rendering, DPI scaling, page info)
+│   ├── PdfTextService.cs       # Text extraction with per-character bounding boxes (PDFium P/Invoke)
 │   └── RailNav.cs              # Rail navigation state machine (snap, scroll, clamp)
 ├── ViewModels/
 │   ├── MainWindowViewModel.cs  # Central orchestrator (tabs, worker, animation loop, input)
 │   └── TabViewModel.cs         # Per-document state (PDF, camera, rail nav, analysis cache)
+├── Controls/
+│   └── RadialMenu.cs           # Radial context menu for annotation tools (Skia custom draw)
 └── Views/
     ├── MainWindow.axaml/.cs    # Window with compositor camera transforms, keyboard handling
     ├── ViewportPanel.cs        # Custom panel for zoom/pan/click input handling
     ├── PdfPageLayer.cs         # Custom draw: renders PDF bitmap via ICustomDrawOperation
     ├── RailOverlayLayer.cs     # Custom draw: rail mode dim/highlight/debug overlays
+    ├── AnnotationLayer.cs      # Custom draw: renders annotations and text selection
+    ├── SearchHighlightLayer.cs # Custom draw: search match highlighting
+    ├── SearchBarView.axaml/.cs # Search bar overlay (Ctrl+F) with regex/case toggles
+    ├── ToolBarView.axaml/.cs   # Browse/Text Select/Copy toolbar overlay
     ├── MinimapControl.axaml/.cs    # Interactive minimap overlay
     ├── OutlinePanel.axaml/.cs      # TOC/bookmark side panel
     ├── TabBarView.axaml/.cs        # Custom tab bar with close buttons
     ├── MenuBarView.axaml/.cs       # File/View/Navigation/Help menus
-    ├── StatusBarView.axaml/.cs     # Page number, zoom level, rail mode status
+    ├── StatusBarView.axaml/.cs     # Page number, zoom level, rail/annotation mode status
     ├── SettingsWindow.axaml/.cs    # Live-editable settings panel
     ├── ShortcutsDialog.axaml/.cs   # Keyboard shortcuts help dialog (F1)
     ├── AboutDialog.axaml/.cs       # Version info and credits
@@ -98,6 +111,12 @@ scripts/
 - **Splash screen**: `SplashWindow` shows immediately on startup while config loads and ONNX worker initializes. Closed when the main window opens. Status bar shows "Analyzing..." while ONNX inference is in progress for the current page (`PendingRailSetup`).
 - **Startup sequencing**: `window.Opened` can fire before `MainWindow.OnLoaded` finishes wiring `_invalidation`. `OnLoaded` guards against this by re-centering and forcing a camera update if a tab is already present. `PdfPageLayer.Render` uses tab page dimensions for the draw-op bounds (not `Bounds.Width/Height`) so the compositor does not cull the draw operation before the first layout pass completes.
 - **Multi-tab**: `TabViewModel` holds per-document state (PDF, camera, rail nav, analysis cache, outline, cached bitmap, minimap thumbnail). `MainWindowViewModel` owns the tab collection and shared resources (ONNX session, config, shaders).
+- **Search**: Full-text search across all pages with regex and case-sensitivity support. `PdfTextService` extracts text with per-character bounding boxes via PDFium P/Invoke. Matches are highlighted via `SearchHighlightLayer` with the active match emphasized. Search bar overlay (Ctrl+F) with match count and prev/next navigation.
+- **Annotations**: Five annotation tools (Highlight, Pen, Rectangle, TextNote, Eraser) accessible via right-click radial menu. Annotations are persisted as JSON sidecar files (`<pdf>.annotations.json`) via `AnnotationService`. Undo/redo stack per tab. Export to PDF via `AnnotationExportService` which renders annotations into page bitmaps.
+- **Text selection**: Browse/Text Select/Copy toolbar (top-left overlay, `ToolBarView`) provides mode switching. Text select mode uses character-level hit testing from `PdfTextService` to build selection rectangles. Selected text is rendered via `AnnotationLayer` and copied to clipboard via Ctrl+C.
+- **Radial menu**: `RadialMenu` is a Skia-rendered radial context menu with Font Awesome icons (embedded `fa-solid-900.ttf`). Shows annotation tools only. Centre button closes. Segments are static (configured once in `SetupRadialMenu`).
+- **Toolbar**: `ToolBarView` provides Browse (pan mode), Text Select, and Copy buttons as a floating overlay. Uses `avares://` font resource for Font Awesome icons. Copy button appears only when text is selected. Active mode is indicated by a blue toggle highlight.
+- **Status bar annotation indicator**: When an annotation tool or text select is active, the status bar shows the tool name in amber with a clickable exit button, matching the Rail Mode display pattern.
 
 ### Dependencies
 
@@ -323,6 +342,13 @@ If the model is not found, the app logs a warning and falls back to horizontal-s
 | `→` / `D` | Scroll right (rail) / pan right |
 | `←` / `A` | Scroll left (rail) / pan left |
 | Click | Jump to block (rail mode) |
+| `Ctrl+F` | Open search bar |
+| `F3` / `Shift+F3` | Next / previous search match |
+| `Escape` | Close search / cancel annotation tool |
+| Right-click | Open annotation radial menu |
+| `Ctrl+Z` | Undo annotation |
+| `Ctrl+Y` / `Ctrl+Shift+Z` | Redo annotation |
+| `Ctrl+C` | Copy selected text |
 
 On-screen `◀` / `▶` buttons in the status bar provide mouse-accessible page navigation.
 

@@ -55,6 +55,18 @@
                 <TextBlock Grid.Row="6" Grid.Column="1" Text="Toggle debug overlay" Margin="0,2" />
             </Grid>
 
+            <TextBlock Text="Search" FontWeight="Bold" FontSize="14" />
+            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto" Margin="8,0">
+                <TextBlock Grid.Row="0" Grid.Column="0" Text="Ctrl+F" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="0" Grid.Column="1" Text="Open find bar" Margin="0,2" />
+                <TextBlock Grid.Row="1" Grid.Column="0" Text="Enter" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="1" Grid.Column="1" Text="Next match" Margin="0,2" />
+                <TextBlock Grid.Row="2" Grid.Column="0" Text="Shift+Enter / Shift+F3" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="2" Grid.Column="1" Text="Previous match" Margin="0,2" />
+                <TextBlock Grid.Row="3" Grid.Column="0" Text="Escape" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="3" Grid.Column="1" Text="Close find bar" Margin="0,2" />
+            </Grid>
+
             <TextBlock Text="Rail Mode (active above zoom threshold)" FontWeight="Bold" FontSize="14" />
             <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" Margin="8,0">
                 <TextBlock Grid.Row="0" Grid.Column="0" Text="Down / S" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
@@ -75,6 +87,20 @@
                 <TextBlock Grid.Row="0" Grid.Column="1" Text="Pan" Margin="0,2" />
                 <TextBlock Grid.Row="1" Grid.Column="0" Text="Click+drag" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
                 <TextBlock Grid.Row="1" Grid.Column="1" Text="Pan" Margin="0,2" />
+            </Grid>
+
+            <TextBlock Text="Annotations" FontWeight="Bold" FontSize="14" />
+            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" Margin="8,0">
+                <TextBlock Grid.Row="0" Grid.Column="0" Text="Right-click" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="0" Grid.Column="1" Text="Radial tool menu" Margin="0,2" />
+                <TextBlock Grid.Row="1" Grid.Column="0" Text="Escape" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="1" Grid.Column="1" Text="Cancel tool / close menu" Margin="0,2" />
+                <TextBlock Grid.Row="2" Grid.Column="0" Text="Ctrl+Z" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="2" Grid.Column="1" Text="Undo annotation" Margin="0,2" />
+                <TextBlock Grid.Row="3" Grid.Column="0" Text="Ctrl+Shift+Z" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="3" Grid.Column="1" Text="Redo annotation" Margin="0,2" />
+                <TextBlock Grid.Row="4" Grid.Column="0" Text="Ctrl+C" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="4" Grid.Column="1" Text="Copy selected text" Margin="0,2" />
             </Grid>
         </StackPanel>
     </ScrollViewer>

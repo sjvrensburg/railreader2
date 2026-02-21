@@ -1,0 +1,112 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:RailReader2.ViewModels"
+             x:Class="RailReader2.Views.SearchBarView"
+             x:DataType="vm:MainWindowViewModel">
+    <UserControl.Styles>
+        <Style Selector="ToggleButton">
+            <Setter Property="Background" Value="#404040" />
+            <Setter Property="Foreground" Value="#E0E0E0" />
+            <Setter Property="BorderBrush" Value="#606060" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="3" />
+        </Style>
+        <Style Selector="ToggleButton:checked">
+            <Setter Property="Background" Value="#0078D4" />
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="BorderBrush" Value="#0078D4" />
+        </Style>
+        <Style Selector="ToggleButton:pointerover">
+            <Setter Property="Background" Value="#505050" />
+            <Setter Property="Foreground" Value="#FFFFFF" />
+        </Style>
+        <Style Selector="ToggleButton:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Foreground" Value="#FFFFFF" />
+        </Style>
+        <Style Selector="ToggleButton:checked:pointerover">
+            <Setter Property="Background" Value="#1084D8" />
+        </Style>
+        <Style Selector="ToggleButton:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Foreground" Value="#FFFFFF" />
+        </Style>
+        <Style Selector="Button.searchBtn">
+            <Setter Property="Background" Value="#404040" />
+            <Setter Property="Foreground" Value="#E0E0E0" />
+            <Setter Property="BorderBrush" Value="#606060" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="3" />
+        </Style>
+        <Style Selector="Button.searchBtn:pointerover">
+            <Setter Property="Background" Value="#505050" />
+            <Setter Property="Foreground" Value="#FFFFFF" />
+        </Style>
+        <Style Selector="Button.searchBtn:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Foreground" Value="#FFFFFF" />
+        </Style>
+    </UserControl.Styles>
+
+    <Border Background="#252526"
+            BorderBrush="#555555"
+            BorderThickness="1"
+            CornerRadius="4"
+            Padding="8,6"
+            MinWidth="380">
+        <StackPanel Orientation="Horizontal" Spacing="6">
+            <TextBox Name="SearchInput"
+                     Watermark="Find..."
+                     Width="180"
+                     FontSize="13" />
+            <ToggleButton Name="CaseSensitiveToggle"
+                          Content="Aa"
+                          ToolTip.Tip="Case Sensitive"
+                          Width="32" Height="28"
+                          FontSize="12"
+                          HorizontalContentAlignment="Center"
+                          VerticalContentAlignment="Center"
+                          Padding="0" />
+            <ToggleButton Name="RegexToggle"
+                          Content=".*"
+                          ToolTip.Tip="Regex"
+                          Width="32" Height="28"
+                          FontSize="12"
+                          HorizontalContentAlignment="Center"
+                          VerticalContentAlignment="Center"
+                          Padding="0" />
+            <TextBlock Name="MatchCount"
+                       Text="0 of 0"
+                       VerticalAlignment="Center"
+                       Foreground="#D0D0D0"
+                       FontSize="12"
+                       MinWidth="54"
+                       TextAlignment="Center"
+                       Margin="4,0" />
+            <Button Name="PrevButton"
+                    Classes="searchBtn"
+                    Content="&#x25B2;"
+                    ToolTip.Tip="Previous Match (Shift+Enter)"
+                    Width="28" Height="28"
+                    FontSize="11"
+                    HorizontalContentAlignment="Center"
+                    VerticalContentAlignment="Center"
+                    Padding="0" />
+            <Button Name="NextButton"
+                    Classes="searchBtn"
+                    Content="&#x25BC;"
+                    ToolTip.Tip="Next Match (Enter)"
+                    Width="28" Height="28"
+                    FontSize="11"
+                    HorizontalContentAlignment="Center"
+                    VerticalContentAlignment="Center"
+                    Padding="0" />
+            <Button Name="CloseButton"
+                    Classes="searchBtn"
+                    Content="&#x2715;"
+                    ToolTip.Tip="Close (Escape)"
+                    Width="28" Height="28"
+                    FontSize="11"
+                    HorizontalContentAlignment="Center"
+                    VerticalContentAlignment="Center"
+                    Padding="0" />
+        </StackPanel>
+    </Border>
+</UserControl>

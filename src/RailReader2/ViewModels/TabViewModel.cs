@@ -1,3 +1,4 @@
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using RailReader2.Models;
 using RailReader2.Services;
@@ -23,8 +24,16 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
     public Camera Camera { get; } = new();
     public RailNav Rail { get; }
     public Dictionary<int, PageAnalysis> AnalysisCache { get; } = [];
+    public Dictionary<int, PageText> TextCache { get; } = [];
     public Queue<int> PendingAnalysis { get; } = new();
     public List<OutlineEntry> Outline { get; }
+
+    // Annotations
+    public AnnotationFile? Annotations { get; set; }
+    public bool AnnotationsDirty { get; set; }
+    public Stack<IUndoAction> UndoStack { get; } = new();
+    public Stack<IUndoAction> RedoStack { get; } = new();
+    private DispatcherTimer? _autoSaveTimer;
 
     // Cached page bitmap, GPU-ready image, and the DPI it was rendered at
     public SKBitmap? CachedBitmap { get; private set; }
@@ -317,8 +326,110 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
         Rail.StartSnapToCurrent(Camera.OffsetX, Camera.OffsetY, Camera.Zoom, windowWidth, windowHeight);
     }
 
+    public void LoadAnnotations()
+    {
+        Annotations = AnnotationService.Load(FilePath) ?? new AnnotationFile
+        {
+            SourcePdf = Path.GetFileName(FilePath),
+        };
+    }
+
+    public void SaveAnnotations()
+    {
+        if (Annotations is not null && AnnotationsDirty)
+        {
+            bool hasAnnotations = Annotations.Pages.Values.Any(list => list.Count > 0);
+            var sidecarPath = AnnotationService.GetSidecarPath(FilePath);
+            if (hasAnnotations)
+            {
+                AnnotationService.Save(FilePath, Annotations);
+            }
+            else if (File.Exists(sidecarPath))
+            {
+                // All annotations removed — clean up the now-empty sidecar
+                try { File.Delete(sidecarPath); }
+                catch { /* ignore */ }
+            }
+            AnnotationsDirty = false;
+        }
+    }
+
+    public void MarkAnnotationsDirty()
+    {
+        AnnotationsDirty = true;
+        // Debounced auto-save: save 1 second after last modification
+        _autoSaveTimer?.Stop();
+        _autoSaveTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        _autoSaveTimer.Tick += (_, _) =>
+        {
+            _autoSaveTimer.Stop();
+            SaveAnnotations();
+        };
+        _autoSaveTimer.Start();
+    }
+
+    public void AddAnnotation(int page, Annotation annotation)
+    {
+        if (Annotations is null) return;
+        if (!Annotations.Pages.TryGetValue(page, out var list))
+        {
+            list = [];
+            Annotations.Pages[page] = list;
+        }
+        list.Add(annotation);
+
+        var action = new AddAnnotationAction(page, annotation);
+        UndoStack.Push(action);
+        RedoStack.Clear();
+        MarkAnnotationsDirty();
+    }
+
+    public void RemoveAnnotation(int page, Annotation annotation)
+    {
+        if (Annotations is null) return;
+        var action = new RemoveAnnotationAction(page, annotation);
+        action.Redo(Annotations, page);
+
+        UndoStack.Push(action);
+        RedoStack.Clear();
+        MarkAnnotationsDirty();
+    }
+
+    public void Undo()
+    {
+        if (UndoStack.Count == 0 || Annotations is null) return;
+        var action = UndoStack.Pop();
+        action.Undo(Annotations, CurrentPage);
+        RedoStack.Push(action);
+        MarkAnnotationsDirty();
+    }
+
+    public void Redo()
+    {
+        if (RedoStack.Count == 0 || Annotations is null) return;
+        var action = RedoStack.Pop();
+        action.Redo(Annotations, CurrentPage);
+        UndoStack.Push(action);
+        MarkAnnotationsDirty();
+    }
+
+    /// <summary>
+    /// Returns cached text for a page, extracting it on first access.
+    /// PDFium text extraction is fast (<1ms per page typically), safe to call on UI thread.
+    /// </summary>
+    public PageText GetOrExtractText(int pageIndex)
+    {
+        if (TextCache.TryGetValue(pageIndex, out var cached))
+            return cached;
+        var text = PdfTextService.ExtractPageText(_pdf.PdfBytes, pageIndex);
+        TextCache[pageIndex] = text;
+        return text;
+    }
+
     public void Dispose()
     {
+        _autoSaveTimer?.Stop();
+        SaveAnnotations();
         // Null references first so the render thread sees null,
         // then dispose. The tab should already be removed from Tabs by now.
         var img = CachedImage;
