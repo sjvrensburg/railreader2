@@ -14,6 +14,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <EmbeddedResource Include="Assets/fa-solid-900.ttf" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Avalonia" Version="11.*" />
     <PackageReference Include="Avalonia.Desktop" Version="11.*" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="11.*" />

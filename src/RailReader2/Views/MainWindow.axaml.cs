@@ -2,6 +2,8 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
+using RailReader2.Controls;
+using RailReader2.Models;
 using RailReader2.ViewModels;
 
 namespace RailReader2.Views;
@@ -39,12 +41,16 @@ public partial class MainWindow : Window
                     Minimap.InvalidateVisual();
                 },
                 InvalidateOverlay = () => OverlayLayer.InvalidateVisual(),
+                InvalidateSearch = () => SearchLayer.InvalidateVisual(),
+                InvalidateAnnotations = () => AnnotationLayer.InvalidateVisual(),
             });
 
             vm.SetInvalidateCanvas(() =>
             {
                 UpdateCameraTransform();
                 PageLayer.InvalidateVisual();
+                SearchLayer.InvalidateVisual();
+                AnnotationLayer.InvalidateVisual();
                 OverlayLayer.InvalidateVisual();
                 Minimap.InvalidateVisual();
             });
@@ -65,6 +71,7 @@ public partial class MainWindow : Window
             };
 
             UpdateLayerBindings(vm.ActiveTab);
+            SetupRadialMenu(vm);
 
             // window.Opened (which calls OpenDocument) can fire before OnLoaded
             // finishes wiring _invalidation. If a tab is already present, the
@@ -86,6 +93,8 @@ public partial class MainWindow : Window
                         UpdateLayerBindings(vm.ActiveTab);
                         UpdateCameraTransform();
                         PageLayer.InvalidateVisual();
+                        SearchLayer.InvalidateVisual();
+                        AnnotationLayer.InvalidateVisual();
                         OverlayLayer.InvalidateVisual();
                         Minimap.InvalidateVisual();
                         break;
@@ -106,12 +115,62 @@ public partial class MainWindow : Window
         }
     }
 
+    private void SetupRadialMenu(MainWindowViewModel vm)
+    {
+        RadialMenuControl.Scale = vm.Config.UiFontScale;
+
+        // Wire clipboard callback
+        vm.CopyToClipboard = async text =>
+        {
+            var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
+            if (clipboard is not null)
+                await clipboard.SetTextAsync(text);
+        };
+
+        // Wire dynamic radial menu rebuild
+        vm.OnRadialMenuOpening = () => UpdateRadialMenuSegments(vm);
+
+        // Initial segments
+        UpdateRadialMenuSegments(vm);
+    }
+
+    private void UpdateRadialMenuSegments(MainWindowViewModel vm)
+    {
+        var segments = new List<RadialMenu.Segment>();
+
+        segments.Add(new RadialMenu.Segment("Select", RadialMenu.IconChars.ICursor,
+            () => vm.SetAnnotationTool(AnnotationTool.TextSelect)));
+
+        if (vm.SelectedText is not null)
+        {
+            segments.Add(new RadialMenu.Segment("Copy", RadialMenu.IconChars.Copy,
+                () => vm.CopySelectedText()));
+        }
+
+        segments.Add(new RadialMenu.Segment("Highlight", RadialMenu.IconChars.Highlighter,
+            () => vm.SetAnnotationTool(AnnotationTool.Highlight)));
+        segments.Add(new RadialMenu.Segment("Pen", RadialMenu.IconChars.Pen,
+            () => vm.SetAnnotationTool(AnnotationTool.Pen)));
+        segments.Add(new RadialMenu.Segment("Text", RadialMenu.IconChars.TextHeight,
+            () => vm.SetAnnotationTool(AnnotationTool.TextNote)));
+        segments.Add(new RadialMenu.Segment("Rect", RadialMenu.IconChars.Square,
+            () => vm.SetAnnotationTool(AnnotationTool.Rectangle)));
+        segments.Add(new RadialMenu.Segment("Eraser", RadialMenu.IconChars.Eraser,
+            () => vm.SetAnnotationTool(AnnotationTool.Eraser)));
+
+        RadialMenuControl.SetSegments(segments, onClose: () => vm.CloseRadialMenu());
+    }
+
     private void UpdateLayerBindings(TabViewModel? tab)
     {
         PageLayer.Tab = tab;
         PageLayer.ColourEffects = Vm?.ColourEffects;
         PageLayer.MotionBlurEnabled = Vm?.Config.MotionBlur ?? true;
         PageLayer.MotionBlurIntensity = Vm?.Config.MotionBlurIntensity ?? 0.5;
+        SearchLayer.Tab = tab;
+        SearchLayer.ViewModel = Vm;
+        AnnotationLayer.Tab = tab;
+        AnnotationLayer.ViewModel = Vm;
         OverlayLayer.Tab = tab;
         OverlayLayer.ColourEffects = Vm?.ColourEffects;
 
@@ -173,6 +232,19 @@ public partial class MainWindow : Window
                     vm.ShowMinimap = !vm.ShowMinimap; e.Handled = true; return;
                 case Key.OemComma:
                     vm.ShowSettings = true; e.Handled = true; return;
+                case Key.F:
+                    vm.OpenSearch();
+                    SearchBar.FocusSearch();
+                    e.Handled = true; return;
+                case Key.Z when shift:
+                    vm.RedoAnnotation(); e.Handled = true; return;
+                case Key.Z:
+                    vm.UndoAnnotation(); e.Handled = true; return;
+                case Key.Y:
+                    vm.RedoAnnotation(); e.Handled = true; return;
+                case Key.C:
+                    if (vm.SelectedText is not null) vm.CopySelectedText();
+                    e.Handled = true; return;
                 case Key.Home:
                     vm.GoToPage(0); e.Handled = true; return;
                 case Key.End:
@@ -185,26 +257,33 @@ public partial class MainWindow : Window
             }
         }
 
+        // When the search TextBox has focus, let text input keys through.
+        // Only intercept non-text keys (F-keys, Escape, PgUp/PgDn, etc.).
+        bool searchFocused = vm.ShowSearch && SearchBar.IsSearchInputFocused;
+
         // Navigation keys always handled at window level.
         // Ctrl cases above already return, so ctrl is never held here.
         switch (e.Key)
         {
-            case Key.Down or Key.S:
+            case Key.Down when !searchFocused:
+            case Key.S when !searchFocused:
                 vm.HandleArrowDown(); e.Handled = true; break;
-            case Key.Up or Key.W:
+            case Key.Up when !searchFocused:
+            case Key.W when !searchFocused:
                 vm.HandleArrowUp(); e.Handled = true; break;
-            case Key.Right:
+            case Key.Right when !searchFocused:
                 vm.HandleArrowRight(); e.Handled = true; break;
-            case Key.Left or Key.A:
+            case Key.Left when !searchFocused:
+            case Key.A when !searchFocused:
                 vm.HandleArrowLeft(); e.Handled = true; break;
-            case Key.D when e.KeyModifiers.HasFlag(KeyModifiers.Shift):
+            case Key.D when !searchFocused && e.KeyModifiers.HasFlag(KeyModifiers.Shift):
                 if (vm.ActiveTab is { } dbgTab)
                 {
                     dbgTab.DebugOverlay = !dbgTab.DebugOverlay;
                     OverlayLayer.InvalidateVisual();
                 }
                 e.Handled = true; break;
-            case Key.D:
+            case Key.D when !searchFocused:
                 vm.HandleArrowRight(); e.Handled = true; break;
             case Key.PageDown:
                 if (vm.ActiveTab is { } t1) vm.GoToPage(t1.CurrentPage + 1);
@@ -212,21 +291,31 @@ public partial class MainWindow : Window
             case Key.PageUp:
                 if (vm.ActiveTab is { } t2) vm.GoToPage(t2.CurrentPage - 1);
                 e.Handled = true; break;
-            case Key.Home:
+            case Key.Home when !searchFocused:
                 vm.GoToPage(0); e.Handled = true; break;
-            case Key.End:
+            case Key.End when !searchFocused:
                 if (vm.ActiveTab is { } t3) vm.GoToPage(t3.PageCount - 1);
                 e.Handled = true; break;
-            case Key.OemPlus or Key.Add:
+            case Key.OemPlus or Key.Add when !searchFocused:
                 vm.HandleZoomKey(true); e.Handled = true; break;
-            case Key.OemMinus or Key.Subtract:
+            case Key.OemMinus or Key.Subtract when !searchFocused:
                 vm.HandleZoomKey(false); e.Handled = true; break;
-            case Key.D0 or Key.NumPad0:
+            case Key.D0 or Key.NumPad0 when !searchFocused:
                 vm.HandleResetZoom(); e.Handled = true; break;
-            case Key.Space:
+            case Key.Space when !searchFocused:
                 vm.HandleArrowDown(); e.Handled = true; break;
             case Key.F1:
                 vm.ShowShortcuts = true; e.Handled = true; break;
+            case Key.F3 when e.KeyModifiers.HasFlag(KeyModifiers.Shift):
+                vm.PreviousMatch(); e.Handled = true; break;
+            case Key.F3:
+                vm.NextMatch(); e.Handled = true; break;
+            case Key.Escape when vm.IsRadialMenuOpen:
+                vm.CloseRadialMenu(); e.Handled = true; break;
+            case Key.Escape when vm.IsAnnotating:
+                vm.CancelAnnotationTool(); e.Handled = true; break;
+            case Key.Escape when vm.ShowSearch:
+                vm.CloseSearch(); e.Handled = true; break;
         }
 
         if (!e.Handled)
