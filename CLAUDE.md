@@ -85,6 +85,7 @@ src/RailReader2/
     ├── ShortcutsDialog.axaml/.cs   # Keyboard shortcuts help dialog (F1)
     ├── AboutDialog.axaml/.cs       # Version info and credits
     ├── TextNoteDialog.axaml/.cs    # Modal text input dialog for creating/editing TextNote annotations
+    ├── RailToolBar.axaml/.cs       # Rail mode speed/blur/auto-scroll sliders (right edge)
     ├── GoToPageDialog.axaml/.cs    # Modal go-to-page dialog (Ctrl+G)
     ├── LoadingOverlay.axaml/.cs    # Loading spinner overlay
     └── SplashWindow.axaml/.cs      # Startup splash screen
@@ -102,7 +103,7 @@ scripts/
 
 - **Rendering pipeline**: PDF bytes held in memory → PDFtoImage (PDFium) rasterises pages to `SKBitmap` at zoom-proportional DPI (150–600, capped to avoid ~35 MP bitmaps) → `SKImage` uploaded to GPU → drawn via Avalonia's `ICustomDrawOperation` / `ISkiaSharpApiLeaseFeature` → `SKCanvas` using `SKCubicResampler.Mitchell` for sharp text. Camera pan/zoom are compositor-level `MatrixTransform` on the `CameraPanel` (no bitmap repaint needed). DPI upgrades happen asynchronously via `Task.Run`; the swap is atomic (new `SKImage` is built before replacing the old one) to avoid blank frames.
 - **Layout analysis**: Page bitmap → BGRA-to-RGB → 800×800 bilinear rescale → CHW float tensor (pixels/255) → PP-DocLayoutV3 ONNX (`im_shape`, `image`, `scale_factor` inputs) → `[N,7]` detection tensor `[classId, confidence, xmin, ymin, xmax, ymax, readingOrder]` → confidence filter (0.4) → NMS (IoU 0.5) → sort by reading order → horizontal projection line detection per block. Input pixmap preparation (`RenderPagePixmap`) runs on a background thread via `Task.Run`; ONNX inference runs on a dedicated `Channel<T>`-based background worker thread (`AnalysisWorker`).
-- **Rail mode**: Activates above configurable zoom threshold when analysis is available. Navigation locks to detected text blocks, advances line-by-line with cubic ease-out snap animations. Horizontal scrolling uses hold-to-scroll with quadratic speed ramping (integrated for frame-rate-independent displacement). Click-to-select jumps to any navigable block. Rail overlay (None palette) uses `DimExcludesBlock=true` with a yellow highlighter-style line tint for readable contrast.
+- **Rail mode**: Activates above configurable zoom threshold when analysis is available. Navigation locks to detected text blocks, advances line-by-line with cubic ease-out snap animations. Horizontal scrolling uses hold-to-scroll with quadratic speed ramping (integrated for frame-rate-independent displacement). Click-to-select jumps to any navigable block. Rail overlay (None palette) uses `DimExcludesBlock=true` with a yellow highlighter-style line tint for readable contrast. `VerticalBias` preserves user's panned vertical offset across line navigation (instead of always centering). Home/End keys snap to line start/end horizontally. Auto-scroll (`P` key) advances lines at a configurable interval.
 - **Config**: `AppConfig` reads/writes `~/.config/railreader2/config.json` (Linux) or `%APPDATA%\railreader2\config.json` (Windows) via `System.Text.Json` with snake_case naming. Loaded at startup; editable live via Settings panel; changes auto-save. `UiFontScale` is applied by setting `Window.FontSize = 14.0 * scale` (inherited by all child controls); dialogs receive the current font size at creation time. `RecentFiles` (max 10) tracks recently opened PDFs; updated on each `OpenDocument()` call, persisted in config JSON, and shown in File → Recent Files submenu.
 - **Fit Width**: `TabViewModel.FitWidth()` sets zoom so the page fills the viewport horizontally (top-aligned if taller than viewport). Accessible via View → Fit Width menu. Complements the existing `CenterPage()` (fit-page) which fits both dimensions.
 - **Analysis caching**: Per-tab `Dictionary<int, PageAnalysis> AnalysisCache` avoids re-running ONNX inference on revisited pages. Lookahead analysis pre-processes upcoming pages when the worker is idle.
@@ -120,6 +121,9 @@ scripts/
 - **Radial menu**: `RadialMenu` is a Skia-rendered radial context menu with Font Awesome icons (embedded `fa-solid-900.ttf`). Shows annotation tools only. Centre button closes. Segments are static (configured once in `SetupRadialMenu`).
 - **Toolbar**: `ToolBarView` provides Browse (pan mode), Text Select, and Copy buttons as a floating overlay. Uses `avares://` font resource for Font Awesome icons. Copy button appears only when text is selected. Active mode is indicated by a blue toggle highlight.
 - **Status bar annotation indicator**: When an annotation tool or text select is active, the status bar shows the tool name in amber with a clickable exit button, matching the Rail Mode display pattern.
+- **Rail toolbar**: `RailToolBar` is a slim vertical toolbar docked inline to the right edge of the viewport (pushes content aside, not an overlay), visible only in rail mode. Contains vertical sliders for scroll speed and motion blur intensity. Values sync bidirectionally with `AppConfig` and persist across sessions. Labels inherit `Window.FontSize` for proper UI scaling. Keyboard shortcuts `[`/`]` adjust speed, `Shift+[`/`Shift+]` adjust blur.
+- **Auto-scroll**: Toggleable via `P` key in rail mode. Continuously scrolls horizontally along the current line at the current speed setting, then advances to the next line when reaching the block's right edge. Holding `D`/`Right` during auto-scroll doubles the speed (boost). Disengages on opposing navigation (Up, Left), panning, or zooming. Status bar shows green "Auto-Scroll" indicator with pause button when active. Stops automatically when leaving rail mode.
+- **Tab styling**: `TabBarView` uses programmatic styling with distinct active/inactive appearances — active tab has blue background with bold white text and a blue bottom indicator bar; inactive tabs have muted grey styling.
 
 ### Dependencies
 
@@ -346,6 +350,11 @@ If the model is not found, the app logs a warning and falls back to horizontal-s
 | `↑` / `W` | Previous line (rail) / pan up |
 | `→` / `D` | Scroll right (rail) / pan right |
 | `←` / `A` | Scroll left (rail) / pan left |
+| `Home` | Line start (rail) / first page |
+| `End` | Line end (rail) / last page |
+| `P` | Toggle auto-scroll (rail) |
+| `[` / `]` | Adjust scroll speed (rail) |
+| `Shift+[` / `Shift+]` | Adjust blur intensity (rail) |
 | Click | Jump to block (rail mode) |
 | `Ctrl+F` | Open search bar |
 | `F3` / `Shift+F3` | Next / previous search match |

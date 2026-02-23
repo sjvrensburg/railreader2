@@ -14,15 +14,30 @@ public sealed class RailNav
     public bool Active { get; set; }
     public double ScrollSpeed { get; private set; }
 
+    /// <summary>
+    /// Vertical offset from center (in pixels). Positive = line drawn above center.
+    /// Set by user panning in rail mode; preserved across line navigation.
+    /// </summary>
+    public double VerticalBias { get; set; }
+
     private SnapAnimation? _snap;
     private ScrollDirection? _scrollDir;
     private Stopwatch? _scrollHoldTimer;
     private double _scrollStartX;
 
+    // Auto-scroll state: continuous forward scroll along the line then advance
+    public bool AutoScrolling { get; private set; }
+    private double _autoScrollSpeed; // pixels/sec in page coordinates
+    private bool _autoScrollBoost;   // true while user holds D/Right during auto-scroll
+
     public RailNav(AppConfig config) => _config = config;
 
     public void SetAnalysis(PageAnalysis analysis, HashSet<int> navigable)
     {
+        // If re-applying the same analysis (e.g. config change that didn't affect
+        // navigable classes), preserve the current navigation position.
+        bool sameAnalysis = ReferenceEquals(_analysis, analysis);
+
         _navigableIndices.Clear();
         for (int i = 0; i < analysis.Blocks.Count; i++)
         {
@@ -30,11 +45,24 @@ public sealed class RailNav
                 _navigableIndices.Add(i);
         }
         _analysis = analysis;
-        CurrentBlock = 0;
-        CurrentLine = 0;
-        _snap = null;
-        _scrollDir = null;
-        _scrollHoldTimer = null;
+
+        if (!sameAnalysis)
+        {
+            CurrentBlock = 0;
+            CurrentLine = 0;
+            VerticalBias = 0;
+            _snap = null;
+            _scrollDir = null;
+            _scrollHoldTimer = null;
+        }
+        else
+        {
+            // Clamp in case navigable set changed and current block is out of range
+            if (CurrentBlock >= _navigableIndices.Count)
+                CurrentBlock = Math.Max(0, _navigableIndices.Count - 1);
+            if (_navigableIndices.Count > 0 && CurrentLine >= CurrentNavigableBlock.Lines.Count)
+                CurrentLine = Math.Max(0, CurrentNavigableBlock.Lines.Count - 1);
+        }
     }
 
     public bool HasAnalysis => _analysis is not null && _navigableIndices.Count > 0;
@@ -159,9 +187,49 @@ public sealed class RailNav
     {
         var block = CurrentNavigableBlock;
         var line = CurrentLineInfo;
-        double targetY = windowHeight / 2.0 - line.Y * zoom;
+        double targetY = windowHeight / 2.0 - line.Y * zoom + VerticalBias;
         double targetX = windowWidth * 0.05 - block.BBox.X * zoom;
         return (targetX, targetY);
+    }
+
+    /// <summary>
+    /// Captures the vertical bias from the current camera position relative to
+    /// where the current line's center-aligned position would be.
+    /// Call this when the user manually pans while in rail mode.
+    /// </summary>
+    public void CaptureVerticalBias(double cameraY, double zoom, double windowHeight)
+    {
+        if (!Active || _navigableIndices.Count == 0) return;
+        var line = CurrentLineInfo;
+        double centeredY = windowHeight / 2.0 - line.Y * zoom;
+        VerticalBias = cameraY - centeredY;
+    }
+
+    /// <summary>
+    /// Returns the camera X to show the left edge of the current block at the left margin.
+    /// Returns null if not in rail mode.
+    /// </summary>
+    public double? ComputeLineStartX(double zoom, double windowWidth)
+    {
+        if (!Active || _navigableIndices.Count == 0) return null;
+        var block = CurrentNavigableBlock;
+        double x = windowWidth * 0.05 - block.BBox.X * zoom;
+        _snap = null;
+        return ClampX(x, zoom, windowWidth);
+    }
+
+    /// <summary>
+    /// Returns the camera X to show the right edge of the current block at the right margin.
+    /// Returns null if not in rail mode.
+    /// </summary>
+    public double? ComputeLineEndX(double zoom, double windowWidth)
+    {
+        if (!Active || _navigableIndices.Count == 0) return null;
+        var block = CurrentNavigableBlock;
+        double blockRight = block.BBox.X + block.BBox.W;
+        double x = windowWidth * 0.95 - blockRight * zoom;
+        _snap = null;
+        return ClampX(x, zoom, windowWidth);
     }
 
     private double ClampX(double cameraX, double zoom, double windowWidth)
@@ -268,6 +336,50 @@ public sealed class RailNav
                 return i;
         }
         return null;
+    }
+
+    /// <summary>
+    /// Starts auto-scroll at the given speed (page-coordinate pixels/sec).
+    /// </summary>
+    public void StartAutoScroll(double speed)
+    {
+        if (!Active || _navigableIndices.Count == 0) return;
+        AutoScrolling = true;
+        _autoScrollSpeed = speed;
+        _autoScrollBoost = false;
+        // Stop any manual scroll
+        StopScroll();
+    }
+
+    public void StopAutoScroll()
+    {
+        AutoScrolling = false;
+        _autoScrollSpeed = 0;
+        _autoScrollBoost = false;
+    }
+
+    /// <summary>Set/clear the boost flag (user holding D/Right during auto-scroll).</summary>
+    public void SetAutoScrollBoost(bool boost) => _autoScrollBoost = boost;
+
+    /// <summary>
+    /// Returns true if auto-scroll has reached the right edge and should advance.
+    /// Called from Tick; the caller is responsible for calling NextLine and snapping.
+    /// </summary>
+    public bool TickAutoScroll(ref double cameraX, double dtSecs, double zoom, double windowWidth)
+    {
+        if (!AutoScrolling || _navigableIndices.Count == 0) return false;
+
+        double speed = _autoScrollBoost ? _autoScrollSpeed * 2.0 : _autoScrollSpeed;
+        // Move camera left (negative X) to scroll content right
+        cameraX -= speed * zoom * dtSecs;
+        cameraX = ClampX(cameraX, zoom, windowWidth);
+
+        // Check if we've reached the right edge of the block
+        var block = CurrentNavigableBlock;
+        double blockRight = block.BBox.X + block.BBox.W + block.BBox.W * 0.05;
+        double visibleRight = (-cameraX + windowWidth) / zoom;
+
+        return visibleRight >= blockRight;
     }
 
     public void UpdateConfig(AppConfig config) => _config = config;

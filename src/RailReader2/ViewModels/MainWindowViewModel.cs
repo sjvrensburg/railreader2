@@ -71,6 +71,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
     // Clipboard callback wired by MainWindow
     public Action<string>? CopyToClipboard { get; set; }
 
+    // Auto-scroll state (driven by animation frame loop via RailNav)
+    public bool AutoScrollActive { get; private set; }
+
     public AppConfig Config => _config;
     public ColourEffectShaders ColourEffects => _colourEffects;
 
@@ -158,6 +161,44 @@ public sealed partial class MainWindowViewModel : ObservableObject
         bool animating = tab.Rail.Tick(ref cx, ref cy, dt, tab.Camera.Zoom, ww);
         tab.Camera.OffsetX = cx;
         tab.Camera.OffsetY = cy;
+
+        // Auto-scroll: continuous horizontal scroll, advance on line end
+        if (tab.Rail.AutoScrolling)
+        {
+            cx = tab.Camera.OffsetX;
+            bool reachedEnd = tab.Rail.TickAutoScroll(ref cx, dt, tab.Camera.Zoom, ww);
+            tab.Camera.OffsetX = cx;
+            animating = true;
+
+            if (reachedEnd)
+            {
+                int currentPage = tab.CurrentPage;
+                switch (tab.Rail.NextLine())
+                {
+                    case NavResult.PageBoundaryNext:
+                        tab.GoToPage(currentPage + 1, _worker, ww, wh);
+                        tab.QueueLookahead(_config.AnalysisLookaheadPages);
+                        if (tab.Rail.Active)
+                        {
+                            tab.StartSnap(ww, wh);
+                            // Restart auto-scroll on new page analysis
+                            double speed = _config.ScrollSpeedStart +
+                                (_config.ScrollSpeedMax - _config.ScrollSpeedStart) * 0.5;
+                            tab.Rail.StartAutoScroll(speed);
+                        }
+                        else
+                        {
+                            StopAutoScroll();
+                        }
+                        break;
+                    case NavResult.Ok:
+                        tab.StartSnap(ww, wh);
+                        break;
+                }
+                InvalidateOverlay();
+                OnPropertyChanged(nameof(ActiveTab));
+            }
+        }
 
         // Decay zoom blur speed
         bool wasZooming = tab.Camera.ZoomSpeed > 0;
@@ -428,6 +469,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public void HandleZoom(double scrollDelta, double cursorX, double cursorY, bool ctrlHeld)
     {
+        if (AutoScrollActive) StopAutoScroll();
         if (ActiveTab is not { } tab) return;
         var (ww, wh) = GetWindowSize();
 
@@ -464,10 +506,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public void HandlePan(double dx, double dy)
     {
         if (ActiveTab is not { } tab) return;
+        if (AutoScrollActive) StopAutoScroll();
         var (ww, wh) = GetWindowSize();
         tab.Camera.OffsetX += dx;
         tab.Camera.OffsetY += dy;
         tab.ClampCamera(ww, wh);
+        if (tab.Rail.Active)
+            tab.Rail.CaptureVerticalBias(tab.Camera.OffsetY, tab.Camera.Zoom, wh);
         InvalidateCamera();
         OnPropertyChanged(nameof(ActiveTab));
     }
@@ -502,6 +547,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public void HandleArrowUp()
     {
+        if (AutoScrollActive) StopAutoScroll();
         if (ActiveTab is not { } tab) return;
         var (ww, wh) = GetWindowSize();
 
@@ -528,8 +574,23 @@ public sealed partial class MainWindowViewModel : ObservableObject
         InvalidateNavigation();
     }
 
-    public void HandleArrowRight() => HandleHorizontalArrow(ScrollDirection.Forward, -PanStep);
-    public void HandleArrowLeft() => HandleHorizontalArrow(ScrollDirection.Backward, PanStep);
+    public void HandleArrowRight()
+    {
+        if (AutoScrollActive && ActiveTab is { } t && t.Rail.Active)
+        {
+            // Boost auto-scroll speed while holding right
+            t.Rail.SetAutoScrollBoost(true);
+            RequestAnimationFrame();
+            return;
+        }
+        HandleHorizontalArrow(ScrollDirection.Forward, -PanStep);
+    }
+
+    public void HandleArrowLeft()
+    {
+        if (AutoScrollActive) StopAutoScroll();
+        HandleHorizontalArrow(ScrollDirection.Backward, PanStep);
+    }
 
     private void HandleHorizontalArrow(ScrollDirection direction, double panDelta)
     {
@@ -547,10 +608,64 @@ public sealed partial class MainWindowViewModel : ObservableObject
         RequestAnimationFrame();
     }
 
+    public void ToggleAutoScroll()
+    {
+        if (AutoScrollActive)
+        {
+            StopAutoScroll();
+            return;
+        }
+        if (ActiveTab is not { } tab || !tab.Rail.Active) return;
+
+        // Use the current scroll speed setting as the auto-scroll speed
+        double speed = _config.ScrollSpeedStart +
+            (_config.ScrollSpeedMax - _config.ScrollSpeedStart) * 0.5;
+        tab.Rail.StartAutoScroll(speed);
+        AutoScrollActive = true;
+        OnPropertyChanged(nameof(AutoScrollActive));
+        RequestAnimationFrame();
+    }
+
+    public void StopAutoScroll()
+    {
+        ActiveTab?.Rail.StopAutoScroll();
+        AutoScrollActive = false;
+        OnPropertyChanged(nameof(AutoScrollActive));
+    }
+
+    public void HandleLineHome()
+    {
+        if (ActiveTab is not { } tab || !tab.Rail.Active) return;
+        var (ww, _) = GetWindowSize();
+        if (tab.Rail.ComputeLineStartX(tab.Camera.Zoom, ww) is { } x)
+        {
+            tab.Camera.OffsetX = x;
+            InvalidateCamera();
+            OnPropertyChanged(nameof(ActiveTab));
+        }
+    }
+
+    public void HandleLineEnd()
+    {
+        if (ActiveTab is not { } tab || !tab.Rail.Active) return;
+        var (ww, _) = GetWindowSize();
+        if (tab.Rail.ComputeLineEndX(tab.Camera.Zoom, ww) is { } x)
+        {
+            tab.Camera.OffsetX = x;
+            InvalidateCamera();
+            OnPropertyChanged(nameof(ActiveTab));
+        }
+    }
+
     public void HandleArrowRelease(bool isHorizontal)
     {
         if (isHorizontal)
+        {
             ActiveTab?.Rail.StopScroll();
+            // Clear auto-scroll boost when releasing D/Right
+            if (AutoScrollActive)
+                ActiveTab?.Rail.SetAutoScrollBoost(false);
+        }
         RequestAnimationFrame();
     }
 
@@ -579,6 +694,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
         tab.ApplyZoom(newZoom, ww, wh);
         tab.Camera.NotifyZoomChange();
         tab.UpdateRenderDpiIfNeeded();
+        // Stop auto-scroll if zoom takes us out of rail mode
+        if (!tab.Rail.Active && AutoScrollActive) StopAutoScroll();
         InvalidateCamera();
         OnPropertyChanged(nameof(ActiveTab));
         RequestAnimationFrame();
