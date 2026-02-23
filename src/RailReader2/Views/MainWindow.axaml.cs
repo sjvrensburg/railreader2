@@ -180,7 +180,13 @@ public partial class MainWindow : Window
 
     private void UpdateRailToolBarVisibility()
     {
-        RailToolBar.IsVisible = Vm?.ActiveTab?.Rail.Active == true;
+        bool shouldShow = Vm?.ActiveTab?.Rail.Active == true;
+        bool wasVisible = RailToolBar.IsVisible;
+        RailToolBar.IsVisible = shouldShow;
+
+        // Persist config when toolbar hides (deferred save for slider changes)
+        if (wasVisible && !shouldShow)
+            Vm?.Config.Save();
     }
 
     private void UpdateCameraTransform()

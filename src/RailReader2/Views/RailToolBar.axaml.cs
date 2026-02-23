@@ -44,7 +44,7 @@ public partial class RailToolBar : UserControl
             if (e.Property == RangeBase.ValueProperty && ViewModel is { } vm)
             {
                 vm.Config.ScrollSpeedMax = _speedSlider.Value;
-                vm.OnConfigChanged();
+                vm.OnSliderChanged();
             }
         };
         SliderPanel.Children.Add(_speedSlider);
@@ -69,7 +69,7 @@ public partial class RailToolBar : UserControl
             if (e.Property == RangeBase.ValueProperty && ViewModel is { } vm)
             {
                 vm.Config.MotionBlurIntensity = _blurSlider.Value;
-                vm.OnConfigChanged();
+                vm.OnSliderChanged();
             }
         };
         SliderPanel.Children.Add(_blurSlider);

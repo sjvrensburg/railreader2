@@ -456,6 +456,16 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(ActiveTab));
     }
 
+    /// <summary>
+    /// Lightweight config update for slider changes (speed/blur).
+    /// Avoids disk I/O, analysis reapply, and full invalidation on every tick.
+    /// </summary>
+    public void OnSliderChanged()
+    {
+        foreach (var tab in Tabs)
+            tab.Rail.UpdateConfig(_config);
+    }
+
     private const double BaseFontSize = 14.0;
 
     private void ApplyFontScale()
