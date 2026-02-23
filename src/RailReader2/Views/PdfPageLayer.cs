@@ -40,6 +40,16 @@ public class PdfPageLayer : Control
         private const float MaxBlurSigma = 0.35f;
         private const double MinSpeedThreshold = 0.1;
 
+        // Cached blur filter — reused when sigma values haven't changed
+        [ThreadStatic] private static SKImageFilter? s_cachedBlurFilter;
+        [ThreadStatic] private static float s_cachedSigmaX, s_cachedSigmaY;
+
+        // Cached paint objects to avoid per-frame allocation
+        [ThreadStatic] private static SKPaint? s_layerPaint;
+
+        // Cached sampling options (struct, but avoids repeated construction)
+        private static readonly SKSamplingOptions s_sampling = new(SKCubicResampler.Mitchell);
+
         private readonly Rect _bounds;
         private readonly TabViewModel? _tab;
         private readonly ColourEffectShaders? _effects;
@@ -76,11 +86,10 @@ public class PdfPageLayer : Control
             // Motion blur: horizontal during rail scroll, uniform during zoom.
             // Cubic curve keeps blur barely visible at low/medium speeds,
             // only becoming noticeable near max speed.
-            SKImageFilter? blurFilter = null;
+            float sigmaX = 0, sigmaY = 0;
             if (_motionBlur && _blurIntensity > 0)
             {
                 float maxSigma = (float)(MaxBlurSigma * _blurIntensity);
-                float sigmaX = 0, sigmaY = 0;
 
                 if (tab.Rail.Active && tab.Rail.ScrollSpeed > MinSpeedThreshold)
                 {
@@ -95,30 +104,46 @@ public class PdfPageLayer : Control
                     sigmaX = Math.Max(sigmaX, zoomSigma);
                     sigmaY = Math.Max(sigmaY, zoomSigma);
                 }
-
-                if (sigmaX > 0 || sigmaY > 0)
-                    blurFilter = SKImageFilter.CreateBlur(sigmaX, sigmaY);
             }
 
-            SKPaint? layerPaint = null;
-            if (effectPaint is not null || blurFilter is not null)
+            // Get or update cached blur filter (only recreate if sigma changed)
+            SKImageFilter? blurFilter = null;
+            if (sigmaX > 0 || sigmaY > 0)
             {
-                layerPaint = effectPaint ?? new SKPaint();
-                if (blurFilter is not null)
-                    layerPaint.ImageFilter = blurFilter;
-                canvas.SaveLayer(layerPaint);
+                if (s_cachedBlurFilter is null
+                    || Math.Abs(sigmaX - s_cachedSigmaX) > 0.001f
+                    || Math.Abs(sigmaY - s_cachedSigmaY) > 0.001f)
+                {
+                    s_cachedBlurFilter?.Dispose();
+                    s_cachedBlurFilter = SKImageFilter.CreateBlur(sigmaX, sigmaY);
+                    s_cachedSigmaX = sigmaX;
+                    s_cachedSigmaY = sigmaY;
+                }
+                blurFilter = s_cachedBlurFilter;
+            }
+
+            bool needsLayer = effectPaint is not null || blurFilter is not null;
+            if (needsLayer)
+            {
+                // Reuse a thread-local paint for the layer to avoid per-frame allocation
+                s_layerPaint ??= new SKPaint();
+                s_layerPaint.ColorFilter = effectPaint?.ColorFilter;
+                s_layerPaint.ImageFilter = blurFilter;
+                canvas.SaveLayer(s_layerPaint);
             }
 
             var destRect = SKRect.Create(0, 0, (float)tab.PageWidth, (float)tab.PageHeight);
-            var sampling = new SKSamplingOptions(SKCubicResampler.Mitchell);
-            canvas.DrawImage(image, destRect, sampling);
+            canvas.DrawImage(image, destRect, s_sampling);
 
-            if (layerPaint is not null)
+            if (needsLayer)
             {
                 canvas.Restore();
-                layerPaint.Dispose();
-                blurFilter?.Dispose();
+                // Clear references but keep the paint object for reuse
+                s_layerPaint!.ColorFilter = null;
+                s_layerPaint.ImageFilter = null;
             }
+
+            effectPaint?.Dispose();
         }
     }
 }

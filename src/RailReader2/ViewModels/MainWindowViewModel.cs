@@ -150,7 +150,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
     {
         _animationRequested = false;
 
+        // Restart timer immediately so dt measures frame-to-frame interval,
+        // not end-of-previous-frame to start-of-this-frame (which excludes
+        // OnAnimationFrame work time, causing variable dt).
         double dt = _frameTimer.Elapsed.TotalSeconds;
+        _frameTimer.Restart();
         dt = Math.Min(dt, 0.05); // cap at 50ms to avoid large jumps
 
         var tab = ActiveTab;
@@ -227,8 +231,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
             InvalidateCamera();
             RequestAnimationFrame();
         }
-
-        _frameTimer.Restart();
     }
 
     /// <summary>
