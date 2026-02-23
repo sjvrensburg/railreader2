@@ -48,6 +48,7 @@ src/RailReader2/
 │   ├── OutlineEntry.cs         # PDF bookmark tree node
 │   ├── PageAnalysis.cs         # Full analysis for one page (blocks, dimensions)
 │   ├── PageText.cs             # Extracted page text with per-character bounding boxes
+│   ├── RecentFileEntry.cs      # Recent file with saved reading position (page, zoom, offset)
 │   └── SearchMatch.cs          # Search hit (page, char index, length, visual rects)
 ├── Services/
 │   ├── AnalysisWorker.cs       # Background thread for ONNX inference (Channel<T> queues)
@@ -104,7 +105,8 @@ scripts/
 - **Rendering pipeline**: PDF bytes held in memory → PDFtoImage (PDFium) rasterises pages to `SKBitmap` at zoom-proportional DPI (150–600, capped to avoid ~35 MP bitmaps) → `SKImage` uploaded to GPU → drawn via Avalonia's `ICustomDrawOperation` / `ISkiaSharpApiLeaseFeature` → `SKCanvas` using `SKCubicResampler.Mitchell` for sharp text. Camera pan/zoom are compositor-level `MatrixTransform` on the `CameraPanel` (no bitmap repaint needed). DPI upgrades happen asynchronously via `Task.Run`; the swap is atomic (new `SKImage` is built before replacing the old one) to avoid blank frames.
 - **Layout analysis**: Page bitmap → BGRA-to-RGB → 800×800 bilinear rescale → CHW float tensor (pixels/255) → PP-DocLayoutV3 ONNX (`im_shape`, `image`, `scale_factor` inputs) → `[N,7]` detection tensor `[classId, confidence, xmin, ymin, xmax, ymax, readingOrder]` → confidence filter (0.4) → NMS (IoU 0.5) → sort by reading order → horizontal projection line detection per block. Input pixmap preparation (`RenderPagePixmap`) runs on a background thread via `Task.Run`; ONNX inference runs on a dedicated `Channel<T>`-based background worker thread (`AnalysisWorker`).
 - **Rail mode**: Activates above configurable zoom threshold when analysis is available. Navigation locks to detected text blocks, advances line-by-line with cubic ease-out snap animations. Horizontal scrolling uses hold-to-scroll with quadratic speed ramping (integrated for frame-rate-independent displacement). Click-to-select jumps to any navigable block. Rail overlay (None palette) uses `DimExcludesBlock=true` with a yellow highlighter-style line tint for readable contrast. `VerticalBias` preserves user's panned vertical offset across line navigation (instead of always centering). Home/End keys snap to line start/end horizontally. Auto-scroll (`P` key) advances lines at a configurable interval.
-- **Config**: `AppConfig` reads/writes `~/.config/railreader2/config.json` (Linux) or `%APPDATA%\railreader2\config.json` (Windows) via `System.Text.Json` with snake_case naming. Loaded at startup; editable live via Settings panel; changes auto-save. `UiFontScale` is applied by setting `Window.FontSize = 14.0 * scale` (inherited by all child controls); dialogs receive the current font size at creation time. `RecentFiles` (max 10) tracks recently opened PDFs; updated on each `OpenDocument()` call, persisted in config JSON, and shown in File → Recent Files submenu.
+- **Config**: `AppConfig` reads/writes `~/.config/railreader2/config.json` (Linux) or `%APPDATA%\railreader2\config.json` (Windows) via `System.Text.Json` with snake_case naming. Loaded at startup; editable live via Settings panel; changes auto-save. `UiFontScale` is applied by setting `Window.FontSize = 14.0 * scale` (inherited by all child controls); dialogs receive the current font size at creation time. `RecentFiles` (max 10) is a `List<RecentFileEntry>` tracking recently opened PDFs with per-document reading position (page, zoom, camera offset); updated on each `OpenDocument()` call, persisted in config JSON, and shown in File → Recent Files submenu. A custom `RecentFilesConverter` handles backward compatibility with the old plain-string format.
+- **Resume reading position**: Each `RecentFileEntry` stores `FilePath`, `Page`, `Zoom`, `OffsetX`, `OffsetY`. Position is saved via `AppConfig.SaveReadingPosition()` when a tab is closed (`CloseTab`) and when the app exits (`window.Closing` → `SaveAllReadingPositions()`). On reopen, `OpenDocument()` checks `GetReadingPosition()` and restores the saved page, zoom, and camera offset instead of centering. If the same file is open in multiple tabs, the last-closed tab's position wins.
 - **Fit Width**: `TabViewModel.FitWidth()` sets zoom so the page fills the viewport horizontally (top-aligned if taller than viewport). Accessible via View → Fit Width menu. Complements the existing `CenterPage()` (fit-page) which fits both dimensions.
 - **Analysis caching**: Per-tab `Dictionary<int, PageAnalysis> AnalysisCache` avoids re-running ONNX inference on revisited pages. Lookahead analysis pre-processes upcoming pages when the worker is idle.
 - **Minimap**: Draws from `TabViewModel.MinimapBitmap` — a small thumbnail (≤200×280 px) rendered once per page change via `PdfService.RenderThumbnail()`. This avoids downsampling the full 600 DPI bitmap (~35 MP) on every animation frame.
@@ -155,7 +157,15 @@ Config file location: `~/.config/railreader2/config.json` (Linux) or `%APPDATA%\
     "abstract", "algorithm", "display_formula",
     "footnote", "paragraph_title", "text"
   ],
-  "recent_files": []
+  "recent_files": [
+    {
+      "file_path": "/path/to/document.pdf",
+      "page": 4,
+      "zoom": 3.2,
+      "offset_x": -120.5,
+      "offset_y": -45.0
+    }
+  ]
 }
 ```
 
