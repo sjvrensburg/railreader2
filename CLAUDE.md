@@ -360,6 +360,11 @@ If the model is not found, the app logs a warning and falls back to horizontal-s
 | `Ctrl+F` | Open search bar |
 | `F3` / `Shift+F3` | Next / previous search match |
 | `Escape` | Close search / cancel annotation tool |
+| `1` | Highlight tool |
+| `2` | Pen tool |
+| `3` | Rectangle tool |
+| `4` | Text note tool |
+| `5` | Eraser tool |
 | Right-click | Open annotation radial menu |
 | `Ctrl+Z` | Undo annotation |
 | `Ctrl+Y` / `Ctrl+Shift+Z` | Redo annotation |

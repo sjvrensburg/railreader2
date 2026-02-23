@@ -340,6 +340,16 @@ public partial class MainWindow : Window
                 vm.PreviousMatch(); e.Handled = true; break;
             case Key.F3:
                 vm.NextMatch(); e.Handled = true; break;
+            case Key.D1 when !searchFocused:
+                vm.SetAnnotationTool(Models.AnnotationTool.Highlight); e.Handled = true; break;
+            case Key.D2 when !searchFocused:
+                vm.SetAnnotationTool(Models.AnnotationTool.Pen); e.Handled = true; break;
+            case Key.D3 when !searchFocused:
+                vm.SetAnnotationTool(Models.AnnotationTool.Rectangle); e.Handled = true; break;
+            case Key.D4 when !searchFocused:
+                vm.SetAnnotationTool(Models.AnnotationTool.TextNote); e.Handled = true; break;
+            case Key.D5 when !searchFocused:
+                vm.SetAnnotationTool(Models.AnnotationTool.Eraser); e.Handled = true; break;
             case Key.Escape when vm.IsRadialMenuOpen:
                 vm.CloseRadialMenu(); e.Handled = true; break;
             case Key.Escape when vm.IsAnnotating:
