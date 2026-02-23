@@ -118,7 +118,7 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
         if (_dpiRenderPending) return false;
 
         int neededDpi = PdfService.CalculateRenderDpi(Camera.Zoom);
-        if (neededDpi > CachedDpi * 1.4 || (neededDpi < CachedDpi * 0.4 && CachedDpi > 150))
+        if (neededDpi > CachedDpi * 1.5 || (neededDpi < CachedDpi * 0.5 && CachedDpi > 150))
         {
             _dpiRenderPending = true;
             int page = CurrentPage;
@@ -127,26 +127,27 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
                 try
                 {
                     var newBitmap = _pdf.RenderPage(page, neededDpi);
-                    // Marshal back to UI thread for the swap
-                    var newImage = SKImage.FromBitmap(newBitmap);
+                    // Marshal bitmap to UI thread — SKImage.FromBitmap() is called
+                    // there to avoid GPU texture upload on the wrong thread.
                     Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                     {
                         if (CurrentPage == page) // still on same page
                         {
-                            // Build the new SKImage before swapping so there is no
-                            // blank frame between clearing the old image and setting
-                            // the new one. The old bitmap/image is not explicitly
-                            // disposed here — let GC collect via finalizer to avoid
-                            // use-after-free with the compositor render thread.
+                            var newImage = SKImage.FromBitmap(newBitmap);
+                            var oldImage = CachedImage;
+                            var oldBitmap = CachedBitmap;
                             CachedBitmap = newBitmap;
                             CachedImage = newImage;
                             CachedDpi = neededDpi;
                             DpiRenderReady = true;
+                            // Dispose old assets after swap so render thread sees
+                            // the new image before the old one is freed.
+                            oldImage?.Dispose();
+                            oldBitmap?.Dispose();
                             OnDpiRenderComplete?.Invoke();
                         }
                         else
                         {
-                            newImage.Dispose();
                             newBitmap.Dispose();
                         }
                         _dpiRenderPending = false;

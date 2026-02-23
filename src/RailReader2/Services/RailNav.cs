@@ -24,6 +24,7 @@ public sealed class RailNav
     private ScrollDirection? _scrollDir;
     private Stopwatch? _scrollHoldTimer;
     private double _scrollStartX;
+    private double _scrollSeedSecs; // virtual time offset so first frame has visible displacement
 
     // Auto-scroll state: continuous forward scroll along the line then advance
     public bool AutoScrolling { get; private set; }
@@ -157,6 +158,9 @@ public sealed class RailNav
             _scrollDir = dir;
             _scrollHoldTimer = Stopwatch.StartNew();
             _scrollStartX = currentCameraX;
+            // Seed one frame ahead (~16ms) so the first Tick() produces
+            // visible displacement instead of near-zero movement.
+            _scrollSeedSecs = 1.0 / 60.0;
         }
     }
 
@@ -164,6 +168,7 @@ public sealed class RailNav
     {
         _scrollDir = null;
         _scrollHoldTimer = null;
+        _scrollSeedSecs = 0;
         ScrollSpeed = 0.0;
     }
 
@@ -250,7 +255,21 @@ public sealed class RailNav
 
         double maxX = -blockLeft * zoom;
         double minX = windowWidth - blockRight * zoom;
-        return Math.Clamp(cameraX, minX, maxX);
+
+        // Soft clamp: ease into the boundary over a small pixel zone
+        // instead of a hard stop, which eliminates visual judder.
+        const double softZone = 20.0; // pixels of easing
+        if (cameraX > maxX)
+        {
+            double over = cameraX - maxX;
+            return maxX + softZone * (1.0 - 1.0 / (1.0 + over / softZone));
+        }
+        if (cameraX < minX)
+        {
+            double over = minX - cameraX;
+            return minX - softZone * (1.0 - 1.0 / (1.0 + over / softZone));
+        }
+        return cameraX;
     }
 
     public bool Tick(ref double cameraX, ref double cameraY, double dtSecs, double zoom, double windowWidth)
@@ -278,7 +297,7 @@ public sealed class RailNav
             // This eliminates frame-rate dependent jitter from variable dt.
             // speed(t) = start + (max - start) * (t/ramp)^2
             // integral: start*T + (max-start) * T^3 / (3*ramp^2)  for T <= ramp
-            double holdSecs = _scrollHoldTimer.Elapsed.TotalSeconds;
+            double holdSecs = _scrollHoldTimer.Elapsed.TotalSeconds + _scrollSeedSecs;
             double ramp = _config.ScrollRampTime;
             double sStart = _config.ScrollSpeedStart;
             double sMax = _config.ScrollSpeedMax;
