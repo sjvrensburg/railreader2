@@ -380,6 +380,27 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
     }
 
+    public void MoveTab(int fromIndex, int toIndex)
+    {
+        if (fromIndex == toIndex) return;
+        if (fromIndex < 0 || fromIndex >= Tabs.Count) return;
+        if (toIndex < 0 || toIndex >= Tabs.Count) return;
+
+        int activeBeforeMove = ActiveTabIndex;
+        Tabs.Move(fromIndex, toIndex);
+
+        // Keep the same tab selected after the move
+        if (activeBeforeMove == fromIndex)
+            ActiveTabIndex = toIndex;
+        else if (fromIndex < activeBeforeMove && toIndex >= activeBeforeMove)
+            ActiveTabIndex = activeBeforeMove - 1;
+        else if (fromIndex > activeBeforeMove && toIndex <= activeBeforeMove)
+            ActiveTabIndex = activeBeforeMove + 1;
+
+        OnPropertyChanged(nameof(ActiveTab));
+        InvalidateAll();
+    }
+
     [RelayCommand]
     public void DuplicateTab()
     {
