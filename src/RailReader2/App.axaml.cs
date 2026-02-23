@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using Avalonia.Threading;
 using RailReader2.Services;
 using RailReader2.ViewModels;
 using RailReader2.Views;
@@ -22,21 +23,31 @@ public partial class App : Application
             desktop.MainWindow = splash;
             splash.Show();
 
-            var config = AppConfig.Load();
-            CleanupService.RunCleanup();
+            // Defer heavy initialization so the event loop can pump and
+            // the splash window actually renders before we block the UI
+            // thread with config loading, cleanup, and ONNX model init.
+            var args = desktop.Args;
+            Dispatcher.UIThread.Post(async () =>
+            {
+                // Yield once to let the splash paint
+                await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Background);
 
-            var vm = new MainWindowViewModel(config);
-            var window = new MainWindow { DataContext = vm };
-            vm.SetWindow(window);
+                var config = AppConfig.Load();
+                CleanupService.RunCleanup();
 
-            window.Opened += (_, _) => splash.Close();
-            window.Closing += (_, _) => vm.SaveAllReadingPositions();
-            desktop.MainWindow = window;
+                var vm = new MainWindowViewModel(config);
+                var window = new MainWindow { DataContext = vm };
+                vm.SetWindow(window);
 
-            if (desktop.Args is { Length: > 0 } && File.Exists(desktop.Args[0]))
-                window.Opened += (_, _) => vm.OpenDocument(desktop.Args[0]);
+                window.Opened += (_, _) => splash.Close();
+                window.Closing += (_, _) => vm.SaveAllReadingPositions();
+                desktop.MainWindow = window;
 
-            window.Show();
+                if (args is { Length: > 0 } && File.Exists(args[0]))
+                    window.Opened += (_, _) => vm.OpenDocument(args[0]);
+
+                window.Show();
+            }, DispatcherPriority.Background);
         }
 
         base.OnFrameworkInitializationCompleted();
