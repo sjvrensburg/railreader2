@@ -386,16 +386,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
         if (fromIndex < 0 || fromIndex >= Tabs.Count) return;
         if (toIndex < 0 || toIndex >= Tabs.Count) return;
 
-        int activeBeforeMove = ActiveTabIndex;
+        var selectedTab = ActiveTab;
         Tabs.Move(fromIndex, toIndex);
 
-        // Keep the same tab selected after the move
-        if (activeBeforeMove == fromIndex)
-            ActiveTabIndex = toIndex;
-        else if (fromIndex < activeBeforeMove && toIndex >= activeBeforeMove)
-            ActiveTabIndex = activeBeforeMove - 1;
-        else if (fromIndex > activeBeforeMove && toIndex <= activeBeforeMove)
-            ActiveTabIndex = activeBeforeMove + 1;
+        if (selectedTab is not null)
+            ActiveTabIndex = Tabs.IndexOf(selectedTab);
 
         OnPropertyChanged(nameof(ActiveTab));
         InvalidateAll();

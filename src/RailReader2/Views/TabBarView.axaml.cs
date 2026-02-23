@@ -1,3 +1,5 @@
+using System;
+using System.ComponentModel;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
@@ -10,16 +12,14 @@ namespace RailReader2.Views;
 
 public partial class TabBarView : UserControl
 {
-    private static readonly IBrush ActiveTabBg = new SolidColorBrush(Color.FromRgb(66, 133, 244));
+    private static readonly IBrush AccentBrush = new SolidColorBrush(Color.FromRgb(66, 133, 244));
     private static readonly IBrush ActiveTabFg = Brushes.White;
     private static readonly IBrush InactiveTabBg = new SolidColorBrush(Color.FromArgb(30, 0, 0, 0));
     private static readonly IBrush InactiveTabFg = new SolidColorBrush(Color.FromRgb(80, 80, 80));
-    private static readonly IBrush ActiveIndicator = new SolidColorBrush(Color.FromRgb(66, 133, 244));
-    private static readonly IBrush DropIndicatorBrush = new SolidColorBrush(Color.FromRgb(66, 133, 244));
+    private static readonly IBrush SeparatorBrush = new SolidColorBrush(Color.FromArgb(30, 0, 0, 0));
 
     private const double DragThreshold = 5.0;
 
-    // Drag state
     private int _dragIndex = -1;
     private bool _isDragging;
     private Point _dragStartPoint;
@@ -54,7 +54,7 @@ public partial class TabBarView : UserControl
         }
     }
 
-    private void OnVmPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    private void OnVmPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName is nameof(MainWindowViewModel.ActiveTabIndex))
             UpdateTabStyles();
@@ -70,10 +70,7 @@ public partial class TabBarView : UserControl
             var tab = _vm.Tabs[i];
             var container = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 0, Tag = i };
 
-            // Tab content panel with bottom indicator
             var tabContent = new DockPanel { Tag = tab };
-
-            // Bottom indicator bar
             var indicator = new Border
             {
                 Height = 3,
@@ -122,7 +119,7 @@ public partial class TabBarView : UserControl
                 container.Children.Add(new Border
                 {
                     Width = 1,
-                    Background = new SolidColorBrush(Color.FromArgb(30, 0, 0, 0)),
+                    Background = SeparatorBrush,
                     Margin = new Thickness(2, 4),
                     VerticalAlignment = VerticalAlignment.Stretch,
                 });
@@ -145,31 +142,25 @@ public partial class TabBarView : UserControl
 
             bool isActive = idx == _vm.ActiveTabIndex;
 
-            // Find the DockPanel (tabContent) -> indicator + button
             if (container.Children[0] is DockPanel dock)
             {
-                // First child of DockPanel is the indicator
                 if (dock.Children[0] is Border indicator)
-                    indicator.Background = isActive ? ActiveIndicator : Brushes.Transparent;
+                    indicator.Background = isActive ? AccentBrush : Brushes.Transparent;
 
-                // Second child is the tab button
                 if (dock.Children[1] is Button tabBtn)
                 {
-                    tabBtn.Background = isActive ? ActiveTabBg : InactiveTabBg;
+                    tabBtn.Background = isActive ? AccentBrush : InactiveTabBg;
                     tabBtn.Foreground = isActive ? ActiveTabFg : InactiveTabFg;
                     tabBtn.FontWeight = isActive ? FontWeight.Bold : FontWeight.Normal;
                 }
             }
 
-            // Close button opacity
             if (container.Children[1] is Button closeBtn)
                 closeBtn.Opacity = isActive ? 1.0 : 0.5;
 
             idx++;
         }
     }
-
-    // --- Tab click handlers ---
 
     private void OnTabClick(object? sender, RoutedEventArgs e)
     {
@@ -190,8 +181,6 @@ public partial class TabBarView : UserControl
             if (idx >= 0) vm.CloseTab(idx);
         }
     }
-
-    // --- Drag-to-reorder handlers (tunnelling on TabPanel) ---
 
     private int HitTestTabIndex(Point posInPanel)
     {
@@ -223,8 +212,7 @@ public partial class TabBarView : UserControl
         int index = HitTestTabIndex(pos);
         if (index < 0) return;
 
-        // Don't start drag on the close button
-        if (e.Source is Button btn && btn.Content is string s && s == "\u00d7") return;
+        if (e.Source is Button { Content: "\u00d7" }) return;
 
         _dragIndex = index;
         _dragStartPoint = pos;
@@ -239,7 +227,7 @@ public partial class TabBarView : UserControl
 
         if (!_isDragging)
         {
-            if (System.Math.Abs(pos.X - _dragStartPoint.X) < DragThreshold)
+            if (Math.Abs(pos.X - _dragStartPoint.X) < DragThreshold)
                 return;
 
             _isDragging = true;
@@ -250,7 +238,6 @@ public partial class TabBarView : UserControl
                 dragContainer.Opacity = 0.5;
         }
 
-        // Mark as handled so buttons don't process the drag movement
         e.Handled = true;
 
         int targetIndex = GetDropTargetIndex(pos);
@@ -268,17 +255,16 @@ public partial class TabBarView : UserControl
 
         if (wasDragging && _vm is not null)
         {
-            // Mark handled so the button click doesn't fire after a drag
             e.Handled = true;
 
             var pos = e.GetPosition(TabPanel);
             int targetIndex = GetDropTargetIndex(pos);
 
-            // Adjust: Move() uses direct indices, not insertion points
+            // Convert insertion point to move-destination index
             if (targetIndex > fromIndex)
                 targetIndex--;
 
-            targetIndex = System.Math.Clamp(targetIndex, 0, _vm.Tabs.Count - 1);
+            targetIndex = Math.Clamp(targetIndex, 0, _vm.Tabs.Count - 1);
 
             if (targetIndex != fromIndex)
                 _vm.MoveTab(fromIndex, targetIndex);
@@ -316,7 +302,7 @@ public partial class TabBarView : UserControl
                 break;
         }
 
-        return System.Math.Clamp(insertIndex, 0, _vm?.Tabs.Count ?? 0);
+        return Math.Clamp(insertIndex, 0, _vm?.Tabs.Count ?? 0);
     }
 
     private void ShowDropIndicator(int insertIndex)
@@ -326,13 +312,12 @@ public partial class TabBarView : UserControl
         _dropIndicator = new Border
         {
             Width = 2,
-            Background = DropIndicatorBrush,
+            Background = AccentBrush,
             VerticalAlignment = VerticalAlignment.Stretch,
             Margin = new Thickness(-1, 2, -1, 2),
             CornerRadius = new CornerRadius(1),
         };
 
-        // Find the panel child position matching the insertion index
         int panelChildIndex = 0;
         int tabsSeen = 0;
         foreach (var child in TabPanel.Children)
@@ -342,7 +327,7 @@ public partial class TabBarView : UserControl
             panelChildIndex++;
         }
 
-        panelChildIndex = System.Math.Clamp(panelChildIndex, 0, TabPanel.Children.Count);
+        panelChildIndex = Math.Clamp(panelChildIndex, 0, TabPanel.Children.Count);
         TabPanel.Children.Insert(panelChildIndex, _dropIndicator);
     }
 
