@@ -32,22 +32,20 @@ public partial class GoToPageDialog : Window
             Close(-1);
     }
 
-    private void OnCancelClick(object? sender, RoutedEventArgs e)
-    {
-        Close(-1);
-    }
+    private void OnCancelClick(object? sender, RoutedEventArgs e) => Close(-1);
 
     private void OnKeyDown(object? sender, KeyEventArgs e)
     {
-        if (e.Key == Key.Escape)
+        switch (e.Key)
         {
-            Close(-1);
-            e.Handled = true;
-        }
-        else if (e.Key == Key.Enter)
-        {
-            OnOkClick(sender, e);
-            e.Handled = true;
+            case Key.Escape:
+                Close(-1);
+                e.Handled = true;
+                break;
+            case Key.Enter:
+                OnOkClick(sender, e);
+                e.Handled = true;
+                break;
         }
     }
 }

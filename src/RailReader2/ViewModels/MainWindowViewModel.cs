@@ -19,12 +19,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private const double ZoomScrollSensitivity = 0.003;
     private const double PanStep = 50.0;
 
-    private AppConfig _config;
+    private readonly AppConfig _config;
     private AnalysisWorker _worker = null!; // initialized in InitializeWorker, called from ctor
-    private ColourEffectShaders _colourEffects = new();
+    private readonly ColourEffectShaders _colourEffects = new();
     private Window? _window;
     private DispatcherTimer? _pollTimer;
-    private Stopwatch _frameTimer = Stopwatch.StartNew();
+    private readonly Stopwatch _frameTimer = Stopwatch.StartNew();
     private Action? _invalidateCanvas; // legacy fallback
     private InvalidationCallbacks? _invalidation;
     private bool _animationRequested;
@@ -70,6 +70,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     // Clipboard callback wired by MainWindow
     public Action<string>? CopyToClipboard { get; set; }
+
+    // Auto-scroll state (driven by animation frame loop via RailNav)
+    public bool AutoScrollActive { get; private set; }
 
     public AppConfig Config => _config;
     public ColourEffectShaders ColourEffects => _colourEffects;
@@ -158,6 +161,44 @@ public sealed partial class MainWindowViewModel : ObservableObject
         bool animating = tab.Rail.Tick(ref cx, ref cy, dt, tab.Camera.Zoom, ww);
         tab.Camera.OffsetX = cx;
         tab.Camera.OffsetY = cy;
+
+        // Auto-scroll: continuous horizontal scroll, advance on line end
+        if (tab.Rail.AutoScrolling)
+        {
+            cx = tab.Camera.OffsetX;
+            bool reachedEnd = tab.Rail.TickAutoScroll(ref cx, dt, tab.Camera.Zoom, ww);
+            tab.Camera.OffsetX = cx;
+            animating = true;
+
+            if (reachedEnd)
+            {
+                int currentPage = tab.CurrentPage;
+                switch (tab.Rail.NextLine())
+                {
+                    case NavResult.PageBoundaryNext:
+                        tab.GoToPage(currentPage + 1, _worker, ww, wh);
+                        tab.QueueLookahead(_config.AnalysisLookaheadPages);
+                        if (tab.Rail.Active)
+                        {
+                            tab.StartSnap(ww, wh);
+                            // Restart auto-scroll on new page analysis
+                            double speed = _config.ScrollSpeedStart +
+                                (_config.ScrollSpeedMax - _config.ScrollSpeedStart) * 0.5;
+                            tab.Rail.StartAutoScroll(speed);
+                        }
+                        else
+                        {
+                            StopAutoScroll();
+                        }
+                        break;
+                    case NavResult.Ok:
+                        tab.StartSnap(ww, wh);
+                        break;
+                }
+                InvalidateOverlay();
+                OnPropertyChanged(nameof(ActiveTab));
+            }
+        }
 
         // Decay zoom blur speed
         bool wasZooming = tab.Camera.ZoomSpeed > 0;
@@ -415,6 +456,16 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(ActiveTab));
     }
 
+    /// <summary>
+    /// Lightweight config update for slider changes (speed/blur).
+    /// Avoids disk I/O, analysis reapply, and full invalidation on every tick.
+    /// </summary>
+    public void OnSliderChanged()
+    {
+        foreach (var tab in Tabs)
+            tab.Rail.UpdateConfig(_config);
+    }
+
     private const double BaseFontSize = 14.0;
 
     private void ApplyFontScale()
@@ -428,6 +479,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public void HandleZoom(double scrollDelta, double cursorX, double cursorY, bool ctrlHeld)
     {
+        if (AutoScrollActive) StopAutoScroll();
         if (ActiveTab is not { } tab) return;
         var (ww, wh) = GetWindowSize();
 
@@ -464,10 +516,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public void HandlePan(double dx, double dy)
     {
         if (ActiveTab is not { } tab) return;
+        if (AutoScrollActive) StopAutoScroll();
         var (ww, wh) = GetWindowSize();
         tab.Camera.OffsetX += dx;
         tab.Camera.OffsetY += dy;
         tab.ClampCamera(ww, wh);
+        if (tab.Rail.Active)
+            tab.Rail.CaptureVerticalBias(tab.Camera.OffsetY, tab.Camera.Zoom, wh);
         InvalidateCamera();
         OnPropertyChanged(nameof(ActiveTab));
     }
@@ -502,6 +557,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public void HandleArrowUp()
     {
+        if (AutoScrollActive) StopAutoScroll();
         if (ActiveTab is not { } tab) return;
         var (ww, wh) = GetWindowSize();
 
@@ -528,8 +584,23 @@ public sealed partial class MainWindowViewModel : ObservableObject
         InvalidateNavigation();
     }
 
-    public void HandleArrowRight() => HandleHorizontalArrow(ScrollDirection.Forward, -PanStep);
-    public void HandleArrowLeft() => HandleHorizontalArrow(ScrollDirection.Backward, PanStep);
+    public void HandleArrowRight()
+    {
+        if (AutoScrollActive && ActiveTab is { } t && t.Rail.Active)
+        {
+            // Boost auto-scroll speed while holding right
+            t.Rail.SetAutoScrollBoost(true);
+            RequestAnimationFrame();
+            return;
+        }
+        HandleHorizontalArrow(ScrollDirection.Forward, -PanStep);
+    }
+
+    public void HandleArrowLeft()
+    {
+        if (AutoScrollActive) StopAutoScroll();
+        HandleHorizontalArrow(ScrollDirection.Backward, PanStep);
+    }
 
     private void HandleHorizontalArrow(ScrollDirection direction, double panDelta)
     {
@@ -547,10 +618,64 @@ public sealed partial class MainWindowViewModel : ObservableObject
         RequestAnimationFrame();
     }
 
+    public void ToggleAutoScroll()
+    {
+        if (AutoScrollActive)
+        {
+            StopAutoScroll();
+            return;
+        }
+        if (ActiveTab is not { } tab || !tab.Rail.Active) return;
+
+        // Use the current scroll speed setting as the auto-scroll speed
+        double speed = _config.ScrollSpeedStart +
+            (_config.ScrollSpeedMax - _config.ScrollSpeedStart) * 0.5;
+        tab.Rail.StartAutoScroll(speed);
+        AutoScrollActive = true;
+        OnPropertyChanged(nameof(AutoScrollActive));
+        RequestAnimationFrame();
+    }
+
+    public void StopAutoScroll()
+    {
+        ActiveTab?.Rail.StopAutoScroll();
+        AutoScrollActive = false;
+        OnPropertyChanged(nameof(AutoScrollActive));
+    }
+
+    public void HandleLineHome()
+    {
+        if (ActiveTab is not { } tab || !tab.Rail.Active) return;
+        var (ww, _) = GetWindowSize();
+        if (tab.Rail.ComputeLineStartX(tab.Camera.Zoom, ww) is { } x)
+        {
+            tab.Camera.OffsetX = x;
+            InvalidateCamera();
+            OnPropertyChanged(nameof(ActiveTab));
+        }
+    }
+
+    public void HandleLineEnd()
+    {
+        if (ActiveTab is not { } tab || !tab.Rail.Active) return;
+        var (ww, _) = GetWindowSize();
+        if (tab.Rail.ComputeLineEndX(tab.Camera.Zoom, ww) is { } x)
+        {
+            tab.Camera.OffsetX = x;
+            InvalidateCamera();
+            OnPropertyChanged(nameof(ActiveTab));
+        }
+    }
+
     public void HandleArrowRelease(bool isHorizontal)
     {
         if (isHorizontal)
+        {
             ActiveTab?.Rail.StopScroll();
+            // Clear auto-scroll boost when releasing D/Right
+            if (AutoScrollActive)
+                ActiveTab?.Rail.SetAutoScrollBoost(false);
+        }
         RequestAnimationFrame();
     }
 
@@ -579,6 +704,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
         tab.ApplyZoom(newZoom, ww, wh);
         tab.Camera.NotifyZoomChange();
         tab.UpdateRenderDpiIfNeeded();
+        // Stop auto-scroll if zoom takes us out of rail mode
+        if (!tab.Rail.Active && AutoScrollActive) StopAutoScroll();
         InvalidateCamera();
         OnPropertyChanged(nameof(ActiveTab));
         RequestAnimationFrame();
@@ -667,16 +794,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public void OpenRadialMenu(double screenX, double screenY)
     {
-        double menuSize = 210 * (_config?.UiFontScale ?? 1.0);
+        double menuSize = 210 * _config.UiFontScale;
         RadialMenuX = screenX - menuSize / 2;
         RadialMenuY = screenY - menuSize / 2;
         IsRadialMenuOpen = true;
     }
 
-    public void CloseRadialMenu()
-    {
-        IsRadialMenuOpen = false;
-    }
+    public void CloseRadialMenu() => IsRadialMenuOpen = false;
 
     public void SetAnnotationTool(AnnotationTool tool)
     {
@@ -962,37 +1086,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private static List<HighlightRect> BuildHighlightRects(PageText pageText, int charStart, int charLength)
     {
         var rects = new List<HighlightRect>();
-        int end = Math.Min(charStart + charLength, pageText.CharBoxes.Count);
-
-        float curLeft = 0, curTop = 0, curRight = 0, curBottom = 0;
-        bool hasRect = false;
-        const float lineThreshold = 4f;
-
-        for (int i = charStart; i < end; i++)
-        {
-            var cb = pageText.CharBoxes[i];
-            if (cb.Left == 0 && cb.Right == 0 && cb.Top == 0 && cb.Bottom == 0) continue;
-
-            if (!hasRect)
-            {
-                curLeft = cb.Left; curTop = cb.Top; curRight = cb.Right; curBottom = cb.Bottom;
-                hasRect = true;
-            }
-            else if (Math.Abs(cb.Top - curTop) < lineThreshold)
-            {
-                curLeft = Math.Min(curLeft, cb.Left);
-                curRight = Math.Max(curRight, cb.Right);
-                curTop = Math.Min(curTop, cb.Top);
-                curBottom = Math.Max(curBottom, cb.Bottom);
-            }
-            else
-            {
-                rects.Add(new HighlightRect(curLeft - 1, curTop, curRight - curLeft + 2, curBottom - curTop));
-                curLeft = cb.Left; curTop = cb.Top; curRight = cb.Right; curBottom = cb.Bottom;
-            }
-        }
-        if (hasRect)
-            rects.Add(new HighlightRect(curLeft - 1, curTop, curRight - curLeft + 2, curBottom - curTop));
+        foreach (var (l, t, r, b) in MergeCharBoxesIntoLines(pageText, charStart, charLength))
+            rects.Add(new HighlightRect(l - 1, t, r - l + 2, b - t));
         return rects;
     }
 
@@ -1015,10 +1110,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         InvalidateAnnotations();
     }
 
-    private void InvalidateAnnotations()
-    {
-        _invalidation?.InvalidateAnnotations?.Invoke();
-    }
+    private void InvalidateAnnotations() => _invalidation?.InvalidateAnnotations?.Invoke();
 
     [RelayCommand]
     public async Task ExportAnnotated()
@@ -1055,10 +1147,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     // --- Search ---
 
-    public void OpenSearch()
-    {
-        ShowSearch = true;
-    }
+    public void OpenSearch() => ShowSearch = true;
 
     public void CloseSearch()
     {
@@ -1174,10 +1263,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             .ToList();
     }
 
-    private void InvalidateSearch()
-    {
-        _invalidation?.InvalidateSearch?.Invoke();
-    }
+    private void InvalidateSearch() => _invalidation?.InvalidateSearch?.Invoke();
 
     private static IEnumerable<(int Index, int Length)> FindAllOccurrences(string text, string query, StringComparison comparison)
     {
@@ -1191,38 +1277,41 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
     }
 
-    /// <summary>
-    /// Builds a list of SKRects for a text match by merging adjacent character boxes on the same line.
-    /// </summary>
     private static List<SKRect> BuildMatchRects(PageText pageText, int charStart, int charLength)
     {
         var rects = new List<SKRect>();
-        if (pageText.CharBoxes.Count == 0) return rects;
+        foreach (var (l, t, r, b) in MergeCharBoxesIntoLines(pageText, charStart, charLength))
+            rects.Add(new SKRect(l, t, r, b));
+        return rects;
+    }
+
+    /// <summary>
+    /// Merges adjacent character bounding boxes on the same line into
+    /// (left, top, right, bottom) bounds. Used by both highlight rects
+    /// and search match rects.
+    /// </summary>
+    private static IEnumerable<(float Left, float Top, float Right, float Bottom)> MergeCharBoxesIntoLines(
+        PageText pageText, int charStart, int charLength)
+    {
+        if (pageText.CharBoxes.Count == 0) yield break;
 
         int end = Math.Min(charStart + charLength, pageText.CharBoxes.Count);
-
         float curLeft = 0, curTop = 0, curRight = 0, curBottom = 0;
         bool hasRect = false;
-        const float lineThreshold = 4f; // max Y difference to consider same line
+        const float lineThreshold = 4f;
 
         for (int i = charStart; i < end; i++)
         {
             var cb = pageText.CharBoxes[i];
-            // Skip zero-size boxes (whitespace/control chars)
-            if (cb.Left == 0 && cb.Right == 0 && cb.Top == 0 && cb.Bottom == 0)
-                continue;
+            if (cb.Left == 0 && cb.Right == 0 && cb.Top == 0 && cb.Bottom == 0) continue;
 
             if (!hasRect)
             {
-                curLeft = cb.Left;
-                curTop = cb.Top;
-                curRight = cb.Right;
-                curBottom = cb.Bottom;
+                curLeft = cb.Left; curTop = cb.Top; curRight = cb.Right; curBottom = cb.Bottom;
                 hasRect = true;
             }
             else if (Math.Abs(cb.Top - curTop) < lineThreshold)
             {
-                // Same line — extend horizontally
                 curLeft = Math.Min(curLeft, cb.Left);
                 curRight = Math.Max(curRight, cb.Right);
                 curTop = Math.Min(curTop, cb.Top);
@@ -1230,19 +1319,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
             }
             else
             {
-                // New line — flush current rect
-                rects.Add(new SKRect(curLeft, curTop, curRight, curBottom));
-                curLeft = cb.Left;
-                curTop = cb.Top;
-                curRight = cb.Right;
-                curBottom = cb.Bottom;
+                yield return (curLeft, curTop, curRight, curBottom);
+                curLeft = cb.Left; curTop = cb.Top; curRight = cb.Right; curBottom = cb.Bottom;
             }
         }
 
         if (hasRect)
-            rects.Add(new SKRect(curLeft, curTop, curRight, curBottom));
-
-        return rects;
+            yield return (curLeft, curTop, curRight, curBottom);
     }
 }
 

@@ -72,6 +72,8 @@ public partial class MainWindow : Window
 
             UpdateLayerBindings(vm.ActiveTab);
             SetupRadialMenu(vm);
+            RailToolBar.ViewModel = vm;
+            RailToolBar.SyncFromConfig();
 
             // window.Opened (which calls OpenDocument) can fire before OnLoaded
             // finishes wiring _invalidation. If a tab is already present, the
@@ -92,6 +94,7 @@ public partial class MainWindow : Window
                     case nameof(MainWindowViewModel.ActiveTab):
                         UpdateLayerBindings(vm.ActiveTab);
                         UpdateCameraTransform();
+                        UpdateRailToolBarVisibility();
                         PageLayer.InvalidateVisual();
                         SearchLayer.InvalidateVisual();
                         AnnotationLayer.InvalidateVisual();
@@ -130,7 +133,6 @@ public partial class MainWindow : Window
     {
         RadialMenuControl.Scale = vm.Config.UiFontScale;
 
-        // Wire clipboard callback
         vm.CopyToClipboard = async text =>
         {
             var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
@@ -138,10 +140,8 @@ public partial class MainWindow : Window
                 await clipboard.SetTextAsync(text);
         };
 
-        // Wire toolbar
         ToolBar.ViewModel = vm;
 
-        // Static annotation-only segments
         var segments = new List<RadialMenu.Segment>
         {
             new("Highlight", RadialMenu.IconChars.Highlighter,
@@ -175,6 +175,17 @@ public partial class MainWindow : Window
             tab.OnDpiRenderComplete = () => Vm?.RequestAnimationFrame();
     }
 
+    private void UpdateRailToolBarVisibility()
+    {
+        bool shouldShow = Vm?.ActiveTab?.Rail.Active == true;
+        bool wasVisible = RailToolBar.IsVisible;
+        RailToolBar.IsVisible = shouldShow;
+
+        // Persist config when toolbar hides (deferred save for slider changes)
+        if (wasVisible && !shouldShow)
+            Vm?.Config.Save();
+    }
+
     private void UpdateCameraTransform()
     {
         var tab = Vm?.ActiveTab;
@@ -183,6 +194,7 @@ public partial class MainWindow : Window
             CameraPanel.RenderTransform = null;
             PagePanel.Width = 0;
             PagePanel.Height = 0;
+            UpdateRailToolBarVisibility();
             return;
         }
 
@@ -202,6 +214,8 @@ public partial class MainWindow : Window
             _lastMinimapZoom = tab.Camera.Zoom;
             Minimap.InvalidateVisual();
         }
+
+        UpdateRailToolBarVisibility();
     }
 
     /// <summary>
@@ -275,6 +289,16 @@ public partial class MainWindow : Window
             case Key.Left when !searchFocused:
             case Key.A when !searchFocused:
                 vm.HandleArrowLeft(); e.Handled = true; break;
+            case Key.P when !searchFocused:
+                vm.ToggleAutoScroll(); e.Handled = true; break;
+            case Key.OemOpenBrackets when !searchFocused && e.KeyModifiers.HasFlag(KeyModifiers.Shift):
+                RailToolBar.AdjustBlur(-0.05); e.Handled = true; break;
+            case Key.OemCloseBrackets when !searchFocused && e.KeyModifiers.HasFlag(KeyModifiers.Shift):
+                RailToolBar.AdjustBlur(0.05); e.Handled = true; break;
+            case Key.OemOpenBrackets when !searchFocused:
+                RailToolBar.AdjustSpeed(-5); e.Handled = true; break;
+            case Key.OemCloseBrackets when !searchFocused:
+                RailToolBar.AdjustSpeed(5); e.Handled = true; break;
             case Key.D when !searchFocused && e.KeyModifiers.HasFlag(KeyModifiers.Shift):
                 if (vm.ActiveTab is { } dbgTab)
                 {
@@ -291,9 +315,16 @@ public partial class MainWindow : Window
                 if (vm.ActiveTab is { } t2) vm.GoToPage(t2.CurrentPage - 1);
                 e.Handled = true; break;
             case Key.Home when !searchFocused:
-                vm.GoToPage(0); e.Handled = true; break;
+                if (vm.ActiveTab is { } tH && tH.Rail.Active)
+                    vm.HandleLineHome();
+                else
+                    vm.GoToPage(0);
+                e.Handled = true; break;
             case Key.End when !searchFocused:
-                if (vm.ActiveTab is { } t3) vm.GoToPage(t3.PageCount - 1);
+                if (vm.ActiveTab is { } tE2 && tE2.Rail.Active)
+                    vm.HandleLineEnd();
+                else if (vm.ActiveTab is { } tE3)
+                    vm.GoToPage(tE3.PageCount - 1);
                 e.Handled = true; break;
             case Key.OemPlus or Key.Add when !searchFocused:
                 vm.HandleZoomKey(true); e.Handled = true; break;

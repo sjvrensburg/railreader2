@@ -42,8 +42,7 @@ public partial class MenuBarView : UserControl
             var name = System.IO.Path.GetFileName(filePath);
             var dir = System.IO.Path.GetDirectoryName(filePath);
             var item = new MenuItem { Header = $"{name}  ({dir})" };
-            var captured = filePath;
-            item.Click += (_, _) => vm!.OpenDocument(captured);
+            item.Click += (_, _) => vm!.OpenDocument(filePath);
             menu.Items.Add(item);
         }
         if (menu.Items.Count == 0)

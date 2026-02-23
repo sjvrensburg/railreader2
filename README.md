@@ -56,6 +56,11 @@ At high zoom levels, navigation switches to "rail mode" — the viewer locks ont
 - **Annotation export** — export PDFs with embedded annotations (File → Export with Annotations)
 - **Undo/redo** — annotation history with Ctrl+Z / Ctrl+Y
 - **Annotation mode indicator** — status bar shows active tool name in amber with a clickable exit button
+- **Auto-scroll** — toggle continuous horizontal scrolling in rail mode (P key), hold D/Right to boost speed
+- **Speed/blur toolbar** — docked vertical sliders for scroll speed and motion blur intensity, visible in rail mode
+- **Vertical position preservation** — maintains your panned vertical offset when navigating lines in rail mode
+- **Line snap shortcuts** — Home/End keys snap to the start/end of the current line in rail mode
+- **Tooltips** — all interactive controls have descriptive tooltips
 
 ## Usage
 
@@ -87,6 +92,10 @@ dotnet run -c Release --project src/RailReader2 --
 | Mouse drag | Pan |
 | Mouse wheel | Zoom towards cursor |
 | Click on block | Jump to block (rail mode) |
+| Home / End | Line start / end (rail mode) or first / last page |
+| P | Toggle auto-scroll (rail mode), D/Right to boost |
+| [ / ] | Adjust scroll speed (rail mode) |
+| Shift+[ / Shift+] | Adjust blur intensity (rail mode) |
 | D (shift) | Toggle debug overlay (shows detected blocks) |
 | Ctrl+F | Open search bar |
 | F3 / Shift+F3 | Next / previous search match |

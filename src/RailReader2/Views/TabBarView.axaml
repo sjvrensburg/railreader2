@@ -6,30 +6,6 @@
              IsVisible="{Binding Tabs.Count}">
     <Border Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}"
             Padding="4,2">
-        <ItemsControl ItemsSource="{Binding Tabs}">
-            <ItemsControl.ItemsPanel>
-                <ItemsPanelTemplate>
-                    <StackPanel Orientation="Horizontal" Spacing="2" />
-                </ItemsPanelTemplate>
-            </ItemsControl.ItemsPanel>
-            <ItemsControl.ItemTemplate>
-                <DataTemplate DataType="vm:TabViewModel">
-                    <StackPanel Orientation="Horizontal" Spacing="4">
-                        <Button Content="{Binding Title}"
-                                Classes="tab"
-                                Click="OnTabClick"
-                                Tag="{Binding}" />
-                        <Button Content="x"
-                                Classes="tabClose"
-                                Click="OnTabClose"
-                                Tag="{Binding}"
-                                FontSize="10"
-                                Padding="4,0"
-                                MinWidth="16" MinHeight="16" />
-                        <Separator />
-                    </StackPanel>
-                </DataTemplate>
-            </ItemsControl.ItemTemplate>
-        </ItemsControl>
+        <StackPanel Name="TabPanel" Orientation="Horizontal" Spacing="2" />
     </Border>
 </UserControl>

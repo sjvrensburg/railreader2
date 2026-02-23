@@ -59,20 +59,13 @@ public class ViewportPanel : Panel
         {
             _pressPos = e.GetPosition(this);
             _lastPos = _pressPos;
+            _dragging = true;
+            e.Handled = true;
 
             if (ViewModel is { IsAnnotating: true } avm)
             {
-                // Route to annotation tool — convert to page coords
-                var pos = e.GetPosition(this);
-                var (pageX, pageY) = ScreenToPage(pos);
+                var (pageX, pageY) = ScreenToPage(_pressPos);
                 avm.HandleAnnotationPointerDown(pageX, pageY);
-                _dragging = true;
-                e.Handled = true;
-            }
-            else
-            {
-                _dragging = true;
-                e.Handled = true;
             }
         }
     }
@@ -114,7 +107,9 @@ public class ViewportPanel : Panel
             }
             else
             {
-                double dist = Math.Sqrt(Math.Pow(pos.X - _pressPos.X, 2) + Math.Pow(pos.Y - _pressPos.Y, 2));
+                double dx = pos.X - _pressPos.X;
+                double dy = pos.Y - _pressPos.Y;
+                double dist = Math.Sqrt(dx * dx + dy * dy);
                 if (dist < 5.0)
                     ViewModel.HandleClick(pos.X, pos.Y);
             }

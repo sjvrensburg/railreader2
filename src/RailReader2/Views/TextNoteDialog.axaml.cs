@@ -18,22 +18,14 @@ public partial class TextNoteDialog : Window
         NoteTextBox.Text = existingText;
     }
 
-    private void OnOkClick(object? sender, RoutedEventArgs e)
-    {
-        Close(NoteTextBox.Text);
-    }
+    private void OnOkClick(object? sender, RoutedEventArgs e) => Close(NoteTextBox.Text);
 
-    private void OnCancelClick(object? sender, RoutedEventArgs e)
-    {
-        Close(null as string);
-    }
+    private void OnCancelClick(object? sender, RoutedEventArgs e) => Close(null as string);
 
     private void OnKeyDown(object? sender, KeyEventArgs e)
     {
-        if (e.Key == Key.Escape)
-        {
-            Close(null as string);
-            e.Handled = true;
-        }
+        if (e.Key != Key.Escape) return;
+        Close(null as string);
+        e.Handled = true;
     }
 }

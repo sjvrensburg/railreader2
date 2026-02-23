@@ -6,9 +6,7 @@ namespace RailReader2.Services;
 
 public sealed class PdfService : IDisposable
 {
-    private readonly byte[] _pdfBytes;
-
-    public byte[] PdfBytes => _pdfBytes;
+    public byte[] PdfBytes { get; }
     public string FilePath { get; }
     public int PageCount { get; }
     public List<OutlineEntry> Outline { get; }
@@ -16,16 +14,16 @@ public sealed class PdfService : IDisposable
     public PdfService(string filePath)
     {
         FilePath = filePath;
-        _pdfBytes = File.ReadAllBytes(filePath);
-        PageCount = Conversion.GetPageCount(_pdfBytes);
-        Outline = PdfOutlineExtractor.Extract(_pdfBytes);
+        PdfBytes = File.ReadAllBytes(filePath);
+        PageCount = Conversion.GetPageCount(PdfBytes);
+        Outline = PdfOutlineExtractor.Extract(PdfBytes);
         if (Outline.Count > 0)
             Console.Error.WriteLine($"[PDF] Extracted {Outline.Count} outline entries");
     }
 
     public (double Width, double Height) GetPageSize(int pageIndex)
     {
-        var size = Conversion.GetPageSize(_pdfBytes, page: pageIndex);
+        var size = Conversion.GetPageSize(PdfBytes, page: pageIndex);
         return (size.Width, size.Height);
     }
 
@@ -35,7 +33,7 @@ public sealed class PdfService : IDisposable
     /// </summary>
     public SKBitmap RenderPage(int pageIndex, int dpi = 200)
     {
-        return Conversion.ToImage(_pdfBytes, page: pageIndex,
+        return Conversion.ToImage(PdfBytes, page: pageIndex,
             options: new RenderOptions(Dpi: dpi));
     }
 
@@ -46,7 +44,7 @@ public sealed class PdfService : IDisposable
     {
         var (pixW, pixH) = FitPageToTarget(pageIndex, targetSize);
 
-        using var bitmap = Conversion.ToImage(_pdfBytes, page: pageIndex,
+        using var bitmap = Conversion.ToImage(PdfBytes, page: pageIndex,
             options: new RenderOptions(Width: pixW, Height: pixH));
 
         // Convert BGRA (PDFium/SkiaSharp native) to RGB for ONNX
@@ -73,7 +71,7 @@ public sealed class PdfService : IDisposable
     public SKBitmap RenderThumbnail(int pageIndex)
     {
         var (pixW, pixH) = FitPageToTarget(pageIndex, 200);
-        return Conversion.ToImage(_pdfBytes, page: pageIndex,
+        return Conversion.ToImage(PdfBytes, page: pageIndex,
             options: new RenderOptions(Width: pixW, Height: pixH));
     }
 

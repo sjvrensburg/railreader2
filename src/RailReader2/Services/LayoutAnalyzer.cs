@@ -72,10 +72,10 @@ public sealed class LayoutAnalyzer : IDisposable
         int detRows = 0, detCols = 0;
         foreach (var r in results)
         {
-            Tensor<float>? t = null;
-            try { t = r.AsTensor<float>(); } catch { }
+            var t = r.Value as Tensor<float>;
+            if (t is null) continue;
 
-            if (!_loggedOutputShapes && t is not null)
+            if (!_loggedOutputShapes)
             {
                 Console.Error.WriteLine($"[ONNX] Output '{r.Name}': dims=[{string.Join(",", t.Dimensions.ToArray())}]");
                 var flat = t.ToArray();
@@ -83,7 +83,7 @@ public sealed class LayoutAnalyzer : IDisposable
                 Console.Error.WriteLine($"[ONNX]   First values: [{preview}]");
             }
 
-            if (detectionData is null && t is not null && t.Dimensions.Length == 2 && t.Dimensions[1] >= 6)
+            if (detectionData is null && t.Dimensions.Length == 2 && t.Dimensions[1] >= 6)
             {
                 detRows = t.Dimensions[0];
                 detCols = t.Dimensions[1];
