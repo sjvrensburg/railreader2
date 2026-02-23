@@ -22,13 +22,21 @@
   <img src="docs/img/rail_mode.png" alt="Rail mode" width="45%">
 </p>
 
+## Why I built this
+
+As a visually impaired user, I need a PDF viewer that works comfortably at high magnification. The tech industry rarely builds for this "missing middle": the market is too niche for standard software companies, and tools designed for full blindness aren't appropriate when you have poor-but-usable vision.
+
+High magnification introduces real navigation challenges: context loss, inefficient scrolling, and UI elements that break at zoom. RailReader2 addresses these by using AI layout analysis to guide line-by-line reading through detected text blocks, like a typewriter carriage return across the page.
+
+RailReader2 was built with [Claude Code](https://docs.anthropic.com/en/docs/claude-code). It is an example of how AI-assisted development can enable niche accessibility tools that would otherwise never exist.
+
 ## How it works
 
 PDF pages are rasterised by PDFium (via PDFtoImage) at a DPI proportional to the current zoom level (150–600 DPI). The resulting bitmap is uploaded to the GPU as an `SKImage` and drawn on an Avalonia Skia canvas via `ICustomDrawOperation`. Camera pan and zoom are applied as a compositor-level `MatrixTransform` — the bitmap only re-renders when the DPI tier changes, not on every pan/zoom frame.
 
 ### Rail reading
 
-At high zoom levels, navigation switches to "rail mode" — the viewer locks onto detected text blocks and advances line-by-line, like a typewriter carriage return. This is powered by PP-DocLayoutV3 (ONNX), which detects document regions (text, titles, footnotes, etc.) and predicts reading order natively via its Global Pointer Mechanism — correctly handling multi-column layouts, headers, footnotes, etc. Non-active regions are dimmed so you can focus on the current block and line.
+At high zoom levels, navigation switches to "rail mode" — the viewer locks onto detected text blocks and advances line-by-line, like a typewriter carriage return. This is powered by [PP-DocLayoutV3](https://huggingface.co/PaddlePaddle/PP-DocLayoutV3) by [PaddlePaddle](https://www.paddlepaddle.org.cn/en), which detects document regions (text, titles, footnotes, etc.) and predicts reading order natively via its Global Pointer Mechanism, correctly handling multi-column layouts, headers, footnotes, etc. See the [technical report](https://arxiv.org/abs/2601.21957). Non-active regions are dimmed so you can focus on the current block and line.
 
 ### Features
 

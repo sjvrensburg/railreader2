@@ -166,6 +166,30 @@
       color: var(--accent);
     }
 
+    /* ---- Story ---- */
+    .story {
+      background-color: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-left: 3px solid var(--accent);
+      padding: 1.5rem 1.8rem;
+      margin-bottom: 1rem;
+      line-height: 1.8;
+    }
+
+    .story p {
+      color: var(--fg-muted);
+      font-size: 0.95rem;
+      margin-bottom: 1rem;
+    }
+
+    .story p:last-child {
+      margin-bottom: 0;
+    }
+
+    .story strong {
+      color: var(--fg);
+    }
+
     /* ---- Screenshots ---- */
     .screenshots {
       display: flex;
@@ -359,6 +383,7 @@
   <header class="header">
     <span class="header__logo"><img src="img/logo.png" alt="railreader2 icon">railreader2</span>
     <nav>
+      <a href="#story">Story</a>
       <a href="#features">Features</a>
       <a href="#screenshots">Screenshots</a>
       <a href="#getting-started">Get Started</a>
@@ -378,6 +403,41 @@
     <div class="hero__buttons">
       <a href="https://github.com/sjvrensburg/railreader2/releases/latest" class="btn btn--primary">Download Latest Release</a>
       <a href="https://github.com/sjvrensburg/railreader2" class="btn">View Source</a>
+    </div>
+  </section>
+
+  <!-- Why I built this -->
+  <section class="section" id="story">
+    <h2>Why I built this</h2>
+    <div class="story">
+      <p>
+        I'm a statistics lecturer at Nelson Mandela University in South Africa,
+        and I'm visually impaired. I needed a PDF viewer that works comfortably
+        at high magnification, but the tech industry rarely builds for this
+        "missing middle": the market is too niche for standard software
+        companies, and tools designed for full blindness aren't appropriate when
+        you have poor-but-usable vision.
+      </p>
+      <p>
+        High magnification turns even simple reading into a navigation puzzle.
+        You lose context, scrolling becomes inefficient, and most viewers
+        simply aren't designed for sustained use at 3&times; zoom and above.
+        RailReader2 solves this with <strong>AI-guided rail reading</strong>:
+        a layout analysis model
+        (<a href="https://huggingface.co/PaddlePaddle/PP-DocLayoutV3">PP-DocLayoutV3</a>)
+        detects text blocks and reading order, then the viewer guides you
+        through the document line by line, block by block.
+      </p>
+      <p>
+        There is an "AI inception" to the whole project: RailReader2 was built
+        almost entirely with
+        <a href="https://docs.anthropic.com/en/docs/claude-code">Claude Code</a>,
+        an AI coding agent. So it is an AI agent that wrote the code for an
+        accessibility app that itself leverages an AI vision model to function.
+        It's a small example of how AI-assisted development can bring niche,
+        genuinely needed tools into existence when the traditional software
+        market would never justify building them.
+      </p>
     </div>
   </section>
 
@@ -424,8 +484,11 @@
       <div class="feature">
         <h3>AI Layout Detection</h3>
         <p>
-          PP-DocLayoutV3 identifies 23 block types &mdash; paragraphs, headings, figures,
-          tables, formulas &mdash; and predicts reading order automatically.
+          <a href="https://huggingface.co/PaddlePaddle/PP-DocLayoutV3">PP-DocLayoutV3</a>
+          by <a href="https://www.paddlepaddle.org.cn/en">PaddlePaddle</a>
+          identifies 23 block types (paragraphs, headings, figures,
+          tables, formulas) and predicts reading order automatically.
+          See the <a href="https://arxiv.org/abs/2601.21957">technical report</a>.
         </p>
       </div>
       <div class="feature">
