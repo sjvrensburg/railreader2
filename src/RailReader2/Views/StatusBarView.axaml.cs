@@ -113,7 +113,7 @@ public partial class StatusBarView : UserControl
                 FontWeight = FontWeight.Bold,
             });
 
-            if (vm is not null && vm.AutoScrollActive)
+            if (vm is { AutoScrollActive: true })
             {
                 AddSeparator();
                 StatusPanel.Children.Add(new TextBlock
@@ -128,7 +128,7 @@ public partial class StatusBarView : UserControl
             }
         }
 
-        if (vm is not null && vm.IsAnnotating)
+        if (vm is { IsAnnotating: true })
         {
             AddSeparator();
             string toolName = vm.ActiveTool switch

@@ -35,20 +35,20 @@ public partial class SearchBarView : UserControl
 
     private void OnSearchTextChanged(object? sender, TextChangedEventArgs e)
     {
-        _debounceTimer?.Stop();
-        _debounceTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(200) };
-        _debounceTimer.Tick += (_, _) =>
+        if (_debounceTimer is null)
         {
-            _debounceTimer.Stop();
-            RunSearch();
-        };
+            _debounceTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(200) };
+            _debounceTimer.Tick += (_, _) =>
+            {
+                _debounceTimer.Stop();
+                RunSearch();
+            };
+        }
+        _debounceTimer.Stop();
         _debounceTimer.Start();
     }
 
-    private void OnOptionChanged(object? sender, RoutedEventArgs e)
-    {
-        RunSearch();
-    }
+    private void OnOptionChanged(object? sender, RoutedEventArgs e) => RunSearch();
 
     private void OnSearchKeyDown(object? sender, KeyEventArgs e)
     {
@@ -83,10 +83,7 @@ public partial class SearchBarView : UserControl
         UpdateMatchDisplay();
     }
 
-    private void OnCloseClick(object? sender, RoutedEventArgs e)
-    {
-        Vm?.CloseSearch();
-    }
+    private void OnCloseClick(object? sender, RoutedEventArgs e) => Vm?.CloseSearch();
 
     private void RunSearch()
     {

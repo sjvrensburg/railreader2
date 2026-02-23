@@ -33,7 +33,7 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
     public bool AnnotationsDirty { get; set; }
     public Stack<IUndoAction> UndoStack { get; } = new();
     public Stack<IUndoAction> RedoStack { get; } = new();
-    private DispatcherTimer? _autoSaveTimer;
+    private readonly DispatcherTimer _autoSaveTimer = new() { Interval = TimeSpan.FromSeconds(1) };
 
     // Cached page bitmap, GPU-ready image, and the DPI it was rendered at
     public SKBitmap? CachedBitmap { get; private set; }
@@ -53,6 +53,12 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
         _title = Path.GetFileName(filePath);
         Rail = new RailNav(config);
         Outline = _pdf.Outline;
+
+        _autoSaveTimer.Tick += (_, _) =>
+        {
+            _autoSaveTimer.Stop();
+            SaveAnnotations();
+        };
     }
 
     /// <summary>
@@ -367,14 +373,8 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
     public void MarkAnnotationsDirty()
     {
         AnnotationsDirty = true;
-        // Debounced auto-save: save 1 second after last modification
-        _autoSaveTimer?.Stop();
-        _autoSaveTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
-        _autoSaveTimer.Tick += (_, _) =>
-        {
-            _autoSaveTimer.Stop();
-            SaveAnnotations();
-        };
+        // Debounced auto-save: restart the timer on each modification
+        _autoSaveTimer.Stop();
         _autoSaveTimer.Start();
     }
 
@@ -444,7 +444,7 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
 
     public void Dispose()
     {
-        _autoSaveTimer?.Stop();
+        _autoSaveTimer.Stop();
         SaveAnnotations();
         // Null references first so the render thread sees null,
         // then dispose. The tab should already be removed from Tabs by now.

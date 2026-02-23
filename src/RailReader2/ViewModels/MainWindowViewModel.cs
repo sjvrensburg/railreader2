@@ -19,12 +19,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private const double ZoomScrollSensitivity = 0.003;
     private const double PanStep = 50.0;
 
-    private AppConfig _config;
+    private readonly AppConfig _config;
     private AnalysisWorker _worker = null!; // initialized in InitializeWorker, called from ctor
-    private ColourEffectShaders _colourEffects = new();
+    private readonly ColourEffectShaders _colourEffects = new();
     private Window? _window;
     private DispatcherTimer? _pollTimer;
-    private Stopwatch _frameTimer = Stopwatch.StartNew();
+    private readonly Stopwatch _frameTimer = Stopwatch.StartNew();
     private Action? _invalidateCanvas; // legacy fallback
     private InvalidationCallbacks? _invalidation;
     private bool _animationRequested;
@@ -794,16 +794,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public void OpenRadialMenu(double screenX, double screenY)
     {
-        double menuSize = 210 * (_config?.UiFontScale ?? 1.0);
+        double menuSize = 210 * _config.UiFontScale;
         RadialMenuX = screenX - menuSize / 2;
         RadialMenuY = screenY - menuSize / 2;
         IsRadialMenuOpen = true;
     }
 
-    public void CloseRadialMenu()
-    {
-        IsRadialMenuOpen = false;
-    }
+    public void CloseRadialMenu() => IsRadialMenuOpen = false;
 
     public void SetAnnotationTool(AnnotationTool tool)
     {
@@ -1089,37 +1086,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private static List<HighlightRect> BuildHighlightRects(PageText pageText, int charStart, int charLength)
     {
         var rects = new List<HighlightRect>();
-        int end = Math.Min(charStart + charLength, pageText.CharBoxes.Count);
-
-        float curLeft = 0, curTop = 0, curRight = 0, curBottom = 0;
-        bool hasRect = false;
-        const float lineThreshold = 4f;
-
-        for (int i = charStart; i < end; i++)
-        {
-            var cb = pageText.CharBoxes[i];
-            if (cb.Left == 0 && cb.Right == 0 && cb.Top == 0 && cb.Bottom == 0) continue;
-
-            if (!hasRect)
-            {
-                curLeft = cb.Left; curTop = cb.Top; curRight = cb.Right; curBottom = cb.Bottom;
-                hasRect = true;
-            }
-            else if (Math.Abs(cb.Top - curTop) < lineThreshold)
-            {
-                curLeft = Math.Min(curLeft, cb.Left);
-                curRight = Math.Max(curRight, cb.Right);
-                curTop = Math.Min(curTop, cb.Top);
-                curBottom = Math.Max(curBottom, cb.Bottom);
-            }
-            else
-            {
-                rects.Add(new HighlightRect(curLeft - 1, curTop, curRight - curLeft + 2, curBottom - curTop));
-                curLeft = cb.Left; curTop = cb.Top; curRight = cb.Right; curBottom = cb.Bottom;
-            }
-        }
-        if (hasRect)
-            rects.Add(new HighlightRect(curLeft - 1, curTop, curRight - curLeft + 2, curBottom - curTop));
+        foreach (var (l, t, r, b) in MergeCharBoxesIntoLines(pageText, charStart, charLength))
+            rects.Add(new HighlightRect(l - 1, t, r - l + 2, b - t));
         return rects;
     }
 
@@ -1142,10 +1110,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         InvalidateAnnotations();
     }
 
-    private void InvalidateAnnotations()
-    {
-        _invalidation?.InvalidateAnnotations?.Invoke();
-    }
+    private void InvalidateAnnotations() => _invalidation?.InvalidateAnnotations?.Invoke();
 
     [RelayCommand]
     public async Task ExportAnnotated()
@@ -1182,10 +1147,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     // --- Search ---
 
-    public void OpenSearch()
-    {
-        ShowSearch = true;
-    }
+    public void OpenSearch() => ShowSearch = true;
 
     public void CloseSearch()
     {
@@ -1301,10 +1263,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             .ToList();
     }
 
-    private void InvalidateSearch()
-    {
-        _invalidation?.InvalidateSearch?.Invoke();
-    }
+    private void InvalidateSearch() => _invalidation?.InvalidateSearch?.Invoke();
 
     private static IEnumerable<(int Index, int Length)> FindAllOccurrences(string text, string query, StringComparison comparison)
     {
@@ -1318,38 +1277,41 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
     }
 
-    /// <summary>
-    /// Builds a list of SKRects for a text match by merging adjacent character boxes on the same line.
-    /// </summary>
     private static List<SKRect> BuildMatchRects(PageText pageText, int charStart, int charLength)
     {
         var rects = new List<SKRect>();
-        if (pageText.CharBoxes.Count == 0) return rects;
+        foreach (var (l, t, r, b) in MergeCharBoxesIntoLines(pageText, charStart, charLength))
+            rects.Add(new SKRect(l, t, r, b));
+        return rects;
+    }
+
+    /// <summary>
+    /// Merges adjacent character bounding boxes on the same line into
+    /// (left, top, right, bottom) bounds. Used by both highlight rects
+    /// and search match rects.
+    /// </summary>
+    private static IEnumerable<(float Left, float Top, float Right, float Bottom)> MergeCharBoxesIntoLines(
+        PageText pageText, int charStart, int charLength)
+    {
+        if (pageText.CharBoxes.Count == 0) yield break;
 
         int end = Math.Min(charStart + charLength, pageText.CharBoxes.Count);
-
         float curLeft = 0, curTop = 0, curRight = 0, curBottom = 0;
         bool hasRect = false;
-        const float lineThreshold = 4f; // max Y difference to consider same line
+        const float lineThreshold = 4f;
 
         for (int i = charStart; i < end; i++)
         {
             var cb = pageText.CharBoxes[i];
-            // Skip zero-size boxes (whitespace/control chars)
-            if (cb.Left == 0 && cb.Right == 0 && cb.Top == 0 && cb.Bottom == 0)
-                continue;
+            if (cb.Left == 0 && cb.Right == 0 && cb.Top == 0 && cb.Bottom == 0) continue;
 
             if (!hasRect)
             {
-                curLeft = cb.Left;
-                curTop = cb.Top;
-                curRight = cb.Right;
-                curBottom = cb.Bottom;
+                curLeft = cb.Left; curTop = cb.Top; curRight = cb.Right; curBottom = cb.Bottom;
                 hasRect = true;
             }
             else if (Math.Abs(cb.Top - curTop) < lineThreshold)
             {
-                // Same line — extend horizontally
                 curLeft = Math.Min(curLeft, cb.Left);
                 curRight = Math.Max(curRight, cb.Right);
                 curTop = Math.Min(curTop, cb.Top);
@@ -1357,19 +1319,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
             }
             else
             {
-                // New line — flush current rect
-                rects.Add(new SKRect(curLeft, curTop, curRight, curBottom));
-                curLeft = cb.Left;
-                curTop = cb.Top;
-                curRight = cb.Right;
-                curBottom = cb.Bottom;
+                yield return (curLeft, curTop, curRight, curBottom);
+                curLeft = cb.Left; curTop = cb.Top; curRight = cb.Right; curBottom = cb.Bottom;
             }
         }
 
         if (hasRect)
-            rects.Add(new SKRect(curLeft, curTop, curRight, curBottom));
-
-        return rects;
+            yield return (curLeft, curTop, curRight, curBottom);
     }
 }
 

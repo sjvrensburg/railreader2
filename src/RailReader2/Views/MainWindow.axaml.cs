@@ -133,7 +133,6 @@ public partial class MainWindow : Window
     {
         RadialMenuControl.Scale = vm.Config.UiFontScale;
 
-        // Wire clipboard callback
         vm.CopyToClipboard = async text =>
         {
             var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
@@ -141,10 +140,8 @@ public partial class MainWindow : Window
                 await clipboard.SetTextAsync(text);
         };
 
-        // Wire toolbar
         ToolBar.ViewModel = vm;
 
-        // Static annotation-only segments
         var segments = new List<RadialMenu.Segment>
         {
             new("Highlight", RadialMenu.IconChars.Highlighter,

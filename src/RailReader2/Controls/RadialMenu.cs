@@ -29,15 +29,6 @@ public class RadialMenu : Control
         public const string Square      = "\uf0c8";
         public const string Eraser      = "\uf12d";
         public const string Xmark       = "\uf00d";
-        public const string PaintBrush  = "\uf1fc";
-        public const string Bookmark    = "\uf02e";
-        public const string Shapes      = "\uf61f";
-        public const string Comment     = "\uf075";
-        public const string CirclePlus  = "\uf055";
-        public const string Palette     = "\uf53f";
-        public const string Hand       = "\uf0b2";
-        public const string ICursor    = "\uf246";
-        public const string Copy       = "\uf0c5";
     }
 
     public record Segment(string Label, string Icon, Action Action);
@@ -153,9 +144,7 @@ public class RadialMenu : Control
     protected override void OnPointerPressed(PointerPressedEventArgs e)
     {
         base.OnPointerPressed(e);
-        if (_hoveringCentre)
-            _onClose?.Invoke();
-        else if (_hoveredIndex >= 0 && _hoveredIndex < _segments.Count)
+        if (_hoveredIndex >= 0 && _hoveredIndex < _segments.Count)
             _segments[_hoveredIndex].Action.Invoke();
         else
             _onClose?.Invoke();

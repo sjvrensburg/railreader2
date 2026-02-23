@@ -18,7 +18,7 @@ public partial class NavigableClassItem : ObservableObject
 public partial class SettingsWindow : Window
 {
     private bool _loading = true;
-    private ObservableCollection<NavigableClassItem> _classItems = new();
+    private readonly ObservableCollection<NavigableClassItem> _classItems = [];
 
     public SettingsWindow()
     {
@@ -114,7 +114,7 @@ public partial class SettingsWindow : Window
     private void OnEffectChanged(object? sender, SelectionChangedEventArgs e)
     {
         if (Vm is not { } vm || _loading) return;
-        vm.Config.ColourEffect = (ColourEffect)(EffectCombo.SelectedIndex);
+        vm.Config.ColourEffect = (ColourEffect)EffectCombo.SelectedIndex;
         SaveToConfig();
     }
     private void OnIntensityChanged(object? sender, Avalonia.AvaloniaPropertyChangedEventArgs e)
