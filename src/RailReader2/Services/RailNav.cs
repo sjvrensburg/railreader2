@@ -256,21 +256,20 @@ public sealed class RailNav
         double maxX = -blockLeft * zoom;
         double minX = windowWidth - blockRight * zoom;
 
-        // Soft clamp: ease into the boundary over a small pixel zone
+        // Soft clamp: ease into the boundary using an asymptotic curve
         // instead of a hard stop, which eliminates visual judder.
-        const double softZone = 20.0; // pixels of easing
+        // SoftEase(over) = over * k / (k + over) — approaches k as over → ∞.
+        const double k = 20.0; // pixels of easing zone
         if (cameraX > maxX)
-        {
-            double over = cameraX - maxX;
-            return maxX + softZone * (1.0 - 1.0 / (1.0 + over / softZone));
-        }
+            return maxX + SoftEase(cameraX - maxX, k);
         if (cameraX < minX)
-        {
-            double over = minX - cameraX;
-            return minX - softZone * (1.0 - 1.0 / (1.0 + over / softZone));
-        }
+            return minX - SoftEase(minX - cameraX, k);
         return cameraX;
     }
+
+    /// <summary>Asymptotic ease: approaches <paramref name="limit"/> as overshoot grows.</summary>
+    private static double SoftEase(double overshoot, double limit)
+        => overshoot * limit / (limit + overshoot);
 
     public bool Tick(ref double cameraX, ref double cameraY, double dtSecs, double zoom, double windowWidth)
     {
