@@ -251,7 +251,9 @@ public partial class TabBarView : UserControl
         int fromIndex = _dragIndex;
         bool wasDragging = _isDragging;
 
-        ResetDragState(e.Pointer);
+        // Only release pointer capture if we were actually dragging;
+        // otherwise the Button's internal capture is disrupted and Click never fires.
+        ResetDragState(wasDragging ? e.Pointer : null);
 
         if (wasDragging && _vm is not null)
         {
