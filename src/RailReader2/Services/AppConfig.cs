@@ -18,7 +18,8 @@ public sealed class AppConfig
     public bool MotionBlur { get; set; } = true;
     public double MotionBlurIntensity { get; set; } = 0.33;
 
-    public List<string> RecentFiles { get; set; } = [];
+    [JsonConverter(typeof(RecentFilesConverter))]
+    public List<RecentFileEntry> RecentFiles { get; set; } = [];
 
     [JsonConverter(typeof(NavigableClassesConverter))]
     public HashSet<int> NavigableClasses { get; set; } = LayoutConstants.DefaultNavigableClasses();
@@ -67,11 +68,43 @@ public sealed class AppConfig
 
     public void AddRecentFile(string filePath)
     {
-        RecentFiles.Remove(filePath);
-        RecentFiles.Insert(0, filePath);
+        var idx = RecentFiles.FindIndex(e => e.FilePath == filePath);
+        RecentFileEntry entry;
+        if (idx >= 0)
+        {
+            entry = RecentFiles[idx];
+            RecentFiles.RemoveAt(idx);
+        }
+        else
+        {
+            entry = new RecentFileEntry { FilePath = filePath };
+        }
+        RecentFiles.Insert(0, entry);
         if (RecentFiles.Count > 10)
             RecentFiles.RemoveRange(10, RecentFiles.Count - 10);
         Save();
+    }
+
+    public void SaveReadingPosition(string filePath, int page, double zoom, double offsetX, double offsetY)
+    {
+        var entry = RecentFiles.Find(e => e.FilePath == filePath);
+        if (entry is null)
+        {
+            entry = new RecentFileEntry { FilePath = filePath };
+            RecentFiles.Insert(0, entry);
+            if (RecentFiles.Count > 10)
+                RecentFiles.RemoveRange(10, RecentFiles.Count - 10);
+        }
+        entry.Page = page;
+        entry.Zoom = zoom;
+        entry.OffsetX = offsetX;
+        entry.OffsetY = offsetY;
+        Save();
+    }
+
+    public RecentFileEntry? GetReadingPosition(string filePath)
+    {
+        return RecentFiles.Find(e => e.FilePath == filePath);
     }
 
     public void Save()
@@ -85,6 +118,59 @@ public sealed class AppConfig
         {
             Console.Error.WriteLine($"Failed to save config: {ex.Message}");
         }
+    }
+}
+
+/// <summary>
+/// Handles backward compatibility: deserializes both old-format string arrays
+/// and new-format object arrays into List&lt;RecentFileEntry&gt;.
+/// </summary>
+internal sealed class RecentFilesConverter : JsonConverter<List<RecentFileEntry>>
+{
+    public override List<RecentFileEntry>? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        var result = new List<RecentFileEntry>();
+        if (reader.TokenType != JsonTokenType.StartArray) return result;
+
+        // We need snake_case options for deserializing the entry objects
+        var entryOptions = new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
+        };
+
+        while (reader.Read())
+        {
+            if (reader.TokenType == JsonTokenType.EndArray) break;
+
+            if (reader.TokenType == JsonTokenType.String)
+            {
+                // Old format: plain string path
+                var path = reader.GetString();
+                if (path is not null)
+                    result.Add(new RecentFileEntry { FilePath = path });
+            }
+            else if (reader.TokenType == JsonTokenType.StartObject)
+            {
+                // New format: object with file_path, page, zoom, etc.
+                var entry = JsonSerializer.Deserialize<RecentFileEntry>(ref reader, entryOptions);
+                if (entry is not null)
+                    result.Add(entry);
+            }
+        }
+        return result;
+    }
+
+    public override void Write(Utf8JsonWriter writer, List<RecentFileEntry> value, JsonSerializerOptions options)
+    {
+        var entryOptions = new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
+        };
+
+        writer.WriteStartArray();
+        foreach (var entry in value)
+            JsonSerializer.Serialize(writer, entry, entryOptions);
+        writer.WriteEndArray();
     }
 }
 

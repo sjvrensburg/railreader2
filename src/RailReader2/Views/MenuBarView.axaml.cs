@@ -36,8 +36,9 @@ public partial class MenuBarView : UserControl
             menu.Items.Add(new MenuItem { Header = "(No recent files)", IsEnabled = false });
             return;
         }
-        foreach (var filePath in files)
+        foreach (var entry in files)
         {
+            var filePath = entry.FilePath;
             if (!System.IO.File.Exists(filePath)) continue;
             var name = System.IO.Path.GetFileName(filePath);
             var dir = System.IO.Path.GetDirectoryName(filePath);

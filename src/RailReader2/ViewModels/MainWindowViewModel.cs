@@ -310,8 +310,24 @@ public sealed partial class MainWindowViewModel : ObservableObject
             tab.LoadAnnotations();
 
             var (ww, wh) = GetWindowSize();
-            tab.CenterPage(ww, wh);
-            tab.UpdateRailZoom(ww, wh);
+
+            // Restore saved reading position, or center the page for new files
+            var saved = _config.GetReadingPosition(path);
+            if (saved is not null && (saved.Page > 0 || saved.Zoom != 1.0))
+            {
+                tab.GoToPage(Math.Clamp(saved.Page, 0, tab.PageCount - 1), _worker, ww, wh);
+                tab.Camera.Zoom = Math.Clamp(saved.Zoom, Camera.ZoomMin, Camera.ZoomMax);
+                tab.Camera.OffsetX = saved.OffsetX;
+                tab.Camera.OffsetY = saved.OffsetY;
+                tab.ClampCamera(ww, wh);
+                tab.UpdateRailZoom(ww, wh);
+                tab.UpdateRenderDpiIfNeeded();
+            }
+            else
+            {
+                tab.CenterPage(ww, wh);
+                tab.UpdateRailZoom(ww, wh);
+            }
 
             Tabs.Add(tab);
             _config.AddRecentFile(path);
@@ -361,12 +377,21 @@ public sealed partial class MainWindowViewModel : ObservableObject
     {
         if (index < 0 || index >= Tabs.Count) return;
         var tab = Tabs[index];
+        _config.SaveReadingPosition(tab.FilePath, tab.CurrentPage,
+            tab.Camera.Zoom, tab.Camera.OffsetX, tab.Camera.OffsetY);
         Tabs.RemoveAt(index);
         tab.Dispose();
         if (Tabs.Count == 0) ActiveTabIndex = 0;
         else if (ActiveTabIndex >= Tabs.Count) ActiveTabIndex = Tabs.Count - 1;
         OnPropertyChanged(nameof(ActiveTab));
         InvalidateAll();
+    }
+
+    public void SaveAllReadingPositions()
+    {
+        foreach (var tab in Tabs)
+            _config.SaveReadingPosition(tab.FilePath, tab.CurrentPage,
+                tab.Camera.Zoom, tab.Camera.OffsetX, tab.Camera.OffsetY);
     }
 
     [RelayCommand]

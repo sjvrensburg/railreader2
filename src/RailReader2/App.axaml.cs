@@ -30,6 +30,7 @@ public partial class App : Application
             vm.SetWindow(window);
 
             window.Opened += (_, _) => splash.Close();
+            window.Closing += (_, _) => vm.SaveAllReadingPositions();
             desktop.MainWindow = window;
 
             if (desktop.Args is { Length: > 0 } && File.Exists(desktop.Args[0]))
