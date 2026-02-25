@@ -91,6 +91,11 @@ public partial class MinimapControl : UserControl
         private readonly Rect _bounds;
         private readonly MainWindowViewModel? _vm;
 
+        [ThreadStatic] private static SKPaint? s_bgPaint;
+        [ThreadStatic] private static SKPaint? s_vpFill;
+        [ThreadStatic] private static SKPaint? s_vpStroke;
+        [ThreadStatic] private static SKPaint? s_borderPaint;
+
         public MinimapDrawOperation(Rect bounds, MainWindowViewModel? vm)
         {
             _bounds = bounds;
@@ -117,7 +122,7 @@ public partial class MinimapControl : UserControl
             float controlH = (float)_bounds.Height;
             var controlRect = new SKRoundRect(SKRect.Create(0, 0, controlW, controlH), 4);
 
-            using var bgPaint = new SKPaint { Color = new SKColor(40, 40, 40, 200) };
+            var bgPaint = s_bgPaint ??= new SKPaint { Color = new SKColor(40, 40, 40, 200) };
             canvas.DrawRoundRect(controlRect, bgPaint);
 
             var thumb = ThumbnailGeometry.Compute(controlW, controlH, tab.PageWidth, tab.PageHeight);
@@ -140,10 +145,10 @@ public partial class MinimapControl : UserControl
                 (float)(winW / tab.Camera.Zoom) * scale,
                 (float)(winH / tab.Camera.Zoom) * scale);
 
-            using var vpFill = new SKPaint { Color = new SKColor(100, 180, 255, 120) };
+            var vpFill = s_vpFill ??= new SKPaint { Color = new SKColor(100, 180, 255, 120) };
             canvas.DrawRect(vpRect, vpFill);
 
-            using var vpStroke = new SKPaint
+            var vpStroke = s_vpStroke ??= new SKPaint
             {
                 Color = new SKColor(100, 180, 255, 220),
                 Style = SKPaintStyle.Stroke,
@@ -152,7 +157,7 @@ public partial class MinimapControl : UserControl
             };
             canvas.DrawRect(vpRect, vpStroke);
 
-            using var borderPaint = new SKPaint
+            var borderPaint = s_borderPaint ??= new SKPaint
             {
                 Color = new SKColor(100, 100, 100),
                 Style = SKPaintStyle.Stroke,
