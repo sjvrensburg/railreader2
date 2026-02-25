@@ -87,14 +87,8 @@ public sealed class AppConfig
 
     public void SaveReadingPosition(string filePath, int page, double zoom, double offsetX, double offsetY)
     {
-        var entry = RecentFiles.Find(e => e.FilePath == filePath);
-        if (entry is null)
-        {
-            entry = new RecentFileEntry { FilePath = filePath };
-            RecentFiles.Insert(0, entry);
-            if (RecentFiles.Count > 10)
-                RecentFiles.RemoveRange(10, RecentFiles.Count - 10);
-        }
+        AddRecentFile(filePath); // ensures entry exists at index 0
+        var entry = RecentFiles[0];
         entry.Page = page;
         entry.Zoom = zoom;
         entry.OffsetX = offsetX;
@@ -127,16 +121,15 @@ public sealed class AppConfig
 /// </summary>
 internal sealed class RecentFilesConverter : JsonConverter<List<RecentFileEntry>>
 {
+    private static readonly JsonSerializerOptions s_entryOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
+    };
+
     public override List<RecentFileEntry>? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
         var result = new List<RecentFileEntry>();
         if (reader.TokenType != JsonTokenType.StartArray) return result;
-
-        // We need snake_case options for deserializing the entry objects
-        var entryOptions = new JsonSerializerOptions
-        {
-            PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
-        };
 
         while (reader.Read())
         {
@@ -152,7 +145,7 @@ internal sealed class RecentFilesConverter : JsonConverter<List<RecentFileEntry>
             else if (reader.TokenType == JsonTokenType.StartObject)
             {
                 // New format: object with file_path, page, zoom, etc.
-                var entry = JsonSerializer.Deserialize<RecentFileEntry>(ref reader, entryOptions);
+                var entry = JsonSerializer.Deserialize<RecentFileEntry>(ref reader, s_entryOptions);
                 if (entry is not null)
                     result.Add(entry);
             }
@@ -162,14 +155,9 @@ internal sealed class RecentFilesConverter : JsonConverter<List<RecentFileEntry>
 
     public override void Write(Utf8JsonWriter writer, List<RecentFileEntry> value, JsonSerializerOptions options)
     {
-        var entryOptions = new JsonSerializerOptions
-        {
-            PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
-        };
-
         writer.WriteStartArray();
         foreach (var entry in value)
-            JsonSerializer.Serialize(writer, entry, entryOptions);
+            JsonSerializer.Serialize(writer, entry, s_entryOptions);
         writer.WriteEndArray();
     }
 }

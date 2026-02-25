@@ -45,15 +45,6 @@ public partial class MainWindow : Window
                 InvalidateAnnotations = () => AnnotationLayer.InvalidateVisual(),
             });
 
-            vm.SetInvalidateCanvas(() =>
-            {
-                UpdateCameraTransform();
-                PageLayer.InvalidateVisual();
-                SearchLayer.InvalidateVisual();
-                AnnotationLayer.InvalidateVisual();
-                OverlayLayer.InvalidateVisual();
-                Minimap.InvalidateVisual();
-            });
 
             // Keep ViewModel's viewport size in sync with the actual drawable area.
             // SizeChanged fires during the initial layout pass (before window.Opened),
