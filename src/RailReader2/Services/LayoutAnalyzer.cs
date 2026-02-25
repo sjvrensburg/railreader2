@@ -134,6 +134,7 @@ public sealed class LayoutAnalyzer : IDisposable
         }
 
         Nms(rawBlocks, LayoutConstants.NmsIouThreshold);
+        SuppressNestedBlocks(rawBlocks);
 
         rawBlocks.Sort((a, b) =>
         {
@@ -213,6 +214,47 @@ public sealed class LayoutAnalyzer : IDisposable
         for (int i = blocks.Count - 1; i >= 0; i--)
         {
             if (!keep[i]) blocks.RemoveAt(i);
+        }
+    }
+
+    /// <summary>
+    /// Removes blocks that are fully contained within a larger block.
+    /// Handles cases like inline_formula detected inside a text block,
+    /// which would otherwise create redundant navigation targets.
+    /// </summary>
+    private static void SuppressNestedBlocks(List<LayoutBlock> blocks)
+    {
+        const float margin = 2f; // tolerance in page points
+        var suppress = new bool[blocks.Count];
+
+        for (int i = 0; i < blocks.Count; i++)
+        {
+            if (suppress[i]) continue;
+            for (int j = 0; j < blocks.Count; j++)
+            {
+                if (i == j || suppress[j]) continue;
+
+                // Check if block j is contained within block i
+                var outer = blocks[i].BBox;
+                var inner = blocks[j].BBox;
+
+                if (inner.X >= outer.X - margin &&
+                    inner.Y >= outer.Y - margin &&
+                    inner.X + inner.W <= outer.X + outer.W + margin &&
+                    inner.Y + inner.H <= outer.Y + outer.H + margin)
+                {
+                    // j is inside i — suppress the smaller one
+                    float areaI = outer.W * outer.H;
+                    float areaJ = inner.W * inner.H;
+                    if (areaJ < areaI)
+                        suppress[j] = true;
+                }
+            }
+        }
+
+        for (int i = blocks.Count - 1; i >= 0; i--)
+        {
+            if (suppress[i]) blocks.RemoveAt(i);
         }
     }
 

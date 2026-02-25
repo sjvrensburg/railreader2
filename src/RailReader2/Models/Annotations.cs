@@ -55,8 +55,8 @@ public class RectAnnotation : Annotation
 // Undo system
 public interface IUndoAction
 {
-    void Undo(AnnotationFile file, int pageIndex);
-    void Redo(AnnotationFile file, int pageIndex);
+    void Undo(AnnotationFile file);
+    void Redo(AnnotationFile file);
 }
 
 public class AddAnnotationAction : IUndoAction
@@ -70,13 +70,13 @@ public class AddAnnotationAction : IUndoAction
         _annotation = annotation;
     }
 
-    public void Undo(AnnotationFile file, int pageIndex)
+    public void Undo(AnnotationFile file)
     {
         if (file.Pages.TryGetValue(_pageIndex, out var list))
             list.Remove(_annotation);
     }
 
-    public void Redo(AnnotationFile file, int pageIndex)
+    public void Redo(AnnotationFile file)
     {
         if (!file.Pages.TryGetValue(_pageIndex, out var list))
         {
@@ -99,7 +99,7 @@ public class RemoveAnnotationAction : IUndoAction
         _annotation = annotation;
     }
 
-    public void Undo(AnnotationFile file, int pageIndex)
+    public void Undo(AnnotationFile file)
     {
         if (!file.Pages.TryGetValue(_pageIndex, out var list))
         {
@@ -109,7 +109,7 @@ public class RemoveAnnotationAction : IUndoAction
         list.Insert(Math.Min(_index, list.Count), _annotation);
     }
 
-    public void Redo(AnnotationFile file, int pageIndex)
+    public void Redo(AnnotationFile file)
     {
         if (file.Pages.TryGetValue(_pageIndex, out var list))
         {

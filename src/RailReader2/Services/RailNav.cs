@@ -210,29 +210,19 @@ public sealed class RailNav
         VerticalBias = cameraY - centeredY;
     }
 
-    /// <summary>
-    /// Returns the camera X to show the left edge of the current block at the left margin.
-    /// Returns null if not in rail mode.
-    /// </summary>
     public double? ComputeLineStartX(double zoom, double windowWidth)
-    {
-        if (!Active || _navigableIndices.Count == 0) return null;
-        var block = CurrentNavigableBlock;
-        double x = windowWidth * 0.05 - block.BBox.X * zoom;
-        _snap = null;
-        return ClampX(x, zoom, windowWidth);
-    }
+        => ComputeLineEdgeX(zoom, windowWidth, start: true);
 
-    /// <summary>
-    /// Returns the camera X to show the right edge of the current block at the right margin.
-    /// Returns null if not in rail mode.
-    /// </summary>
     public double? ComputeLineEndX(double zoom, double windowWidth)
+        => ComputeLineEdgeX(zoom, windowWidth, start: false);
+
+    private double? ComputeLineEdgeX(double zoom, double windowWidth, bool start)
     {
         if (!Active || _navigableIndices.Count == 0) return null;
         var block = CurrentNavigableBlock;
-        double blockRight = block.BBox.X + block.BBox.W;
-        double x = windowWidth * 0.95 - blockRight * zoom;
+        double x = start
+            ? windowWidth * 0.05 - block.BBox.X * zoom
+            : windowWidth * 0.95 - (block.BBox.X + block.BBox.W) * zoom;
         _snap = null;
         return ClampX(x, zoom, windowWidth);
     }

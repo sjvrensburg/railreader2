@@ -45,15 +45,6 @@ public partial class MainWindow : Window
                 InvalidateAnnotations = () => AnnotationLayer.InvalidateVisual(),
             });
 
-            vm.SetInvalidateCanvas(() =>
-            {
-                UpdateCameraTransform();
-                PageLayer.InvalidateVisual();
-                SearchLayer.InvalidateVisual();
-                AnnotationLayer.InvalidateVisual();
-                OverlayLayer.InvalidateVisual();
-                Minimap.InvalidateVisual();
-            });
 
             // Keep ViewModel's viewport size in sync with the actual drawable area.
             // SizeChanged fires during the initial layout pass (before window.Opened),
@@ -112,6 +103,10 @@ public partial class MainWindow : Window
                     case nameof(MainWindowViewModel.ShowSettings) when vm.ShowSettings:
                         vm.ShowSettings = false;
                         await new SettingsWindow { DataContext = vm, FontSize = vm.CurrentFontSize }.ShowDialog(this);
+                        break;
+                    case nameof(MainWindowViewModel.IsFullScreen):
+                        WindowState = vm.IsFullScreen ? WindowState.FullScreen : WindowState.Normal;
+                        SystemDecorations = vm.IsFullScreen ? SystemDecorations.None : SystemDecorations.Full;
                         break;
                     case nameof(MainWindowViewModel.ShowGoToPage) when vm.ShowGoToPage:
                         vm.ShowGoToPage = false;
@@ -204,10 +199,12 @@ public partial class MainWindow : Window
         PagePanel.Width = tab.PageWidth;
         PagePanel.Height = tab.PageHeight;
 
-        const double threshold = 0.5;
-        if (Math.Abs(tab.Camera.OffsetX - _lastMinimapOx) > threshold ||
-            Math.Abs(tab.Camera.OffsetY - _lastMinimapOy) > threshold ||
-            Math.Abs(tab.Camera.Zoom - _lastMinimapZoom) > 0.001)
+        // The minimap is ≤200×280px — sub-pixel viewport indicator movement is
+        // invisible. Use thresholds large enough to skip redraws during smooth
+        // scrolling frames where the visual change is imperceptible.
+        if (Math.Abs(tab.Camera.OffsetX - _lastMinimapOx) > 8.0 ||
+            Math.Abs(tab.Camera.OffsetY - _lastMinimapOy) > 8.0 ||
+            Math.Abs(tab.Camera.Zoom - _lastMinimapZoom) > 0.02)
         {
             _lastMinimapOx = tab.Camera.OffsetX;
             _lastMinimapOy = tab.Camera.OffsetY;
@@ -350,6 +347,10 @@ public partial class MainWindow : Window
                 vm.SetAnnotationTool(Models.AnnotationTool.TextNote); e.Handled = true; break;
             case Key.D5 when !searchFocused:
                 vm.SetAnnotationTool(Models.AnnotationTool.Eraser); e.Handled = true; break;
+            case Key.F11:
+                vm.IsFullScreen = !vm.IsFullScreen; e.Handled = true; break;
+            case Key.Escape when vm.IsFullScreen:
+                vm.IsFullScreen = false; e.Handled = true; break;
             case Key.Escape when vm.IsRadialMenuOpen:
                 vm.CloseRadialMenu(); e.Handled = true; break;
             case Key.Escape when vm.IsAnnotating:

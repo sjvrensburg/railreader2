@@ -405,7 +405,7 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
     {
         if (Annotations is null) return;
         var action = new RemoveAnnotationAction(page, annotation);
-        action.Redo(Annotations, page);
+        action.Redo(Annotations);
 
         UndoStack.Push(action);
         RedoStack.Clear();
@@ -416,7 +416,7 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
     {
         if (UndoStack.Count == 0 || Annotations is null) return;
         var action = UndoStack.Pop();
-        action.Undo(Annotations, CurrentPage);
+        action.Undo(Annotations);
         RedoStack.Push(action);
         MarkAnnotationsDirty();
     }
@@ -425,7 +425,7 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
     {
         if (RedoStack.Count == 0 || Annotations is null) return;
         var action = RedoStack.Pop();
-        action.Redo(Annotations, CurrentPage);
+        action.Redo(Annotations);
         UndoStack.Push(action);
         MarkAnnotationsDirty();
     }

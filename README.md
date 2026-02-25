@@ -68,6 +68,7 @@ At high zoom levels, navigation switches to "rail mode" — the viewer locks ont
 - **Speed/blur toolbar** — docked vertical sliders for scroll speed and motion blur intensity, visible in rail mode
 - **Vertical position preservation** — maintains your panned vertical offset when navigating lines in rail mode
 - **Line snap shortcuts** — Home/End keys snap to the start/end of the current line in rail mode
+- **Fullscreen mode** — F11 hides all chrome for distraction-free reading; Escape exits
 - **Tooltips** — all interactive controls have descriptive tooltips
 
 ## Usage
@@ -110,7 +111,8 @@ dotnet run -c Release --project src/RailReader2 --
 | Right-click | Open annotation radial menu |
 | Ctrl+Z / Ctrl+Y | Undo / redo annotation |
 | Ctrl+C | Copy selected text |
-| Escape | Cancel annotation tool / close search |
+| F11 | Toggle fullscreen (hides chrome) |
+| Escape | Cancel annotation tool / close search / exit fullscreen |
 | F1 | Keyboard shortcuts dialog |
 
 ### Configuration

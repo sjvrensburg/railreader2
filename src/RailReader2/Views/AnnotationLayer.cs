@@ -43,6 +43,8 @@ public class AnnotationLayer : Control
         private readonly TabViewModel _tab;
         private readonly MainWindowViewModel _vm;
 
+        [ThreadStatic] private static SKPaint? s_selPaint;
+
         public AnnotationDrawOperation(Rect bounds, TabViewModel tab, MainWindowViewModel vm)
         {
             _bounds = bounds;
@@ -79,9 +81,9 @@ public class AnnotationLayer : Control
             var selRects = _vm.TextSelectionRects;
             if (selRects is { Count: > 0 })
             {
-                using var selPaint = new SKPaint
+                var selPaint = s_selPaint ??= new SKPaint
                 {
-                    Color = new SKColor(0x33, 0x90, 0xFF, 77), // ~30% opacity
+                    Color = new SKColor(0x33, 0x90, 0xFF, 77),
                     IsAntialias = true,
                 };
                 foreach (var r in selRects)
@@ -96,6 +98,16 @@ public class AnnotationLayer : Control
 /// </summary>
 public static class AnnotationRenderer
 {
+    // Cached paints — per render thread via [ThreadStatic].
+    // Color/StrokeWidth are mutated per annotation; Style/StrokeCap/etc. are stable.
+    [ThreadStatic] private static SKPaint? s_fillPaint;
+    [ThreadStatic] private static SKPaint? s_strokePaint;
+    [ThreadStatic] private static SKPaint? s_noteBorderPaint;
+    [ThreadStatic] private static SKPaint? s_noteTextPaint;
+    [ThreadStatic] private static SKPaint? s_noteBgPaint;
+    [ThreadStatic] private static SKFont? s_noteFont;
+    [ThreadStatic] private static SKPaint? s_dashPaint;
+
     public static void DrawAnnotations(SKCanvas canvas, List<Annotation> annotations, Annotation? selected)
     {
         foreach (var ann in annotations)
@@ -126,9 +138,22 @@ public static class AnnotationRenderer
             DrawSelectionIndicator(canvas, annotation);
     }
 
+    private static SKPaint GetFillPaint()
+        => s_fillPaint ??= new SKPaint { IsAntialias = true };
+
+    private static SKPaint GetStrokePaint()
+        => s_strokePaint ??= new SKPaint
+        {
+            Style = SKPaintStyle.Stroke,
+            StrokeCap = SKStrokeCap.Round,
+            StrokeJoin = SKStrokeJoin.Round,
+            IsAntialias = true,
+        };
+
     private static void DrawHighlight(SKCanvas canvas, HighlightAnnotation highlight, SKColor color)
     {
-        using var paint = new SKPaint { Color = color, IsAntialias = true };
+        var paint = GetFillPaint();
+        paint.Color = color;
         foreach (var r in highlight.Rects)
             canvas.DrawRect(SKRect.Create(r.X, r.Y, r.W, r.H), paint);
     }
@@ -142,41 +167,35 @@ public static class AnnotationRenderer
         for (int i = 1; i < freehand.Points.Count; i++)
             path.LineTo(freehand.Points[i].X, freehand.Points[i].Y);
 
-        using var paint = new SKPaint
-        {
-            Color = color,
-            Style = SKPaintStyle.Stroke,
-            StrokeWidth = freehand.StrokeWidth,
-            StrokeCap = SKStrokeCap.Round,
-            StrokeJoin = SKStrokeJoin.Round,
-            IsAntialias = true,
-        };
+        var paint = GetStrokePaint();
+        paint.Color = color;
+        paint.StrokeWidth = freehand.StrokeWidth;
         canvas.DrawPath(path, paint);
     }
 
     private static void DrawTextNote(SKCanvas canvas, TextNoteAnnotation note, SKColor color)
     {
-        // Draw marker icon
         float size = 12f;
-        using var markerPaint = new SKPaint { Color = color, IsAntialias = true };
-        canvas.DrawRect(SKRect.Create(note.X - size / 2, note.Y - size / 2, size, size), markerPaint);
+        var markerRect = SKRect.Create(note.X - size / 2, note.Y - size / 2, size, size);
 
-        // Draw border
-        using var borderPaint = new SKPaint
+        var fillPaint = GetFillPaint();
+        fillPaint.Color = color;
+        canvas.DrawRect(markerRect, fillPaint);
+
+        var borderPaint = s_noteBorderPaint ??= new SKPaint
         {
-            Color = color.WithAlpha(255),
             Style = SKPaintStyle.Stroke,
             StrokeWidth = 1,
             IsAntialias = true,
         };
-        canvas.DrawRect(SKRect.Create(note.X - size / 2, note.Y - size / 2, size, size), borderPaint);
+        borderPaint.Color = color.WithAlpha(255);
+        canvas.DrawRect(markerRect, borderPaint);
 
-        // Draw text label
         if (!string.IsNullOrEmpty(note.Text))
         {
-            using var font = new SKFont(SKTypeface.Default, 9);
-            using var textPaint = new SKPaint { Color = new SKColor(0, 0, 0, 220), IsAntialias = true };
-            using var bgPaint = new SKPaint { Color = new SKColor(255, 255, 200, 230) };
+            var font = s_noteFont ??= new SKFont(SKTypeface.Default, 9);
+            var textPaint = s_noteTextPaint ??= new SKPaint { Color = new SKColor(0, 0, 0, 220), IsAntialias = true };
+            var bgPaint = s_noteBgPaint ??= new SKPaint { Color = new SKColor(255, 255, 200, 230) };
             float textWidth = font.MeasureText(note.Text);
             var bgRect = SKRect.Create(note.X + size / 2 + 2, note.Y - 6, textWidth + 6, 14);
             canvas.DrawRect(bgRect, bgPaint);
@@ -189,16 +208,13 @@ public static class AnnotationRenderer
         var skRect = SKRect.Create(rect.X, rect.Y, rect.W, rect.H);
         if (rect.Filled)
         {
-            using var fillPaint = new SKPaint { Color = color, IsAntialias = true };
+            var fillPaint = GetFillPaint();
+            fillPaint.Color = color;
             canvas.DrawRect(skRect, fillPaint);
         }
-        using var strokePaint = new SKPaint
-        {
-            Color = color.WithAlpha(255),
-            Style = SKPaintStyle.Stroke,
-            StrokeWidth = rect.StrokeWidth,
-            IsAntialias = true,
-        };
+        var strokePaint = GetStrokePaint();
+        strokePaint.Color = color.WithAlpha(255);
+        strokePaint.StrokeWidth = rect.StrokeWidth;
         canvas.DrawRect(skRect, strokePaint);
     }
 
@@ -207,7 +223,7 @@ public static class AnnotationRenderer
         var bounds = GetAnnotationBounds(annotation);
         if (bounds is not { } rect) return;
 
-        using var dashPaint = new SKPaint
+        var dashPaint = s_dashPaint ??= new SKPaint
         {
             Color = new SKColor(0, 120, 212, 200),
             Style = SKPaintStyle.Stroke,
@@ -224,16 +240,26 @@ public static class AnnotationRenderer
         switch (annotation)
         {
             case HighlightAnnotation h when h.Rects.Count > 0:
-                float minX = h.Rects.Min(r => r.X);
-                float minY = h.Rects.Min(r => r.Y);
-                float maxX = h.Rects.Max(r => r.X + r.W);
-                float maxY = h.Rects.Max(r => r.Y + r.H);
+                float minX = float.MaxValue, minY = float.MaxValue;
+                float maxX = float.MinValue, maxY = float.MinValue;
+                foreach (var r in h.Rects)
+                {
+                    if (r.X < minX) minX = r.X;
+                    if (r.Y < minY) minY = r.Y;
+                    if (r.X + r.W > maxX) maxX = r.X + r.W;
+                    if (r.Y + r.H > maxY) maxY = r.Y + r.H;
+                }
                 return new SKRect(minX, minY, maxX, maxY);
             case FreehandAnnotation f when f.Points.Count > 0:
-                float fMinX = f.Points.Min(p => p.X);
-                float fMinY = f.Points.Min(p => p.Y);
-                float fMaxX = f.Points.Max(p => p.X);
-                float fMaxY = f.Points.Max(p => p.Y);
+                float fMinX = float.MaxValue, fMinY = float.MaxValue;
+                float fMaxX = float.MinValue, fMaxY = float.MinValue;
+                foreach (var p in f.Points)
+                {
+                    if (p.X < fMinX) fMinX = p.X;
+                    if (p.Y < fMinY) fMinY = p.Y;
+                    if (p.X > fMaxX) fMaxX = p.X;
+                    if (p.Y > fMaxY) fMaxY = p.Y;
+                }
                 return new SKRect(fMinX, fMinY, fMaxX, fMaxY);
             case TextNoteAnnotation t:
                 return new SKRect(t.X - 6, t.Y - 6, t.X + 6, t.Y + 6);

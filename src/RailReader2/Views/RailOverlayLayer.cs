@@ -41,6 +41,18 @@ public class RailOverlayLayer : Control
         private readonly TabViewModel? _tab;
         private readonly ColourEffectShaders? _effects;
 
+        // Cached paints — one set per render thread to avoid cross-thread mutation.
+        // Reused every frame; only Color/BlendMode/StrokeWidth are mutated between draws.
+        [ThreadStatic] private static SKPaint? s_dimPaint;
+        [ThreadStatic] private static SKPaint? s_revealPaint;
+        [ThreadStatic] private static SKPaint? s_outlinePaint;
+        [ThreadStatic] private static SKPaint? s_linePaint;
+        [ThreadStatic] private static SKPaint? s_debugFillPaint;
+        [ThreadStatic] private static SKPaint? s_debugStrokePaint;
+        [ThreadStatic] private static SKPaint? s_debugBgPaint;
+        [ThreadStatic] private static SKPaint? s_debugTextPaint;
+        [ThreadStatic] private static SKFont? s_debugFont;
+
         public OverlayDrawOperation(Rect bounds, TabViewModel? tab, ColourEffectShaders? effects)
         {
             _bounds = bounds;
@@ -85,7 +97,8 @@ public class RailOverlayLayer : Control
 
             var pageRect = SKRect.Create(0, 0, (float)tab.PageWidth, (float)tab.PageHeight);
 
-            using var dimPaint = new SKPaint { Color = palette.Dim };
+            var dimPaint = s_dimPaint ??= new SKPaint();
+            dimPaint.Color = palette.Dim;
             if (palette.DimExcludesBlock)
             {
                 canvas.Save();
@@ -102,59 +115,62 @@ public class RailOverlayLayer : Control
             {
                 canvas.Save();
                 canvas.ClipRect(blockRect);
-                using var revealPaint = new SKPaint { Color = revealColor, BlendMode = blendMode };
+                var revealPaint = s_revealPaint ??= new SKPaint();
+                revealPaint.Color = revealColor;
+                revealPaint.BlendMode = blendMode;
                 canvas.DrawRect(blockRect, revealPaint);
                 canvas.Restore();
             }
 
             var bboxRect = BBoxToRect(block.BBox);
 
-            using var outlinePaint = new SKPaint
+            var outlinePaint = s_outlinePaint ??= new SKPaint
             {
-                Color = palette.BlockOutline,
                 Style = SKPaintStyle.Stroke,
-                StrokeWidth = palette.BlockOutlineWidth,
                 IsAntialias = true,
             };
+            outlinePaint.Color = palette.BlockOutline;
+            outlinePaint.StrokeWidth = palette.BlockOutlineWidth;
             canvas.DrawRect(bboxRect, outlinePaint);
 
             var line = tab.Rail.CurrentLineInfo;
-            using var linePaint = new SKPaint { Color = palette.LineHighlight };
+            var linePaint = s_linePaint ??= new SKPaint();
+            linePaint.Color = palette.LineHighlight;
             canvas.DrawRect(SKRect.Create(block.BBox.X, line.Y - line.Height / 2, block.BBox.W, line.Height), linePaint);
         }
 
+        private static readonly SKColor[] s_debugColors =
+        [
+            new(244, 67, 54), new(33, 150, 243), new(76, 175, 80),
+            new(255, 152, 0), new(156, 39, 176), new(0, 188, 212),
+        ];
+
         private static void DrawDebugOverlay(SKCanvas canvas, TabViewModel tab, PageAnalysis analysis)
         {
-            var colors = new SKColor[] {
-                new(244, 67, 54), new(33, 150, 243), new(76, 175, 80),
-                new(255, 152, 0), new(156, 39, 176), new(0, 188, 212) };
-
-            using var font = new SKFont(SKTypeface.Default, 8);
+            var font = s_debugFont ??= new SKFont(SKTypeface.Default, 8);
+            var fillPaint = s_debugFillPaint ??= new SKPaint();
+            var strokePaint = s_debugStrokePaint ??= new SKPaint { Style = SKPaintStyle.Stroke, StrokeWidth = 1 };
+            var bgPaint = s_debugBgPaint ??= new SKPaint { Color = new SKColor(0, 0, 0, 200) };
+            var textPaint = s_debugTextPaint ??= new SKPaint { IsAntialias = true };
 
             foreach (var block in analysis.Blocks)
             {
-                var color = colors[block.ClassId % colors.Length];
+                var color = s_debugColors[block.ClassId % s_debugColors.Length];
                 var rect = BBoxToRect(block.BBox);
 
-                using var rectPaint = new SKPaint { Color = color.WithAlpha(50) };
-                canvas.DrawRect(rect, rectPaint);
+                fillPaint.Color = color.WithAlpha(50);
+                canvas.DrawRect(rect, fillPaint);
 
-                using var strokePaint = new SKPaint
-                {
-                    Color = color.WithAlpha(180),
-                    Style = SKPaintStyle.Stroke,
-                    StrokeWidth = 1,
-                };
+                strokePaint.Color = color.WithAlpha(180);
                 canvas.DrawRect(rect, strokePaint);
 
                 string className = block.ClassId < LayoutConstants.LayoutClasses.Length
                     ? LayoutConstants.LayoutClasses[block.ClassId] : "unknown";
                 string label = $"#{block.Order} {className} ({block.Confidence * 100:F0}%)";
 
-                using var bgPaint = new SKPaint { Color = new SKColor(0, 0, 0, 200) };
                 canvas.DrawRect(SKRect.Create(block.BBox.X, block.BBox.Y - 10, label.Length * 5f, 11), bgPaint);
 
-                using var textPaint = new SKPaint { Color = color, IsAntialias = true };
+                textPaint.Color = color;
                 canvas.DrawText(label, block.BBox.X + 1, block.BBox.Y - 1, font, textPaint);
             }
         }

@@ -25,7 +25,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private Window? _window;
     private DispatcherTimer? _pollTimer;
     private readonly Stopwatch _frameTimer = Stopwatch.StartNew();
-    private Action? _invalidateCanvas; // legacy fallback
     private InvalidationCallbacks? _invalidation;
     private bool _animationRequested;
 
@@ -38,6 +37,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     [ObservableProperty] private bool _showGoToPage;
     [ObservableProperty] private string? _cleanupMessage;
     [ObservableProperty] private bool _showSearch;
+    [ObservableProperty] private bool _isFullScreen;
     [ObservableProperty] private bool _isRadialMenuOpen;
     [ObservableProperty] private double _radialMenuX;
     [ObservableProperty] private double _radialMenuY;
@@ -95,7 +95,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _window = window;
         ApplyFontScale();
     }
-    public void SetInvalidateCanvas(Action invalidate) => _invalidateCanvas = invalidate;
     public void SetInvalidation(InvalidationCallbacks callbacks) => _invalidation = callbacks;
 
     private void InitializeWorker()
@@ -185,10 +184,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
                         if (tab.Rail.Active)
                         {
                             tab.StartSnap(ww, wh);
-                            // Restart auto-scroll on new page analysis
-                            double speed = _config.ScrollSpeedStart +
-                                (_config.ScrollSpeedMax - _config.ScrollSpeedStart) * 0.5;
-                            tab.Rail.StartAutoScroll(speed);
+                            tab.Rail.StartAutoScroll(AutoScrollSpeed);
                         }
                         else
                         {
@@ -570,58 +566,39 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(ActiveTab));
     }
 
-    public void HandleArrowDown()
+    public void HandleArrowDown() => HandleVerticalNav(forward: true);
+    public void HandleArrowUp() => HandleVerticalNav(forward: false);
+
+    private void HandleVerticalNav(bool forward)
     {
+        if (!forward && AutoScrollActive) StopAutoScroll();
         if (ActiveTab is not { } tab) return;
         var (ww, wh) = GetWindowSize();
 
         if (tab.Rail.Active)
         {
             int currentPage = tab.CurrentPage;
-            switch (tab.Rail.NextLine())
+            var result = forward ? tab.Rail.NextLine() : tab.Rail.PrevLine();
+            var boundary = forward ? NavResult.PageBoundaryNext : NavResult.PageBoundaryPrev;
+
+            if (result == boundary)
             {
-                case NavResult.PageBoundaryNext:
-                    tab.GoToPage(currentPage + 1, _worker, ww, wh);
-                    tab.QueueLookahead(_config.AnalysisLookaheadPages);
-                    if (tab.Rail.Active) tab.StartSnap(ww, wh);
-                    break;
-                case NavResult.Ok:
+                tab.GoToPage(currentPage + (forward ? 1 : -1), _worker, ww, wh);
+                tab.QueueLookahead(_config.AnalysisLookaheadPages);
+                if (tab.Rail.Active)
+                {
+                    if (!forward) tab.Rail.JumpToEnd();
                     tab.StartSnap(ww, wh);
-                    break;
+                }
+            }
+            else if (result == NavResult.Ok)
+            {
+                tab.StartSnap(ww, wh);
             }
         }
         else
         {
-            tab.Camera.OffsetY -= PanStep;
-            tab.ClampCamera(ww, wh);
-        }
-        InvalidateNavigation();
-    }
-
-    public void HandleArrowUp()
-    {
-        if (AutoScrollActive) StopAutoScroll();
-        if (ActiveTab is not { } tab) return;
-        var (ww, wh) = GetWindowSize();
-
-        if (tab.Rail.Active)
-        {
-            int currentPage = tab.CurrentPage;
-            switch (tab.Rail.PrevLine())
-            {
-                case NavResult.PageBoundaryPrev:
-                    tab.GoToPage(currentPage - 1, _worker, ww, wh);
-                    tab.QueueLookahead(_config.AnalysisLookaheadPages);
-                    if (tab.Rail.Active) { tab.Rail.JumpToEnd(); tab.StartSnap(ww, wh); }
-                    break;
-                case NavResult.Ok:
-                    tab.StartSnap(ww, wh);
-                    break;
-            }
-        }
-        else
-        {
-            tab.Camera.OffsetY += PanStep;
+            tab.Camera.OffsetY += forward ? -PanStep : PanStep;
             tab.ClampCamera(ww, wh);
         }
         InvalidateNavigation();
@@ -670,10 +647,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
         if (ActiveTab is not { } tab || !tab.Rail.Active) return;
 
-        // Use the current scroll speed setting as the auto-scroll speed
-        double speed = _config.ScrollSpeedStart +
-            (_config.ScrollSpeedMax - _config.ScrollSpeedStart) * 0.5;
-        tab.Rail.StartAutoScroll(speed);
+        tab.Rail.StartAutoScroll(AutoScrollSpeed);
         AutoScrollActive = true;
         OnPropertyChanged(nameof(AutoScrollActive));
         RequestAnimationFrame();
@@ -686,25 +660,22 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(AutoScrollActive));
     }
 
-    public void HandleLineHome()
-    {
-        if (ActiveTab is not { } tab || !tab.Rail.Active) return;
-        var (ww, _) = GetWindowSize();
-        if (tab.Rail.ComputeLineStartX(tab.Camera.Zoom, ww) is { } x)
-        {
-            tab.Camera.OffsetX = x;
-            InvalidateCamera();
-            OnPropertyChanged(nameof(ActiveTab));
-        }
-    }
+    private double AutoScrollSpeed =>
+        (_config.ScrollSpeedStart + _config.ScrollSpeedMax) / 2.0;
 
-    public void HandleLineEnd()
+    public void HandleLineHome() => SnapToLineEdge(start: true);
+    public void HandleLineEnd() => SnapToLineEdge(start: false);
+
+    private void SnapToLineEdge(bool start)
     {
         if (ActiveTab is not { } tab || !tab.Rail.Active) return;
         var (ww, _) = GetWindowSize();
-        if (tab.Rail.ComputeLineEndX(tab.Camera.Zoom, ww) is { } x)
+        var x = start
+            ? tab.Rail.ComputeLineStartX(tab.Camera.Zoom, ww)
+            : tab.Rail.ComputeLineEndX(tab.Camera.Zoom, ww);
+        if (x is { } val)
         {
-            tab.Camera.OffsetX = x;
+            tab.Camera.OffsetX = val;
             InvalidateCamera();
             OnPropertyChanged(nameof(ActiveTab));
         }
@@ -804,17 +775,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     // --- Granular invalidation helpers ---
 
-    private void Invalidate(Action? target)
-    {
-        if (_invalidation is not null)
-            target?.Invoke();
-        else
-            _invalidateCanvas?.Invoke();
-    }
-
-    private void InvalidateCamera() => Invalidate(_invalidation?.InvalidateCamera);
-    private void InvalidatePage() => Invalidate(_invalidation?.InvalidatePage);
-    private void InvalidateOverlay() => Invalidate(_invalidation?.InvalidateOverlay);
+    private void InvalidateCamera() => _invalidation?.InvalidateCamera?.Invoke();
+    private void InvalidatePage() => _invalidation?.InvalidatePage?.Invoke();
+    private void InvalidateOverlay() => _invalidation?.InvalidateOverlay?.Invoke();
 
     private void InvalidateNavigation()
     {
@@ -866,8 +829,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
         // Set default colours per tool
         switch (tool)
         {
-            case AnnotationTool.TextSelect:
-                break;
             case AnnotationTool.Highlight:
                 ActiveAnnotationColor = "#FFFF00";
                 ActiveAnnotationOpacity = 0.35f;
@@ -1047,10 +1008,15 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
     }
 
-    private TextNoteAnnotation? FindTextNoteAtPoint(TabViewModel tab, float pageX, float pageY)
+    private static List<Annotation>? GetCurrentPageAnnotations(TabViewModel tab)
     {
         if (tab.Annotations is null) return null;
-        if (!tab.Annotations.Pages.TryGetValue(tab.CurrentPage, out var list)) return null;
+        return tab.Annotations.Pages.TryGetValue(tab.CurrentPage, out var list) ? list : null;
+    }
+
+    private TextNoteAnnotation? FindTextNoteAtPoint(TabViewModel tab, float pageX, float pageY)
+    {
+        if (GetCurrentPageAnnotations(tab) is not { } list) return null;
 
         for (int i = list.Count - 1; i >= 0; i--)
         {
@@ -1092,8 +1058,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     private void EraseAtPoint(TabViewModel tab, float pageX, float pageY)
     {
-        if (tab.Annotations is null) return;
-        if (!tab.Annotations.Pages.TryGetValue(tab.CurrentPage, out var list)) return;
+        if (GetCurrentPageAnnotations(tab) is not { } list) return;
 
         // Search from top (last drawn) to bottom for hit
         for (int i = list.Count - 1; i >= 0; i--)

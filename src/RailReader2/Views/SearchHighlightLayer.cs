@@ -43,6 +43,9 @@ public class SearchHighlightLayer : Control
         private readonly TabViewModel _tab;
         private readonly MainWindowViewModel _vm;
 
+        [ThreadStatic] private static SKPaint? s_highlightPaint;
+        [ThreadStatic] private static SKPaint? s_activePaint;
+
         public SearchDrawOperation(Rect bounds, TabViewModel tab, MainWindowViewModel vm)
         {
             _bounds = bounds;
@@ -69,8 +72,8 @@ public class SearchHighlightLayer : Control
             int activeGlobal = _vm.ActiveMatchIndex;
             int pageIndex = _tab.CurrentPage;
 
-            using var highlightPaint = new SKPaint { Color = new SKColor(255, 255, 0, 100), IsAntialias = true };
-            using var activePaint = new SKPaint { Color = new SKColor(255, 165, 0, 160), IsAntialias = true };
+            var highlightPaint = s_highlightPaint ??= new SKPaint { Color = new SKColor(255, 255, 0, 100), IsAntialias = true };
+            var activePaint = s_activePaint ??= new SKPaint { Color = new SKColor(255, 165, 0, 160), IsAntialias = true };
 
             // Determine which match in the current page list is the active one
             int activeLocalIndex = -1;

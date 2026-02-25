@@ -35,6 +35,7 @@
             <Separator />
             <MenuItem Header="_Outline" InputGesture="Ctrl+Shift+O" Click="OnToggleOutline" />
             <MenuItem Header="_Minimap" InputGesture="Ctrl+M" Click="OnToggleMinimap" />
+            <MenuItem Header="_Fullscreen" InputGesture="F11" Click="OnToggleFullscreen" />
             <Separator />
             <MenuItem Header="_Debug Overlay" InputGesture="Shift+D" Click="OnToggleDebug" />
             <Separator />
