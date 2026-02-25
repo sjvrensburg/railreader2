@@ -126,6 +126,7 @@ scripts/
 - **Rail toolbar**: `RailToolBar` is a slim vertical toolbar docked inline to the right edge of the viewport (pushes content aside, not an overlay), visible only in rail mode. Contains vertical sliders for scroll speed and motion blur intensity. Values sync bidirectionally with `AppConfig` and persist across sessions. Labels inherit `Window.FontSize` for proper UI scaling. Keyboard shortcuts `[`/`]` adjust speed, `Shift+[`/`Shift+]` adjust blur.
 - **Auto-scroll**: Toggleable via `P` key in rail mode. Continuously scrolls horizontally along the current line at the current speed setting, then advances to the next line when reaching the block's right edge. Holding `D`/`Right` during auto-scroll doubles the speed (boost). Disengages on opposing navigation (Up, Left), panning, or zooming. Status bar shows green "Auto-Scroll" indicator with pause button when active. Stops automatically when leaving rail mode.
 - **Tab styling**: `TabBarView` uses programmatic styling with distinct active/inactive appearances — active tab has blue background with bold white text and a blue bottom indicator bar; inactive tabs have muted grey styling.
+- **Fullscreen**: F11 toggles fullscreen mode — hides menu bar, tab bar, status bar, and window decorations (`SystemDecorations.None` + `WindowState.FullScreen`). Escape exits fullscreen. Also accessible via View → Fullscreen menu. `IsFullScreen` is an `[ObservableProperty]` on `MainWindowViewModel`; the `PropertyChanged` handler in `MainWindow.axaml.cs` toggles `WindowState` and `SystemDecorations`. Chrome elements bind `IsVisible="{Binding !IsFullScreen}"`.
 - **Tab reorder**: Tabs can be rearranged by dragging. Implemented via tunnelling pointer events (`RoutingStrategies.Tunnel`) on `TabPanel` so press/move/release are intercepted before buttons consume them. A 5px drag threshold distinguishes clicks from drags. Visual feedback: dragged tab dims to 50% opacity, a 2px blue insertion indicator appears at the drop target. `MainWindowViewModel.MoveTab()` uses `ObservableCollection.Move()` and tracks the active tab by reference. Pointer capture is only released when an actual drag occurred, preserving normal button click behaviour.
 
 ### Dependencies
@@ -367,6 +368,7 @@ If the model is not found, the app logs a warning and falls back to horizontal-s
 | `Ctrl+Shift+O` | Toggle outline panel |
 | `Ctrl+M` | Toggle minimap |
 | `Ctrl+,` | Settings |
+| `F11` | Toggle fullscreen |
 | `Shift+D` | Toggle debug overlay |
 | `↓` / `S` | Next line (rail) / pan down |
 | `↑` / `W` | Previous line (rail) / pan up |
@@ -380,7 +382,7 @@ If the model is not found, the app logs a warning and falls back to horizontal-s
 | Click | Jump to block (rail mode) |
 | `Ctrl+F` | Open search bar |
 | `F3` / `Shift+F3` | Next / previous search match |
-| `Escape` | Close search / cancel annotation tool |
+| `Escape` | Close search / cancel annotation tool / exit fullscreen |
 | `1` | Highlight tool |
 | `2` | Pen tool |
 | `3` | Rectangle tool |
