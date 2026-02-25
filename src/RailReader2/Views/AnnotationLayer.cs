@@ -240,16 +240,26 @@ public static class AnnotationRenderer
         switch (annotation)
         {
             case HighlightAnnotation h when h.Rects.Count > 0:
-                float minX = h.Rects.Min(r => r.X);
-                float minY = h.Rects.Min(r => r.Y);
-                float maxX = h.Rects.Max(r => r.X + r.W);
-                float maxY = h.Rects.Max(r => r.Y + r.H);
+                float minX = float.MaxValue, minY = float.MaxValue;
+                float maxX = float.MinValue, maxY = float.MinValue;
+                foreach (var r in h.Rects)
+                {
+                    if (r.X < minX) minX = r.X;
+                    if (r.Y < minY) minY = r.Y;
+                    if (r.X + r.W > maxX) maxX = r.X + r.W;
+                    if (r.Y + r.H > maxY) maxY = r.Y + r.H;
+                }
                 return new SKRect(minX, minY, maxX, maxY);
             case FreehandAnnotation f when f.Points.Count > 0:
-                float fMinX = f.Points.Min(p => p.X);
-                float fMinY = f.Points.Min(p => p.Y);
-                float fMaxX = f.Points.Max(p => p.X);
-                float fMaxY = f.Points.Max(p => p.Y);
+                float fMinX = float.MaxValue, fMinY = float.MaxValue;
+                float fMaxX = float.MinValue, fMaxY = float.MinValue;
+                foreach (var p in f.Points)
+                {
+                    if (p.X < fMinX) fMinX = p.X;
+                    if (p.Y < fMinY) fMinY = p.Y;
+                    if (p.X > fMaxX) fMaxX = p.X;
+                    if (p.Y > fMaxY) fMaxY = p.Y;
+                }
                 return new SKRect(fMinX, fMinY, fMaxX, fMaxY);
             case TextNoteAnnotation t:
                 return new SKRect(t.X - 6, t.Y - 6, t.X + 6, t.Y + 6);

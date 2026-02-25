@@ -183,10 +183,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
                         if (tab.Rail.Active)
                         {
                             tab.StartSnap(ww, wh);
-                            // Restart auto-scroll on new page analysis
-                            double speed = _config.ScrollSpeedStart +
-                                (_config.ScrollSpeedMax - _config.ScrollSpeedStart) * 0.5;
-                            tab.Rail.StartAutoScroll(speed);
+                            tab.Rail.StartAutoScroll(AutoScrollSpeed);
                         }
                         else
                         {
@@ -649,10 +646,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
         if (ActiveTab is not { } tab || !tab.Rail.Active) return;
 
-        // Use the current scroll speed setting as the auto-scroll speed
-        double speed = _config.ScrollSpeedStart +
-            (_config.ScrollSpeedMax - _config.ScrollSpeedStart) * 0.5;
-        tab.Rail.StartAutoScroll(speed);
+        tab.Rail.StartAutoScroll(AutoScrollSpeed);
         AutoScrollActive = true;
         OnPropertyChanged(nameof(AutoScrollActive));
         RequestAnimationFrame();
@@ -664,6 +658,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
         AutoScrollActive = false;
         OnPropertyChanged(nameof(AutoScrollActive));
     }
+
+    private double AutoScrollSpeed =>
+        (_config.ScrollSpeedStart + _config.ScrollSpeedMax) / 2.0;
 
     public void HandleLineHome() => SnapToLineEdge(start: true);
     public void HandleLineEnd() => SnapToLineEdge(start: false);
@@ -777,11 +774,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     // --- Granular invalidation helpers ---
 
-    private void Invalidate(Action? target) => target?.Invoke();
-
-    private void InvalidateCamera() => Invalidate(_invalidation?.InvalidateCamera);
-    private void InvalidatePage() => Invalidate(_invalidation?.InvalidatePage);
-    private void InvalidateOverlay() => Invalidate(_invalidation?.InvalidateOverlay);
+    private void InvalidateCamera() => _invalidation?.InvalidateCamera?.Invoke();
+    private void InvalidatePage() => _invalidation?.InvalidatePage?.Invoke();
+    private void InvalidateOverlay() => _invalidation?.InvalidateOverlay?.Invoke();
 
     private void InvalidateNavigation()
     {
@@ -1012,10 +1007,15 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
     }
 
-    private TextNoteAnnotation? FindTextNoteAtPoint(TabViewModel tab, float pageX, float pageY)
+    private static List<Annotation>? GetCurrentPageAnnotations(TabViewModel tab)
     {
         if (tab.Annotations is null) return null;
-        if (!tab.Annotations.Pages.TryGetValue(tab.CurrentPage, out var list)) return null;
+        return tab.Annotations.Pages.TryGetValue(tab.CurrentPage, out var list) ? list : null;
+    }
+
+    private TextNoteAnnotation? FindTextNoteAtPoint(TabViewModel tab, float pageX, float pageY)
+    {
+        if (GetCurrentPageAnnotations(tab) is not { } list) return null;
 
         for (int i = list.Count - 1; i >= 0; i--)
         {
@@ -1057,8 +1057,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     private void EraseAtPoint(TabViewModel tab, float pageX, float pageY)
     {
-        if (tab.Annotations is null) return;
-        if (!tab.Annotations.Pages.TryGetValue(tab.CurrentPage, out var list)) return;
+        if (GetCurrentPageAnnotations(tab) is not { } list) return;
 
         // Search from top (last drawn) to bottom for hit
         for (int i = list.Count - 1; i >= 0; i--)
