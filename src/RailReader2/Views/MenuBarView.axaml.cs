@@ -62,6 +62,8 @@ public partial class MenuBarView : UserControl
     { if (Vm is { } vm) vm.ShowOutline = !vm.ShowOutline; }
     private void OnToggleMinimap(object? s, RoutedEventArgs e)
     { if (Vm is { } vm) vm.ShowMinimap = !vm.ShowMinimap; }
+    private void OnToggleFullscreen(object? s, RoutedEventArgs e)
+    { if (Vm is { } vm) vm.IsFullScreen = !vm.IsFullScreen; }
     private void OnToggleDebug(object? s, RoutedEventArgs e)
     {
         if (Vm?.ActiveTab is { } tab)

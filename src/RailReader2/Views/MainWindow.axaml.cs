@@ -104,6 +104,10 @@ public partial class MainWindow : Window
                         vm.ShowSettings = false;
                         await new SettingsWindow { DataContext = vm, FontSize = vm.CurrentFontSize }.ShowDialog(this);
                         break;
+                    case nameof(MainWindowViewModel.IsFullScreen):
+                        WindowState = vm.IsFullScreen ? WindowState.FullScreen : WindowState.Normal;
+                        SystemDecorations = vm.IsFullScreen ? SystemDecorations.None : SystemDecorations.Full;
+                        break;
                     case nameof(MainWindowViewModel.ShowGoToPage) when vm.ShowGoToPage:
                         vm.ShowGoToPage = false;
                         if (vm.ActiveTab is { } gotoTab)
@@ -343,6 +347,10 @@ public partial class MainWindow : Window
                 vm.SetAnnotationTool(Models.AnnotationTool.TextNote); e.Handled = true; break;
             case Key.D5 when !searchFocused:
                 vm.SetAnnotationTool(Models.AnnotationTool.Eraser); e.Handled = true; break;
+            case Key.F11:
+                vm.IsFullScreen = !vm.IsFullScreen; e.Handled = true; break;
+            case Key.Escape when vm.IsFullScreen:
+                vm.IsFullScreen = false; e.Handled = true; break;
             case Key.Escape when vm.IsRadialMenuOpen:
                 vm.CloseRadialMenu(); e.Handled = true; break;
             case Key.Escape when vm.IsAnnotating:

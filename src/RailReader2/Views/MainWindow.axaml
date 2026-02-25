@@ -15,13 +15,16 @@
 
     <DockPanel>
         <!-- Menu Bar -->
-        <v:MenuBarView DockPanel.Dock="Top" DataContext="{Binding}" />
+        <v:MenuBarView DockPanel.Dock="Top" DataContext="{Binding}"
+                       IsVisible="{Binding !IsFullScreen}" />
 
         <!-- Tab Bar -->
-        <v:TabBarView DockPanel.Dock="Top" DataContext="{Binding}" />
+        <v:TabBarView DockPanel.Dock="Top" DataContext="{Binding}"
+                      IsVisible="{Binding !IsFullScreen}" />
 
         <!-- Status Bar -->
-        <v:StatusBarView DockPanel.Dock="Bottom" DataContext="{Binding}" />
+        <v:StatusBarView DockPanel.Dock="Bottom" DataContext="{Binding}"
+                         IsVisible="{Binding !IsFullScreen}" />
 
         <!-- Main Content -->
         <Panel>

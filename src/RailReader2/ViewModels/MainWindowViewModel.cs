@@ -37,6 +37,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     [ObservableProperty] private bool _showGoToPage;
     [ObservableProperty] private string? _cleanupMessage;
     [ObservableProperty] private bool _showSearch;
+    [ObservableProperty] private bool _isFullScreen;
     [ObservableProperty] private bool _isRadialMenuOpen;
     [ObservableProperty] private double _radialMenuX;
     [ObservableProperty] private double _radialMenuY;
