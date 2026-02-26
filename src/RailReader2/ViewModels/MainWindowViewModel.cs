@@ -330,7 +330,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public void HandleZoomKey(bool zoomIn)
     {
         _controller.HandleZoomKey(zoomIn);
-        if (ActiveTab is { } tab && !tab.Rail.Active && AutoScrollActive) { /* already handled in controller */ }
         InvalidateCamera();
         OnPropertyChanged(nameof(ActiveTab));
         RequestAnimationFrame();
@@ -411,7 +410,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public void ToggleAutoScrollExclusive()
     {
-        if (JumpMode) JumpMode = false;
+        JumpMode = false;
         ToggleAutoScroll();
     }
 

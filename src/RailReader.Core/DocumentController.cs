@@ -97,20 +97,9 @@ public sealed class DocumentController
     /// </summary>
     public void InitializeWorker()
     {
-        var modelPath = FindModelPath();
-        if (modelPath is null)
-        {
-            const string filename = "PP-DocLayoutV3.onnx";
-            var searched = new[]
-            {
-                Path.Combine(AppContext.BaseDirectory, "models", filename),
-                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "railreader2", "models", filename),
-                Path.GetFullPath(Path.Combine("models", filename)),
-            };
-            var msg = $"ONNX model not found ({filename}). Run ./scripts/download-model.sh\nSearched:\n"
-                      + string.Join("\n", searched.Select(p => $"  - {p}"));
-            throw new FileNotFoundException(msg);
-        }
+        var modelPath = FindModelPath()
+            ?? throw new FileNotFoundException(
+                "ONNX model not found (PP-DocLayoutV3.onnx). Run ./scripts/download-model.sh");
 
         Console.Error.WriteLine($"[ONNX] Starting worker with model: {modelPath}");
         _worker = new AnalysisWorker(modelPath);
@@ -281,8 +270,6 @@ public sealed class DocumentController
         doc.UpdateRenderDpiIfNeeded();
         if (!doc.Rail.Active && AutoScrollActive) StopAutoScroll();
     }
-
-    public void HandleResetZoom() => FitPage();
 
     // --- Rail navigation ---
 
@@ -694,10 +681,7 @@ public sealed class DocumentController
                 break;
             case AnnotationTool.TextNote:
                 var hitNote = FindTextNoteAtPoint(doc, (float)pageX, (float)pageY);
-                if (hitNote is not null)
-                    return (true, true, hitNote, (float)pageX, (float)pageY);
-                else
-                    return (true, false, null, (float)pageX, (float)pageY);
+                return (true, hitNote is not null, hitNote, (float)pageX, (float)pageY);
             case AnnotationTool.Eraser:
                 EraseAtPoint(doc, (float)pageX, (float)pageY);
                 break;
@@ -1020,12 +1004,9 @@ public sealed class DocumentController
 
     public SearchResult GetSearchState()
     {
-        var perPage = new Dictionary<int, int>();
-        foreach (var m in SearchMatches)
-        {
-            if (!perPage.TryGetValue(m.PageIndex, out var c)) c = 0;
-            perPage[m.PageIndex] = c + 1;
-        }
+        var perPage = SearchMatches
+            .GroupBy(m => m.PageIndex)
+            .ToDictionary(g => g.Key, g => g.Count());
         return new SearchResult(SearchMatches.Count, ActiveMatchIndex, perPage);
     }
 

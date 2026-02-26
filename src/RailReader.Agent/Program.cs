@@ -15,8 +15,7 @@ var baseUrl = Environment.GetEnvironmentVariable("RAILREADER_BASE_URL");
 
 // --- Setup ---
 var config = AppConfig.Load();
-var marshaller = new SynchronousAgentMarshaller();
-var controller = new DocumentController(config, marshaller);
+var controller = new DocumentController(config, new SynchronousThreadMarshaller());
 controller.SetViewportSize(1200, 900); // virtual viewport for headless use
 
 // Try to initialize the ONNX worker (optional for agent use)
@@ -63,9 +62,7 @@ IChatClient client = openAiClient.GetChatClient(modelId)
 // --- Get task from args or stdin ---
 string task;
 if (args.Length > 0)
-{
     task = string.Join(" ", args);
-}
 else
 {
     Console.Write("Enter task: ");
@@ -99,11 +96,3 @@ foreach (var doc in controller.Documents.ToList())
     doc.Dispose();
 
 return 0;
-
-/// <summary>
-/// Synchronous thread marshaller for headless agent use (no UI thread).
-/// </summary>
-file sealed class SynchronousAgentMarshaller : IThreadMarshaller
-{
-    public void Post(Action action) => action();
-}
