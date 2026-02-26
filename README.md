@@ -64,11 +64,15 @@ At high zoom levels, navigation switches to "rail mode" — the viewer locks ont
 - **Annotation export** — export PDFs with embedded annotations (File → Export with Annotations)
 - **Undo/redo** — annotation history with Ctrl+Z / Ctrl+Y
 - **Annotation mode indicator** — status bar shows active tool name in amber with a clickable exit button
-- **Auto-scroll** — toggle continuous horizontal scrolling in rail mode (P key), hold D/Right to boost speed
-- **Speed/blur toolbar** — docked vertical sliders for scroll speed and motion blur intensity, visible in rail mode
+- **Auto-scroll** — toggle continuous horizontal scrolling in rail mode (P key), hold D/Right to boost speed, with configurable pauses at line and block boundaries
+- **Jump mode** — saccade-style reading (J key) that advances by a configurable percentage of the visible width
+- **Line focus blur** — Gaussian blur on non-active lines to reduce peripheral distraction and perceived jitter
+- **Pixel snapping** — quantises camera positions to the pixel grid to eliminate sub-pixel text shimmer at high zoom
+- **Speed/blur toolbar** — docked vertical sliders for scroll speed (or jump distance in jump mode) and motion blur intensity, visible in rail mode
 - **Vertical position preservation** — maintains your panned vertical offset when navigating lines in rail mode
 - **Line snap shortcuts** — Home/End keys snap to the start/end of the current line in rail mode
 - **Fullscreen mode** — F11 hides all chrome for distraction-free reading; Escape exits
+- **Tabbed settings** — organised settings panel with Appearance, Rail Reading, Auto-Scroll, and Advanced tabs
 - **Tooltips** — all interactive controls have descriptive tooltips
 
 ## Usage
@@ -103,7 +107,8 @@ dotnet run -c Release --project src/RailReader2 --
 | Click on block | Jump to block (rail mode) |
 | Home / End | Line start / end (rail mode) or first / last page |
 | P | Toggle auto-scroll (rail mode), D/Right to boost |
-| [ / ] | Adjust scroll speed (rail mode) |
+| J | Toggle jump mode (saccade-style advance) |
+| [ / ] | Adjust scroll speed or jump distance (rail mode) |
 | Shift+[ / Shift+] | Adjust blur intensity (rail mode) |
 | D (shift) | Toggle debug overlay (shows detected blocks) |
 | Ctrl+F | Open search bar |
@@ -112,7 +117,7 @@ dotnet run -c Release --project src/RailReader2 --
 | Ctrl+Z / Ctrl+Y | Undo / redo annotation |
 | Ctrl+C | Copy selected text |
 | F11 | Toggle fullscreen (hides chrome) |
-| Escape | Cancel annotation tool / close search / exit fullscreen |
+| Escape | Stop auto-scroll / cancel annotation tool / close search / exit fullscreen |
 | F1 | Keyboard shortcuts dialog |
 
 ### Configuration
@@ -132,6 +137,12 @@ Rail reading parameters are editable via the Settings panel (gear icon in menu b
   "colour_effect_intensity": 1.0,
   "motion_blur": true,
   "motion_blur_intensity": 0.33,
+  "pixel_snapping": true,
+  "line_focus_blur": false,
+  "line_focus_blur_intensity": 0.5,
+  "auto_scroll_line_pause_ms": 400.0,
+  "auto_scroll_block_pause_ms": 600.0,
+  "jump_percentage": 25.0,
   "navigable_classes": [
     "abstract", "algorithm", "display_formula",
     "footnote", "paragraph_title", "text"
@@ -152,7 +163,13 @@ Rail reading parameters are editable via the Settings panel (gear icon in menu b
 | `colour_effect_intensity` | Effect intensity from 0.0 (off) to 1.0 (full) |
 | `motion_blur` | Enable subtle directional blur during scroll and zoom (`true`/`false`) |
 | `motion_blur_intensity` | Motion blur strength from 0.0 (off) to 1.0 (maximum) |
-| `navigable_classes` | Which block types rail mode navigates (array of class names). Configurable via Settings → Advanced. Add `"display_formula"` to include formulas, remove `"paragraph_title"` to skip headings, etc. |
+| `pixel_snapping` | Quantise camera positions to pixel grid to reduce text shimmer (`true`/`false`) |
+| `line_focus_blur` | Gaussian blur on non-active lines in rail mode (`true`/`false`) |
+| `line_focus_blur_intensity` | Line focus blur strength from 0.0 (off) to 1.0 (maximum) |
+| `auto_scroll_line_pause_ms` | Pause duration at line boundaries during auto-scroll (ms, 0 to disable) |
+| `auto_scroll_block_pause_ms` | Pause duration at block boundaries during auto-scroll (ms, 0 to disable) |
+| `jump_percentage` | Jump distance as percentage of visible width (5–80%) |
+| `navigable_classes` | Which block types rail mode navigates (array of class names). Configurable via Settings → Advanced. |
 
 ## Building
 

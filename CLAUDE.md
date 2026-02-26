@@ -390,12 +390,12 @@ If the model is not found, the app logs a warning and falls back to horizontal-s
 | `End` | Line end (rail) / last page |
 | `P` | Toggle auto-scroll (rail) |
 | `J` | Toggle jump mode (rail) |
-| `[` / `]` | Adjust scroll speed (rail) |
+| `[` / `]` | Adjust scroll speed or jump distance (rail) |
 | `Shift+[` / `Shift+]` | Adjust blur intensity (rail) |
 | Click | Jump to block (rail mode) |
 | `Ctrl+F` | Open search bar |
 | `F3` / `Shift+F3` | Next / previous search match |
-| `Escape` | Close search / cancel annotation tool / exit fullscreen |
+| `Escape` | Stop auto-scroll / close search / cancel annotation tool / exit fullscreen |
 | `1` | Highlight tool |
 | `2` | Pen tool |
 | `3` | Rectangle tool |
