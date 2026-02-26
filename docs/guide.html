@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>User Guide — railreader2</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;600;700&family=Fira+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #141c2b;
+      --fg: #fff;
+      --fg-muted: #a0aec0;
+      --accent: #63b3ed;
+      --accent-hover: #90cdf4;
+      --card-bg: #1a2435;
+      --card-border: #2d3a4e;
+      --max-width: 860px;
+      --font-body: 'Nunito Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'Fira Mono', 'Consolas', 'Courier New', monospace;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background-color: var(--bg);
+      color: var(--fg);
+      font-family: var(--font-body);
+      font-size: 16px;
+      line-height: 1.7;
+    }
+
+    a { color: var(--accent); text-decoration: none; transition: color 0.2s; }
+    a:hover { color: var(--accent-hover); }
+
+    .header {
+      padding: 2rem 1.5rem 0;
+      max-width: var(--max-width);
+      margin: 0 auto;
+    }
+
+    .header__logo {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.3rem 0.8rem;
+      background-color: var(--fg);
+      color: var(--bg);
+      font-family: var(--font-mono);
+      font-weight: 700;
+      font-size: 1.1rem;
+      position: relative;
+      margin-right: 0.5rem;
+    }
+
+    .header__logo img { height: 22px; width: auto; }
+
+    .header__logo::after {
+      content: '';
+      display: block;
+      position: absolute;
+      top: 0;
+      right: -10px;
+      bottom: 0;
+      width: 40px;
+      background: repeating-linear-gradient(
+        90deg, var(--fg), var(--fg) 2px, transparent 0, transparent 10px
+      );
+    }
+
+    .header nav {
+      margin-top: 1rem;
+      font-family: var(--font-mono);
+      font-size: 0.9rem;
+    }
+
+    .header nav a { margin-right: 1.5rem; }
+
+    .content {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: 2rem 1.5rem 3rem;
+    }
+
+    .content h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+    }
+
+    .content > p.subtitle {
+      color: var(--fg-muted);
+      font-size: 1.1rem;
+      margin-bottom: 2rem;
+    }
+
+    /* TOC */
+    .toc {
+      background-color: var(--card-bg);
+      border: 1px solid var(--card-border);
+      padding: 1.2rem 1.5rem;
+      margin-bottom: 2.5rem;
+    }
+
+    .toc h2 {
+      font-size: 1rem;
+      font-family: var(--font-mono);
+      margin-bottom: 0.6rem;
+    }
+
+    .toc ol {
+      padding-left: 1.5rem;
+      font-size: 0.95rem;
+    }
+
+    .toc li { margin-bottom: 0.3rem; }
+
+    /* Sections */
+    .guide-section {
+      margin-bottom: 3rem;
+    }
+
+    .guide-section h2 {
+      font-size: 1.3rem;
+      font-weight: 700;
+      margin-bottom: 1rem;
+      font-family: var(--font-mono);
+      padding-bottom: 0.4rem;
+      border-bottom: 1px solid var(--card-border);
+    }
+
+    .guide-section h2::before {
+      content: '# ';
+      color: var(--accent);
+    }
+
+    .guide-section h3 {
+      font-size: 1.05rem;
+      font-weight: 700;
+      margin: 1.2rem 0 0.5rem;
+      font-family: var(--font-mono);
+    }
+
+    .guide-section p {
+      color: var(--fg-muted);
+      margin-bottom: 0.8rem;
+    }
+
+    .guide-section p strong { color: var(--fg); }
+
+    .guide-section ul, .guide-section ol {
+      padding-left: 1.5rem;
+      color: var(--fg-muted);
+      margin-bottom: 0.8rem;
+    }
+
+    .guide-section li { margin-bottom: 0.3rem; }
+
+    /* Screenshots */
+    .guide-screenshot {
+      margin: 1rem 0 1.5rem;
+      background-color: var(--card-bg);
+      border: 1px solid var(--card-border);
+      overflow: hidden;
+      max-width: 600px;
+    }
+
+    .guide-screenshot img {
+      width: 100%;
+      display: block;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+
+    .guide-screenshot img:hover { opacity: 0.9; }
+
+    .guide-screenshot figcaption {
+      padding: 0.5rem 0.8rem;
+      font-size: 0.85rem;
+      color: var(--fg-muted);
+    }
+
+    /* Lightbox */
+    .lightbox {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      background: rgba(0, 0, 0, 0.85);
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+
+    .lightbox.active { display: flex; }
+
+    .lightbox img {
+      max-width: 90vw;
+      max-height: 90vh;
+      object-fit: contain;
+      border: 1px solid var(--card-border);
+    }
+
+    /* Code */
+    code {
+      font-family: var(--font-mono);
+      background-color: var(--card-bg);
+      padding: 0.15rem 0.4rem;
+      font-size: 0.85em;
+      border: 1px solid var(--card-border);
+    }
+
+    pre {
+      background-color: var(--card-bg);
+      border: 1px solid var(--card-border);
+      padding: 1rem;
+      overflow-x: auto;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      margin-bottom: 1rem;
+      line-height: 1.5;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+    }
+
+    /* Keyboard shortcut table */
+    .shortcuts-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+      margin-bottom: 1rem;
+    }
+
+    .shortcuts-table th {
+      text-align: left;
+      font-family: var(--font-mono);
+      color: var(--accent);
+      padding: 0.5rem 0.8rem;
+      border-bottom: 1px solid var(--card-border);
+    }
+
+    .shortcuts-table td {
+      padding: 0.4rem 0.8rem;
+      border-bottom: 1px solid var(--card-border);
+    }
+
+    .shortcuts-table td:first-child {
+      font-family: var(--font-mono);
+      white-space: nowrap;
+      width: 180px;
+    }
+
+    .shortcuts-table td:last-child { color: var(--fg-muted); }
+
+    /* Tip boxes */
+    .tip {
+      background-color: var(--card-bg);
+      border-left: 3px solid var(--accent);
+      padding: 0.8rem 1rem;
+      margin: 1rem 0;
+      font-size: 0.9rem;
+    }
+
+    .tip strong { color: var(--accent); }
+
+    /* Footer */
+    .footer {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: 2rem 1.5rem 3rem;
+      font-size: 0.85rem;
+      color: var(--fg-muted);
+      font-family: var(--font-mono);
+      border-top: 1px solid var(--card-border);
+    }
+
+    .footer a { color: var(--fg-muted); }
+    .footer a:hover { color: var(--fg); }
+
+    @media (max-width: 600px) {
+      .content h1 { font-size: 1.5rem; }
+      .guide-screenshot { max-width: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+  <header class="header">
+    <a href="index.html">
+      <span class="header__logo"><img src="img/logo.png" alt="railreader2 icon">railreader2</span>
+    </a>
+    <nav>
+      <a href="index.html">Home</a>
+      <a href="#getting-started">Getting Started</a>
+      <a href="#rail-mode">Rail Mode</a>
+      <a href="#colour-effects">Colour Effects</a>
+      <a href="#search">Search</a>
+      <a href="#annotations">Annotations</a>
+      <a href="#shortcuts">Shortcuts</a>
+      <a href="https://github.com/sjvrensburg/railreader2">GitHub</a>
+    </nav>
+  </header>
+
+  <div class="content">
+    <h1>User Guide</h1>
+    <p class="subtitle">Everything you need to know to get the most out of railreader2.</p>
+
+    <nav class="toc">
+      <h2>Contents</h2>
+      <ol>
+        <li><a href="#getting-started">Getting Started</a></li>
+        <li><a href="#navigation">Basic Navigation</a></li>
+        <li><a href="#rail-mode">Rail Mode</a></li>
+        <li><a href="#auto-scroll">Auto-Scroll</a></li>
+        <li><a href="#jump-mode">Jump Mode</a></li>
+        <li><a href="#line-focus-blur">Line Focus Blur</a></li>
+        <li><a href="#colour-effects">Colour Effects</a></li>
+        <li><a href="#search">Search</a></li>
+        <li><a href="#annotations">Annotations</a></li>
+        <li><a href="#text-selection">Text Selection</a></li>
+        <li><a href="#settings">Settings</a></li>
+        <li><a href="#agent-cli">AI Agent CLI</a></li>
+        <li><a href="#shortcuts">Keyboard Shortcuts</a></li>
+      </ol>
+    </nav>
+
+    <!-- 1. Getting Started -->
+    <section class="guide-section" id="getting-started">
+      <h2>Getting Started</h2>
+      <h3>Download and install</h3>
+      <p>
+        Download the latest release from
+        <a href="https://github.com/sjvrensburg/railreader2/releases/latest">GitHub Releases</a>.
+        The AI layout model is bundled in both packages.
+      </p>
+      <ul>
+        <li><strong>Linux:</strong> Download the AppImage, make it executable
+          (<code>chmod +x railreader2-linux-x86_64.AppImage</code>), and run it.</li>
+        <li><strong>Windows:</strong> Run <code>railreader2-setup-x64.exe</code> and follow the installer.
+          Optionally associate <code>.pdf</code> files during setup.</li>
+      </ul>
+
+      <h3>Opening a PDF</h3>
+      <p>
+        Use <strong>File &rarr; Open</strong> or press <code>Ctrl+O</code> to open a PDF.
+        You can also pass a file path as a command-line argument.
+        When no file is open, a welcome screen shows with instructions.
+      </p>
+
+      <h3>First steps</h3>
+      <p>
+        Once a PDF is open, you can scroll through pages with <code>PgDn</code>/<code>PgUp</code>,
+        zoom with <code>+</code>/<code>-</code> or the mouse wheel, and pan by dragging.
+        When you zoom past 3x, <strong>rail mode</strong> activates automatically &mdash; this is
+        where the AI-guided reading begins.
+      </p>
+    </section>
+
+    <!-- 2. Basic Navigation -->
+    <section class="guide-section" id="navigation">
+      <h2>Basic Navigation</h2>
+
+      <h3>Zoom and pan</h3>
+      <p>
+        <strong>Mouse wheel</strong> zooms towards the cursor. <code>+</code> and <code>-</code> keys
+        zoom in and out. Press <code>0</code> to fit the page to the window. Use <strong>View &rarr;
+        Fit Width</strong> to fill the viewport horizontally.
+      </p>
+      <p>
+        <strong>Click and drag</strong> to pan. Arrow keys also pan when not in rail mode.
+      </p>
+
+      <h3>Page navigation</h3>
+      <ul>
+        <li><code>PgDn</code> / <code>PgUp</code> &mdash; Next / previous page</li>
+        <li><code>Home</code> / <code>End</code> &mdash; First / last page</li>
+        <li><code>Ctrl+G</code> &mdash; Go to a specific page number</li>
+        <li><code>Space</code> &mdash; Next line (in rail mode) or next page</li>
+      </ul>
+
+      <h3>Minimap and outline</h3>
+      <p>
+        Press <code>Ctrl+M</code> to toggle the <strong>minimap</strong> &mdash; a small page thumbnail
+        in the corner. Click or drag on it to navigate.
+      </p>
+      <p>
+        Press <code>Ctrl+Shift+O</code> to open the <strong>outline panel</strong> (table of contents).
+        Click entries to jump to sections.
+      </p>
+
+      <h3>Multi-tab</h3>
+      <p>
+        Open multiple PDFs in tabs with <code>Ctrl+O</code>. Each tab has independent zoom, position,
+        and analysis state. Switch tabs with <code>Ctrl+Tab</code> or by clicking. Drag tabs to reorder.
+      </p>
+    </section>
+
+    <!-- 3. Rail Mode -->
+    <section class="guide-section" id="rail-mode">
+      <h2>Rail Mode</h2>
+      <p>
+        Rail mode is the core feature of railreader2. When you zoom past the threshold (default 3x),
+        the AI layout analysis detects text blocks and reading order, and navigation locks to those blocks.
+        Non-active regions are dimmed so you can focus on the current block and line.
+      </p>
+
+      <figure class="guide-screenshot">
+        <img src="img/rail_mode.png" alt="Rail mode reading a text block" onclick="openLightbox(this)">
+        <figcaption>Rail mode &mdash; line-by-line reading at high magnification with the current line highlighted</figcaption>
+      </figure>
+
+      <h3>Line-by-line navigation</h3>
+      <ul>
+        <li><code>Down</code> / <code>S</code> &mdash; Next line</li>
+        <li><code>Up</code> / <code>W</code> &mdash; Previous line</li>
+        <li><code>Right</code> / <code>D</code> &mdash; Hold to scroll forward along the line</li>
+        <li><code>Left</code> / <code>A</code> &mdash; Hold to scroll backward</li>
+        <li><code>Home</code> / <code>End</code> &mdash; Snap to start/end of current line</li>
+      </ul>
+      <p>
+        When you reach the last line of a block, pressing <code>Down</code> advances to the next
+        navigable block. At the last block on a page, it advances to the next page.
+      </p>
+
+      <h3>Click to jump</h3>
+      <p>
+        Click on any detected block in rail mode to jump directly to it. The view snaps to the
+        clicked block's first line.
+      </p>
+
+      <h3>Horizontal scrolling</h3>
+      <p>
+        Holding <code>Right</code>/<code>D</code> scrolls horizontally along the current line with
+        speed ramping &mdash; it starts slow and accelerates. <code>Ctrl + mouse wheel</code> also
+        scrolls horizontally. The speed ramp time and max speed are configurable in Settings.
+      </p>
+
+      <div class="tip">
+        <strong>Tip:</strong> Press <code>Shift+D</code> to toggle the debug overlay, which shows
+        all detected layout blocks with their class labels, confidence scores, and reading order.
+        Useful for understanding why rail navigation behaves a certain way.
+      </div>
+    </section>
+
+    <!-- 4. Auto-Scroll -->
+    <section class="guide-section" id="auto-scroll">
+      <h2>Auto-Scroll</h2>
+      <p>
+        Press <code>P</code> in rail mode to toggle <strong>auto-scroll</strong>. The view
+        continuously scrolls horizontally along the current line, then advances to the next line
+        when it reaches the edge.
+      </p>
+      <ul>
+        <li><strong>Speed boost:</strong> Hold <code>D</code> or <code>Right</code> during auto-scroll to double the speed.</li>
+        <li><strong>Pauses:</strong> Auto-scroll pauses briefly at line boundaries (default 400ms) and block/page
+          transitions (default 600ms) to let your eyes settle. Configurable in Settings &rarr; Auto-Scroll.</li>
+        <li><strong>Stop:</strong> Press <code>Escape</code>, <code>P</code>, or any opposing navigation key (<code>Up</code>, <code>Left</code>).</li>
+      </ul>
+      <p>
+        The status bar shows a green <strong>"Auto-Scroll"</strong> indicator when active. Adjust
+        speed with the rail toolbar slider or the <code>[</code> / <code>]</code> keys.
+      </p>
+    </section>
+
+    <!-- 5. Jump Mode -->
+    <section class="guide-section" id="jump-mode">
+      <h2>Jump Mode</h2>
+      <p>
+        Press <code>J</code> in rail mode to toggle <strong>jump mode</strong>. Instead of
+        continuous scrolling, <code>Right</code>/<code>D</code> and <code>Left</code>/<code>A</code>
+        perform saccade-style jumps &mdash; advancing by a configurable percentage of the visible width
+        (default 25%).
+      </p>
+      <p>
+        This mimics natural reading eye movements and is useful for scanning text quickly.
+        Adjust jump distance with <code>[</code> / <code>]</code> or in Settings &rarr; Rail Reading.
+      </p>
+      <div class="tip">
+        <strong>Tip:</strong> Auto-scroll and jump mode are mutually exclusive. Enabling one
+        disables the other.
+      </div>
+    </section>
+
+    <!-- 6. Line Focus Blur -->
+    <section class="guide-section" id="line-focus-blur">
+      <h2>Line Focus Blur</h2>
+      <p>
+        When enabled, line focus blur applies a Gaussian blur to the entire page except the active
+        line in rail mode. This reduces peripheral distraction and perceived jitter, making it
+        easier to focus on the line you're reading.
+      </p>
+
+      <figure class="guide-screenshot">
+        <img src="img/line_focus_blur.png" alt="Line focus blur in rail mode" onclick="openLightbox(this)">
+        <figcaption>Line focus blur &mdash; non-active lines are blurred to reduce distraction</figcaption>
+      </figure>
+
+      <p>
+        Toggle via the <strong>F</strong> button on the rail toolbar, or in Settings &rarr; Rail Reading.
+        Blur intensity is adjustable from 0 (off) to 1 (maximum, sigma 4.0).
+      </p>
+    </section>
+
+    <!-- 7. Colour Effects -->
+    <section class="guide-section" id="colour-effects">
+      <h2>Colour Effects</h2>
+      <p>
+        Four GPU-accelerated colour filters are available, applied only to PDF content (not the UI).
+        Access via <strong>View &rarr; Colour Effect</strong> or Settings &rarr; Appearance.
+      </p>
+      <ul>
+        <li><strong>Amber Filter:</strong> Warm tint that reduces blue light and perceived haze. Good for extended reading.</li>
+        <li><strong>High Contrast:</strong> White-on-black rendering with an S-curve for maximum contrast. Reduces glare.</li>
+        <li><strong>High Visibility:</strong> Yellow-on-black for maximum legibility at the cost of colour information.</li>
+        <li><strong>Invert:</strong> Simple colour inversion for dark backgrounds.</li>
+      </ul>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1rem 0;">
+        <figure class="guide-screenshot" style="max-width: 100%; margin: 0;">
+          <img src="img/colour_effects.png" alt="Amber colour filter" onclick="openLightbox(this)">
+          <figcaption>Amber filter &mdash; warm tint for comfortable reading</figcaption>
+        </figure>
+        <figure class="guide-screenshot" style="max-width: 100%; margin: 0;">
+          <img src="img/colour_effect_high_contrast.png" alt="High contrast with rail mode" onclick="openLightbox(this)">
+          <figcaption>High contrast + rail mode &mdash; maximum readability</figcaption>
+        </figure>
+      </div>
+
+      <p>
+        Each effect has adjustable intensity (0.0 to 1.0). Rail mode overlay colours automatically
+        adapt to the active colour effect for readable contrast.
+      </p>
+    </section>
+
+    <!-- 8. Search -->
+    <section class="guide-section" id="search">
+      <h2>Search</h2>
+      <p>
+        Press <code>Ctrl+F</code> to open the search bar. Type your query and press <code>Enter</code>
+        to search across all pages.
+      </p>
+
+      <figure class="guide-screenshot">
+        <img src="img/search_highlights.png" alt="Search highlights on page" onclick="openLightbox(this)">
+        <figcaption>Search results &mdash; matches highlighted in yellow, active match in orange</figcaption>
+      </figure>
+
+      <ul>
+        <li><strong>Navigate matches:</strong> <code>F3</code> / <code>Shift+F3</code> or the arrow buttons in the search bar.</li>
+        <li><strong>Case sensitivity:</strong> Toggle with the <code>Aa</code> button in the search bar.</li>
+        <li><strong>Regex:</strong> Toggle with the <code>.*</code> button for regular expression search.</li>
+        <li><strong>Match count:</strong> The search bar shows the current match index and total count.</li>
+      </ul>
+      <p>
+        Press <code>Escape</code> to close the search bar and clear highlights.
+      </p>
+    </section>
+
+    <!-- 9. Annotations -->
+    <section class="guide-section" id="annotations">
+      <h2>Annotations</h2>
+      <p>
+        Right-click anywhere on the page to open the <strong>radial menu</strong> with five annotation tools:
+      </p>
+
+      <figure class="guide-screenshot">
+        <img src="img/annotations.png" alt="Annotations on a PDF page" onclick="openLightbox(this)">
+        <figcaption>Annotations &mdash; highlights and text notes on a PDF page</figcaption>
+      </figure>
+
+      <ul>
+        <li><strong>Highlight</strong> (<code>1</code>) &mdash; Click and drag over text to highlight. Uses character-level detection for precise selection.</li>
+        <li><strong>Pen</strong> (<code>2</code>) &mdash; Freehand drawing with configurable colour and stroke width.</li>
+        <li><strong>Rectangle</strong> (<code>3</code>) &mdash; Draw rectangular outlines or filled regions.</li>
+        <li><strong>Text Note</strong> (<code>4</code>) &mdash; Click to place a text note marker. A dialog opens for you to type the note text. Click an existing note to edit it.</li>
+        <li><strong>Eraser</strong> (<code>5</code>) &mdash; Click on an annotation to remove it.</li>
+      </ul>
+
+      <h3>Undo and redo</h3>
+      <p>
+        <code>Ctrl+Z</code> undoes the last annotation action. <code>Ctrl+Y</code> or
+        <code>Ctrl+Shift+Z</code> redoes. Each tab has an independent undo/redo stack.
+      </p>
+
+      <h3>Persistence</h3>
+      <p>
+        Annotations are saved automatically as JSON sidecar files alongside the PDF
+        (e.g. <code>paper.pdf.annotations.json</code>). They load automatically when you reopen the file.
+      </p>
+
+      <h3>Export</h3>
+      <p>
+        Use <strong>File &rarr; Export with Annotations</strong> to create a new PDF with annotations
+        rendered into the pages. The original PDF is not modified.
+      </p>
+    </section>
+
+    <!-- 10. Text Selection -->
+    <section class="guide-section" id="text-selection">
+      <h2>Text Selection</h2>
+      <p>
+        The floating toolbar in the top-left corner provides three modes:
+      </p>
+      <ul>
+        <li><strong>Browse</strong> &mdash; Default pan mode.</li>
+        <li><strong>Text Select</strong> &mdash; Click and drag to select text. Selection uses character-level
+          bounding boxes for precise results.</li>
+        <li><strong>Copy</strong> &mdash; Appears when text is selected. Click to copy, or use <code>Ctrl+C</code>.</li>
+      </ul>
+      <p>
+        The active mode is shown with a blue highlight on the toolbar button. Press <code>Escape</code>
+        to cancel selection and return to browse mode.
+      </p>
+    </section>
+
+    <!-- 11. Settings -->
+    <section class="guide-section" id="settings">
+      <h2>Settings</h2>
+      <p>
+        Press <code>Ctrl+,</code> or use the menu to open Settings. Changes take effect immediately
+        and are saved automatically to the config file.
+      </p>
+
+      <h3>Appearance</h3>
+      <ul>
+        <li><strong>UI Font Scale:</strong> Adjust the size of all UI text (default 1.25x).</li>
+        <li><strong>Motion Blur:</strong> Toggle and adjust intensity of directional blur during scroll/zoom.</li>
+        <li><strong>Colour Effect:</strong> Select and configure the active colour filter.</li>
+      </ul>
+
+      <h3>Rail Reading</h3>
+      <ul>
+        <li><strong>Zoom Threshold:</strong> Zoom level at which rail mode activates (default 3.0x).</li>
+        <li><strong>Snap Duration:</strong> Duration of line-snap animations in milliseconds.</li>
+        <li><strong>Scroll Speed:</strong> Start and max speed for horizontal hold-to-scroll.</li>
+        <li><strong>Ramp Time:</strong> Seconds to reach max scroll speed from start.</li>
+        <li><strong>Pixel Snapping:</strong> Quantise camera to pixel grid to reduce text shimmer.</li>
+        <li><strong>Line Focus Blur:</strong> Toggle and set intensity.</li>
+        <li><strong>Jump Distance:</strong> Percentage of visible width for jump mode (5&ndash;80%).</li>
+      </ul>
+
+      <h3>Auto-Scroll</h3>
+      <ul>
+        <li><strong>Line Pause:</strong> Pause duration at line boundaries (ms, 0 to disable).</li>
+        <li><strong>Block Pause:</strong> Pause duration at block/page boundaries (ms, 0 to disable).</li>
+      </ul>
+
+      <h3>Advanced</h3>
+      <ul>
+        <li><strong>Navigable Block Types:</strong> Choose which PP-DocLayoutV3 block types are navigable
+          in rail mode. Toggling classes doesn't require re-running analysis.</li>
+        <li><strong>Analysis Lookahead:</strong> Number of pages to pre-analyze ahead (0 to disable).</li>
+      </ul>
+
+      <h3>Config file</h3>
+      <p>
+        Configuration is stored at <code>~/.config/railreader2/config.json</code> (Linux) or
+        <code>%APPDATA%\railreader2\config.json</code> (Windows). You can edit it directly;
+        restart the app to apply changes.
+      </p>
+    </section>
+
+    <!-- 12. AI Agent CLI -->
+    <section class="guide-section" id="agent-cli">
+      <h2>AI Agent CLI</h2>
+      <p>
+        RailReader includes a headless agent CLI that lets an LLM open PDFs, navigate, extract text,
+        search, annotate, and export &mdash; all via structured tool calls.
+      </p>
+
+      <h3>Setup</h3>
+      <pre><code># Set your API key
+export OPENAI_API_KEY="your-key"
+
+# Optional: specify model and base URL
+export RAILREADER_MODEL="gpt-4o"
+export RAILREADER_BASE_URL="https://api.example.com/v1"</code></pre>
+
+      <h3>Usage</h3>
+      <pre><code># Run with a task description
+dotnet run --project src/RailReader.Agent -- "Open paper.pdf and summarise page 1"
+
+# Interactive mode (prompts for task)
+dotnet run --project src/RailReader.Agent
+
+# Capture screenshots deterministically
+dotnet run --project src/RailReader.Agent -- --capture-screenshots docs/img/</code></pre>
+
+      <h3>Available tools</h3>
+      <p>The agent has access to these tools:</p>
+      <ul>
+        <li><code>OpenDocument</code>, <code>CloseDocument</code>, <code>ListDocuments</code> &mdash; Document management</li>
+        <li><code>GoToPage</code>, <code>NextPage</code>, <code>PrevPage</code> &mdash; Navigation</li>
+        <li><code>SetZoom</code>, <code>SetRailPosition</code> &mdash; View control</li>
+        <li><code>GetPageText</code>, <code>GetLayoutInfo</code> &mdash; Content extraction</li>
+        <li><code>Search</code> &mdash; Full-text search</li>
+        <li><code>AddHighlight</code>, <code>AddTextAnnotation</code> &mdash; Annotations</li>
+        <li><code>ExportPdf</code>, <code>ExportPageImage</code> &mdash; Export</li>
+        <li><code>WaitForAnalysis</code> &mdash; Wait for layout analysis to complete</li>
+        <li><code>SetColourEffect</code> &mdash; Colour filter control</li>
+      </ul>
+    </section>
+
+    <!-- 13. Keyboard Shortcuts -->
+    <section class="guide-section" id="shortcuts">
+      <h2>Keyboard Shortcuts</h2>
+      <table class="shortcuts-table">
+        <tr><th colspan="2">General</th></tr>
+        <tr><td>Ctrl+O</td><td>Open file</td></tr>
+        <tr><td>Ctrl+W</td><td>Close tab</td></tr>
+        <tr><td>Ctrl+Tab</td><td>Next tab</td></tr>
+        <tr><td>Ctrl+Q</td><td>Quit</td></tr>
+        <tr><td>Ctrl+,</td><td>Settings</td></tr>
+        <tr><td>Ctrl+M</td><td>Toggle minimap</td></tr>
+        <tr><td>Ctrl+Shift+O</td><td>Toggle outline panel</td></tr>
+        <tr><td>Ctrl+G</td><td>Go to page</td></tr>
+        <tr><td>F1</td><td>Keyboard shortcuts dialog</td></tr>
+        <tr><td>F11</td><td>Toggle fullscreen</td></tr>
+        <tr><th colspan="2">Navigation</th></tr>
+        <tr><td>PgDn / PgUp</td><td>Next / previous page</td></tr>
+        <tr><td>Home / End</td><td>First / last page</td></tr>
+        <tr><td>Space</td><td>Next line (rail) or next page</td></tr>
+        <tr><td>+ / -</td><td>Zoom in / out</td></tr>
+        <tr><td>0</td><td>Fit page to window</td></tr>
+        <tr><td>Shift+D</td><td>Toggle debug overlay</td></tr>
+        <tr><th colspan="2">Rail Mode</th></tr>
+        <tr><td>Down / S</td><td>Next line</td></tr>
+        <tr><td>Up / W</td><td>Previous line</td></tr>
+        <tr><td>Right / D</td><td>Scroll forward (hold)</td></tr>
+        <tr><td>Left / A</td><td>Scroll backward (hold)</td></tr>
+        <tr><td>Home / End</td><td>Line start / end</td></tr>
+        <tr><td>P</td><td>Toggle auto-scroll</td></tr>
+        <tr><td>J</td><td>Toggle jump mode</td></tr>
+        <tr><td>[ / ]</td><td>Adjust speed or jump distance</td></tr>
+        <tr><td>Shift+[ / Shift+]</td><td>Adjust blur intensity</td></tr>
+        <tr><td>Click</td><td>Jump to block</td></tr>
+        <tr><th colspan="2">Search &amp; Annotations</th></tr>
+        <tr><td>Ctrl+F</td><td>Open search bar</td></tr>
+        <tr><td>F3 / Shift+F3</td><td>Next / previous match</td></tr>
+        <tr><td>1 / 2 / 3 / 4 / 5</td><td>Highlight / Pen / Rectangle / Text Note / Eraser</td></tr>
+        <tr><td>Right-click</td><td>Open radial menu</td></tr>
+        <tr><td>Ctrl+Z</td><td>Undo</td></tr>
+        <tr><td>Ctrl+Y</td><td>Redo</td></tr>
+        <tr><td>Ctrl+C</td><td>Copy selected text</td></tr>
+        <tr><td>Escape</td><td>Cancel tool / close search / stop auto-scroll / exit fullscreen</td></tr>
+      </table>
+    </section>
+
+  </div>
+
+  <footer class="footer">
+    <p>
+      railreader2 &mdash;
+      <a href="index.html">Home</a> &middot;
+      <a href="https://github.com/sjvrensburg/railreader2">Source</a> &middot;
+      <a href="https://github.com/sjvrensburg/railreader2/releases">Releases</a> &middot;
+      GPL-3.0 License
+    </p>
+  </footer>
+
+  <div class="lightbox" id="lightbox" onclick="closeLightbox()">
+    <img id="lightbox-img" src="" alt="">
+  </div>
+
+  <script>
+    function openLightbox(img) {
+      document.getElementById('lightbox-img').src = img.src;
+      document.getElementById('lightbox').classList.add('active');
+    }
+    function closeLightbox() {
+      document.getElementById('lightbox').classList.remove('active');
+    }
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') closeLightbox();
+    });
+  </script>
+</body>
+</html>

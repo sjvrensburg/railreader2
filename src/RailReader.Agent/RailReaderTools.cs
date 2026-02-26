@@ -1,6 +1,8 @@
 using System.ComponentModel;
 using RailReader.Core;
 using RailReader.Core.Commands;
+using RailReader.Core.Models;
+using RailReader.Core.Services;
 
 namespace RailReader.Agent;
 
@@ -157,7 +159,7 @@ public sealed class RailReaderTools
 
         try
         {
-            RailReader.Core.Services.AnnotationExportService.Export(
+            AnnotationExportService.Export(
                 doc.Pdf, doc.Annotations, outputPath);
             return true;
         }
@@ -165,5 +167,98 @@ public sealed class RailReaderTools
         {
             return false;
         }
+    }
+
+    [Description("Export the current page as a PNG screenshot with overlays (rail, annotations, search highlights, debug).")]
+    public ExportResult? ExportPageImage(
+        string outputPath,
+        int dpi = 150,
+        bool railOverlay = true,
+        bool annotations = true,
+        bool searchHighlights = true,
+        bool debugOverlay = false,
+        bool lineFocusBlur = false)
+    {
+        var doc = _controller.ActiveDocument;
+        if (doc is null) return null;
+
+        var options = new ScreenshotOptions
+        {
+            Dpi = dpi,
+            RailOverlay = railOverlay,
+            Annotations = annotations,
+            SearchHighlights = searchHighlights,
+            DebugOverlay = debugOverlay,
+            LineFocusBlur = lineFocusBlur,
+        };
+
+        using var bitmap = ScreenshotCompositor.RenderPage(doc, _controller, options);
+        ScreenshotCompositor.SavePng(bitmap, outputPath);
+
+        var fileInfo = new FileInfo(outputPath);
+        return new ExportResult(
+            Path.GetFullPath(outputPath),
+            bitmap.Width,
+            bitmap.Height,
+            fileInfo.Length);
+    }
+
+    [Description("Wait for layout analysis to complete on the current page. Returns layout info when ready, or null on timeout.")]
+    public LayoutInfo? WaitForAnalysis(int timeoutMs = 10000)
+    {
+        var doc = _controller.ActiveDocument;
+        if (doc is null) return null;
+
+        // If already cached, return immediately
+        if (doc.AnalysisCache.ContainsKey(doc.CurrentPage))
+        {
+            var (ww, wh) = _controller.GetViewportSize();
+            doc.UpdateRailZoom(ww, wh);
+            return _controller.GetLayoutInfo();
+        }
+
+        // Poll until analysis completes or timeout
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        while (sw.ElapsedMilliseconds < timeoutMs)
+        {
+            _controller.PollAnalysisResults();
+            if (doc.AnalysisCache.ContainsKey(doc.CurrentPage))
+            {
+                var (ww, wh) = _controller.GetViewportSize();
+                doc.UpdateRailZoom(ww, wh);
+                return _controller.GetLayoutInfo();
+            }
+            Thread.Sleep(50);
+        }
+
+        return null;
+    }
+
+    [Description("Set the rail navigation position to a specific block and line index.")]
+    public NavigationResult SetRailPosition(int block, int line = 0)
+    {
+        var doc = _controller.ActiveDocument;
+        if (doc is null) return new NavigationResult(false, -1, "No document open");
+        if (!doc.Rail.Active || !doc.Rail.HasAnalysis)
+            return new NavigationResult(false, doc.CurrentPage, "Rail mode not active (zoom in or wait for analysis)");
+        if (block < 0 || block >= doc.Rail.NavigableCount)
+            return new NavigationResult(false, doc.CurrentPage, $"Block {block} out of range (0-{doc.Rail.NavigableCount - 1})");
+
+        doc.Rail.CurrentBlock = block;
+        doc.Rail.CurrentLine = Math.Clamp(line, 0, doc.Rail.CurrentLineCount - 1);
+        var (ww, wh) = _controller.GetViewportSize();
+        doc.StartSnap(ww, wh);
+        return new NavigationResult(true, doc.CurrentPage, $"Rail at block {block}, line {doc.Rail.CurrentLine}");
+    }
+
+    [Description("Set the colour effect filter. Effects: None, HighContrast, HighVisibility, Amber, Invert.")]
+    public bool SetColourEffect(string effect, float intensity = 1.0f)
+    {
+        if (!Enum.TryParse<ColourEffect>(effect, ignoreCase: true, out var parsed))
+            return false;
+
+        _controller.ColourEffects.Intensity = Math.Clamp(intensity, 0f, 1f);
+        _controller.SetColourEffect(parsed);
+        return true;
     }
 }
