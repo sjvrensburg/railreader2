@@ -671,6 +671,20 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(AutoScrollActive));
     }
 
+    /// <summary>Toggle auto-scroll, disabling jump mode first (mutually exclusive).</summary>
+    public void ToggleAutoScrollExclusive()
+    {
+        if (JumpMode) JumpMode = false;
+        ToggleAutoScroll();
+    }
+
+    /// <summary>Toggle jump mode, stopping auto-scroll first (mutually exclusive).</summary>
+    public void ToggleJumpModeExclusive()
+    {
+        if (AutoScrollActive) StopAutoScroll();
+        JumpMode = !JumpMode;
+    }
+
     private double AutoScrollSpeed =>
         (_config.ScrollSpeedStart + _config.ScrollSpeedMax) / 2.0;
 
