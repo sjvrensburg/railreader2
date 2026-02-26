@@ -8,182 +8,181 @@
         Width="480" Height="680"
         WindowStartupLocation="CenterOwner"
         CanResize="True">
-    <TabControl Margin="8">
-        <!-- Appearance Tab -->
-        <TabItem Header="Appearance">
-            <ScrollViewer Padding="16,16,16,8">
-                <StackPanel Spacing="8">
-                    <TextBlock Text="General" FontWeight="Bold" FontSize="14" />
-                    <Separator />
-                    <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto">
-                        <TextBlock Grid.Column="0" Text="UI Font Scale:" VerticalAlignment="Center" />
-                        <NumericUpDown Grid.Column="2" Name="FontScale" Value="1.25"
-                                       Minimum="0.75" Maximum="2.0" Increment="0.05"
-                                       FormatString="F2" Width="130" HorizontalAlignment="Left"
-                                       ValueChanged="OnSettingChanged" />
-                    </Grid>
+    <DockPanel>
+        <Border DockPanel.Dock="Bottom" Padding="16,8"
+                BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
+                BorderThickness="0,1,0,0">
+            <Button Content="Reset All to Defaults" Click="OnResetDefaults" />
+        </Border>
+        <TabControl Margin="8,8,8,0">
+            <!-- Appearance Tab -->
+            <TabItem Header="Appearance">
+                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Spacing="8" Margin="16">
+                        <TextBlock Text="General" FontWeight="Bold" FontSize="14" />
+                        <Separator />
+                        <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto">
+                            <TextBlock Grid.Column="0" Text="UI Font Scale:" VerticalAlignment="Center" />
+                            <NumericUpDown Grid.Column="2" Name="FontScale" Value="1.25"
+                                           Minimum="0.75" Maximum="2.0" Increment="0.05"
+                                           FormatString="F2" Width="130" HorizontalAlignment="Left"
+                                           ValueChanged="OnSettingChanged" />
+                        </Grid>
 
-                    <TextBlock Text="Motion Blur" FontWeight="Bold" FontSize="14" Margin="0,12,0,0" />
-                    <Separator />
-                    <CheckBox Name="MotionBlurCheck" Content="Motion blur during scroll and zoom"
-                              IsCheckedChanged="OnMotionBlurChanged" />
-                    <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto">
-                        <TextBlock Grid.Column="0" Text="Blur amount:" VerticalAlignment="Center" />
-                        <Slider Grid.Column="2" Name="BlurIntensitySlider" Minimum="0" Maximum="1"
-                                Value="0.33" MinWidth="120"
-                                PropertyChanged="OnBlurIntensityChanged" />
-                    </Grid>
+                        <TextBlock Text="Motion Blur" FontWeight="Bold" FontSize="14" Margin="0,12,0,0" />
+                        <Separator />
+                        <CheckBox Name="MotionBlurCheck" Content="Motion blur during scroll and zoom"
+                                  IsCheckedChanged="OnMotionBlurChanged" />
+                        <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto">
+                            <TextBlock Grid.Column="0" Text="Blur amount:" VerticalAlignment="Center" />
+                            <Slider Grid.Column="2" Name="BlurIntensitySlider" Minimum="0" Maximum="1"
+                                    Value="0.33" MinWidth="120"
+                                    PropertyChanged="OnBlurIntensityChanged" />
+                        </Grid>
 
-                    <TextBlock Text="Colour Effects" FontWeight="Bold" FontSize="14" Margin="0,12,0,0" />
-                    <Separator />
-                    <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto,8,Auto">
-                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Effect:" VerticalAlignment="Center" />
-                        <ComboBox Grid.Row="0" Grid.Column="2" Name="EffectCombo" Width="150"
-                                  HorizontalAlignment="Left" SelectionChanged="OnEffectChanged">
-                            <ComboBoxItem Content="None" />
-                            <ComboBoxItem Content="High Contrast" />
-                            <ComboBoxItem Content="High Visibility" />
-                            <ComboBoxItem Content="Amber Filter" />
-                            <ComboBoxItem Content="Invert" />
-                        </ComboBox>
-                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Intensity:" VerticalAlignment="Center" />
-                        <Slider Grid.Row="2" Grid.Column="2" Name="IntensitySlider" Minimum="0" Maximum="1"
-                                Value="1.0" MinWidth="120"
-                                PropertyChanged="OnIntensityChanged" />
-                    </Grid>
+                        <TextBlock Text="Colour Effects" FontWeight="Bold" FontSize="14" Margin="0,12,0,0" />
+                        <Separator />
+                        <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto,8,Auto">
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Effect:" VerticalAlignment="Center" />
+                            <ComboBox Grid.Row="0" Grid.Column="2" Name="EffectCombo" Width="150"
+                                      HorizontalAlignment="Left" SelectionChanged="OnEffectChanged">
+                                <ComboBoxItem Content="None" />
+                                <ComboBoxItem Content="High Contrast" />
+                                <ComboBoxItem Content="High Visibility" />
+                                <ComboBoxItem Content="Amber Filter" />
+                                <ComboBoxItem Content="Invert" />
+                            </ComboBox>
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Intensity:" VerticalAlignment="Center" />
+                            <Slider Grid.Row="2" Grid.Column="2" Name="IntensitySlider" Minimum="0" Maximum="1"
+                                    Value="1.0" MinWidth="120"
+                                    PropertyChanged="OnIntensityChanged" />
+                        </Grid>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
 
-                    <Separator Margin="0,16,0,0" />
-                    <Button Content="Reset All to Defaults" Click="OnResetDefaults" />
-                </StackPanel>
-            </ScrollViewer>
-        </TabItem>
+            <!-- Rail Reading Tab -->
+            <TabItem Header="Rail Reading">
+                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Spacing="8" Margin="16">
+                        <TextBlock Text="Navigation" FontWeight="Bold" FontSize="14" />
+                        <Separator />
+                        <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto,4,Auto,4,Auto,4,Auto,4,Auto">
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Zoom threshold:" VerticalAlignment="Center" />
+                            <NumericUpDown Grid.Row="0" Grid.Column="2" Name="ZoomThreshold" Value="3.0"
+                                           Minimum="1.0" Maximum="15.0" Increment="0.1"
+                                           FormatString="F1" Width="130" HorizontalAlignment="Left"
+                                           ValueChanged="OnSettingChanged" />
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Snap duration (ms):" VerticalAlignment="Center" />
+                            <NumericUpDown Grid.Row="2" Grid.Column="2" Name="SnapDuration" Value="300"
+                                           Minimum="50" Maximum="1000" Increment="10"
+                                           FormatString="F0" Width="130" HorizontalAlignment="Left"
+                                           ValueChanged="OnSettingChanged" />
+                            <TextBlock Grid.Row="4" Grid.Column="0" Text="Scroll speed start:" VerticalAlignment="Center" />
+                            <NumericUpDown Grid.Row="4" Grid.Column="2" Name="ScrollStart" Value="10"
+                                           Minimum="10" Maximum="500" Increment="5"
+                                           FormatString="F0" Width="130" HorizontalAlignment="Left"
+                                           ValueChanged="OnSettingChanged" />
+                            <TextBlock Grid.Row="6" Grid.Column="0" Text="Scroll speed max:" VerticalAlignment="Center" />
+                            <NumericUpDown Grid.Row="6" Grid.Column="2" Name="ScrollMax" Value="30"
+                                           Minimum="10" Maximum="500" Increment="5"
+                                           FormatString="F0" Width="130" HorizontalAlignment="Left"
+                                           ValueChanged="OnSettingChanged" />
+                            <TextBlock Grid.Row="8" Grid.Column="0" Text="Ramp time (s):" VerticalAlignment="Center" />
+                            <NumericUpDown Grid.Row="8" Grid.Column="2" Name="RampTime" Value="1.5"
+                                           Minimum="0.1" Maximum="5.0" Increment="0.1"
+                                           FormatString="F1" Width="130" HorizontalAlignment="Left"
+                                           ValueChanged="OnSettingChanged" />
+                        </Grid>
 
-        <!-- Rail Reading Tab -->
-        <TabItem Header="Rail Reading">
-            <ScrollViewer Padding="16,16,16,8">
-                <StackPanel Spacing="8">
-                    <TextBlock Text="Navigation" FontWeight="Bold" FontSize="14" />
-                    <Separator />
-                    <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto,4,Auto,4,Auto,4,Auto,4,Auto">
-                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Zoom threshold:" VerticalAlignment="Center" />
-                        <NumericUpDown Grid.Row="0" Grid.Column="2" Name="ZoomThreshold" Value="3.0"
-                                       Minimum="1.0" Maximum="15.0" Increment="0.1"
-                                       FormatString="F1" Width="130" HorizontalAlignment="Left"
-                                       ValueChanged="OnSettingChanged" />
-                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Snap duration (ms):" VerticalAlignment="Center" />
-                        <NumericUpDown Grid.Row="2" Grid.Column="2" Name="SnapDuration" Value="300"
-                                       Minimum="50" Maximum="1000" Increment="10"
-                                       FormatString="F0" Width="130" HorizontalAlignment="Left"
-                                       ValueChanged="OnSettingChanged" />
-                        <TextBlock Grid.Row="4" Grid.Column="0" Text="Scroll speed start:" VerticalAlignment="Center" />
-                        <NumericUpDown Grid.Row="4" Grid.Column="2" Name="ScrollStart" Value="10"
-                                       Minimum="10" Maximum="500" Increment="5"
-                                       FormatString="F0" Width="130" HorizontalAlignment="Left"
-                                       ValueChanged="OnSettingChanged" />
-                        <TextBlock Grid.Row="6" Grid.Column="0" Text="Scroll speed max:" VerticalAlignment="Center" />
-                        <NumericUpDown Grid.Row="6" Grid.Column="2" Name="ScrollMax" Value="30"
-                                       Minimum="10" Maximum="500" Increment="5"
-                                       FormatString="F0" Width="130" HorizontalAlignment="Left"
-                                       ValueChanged="OnSettingChanged" />
-                        <TextBlock Grid.Row="8" Grid.Column="0" Text="Ramp time (s):" VerticalAlignment="Center" />
-                        <NumericUpDown Grid.Row="8" Grid.Column="2" Name="RampTime" Value="1.5"
-                                       Minimum="0.1" Maximum="5.0" Increment="0.1"
-                                       FormatString="F1" Width="130" HorizontalAlignment="Left"
-                                       ValueChanged="OnSettingChanged" />
-                    </Grid>
+                        <TextBlock Text="Visual" FontWeight="Bold" FontSize="14" Margin="0,12,0,0" />
+                        <Separator />
+                        <CheckBox Name="PixelSnappingCheck" Content="Pixel snapping (reduces text shimmer)"
+                                  IsCheckedChanged="OnPixelSnappingChanged" />
+                        <CheckBox Name="LineFocusBlurCheck" Content="Blur non-active lines in rail mode"
+                                  IsCheckedChanged="OnLineFocusBlurChanged" />
+                        <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto">
+                            <TextBlock Grid.Column="0" Text="Focus blur amount:" VerticalAlignment="Center" />
+                            <Slider Grid.Column="2" Name="LineFocusBlurSlider" Minimum="0" Maximum="1"
+                                    Value="0.5" MinWidth="120"
+                                    PropertyChanged="OnLineFocusBlurIntensityChanged" />
+                        </Grid>
 
-                    <TextBlock Text="Visual" FontWeight="Bold" FontSize="14" Margin="0,12,0,0" />
-                    <Separator />
-                    <CheckBox Name="PixelSnappingCheck" Content="Pixel snapping (reduces text shimmer)"
-                              IsCheckedChanged="OnPixelSnappingChanged" />
-                    <CheckBox Name="LineFocusBlurCheck" Content="Blur non-active lines in rail mode"
-                              IsCheckedChanged="OnLineFocusBlurChanged" />
-                    <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto">
-                        <TextBlock Grid.Column="0" Text="Focus blur amount:" VerticalAlignment="Center" />
-                        <Slider Grid.Column="2" Name="LineFocusBlurSlider" Minimum="0" Maximum="1"
-                                Value="0.5" MinWidth="120"
-                                PropertyChanged="OnLineFocusBlurIntensityChanged" />
-                    </Grid>
+                        <TextBlock Text="Jump Mode" FontWeight="Bold" FontSize="14" Margin="0,12,0,0" />
+                        <Separator />
+                        <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto">
+                            <TextBlock Grid.Column="0" Text="Jump distance (%):" VerticalAlignment="Center" />
+                            <NumericUpDown Grid.Column="2" Name="JumpPercentage" Value="25"
+                                           Minimum="5" Maximum="80" Increment="5"
+                                           FormatString="F0" Width="130" HorizontalAlignment="Left"
+                                           ValueChanged="OnSettingChanged" />
+                        </Grid>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
 
-                    <TextBlock Text="Jump Mode" FontWeight="Bold" FontSize="14" Margin="0,12,0,0" />
-                    <Separator />
-                    <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto">
-                        <TextBlock Grid.Column="0" Text="Jump distance (%):" VerticalAlignment="Center" />
-                        <NumericUpDown Grid.Column="2" Name="JumpPercentage" Value="25"
-                                       Minimum="5" Maximum="80" Increment="5"
-                                       FormatString="F0" Width="130" HorizontalAlignment="Left"
-                                       ValueChanged="OnSettingChanged" />
-                    </Grid>
+            <!-- Auto-Scroll Tab -->
+            <TabItem Header="Auto-Scroll">
+                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Spacing="8" Margin="16">
+                        <TextBlock Text="Pause Durations" FontWeight="Bold" FontSize="14" />
+                        <Separator />
+                        <TextBlock Text="Brief pause at line and block boundaries during auto-scroll, giving your eyes time to settle."
+                                   TextWrapping="Wrap" Opacity="0.7" FontSize="12" />
+                        <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto,4,Auto">
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Line pause (ms):" VerticalAlignment="Center" />
+                            <NumericUpDown Grid.Row="0" Grid.Column="2" Name="AutoScrollLinePause" Value="400"
+                                           Minimum="0" Maximum="2000" Increment="50"
+                                           FormatString="F0" Width="130" HorizontalAlignment="Left"
+                                           ValueChanged="OnSettingChanged" />
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Block pause (ms):" VerticalAlignment="Center" />
+                            <NumericUpDown Grid.Row="2" Grid.Column="2" Name="AutoScrollBlockPause" Value="600"
+                                           Minimum="0" Maximum="2000" Increment="50"
+                                           FormatString="F0" Width="130" HorizontalAlignment="Left"
+                                           ValueChanged="OnSettingChanged" />
+                        </Grid>
+                        <TextBlock Text="Set to 0 to disable pauses. Speed is controlled via the rail toolbar sliders."
+                                   TextWrapping="Wrap" Opacity="0.5" FontSize="11" Margin="0,8,0,0" />
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
 
-                    <Separator Margin="0,16,0,0" />
-                    <Button Content="Reset All to Defaults" Click="OnResetDefaults" />
-                </StackPanel>
-            </ScrollViewer>
-        </TabItem>
+            <!-- Advanced Tab -->
+            <TabItem Header="Advanced">
+                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Spacing="8" Margin="16">
+                        <TextBlock Text="Document Analysis" FontWeight="Bold" FontSize="14" />
+                        <Separator />
+                        <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto">
+                            <TextBlock Grid.Column="0" Text="Lookahead pages:" VerticalAlignment="Center" />
+                            <NumericUpDown Grid.Column="2" Name="Lookahead" Value="2"
+                                           Minimum="0" Maximum="10" Increment="1"
+                                           FormatString="F0" Width="130" HorizontalAlignment="Left"
+                                           ValueChanged="OnSettingChanged" />
+                        </Grid>
+                        <TextBlock Text="Number of pages to pre-analyse ahead of the current page."
+                                   TextWrapping="Wrap" Opacity="0.5" FontSize="11" />
 
-        <!-- Auto-Scroll Tab -->
-        <TabItem Header="Auto-Scroll">
-            <ScrollViewer Padding="16,16,16,8">
-                <StackPanel Spacing="8">
-                    <TextBlock Text="Pause Durations" FontWeight="Bold" FontSize="14" />
-                    <Separator />
-                    <TextBlock Text="Brief pause at line and block boundaries during auto-scroll, giving your eyes time to settle."
-                               TextWrapping="Wrap" Opacity="0.7" FontSize="12" />
-                    <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto,4,Auto">
-                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Line pause (ms):" VerticalAlignment="Center" />
-                        <NumericUpDown Grid.Row="0" Grid.Column="2" Name="AutoScrollLinePause" Value="400"
-                                       Minimum="0" Maximum="2000" Increment="50"
-                                       FormatString="F0" Width="130" HorizontalAlignment="Left"
-                                       ValueChanged="OnSettingChanged" />
-                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Block pause (ms):" VerticalAlignment="Center" />
-                        <NumericUpDown Grid.Row="2" Grid.Column="2" Name="AutoScrollBlockPause" Value="600"
-                                       Minimum="0" Maximum="2000" Increment="50"
-                                       FormatString="F0" Width="130" HorizontalAlignment="Left"
-                                       ValueChanged="OnSettingChanged" />
-                    </Grid>
-                    <TextBlock Text="Set to 0 to disable pauses. Speed is controlled via the rail toolbar sliders."
-                               TextWrapping="Wrap" Opacity="0.5" FontSize="11" Margin="0,8,0,0" />
-
-                    <Separator Margin="0,16,0,0" />
-                    <Button Content="Reset All to Defaults" Click="OnResetDefaults" />
-                </StackPanel>
-            </ScrollViewer>
-        </TabItem>
-
-        <!-- Advanced Tab -->
-        <TabItem Header="Advanced">
-            <ScrollViewer Padding="16,16,16,8">
-                <StackPanel Spacing="8">
-                    <TextBlock Text="Document Analysis" FontWeight="Bold" FontSize="14" />
-                    <Separator />
-                    <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto">
-                        <TextBlock Grid.Column="0" Text="Lookahead pages:" VerticalAlignment="Center" />
-                        <NumericUpDown Grid.Column="2" Name="Lookahead" Value="2"
-                                       Minimum="0" Maximum="10" Increment="1"
-                                       FormatString="F0" Width="130" HorizontalAlignment="Left"
-                                       ValueChanged="OnSettingChanged" />
-                    </Grid>
-                    <TextBlock Text="Number of pages to pre-analyse ahead of the current page."
-                               TextWrapping="Wrap" Opacity="0.5" FontSize="11" />
-
-                    <TextBlock Text="Navigable Block Types" FontWeight="Bold" FontSize="14" Margin="0,12,0,0" />
-                    <Separator />
-                    <TextBlock Text="Select which layout block types are navigable in rail mode:"
-                               TextWrapping="Wrap" Opacity="0.7" FontSize="12" />
-                    <ItemsControl Name="NavigableClassesList">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="v:NavigableClassItem">
-                                <CheckBox Content="{Binding Name}"
-                                          IsChecked="{Binding IsChecked}"
-                                          Margin="0,1" />
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-
-                    <Separator Margin="0,16,0,0" />
-                    <Button Content="Reset All to Defaults" Click="OnResetDefaults" />
-                </StackPanel>
-            </ScrollViewer>
-        </TabItem>
-    </TabControl>
+                        <TextBlock Text="Navigable Block Types" FontWeight="Bold" FontSize="14" Margin="0,12,0,0" />
+                        <Separator />
+                        <TextBlock Text="Select which layout block types are navigable in rail mode:"
+                                   TextWrapping="Wrap" Opacity="0.7" FontSize="12" />
+                        <ItemsControl Name="NavigableClassesList">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="v:NavigableClassItem">
+                                    <CheckBox Content="{Binding Name}"
+                                              IsChecked="{Binding IsChecked}"
+                                              Margin="0,1" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+        </TabControl>
+    </DockPanel>
 </Window>
