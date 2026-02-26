@@ -19,8 +19,13 @@ public partial class RailToolBar : UserControl
     private Button? _jumpBtn;
     private Button? _focusBlurBtn;
 
-    private static readonly IBrush ActiveBrush = new SolidColorBrush(Color.FromRgb(76, 175, 80));
-    private static readonly IBrush InactiveBrush = new SolidColorBrush(Color.FromRgb(140, 140, 140));
+    // Matching search overlay / toolbar button style
+    private static readonly IBrush ActiveBg = new SolidColorBrush(Color.Parse("#0078D4"));
+    private static readonly IBrush ActiveFg = Brushes.White;
+    private static readonly IBrush ActiveBorder = new SolidColorBrush(Color.Parse("#0078D4"));
+    private static readonly IBrush InactiveBg = new SolidColorBrush(Color.Parse("#404040"));
+    private static readonly IBrush InactiveFg = new SolidColorBrush(Color.Parse("#E0E0E0"));
+    private static readonly IBrush InactiveBorder = new SolidColorBrush(Color.Parse("#606060"));
 
     public MainWindowViewModel? ViewModel { get; set; }
 
@@ -47,7 +52,11 @@ public partial class RailToolBar : UserControl
             VerticalContentAlignment = Avalonia.Layout.VerticalAlignment.Center,
             HorizontalAlignment = HorizontalAlignment.Center,
             FontSize = 10,
-            Foreground = InactiveBrush,
+            Background = InactiveBg,
+            Foreground = InactiveFg,
+            BorderBrush = InactiveBorder,
+            BorderThickness = new Avalonia.Thickness(1),
+            CornerRadius = new Avalonia.CornerRadius(3),
         };
         ToolTip.SetTip(btn, tooltip);
         btn.Click += handler;
@@ -58,8 +67,16 @@ public partial class RailToolBar : UserControl
     {
         _autoScrollBtn = MakeToggleButton("P", "Toggle auto-scroll (P)", (_, _) =>
         {
-            ViewModel?.ToggleAutoScroll();
-            UpdateToggleStates();
+            if (ViewModel is { } vm)
+            {
+                if (vm.JumpMode)
+                {
+                    vm.JumpMode = false;
+                    SetJumpMode(false);
+                }
+                vm.ToggleAutoScroll();
+                UpdateToggleStates();
+            }
         });
         ButtonPanel.Children.Add(_autoScrollBtn);
 
@@ -67,6 +84,8 @@ public partial class RailToolBar : UserControl
         {
             if (ViewModel is { } vm)
             {
+                if (vm.AutoScrollActive)
+                    vm.StopAutoScroll();
                 vm.JumpMode = !vm.JumpMode;
                 SetJumpMode(vm.JumpMode);
                 UpdateToggleStates();
@@ -89,13 +108,17 @@ public partial class RailToolBar : UserControl
     public void UpdateToggleStates()
     {
         if (ViewModel is not { } vm) return;
+        ApplyToggleStyle(_autoScrollBtn, vm.AutoScrollActive);
+        ApplyToggleStyle(_jumpBtn, vm.JumpMode);
+        ApplyToggleStyle(_focusBlurBtn, vm.Config.LineFocusBlur);
+    }
 
-        if (_autoScrollBtn is not null)
-            _autoScrollBtn.Foreground = vm.AutoScrollActive ? ActiveBrush : InactiveBrush;
-        if (_jumpBtn is not null)
-            _jumpBtn.Foreground = vm.JumpMode ? ActiveBrush : InactiveBrush;
-        if (_focusBlurBtn is not null)
-            _focusBlurBtn.Foreground = vm.Config.LineFocusBlur ? ActiveBrush : InactiveBrush;
+    private static void ApplyToggleStyle(Button? btn, bool active)
+    {
+        if (btn is null) return;
+        btn.Background = active ? ActiveBg : InactiveBg;
+        btn.Foreground = active ? ActiveFg : InactiveFg;
+        btn.BorderBrush = active ? ActiveBorder : InactiveBorder;
     }
 
     private void BuildSliders()

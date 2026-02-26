@@ -304,8 +304,10 @@ public partial class MainWindow : Window
             case Key.A when !searchFocused:
                 vm.HandleArrowLeft(); e.Handled = true; break;
             case Key.P when !searchFocused:
+                if (vm.JumpMode) { vm.JumpMode = false; RailToolBar.SetJumpMode(false); }
                 vm.ToggleAutoScroll(); RailToolBar.UpdateToggleStates(); e.Handled = true; break;
             case Key.J when !searchFocused:
+                if (vm.AutoScrollActive) vm.StopAutoScroll();
                 vm.JumpMode = !vm.JumpMode;
                 RailToolBar.SetJumpMode(vm.JumpMode);
                 RailToolBar.UpdateToggleStates();
