@@ -620,29 +620,25 @@ public sealed partial class MainWindowViewModel : ObservableObject
             RequestAnimationFrame();
             return;
         }
-        if (JumpMode && ActiveTab is { } jt && jt.Rail.Active)
-        {
-            var (ww, wh) = GetWindowSize();
-            jt.Rail.Jump(true, jt.Camera.Zoom, ww, wh, jt.Camera.OffsetX, jt.Camera.OffsetY);
-            InvalidateCamera();
-            RequestAnimationFrame();
-            return;
-        }
+        if (TryJump(forward: true)) return;
         HandleHorizontalArrow(ScrollDirection.Forward, -PanStep);
     }
 
     public void HandleArrowLeft()
     {
         if (AutoScrollActive) StopAutoScroll();
-        if (JumpMode && ActiveTab is { } jt && jt.Rail.Active)
-        {
-            var (ww, wh) = GetWindowSize();
-            jt.Rail.Jump(false, jt.Camera.Zoom, ww, wh, jt.Camera.OffsetX, jt.Camera.OffsetY);
-            InvalidateCamera();
-            RequestAnimationFrame();
-            return;
-        }
+        if (TryJump(forward: false)) return;
         HandleHorizontalArrow(ScrollDirection.Backward, PanStep);
+    }
+
+    private bool TryJump(bool forward)
+    {
+        if (!JumpMode || ActiveTab is not { } tab || !tab.Rail.Active) return false;
+        var (ww, wh) = GetWindowSize();
+        tab.Rail.Jump(forward, tab.Camera.Zoom, ww, wh, tab.Camera.OffsetX, tab.Camera.OffsetY);
+        InvalidateCamera();
+        RequestAnimationFrame();
+        return true;
     }
 
     private void HandleHorizontalArrow(ScrollDirection direction, double panDelta)

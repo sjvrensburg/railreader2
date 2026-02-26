@@ -100,24 +100,11 @@ public partial class RailToolBar : UserControl
 
         if (_speedSlider is null || _speedLabel is null || ViewModel is not { } vm) return;
 
-        if (jumpMode)
-        {
-            _speedLabel.Text = "Jmp";
-            _speedSlider.Minimum = 5;
-            _speedSlider.Maximum = 80;
-            _speedSlider.TickFrequency = 5;
-            _speedSlider.Value = vm.Config.JumpPercentage;
-            ToolTip.SetTip(_speedSlider, "Jump distance % ([ / ] keys)");
-        }
-        else
-        {
-            _speedLabel.Text = "Spd";
-            _speedSlider.Minimum = 5;
-            _speedSlider.Maximum = 80;
-            _speedSlider.TickFrequency = 5;
-            _speedSlider.Value = vm.Config.ScrollSpeedMax;
-            ToolTip.SetTip(_speedSlider, "Scroll speed ([ / ] keys)");
-        }
+        _speedLabel.Text = jumpMode ? "Jmp" : "Spd";
+        _speedSlider.Value = jumpMode ? vm.Config.JumpPercentage : vm.Config.ScrollSpeedMax;
+        ToolTip.SetTip(_speedSlider, jumpMode
+            ? "Jump distance % ([ / ] keys)"
+            : "Scroll speed ([ / ] keys)");
     }
 
     /// <summary>

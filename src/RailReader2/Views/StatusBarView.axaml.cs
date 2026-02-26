@@ -137,7 +137,7 @@ public partial class StatusBarView : UserControl
                     Foreground = new SolidColorBrush(Color.FromRgb(255, 170, 0)),
                     FontWeight = FontWeight.Bold,
                 });
-                var exitBtn = MakeNavButton("\u2715", (_, _) => { vm.JumpMode = false; }, "Exit jump mode (J)");
+                var exitBtn = MakeNavButton("\u2715", (_, _) => vm.JumpMode = false, "Exit jump mode (J)");
                 exitBtn.Foreground = new SolidColorBrush(Color.FromRgb(255, 100, 100));
                 StatusPanel.Children.Add(exitBtn);
             }
