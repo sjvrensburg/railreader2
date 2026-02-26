@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
+using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Media;
 using RailReader2.ViewModels;
@@ -14,15 +15,104 @@ public partial class RailToolBar : UserControl
     private TextBlock? _speedLabel;
     private bool _jumpMode;
 
+    private Button? _autoScrollBtn;
+    private Button? _jumpBtn;
+    private Button? _focusBlurBtn;
+
+    // Matching search overlay / toolbar button style
+    private static readonly IBrush ActiveBg = new SolidColorBrush(Color.Parse("#0078D4"));
+    private static readonly IBrush ActiveFg = Brushes.White;
+    private static readonly IBrush InactiveBg = new SolidColorBrush(Color.Parse("#404040"));
+    private static readonly IBrush InactiveFg = new SolidColorBrush(Color.Parse("#E0E0E0"));
+    private static readonly IBrush InactiveBorder = new SolidColorBrush(Color.Parse("#606060"));
+
     public MainWindowViewModel? ViewModel { get; set; }
 
     public RailToolBar()
     {
         InitializeComponent();
+        BuildButtons();
         BuildSliders();
     }
 
     private static readonly IBrush LabelBrush = new SolidColorBrush(Color.FromRgb(180, 180, 180));
+
+    private Button MakeToggleButton(string label, string tooltip, EventHandler<RoutedEventArgs> handler)
+    {
+        var btn = new Button
+        {
+            Content = label,
+            Padding = new Thickness(0),
+            MinWidth = 0,
+            MinHeight = 0,
+            Width = 32,
+            Height = 22,
+            HorizontalContentAlignment = HorizontalAlignment.Center,
+            VerticalContentAlignment = VerticalAlignment.Center,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            FontSize = 10,
+            Background = InactiveBg,
+            Foreground = InactiveFg,
+            BorderBrush = InactiveBorder,
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(3),
+        };
+        ToolTip.SetTip(btn, tooltip);
+        btn.Click += handler;
+        return btn;
+    }
+
+    private void BuildButtons()
+    {
+        _autoScrollBtn = MakeToggleButton("P", "Toggle auto-scroll (P)", (_, _) =>
+        {
+            if (ViewModel is { } vm)
+            {
+                vm.ToggleAutoScrollExclusive();
+                SetJumpMode(vm.JumpMode);
+                UpdateToggleStates();
+            }
+        });
+        ButtonPanel.Children.Add(_autoScrollBtn);
+
+        _jumpBtn = MakeToggleButton("J", "Toggle jump mode (J)", (_, _) =>
+        {
+            if (ViewModel is { } vm)
+            {
+                vm.ToggleJumpModeExclusive();
+                SetJumpMode(vm.JumpMode);
+                UpdateToggleStates();
+            }
+        });
+        ButtonPanel.Children.Add(_jumpBtn);
+
+        _focusBlurBtn = MakeToggleButton("F", "Toggle line focus blur", (_, _) =>
+        {
+            if (ViewModel is { } vm)
+            {
+                vm.Config.LineFocusBlur = !vm.Config.LineFocusBlur;
+                vm.OnConfigChanged();
+                UpdateToggleStates();
+            }
+        });
+        ButtonPanel.Children.Add(_focusBlurBtn);
+    }
+
+    public void UpdateToggleStates()
+    {
+        if (ViewModel is not { } vm) return;
+        ApplyToggleStyle(_autoScrollBtn, vm.AutoScrollActive);
+        ApplyToggleStyle(_jumpBtn, vm.JumpMode);
+        ApplyToggleStyle(_focusBlurBtn, vm.Config.LineFocusBlur);
+    }
+
+    private static void ApplyToggleStyle(Button? btn, bool active)
+    {
+        if (btn is null) return;
+        btn.Background = active ? ActiveBg : InactiveBg;
+        btn.Foreground = active ? ActiveFg : InactiveFg;
+        btn.BorderBrush = active ? ActiveBg : InactiveBorder;
+    }
 
     private void BuildSliders()
     {

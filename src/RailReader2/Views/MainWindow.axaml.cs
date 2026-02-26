@@ -194,6 +194,7 @@ public partial class MainWindow : Window
         else if (shouldShow && Vm is { } v)
         {
             RailToolBar.SetJumpMode(v.JumpMode);
+            RailToolBar.UpdateToggleStates();
         }
     }
 
@@ -303,10 +304,14 @@ public partial class MainWindow : Window
             case Key.A when !searchFocused:
                 vm.HandleArrowLeft(); e.Handled = true; break;
             case Key.P when !searchFocused:
-                vm.ToggleAutoScroll(); e.Handled = true; break;
-            case Key.J when !searchFocused:
-                vm.JumpMode = !vm.JumpMode;
+                vm.ToggleAutoScrollExclusive();
                 RailToolBar.SetJumpMode(vm.JumpMode);
+                RailToolBar.UpdateToggleStates();
+                e.Handled = true; break;
+            case Key.J when !searchFocused:
+                vm.ToggleJumpModeExclusive();
+                RailToolBar.SetJumpMode(vm.JumpMode);
+                RailToolBar.UpdateToggleStates();
                 e.Handled = true; break;
             case Key.OemOpenBrackets when !searchFocused && e.KeyModifiers.HasFlag(KeyModifiers.Shift):
                 RailToolBar.AdjustBlur(-0.05); e.Handled = true; break;
@@ -370,7 +375,7 @@ public partial class MainWindow : Window
             case Key.F11:
                 vm.IsFullScreen = !vm.IsFullScreen; e.Handled = true; break;
             case Key.Escape when vm.AutoScrollActive:
-                vm.StopAutoScroll(); e.Handled = true; break;
+                vm.StopAutoScroll(); RailToolBar.UpdateToggleStates(); e.Handled = true; break;
             case Key.Escape when vm.IsFullScreen:
                 vm.IsFullScreen = false; e.Handled = true; break;
             case Key.Escape when vm.IsRadialMenuOpen:

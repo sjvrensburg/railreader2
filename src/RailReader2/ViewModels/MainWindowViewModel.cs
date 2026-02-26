@@ -318,23 +318,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
             var (ww, wh) = GetWindowSize();
 
-            // Restore saved reading position, or center the page for new files
+            // Restore saved page number only (not zoom/offset to avoid opening in rail mode)
             var saved = _config.GetReadingPosition(path);
-            if (saved is not null && (saved.Page > 0 || saved.Zoom != 1.0))
-            {
+            if (saved is not null && saved.Page > 0)
                 tab.GoToPage(Math.Clamp(saved.Page, 0, tab.PageCount - 1), _worker, ww, wh);
-                tab.Camera.Zoom = Math.Clamp(saved.Zoom, Camera.ZoomMin, Camera.ZoomMax);
-                tab.Camera.OffsetX = saved.OffsetX;
-                tab.Camera.OffsetY = saved.OffsetY;
-                tab.ClampCamera(ww, wh);
-                tab.UpdateRailZoom(ww, wh);
-                tab.UpdateRenderDpiIfNeeded();
-            }
-            else
-            {
-                tab.CenterPage(ww, wh);
-                tab.UpdateRailZoom(ww, wh);
-            }
+
+            tab.CenterPage(ww, wh);
+            tab.UpdateRailZoom(ww, wh);
 
             Tabs.Add(tab);
             _config.AddRecentFile(path);
@@ -679,6 +669,20 @@ public sealed partial class MainWindowViewModel : ObservableObject
         ActiveTab?.Rail.StopAutoScroll();
         AutoScrollActive = false;
         OnPropertyChanged(nameof(AutoScrollActive));
+    }
+
+    /// <summary>Toggle auto-scroll, disabling jump mode first (mutually exclusive).</summary>
+    public void ToggleAutoScrollExclusive()
+    {
+        if (JumpMode) JumpMode = false;
+        ToggleAutoScroll();
+    }
+
+    /// <summary>Toggle jump mode, stopping auto-scroll first (mutually exclusive).</summary>
+    public void ToggleJumpModeExclusive()
+    {
+        if (AutoScrollActive) StopAutoScroll();
+        JumpMode = !JumpMode;
     }
 
     private double AutoScrollSpeed =>
