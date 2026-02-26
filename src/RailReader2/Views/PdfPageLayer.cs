@@ -92,8 +92,6 @@ public class PdfPageLayer : Control
             var effectPaint = _effects?.CreatePaint();
 
             // Motion blur: horizontal during rail scroll, uniform during zoom.
-            // Cubic curve keeps blur barely visible at low/medium speeds,
-            // only becoming noticeable near max speed.
             float sigmaX = 0, sigmaY = 0;
             if (_motionBlur && _blurIntensity > 0)
             {
@@ -114,7 +112,7 @@ public class PdfPageLayer : Control
                 }
             }
 
-            // Get or update cached blur filter (only recreate if sigma changed)
+            // Get or update cached motion blur filter
             SKImageFilter? blurFilter = null;
             if (sigmaX > 0 || sigmaY > 0)
             {
@@ -130,10 +128,11 @@ public class PdfPageLayer : Control
                 blurFilter = s_cachedBlurFilter;
             }
 
+            // Outer layer: colour effect + motion blur. Everything drawn inside
+            // this layer gets the colour filter applied uniformly (once).
             bool needsLayer = effectPaint is not null || blurFilter is not null;
             if (needsLayer)
             {
-                // Reuse a thread-local paint for the layer to avoid per-frame allocation
                 s_layerPaint ??= new SKPaint();
                 s_layerPaint.ColorFilter = effectPaint?.ColorFilter;
                 s_layerPaint.ImageFilter = blurFilter;
@@ -141,51 +140,56 @@ public class PdfPageLayer : Control
             }
 
             var destRect = SKRect.Create(0, 0, (float)tab.PageWidth, (float)tab.PageHeight);
-            canvas.DrawImage(image, destRect, s_sampling);
 
-            if (needsLayer)
-            {
-                canvas.Restore();
-                // Clear references but keep the paint object for reuse
-                s_layerPaint!.ColorFilter = null;
-                s_layerPaint.ImageFilter = null;
-            }
-
-            effectPaint?.Dispose();
-
-            // Line focus blur: apply Gaussian blur to non-current lines within the active block
+            // Line focus blur: draw the page in two passes inside the colour
+            // effect layer so blur doesn't double-apply the tint.
+            // Pass 1: blurred page everywhere except the active line.
+            // Pass 2: sharp active line on top.
+            bool didLineFocusBlur = false;
             if (_lineFocusBlur && _lineFocusIntensity > 0
                 && tab.Rail is { Active: true, NavigableCount: > 0 } rail)
             {
+                var line = rail.CurrentLineInfo;
                 var block = rail.CurrentNavigableBlock;
-                int currentLine = rail.CurrentLine;
-                var lines = block.Lines;
-                float blockX = block.BBox.X;
-                float blockW = block.BBox.W;
-                const float baseSigma = 3.0f;
+                // Use full page width so blur extends beyond the block
+                var lineRect = SKRect.Create(0, line.Y - line.Height / 2f,
+                    (float)tab.PageWidth, line.Height);
 
-                for (int i = 0; i < lines.Count; i++)
+                float sigma = (float)(4.0 * _lineFocusIntensity);
+                if (sigma >= 0.5f)
                 {
-                    if (i == currentLine) continue;
-                    int dist = Math.Abs(i - currentLine);
-                    if (dist > 3) continue; // cap at ±3 lines for performance
+                    didLineFocusBlur = true;
 
-                    float sigma = (float)(baseSigma * _lineFocusIntensity * dist / 3.0);
-                    if (sigma < 0.5f) continue;
-
-                    var lineInfo = lines[i];
-                    var lineRect = SKRect.Create(blockX, lineInfo.Y - lineInfo.Height / 2f, blockW, lineInfo.Height);
-
+                    // Pass 1: Draw entire page blurred, clipping out the active line
                     canvas.Save();
-                    canvas.ClipRect(lineRect);
+                    canvas.ClipRect(lineRect, SKClipOperation.Difference);
                     using var focusBlur = SKImageFilter.CreateBlur(sigma, sigma);
                     using var focusPaint = new SKPaint { ImageFilter = focusBlur };
                     canvas.SaveLayer(focusPaint);
                     canvas.DrawImage(image, destRect, s_sampling);
                     canvas.Restore(); // layer
                     canvas.Restore(); // clip
+
+                    // Pass 2: Draw just the active line sharp
+                    canvas.Save();
+                    canvas.ClipRect(lineRect);
+                    canvas.DrawImage(image, destRect, s_sampling);
+                    canvas.Restore(); // clip
                 }
             }
+
+            // If line focus blur didn't handle the page draw, do it now
+            if (!didLineFocusBlur)
+                canvas.DrawImage(image, destRect, s_sampling);
+
+            if (needsLayer)
+            {
+                canvas.Restore();
+                s_layerPaint!.ColorFilter = null;
+                s_layerPaint.ImageFilter = null;
+            }
+
+            effectPaint?.Dispose();
         }
     }
 }
