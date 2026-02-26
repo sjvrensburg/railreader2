@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
+using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Media;
 using RailReader2.ViewModels;
@@ -14,15 +15,88 @@ public partial class RailToolBar : UserControl
     private TextBlock? _speedLabel;
     private bool _jumpMode;
 
+    private Button? _autoScrollBtn;
+    private Button? _jumpBtn;
+    private Button? _focusBlurBtn;
+
+    private static readonly IBrush ActiveBrush = new SolidColorBrush(Color.FromRgb(76, 175, 80));
+    private static readonly IBrush InactiveBrush = new SolidColorBrush(Color.FromRgb(140, 140, 140));
+
     public MainWindowViewModel? ViewModel { get; set; }
 
     public RailToolBar()
     {
         InitializeComponent();
+        BuildButtons();
         BuildSliders();
     }
 
     private static readonly IBrush LabelBrush = new SolidColorBrush(Color.FromRgb(180, 180, 180));
+
+    private Button MakeToggleButton(string label, string tooltip, EventHandler<RoutedEventArgs> handler)
+    {
+        var btn = new Button
+        {
+            Content = label,
+            Padding = new Avalonia.Thickness(0),
+            MinWidth = 0,
+            MinHeight = 0,
+            Width = 32,
+            Height = 22,
+            HorizontalContentAlignment = HorizontalAlignment.Center,
+            VerticalContentAlignment = Avalonia.Layout.VerticalAlignment.Center,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            FontSize = 10,
+            Foreground = InactiveBrush,
+        };
+        ToolTip.SetTip(btn, tooltip);
+        btn.Click += handler;
+        return btn;
+    }
+
+    private void BuildButtons()
+    {
+        _autoScrollBtn = MakeToggleButton("P", "Toggle auto-scroll (P)", (_, _) =>
+        {
+            ViewModel?.ToggleAutoScroll();
+            UpdateToggleStates();
+        });
+        ButtonPanel.Children.Add(_autoScrollBtn);
+
+        _jumpBtn = MakeToggleButton("J", "Toggle jump mode (J)", (_, _) =>
+        {
+            if (ViewModel is { } vm)
+            {
+                vm.JumpMode = !vm.JumpMode;
+                SetJumpMode(vm.JumpMode);
+                UpdateToggleStates();
+            }
+        });
+        ButtonPanel.Children.Add(_jumpBtn);
+
+        _focusBlurBtn = MakeToggleButton("F", "Toggle line focus blur", (_, _) =>
+        {
+            if (ViewModel is { } vm)
+            {
+                vm.Config.LineFocusBlur = !vm.Config.LineFocusBlur;
+                vm.OnConfigChanged();
+                UpdateToggleStates();
+            }
+        });
+        ButtonPanel.Children.Add(_focusBlurBtn);
+    }
+
+    public void UpdateToggleStates()
+    {
+        if (ViewModel is not { } vm) return;
+
+        if (_autoScrollBtn is not null)
+            _autoScrollBtn.Foreground = vm.AutoScrollActive ? ActiveBrush : InactiveBrush;
+        if (_jumpBtn is not null)
+            _jumpBtn.Foreground = vm.JumpMode ? ActiveBrush : InactiveBrush;
+        if (_focusBlurBtn is not null)
+            _focusBlurBtn.Foreground = vm.Config.LineFocusBlur ? ActiveBrush : InactiveBrush;
+    }
 
     private void BuildSliders()
     {

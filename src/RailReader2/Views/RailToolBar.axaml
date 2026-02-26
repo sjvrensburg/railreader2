@@ -1,11 +1,15 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="RailReader2.Views.RailToolBar"
-             Width="40">
+             Width="44">
     <Border Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}"
             Padding="4,8"
             BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
             BorderThickness="1,0,0,0">
-        <StackPanel Name="SliderPanel" Spacing="6" />
+        <StackPanel Spacing="6">
+            <StackPanel Name="ButtonPanel" Spacing="3" />
+            <Separator Margin="0,2" />
+            <StackPanel Name="SliderPanel" Spacing="6" />
+        </StackPanel>
     </Border>
 </UserControl>
