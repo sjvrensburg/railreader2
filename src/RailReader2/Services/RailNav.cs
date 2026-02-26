@@ -409,6 +409,14 @@ public sealed class RailNav
         _autoScrollPauseTimer = null;
     }
 
+    /// <summary>Inject a pause into auto-scroll (e.g. after advancing to a new line).</summary>
+    public void PauseAutoScroll(double durationMs)
+    {
+        if (!AutoScrolling || durationMs <= 0) return;
+        _autoScrollPauseTimer = Stopwatch.StartNew();
+        _autoScrollPauseDurationMs = durationMs;
+    }
+
     /// <summary>Set/clear the boost flag (user holding D/Right during auto-scroll).</summary>
     public void SetAutoScrollBoost(bool boost) => _autoScrollBoost = boost;
 
