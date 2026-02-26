@@ -9,14 +9,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Build and Development Commands
 
 ```bash
-# Build the project
-dotnet build src/RailReader2
+# Build all projects
+dotnet build RailReader2.slnx
 
 # Run the application (note: src/RailReader2 is the correct project path; -- separates dotnet args from app args)
 dotnet run -c Release --project src/RailReader2 -- <path-to-pdf>
 
 # Run without arguments (shows welcome screen)
 dotnet run -c Release --project src/RailReader2
+
+# Run tests
+dotnet test tests/RailReader.Core.Tests
+
+# Run the AI agent CLI
+dotnet run --project src/RailReader.Agent -- "Open test.pdf and tell me how many pages it has"
 
 # Publish self-contained release (Linux)
 dotnet publish src/RailReader2 -c Release -r linux-x64 --self-contained
@@ -30,66 +36,82 @@ dotnet publish src/RailReader2 -c Release -r win-x64 --self-contained
 
 ## Architecture
 
+The codebase is split into four projects:
+
+```
+RailReader2.slnx
+├── src/RailReader.Core/        # UI-free library: all business logic, models, services
+├── src/RailReader2/            # Thin Avalonia UI shell (references Core)
+├── src/RailReader.Agent/       # AI agent CLI via Microsoft.Extensions.AI (references Core)
+└── tests/RailReader.Core.Tests/# xUnit headless tests against Core
+```
+
+### RailReader.Core (UI-free library)
+
+All business logic lives here with zero Avalonia dependencies. SkiaSharp is used for rendering (it's a graphics library, not a UI framework).
+
+```
+src/RailReader.Core/
+├── RailReader.Core.csproj      # PDFtoImage, OnnxRuntime, SkiaSharp (no Avalonia)
+├── IThreadMarshaller.cs        # Abstraction for UI thread posting
+├── DocumentState.cs            # Per-document state (PDF, camera, rail nav, analysis cache)
+├── DocumentController.cs       # Headless controller facade (all orchestration logic)
+├── Models/                     # Data models (13 files: Annotations, Camera, LayoutBlock, etc.)
+├── Services/                   # Business services (12 files + AnnotationRenderer)
+│   ├── AnalysisWorker.cs       # Background thread for ONNX inference (Channel<T> queues)
+│   ├── AnnotationExportService.cs # Export PDF with annotations rendered into pages
+│   ├── AnnotationRenderer.cs   # Pure SkiaSharp annotation drawing and hit-testing
+│   ├── AnnotationService.cs    # Annotation persistence (JSON sidecar files)
+│   ├── AppConfig.cs            # Config persistence (~/.config/railreader2/config.json)
+│   ├── PdfService.cs           # PDF access (page rendering, DPI scaling, page info)
+│   ├── PdfTextService.cs       # Text extraction with per-character bounding boxes
+│   ├── RailNav.cs              # Rail navigation state machine (snap, scroll, clamp)
+│   └── ...                     # CleanupService, ColourEffectShaders, LayoutAnalyzer, etc.
+└── Commands/
+    └── Results.cs              # Typed result records for agent/headless consumption
+```
+
+### RailReader2 (Avalonia UI shell)
+
+Thin wrapper that delegates all logic to `DocumentController` and `DocumentState` in Core.
+
 ```
 src/RailReader2/
 ├── Program.cs                  # Avalonia entry point
 ├── App.axaml / App.axaml.cs    # App bootstrap (config load, cleanup, MainWindow creation)
-├── RailReader2.csproj          # Project file (dependencies, target framework)
-├── app.manifest                # Windows application manifest
-├── Models/
-│   ├── Annotations.cs          # Annotation data model (Highlight, Freehand, Rect, TextNote, persistence)
-│   ├── AnnotationTool.cs       # AnnotationTool enum (None, TextSelect, Highlight, Pen, TextNote, Rectangle, Eraser)
-│   ├── BBox.cs                 # Bounding box (X, Y, W, H) in page-point coordinates
-│   ├── Camera.cs               # Viewport state (OffsetX, OffsetY, Zoom)
-│   ├── ColourEffect.cs         # ColourEffect enum, OverlayPalette, display names
-│   ├── LayoutBlock.cs          # Detected layout region (BBox, ClassId, Confidence, Order, Lines)
-│   ├── LineInfo.cs             # Text line within a block (Y center, Height)
-│   ├── NavResult.cs            # Navigation result enum (Ok, PageBoundaryNext/Prev)
-│   ├── OutlineEntry.cs         # PDF bookmark tree node
-│   ├── PageAnalysis.cs         # Full analysis for one page (blocks, dimensions)
-│   ├── PageText.cs             # Extracted page text with per-character bounding boxes
-│   ├── RecentFileEntry.cs      # Recent file with saved reading position (page, zoom, offset)
-│   └── SearchMatch.cs          # Search hit (page, char index, length, visual rects)
-├── Services/
-│   ├── AnalysisWorker.cs       # Background thread for ONNX inference (Channel<T> queues)
-│   ├── AnnotationExportService.cs # Export PDF with annotations rendered into pages
-│   ├── AnnotationService.cs    # Annotation persistence (JSON sidecar files) and rendering
-│   ├── AppConfig.cs            # Config persistence (~/.config/railreader2/config.json)
-│   ├── CleanupService.cs       # Disk cleanup (cache, temp files, old logs)
-│   ├── ColourEffectShaders.cs  # SkSL GPU shaders for accessibility colour effects
-│   ├── LayoutAnalyzer.cs       # ONNX inference, NMS, reading order, line detection
-│   ├── LayoutConstants.cs      # Class labels, input tensor size, thresholds
-│   ├── PdfOutlineExtractor.cs  # PDFium P/Invoke for bookmark extraction
-│   ├── PdfService.cs           # PDF access (page rendering, DPI scaling, page info)
-│   ├── PdfTextService.cs       # Text extraction with per-character bounding boxes (PDFium P/Invoke)
-│   └── RailNav.cs              # Rail navigation state machine (snap, scroll, clamp)
+├── AvaloniaThreadMarshaller.cs # IThreadMarshaller → Dispatcher.UIThread.Post()
 ├── ViewModels/
-│   ├── MainWindowViewModel.cs  # Central orchestrator (tabs, worker, animation loop, input)
-│   └── TabViewModel.cs         # Per-document state (PDF, camera, rail nav, analysis cache)
+│   ├── MainWindowViewModel.cs  # Thin wrapper: delegates to DocumentController, handles UI-only concerns
+│   └── TabViewModel.cs         # Thin wrapper: surfaces [ObservableProperty] for DocumentState binding
 ├── Controls/
 │   └── RadialMenu.cs           # Radial context menu for annotation tools (Skia custom draw)
-└── Views/
-    ├── MainWindow.axaml/.cs    # Window with compositor camera transforms, keyboard handling
-    ├── ViewportPanel.cs        # Custom panel for zoom/pan/click input handling
-    ├── PdfPageLayer.cs         # Custom draw: renders PDF bitmap via ICustomDrawOperation
-    ├── RailOverlayLayer.cs     # Custom draw: rail mode dim/highlight/debug overlays
-    ├── AnnotationLayer.cs      # Custom draw: renders annotations and text selection
-    ├── SearchHighlightLayer.cs # Custom draw: search match highlighting
-    ├── SearchBarView.axaml/.cs # Search bar overlay (Ctrl+F) with regex/case toggles
-    ├── ToolBarView.axaml/.cs   # Browse/Text Select/Copy toolbar overlay
-    ├── MinimapControl.axaml/.cs    # Interactive minimap overlay
-    ├── OutlinePanel.axaml/.cs      # TOC/bookmark side panel
-    ├── TabBarView.axaml/.cs        # Custom tab bar with close buttons
-    ├── MenuBarView.axaml/.cs       # File/View/Navigation/Help menus
-    ├── StatusBarView.axaml/.cs     # Page number, zoom level, rail/annotation mode status
-    ├── SettingsWindow.axaml/.cs    # Live-editable settings panel
-    ├── ShortcutsDialog.axaml/.cs   # Keyboard shortcuts help dialog (F1)
-    ├── AboutDialog.axaml/.cs       # Version info and credits
-    ├── TextNoteDialog.axaml/.cs    # Modal text input dialog for creating/editing TextNote annotations
-    ├── RailToolBar.axaml/.cs       # Rail mode speed/blur/auto-scroll sliders (right edge)
-    ├── GoToPageDialog.axaml/.cs    # Modal go-to-page dialog (Ctrl+G)
-    ├── LoadingOverlay.axaml/.cs    # Loading spinner overlay
-    └── SplashWindow.axaml/.cs      # Startup splash screen
+└── Views/                      # All Avalonia views (MainWindow, layers, dialogs, panels)
+```
+
+### RailReader.Agent (AI agent CLI)
+
+```
+src/RailReader.Agent/
+├── RailReader.Agent.csproj     # Microsoft.Extensions.AI, references Core
+├── Program.cs                  # CLI entry point with agent loop
+└── RailReaderTools.cs          # [Description]-annotated tool methods wrapping DocumentController
+```
+
+### Tests
+
+```
+tests/RailReader.Core.Tests/
+├── RailReader.Core.Tests.csproj
+├── TestFixtures.cs             # Generates test PDFs via SkiaSharp
+├── DocumentControllerTests.cs  # Open/close/navigate/fit tests
+├── CameraTests.cs              # Zoom, pan, clamp, center tests
+├── AnnotationTests.cs          # Add/remove/undo/redo/hit-test tests
+└── AppConfigTests.cs           # Load/save round-trip tests
+```
+
+### Supporting files
+
+```
 installer/
 ├── railreader2.iss             # Inno Setup script for Windows installer
 ├── icon.ico                    # Generated from PNG at CI time (gitignored)
@@ -110,13 +132,16 @@ scripts/
 - **Fit Width**: `TabViewModel.FitWidth()` sets zoom so the page fills the viewport horizontally (top-aligned if taller than viewport). Accessible via View → Fit Width menu. Complements the existing `CenterPage()` (fit-page) which fits both dimensions.
 - **Analysis caching**: Per-tab `Dictionary<int, PageAnalysis> AnalysisCache` avoids re-running ONNX inference on revisited pages. Lookahead analysis pre-processes upcoming pages when the worker is idle.
 - **Minimap**: Draws from `TabViewModel.MinimapBitmap` — a small thumbnail (≤200×280 px) rendered once per page change via `PdfService.RenderThumbnail()`. This avoids downsampling the full 600 DPI bitmap (~35 MP) on every animation frame.
+- **Headless controller**: `DocumentController` is the central facade in Core. It owns the document list, analysis worker, viewport size, search state, annotation tool state, and animation tick loop. The UI's `MainWindowViewModel` is a thin wrapper that delegates all logic to the controller and handles only Avalonia-specific concerns (file dialogs, animation frame scheduling, clipboard, invalidation callbacks). `DocumentState` (Core) holds per-document state; `TabViewModel` (UI) is a thin `[ObservableProperty]` wrapper for data binding.
+- **IThreadMarshaller**: Abstracts UI thread posting. `AvaloniaThreadMarshaller` wraps `Dispatcher.UIThread.Post()`; `SynchronousThreadMarshaller` (in Core) executes inline for tests and agent CLI.
+- **TickResult**: `DocumentController.Tick(dt)` returns a `TickResult` record struct indicating what changed (camera, page, overlay, search, annotations, still animating). The UI maps this to granular invalidations.
 - **MVVM**: CommunityToolkit.Mvvm source generators (`[ObservableProperty]`, `[RelayCommand]`). Performance-sensitive paths (camera transforms, canvas invalidation) use direct method calls and `InvalidationCallbacks` for granular repaint targeting rather than pure data binding.
 - **Colour effects**: Four SkSL shaders compiled at startup via `SKRuntimeEffect.CreateColorFilter()` — HighContrast (luminance inversion + S-curve), HighVisibility (yellow-on-black), Amber (warm tint), Invert. Applied via `canvas.SaveLayer(paint)` around page drawing. Each effect has a matching `OverlayPalette` for rail overlay colours.
 - **Compositor camera**: `MainWindow.UpdateCameraTransform()` applies a `MatrixTransform` to `CameraPanel` for GPU-compositor-level pan/zoom — bitmap doesn't repaint on every frame, only on DPI changes. `GetWindowSize()` returns the actual viewport bounds (fed by `Viewport.SizeChanged`), not the full window `ClientSize`, so `CenterPage` positions correctly.
 - **Motion blur**: Subtle directional blur during rail horizontal scroll (horizontal-only) and zoom (uniform). Uses a cubic speed curve (`speed^3 * maxSigma * intensity`) so blur stays barely perceptible at low/medium speeds. Configurable via `motion_blur` (toggle) and `motion_blur_intensity` (0.0–1.0) in config/Settings. `Camera.ZoomSpeed` tracks zoom velocity with exponential decay (~80ms half-life); `RailNav.ScrollSpeed` is the normalized instantaneous scroll speed. Applied via `SKImageFilter.CreateBlur` in `PdfPageLayer`. The blur filter and layer `SKPaint` are cached per render thread (`[ThreadStatic]`) and only recreated when sigma values change, avoiding per-frame allocation and GC pressure during animation.
 - **Splash screen**: `SplashWindow` shows on startup while config loads and ONNX worker initializes. Heavy initialization (config, cleanup, ONNX) is deferred via `Dispatcher.UIThread.Post()` at `Background` priority with an extra yield, so the splash actually paints before blocking work begins (fixes splash not displaying on Linux/X11). Closed when the main window opens. Status bar shows "Analyzing..." while ONNX inference is in progress for the current page (`PendingRailSetup`).
 - **Startup sequencing**: `window.Opened` can fire before `MainWindow.OnLoaded` finishes wiring `_invalidation`. `OnLoaded` guards against this by re-centering and forcing a camera update if a tab is already present. `PdfPageLayer.Render` uses tab page dimensions for the draw-op bounds (not `Bounds.Width/Height`) so the compositor does not cull the draw operation before the first layout pass completes.
-- **Multi-tab**: `TabViewModel` holds per-document state (PDF, camera, rail nav, analysis cache, outline, cached bitmap, minimap thumbnail). `MainWindowViewModel` owns the tab collection and shared resources (ONNX session, config, shaders).
+- **Multi-tab**: `DocumentState` (Core) holds per-document state (PDF, camera, rail nav, analysis cache, outline, cached bitmap, minimap thumbnail). `DocumentController` (Core) owns the document list and shared resources (ONNX session, config, shaders). `TabViewModel` (UI) is a thin binding wrapper around `DocumentState`.
 - **Search**: Full-text search across all pages with regex and case-sensitivity support. `PdfTextService` extracts text with per-character bounding boxes via PDFium P/Invoke. Matches are highlighted via `SearchHighlightLayer` with the active match emphasized. Search bar overlay (Ctrl+F) with match count and prev/next navigation.
 - **Annotations**: Five annotation tools (Highlight, Pen, Rectangle, TextNote, Eraser) accessible via right-click radial menu. Annotations are persisted as JSON sidecar files (`<pdf>.annotations.json`) via `AnnotationService`. Undo/redo stack per tab. Export to PDF via `AnnotationExportService` which renders annotations into page bitmaps. TextNote placement shows a `TextNoteDialog` for user input; clicking an existing TextNote in TextNote mode opens the dialog pre-filled for editing.
 - **Text selection**: Browse/Text Select/Copy toolbar (top-left overlay, `ToolBarView`) provides mode switching. Text select mode uses character-level hit testing from `PdfTextService` to build selection rectangles. Selected text is rendered via `AnnotationLayer` and copied to clipboard via Ctrl+C.
@@ -137,11 +162,18 @@ scripts/
 
 ### Dependencies
 
-- `Avalonia` 11.* — cross-platform UI framework (Desktop, Fluent theme, Inter font)
-- `CommunityToolkit.Mvvm` 8.* — MVVM source generators
+**RailReader.Core** (no Avalonia):
 - `PDFtoImage` 5.* — PDF rasterisation via PDFium
 - `Microsoft.ML.OnnxRuntime` 1.* — ONNX Runtime for layout inference
 - `SkiaSharp` 3.* — GPU-accelerated 2D drawing (overrides Avalonia's bundled 2.88 for `SKRuntimeEffect.CreateColorFilter`)
+
+**RailReader2** (UI shell):
+- `Avalonia` 11.* — cross-platform UI framework (Desktop, Fluent theme, Inter font)
+- `CommunityToolkit.Mvvm` 8.* — MVVM source generators
+
+**RailReader.Agent** (AI agent CLI):
+- `Microsoft.Extensions.AI` 10.* — AI abstraction layer with function calling
+- `Microsoft.Extensions.AI.OpenAI` 10.* — OpenAI-compatible chat client
 
 ## Configuration
 
@@ -193,7 +225,7 @@ The `navigable_classes` array controls which PP-DocLayoutV3 block types are navi
 - **Cleanup**: `CleanupService.RunCleanup()` runs on startup and on-demand via Help menu. Removes `cache/` contents, `.tmp` files, and `.log` files older than 7 days. Skips `config.json`, `.lock`, and `.onnx` files.
 - **PdfOutlineExtractor** uses direct PDFium P/Invoke (`FPDF_*` / `FPDFBookmark_*`) since `PDFtoImage` doesn't expose the bookmark API.
 - SkiaSharp 3.x is explicitly referenced to override Avalonia 11's bundled SkiaSharp 2.88 — required for `SKRuntimeEffect.CreateColorFilter()` used by colour effect shaders.
-- No unit tests currently exist in the project.
+- **Unit tests**: 21 xUnit tests in `tests/RailReader.Core.Tests/` covering DocumentController, Camera, Annotations, and AppConfig. Run via `dotnet test tests/RailReader.Core.Tests`.
 - **Outdated documentation**: TODO.md and DISTRIBUTION.md reference Rust implementation (cargo, rail.rs, config.rs). These are legacy files from a previous Rust version and should be disregarded; the current implementation is C#/.NET.
 
 ## Debugging & Development
@@ -279,14 +311,14 @@ The `LayoutAnalyzer.InferenceAsync()` method in `Services/LayoutAnalyzer.cs` per
 
 ### Safe Cross-Thread Communication
 
-- **Model → UI**: `AnalysisWorker` pushes completed `PageAnalysis` results to `TabViewModel._analysisCache` (a `Dictionary`). This dictionary is accessed only from the UI thread during animation frame polls, avoiding lock contention.
-- **UI → Model**: `MainWindowViewModel.SubmitAnalysisTask()` queues analysis requests on the channel. The channel itself is thread-safe; the marshalling back to the UI thread for dictionary writes is handled inside the worker.
+- **Model → UI**: `AnalysisWorker` pushes completed `PageAnalysis` results to `DocumentState.AnalysisCache` (a `Dictionary`). This dictionary is accessed only from the UI thread during animation frame polls, avoiding lock contention.
+- **UI → Model**: `DocumentController` queues analysis requests on the channel. The channel itself is thread-safe; the marshalling back to the UI thread for dictionary writes is handled inside the worker via `IThreadMarshaller`.
 - **PDFium**: `PdfService` holds a single `PdfDocument` instance per tab. PDFium is not thread-safe for concurrent page access, so all rendering calls must be from the UI thread (they are).
 
 ### Avoid Common Pitfalls
 
 - Do not call `PdfService` methods from background threads — PDFium will crash.
-- Do not modify `TabViewModel` properties from the analysis worker — use the `_analysisCache` dictionary or `ObservableProperty` setters only from the UI thread.
+- Do not modify `DocumentState` properties from the analysis worker — use the `AnalysisCache` dictionary or property setters only from the UI thread (via `IThreadMarshaller`).
 - `InvalidationCallback` delegates execute on the UI thread, so they are safe for property updates.
 
 ## Performance Tuning
@@ -302,12 +334,12 @@ If you need to adjust these constants, see `PdfService.RenderPageAsync()` in `Se
 
 ### ONNX Model Cache Efficiency
 
-- **Per-tab analysis cache**: `TabViewModel.AnalysisCache` is a `Dictionary<int, PageAnalysis>` that persists across navigation. Revisiting a previously analyzed page returns the cached result instantly (no re-inference).
+- **Per-tab analysis cache**: `DocumentState.AnalysisCache` is a `Dictionary<int, PageAnalysis>` that persists across navigation. Revisiting a previously analyzed page returns the cached result instantly (no re-inference).
 - **Lookahead pre-analysis**: When the analysis worker is idle, it analyzes upcoming pages (controlled by `config.analysis_lookahead_pages`, default 2). Disable lookahead (set to 0) if you need to reduce CPU usage or VRAM pressure on slower machines.
 
 ### Minimap Rendering
 
-The minimap draws from `TabViewModel.MinimapBitmap`, a small thumbnail (≤200×280 px) rendered once per page change. This avoids downsampling the full 600 DPI bitmap every frame. If the minimap feels sluggish, the bottleneck is typically `PdfService.RenderThumbnail()` on a slow PDF or large file.
+The minimap draws from `DocumentState.MinimapBitmap`, a small thumbnail (≤200×280 px) rendered once per page change. This avoids downsampling the full 600 DPI bitmap every frame. If the minimap feels sluggish, the bottleneck is typically `PdfService.RenderThumbnail()` on a slow PDF or large file.
 
 ### GPU Colour Effect Shaders
 
@@ -435,7 +467,7 @@ The installer provides:
 
 ### Model loading at runtime
 
-`FindModelPath()` in `MainWindowViewModel` searches these locations in order:
+`FindModelPath()` in `DocumentController` searches these locations in order:
 1. `AppContext.BaseDirectory/models/` — works for Windows installer (model installed alongside exe) and bare `dotnet publish` output
 2. `$APPDIR/models/` — works for Linux AppImage (model at AppImage root)
 3. `LocalApplicationData/railreader2/models/` — user data directory

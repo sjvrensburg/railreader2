@@ -2,7 +2,7 @@ using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
-using RailReader2.Services;
+using RailReader.Core.Services;
 using RailReader2.ViewModels;
 using RailReader2.Views;
 

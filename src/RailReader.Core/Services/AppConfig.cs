@@ -1,0 +1,202 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using RailReader.Core.Models;
+
+namespace RailReader.Core.Services;
+
+public sealed class AppConfig
+{
+    public double RailZoomThreshold { get; set; } = 3.0;
+    public double SnapDurationMs { get; set; } = 300.0;
+    public double ScrollSpeedStart { get; set; } = 10.0;
+    public double ScrollSpeedMax { get; set; } = 30.0;
+    public double ScrollRampTime { get; set; } = 1.5;
+    public int AnalysisLookaheadPages { get; set; } = 2;
+    public float UiFontScale { get; set; } = 1.25f;
+    public ColourEffect ColourEffect { get; set; } = ColourEffect.None;
+    public double ColourEffectIntensity { get; set; } = 1.0;
+    public bool MotionBlur { get; set; } = true;
+    public double MotionBlurIntensity { get; set; } = 0.33;
+    public bool PixelSnapping { get; set; } = true;
+    public bool LineFocusBlur { get; set; } = false;
+    public double LineFocusBlurIntensity { get; set; } = 0.5;
+    public double AutoScrollLinePauseMs { get; set; } = 400.0;
+    public double AutoScrollBlockPauseMs { get; set; } = 600.0;
+    public double JumpPercentage { get; set; } = 25.0;
+
+    [JsonConverter(typeof(RecentFilesConverter))]
+    public List<RecentFileEntry> RecentFiles { get; set; } = [];
+
+    [JsonConverter(typeof(NavigableClassesConverter))]
+    public HashSet<int> NavigableClasses { get; set; } = LayoutConstants.DefaultNavigableClasses();
+
+    private static readonly JsonSerializerOptions s_options = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
+        WriteIndented = true,
+        Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) },
+    };
+
+    public static string ConfigDir
+    {
+        get
+        {
+            var baseDir = OperatingSystem.IsWindows()
+                ? Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData)
+                : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".config");
+            var dir = Path.Combine(baseDir, "railreader2");
+            Directory.CreateDirectory(dir);
+            return dir;
+        }
+    }
+
+    public static string ConfigPath => Path.Combine(ConfigDir, "config.json");
+
+    public static AppConfig Load()
+    {
+        try
+        {
+            if (File.Exists(ConfigPath))
+            {
+                var json = File.ReadAllText(ConfigPath);
+                return JsonSerializer.Deserialize<AppConfig>(json, s_options) ?? new AppConfig();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Failed to load config: {ex.Message}");
+        }
+
+        var config = new AppConfig();
+        config.Save();
+        return config;
+    }
+
+    public void AddRecentFile(string filePath)
+    {
+        var idx = RecentFiles.FindIndex(e => e.FilePath == filePath);
+        RecentFileEntry entry;
+        if (idx >= 0)
+        {
+            entry = RecentFiles[idx];
+            RecentFiles.RemoveAt(idx);
+        }
+        else
+        {
+            entry = new RecentFileEntry { FilePath = filePath };
+        }
+        RecentFiles.Insert(0, entry);
+        if (RecentFiles.Count > 10)
+            RecentFiles.RemoveRange(10, RecentFiles.Count - 10);
+        Save();
+    }
+
+    public void SaveReadingPosition(string filePath, int page, double zoom, double offsetX, double offsetY)
+    {
+        AddRecentFile(filePath); // ensures entry exists at index 0
+        var entry = RecentFiles[0];
+        entry.Page = page;
+        entry.Zoom = zoom;
+        entry.OffsetX = offsetX;
+        entry.OffsetY = offsetY;
+        Save();
+    }
+
+    public RecentFileEntry? GetReadingPosition(string filePath)
+    {
+        return RecentFiles.Find(e => e.FilePath == filePath);
+    }
+
+    public void Save()
+    {
+        try
+        {
+            var json = JsonSerializer.Serialize(this, s_options);
+            File.WriteAllText(ConfigPath, json);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Failed to save config: {ex.Message}");
+        }
+    }
+}
+
+/// <summary>
+/// Handles backward compatibility: deserializes both old-format string arrays
+/// and new-format object arrays into List&lt;RecentFileEntry&gt;.
+/// </summary>
+internal sealed class RecentFilesConverter : JsonConverter<List<RecentFileEntry>>
+{
+    private static readonly JsonSerializerOptions s_entryOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
+    };
+
+    public override List<RecentFileEntry>? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        var result = new List<RecentFileEntry>();
+        if (reader.TokenType != JsonTokenType.StartArray) return result;
+
+        while (reader.Read())
+        {
+            if (reader.TokenType == JsonTokenType.EndArray) break;
+
+            if (reader.TokenType == JsonTokenType.String)
+            {
+                // Old format: plain string path
+                var path = reader.GetString();
+                if (path is not null)
+                    result.Add(new RecentFileEntry { FilePath = path });
+            }
+            else if (reader.TokenType == JsonTokenType.StartObject)
+            {
+                // New format: object with file_path, page, zoom, etc.
+                var entry = JsonSerializer.Deserialize<RecentFileEntry>(ref reader, s_entryOptions);
+                if (entry is not null)
+                    result.Add(entry);
+            }
+        }
+        return result;
+    }
+
+    public override void Write(Utf8JsonWriter writer, List<RecentFileEntry> value, JsonSerializerOptions options)
+    {
+        writer.WriteStartArray();
+        foreach (var entry in value)
+            JsonSerializer.Serialize(writer, entry, s_entryOptions);
+        writer.WriteEndArray();
+    }
+}
+
+internal sealed class NavigableClassesConverter : JsonConverter<HashSet<int>>
+{
+    public override HashSet<int>? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        var result = new HashSet<int>();
+        if (reader.TokenType != JsonTokenType.StartArray) return result;
+
+        while (reader.Read())
+        {
+            if (reader.TokenType == JsonTokenType.EndArray) break;
+            if (reader.TokenType == JsonTokenType.String)
+            {
+                var name = reader.GetString();
+                if (name is not null && LayoutConstants.ClassNameToIndex(name) is { } idx)
+                    result.Add(idx);
+            }
+        }
+        return result;
+    }
+
+    public override void Write(Utf8JsonWriter writer, HashSet<int> value, JsonSerializerOptions options)
+    {
+        var names = value
+            .Where(id => id >= 0 && id < LayoutConstants.LayoutClasses.Length)
+            .Select(id => LayoutConstants.LayoutClasses[id])
+            .OrderBy(n => n);
+        writer.WriteStartArray();
+        foreach (var name in names)
+            writer.WriteStringValue(name);
+        writer.WriteEndArray();
+    }
+}

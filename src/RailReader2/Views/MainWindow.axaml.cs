@@ -3,7 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
 using RailReader2.Controls;
-using RailReader2.Models;
+using RailReader.Core.Models;
 using RailReader2.ViewModels;
 
 namespace RailReader2.Views;
@@ -363,15 +363,15 @@ public partial class MainWindow : Window
             case Key.F3:
                 vm.NextMatch(); e.Handled = true; break;
             case Key.D1 when !searchFocused:
-                vm.SetAnnotationTool(Models.AnnotationTool.Highlight); e.Handled = true; break;
+                vm.SetAnnotationTool(AnnotationTool.Highlight); e.Handled = true; break;
             case Key.D2 when !searchFocused:
-                vm.SetAnnotationTool(Models.AnnotationTool.Pen); e.Handled = true; break;
+                vm.SetAnnotationTool(AnnotationTool.Pen); e.Handled = true; break;
             case Key.D3 when !searchFocused:
-                vm.SetAnnotationTool(Models.AnnotationTool.Rectangle); e.Handled = true; break;
+                vm.SetAnnotationTool(AnnotationTool.Rectangle); e.Handled = true; break;
             case Key.D4 when !searchFocused:
-                vm.SetAnnotationTool(Models.AnnotationTool.TextNote); e.Handled = true; break;
+                vm.SetAnnotationTool(AnnotationTool.TextNote); e.Handled = true; break;
             case Key.D5 when !searchFocused:
-                vm.SetAnnotationTool(Models.AnnotationTool.Eraser); e.Handled = true; break;
+                vm.SetAnnotationTool(AnnotationTool.Eraser); e.Handled = true; break;
             case Key.F11:
                 vm.IsFullScreen = !vm.IsFullScreen; e.Handled = true; break;
             case Key.Escape when vm.AutoScrollActive:

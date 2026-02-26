@@ -1,7 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Media;
-using RailReader2.Models;
+using RailReader.Core.Models;
 using RailReader2.ViewModels;
 
 namespace RailReader2.Views;

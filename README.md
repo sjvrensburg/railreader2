@@ -171,6 +171,21 @@ Rail reading parameters are editable via the Settings panel (gear icon in menu b
 | `jump_percentage` | Jump distance as percentage of visible width (5–80%) |
 | `navigable_classes` | Which block types rail mode navigates (array of class names). Configurable via Settings → Advanced. |
 
+## Architecture
+
+The codebase is split into a UI-free core library, a thin Avalonia UI shell, an AI agent CLI, and headless tests:
+
+```
+src/RailReader.Core/          # All business logic (zero Avalonia dependencies)
+src/RailReader2/              # Thin Avalonia UI shell
+src/RailReader.Agent/         # AI agent CLI (Microsoft.Extensions.AI)
+tests/RailReader.Core.Tests/  # xUnit headless tests
+```
+
+**RailReader.Core** contains `DocumentController` (the headless orchestration facade), `DocumentState` (per-document state), all Models and Services. It can be driven programmatically without any UI — the agent CLI and test project both use it directly.
+
+**RailReader.Agent** exposes RailReader's capabilities as AI tool functions via `Microsoft.Extensions.AI`. It can open PDFs, navigate, extract text, search, annotate, and export — all driven by an LLM agent loop. Configure via environment variables (`OPENAI_API_KEY`, `RAILREADER_MODEL`, `RAILREADER_BASE_URL`).
+
 ## Building
 
 ### Dependencies
@@ -191,7 +206,24 @@ The model is placed in `models/PP-DocLayoutV3.onnx`. Without it, a simple fallba
 ### Build
 
 ```bash
-dotnet build src/RailReader2
+dotnet build RailReader2.slnx
+```
+
+### Test
+
+```bash
+dotnet test tests/RailReader.Core.Tests
+```
+
+### Run the AI agent
+
+```bash
+# Set your API key and optional model/base URL
+export OPENAI_API_KEY="your-key"
+export RAILREADER_MODEL="gpt-4o"           # optional, default gpt-4o
+export RAILREADER_BASE_URL="https://..."   # optional, for OpenAI-compatible APIs
+
+dotnet run --project src/RailReader.Agent -- "Open paper.pdf and summarise page 1"
 ```
 
 ### Publish self-contained
