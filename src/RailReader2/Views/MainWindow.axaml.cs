@@ -187,7 +187,14 @@ public partial class MainWindow : Window
 
         // Persist config when toolbar hides (deferred save for slider changes)
         if (wasVisible && !shouldShow)
+        {
             Vm?.Config.Save();
+            RailToolBar.SetJumpMode(false);
+        }
+        else if (shouldShow && Vm is { } v)
+        {
+            RailToolBar.SetJumpMode(v.JumpMode);
+        }
     }
 
     private void UpdateCameraTransform()
@@ -298,7 +305,9 @@ public partial class MainWindow : Window
             case Key.P when !searchFocused:
                 vm.ToggleAutoScroll(); e.Handled = true; break;
             case Key.J when !searchFocused:
-                vm.JumpMode = !vm.JumpMode; e.Handled = true; break;
+                vm.JumpMode = !vm.JumpMode;
+                RailToolBar.SetJumpMode(vm.JumpMode);
+                e.Handled = true; break;
             case Key.OemOpenBrackets when !searchFocused && e.KeyModifiers.HasFlag(KeyModifiers.Shift):
                 RailToolBar.AdjustBlur(-0.05); e.Handled = true; break;
             case Key.OemCloseBrackets when !searchFocused && e.KeyModifiers.HasFlag(KeyModifiers.Shift):
