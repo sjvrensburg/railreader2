@@ -32,6 +32,7 @@ public sealed class RailNav
     private bool _autoScrollBoost;   // true while user holds D/Right during auto-scroll
     private Stopwatch? _autoScrollPauseTimer;
     private double _autoScrollPauseDurationMs;
+    private bool _autoScrollPauseAdvances; // true = end-of-line pause that triggers advance
 
     public RailNav(AppConfig config) => _config = config;
 
@@ -409,12 +410,14 @@ public sealed class RailNav
         _autoScrollPauseTimer = null;
     }
 
-    /// <summary>Inject a pause into auto-scroll (e.g. after advancing to a new line).</summary>
+    /// <summary>Inject a settling pause into auto-scroll (e.g. after advancing to a new line).
+    /// Unlike the end-of-line pause, this does not trigger another line advance when it expires.</summary>
     public void PauseAutoScroll(double durationMs)
     {
         if (!AutoScrolling || durationMs <= 0) return;
         _autoScrollPauseTimer = Stopwatch.StartNew();
         _autoScrollPauseDurationMs = durationMs;
+        _autoScrollPauseAdvances = false;
     }
 
     /// <summary>Set/clear the boost flag (user holding D/Right during auto-scroll).</summary>
@@ -433,8 +436,9 @@ public sealed class RailNav
         {
             if (_autoScrollPauseTimer.Elapsed.TotalMilliseconds >= _autoScrollPauseDurationMs)
             {
+                bool advance = _autoScrollPauseAdvances;
                 _autoScrollPauseTimer = null;
-                return true; // pause expired, signal line advance
+                return advance;
             }
             return false; // still pausing
         }
@@ -459,6 +463,7 @@ public sealed class RailNav
             {
                 _autoScrollPauseTimer = Stopwatch.StartNew();
                 _autoScrollPauseDurationMs = pauseMs;
+                _autoScrollPauseAdvances = true;
                 return false; // start pause
             }
             return true; // no pause, advance immediately
