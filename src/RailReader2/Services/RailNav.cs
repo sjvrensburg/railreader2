@@ -33,6 +33,7 @@ public sealed class RailNav
     private Stopwatch? _autoScrollPauseTimer;
     private double _autoScrollPauseDurationMs;
     private bool _autoScrollPauseAdvances; // true = end-of-line pause that triggers advance
+    private double _autoScrollPendingPauseMs; // deferred pause that starts after snap completes
 
     public RailNav(AppConfig config) => _config = config;
 
@@ -398,6 +399,7 @@ public sealed class RailNav
         _autoScrollSpeed = speed;
         _autoScrollBoost = false;
         _autoScrollPauseTimer = null;
+        _autoScrollPendingPauseMs = 0;
         // Stop any manual scroll
         StopScroll();
     }
@@ -408,16 +410,16 @@ public sealed class RailNav
         _autoScrollSpeed = 0;
         _autoScrollBoost = false;
         _autoScrollPauseTimer = null;
+        _autoScrollPendingPauseMs = 0;
     }
 
     /// <summary>Inject a settling pause into auto-scroll (e.g. after advancing to a new line).
-    /// Unlike the end-of-line pause, this does not trigger another line advance when it expires.</summary>
+    /// The pause is deferred until any snap animation completes, so the full duration
+    /// is perceived as stillness after the camera reaches its target.</summary>
     public void PauseAutoScroll(double durationMs)
     {
         if (!AutoScrolling || durationMs <= 0) return;
-        _autoScrollPauseTimer = Stopwatch.StartNew();
-        _autoScrollPauseDurationMs = durationMs;
-        _autoScrollPauseAdvances = false;
+        _autoScrollPendingPauseMs = durationMs;
     }
 
     /// <summary>Set/clear the boost flag (user holding D/Right during auto-scroll).</summary>
@@ -431,7 +433,16 @@ public sealed class RailNav
     {
         if (!AutoScrolling || _navigableIndices.Count == 0) return false;
 
-        // End-of-line pause: hold position, count down
+        // Activate deferred pause once the snap animation has finished
+        if (_autoScrollPendingPauseMs > 0 && _snap is null)
+        {
+            _autoScrollPauseTimer = Stopwatch.StartNew();
+            _autoScrollPauseDurationMs = _autoScrollPendingPauseMs;
+            _autoScrollPauseAdvances = false;
+            _autoScrollPendingPauseMs = 0;
+        }
+
+        // Pause: hold position, count down
         if (_autoScrollPauseTimer is not null)
         {
             if (_autoScrollPauseTimer.Elapsed.TotalMilliseconds >= _autoScrollPauseDurationMs)

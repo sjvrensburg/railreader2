@@ -369,6 +369,8 @@ public partial class MainWindow : Window
                 vm.SetAnnotationTool(Models.AnnotationTool.Eraser); e.Handled = true; break;
             case Key.F11:
                 vm.IsFullScreen = !vm.IsFullScreen; e.Handled = true; break;
+            case Key.Escape when vm.AutoScrollActive:
+                vm.StopAutoScroll(); e.Handled = true; break;
             case Key.Escape when vm.IsFullScreen:
                 vm.IsFullScreen = false; e.Handled = true; break;
             case Key.Escape when vm.IsRadialMenuOpen:
