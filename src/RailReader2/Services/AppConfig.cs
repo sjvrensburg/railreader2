@@ -17,6 +17,12 @@ public sealed class AppConfig
     public double ColourEffectIntensity { get; set; } = 1.0;
     public bool MotionBlur { get; set; } = true;
     public double MotionBlurIntensity { get; set; } = 0.33;
+    public bool PixelSnapping { get; set; } = true;
+    public bool LineFocusBlur { get; set; } = false;
+    public double LineFocusBlurIntensity { get; set; } = 0.5;
+    public double AutoScrollLinePauseMs { get; set; } = 400.0;
+    public double AutoScrollBlockPauseMs { get; set; } = 600.0;
+    public double JumpPercentage { get; set; } = 25.0;
 
     [JsonConverter(typeof(RecentFilesConverter))]
     public List<RecentFileEntry> RecentFiles { get; set; } = [];

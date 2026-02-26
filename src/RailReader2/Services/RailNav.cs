@@ -30,6 +30,10 @@ public sealed class RailNav
     public bool AutoScrolling { get; private set; }
     private double _autoScrollSpeed; // pixels/sec in page coordinates
     private bool _autoScrollBoost;   // true while user holds D/Right during auto-scroll
+    private Stopwatch? _autoScrollPauseTimer;
+    private double _autoScrollPauseDurationMs;
+    private bool _autoScrollPauseAdvances; // true = end-of-line pause that triggers advance
+    private double _autoScrollPendingPauseMs; // deferred pause that starts after snap completes
 
     public RailNav(AppConfig config) => _config = config;
 
@@ -172,6 +176,32 @@ public sealed class RailNav
         ScrollSpeed = 0.0;
     }
 
+    /// <summary>
+    /// Saccade-style jump: moves camera forward/backward by a percentage of visible width.
+    /// </summary>
+    public void Jump(bool forward, double zoom, double windowWidth, double windowHeight,
+                     double cameraX, double cameraY)
+    {
+        if (!Active || _navigableIndices.Count == 0) return;
+
+        double jumpPx = windowWidth * (_config.JumpPercentage / 100.0);
+        double newX = forward ? cameraX - jumpPx : cameraX + jumpPx;
+        newX = ClampX(newX, zoom, windowWidth);
+
+        var (_, targetY) = ComputeTargetCamera(zoom, windowWidth, windowHeight);
+
+        _snap = new SnapAnimation
+        {
+            StartX = cameraX,
+            StartY = cameraY,
+            TargetX = newX,
+            TargetY = targetY,
+            Timer = Stopwatch.StartNew(),
+            DurationMs = 120, // crisp, fast snap
+        };
+        StopScroll();
+    }
+
     public void StartSnapToCurrent(double cameraX, double cameraY, double zoom, double windowWidth, double windowHeight)
     {
         if (!Active || _navigableIndices.Count == 0) return;
@@ -194,6 +224,13 @@ public sealed class RailNav
         var line = CurrentLineInfo;
         double targetY = windowHeight / 2.0 - line.Y * zoom + VerticalBias;
         double targetX = windowWidth * 0.05 - block.BBox.X * zoom;
+
+        if (_config.PixelSnapping)
+        {
+            targetY = Math.Round(targetY);               // integer Y = baseline on pixel grid
+            targetX = Math.Round(targetX * 4.0) / 4.0;   // 1/4 pixel X for smooth feel
+        }
+
         return (targetX, targetY);
     }
 
@@ -237,24 +274,30 @@ public sealed class RailNav
         double blockRight = block.BBox.X + block.BBox.W + margin;
         double blockWidthPx = (blockRight - blockLeft) * zoom;
 
+        double result;
         if (blockWidthPx <= windowWidth)
         {
             double center = (blockLeft + blockRight) / 2.0;
-            return windowWidth / 2.0 - center * zoom;
+            result = windowWidth / 2.0 - center * zoom;
+        }
+        else
+        {
+            double maxX = -blockLeft * zoom;
+            double minX = windowWidth - blockRight * zoom;
+
+            // Soft clamp: ease into the boundary using an asymptotic curve
+            // instead of a hard stop, which eliminates visual judder.
+            // SoftEase(over) = over * k / (k + over) — approaches k as over → ∞.
+            const double k = 20.0; // pixels of easing zone
+            if (cameraX > maxX)
+                result = maxX + SoftEase(cameraX - maxX, k);
+            else if (cameraX < minX)
+                result = minX - SoftEase(minX - cameraX, k);
+            else
+                result = cameraX;
         }
 
-        double maxX = -blockLeft * zoom;
-        double minX = windowWidth - blockRight * zoom;
-
-        // Soft clamp: ease into the boundary using an asymptotic curve
-        // instead of a hard stop, which eliminates visual judder.
-        // SoftEase(over) = over * k / (k + over) — approaches k as over → ∞.
-        const double k = 20.0; // pixels of easing zone
-        if (cameraX > maxX)
-            return maxX + SoftEase(cameraX - maxX, k);
-        if (cameraX < minX)
-            return minX - SoftEase(minX - cameraX, k);
-        return cameraX;
+        return _config.PixelSnapping ? Math.Round(result * 4.0) / 4.0 : result;
     }
 
     /// <summary>Asymptotic ease: approaches <paramref name="limit"/> as overshoot grows.</summary>
@@ -355,6 +398,8 @@ public sealed class RailNav
         AutoScrolling = true;
         _autoScrollSpeed = speed;
         _autoScrollBoost = false;
+        _autoScrollPauseTimer = null;
+        _autoScrollPendingPauseMs = 0;
         // Stop any manual scroll
         StopScroll();
     }
@@ -364,6 +409,17 @@ public sealed class RailNav
         AutoScrolling = false;
         _autoScrollSpeed = 0;
         _autoScrollBoost = false;
+        _autoScrollPauseTimer = null;
+        _autoScrollPendingPauseMs = 0;
+    }
+
+    /// <summary>Inject a settling pause into auto-scroll (e.g. after advancing to a new line).
+    /// The pause is deferred until any snap animation completes, so the full duration
+    /// is perceived as stillness after the camera reaches its target.</summary>
+    public void PauseAutoScroll(double durationMs)
+    {
+        if (!AutoScrolling || durationMs <= 0) return;
+        _autoScrollPendingPauseMs = durationMs;
     }
 
     /// <summary>Set/clear the boost flag (user holding D/Right during auto-scroll).</summary>
@@ -377,6 +433,27 @@ public sealed class RailNav
     {
         if (!AutoScrolling || _navigableIndices.Count == 0) return false;
 
+        // Activate deferred pause once the snap animation has finished
+        if (_autoScrollPendingPauseMs > 0 && _snap is null)
+        {
+            _autoScrollPauseTimer = Stopwatch.StartNew();
+            _autoScrollPauseDurationMs = _autoScrollPendingPauseMs;
+            _autoScrollPauseAdvances = false;
+            _autoScrollPendingPauseMs = 0;
+        }
+
+        // Pause: hold position, count down
+        if (_autoScrollPauseTimer is not null)
+        {
+            if (_autoScrollPauseTimer.Elapsed.TotalMilliseconds >= _autoScrollPauseDurationMs)
+            {
+                bool advance = _autoScrollPauseAdvances;
+                _autoScrollPauseTimer = null;
+                return advance;
+            }
+            return false; // still pausing
+        }
+
         double speed = _autoScrollBoost ? _autoScrollSpeed * 2.0 : _autoScrollSpeed;
         // Move camera left (negative X) to scroll content right
         cameraX -= speed * zoom * dtSecs;
@@ -387,7 +464,22 @@ public sealed class RailNav
         double blockRight = block.BBox.X + block.BBox.W + block.BBox.W * 0.05;
         double visibleRight = (-cameraX + windowWidth) / zoom;
 
-        return visibleRight >= blockRight;
+        if (visibleRight >= blockRight)
+        {
+            // Determine pause: longer for block/page boundaries
+            bool isBlockEnd = CurrentLine + 1 >= block.Lines.Count;
+            double pauseMs = isBlockEnd ? _config.AutoScrollBlockPauseMs : _config.AutoScrollLinePauseMs;
+
+            if (pauseMs > 0)
+            {
+                _autoScrollPauseTimer = Stopwatch.StartNew();
+                _autoScrollPauseDurationMs = pauseMs;
+                _autoScrollPauseAdvances = true;
+                return false; // start pause
+            }
+            return true; // no pause, advance immediately
+        }
+        return false;
     }
 
     public void UpdateConfig(AppConfig config) => _config = config;

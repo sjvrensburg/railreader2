@@ -37,10 +37,16 @@ public partial class MainWindow : Window
                 {
                     PageLayer.MotionBlurEnabled = vm.Config.MotionBlur;
                     PageLayer.MotionBlurIntensity = vm.Config.MotionBlurIntensity;
+                    PageLayer.LineFocusBlurEnabled = vm.Config.LineFocusBlur;
+                    PageLayer.LineFocusBlurIntensity = vm.Config.LineFocusBlurIntensity;
                     PageLayer.InvalidateVisual();
                     Minimap.InvalidateVisual();
                 },
-                InvalidateOverlay = () => OverlayLayer.InvalidateVisual(),
+                InvalidateOverlay = () =>
+                {
+                    OverlayLayer.LineFocusBlurActive = vm.Config.LineFocusBlur;
+                    OverlayLayer.InvalidateVisual();
+                },
                 InvalidateSearch = () => SearchLayer.InvalidateVisual(),
                 InvalidateAnnotations = () => AnnotationLayer.InvalidateVisual(),
             });
@@ -159,12 +165,15 @@ public partial class MainWindow : Window
         PageLayer.ColourEffects = Vm?.ColourEffects;
         PageLayer.MotionBlurEnabled = Vm?.Config.MotionBlur ?? true;
         PageLayer.MotionBlurIntensity = Vm?.Config.MotionBlurIntensity ?? 0.5;
+        PageLayer.LineFocusBlurEnabled = Vm?.Config.LineFocusBlur ?? false;
+        PageLayer.LineFocusBlurIntensity = Vm?.Config.LineFocusBlurIntensity ?? 0.5;
         SearchLayer.Tab = tab;
         SearchLayer.ViewModel = Vm;
         AnnotationLayer.Tab = tab;
         AnnotationLayer.ViewModel = Vm;
         OverlayLayer.Tab = tab;
         OverlayLayer.ColourEffects = Vm?.ColourEffects;
+        OverlayLayer.LineFocusBlurActive = Vm?.Config.LineFocusBlur ?? false;
 
         if (tab is not null)
             tab.OnDpiRenderComplete = () => Vm?.RequestAnimationFrame();
@@ -178,7 +187,14 @@ public partial class MainWindow : Window
 
         // Persist config when toolbar hides (deferred save for slider changes)
         if (wasVisible && !shouldShow)
+        {
             Vm?.Config.Save();
+            RailToolBar.SetJumpMode(false);
+        }
+        else if (shouldShow && Vm is { } v)
+        {
+            RailToolBar.SetJumpMode(v.JumpMode);
+        }
     }
 
     private void UpdateCameraTransform()
@@ -288,6 +304,10 @@ public partial class MainWindow : Window
                 vm.HandleArrowLeft(); e.Handled = true; break;
             case Key.P when !searchFocused:
                 vm.ToggleAutoScroll(); e.Handled = true; break;
+            case Key.J when !searchFocused:
+                vm.JumpMode = !vm.JumpMode;
+                RailToolBar.SetJumpMode(vm.JumpMode);
+                e.Handled = true; break;
             case Key.OemOpenBrackets when !searchFocused && e.KeyModifiers.HasFlag(KeyModifiers.Shift):
                 RailToolBar.AdjustBlur(-0.05); e.Handled = true; break;
             case Key.OemCloseBrackets when !searchFocused && e.KeyModifiers.HasFlag(KeyModifiers.Shift):
@@ -349,6 +369,8 @@ public partial class MainWindow : Window
                 vm.SetAnnotationTool(Models.AnnotationTool.Eraser); e.Handled = true; break;
             case Key.F11:
                 vm.IsFullScreen = !vm.IsFullScreen; e.Handled = true; break;
+            case Key.Escape when vm.AutoScrollActive:
+                vm.StopAutoScroll(); e.Handled = true; break;
             case Key.Escape when vm.IsFullScreen:
                 vm.IsFullScreen = false; e.Handled = true; break;
             case Key.Escape when vm.IsRadialMenuOpen:

@@ -74,6 +74,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
     // Auto-scroll state (driven by animation frame loop via RailNav)
     public bool AutoScrollActive { get; private set; }
 
+    // Jump mode: D/Right and A/Left perform saccade-style jumps instead of hold-to-scroll
+    [ObservableProperty] private bool _jumpMode;
+
     public AppConfig Config => _config;
     public ColourEffectShaders ColourEffects => _colourEffects;
 
@@ -165,6 +168,10 @@ public sealed partial class MainWindowViewModel : ObservableObject
         tab.Camera.OffsetX = cx;
         tab.Camera.OffsetY = cy;
 
+        // Snap Y to integer pixel when rail mode is stable (no animation running)
+        if (_config.PixelSnapping && tab.Rail.Active && !animating)
+            tab.Camera.OffsetY = Math.Round(tab.Camera.OffsetY);
+
         // Auto-scroll: continuous horizontal scroll, advance on line end
         if (tab.Rail.AutoScrolling)
         {
@@ -185,6 +192,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
                         {
                             tab.StartSnap(ww, wh);
                             tab.Rail.StartAutoScroll(AutoScrollSpeed);
+                            tab.Rail.PauseAutoScroll(_config.AutoScrollBlockPauseMs);
                         }
                         else
                         {
@@ -193,6 +201,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
                         break;
                     case NavResult.Ok:
                         tab.StartSnap(ww, wh);
+                        tab.Rail.PauseAutoScroll(_config.AutoScrollLinePauseMs);
                         break;
                 }
                 InvalidateOverlay();
@@ -613,13 +622,25 @@ public sealed partial class MainWindowViewModel : ObservableObject
             RequestAnimationFrame();
             return;
         }
+        if (TryJump(forward: true)) return;
         HandleHorizontalArrow(ScrollDirection.Forward, -PanStep);
     }
 
     public void HandleArrowLeft()
     {
         if (AutoScrollActive) StopAutoScroll();
+        if (TryJump(forward: false)) return;
         HandleHorizontalArrow(ScrollDirection.Backward, PanStep);
+    }
+
+    private bool TryJump(bool forward)
+    {
+        if (!JumpMode || ActiveTab is not { } tab || !tab.Rail.Active) return false;
+        var (ww, wh) = GetWindowSize();
+        tab.Rail.Jump(forward, tab.Camera.Zoom, ww, wh, tab.Camera.OffsetX, tab.Camera.OffsetY);
+        InvalidateCamera();
+        RequestAnimationFrame();
+        return true;
     }
 
     private void HandleHorizontalArrow(ScrollDirection direction, double panDelta)

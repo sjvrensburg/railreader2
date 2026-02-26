@@ -11,6 +11,8 @@ public partial class RailToolBar : UserControl
 {
     private Slider? _speedSlider;
     private Slider? _blurSlider;
+    private TextBlock? _speedLabel;
+    private bool _jumpMode;
 
     public MainWindowViewModel? ViewModel { get; set; }
 
@@ -24,8 +26,9 @@ public partial class RailToolBar : UserControl
 
     private void BuildSliders()
     {
-        // Speed slider
-        SliderPanel.Children.Add(MakeLabel("Spd"));
+        // Speed / Jump distance slider
+        _speedLabel = MakeLabel("Spd");
+        SliderPanel.Children.Add(_speedLabel);
 
         _speedSlider = new Slider
         {
@@ -43,7 +46,10 @@ public partial class RailToolBar : UserControl
         {
             if (e.Property == RangeBase.ValueProperty && ViewModel is { } vm)
             {
-                vm.Config.ScrollSpeedMax = _speedSlider.Value;
+                if (_jumpMode)
+                    vm.Config.JumpPercentage = _speedSlider.Value;
+                else
+                    vm.Config.ScrollSpeedMax = _speedSlider.Value;
                 vm.OnSliderChanged();
             }
         };
@@ -85,13 +91,30 @@ public partial class RailToolBar : UserControl
     };
 
     /// <summary>
+    /// Switches the speed slider between scroll speed and jump distance modes.
+    /// </summary>
+    public void SetJumpMode(bool jumpMode)
+    {
+        if (_jumpMode == jumpMode) return;
+        _jumpMode = jumpMode;
+
+        if (_speedSlider is null || _speedLabel is null || ViewModel is not { } vm) return;
+
+        _speedLabel.Text = jumpMode ? "Jmp" : "Spd";
+        _speedSlider.Value = jumpMode ? vm.Config.JumpPercentage : vm.Config.ScrollSpeedMax;
+        ToolTip.SetTip(_speedSlider, jumpMode
+            ? "Jump distance % ([ / ] keys)"
+            : "Scroll speed ([ / ] keys)");
+    }
+
+    /// <summary>
     /// Syncs slider values from the current config. Call after ViewModel is set.
     /// </summary>
     public void SyncFromConfig()
     {
         if (ViewModel is not { } vm) return;
         if (_speedSlider is not null)
-            _speedSlider.Value = vm.Config.ScrollSpeedMax;
+            _speedSlider.Value = _jumpMode ? vm.Config.JumpPercentage : vm.Config.ScrollSpeedMax;
         if (_blurSlider is not null)
             _blurSlider.Value = vm.Config.MotionBlurIntensity;
     }
