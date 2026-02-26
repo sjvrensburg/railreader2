@@ -150,10 +150,12 @@ public class PdfPageLayer : Control
                 && tab.Rail is { Active: true, NavigableCount: > 0 } rail)
             {
                 var line = rail.CurrentLineInfo;
-                var block = rail.CurrentNavigableBlock;
+                // Pad the sharp region by 25% of line height on each side so
+                // descenders (g, q, y) and ascenders aren't clipped by the blur.
+                float pad = line.Height * 0.25f;
                 // Use full page width so blur extends beyond the block
-                var lineRect = SKRect.Create(0, line.Y - line.Height / 2f,
-                    (float)tab.PageWidth, line.Height);
+                var lineRect = SKRect.Create(0, line.Y - line.Height / 2f - pad,
+                    (float)tab.PageWidth, line.Height + pad * 2);
 
                 float sigma = (float)(4.0 * _lineFocusIntensity);
                 if (sigma >= 0.5f)

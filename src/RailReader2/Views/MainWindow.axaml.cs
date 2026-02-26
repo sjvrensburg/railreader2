@@ -42,7 +42,11 @@ public partial class MainWindow : Window
                     PageLayer.InvalidateVisual();
                     Minimap.InvalidateVisual();
                 },
-                InvalidateOverlay = () => OverlayLayer.InvalidateVisual(),
+                InvalidateOverlay = () =>
+                {
+                    OverlayLayer.LineFocusBlurActive = vm.Config.LineFocusBlur;
+                    OverlayLayer.InvalidateVisual();
+                },
                 InvalidateSearch = () => SearchLayer.InvalidateVisual(),
                 InvalidateAnnotations = () => AnnotationLayer.InvalidateVisual(),
             });
@@ -169,6 +173,7 @@ public partial class MainWindow : Window
         AnnotationLayer.ViewModel = Vm;
         OverlayLayer.Tab = tab;
         OverlayLayer.ColourEffects = Vm?.ColourEffects;
+        OverlayLayer.LineFocusBlurActive = Vm?.Config.LineFocusBlur ?? false;
 
         if (tab is not null)
             tab.OnDpiRenderComplete = () => Vm?.RequestAnimationFrame();

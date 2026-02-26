@@ -14,6 +14,7 @@ public class RailOverlayLayer : Control
 {
     public TabViewModel? Tab { get; set; }
     public ColourEffectShaders? ColourEffects { get; set; }
+    public bool LineFocusBlurActive { get; set; }
 
     public RailOverlayLayer()
     {
@@ -32,7 +33,7 @@ public class RailOverlayLayer : Control
         var tab = Tab;
         double w = tab?.PageWidth > 0 ? tab.PageWidth : Bounds.Width;
         double h = tab?.PageHeight > 0 ? tab.PageHeight : Bounds.Height;
-        context.Custom(new OverlayDrawOperation(new Rect(0, 0, w, h), tab, ColourEffects));
+        context.Custom(new OverlayDrawOperation(new Rect(0, 0, w, h), tab, ColourEffects, LineFocusBlurActive));
     }
 
     private sealed class OverlayDrawOperation : ICustomDrawOperation
@@ -40,6 +41,7 @@ public class RailOverlayLayer : Control
         private readonly Rect _bounds;
         private readonly TabViewModel? _tab;
         private readonly ColourEffectShaders? _effects;
+        private readonly bool _lineFocusBlur;
 
         // Cached paints — one set per render thread to avoid cross-thread mutation.
         // Reused every frame; only Color/BlendMode/StrokeWidth are mutated between draws.
@@ -53,11 +55,12 @@ public class RailOverlayLayer : Control
         [ThreadStatic] private static SKPaint? s_debugTextPaint;
         [ThreadStatic] private static SKFont? s_debugFont;
 
-        public OverlayDrawOperation(Rect bounds, TabViewModel? tab, ColourEffectShaders? effects)
+        public OverlayDrawOperation(Rect bounds, TabViewModel? tab, ColourEffectShaders? effects, bool lineFocusBlur)
         {
             _bounds = bounds;
             _tab = tab;
             _effects = effects;
+            _lineFocusBlur = lineFocusBlur;
         }
 
         public Rect Bounds => _bounds;
@@ -79,14 +82,14 @@ public class RailOverlayLayer : Control
             if (tab.Rail.Active && tab.Rail.HasAnalysis)
             {
                 var effect = _effects?.Effect ?? ColourEffect.None;
-                DrawRailOverlays(canvas, tab, effect.GetOverlayPalette());
+                DrawRailOverlays(canvas, tab, effect.GetOverlayPalette(), _lineFocusBlur);
             }
 
             if (tab.DebugOverlay && tab.AnalysisCache.TryGetValue(tab.CurrentPage, out var debugAnalysis))
                 DrawDebugOverlay(canvas, tab, debugAnalysis);
         }
 
-        private static void DrawRailOverlays(SKCanvas canvas, TabViewModel tab, OverlayPalette palette)
+        private static void DrawRailOverlays(SKCanvas canvas, TabViewModel tab, OverlayPalette palette, bool lineFocusBlur)
         {
             if (tab.Rail.NavigableCount == 0) return;
             var block = tab.Rail.CurrentNavigableBlock;
@@ -135,8 +138,26 @@ public class RailOverlayLayer : Control
 
             var line = tab.Rail.CurrentLineInfo;
             var linePaint = s_linePaint ??= new SKPaint();
-            linePaint.Color = palette.LineHighlight;
-            canvas.DrawRect(SKRect.Create(block.BBox.X, line.Y - line.Height / 2, block.BBox.W, line.Height), linePaint);
+
+            if (lineFocusBlur)
+            {
+                // When line focus blur is active, the blur itself highlights the
+                // active line. Draw a narrow indicator bar on the left edge instead
+                // of the full-width tinted highlight.
+                const float barWidth = 3f;
+                float pad = line.Height * 0.15f;
+                linePaint.Color = palette.BlockOutline.WithAlpha(200);
+                canvas.DrawRect(SKRect.Create(
+                    block.BBox.X - margin - barWidth,
+                    line.Y - line.Height / 2 - pad,
+                    barWidth,
+                    line.Height + pad * 2), linePaint);
+            }
+            else
+            {
+                linePaint.Color = palette.LineHighlight;
+                canvas.DrawRect(SKRect.Create(block.BBox.X, line.Y - line.Height / 2, block.BBox.W, line.Height), linePaint);
+            }
         }
 
         private static readonly SKColor[] s_debugColors =
