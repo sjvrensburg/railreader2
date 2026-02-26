@@ -73,3 +73,31 @@ public sealed record BlockInfo(
     int ReadingOrder,
     int LineCount,
     bool Navigable);
+
+/// <summary>
+/// Options for headless screenshot export.
+/// </summary>
+public sealed record ScreenshotOptions
+{
+    public int Dpi { get; init; } = 300;
+    public bool RailOverlay { get; init; } = true;
+    public bool Annotations { get; init; } = true;
+    public bool SearchHighlights { get; init; } = true;
+    public bool DebugOverlay { get; init; } = false;
+    public bool LineFocusBlur { get; init; } = false;
+    public float LineFocusBlurIntensity { get; init; } = 0.5f;
+
+    /// <summary>
+    /// When true, crop the output to simulate what's visible in the viewport
+    /// at the document's current camera position and zoom level.
+    /// The output dimensions match ViewportWidth x ViewportHeight.
+    /// </summary>
+    public bool SimulateViewport { get; init; } = false;
+    public int ViewportWidth { get; init; } = 1200;
+    public int ViewportHeight { get; init; } = 900;
+}
+
+/// <summary>
+/// Result of a screenshot or image export.
+/// </summary>
+public sealed record ExportResult(string FilePath, int Width, int Height, long FileSize);

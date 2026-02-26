@@ -11,7 +11,8 @@
 
 <p align="center">
   <a href="https://github.com/sjvrensburg/railreader2/releases/latest">Download</a> &middot;
-  <a href="https://sjvrensburg.github.io/railreader2/">Website</a>
+  <a href="https://sjvrensburg.github.io/railreader2/">Website</a> &middot;
+  <a href="https://sjvrensburg.github.io/railreader2/guide.html">User Guide</a>
 </p>
 
 ---
