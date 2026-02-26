@@ -37,6 +37,8 @@ public partial class MainWindow : Window
                 {
                     PageLayer.MotionBlurEnabled = vm.Config.MotionBlur;
                     PageLayer.MotionBlurIntensity = vm.Config.MotionBlurIntensity;
+                    PageLayer.LineFocusBlurEnabled = vm.Config.LineFocusBlur;
+                    PageLayer.LineFocusBlurIntensity = vm.Config.LineFocusBlurIntensity;
                     PageLayer.InvalidateVisual();
                     Minimap.InvalidateVisual();
                 },
@@ -159,6 +161,8 @@ public partial class MainWindow : Window
         PageLayer.ColourEffects = Vm?.ColourEffects;
         PageLayer.MotionBlurEnabled = Vm?.Config.MotionBlur ?? true;
         PageLayer.MotionBlurIntensity = Vm?.Config.MotionBlurIntensity ?? 0.5;
+        PageLayer.LineFocusBlurEnabled = Vm?.Config.LineFocusBlur ?? false;
+        PageLayer.LineFocusBlurIntensity = Vm?.Config.LineFocusBlurIntensity ?? 0.5;
         SearchLayer.Tab = tab;
         SearchLayer.ViewModel = Vm;
         AnnotationLayer.Tab = tab;
@@ -288,6 +292,8 @@ public partial class MainWindow : Window
                 vm.HandleArrowLeft(); e.Handled = true; break;
             case Key.P when !searchFocused:
                 vm.ToggleAutoScroll(); e.Handled = true; break;
+            case Key.J when !searchFocused:
+                vm.JumpMode = !vm.JumpMode; e.Handled = true; break;
             case Key.OemOpenBrackets when !searchFocused && e.KeyModifiers.HasFlag(KeyModifiers.Shift):
                 RailToolBar.AdjustBlur(-0.05); e.Handled = true; break;
             case Key.OemCloseBrackets when !searchFocused && e.KeyModifiers.HasFlag(KeyModifiers.Shift):

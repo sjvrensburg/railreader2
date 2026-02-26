@@ -74,6 +74,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
     // Auto-scroll state (driven by animation frame loop via RailNav)
     public bool AutoScrollActive { get; private set; }
 
+    // Jump mode: D/Right and A/Left perform saccade-style jumps instead of hold-to-scroll
+    [ObservableProperty] private bool _jumpMode;
+
     public AppConfig Config => _config;
     public ColourEffectShaders ColourEffects => _colourEffects;
 
@@ -164,6 +167,10 @@ public sealed partial class MainWindowViewModel : ObservableObject
         bool animating = tab.Rail.Tick(ref cx, ref cy, dt, tab.Camera.Zoom, ww);
         tab.Camera.OffsetX = cx;
         tab.Camera.OffsetY = cy;
+
+        // Snap Y to integer pixel when rail mode is stable (no animation running)
+        if (_config.PixelSnapping && tab.Rail.Active && !animating)
+            tab.Camera.OffsetY = Math.Round(tab.Camera.OffsetY);
 
         // Auto-scroll: continuous horizontal scroll, advance on line end
         if (tab.Rail.AutoScrolling)
@@ -613,12 +620,28 @@ public sealed partial class MainWindowViewModel : ObservableObject
             RequestAnimationFrame();
             return;
         }
+        if (JumpMode && ActiveTab is { } jt && jt.Rail.Active)
+        {
+            var (ww, wh) = GetWindowSize();
+            jt.Rail.Jump(true, jt.Camera.Zoom, ww, wh, jt.Camera.OffsetX, jt.Camera.OffsetY);
+            InvalidateCamera();
+            RequestAnimationFrame();
+            return;
+        }
         HandleHorizontalArrow(ScrollDirection.Forward, -PanStep);
     }
 
     public void HandleArrowLeft()
     {
         if (AutoScrollActive) StopAutoScroll();
+        if (JumpMode && ActiveTab is { } jt && jt.Rail.Active)
+        {
+            var (ww, wh) = GetWindowSize();
+            jt.Rail.Jump(false, jt.Camera.Zoom, ww, wh, jt.Camera.OffsetX, jt.Camera.OffsetY);
+            InvalidateCamera();
+            RequestAnimationFrame();
+            return;
+        }
         HandleHorizontalArrow(ScrollDirection.Backward, PanStep);
     }
 

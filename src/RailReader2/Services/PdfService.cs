@@ -88,7 +88,9 @@ public sealed class PdfService : IDisposable
     /// </summary>
     public static int CalculateRenderDpi(double zoom)
     {
-        return Math.Clamp((int)(zoom * 150), 150, 600);
+        int raw = (int)(zoom * 150);
+        int rounded = ((raw + 37) / 75) * 75; // snap to nearest 75 DPI step
+        return Math.Clamp(rounded, 150, 600);
     }
 
     public void Dispose() { }

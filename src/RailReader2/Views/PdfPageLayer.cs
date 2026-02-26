@@ -15,6 +15,8 @@ public class PdfPageLayer : Control
     public ColourEffectShaders? ColourEffects { get; set; }
     public bool MotionBlurEnabled { get; set; } = true;
     public double MotionBlurIntensity { get; set; } = 0.5;
+    public bool LineFocusBlurEnabled { get; set; }
+    public double LineFocusBlurIntensity { get; set; } = 0.5;
 
     protected override void OnSizeChanged(SizeChangedEventArgs e)
     {
@@ -31,7 +33,8 @@ public class PdfPageLayer : Control
         var tab = Tab;
         double w = tab?.PageWidth > 0 ? tab.PageWidth : Bounds.Width;
         double h = tab?.PageHeight > 0 ? tab.PageHeight : Bounds.Height;
-        context.Custom(new PageDrawOperation(new Rect(0, 0, w, h), tab, ColourEffects, MotionBlurEnabled, MotionBlurIntensity));
+        context.Custom(new PageDrawOperation(new Rect(0, 0, w, h), tab, ColourEffects,
+            MotionBlurEnabled, MotionBlurIntensity, LineFocusBlurEnabled, LineFocusBlurIntensity));
     }
 
     private sealed class PageDrawOperation : ICustomDrawOperation
@@ -55,14 +58,19 @@ public class PdfPageLayer : Control
         private readonly ColourEffectShaders? _effects;
         private readonly bool _motionBlur;
         private readonly double _blurIntensity;
+        private readonly bool _lineFocusBlur;
+        private readonly double _lineFocusIntensity;
 
-        public PageDrawOperation(Rect bounds, TabViewModel? tab, ColourEffectShaders? effects, bool motionBlur, double blurIntensity)
+        public PageDrawOperation(Rect bounds, TabViewModel? tab, ColourEffectShaders? effects,
+            bool motionBlur, double blurIntensity, bool lineFocusBlur, double lineFocusIntensity)
         {
             _bounds = bounds;
             _tab = tab;
             _effects = effects;
             _motionBlur = motionBlur;
             _blurIntensity = blurIntensity;
+            _lineFocusBlur = lineFocusBlur;
+            _lineFocusIntensity = lineFocusIntensity;
         }
 
         public Rect Bounds => _bounds;
@@ -144,6 +152,40 @@ public class PdfPageLayer : Control
             }
 
             effectPaint?.Dispose();
+
+            // Line focus blur: apply Gaussian blur to non-current lines within the active block
+            if (_lineFocusBlur && _lineFocusIntensity > 0
+                && tab.Rail is { Active: true, NavigableCount: > 0 } rail)
+            {
+                var block = rail.CurrentNavigableBlock;
+                int currentLine = rail.CurrentLine;
+                var lines = block.Lines;
+                float blockX = block.BBox.X;
+                float blockW = block.BBox.W;
+                const float baseSigma = 3.0f;
+
+                for (int i = 0; i < lines.Count; i++)
+                {
+                    if (i == currentLine) continue;
+                    int dist = Math.Abs(i - currentLine);
+                    if (dist > 3) continue; // cap at ±3 lines for performance
+
+                    float sigma = (float)(baseSigma * _lineFocusIntensity * dist / 3.0);
+                    if (sigma < 0.5f) continue;
+
+                    var lineInfo = lines[i];
+                    var lineRect = SKRect.Create(blockX, lineInfo.Y - lineInfo.Height / 2f, blockW, lineInfo.Height);
+
+                    canvas.Save();
+                    canvas.ClipRect(lineRect);
+                    using var focusBlur = SKImageFilter.CreateBlur(sigma, sigma);
+                    using var focusPaint = new SKPaint { ImageFilter = focusBlur };
+                    canvas.SaveLayer(focusPaint);
+                    canvas.DrawImage(image, destRect, s_sampling);
+                    canvas.Restore(); // layer
+                    canvas.Restore(); // clip
+                }
+            }
         }
     }
 }

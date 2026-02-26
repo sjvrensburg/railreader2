@@ -26,7 +26,8 @@ public partial class StatusBarView : UserControl
                 if (args.PropertyName is nameof(MainWindowViewModel.ActiveTab) or
                     nameof(MainWindowViewModel.ActiveTabIndex) or
                     nameof(MainWindowViewModel.ActiveTool) or
-                    nameof(MainWindowViewModel.AutoScrollActive))
+                    nameof(MainWindowViewModel.AutoScrollActive) or
+                    nameof(MainWindowViewModel.JumpMode))
                 {
                     SubscribeToTab(vm.ActiveTab);
                     UpdateStatus();
@@ -125,6 +126,20 @@ public partial class StatusBarView : UserControl
                 var stopBtn = MakeNavButton("\u23f8", (_, _) => vm.StopAutoScroll(), "Stop auto-scroll (P)");
                 stopBtn.Foreground = new SolidColorBrush(Color.FromRgb(255, 100, 100));
                 StatusPanel.Children.Add(stopBtn);
+            }
+
+            if (vm is { JumpMode: true })
+            {
+                AddSeparator();
+                StatusPanel.Children.Add(new TextBlock
+                {
+                    Text = "Jump",
+                    Foreground = new SolidColorBrush(Color.FromRgb(255, 170, 0)),
+                    FontWeight = FontWeight.Bold,
+                });
+                var exitBtn = MakeNavButton("\u2715", (_, _) => { vm.JumpMode = false; }, "Exit jump mode (J)");
+                exitBtn.Foreground = new SolidColorBrush(Color.FromRgb(255, 100, 100));
+                StatusPanel.Children.Add(exitBtn);
             }
         }
 

@@ -128,6 +128,12 @@ scripts/
 - **Tab styling**: `TabBarView` uses programmatic styling with distinct active/inactive appearances — active tab has blue background with bold white text and a blue bottom indicator bar; inactive tabs have muted grey styling.
 - **Fullscreen**: F11 toggles fullscreen mode — hides menu bar, tab bar, status bar, and window decorations (`SystemDecorations.None` + `WindowState.FullScreen`). Escape exits fullscreen. Also accessible via View → Fullscreen menu. `IsFullScreen` is an `[ObservableProperty]` on `MainWindowViewModel`; the `PropertyChanged` handler in `MainWindow.axaml.cs` toggles `WindowState` and `SystemDecorations`. Chrome elements bind `IsVisible="{Binding !IsFullScreen}"`.
 - **Tab reorder**: Tabs can be rearranged by dragging. Implemented via tunnelling pointer events (`RoutingStrategies.Tunnel`) on `TabPanel` so press/move/release are intercepted before buttons consume them. A 5px drag threshold distinguishes clicks from drags. Visual feedback: dragged tab dims to 50% opacity, a 2px blue insertion indicator appears at the drop target. `MainWindowViewModel.MoveTab()` uses `ObservableCollection.Move()` and tracks the active tab by reference. Pointer capture is only released when an actual drag occurred, preserving normal button click behaviour.
+- **Pixel snapping**: Reduces text shimmer at high zoom by quantizing camera positions to a pixel grid. Snap targets (`ComputeTargetCamera`) round Y to integer and X to 1/4 pixel. `ClampX` also quantizes its return value. When rail mode is stable (no animation), Y is snapped to integer in `OnAnimationFrame`. Controlled by `config.PixelSnapping` (default true).
+- **DPI tier rounding**: `PdfService.CalculateRenderDpi` rounds to nearest 75 DPI step (150, 225, 300, 375, 450, 525, 600) instead of continuous `zoom*150`, keeping GPU upsampling ratios closer to simple fractions and reducing anti-aliasing shimmer.
+- **Line focus blur**: When enabled, applies Gaussian blur to non-current lines within the active block in rail mode. Blur intensity increases with distance from the current line (±1 to ±3 lines, capped for performance). Rendered in `PdfPageLayer` using clipped `SaveLayer` with `SKImageFilter.CreateBlur`. Configured via `config.LineFocusBlur` and `config.LineFocusBlurIntensity`.
+- **Auto-scroll pause**: Auto-scroll pauses briefly at the end of each line before advancing. Configurable via `config.AutoScrollLinePauseMs` (default 400ms) and `config.AutoScrollBlockPauseMs` (default 600ms for block/page transitions). Implemented in `RailNav.TickAutoScroll` with a `Stopwatch`-based pause timer. Set to 0 to disable.
+- **Jump mode**: Toggled via `J` key. When active, D/Right and A/Left perform saccade-style jumps (percentage of visible width) instead of hold-to-scroll. Jump distance configurable via `config.JumpPercentage` (default 25%). Uses a fast 120ms snap animation. Status bar shows amber "Jump" indicator with exit button. `RailNav.Jump()` computes new camera position clamped to block bounds.
+- **Tabbed settings**: `SettingsWindow` uses a `TabControl` with four tabs: Appearance (font scale, motion blur, colour effects), Rail Reading (navigation params, pixel snapping, line focus blur, jump distance), Auto-Scroll (pause durations), Advanced (navigable block types).
 
 ### Dependencies
 
@@ -154,6 +160,12 @@ Config file location: `~/.config/railreader2/config.json` (Linux) or `%APPDATA%\
   "colour_effect_intensity": 1.0,
   "motion_blur": true,
   "motion_blur_intensity": 0.33,
+  "pixel_snapping": true,
+  "line_focus_blur": false,
+  "line_focus_blur_intensity": 0.5,
+  "auto_scroll_line_pause_ms": 400.0,
+  "auto_scroll_block_pause_ms": 600.0,
+  "jump_percentage": 25.0,
   "navigable_classes": [
     "abstract", "algorithm", "display_formula",
     "footnote", "paragraph_title", "text"
@@ -377,6 +389,7 @@ If the model is not found, the app logs a warning and falls back to horizontal-s
 | `Home` | Line start (rail) / first page |
 | `End` | Line end (rail) / last page |
 | `P` | Toggle auto-scroll (rail) |
+| `J` | Toggle jump mode (rail) |
 | `[` / `]` | Adjust scroll speed (rail) |
 | `Shift+[` / `Shift+]` | Adjust blur intensity (rail) |
 | Click | Jump to block (rail mode) |

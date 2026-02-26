@@ -49,6 +49,12 @@ public partial class SettingsWindow : Window
         Lookahead.Value = c.AnalysisLookaheadPages;
         EffectCombo.SelectedIndex = (int)c.ColourEffect;
         IntensitySlider.Value = c.ColourEffectIntensity;
+        PixelSnappingCheck.IsChecked = c.PixelSnapping;
+        LineFocusBlurCheck.IsChecked = c.LineFocusBlur;
+        LineFocusBlurSlider.Value = c.LineFocusBlurIntensity;
+        AutoScrollLinePause.Value = (decimal)c.AutoScrollLinePauseMs;
+        AutoScrollBlockPause.Value = (decimal)c.AutoScrollBlockPauseMs;
+        JumpPercentage.Value = (decimal)c.JumpPercentage;
 
         _classItems.Clear();
         for (int i = 0; i < LayoutConstants.LayoutClasses.Length; i++)
@@ -81,6 +87,9 @@ public partial class SettingsWindow : Window
         c.ScrollRampTime = (double)(RampTime.Value ?? 1.5m);
         c.AnalysisLookaheadPages = (int)(Lookahead.Value ?? 2m);
         c.ColourEffectIntensity = IntensitySlider.Value;
+        c.AutoScrollLinePauseMs = (double)(AutoScrollLinePause.Value ?? 400m);
+        c.AutoScrollBlockPauseMs = (double)(AutoScrollBlockPause.Value ?? 600m);
+        c.JumpPercentage = (double)(JumpPercentage.Value ?? 25m);
         vm.OnConfigChanged();
     }
 
@@ -106,6 +115,29 @@ public partial class SettingsWindow : Window
         if (e.Property.Name == "Value" && Vm is { } vm && !_loading)
         {
             vm.Config.MotionBlurIntensity = BlurIntensitySlider.Value;
+            vm.OnConfigChanged();
+        }
+    }
+
+    private void OnPixelSnappingChanged(object? sender, RoutedEventArgs e)
+    {
+        if (Vm is not { } vm || _loading) return;
+        vm.Config.PixelSnapping = PixelSnappingCheck.IsChecked == true;
+        vm.OnConfigChanged();
+    }
+
+    private void OnLineFocusBlurChanged(object? sender, RoutedEventArgs e)
+    {
+        if (Vm is not { } vm || _loading) return;
+        vm.Config.LineFocusBlur = LineFocusBlurCheck.IsChecked == true;
+        vm.OnConfigChanged();
+    }
+
+    private void OnLineFocusBlurIntensityChanged(object? sender, Avalonia.AvaloniaPropertyChangedEventArgs e)
+    {
+        if (e.Property.Name == "Value" && Vm is { } vm && !_loading)
+        {
+            vm.Config.LineFocusBlurIntensity = LineFocusBlurSlider.Value;
             vm.OnConfigChanged();
         }
     }
@@ -138,6 +170,12 @@ public partial class SettingsWindow : Window
         vm.Config.MotionBlur = defaults.MotionBlur;
         vm.Config.MotionBlurIntensity = defaults.MotionBlurIntensity;
         vm.Config.NavigableClasses = LayoutConstants.DefaultNavigableClasses();
+        vm.Config.PixelSnapping = defaults.PixelSnapping;
+        vm.Config.LineFocusBlur = defaults.LineFocusBlur;
+        vm.Config.LineFocusBlurIntensity = defaults.LineFocusBlurIntensity;
+        vm.Config.AutoScrollLinePauseMs = defaults.AutoScrollLinePauseMs;
+        vm.Config.AutoScrollBlockPauseMs = defaults.AutoScrollBlockPauseMs;
+        vm.Config.JumpPercentage = defaults.JumpPercentage;
         _loading = true;
         LoadFromConfig();
         _loading = false;
