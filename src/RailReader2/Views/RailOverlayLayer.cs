@@ -3,8 +3,8 @@ using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.Rendering.SceneGraph;
 using Avalonia.Skia;
-using RailReader2.Models;
-using RailReader2.Services;
+using RailReader.Core.Models;
+using RailReader.Core.Services;
 using RailReader2.ViewModels;
 using SkiaSharp;
 

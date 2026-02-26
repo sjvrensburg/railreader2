@@ -1,0 +1,1160 @@
+using System.Diagnostics;
+using System.Text.RegularExpressions;
+using RailReader.Core.Commands;
+using RailReader.Core.Models;
+using RailReader.Core.Services;
+using SkiaSharp;
+
+namespace RailReader.Core;
+
+/// <summary>
+/// Result of a single animation tick. Tells the UI what to repaint.
+/// </summary>
+public record struct TickResult(
+    bool CameraChanged,
+    bool PageChanged,
+    bool OverlayChanged,
+    bool SearchChanged,
+    bool AnnotationsChanged,
+    bool StillAnimating);
+
+/// <summary>
+/// Headless controller that owns all document business logic.
+/// No Avalonia dependency — can be driven by AI agent, tests, or UI.
+/// </summary>
+public sealed class DocumentController
+{
+    private const double ZoomStep = 1.25;
+    private const double ZoomScrollSensitivity = 0.003;
+    private const double PanStep = 50.0;
+
+    private readonly AppConfig _config;
+    private readonly IThreadMarshaller _marshaller;
+    private AnalysisWorker? _worker;
+    public bool HasWorker => _worker is not null;
+    private readonly ColourEffectShaders _colourEffects = new();
+
+    private double _vpWidth = 1200;
+    private double _vpHeight = 900;
+
+    public List<DocumentState> Documents { get; } = [];
+    public int ActiveDocumentIndex { get; set; }
+    public AppConfig Config => _config;
+    public ColourEffectShaders ColourEffects => _colourEffects;
+    public AnalysisWorker? Worker => _worker;
+
+    public DocumentState? ActiveDocument =>
+        ActiveDocumentIndex >= 0 && ActiveDocumentIndex < Documents.Count
+            ? Documents[ActiveDocumentIndex]
+            : null;
+
+    // Search state
+    public List<SearchMatch> SearchMatches { get; private set; } = [];
+    public List<SearchMatch>? CurrentPageSearchMatches { get; private set; }
+    public int ActiveMatchIndex { get; set; }
+
+    // Annotation tool state
+    public AnnotationTool ActiveTool { get; set; } = AnnotationTool.None;
+    public bool IsAnnotating => ActiveTool != AnnotationTool.None;
+    public Annotation? SelectedAnnotation { get; set; }
+    public Annotation? PreviewAnnotation { get; set; }
+    public string ActiveAnnotationColor { get; set; } = "#FFFF00";
+    public float ActiveAnnotationOpacity { get; set; } = 0.4f;
+    public float ActiveStrokeWidth { get; set; } = 2f;
+
+    // In-progress annotation building state
+    private List<PointF>? _freehandPoints;
+    private float _rectStartX, _rectStartY;
+    private int _highlightCharStart = -1;
+
+    // Text selection state
+    public string? SelectedText { get; set; }
+    public List<HighlightRect>? TextSelectionRects { get; set; }
+    private int _textSelectCharStart = -1;
+
+    // Clipboard callback (set by UI)
+    public Action<string>? CopyToClipboard { get; set; }
+
+    // Auto-scroll state
+    public bool AutoScrollActive { get; private set; }
+    public bool JumpMode { get; set; }
+
+    /// <summary>
+    /// Fired when a property changes. UI can subscribe to update bindings.
+    /// </summary>
+    public Action<string>? StateChanged;
+
+    public DocumentController(AppConfig config, IThreadMarshaller marshaller)
+    {
+        _config = config;
+        _marshaller = marshaller;
+        _colourEffects.Effect = config.ColourEffect;
+        _colourEffects.Intensity = (float)config.ColourEffectIntensity;
+    }
+
+    /// <summary>
+    /// Initialize the ONNX analysis worker. Must be called before opening documents.
+    /// </summary>
+    public void InitializeWorker()
+    {
+        var modelPath = FindModelPath();
+        if (modelPath is null)
+        {
+            const string filename = "PP-DocLayoutV3.onnx";
+            var searched = new[]
+            {
+                Path.Combine(AppContext.BaseDirectory, "models", filename),
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "railreader2", "models", filename),
+                Path.GetFullPath(Path.Combine("models", filename)),
+            };
+            var msg = $"ONNX model not found ({filename}). Run ./scripts/download-model.sh\nSearched:\n"
+                      + string.Join("\n", searched.Select(p => $"  - {p}"));
+            throw new FileNotFoundException(msg);
+        }
+
+        Console.Error.WriteLine($"[ONNX] Starting worker with model: {modelPath}");
+        _worker = new AnalysisWorker(modelPath);
+        Console.Error.WriteLine("[ONNX] Worker started (ONNX session loading in background)");
+    }
+
+    public void SetViewportSize(double w, double h)
+    {
+        if (w > 0) _vpWidth = w;
+        if (h > 0) _vpHeight = h;
+    }
+
+    public (double Width, double Height) GetViewportSize() => (_vpWidth, _vpHeight);
+
+    // --- Document management ---
+
+    /// <summary>
+    /// Creates a DocumentState for the given path (synchronous). Call LoadDocumentAsync for bitmap loading.
+    /// </summary>
+    public DocumentState CreateDocument(string path)
+    {
+        var state = new DocumentState(path, _config, _marshaller);
+        return state;
+    }
+
+    /// <summary>
+    /// Adds a document to the tab list, restores reading position, and submits analysis.
+    /// Call after bitmap is loaded.
+    /// </summary>
+    public void AddDocument(DocumentState state)
+    {
+        var (ww, wh) = GetViewportSize();
+
+        var saved = _config.GetReadingPosition(state.FilePath);
+        if (saved is not null && saved.Page > 0)
+            state.GoToPage(Math.Clamp(saved.Page, 0, state.PageCount - 1), _worker, ww, wh);
+
+        state.CenterPage(ww, wh);
+        state.UpdateRailZoom(ww, wh);
+
+        Documents.Add(state);
+        _config.AddRecentFile(state.FilePath);
+        ActiveDocumentIndex = Documents.Count - 1;
+
+        state.SubmitAnalysis(_worker);
+        state.QueueLookahead(_config.AnalysisLookaheadPages);
+    }
+
+    public void CloseDocument(int index)
+    {
+        if (index < 0 || index >= Documents.Count) return;
+        var doc = Documents[index];
+        _config.SaveReadingPosition(doc.FilePath, doc.CurrentPage,
+            doc.Camera.Zoom, doc.Camera.OffsetX, doc.Camera.OffsetY);
+        Documents.RemoveAt(index);
+        doc.Dispose();
+        if (Documents.Count == 0) ActiveDocumentIndex = 0;
+        else if (ActiveDocumentIndex >= Documents.Count) ActiveDocumentIndex = Documents.Count - 1;
+    }
+
+    public void SelectDocument(int index)
+    {
+        if (index >= 0 && index < Documents.Count)
+            ActiveDocumentIndex = index;
+    }
+
+    public void MoveDocument(int fromIndex, int toIndex)
+    {
+        if (fromIndex == toIndex) return;
+        if (fromIndex < 0 || fromIndex >= Documents.Count) return;
+        if (toIndex < 0 || toIndex >= Documents.Count) return;
+
+        var selected = ActiveDocument;
+        var doc = Documents[fromIndex];
+        Documents.RemoveAt(fromIndex);
+        Documents.Insert(toIndex, doc);
+
+        if (selected is not null)
+            ActiveDocumentIndex = Documents.IndexOf(selected);
+    }
+
+    public void SaveAllReadingPositions()
+    {
+        foreach (var doc in Documents)
+            _config.SaveReadingPosition(doc.FilePath, doc.CurrentPage,
+                doc.Camera.Zoom, doc.Camera.OffsetX, doc.Camera.OffsetY);
+    }
+
+    // --- Navigation ---
+
+    public void GoToPage(int page)
+    {
+        if (ActiveDocument is not { } doc) return;
+        var (ww, wh) = GetViewportSize();
+        doc.GoToPage(page, _worker, ww, wh);
+        doc.QueueLookahead(_config.AnalysisLookaheadPages);
+        UpdateCurrentPageMatches();
+    }
+
+    public void FitPage()
+    {
+        if (ActiveDocument is not { } doc) return;
+        var (ww, wh) = GetViewportSize();
+        doc.CenterPage(ww, wh);
+        doc.UpdateRailZoom(ww, wh);
+    }
+
+    public void FitWidth()
+    {
+        if (ActiveDocument is not { } doc) return;
+        var (ww, wh) = GetViewportSize();
+        doc.FitWidth(ww, wh);
+        doc.UpdateRailZoom(ww, wh);
+    }
+
+    // --- Camera ---
+
+    public void HandleZoom(double scrollDelta, double cursorX, double cursorY, bool ctrlHeld)
+    {
+        if (AutoScrollActive) StopAutoScroll();
+        if (ActiveDocument is not { } doc) return;
+        var (ww, wh) = GetViewportSize();
+
+        if (ctrlHeld && doc.Rail.Active)
+        {
+            double step = scrollDelta * 2.0 * doc.Camera.Zoom;
+            doc.Camera.OffsetX += step;
+            doc.ClampCamera(ww, wh);
+        }
+        else
+        {
+            double oldZoom = doc.Camera.Zoom;
+            double factor = 1.0 + scrollDelta * ZoomScrollSensitivity;
+            double newZoom = Math.Clamp(oldZoom * factor, Camera.ZoomMin, Camera.ZoomMax);
+
+            doc.Camera.OffsetX = cursorX - (cursorX - doc.Camera.OffsetX) * (newZoom / oldZoom);
+            doc.Camera.OffsetY = cursorY - (cursorY - doc.Camera.OffsetY) * (newZoom / oldZoom);
+            doc.Camera.Zoom = newZoom;
+            doc.Camera.NotifyZoomChange();
+
+            doc.UpdateRailZoom(ww, wh);
+            if (doc.Rail.Active)
+                doc.StartSnap(ww, wh);
+            doc.ClampCamera(ww, wh);
+            doc.UpdateRenderDpiIfNeeded();
+        }
+    }
+
+    public void HandlePan(double dx, double dy)
+    {
+        if (ActiveDocument is not { } doc) return;
+        if (AutoScrollActive) StopAutoScroll();
+        var (ww, wh) = GetViewportSize();
+        doc.Camera.OffsetX += dx;
+        doc.Camera.OffsetY += dy;
+        doc.ClampCamera(ww, wh);
+        if (doc.Rail.Active)
+            doc.Rail.CaptureVerticalBias(doc.Camera.OffsetY, doc.Camera.Zoom, wh);
+    }
+
+    public void HandleZoomKey(bool zoomIn)
+    {
+        if (ActiveDocument is not { } doc) return;
+        var (ww, wh) = GetViewportSize();
+        double newZoom = zoomIn ? doc.Camera.Zoom * ZoomStep : doc.Camera.Zoom / ZoomStep;
+        doc.ApplyZoom(newZoom, ww, wh);
+        doc.Camera.NotifyZoomChange();
+        doc.UpdateRenderDpiIfNeeded();
+        if (!doc.Rail.Active && AutoScrollActive) StopAutoScroll();
+    }
+
+    public void HandleResetZoom() => FitPage();
+
+    // --- Rail navigation ---
+
+    public void HandleArrowDown() => HandleVerticalNav(forward: true);
+    public void HandleArrowUp() => HandleVerticalNav(forward: false);
+
+    private void HandleVerticalNav(bool forward)
+    {
+        if (!forward && AutoScrollActive) StopAutoScroll();
+        if (ActiveDocument is not { } doc) return;
+        var (ww, wh) = GetViewportSize();
+
+        if (doc.Rail.Active)
+        {
+            int currentPage = doc.CurrentPage;
+            var result = forward ? doc.Rail.NextLine() : doc.Rail.PrevLine();
+            var boundary = forward ? NavResult.PageBoundaryNext : NavResult.PageBoundaryPrev;
+
+            if (result == boundary)
+            {
+                doc.GoToPage(currentPage + (forward ? 1 : -1), _worker, ww, wh);
+                doc.QueueLookahead(_config.AnalysisLookaheadPages);
+                if (doc.Rail.Active)
+                {
+                    if (!forward) doc.Rail.JumpToEnd();
+                    doc.StartSnap(ww, wh);
+                }
+            }
+            else if (result == NavResult.Ok)
+            {
+                doc.StartSnap(ww, wh);
+            }
+        }
+        else
+        {
+            doc.Camera.OffsetY += forward ? -PanStep : PanStep;
+            doc.ClampCamera(ww, wh);
+        }
+    }
+
+    public void HandleArrowRight()
+    {
+        if (AutoScrollActive && ActiveDocument is { } d && d.Rail.Active)
+        {
+            d.Rail.SetAutoScrollBoost(true);
+            return;
+        }
+        if (TryJump(forward: true)) return;
+        HandleHorizontalArrow(ScrollDirection.Forward, -PanStep);
+    }
+
+    public void HandleArrowLeft()
+    {
+        if (AutoScrollActive) StopAutoScroll();
+        if (TryJump(forward: false)) return;
+        HandleHorizontalArrow(ScrollDirection.Backward, PanStep);
+    }
+
+    private bool TryJump(bool forward)
+    {
+        if (!JumpMode || ActiveDocument is not { } doc || !doc.Rail.Active) return false;
+        var (ww, wh) = GetViewportSize();
+        doc.Rail.Jump(forward, doc.Camera.Zoom, ww, wh, doc.Camera.OffsetX, doc.Camera.OffsetY);
+        return true;
+    }
+
+    private void HandleHorizontalArrow(ScrollDirection direction, double panDelta)
+    {
+        if (ActiveDocument is not { } doc) return;
+        if (doc.Rail.Active)
+            doc.Rail.StartScroll(direction, doc.Camera.OffsetX);
+        else
+        {
+            var (ww, wh) = GetViewportSize();
+            doc.Camera.OffsetX += panDelta;
+            doc.ClampCamera(ww, wh);
+        }
+    }
+
+    public void HandleLineHome() => SnapToLineEdge(start: true);
+    public void HandleLineEnd() => SnapToLineEdge(start: false);
+
+    private void SnapToLineEdge(bool start)
+    {
+        if (ActiveDocument is not { } doc || !doc.Rail.Active) return;
+        var (ww, _) = GetViewportSize();
+        var x = start
+            ? doc.Rail.ComputeLineStartX(doc.Camera.Zoom, ww)
+            : doc.Rail.ComputeLineEndX(doc.Camera.Zoom, ww);
+        if (x is { } val)
+            doc.Camera.OffsetX = val;
+    }
+
+    public void HandleArrowRelease(bool isHorizontal)
+    {
+        if (isHorizontal)
+        {
+            ActiveDocument?.Rail.StopScroll();
+            if (AutoScrollActive)
+                ActiveDocument?.Rail.SetAutoScrollBoost(false);
+        }
+    }
+
+    public void HandleClick(double canvasX, double canvasY)
+    {
+        if (ActiveDocument is not { } doc || !doc.Rail.Active || !doc.Rail.HasAnalysis) return;
+
+        double pageX = (canvasX - doc.Camera.OffsetX) / doc.Camera.Zoom;
+        double pageY = (canvasY - doc.Camera.OffsetY) / doc.Camera.Zoom;
+
+        if (doc.Rail.FindBlockAtPoint(pageX, pageY) is { } navIdx)
+        {
+            doc.Rail.CurrentBlock = navIdx;
+            doc.Rail.CurrentLine = 0;
+            var (ww, wh) = GetViewportSize();
+            doc.StartSnap(ww, wh);
+        }
+    }
+
+    // --- Auto-scroll ---
+
+    public void ToggleAutoScroll()
+    {
+        if (AutoScrollActive)
+        {
+            StopAutoScroll();
+            return;
+        }
+        if (ActiveDocument is not { } doc || !doc.Rail.Active) return;
+
+        doc.Rail.StartAutoScroll(AutoScrollSpeed);
+        AutoScrollActive = true;
+        StateChanged?.Invoke(nameof(AutoScrollActive));
+    }
+
+    public void StopAutoScroll()
+    {
+        ActiveDocument?.Rail.StopAutoScroll();
+        AutoScrollActive = false;
+        StateChanged?.Invoke(nameof(AutoScrollActive));
+    }
+
+    public void ToggleAutoScrollExclusive()
+    {
+        if (JumpMode) JumpMode = false;
+        ToggleAutoScroll();
+    }
+
+    public void ToggleJumpModeExclusive()
+    {
+        if (AutoScrollActive) StopAutoScroll();
+        JumpMode = !JumpMode;
+    }
+
+    private double AutoScrollSpeed =>
+        (_config.ScrollSpeedStart + _config.ScrollSpeedMax) / 2.0;
+
+    // --- Colour effects ---
+
+    public void SetColourEffect(ColourEffect effect)
+    {
+        _config.ColourEffect = effect;
+        _config.Save();
+        _colourEffects.Effect = effect;
+    }
+
+    // --- Config ---
+
+    public void OnConfigChanged()
+    {
+        _colourEffects.Effect = _config.ColourEffect;
+        _colourEffects.Intensity = (float)_config.ColourEffectIntensity;
+        foreach (var doc in Documents)
+        {
+            doc.Rail.UpdateConfig(_config);
+            doc.ReapplyNavigableClasses();
+        }
+        _config.Save();
+    }
+
+    public void OnSliderChanged()
+    {
+        foreach (var doc in Documents)
+            doc.Rail.UpdateConfig(_config);
+    }
+
+    // --- Tick (animation frame logic) ---
+
+    /// <summary>
+    /// Advance one animation frame. Returns what needs repainting.
+    /// </summary>
+    public TickResult Tick(double dt)
+    {
+        dt = Math.Min(dt, 0.05);
+
+        var doc = ActiveDocument;
+        if (doc is null) return default;
+
+        var (ww, wh) = GetViewportSize();
+        bool cameraChanged = false;
+        bool pageChanged = false;
+        bool overlayChanged = false;
+        bool annotationsChanged = false;
+        bool animating = false;
+
+        // Rail snap animation
+        double cx = doc.Camera.OffsetX, cy = doc.Camera.OffsetY;
+        bool railAnimating = doc.Rail.Tick(ref cx, ref cy, dt, doc.Camera.Zoom, ww);
+        if (cx != doc.Camera.OffsetX || cy != doc.Camera.OffsetY)
+        {
+            doc.Camera.OffsetX = cx;
+            doc.Camera.OffsetY = cy;
+            cameraChanged = true;
+        }
+        if (railAnimating) animating = true;
+
+        // Snap Y to integer pixel when rail mode is stable
+        if (_config.PixelSnapping && doc.Rail.Active && !animating)
+        {
+            double snapped = Math.Round(doc.Camera.OffsetY);
+            if (snapped != doc.Camera.OffsetY)
+            {
+                doc.Camera.OffsetY = snapped;
+                cameraChanged = true;
+            }
+        }
+
+        // Auto-scroll
+        if (doc.Rail.AutoScrolling)
+        {
+            cx = doc.Camera.OffsetX;
+            bool reachedEnd = doc.Rail.TickAutoScroll(ref cx, dt, doc.Camera.Zoom, ww);
+            if (cx != doc.Camera.OffsetX)
+            {
+                doc.Camera.OffsetX = cx;
+                cameraChanged = true;
+            }
+            animating = true;
+
+            if (reachedEnd)
+            {
+                int currentPage = doc.CurrentPage;
+                switch (doc.Rail.NextLine())
+                {
+                    case NavResult.PageBoundaryNext:
+                        doc.GoToPage(currentPage + 1, _worker, ww, wh);
+                        doc.QueueLookahead(_config.AnalysisLookaheadPages);
+                        if (doc.Rail.Active)
+                        {
+                            doc.StartSnap(ww, wh);
+                            doc.Rail.StartAutoScroll(AutoScrollSpeed);
+                            doc.Rail.PauseAutoScroll(_config.AutoScrollBlockPauseMs);
+                        }
+                        else
+                        {
+                            StopAutoScroll();
+                        }
+                        break;
+                    case NavResult.Ok:
+                        doc.StartSnap(ww, wh);
+                        doc.Rail.PauseAutoScroll(_config.AutoScrollLinePauseMs);
+                        break;
+                }
+                overlayChanged = true;
+            }
+        }
+
+        // Decay zoom blur speed
+        bool wasZooming = doc.Camera.ZoomSpeed > 0;
+        doc.Camera.DecayZoomSpeed(dt);
+        if (wasZooming) { animating = true; cameraChanged = true; }
+
+        // Poll analysis results
+        var (gotResults, needsAnim) = PollAnalysisResults();
+        if (needsAnim) animating = true;
+        if (gotResults) overlayChanged = true;
+
+        if (!animating)
+            doc.SubmitPendingLookahead(_worker);
+
+        // DPI bitmap swap
+        if (doc.DpiRenderReady)
+        {
+            doc.DpiRenderReady = false;
+            pageChanged = true;
+        }
+
+        if (animating) cameraChanged = true;
+
+        return new TickResult(cameraChanged, pageChanged, overlayChanged, false, annotationsChanged, animating);
+    }
+
+    /// <summary>
+    /// Poll the analysis worker for completed results. Can also be called
+    /// from a low-frequency timer when not animating.
+    /// </summary>
+    public (bool GotResults, bool NeedsAnimation) PollAnalysisResults()
+    {
+        bool got = false;
+        bool needsAnim = false;
+        if (_worker is null) return (false, false);
+        var (ww, wh) = GetViewportSize();
+        while (_worker.Poll() is { } result)
+        {
+            got = true;
+            Console.Error.WriteLine($"[Analysis] Got result for {Path.GetFileName(result.FilePath)} page {result.Page}: {result.Analysis.Blocks.Count} blocks");
+            foreach (var doc in Documents)
+            {
+                if (doc.FilePath != result.FilePath) continue;
+
+                doc.AnalysisCache[result.Page] = result.Analysis;
+                if (doc.CurrentPage == result.Page && doc.PendingRailSetup)
+                {
+                    doc.Rail.SetAnalysis(result.Analysis, _config.NavigableClasses);
+                    doc.PendingRailSetup = false;
+                    doc.UpdateRailZoom(ww, wh);
+                    Console.Error.WriteLine($"[Analysis] Rail has {doc.Rail.NavigableCount} navigable blocks, Active={doc.Rail.Active}");
+                    if (doc.Rail.Active)
+                    {
+                        doc.StartSnap(ww, wh);
+                        needsAnim = true;
+                    }
+                }
+            }
+        }
+        return (got, needsAnim);
+    }
+
+    // --- Annotation tool ---
+
+    public void SetAnnotationTool(AnnotationTool tool)
+    {
+        ActiveTool = tool;
+        SelectedAnnotation = null;
+        PreviewAnnotation = null;
+        _freehandPoints = null;
+        _highlightCharStart = -1;
+
+        if (tool != AnnotationTool.TextSelect)
+        {
+            SelectedText = null;
+            TextSelectionRects = null;
+            _textSelectCharStart = -1;
+        }
+
+        switch (tool)
+        {
+            case AnnotationTool.Highlight:
+                ActiveAnnotationColor = "#FFFF00";
+                ActiveAnnotationOpacity = 0.35f;
+                break;
+            case AnnotationTool.Pen:
+                ActiveAnnotationColor = "#FF0000";
+                ActiveAnnotationOpacity = 0.8f;
+                ActiveStrokeWidth = 2f;
+                break;
+            case AnnotationTool.Rectangle:
+                ActiveAnnotationColor = "#0066FF";
+                ActiveAnnotationOpacity = 0.5f;
+                ActiveStrokeWidth = 2f;
+                break;
+            case AnnotationTool.TextNote:
+                ActiveAnnotationColor = "#FFCC00";
+                ActiveAnnotationOpacity = 0.9f;
+                break;
+            case AnnotationTool.Eraser:
+            case AnnotationTool.None:
+                break;
+        }
+    }
+
+    public void CancelAnnotationTool()
+    {
+        PreviewAnnotation = null;
+        _freehandPoints = null;
+        _highlightCharStart = -1;
+        _textSelectCharStart = -1;
+        SelectedText = null;
+        TextSelectionRects = null;
+        ActiveTool = AnnotationTool.None;
+        SelectedAnnotation = null;
+    }
+
+    /// <summary>
+    /// Handle pointer down in annotation mode. Returns true if a text note dialog
+    /// is needed (caller should show dialog and call CompleteTextNote/CompleteTextNoteEdit).
+    /// </summary>
+    public (bool NeedsTextNoteDialog, bool IsEdit, TextNoteAnnotation? ExistingNote, float PageX, float PageY)
+        HandleAnnotationPointerDown(double pageX, double pageY)
+    {
+        if (ActiveDocument is not { } doc) return default;
+
+        switch (ActiveTool)
+        {
+            case AnnotationTool.TextSelect:
+                _textSelectCharStart = FindNearestCharIndex(doc, (float)pageX, (float)pageY);
+                SelectedText = null;
+                TextSelectionRects = null;
+                break;
+            case AnnotationTool.Highlight:
+                _highlightCharStart = FindNearestCharIndex(doc, (float)pageX, (float)pageY);
+                break;
+            case AnnotationTool.Pen:
+                _freehandPoints = [new PointF((float)pageX, (float)pageY)];
+                break;
+            case AnnotationTool.Rectangle:
+                _rectStartX = (float)pageX;
+                _rectStartY = (float)pageY;
+                break;
+            case AnnotationTool.TextNote:
+                var hitNote = FindTextNoteAtPoint(doc, (float)pageX, (float)pageY);
+                if (hitNote is not null)
+                    return (true, true, hitNote, (float)pageX, (float)pageY);
+                else
+                    return (true, false, null, (float)pageX, (float)pageY);
+            case AnnotationTool.Eraser:
+                EraseAtPoint(doc, (float)pageX, (float)pageY);
+                break;
+        }
+        return default;
+    }
+
+    /// <summary>
+    /// Complete a text note creation after dialog returns.
+    /// </summary>
+    public void CompleteTextNote(float pageX, float pageY, string text)
+    {
+        if (ActiveDocument is not { } doc || string.IsNullOrEmpty(text)) return;
+        var note = new TextNoteAnnotation
+        {
+            X = pageX,
+            Y = pageY,
+            Color = ActiveAnnotationColor,
+            Opacity = ActiveAnnotationOpacity,
+            Text = text,
+        };
+        doc.AddAnnotation(doc.CurrentPage, note);
+    }
+
+    /// <summary>
+    /// Complete a text note edit after dialog returns.
+    /// </summary>
+    public void CompleteTextNoteEdit(TextNoteAnnotation note, string newText)
+    {
+        if (ActiveDocument is not { } doc) return;
+        doc.UpdateAnnotationText(doc.CurrentPage, note, newText);
+    }
+
+    public bool HandleAnnotationPointerMove(double pageX, double pageY)
+    {
+        if (ActiveDocument is not { } doc) return false;
+        bool changed = false;
+
+        switch (ActiveTool)
+        {
+            case AnnotationTool.TextSelect when _textSelectCharStart >= 0:
+                int tsEnd = FindNearestCharIndex(doc, (float)pageX, (float)pageY);
+                if (tsEnd >= 0)
+                {
+                    int tsStart = Math.Min(_textSelectCharStart, tsEnd);
+                    int tsLen = Math.Max(_textSelectCharStart, tsEnd) - tsStart + 1;
+                    var pageText = doc.GetOrExtractText(doc.CurrentPage);
+                    TextSelectionRects = BuildHighlightRects(pageText, tsStart, tsLen);
+                    int textEnd = Math.Min(tsStart + tsLen, pageText.Text.Length);
+                    SelectedText = tsStart < pageText.Text.Length
+                        ? pageText.Text[tsStart..textEnd]
+                        : null;
+                    changed = true;
+                }
+                break;
+            case AnnotationTool.Highlight when _highlightCharStart >= 0:
+                int endChar = FindNearestCharIndex(doc, (float)pageX, (float)pageY);
+                if (endChar >= 0)
+                {
+                    int start = Math.Min(_highlightCharStart, endChar);
+                    int end = Math.Max(_highlightCharStart, endChar);
+                    var pageText = doc.GetOrExtractText(doc.CurrentPage);
+                    var rects = BuildHighlightRects(pageText, start, end - start + 1);
+                    PreviewAnnotation = new HighlightAnnotation
+                    {
+                        Rects = rects,
+                        Color = ActiveAnnotationColor,
+                        Opacity = ActiveAnnotationOpacity,
+                    };
+                    changed = true;
+                }
+                break;
+            case AnnotationTool.Pen when _freehandPoints is not null:
+                _freehandPoints.Add(new PointF((float)pageX, (float)pageY));
+                PreviewAnnotation = new FreehandAnnotation
+                {
+                    Points = [.. _freehandPoints],
+                    Color = ActiveAnnotationColor,
+                    Opacity = ActiveAnnotationOpacity,
+                    StrokeWidth = ActiveStrokeWidth,
+                };
+                changed = true;
+                break;
+            case AnnotationTool.Rectangle:
+                float rx = Math.Min(_rectStartX, (float)pageX);
+                float ry = Math.Min(_rectStartY, (float)pageY);
+                float rw = Math.Abs((float)pageX - _rectStartX);
+                float rh = Math.Abs((float)pageY - _rectStartY);
+                PreviewAnnotation = new RectAnnotation
+                {
+                    X = rx, Y = ry, W = rw, H = rh,
+                    Color = ActiveAnnotationColor,
+                    Opacity = ActiveAnnotationOpacity,
+                    StrokeWidth = ActiveStrokeWidth,
+                };
+                changed = true;
+                break;
+        }
+        return changed;
+    }
+
+    public bool HandleAnnotationPointerUp(double pageX, double pageY)
+    {
+        if (ActiveDocument is not { } doc) return false;
+        bool changed = false;
+
+        switch (ActiveTool)
+        {
+            case AnnotationTool.TextSelect:
+                _textSelectCharStart = -1;
+                break;
+            case AnnotationTool.Highlight when PreviewAnnotation is HighlightAnnotation h:
+                doc.AddAnnotation(doc.CurrentPage, h);
+                PreviewAnnotation = null;
+                _highlightCharStart = -1;
+                changed = true;
+                break;
+            case AnnotationTool.Pen when PreviewAnnotation is FreehandAnnotation f:
+                doc.AddAnnotation(doc.CurrentPage, f);
+                PreviewAnnotation = null;
+                _freehandPoints = null;
+                changed = true;
+                break;
+            case AnnotationTool.Rectangle when PreviewAnnotation is RectAnnotation r:
+                if (r.W > 1 && r.H > 1)
+                    doc.AddAnnotation(doc.CurrentPage, r);
+                PreviewAnnotation = null;
+                changed = true;
+                break;
+        }
+        return changed;
+    }
+
+    private void EraseAtPoint(DocumentState doc, float pageX, float pageY)
+    {
+        var list = GetCurrentPageAnnotations(doc);
+        if (list is null) return;
+        for (int i = list.Count - 1; i >= 0; i--)
+        {
+            if (AnnotationRenderer.HitTest(list[i], pageX, pageY))
+            {
+                doc.RemoveAnnotation(doc.CurrentPage, list[i]);
+                return;
+            }
+        }
+    }
+
+    public void CopySelectedText()
+    {
+        if (SelectedText is not null)
+            CopyToClipboard?.Invoke(SelectedText);
+    }
+
+    public void UndoAnnotation()
+    {
+        ActiveDocument?.Undo();
+    }
+
+    public void RedoAnnotation()
+    {
+        ActiveDocument?.Redo();
+    }
+
+    // --- Search ---
+
+    public void CloseSearch()
+    {
+        SearchMatches = [];
+        CurrentPageSearchMatches = null;
+        ActiveMatchIndex = 0;
+    }
+
+    public void ExecuteSearch(string query, bool caseSensitive, bool useRegex)
+    {
+        SearchMatches = [];
+        CurrentPageSearchMatches = null;
+        ActiveMatchIndex = 0;
+
+        if (string.IsNullOrEmpty(query) || ActiveDocument is not { } doc)
+            return;
+
+        Regex? regex = null;
+        if (useRegex)
+        {
+            try
+            {
+                var options = caseSensitive ? RegexOptions.None : RegexOptions.IgnoreCase;
+                regex = new Regex(query, options);
+            }
+            catch (RegexParseException)
+            {
+                return;
+            }
+        }
+
+        var allMatches = new List<SearchMatch>();
+        var comparison = caseSensitive ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
+
+        for (int page = 0; page < doc.PageCount; page++)
+        {
+            var pageText = doc.GetOrExtractText(page);
+            if (string.IsNullOrEmpty(pageText.Text)) continue;
+
+            IEnumerable<(int Index, int Length)> hits;
+            if (regex is not null)
+                hits = regex.Matches(pageText.Text).Select(m => (m.Index, m.Length));
+            else
+                hits = FindAllOccurrences(pageText.Text, query, comparison);
+
+            foreach (var (index, length) in hits)
+            {
+                var rects = BuildMatchRects(pageText, index, length);
+                if (rects.Count > 0)
+                    allMatches.Add(new SearchMatch(page, index, length, rects));
+            }
+        }
+
+        SearchMatches = allMatches;
+        if (allMatches.Count > 0)
+        {
+            int firstOnCurrentOrAfter = allMatches.FindIndex(m => m.PageIndex >= doc.CurrentPage);
+            ActiveMatchIndex = firstOnCurrentOrAfter >= 0 ? firstOnCurrentOrAfter : 0;
+            NavigateToActiveMatch();
+        }
+
+        UpdateCurrentPageMatches();
+    }
+
+    public void NextMatch()
+    {
+        if (SearchMatches.Count == 0) return;
+        ActiveMatchIndex = (ActiveMatchIndex + 1) % SearchMatches.Count;
+        NavigateToActiveMatch();
+        UpdateCurrentPageMatches();
+    }
+
+    public void PreviousMatch()
+    {
+        if (SearchMatches.Count == 0) return;
+        ActiveMatchIndex = (ActiveMatchIndex - 1 + SearchMatches.Count) % SearchMatches.Count;
+        NavigateToActiveMatch();
+        UpdateCurrentPageMatches();
+    }
+
+    private void NavigateToActiveMatch()
+    {
+        if (ActiveDocument is not { } doc) return;
+        if (ActiveMatchIndex < 0 || ActiveMatchIndex >= SearchMatches.Count) return;
+        var match = SearchMatches[ActiveMatchIndex];
+        if (match.PageIndex != doc.CurrentPage)
+            GoToPage(match.PageIndex);
+    }
+
+    public void UpdateCurrentPageMatches()
+    {
+        if (ActiveDocument is not { } doc)
+        {
+            CurrentPageSearchMatches = null;
+            return;
+        }
+        CurrentPageSearchMatches = SearchMatches
+            .Where(m => m.PageIndex == doc.CurrentPage)
+            .ToList();
+    }
+
+    // --- Query methods (for agent / headless use) ---
+
+    public DocumentList ListDocuments()
+    {
+        var summaries = Documents.Select((d, i) => new DocumentSummary(
+            i, d.FilePath, d.Title, d.PageCount, d.CurrentPage)).ToList();
+        return new DocumentList(ActiveDocumentIndex, summaries);
+    }
+
+    public DocumentInfo? GetDocumentInfo(int? index = null)
+    {
+        var doc = index.HasValue && index.Value >= 0 && index.Value < Documents.Count
+            ? Documents[index.Value]
+            : ActiveDocument;
+        if (doc is null) return null;
+
+        return new DocumentInfo(
+            doc.FilePath, doc.Title, doc.PageCount, doc.CurrentPage,
+            doc.Camera.Zoom, doc.Camera.OffsetX, doc.Camera.OffsetY,
+            doc.Rail.Active, doc.Rail.HasAnalysis, doc.Rail.NavigableCount,
+            AutoScrollActive, JumpMode);
+    }
+
+    public TextContent? GetPageText(int? page = null)
+    {
+        var doc = ActiveDocument;
+        if (doc is null) return null;
+        int p = page ?? doc.CurrentPage;
+        if (p < 0 || p >= doc.PageCount) return null;
+        var text = doc.GetOrExtractText(p);
+        return new TextContent(p, text.Text);
+    }
+
+    public LayoutInfo? GetLayoutInfo(int? page = null)
+    {
+        var doc = ActiveDocument;
+        if (doc is null) return null;
+        int p = page ?? doc.CurrentPage;
+        if (!doc.AnalysisCache.TryGetValue(p, out var analysis)) return null;
+
+        var navigableSet = Config.NavigableClasses;
+        var blocks = analysis.Blocks.Select(b =>
+        {
+            var className = b.ClassId >= 0 && b.ClassId < LayoutConstants.LayoutClasses.Length
+                ? LayoutConstants.LayoutClasses[b.ClassId]
+                : $"class_{b.ClassId}";
+            return new BlockInfo(
+                className, b.BBox.X, b.BBox.Y, b.BBox.W, b.BBox.H,
+                b.Confidence, b.Order, b.Lines.Count,
+                navigableSet.Contains(b.ClassId));
+        }).ToList();
+
+        return new LayoutInfo(p, blocks);
+    }
+
+    public SearchResult GetSearchState()
+    {
+        var perPage = new Dictionary<int, int>();
+        foreach (var m in SearchMatches)
+        {
+            if (!perPage.TryGetValue(m.PageIndex, out var c)) c = 0;
+            perPage[m.PageIndex] = c + 1;
+        }
+        return new SearchResult(SearchMatches.Count, ActiveMatchIndex, perPage);
+    }
+
+    // --- Static helpers ---
+
+    public static string? FindModelPath()
+    {
+        const string filename = "PP-DocLayoutV3.onnx";
+        string?[] candidates =
+        [
+            Path.Combine(AppContext.BaseDirectory, "models", filename),
+            Environment.GetEnvironmentVariable("APPDIR") is { } appDir
+                ? Path.Combine(appDir, "models", filename) : null,
+            Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "railreader2", "models", filename),
+            Path.Combine("models", filename),
+            Path.Combine("..", "models", filename),
+            Path.Combine("..", "..", "models", filename),
+            Path.Combine("..", "..", "..", "models", filename),
+        ];
+
+        foreach (var path in candidates)
+        {
+            if (path is not null && File.Exists(path))
+                return Path.GetFullPath(path);
+        }
+        return null;
+    }
+
+    private static List<Annotation>? GetCurrentPageAnnotations(DocumentState doc)
+    {
+        if (doc.Annotations is null) return null;
+        return doc.Annotations.Pages.TryGetValue(doc.CurrentPage, out var list) ? list : null;
+    }
+
+    private static TextNoteAnnotation? FindTextNoteAtPoint(DocumentState doc, float pageX, float pageY)
+    {
+        if (GetCurrentPageAnnotations(doc) is not { } list) return null;
+        for (int i = list.Count - 1; i >= 0; i--)
+        {
+            if (list[i] is TextNoteAnnotation tn && AnnotationRenderer.HitTest(tn, pageX, pageY))
+                return tn;
+        }
+        return null;
+    }
+
+    private static int FindNearestCharIndex(DocumentState doc, float pageX, float pageY)
+    {
+        var pageText = doc.GetOrExtractText(doc.CurrentPage);
+        if (pageText.CharBoxes.Count == 0) return -1;
+
+        float bestDist = float.MaxValue;
+        int bestIdx = -1;
+        for (int i = 0; i < pageText.CharBoxes.Count; i++)
+        {
+            var cb = pageText.CharBoxes[i];
+            if (cb.Left == 0 && cb.Right == 0 && cb.Top == 0 && cb.Bottom == 0) continue;
+            float cx = (cb.Left + cb.Right) / 2;
+            float cy = (cb.Top + cb.Bottom) / 2;
+            float dist = (cx - pageX) * (cx - pageX) + (cy - pageY) * (cy - pageY);
+            if (dist < bestDist) { bestDist = dist; bestIdx = i; }
+        }
+        return bestIdx;
+    }
+
+    private static List<HighlightRect> BuildHighlightRects(PageText pageText, int charStart, int charLength)
+    {
+        var rects = new List<HighlightRect>();
+        foreach (var (l, t, r, b) in MergeCharBoxesIntoLines(pageText, charStart, charLength))
+            rects.Add(new HighlightRect(l - 1, t, r - l + 2, b - t));
+        return rects;
+    }
+
+    private static List<SKRect> BuildMatchRects(PageText pageText, int charStart, int charLength)
+    {
+        var rects = new List<SKRect>();
+        foreach (var (l, t, r, b) in MergeCharBoxesIntoLines(pageText, charStart, charLength))
+            rects.Add(new SKRect(l, t, r, b));
+        return rects;
+    }
+
+    private static IEnumerable<(int Index, int Length)> FindAllOccurrences(string text, string query, StringComparison comparison)
+    {
+        int pos = 0;
+        while (pos < text.Length)
+        {
+            int idx = text.IndexOf(query, pos, comparison);
+            if (idx < 0) break;
+            yield return (idx, query.Length);
+            pos = idx + 1;
+        }
+    }
+
+    private static IEnumerable<(float Left, float Top, float Right, float Bottom)> MergeCharBoxesIntoLines(
+        PageText pageText, int charStart, int charLength)
+    {
+        if (pageText.CharBoxes.Count == 0) yield break;
+
+        int end = Math.Min(charStart + charLength, pageText.CharBoxes.Count);
+        float curLeft = 0, curTop = 0, curRight = 0, curBottom = 0;
+        bool hasRect = false;
+        const float lineThreshold = 4f;
+
+        for (int i = charStart; i < end; i++)
+        {
+            var cb = pageText.CharBoxes[i];
+            if (cb.Left == 0 && cb.Right == 0 && cb.Top == 0 && cb.Bottom == 0) continue;
+
+            if (!hasRect)
+            {
+                curLeft = cb.Left; curTop = cb.Top; curRight = cb.Right; curBottom = cb.Bottom;
+                hasRect = true;
+            }
+            else if (Math.Abs(cb.Top - curTop) < lineThreshold)
+            {
+                curLeft = Math.Min(curLeft, cb.Left);
+                curRight = Math.Max(curRight, cb.Right);
+                curTop = Math.Min(curTop, cb.Top);
+                curBottom = Math.Max(curBottom, cb.Bottom);
+            }
+            else
+            {
+                yield return (curLeft, curTop, curRight, curBottom);
+                curLeft = cb.Left; curTop = cb.Top; curRight = cb.Right; curBottom = cb.Bottom;
+            }
+        }
+
+        if (hasRect)
+            yield return (curLeft, curTop, curRight, curBottom);
+    }
+}

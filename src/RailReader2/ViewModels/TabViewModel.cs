@@ -1,15 +1,18 @@
-using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
-using RailReader2.Models;
-using RailReader2.Services;
+using RailReader.Core;
+using RailReader.Core.Models;
+using RailReader.Core.Services;
 using SkiaSharp;
 
 namespace RailReader2.ViewModels;
 
+/// <summary>
+/// Thin Avalonia wrapper around <see cref="DocumentState"/>.
+/// Surfaces [ObservableProperty] for data binding and delegates all logic.
+/// </summary>
 public sealed partial class TabViewModel : ObservableObject, IDisposable
 {
-    private readonly PdfService _pdf;
-    private readonly AppConfig _config;
+    public DocumentState State { get; }
 
     [ObservableProperty] private string _title;
     [ObservableProperty] private int _currentPage;
@@ -18,446 +21,117 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
     [ObservableProperty] private bool _debugOverlay;
     [ObservableProperty] private bool _pendingRailSetup;
 
-    public string FilePath { get; }
-    public int PageCount { get; }
-    public PdfService Pdf => _pdf;
-    public Camera Camera { get; } = new();
-    public RailNav Rail { get; }
-    public Dictionary<int, PageAnalysis> AnalysisCache { get; } = [];
-    public Dictionary<int, PageText> TextCache { get; } = [];
-    public Queue<int> PendingAnalysis { get; } = new();
-    public List<OutlineEntry> Outline { get; }
+    public string FilePath => State.FilePath;
+    public int PageCount => State.PageCount;
+    public PdfService Pdf => State.Pdf;
+    public Camera Camera => State.Camera;
+    public RailNav Rail => State.Rail;
+    public Dictionary<int, PageAnalysis> AnalysisCache => State.AnalysisCache;
+    public Dictionary<int, PageText> TextCache => State.TextCache;
+    public Queue<int> PendingAnalysis => State.PendingAnalysis;
+    public List<OutlineEntry> Outline => State.Outline;
 
-    // Annotations
-    public AnnotationFile? Annotations { get; set; }
-    public bool AnnotationsDirty { get; set; }
-    public Stack<IUndoAction> UndoStack { get; } = new();
-    public Stack<IUndoAction> RedoStack { get; } = new();
-    private readonly DispatcherTimer _autoSaveTimer = new() { Interval = TimeSpan.FromSeconds(1) };
+    // Annotations — delegated to State
+    public AnnotationFile? Annotations
+    {
+        get => State.Annotations;
+        set => State.Annotations = value;
+    }
+    public bool AnnotationsDirty
+    {
+        get => State.AnnotationsDirty;
+        set => State.AnnotationsDirty = value;
+    }
+    public Stack<IUndoAction> UndoStack => State.UndoStack;
+    public Stack<IUndoAction> RedoStack => State.RedoStack;
 
-    // Cached page bitmap, GPU-ready image, and the DPI it was rendered at
-    public SKBitmap? CachedBitmap { get; private set; }
-    public SKImage? CachedImage { get; private set; }
-    public int CachedDpi { get; private set; }
+    // Cached bitmaps — delegated to State
+    public SKBitmap? CachedBitmap => State.CachedBitmap;
+    public SKImage? CachedImage => State.CachedImage;
+    public int CachedDpi => State.CachedDpi;
+    public SKBitmap? MinimapBitmap => State.MinimapBitmap;
 
-    // Small pre-scaled thumbnail used by the minimap (≤200×280 px).
-    // Re-rendered only on page change, not on DPI upgrades.
-    public SKBitmap? MinimapBitmap { get; private set; }
+    public bool DpiRenderReady
+    {
+        get => State.DpiRenderReady;
+        set => State.DpiRenderReady = value;
+    }
+
+    public Action? OnDpiRenderComplete
+    {
+        get => State.OnDpiRenderComplete;
+        set => State.OnDpiRenderComplete = value;
+    }
 
     public TabViewModel(string filePath, AppConfig config)
+        : this(new DocumentState(filePath, config, new AvaloniaThreadMarshaller()))
     {
-        _config = config;
-        FilePath = filePath;
-        _pdf = new PdfService(filePath);
-        PageCount = _pdf.PageCount;
-        _title = Path.GetFileName(filePath);
-        Rail = new RailNav(config);
-        Outline = _pdf.Outline;
-
-        _autoSaveTimer.Tick += (_, _) =>
-        {
-            _autoSaveTimer.Stop();
-            SaveAnnotations();
-        };
     }
 
-    /// <summary>
-    /// Renders the current page bitmap. Safe to call from a background thread.
-    /// Does NOT submit analysis (which requires UI-thread access to the worker).
-    /// </summary>
-    public void LoadPageBitmap()
+    public TabViewModel(DocumentState state)
     {
-        try
-        {
-            // Don't dispose old bitmap here — the render thread may still be
-            // drawing it. Assign null first so the renderer sees no bitmap,
-            // then let GC collect the old one safely.
-            CachedImage = null;
-            CachedBitmap = null;
-            MinimapBitmap = null;
+        State = state;
 
-            var (w, h) = _pdf.GetPageSize(CurrentPage);
-            PageWidth = w;
-            PageHeight = h;
+        // Initialize from state
+        _title = state.Title;
+        _currentPage = state.CurrentPage;
+        _pageWidth = state.PageWidth;
+        _pageHeight = state.PageHeight;
+        _debugOverlay = state.DebugOverlay;
+        _pendingRailSetup = state.PendingRailSetup;
 
-            int dpi = PdfService.CalculateRenderDpi(Camera.Zoom);
-            CachedBitmap = _pdf.RenderPage(CurrentPage, dpi);
-            CachedImage = SKImage.FromBitmap(CachedBitmap);
-            CachedDpi = dpi;
-            MinimapBitmap = _pdf.RenderThumbnail(CurrentPage);
-        }
-        catch (Exception ex)
+        // Sync state changes back to observable properties
+        state.StateChanged += OnStateChanged;
+    }
+
+    private void OnStateChanged(string propertyName)
+    {
+        switch (propertyName)
         {
-            Console.Error.WriteLine($"Failed to render page {CurrentPage}: {ex.Message}");
-            CachedBitmap = null;
+            case nameof(Title): Title = State.Title; break;
+            case nameof(CurrentPage): CurrentPage = State.CurrentPage; break;
+            case nameof(PageWidth): PageWidth = State.PageWidth; break;
+            case nameof(PageHeight): PageHeight = State.PageHeight; break;
+            case nameof(DebugOverlay): DebugOverlay = State.DebugOverlay; break;
+            case nameof(PendingRailSetup): PendingRailSetup = State.PendingRailSetup; break;
         }
     }
 
-    private bool _dpiRenderPending;
+    // Sync observable property changes back to state (when set from UI side)
+    partial void OnTitleChanged(string value) => State.Title = value;
+    partial void OnCurrentPageChanged(int value) => State.CurrentPage = value;
+    partial void OnPageWidthChanged(double value) => State.PageWidth = value;
+    partial void OnPageHeightChanged(double value) => State.PageHeight = value;
+    partial void OnDebugOverlayChanged(bool value) => State.DebugOverlay = value;
+    partial void OnPendingRailSetupChanged(bool value) => State.PendingRailSetup = value;
 
-    /// <summary>
-    /// Set to true when a DPI re-render completes. The next animation frame
-    /// picks this up and invalidates the page layer atomically with the
-    /// camera update, avoiding mid-frame bitmap swaps.
-    /// </summary>
-    public bool DpiRenderReady { get; set; }
-
-    /// <summary>
-    /// Called on the UI thread when a DPI re-render completes, so the view can
-    /// request an animation frame to pick up the new bitmap.
-    /// </summary>
-    public Action? OnDpiRenderComplete { get; set; }
-
-    /// <summary>
-    /// Checks if the current zoom demands a different DPI and schedules an
-    /// async re-render on a background thread. Returns true if a render was
-    /// scheduled (caller should request an animation frame to pick up the result).
-    /// </summary>
-    public bool UpdateRenderDpiIfNeeded()
-    {
-        if (_dpiRenderPending) return false;
-
-        int neededDpi = PdfService.CalculateRenderDpi(Camera.Zoom);
-        if (neededDpi > CachedDpi * 1.5 || (neededDpi < CachedDpi * 0.5 && CachedDpi > 150))
-        {
-            _dpiRenderPending = true;
-            int page = CurrentPage;
-            Task.Run(() =>
-            {
-                try
-                {
-                    var newBitmap = _pdf.RenderPage(page, neededDpi);
-                    // Marshal bitmap to UI thread — SKImage.FromBitmap() is called
-                    // there to avoid GPU texture upload on the wrong thread.
-                    Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-                    {
-                        if (CurrentPage == page) // still on same page
-                        {
-                            var newImage = SKImage.FromBitmap(newBitmap);
-                            var oldImage = CachedImage;
-                            var oldBitmap = CachedBitmap;
-                            CachedBitmap = newBitmap;
-                            CachedImage = newImage;
-                            CachedDpi = neededDpi;
-                            DpiRenderReady = true;
-                            // Dispose old assets after swap so render thread sees
-                            // the new image before the old one is freed.
-                            oldImage?.Dispose();
-                            oldBitmap?.Dispose();
-                            OnDpiRenderComplete?.Invoke();
-                        }
-                        else
-                        {
-                            newBitmap.Dispose();
-                        }
-                        _dpiRenderPending = false;
-                    });
-                }
-                catch (Exception ex)
-                {
-                    Console.Error.WriteLine($"Failed to re-render page at {neededDpi} DPI: {ex.Message}");
-                    Avalonia.Threading.Dispatcher.UIThread.Post(() => _dpiRenderPending = false);
-                }
-            });
-            return true;
-        }
-        return false;
-    }
-
-    public void SubmitAnalysis(AnalysisWorker worker)
-    {
-        if (AnalysisCache.TryGetValue(CurrentPage, out var cached))
-        {
-            Console.Error.WriteLine($"[SubmitAnalysis] Page {CurrentPage}: cache hit, {cached.Blocks.Count} blocks");
-            ApplyAnalysis(cached);
-            return;
-        }
-
-        if (worker.IsInFlight(FilePath, CurrentPage))
-        {
-            Console.Error.WriteLine($"[SubmitAnalysis] Page {CurrentPage}: already in flight");
-            PendingRailSetup = true;
-            return;
-        }
-
-        // Capture page-specific values before the Task.Run closure, since
-        // CurrentPage/PageWidth/PageHeight may change if the user navigates
-        // while the background render is in flight.
-        int page = CurrentPage;
-        double pageW = PageWidth, pageH = PageHeight;
-        string filePath = FilePath;
-        PendingRailSetup = true;
-
-        Console.Error.WriteLine($"[SubmitAnalysis] Page {page}: scheduling pixmap on background thread...");
-        Task.Run(() =>
-        {
-            try
-            {
-                var (rgb, pxW, pxH) = _pdf.RenderPagePixmap(page, LayoutConstants.InputSize);
-                Console.Error.WriteLine($"[SubmitAnalysis] Page {page}: pixmap ready {pxW}x{pxH}, submitting...");
-                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-                {
-                    if (CurrentPage != page) return; // user navigated away; discard
-                    worker.Submit(new AnalysisRequest
-                    {
-                        FilePath = filePath,
-                        Page = page,
-                        RgbBytes = rgb,
-                        PxW = pxW,
-                        PxH = pxH,
-                        PageW = pageW,
-                        PageH = pageH,
-                    });
-                });
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine($"Failed to prepare analysis input: {ex.Message}");
-                Avalonia.Threading.Dispatcher.UIThread.Post(() => PendingRailSetup = false);
-            }
-        });
-    }
-
-    public void ReapplyNavigableClasses()
-    {
-        if (AnalysisCache.TryGetValue(CurrentPage, out var cached))
-            Rail.SetAnalysis(cached, _config.NavigableClasses);
-    }
-
-    private void ApplyAnalysis(PageAnalysis analysis)
-    {
-        Rail.SetAnalysis(analysis, _config.NavigableClasses);
-        PendingRailSetup = false;
-    }
-
-    public void QueueLookahead(int count)
-    {
-        PendingAnalysis.Clear();
-        for (int i = 1; i <= count; i++)
-        {
-            int page = CurrentPage + i;
-            if (page < PageCount && !AnalysisCache.ContainsKey(page))
-                PendingAnalysis.Enqueue(page);
-        }
-    }
-
-    public bool SubmitPendingLookahead(AnalysisWorker worker)
-    {
-        if (!worker.IsIdle) return false;
-        // Don't steal the worker for lookahead while the current page's
-        // analysis is still being prepared (Task.Run pixmap render → Post).
-        // Without this guard, the lookahead submits synchronously before
-        // the current page's async Post runs, delaying rail setup.
-        if (PendingRailSetup) return false;
-
-        while (PendingAnalysis.Count > 0)
-        {
-            int page = PendingAnalysis.Dequeue();
-            if (AnalysisCache.ContainsKey(page) || worker.IsInFlight(FilePath, page)) continue;
-
-            try
-            {
-                var (rgb, pxW, pxH) = _pdf.RenderPagePixmap(page, LayoutConstants.InputSize);
-                worker.Submit(new AnalysisRequest
-                {
-                    FilePath = FilePath, Page = page, RgbBytes = rgb, PxW = pxW, PxH = pxH,
-                    PageW = PageWidth, PageH = PageHeight,
-                });
-                return true;
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine($"Lookahead prepare failed for page {page + 1}: {ex.Message}");
-            }
-        }
-        return false;
-    }
-
-    public void GoToPage(int page, AnalysisWorker worker, double windowWidth, double windowHeight)
-    {
-        page = Math.Clamp(page, 0, PageCount - 1);
-        if (page == CurrentPage) return;
-
-        double oldZoom = Camera.Zoom;
-        CurrentPage = page;
-        LoadPageBitmap();
-        SubmitAnalysis(worker);
-        Camera.Zoom = oldZoom;
-        ClampCamera(windowWidth, windowHeight);
-    }
-
-    public void CenterPage(double windowWidth, double windowHeight)
-    {
-        if (PageWidth <= 0 || PageHeight <= 0 || windowWidth <= 0 || windowHeight <= 0) return;
-        double scaleX = windowWidth / PageWidth;
-        double scaleY = windowHeight / PageHeight;
-        Camera.Zoom = Math.Min(scaleX, scaleY);
-        double scaledW = PageWidth * Camera.Zoom;
-        double scaledH = PageHeight * Camera.Zoom;
-        Camera.OffsetX = (windowWidth - scaledW) / 2.0;
-        Camera.OffsetY = (windowHeight - scaledH) / 2.0;
-    }
-
-    public void FitWidth(double windowWidth, double windowHeight)
-    {
-        if (PageWidth <= 0 || windowWidth <= 0) return;
-        Camera.Zoom = Math.Clamp(windowWidth / PageWidth, Camera.ZoomMin, Camera.ZoomMax);
-        double scaledW = PageWidth * Camera.Zoom;
-        double scaledH = PageHeight * Camera.Zoom;
-        Camera.OffsetX = (windowWidth - scaledW) / 2.0;
-        Camera.OffsetY = scaledH <= windowHeight ? (windowHeight - scaledH) / 2.0 : 0;
-    }
-
-    public void ClampCamera(double windowWidth, double windowHeight)
-    {
-        double scaledW = PageWidth * Camera.Zoom;
-        double scaledH = PageHeight * Camera.Zoom;
-
-        if (scaledW <= windowWidth)
-            Camera.OffsetX = (windowWidth - scaledW) / 2.0;
-        else
-            Camera.OffsetX = Math.Clamp(Camera.OffsetX, windowWidth - scaledW, 0);
-
-        if (scaledH <= windowHeight)
-            Camera.OffsetY = (windowHeight - scaledH) / 2.0;
-        else
-            Camera.OffsetY = Math.Clamp(Camera.OffsetY, windowHeight - scaledH, 0);
-    }
-
-    public void ApplyZoom(double newZoom, double windowWidth, double windowHeight)
-    {
-        Camera.Zoom = Math.Clamp(newZoom, Camera.ZoomMin, Camera.ZoomMax);
-        UpdateRailZoom(windowWidth, windowHeight);
-        if (Rail.Active)
-            StartSnap(windowWidth, windowHeight);
-        ClampCamera(windowWidth, windowHeight);
-    }
-
-    public void UpdateRailZoom(double windowWidth, double windowHeight)
-    {
-        Rail.UpdateZoom(Camera.Zoom, Camera.OffsetX, Camera.OffsetY, windowWidth, windowHeight);
-    }
-
-    public void StartSnap(double windowWidth, double windowHeight)
-    {
-        Rail.StartSnapToCurrent(Camera.OffsetX, Camera.OffsetY, Camera.Zoom, windowWidth, windowHeight);
-    }
-
-    public void LoadAnnotations()
-    {
-        Annotations = AnnotationService.Load(FilePath) ?? new AnnotationFile
-        {
-            SourcePdf = Path.GetFileName(FilePath),
-        };
-    }
-
-    public void SaveAnnotations()
-    {
-        if (Annotations is not null && AnnotationsDirty)
-        {
-            bool hasAnnotations = Annotations.Pages.Values.Any(list => list.Count > 0);
-            var sidecarPath = AnnotationService.GetSidecarPath(FilePath);
-            if (hasAnnotations)
-            {
-                AnnotationService.Save(FilePath, Annotations);
-            }
-            else if (File.Exists(sidecarPath))
-            {
-                // All annotations removed — clean up the now-empty sidecar
-                try { File.Delete(sidecarPath); }
-                catch { /* ignore */ }
-            }
-            AnnotationsDirty = false;
-        }
-    }
-
-    public void MarkAnnotationsDirty()
-    {
-        AnnotationsDirty = true;
-        // Debounced auto-save: restart the timer on each modification
-        _autoSaveTimer.Stop();
-        _autoSaveTimer.Start();
-    }
-
-    public void AddAnnotation(int page, Annotation annotation)
-    {
-        if (Annotations is null) return;
-        if (!Annotations.Pages.TryGetValue(page, out var list))
-        {
-            list = [];
-            Annotations.Pages[page] = list;
-        }
-        list.Add(annotation);
-
-        var action = new AddAnnotationAction(page, annotation);
-        UndoStack.Push(action);
-        RedoStack.Clear();
-        MarkAnnotationsDirty();
-    }
-
-    public void UpdateAnnotationText(int page, TextNoteAnnotation note, string newText)
-    {
-        note.Text = newText;
-        MarkAnnotationsDirty();
-    }
-
-    public void RemoveAnnotation(int page, Annotation annotation)
-    {
-        if (Annotations is null) return;
-        var action = new RemoveAnnotationAction(page, annotation);
-        action.Redo(Annotations);
-
-        UndoStack.Push(action);
-        RedoStack.Clear();
-        MarkAnnotationsDirty();
-    }
-
-    public void Undo()
-    {
-        if (UndoStack.Count == 0 || Annotations is null) return;
-        var action = UndoStack.Pop();
-        action.Undo(Annotations);
-        RedoStack.Push(action);
-        MarkAnnotationsDirty();
-    }
-
-    public void Redo()
-    {
-        if (RedoStack.Count == 0 || Annotations is null) return;
-        var action = RedoStack.Pop();
-        action.Redo(Annotations);
-        UndoStack.Push(action);
-        MarkAnnotationsDirty();
-    }
-
-    /// <summary>
-    /// Returns cached text for a page, extracting it on first access.
-    /// PDFium text extraction is fast (<1ms per page typically), safe to call on UI thread.
-    /// </summary>
-    public PageText GetOrExtractText(int pageIndex)
-    {
-        if (TextCache.TryGetValue(pageIndex, out var cached))
-            return cached;
-        var text = PdfTextService.ExtractPageText(_pdf.PdfBytes, pageIndex);
-        TextCache[pageIndex] = text;
-        return text;
-    }
+    // All logic delegated to DocumentState
+    public void LoadPageBitmap() => State.LoadPageBitmap();
+    public bool UpdateRenderDpiIfNeeded() => State.UpdateRenderDpiIfNeeded();
+    public void SubmitAnalysis(AnalysisWorker? worker) => State.SubmitAnalysis(worker);
+    public void ReapplyNavigableClasses() => State.ReapplyNavigableClasses();
+    public void QueueLookahead(int count) => State.QueueLookahead(count);
+    public bool SubmitPendingLookahead(AnalysisWorker? worker) => State.SubmitPendingLookahead(worker);
+    public void GoToPage(int page, AnalysisWorker? worker, double ww, double wh) => State.GoToPage(page, worker, ww, wh);
+    public void CenterPage(double ww, double wh) => State.CenterPage(ww, wh);
+    public void FitWidth(double ww, double wh) => State.FitWidth(ww, wh);
+    public void ClampCamera(double ww, double wh) => State.ClampCamera(ww, wh);
+    public void ApplyZoom(double newZoom, double ww, double wh) => State.ApplyZoom(newZoom, ww, wh);
+    public void UpdateRailZoom(double ww, double wh) => State.UpdateRailZoom(ww, wh);
+    public void StartSnap(double ww, double wh) => State.StartSnap(ww, wh);
+    public void LoadAnnotations() => State.LoadAnnotations();
+    public void SaveAnnotations() => State.SaveAnnotations();
+    public void MarkAnnotationsDirty() => State.MarkAnnotationsDirty();
+    public void AddAnnotation(int page, Annotation annotation) => State.AddAnnotation(page, annotation);
+    public void UpdateAnnotationText(int page, TextNoteAnnotation note, string newText) => State.UpdateAnnotationText(page, note, newText);
+    public void RemoveAnnotation(int page, Annotation annotation) => State.RemoveAnnotation(page, annotation);
+    public void Undo() => State.Undo();
+    public void Redo() => State.Redo();
+    public PageText GetOrExtractText(int pageIndex) => State.GetOrExtractText(pageIndex);
 
     public void Dispose()
     {
-        _autoSaveTimer.Stop();
-        SaveAnnotations();
-        // Null references first so the render thread sees null,
-        // then dispose. The tab should already be removed from Tabs by now.
-        var img = CachedImage;
-        CachedImage = null;
-        img?.Dispose();
-        var bmp = CachedBitmap;
-        CachedBitmap = null;
-        bmp?.Dispose();
-        var mmBmp = MinimapBitmap;
-        MinimapBitmap = null;
-        mmBmp?.Dispose();
-        _pdf.Dispose();
+        State.StateChanged -= OnStateChanged;
+        State.Dispose();
     }
 }

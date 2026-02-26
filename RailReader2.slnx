@@ -1,5 +1,10 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/RailReader.Core/RailReader.Core.csproj" />
     <Project Path="src/RailReader2/RailReader2.csproj" />
+    <Project Path="src/RailReader.Agent/RailReader.Agent.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/RailReader.Core.Tests/RailReader.Core.Tests.csproj" />
   </Folder>
 </Solution>

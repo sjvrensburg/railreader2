@@ -25,15 +25,10 @@
     <PackageReference Include="Avalonia.Themes.Fluent" Version="11.*" />
     <PackageReference Include="Avalonia.Fonts.Inter" Version="11.*" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.*" />
-    <PackageReference Include="PDFtoImage" Version="5.*" />
-    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.*" />
+  </ItemGroup>
 
-    <!-- SkiaSharp 3.x override: Avalonia 11.3 bundles 2.88 but is compatible with 3.x.
-         Required for SKRuntimeEffect.CreateColorFilter (GPU colour filters). -->
-    <PackageReference Include="SkiaSharp" Version="3.*" />
-    <PackageReference Include="SkiaSharp.NativeAssets.Linux" Version="3.*" />
-    <PackageReference Include="SkiaSharp.NativeAssets.Win32" Version="3.*" />
-    <PackageReference Include="SkiaSharp.NativeAssets.macOS" Version="3.*" />
+  <ItemGroup>
+    <ProjectReference Include="../RailReader.Core/RailReader.Core.csproj" />
   </ItemGroup>
 
 </Project>
