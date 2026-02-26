@@ -192,7 +192,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
                         {
                             tab.StartSnap(ww, wh);
                             tab.Rail.StartAutoScroll(AutoScrollSpeed);
-                            tab.Rail.PauseAutoScroll(_config.AutoScrollBlockPauseMs);
+                            tab.Rail.PauseAutoScroll(_config.SnapDurationMs + _config.AutoScrollBlockPauseMs);
                         }
                         else
                         {
@@ -201,7 +201,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
                         break;
                     case NavResult.Ok:
                         tab.StartSnap(ww, wh);
-                        tab.Rail.PauseAutoScroll(_config.AutoScrollLinePauseMs);
+                        tab.Rail.PauseAutoScroll(_config.SnapDurationMs + _config.AutoScrollLinePauseMs);
                         break;
                 }
                 InvalidateOverlay();
