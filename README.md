@@ -68,7 +68,7 @@ At high zoom levels, navigation switches to "rail mode" — the viewer locks ont
 - **Jump mode** — saccade-style reading (J key) that advances by a configurable percentage of the visible width
 - **Line focus blur** — Gaussian blur on non-active lines to reduce peripheral distraction and perceived jitter
 - **Pixel snapping** — quantises camera positions to the pixel grid to eliminate sub-pixel text shimmer at high zoom
-- **Speed/blur toolbar** — docked vertical sliders for scroll speed (or jump distance in jump mode) and motion blur intensity, visible in rail mode
+- **Rail toolbar** — docked vertical toolbar with toggle buttons (P/J/F) for auto-scroll, jump mode, and line focus blur, plus sliders for scroll speed (or jump distance) and motion blur intensity; auto-scroll and jump mode are mutually exclusive
 - **Vertical position preservation** — maintains your panned vertical offset when navigating lines in rail mode
 - **Line snap shortcuts** — Home/End keys snap to the start/end of the current line in rail mode
 - **Fullscreen mode** — F11 hides all chrome for distraction-free reading; Escape exits
