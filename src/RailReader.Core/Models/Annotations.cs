@@ -40,6 +40,9 @@ public class TextNoteAnnotation : Annotation
     public float X { get; set; }
     public float Y { get; set; }
     public string Text { get; set; } = "";
+
+    [JsonIgnore]
+    public bool IsExpanded { get; set; }
 }
 
 public class RectAnnotation : Annotation
@@ -117,4 +120,96 @@ public class RemoveAnnotationAction : IUndoAction
             list.Remove(_annotation);
         }
     }
+}
+
+/// <summary>
+/// Undo action for moving an annotation by delta.
+/// Stores position snapshots to restore on undo.
+/// </summary>
+public class MoveAnnotationAction : IUndoAction
+{
+    private readonly Annotation _annotation;
+    private readonly PositionSnapshot _oldPosition;
+    private readonly PositionSnapshot _newPosition;
+
+    public MoveAnnotationAction(Annotation annotation, PositionSnapshot oldPosition, PositionSnapshot newPosition)
+    {
+        _annotation = annotation;
+        _oldPosition = oldPosition;
+        _newPosition = newPosition;
+    }
+
+    public void Undo(AnnotationFile file) => _oldPosition.ApplyTo(_annotation);
+    public void Redo(AnnotationFile file) => _newPosition.ApplyTo(_annotation);
+}
+
+/// <summary>
+/// Snapshot of an annotation's position for undo/redo.
+/// </summary>
+public class PositionSnapshot
+{
+    public float X { get; init; }
+    public float Y { get; init; }
+    public List<PointF>? Points { get; init; }
+    public List<HighlightRect>? Rects { get; init; }
+
+    public static PositionSnapshot Capture(Annotation annotation) => annotation switch
+    {
+        TextNoteAnnotation tn => new() { X = tn.X, Y = tn.Y },
+        FreehandAnnotation f => new() { Points = [.. f.Points] },
+        HighlightAnnotation h => new() { Rects = [.. h.Rects] },
+        RectAnnotation r => new() { X = r.X, Y = r.Y },
+        _ => new(),
+    };
+
+    public void ApplyTo(Annotation annotation)
+    {
+        switch (annotation)
+        {
+            case TextNoteAnnotation tn:
+                tn.X = X; tn.Y = Y;
+                break;
+            case FreehandAnnotation f when Points is not null:
+                f.Points = [.. Points];
+                break;
+            case HighlightAnnotation h when Rects is not null:
+                h.Rects = [.. Rects];
+                break;
+            case RectAnnotation r:
+                r.X = X; r.Y = Y;
+                break;
+        }
+    }
+}
+
+/// <summary>
+/// Resize handle positions on a bounding box.
+/// </summary>
+public enum ResizeHandle
+{
+    None,
+    TopLeft, Top, TopRight,
+    Right,
+    BottomRight, Bottom, BottomLeft,
+    Left,
+}
+
+/// <summary>
+/// Undo action for resizing a freehand annotation.
+/// </summary>
+public class ResizeFreehandAction : IUndoAction
+{
+    private readonly FreehandAnnotation _annotation;
+    private readonly List<PointF> _oldPoints;
+    private readonly List<PointF> _newPoints;
+
+    public ResizeFreehandAction(FreehandAnnotation annotation, List<PointF> oldPoints, List<PointF> newPoints)
+    {
+        _annotation = annotation;
+        _oldPoints = oldPoints;
+        _newPoints = newPoints;
+    }
+
+    public void Undo(AnnotationFile file) => _annotation.Points = [.. _oldPoints];
+    public void Redo(AnnotationFile file) => _annotation.Points = [.. _newPoints];
 }

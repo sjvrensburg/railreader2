@@ -424,6 +424,13 @@ public sealed class DocumentState : IDisposable
         MarkAnnotationsDirty();
     }
 
+    public void PushUndoAction(IUndoAction action)
+    {
+        UndoStack.Push(action);
+        RedoStack.Clear();
+        MarkAnnotationsDirty();
+    }
+
     public void RemoveAnnotation(int page, Annotation annotation)
     {
         if (Annotations is null) return;
