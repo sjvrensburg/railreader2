@@ -322,6 +322,7 @@
         <li><a href="#search">Search</a></li>
         <li><a href="#annotations">Annotations</a></li>
         <li><a href="#text-selection">Text Selection</a></li>
+        <li><a href="#bookmarks">Bookmarks</a></li>
         <li><a href="#settings">Settings</a></li>
         <li><a href="#shortcuts">Keyboard Shortcuts</a></li>
         <li><a href="#agent-cli">AI Agent CLI (Experimental)</a></li>
@@ -391,7 +392,8 @@
       </p>
       <p>
         Press <code>Ctrl+Shift+O</code> to open the <strong>outline panel</strong> (table of contents).
-        Click entries to jump to sections.
+        Click entries to jump to sections. Press <code>Ctrl+Shift+B</code> to open the
+        <strong>bookmarks panel</strong> &mdash; see <a href="#bookmarks">Bookmarks</a>.
       </p>
 
       <h3>Multi-tab</h3>
@@ -509,6 +511,23 @@
       <p>
         Toggle with the <code>F</code> key, the <strong>F</strong> button on the rail toolbar, or in Settings &rarr; Rail Reading.
         Blur intensity is adjustable from 0 (off) to 1 (maximum, sigma 4.0).
+      </p>
+
+      <h3>Line highlight tint</h3>
+      <p>
+        The active line in rail mode can have a configurable colour tint applied as an overlay.
+        This makes the current line stand out more clearly, especially at high magnification.
+      </p>
+      <p>Choose from five presets in Settings &rarr; Rail Reading:</p>
+      <ul>
+        <li><strong>Auto</strong> &mdash; Adapts to the active colour effect (amber for Amber, green for HighContrast/HighVisibility, etc.)</li>
+        <li><strong>Yellow</strong> &mdash; Warm yellow highlighter</li>
+        <li><strong>Cyan</strong> &mdash; Cool cyan tint</li>
+        <li><strong>Green</strong> &mdash; Soft green tint</li>
+        <li><strong>None</strong> &mdash; No tint &mdash; line is highlighted by dimming only</li>
+      </ul>
+      <p>
+        Opacity is adjustable from 0.0 (invisible) to 1.0 (fully opaque). The default is Auto at 25% opacity.
       </p>
     </section>
 
@@ -662,7 +681,41 @@
       </p>
     </section>
 
-    <!-- 11. Settings -->
+    <!-- 11. Bookmarks -->
+    <section class="guide-section" id="bookmarks">
+      <h2>Bookmarks</h2>
+      <p>
+        Press <code>B</code> to bookmark the current page, or click <strong>+ Add Bookmark</strong>
+        in the bookmarks panel. A dialog lets you name the bookmark (pre-filled with "Page N").
+      </p>
+
+      <h3>Managing bookmarks</h3>
+      <p>
+        Press <code>Ctrl+Shift+B</code> to open the bookmarks panel (a tab alongside the outline panel).
+        Each bookmark shows its name and page number.
+      </p>
+      <ul>
+        <li><strong>Navigate:</strong> Click a bookmark to jump to that page (zoom resets to fit the page).</li>
+        <li><strong>Rename:</strong> Click the <strong>Rename</strong> button on a bookmark to change its name.</li>
+        <li><strong>Delete:</strong> Click the <strong>Delete</strong> button to remove a bookmark.</li>
+        <li><strong>Back:</strong> After navigating to a bookmark, a <strong>&ldquo;Back to previous location&rdquo;</strong>
+          button appears at the top of the list. Click it or press <code>`</code> (backtick) to return to where you were.</li>
+      </ul>
+
+      <h3>Duplicate handling</h3>
+      <p>
+        If you bookmark a page that already has a bookmark, the existing bookmark's name is updated
+        instead of creating a duplicate.
+      </p>
+
+      <h3>Persistence</h3>
+      <p>
+        Bookmarks are stored in the same annotation sidecar file as highlights, notes, and other
+        annotations. They persist across sessions automatically.
+      </p>
+    </section>
+
+    <!-- 12. Settings -->
     <section class="guide-section" id="settings">
       <h2>Settings</h2>
       <p>
@@ -686,6 +739,7 @@
         <li><strong>Ramp Time:</strong> Seconds to reach max scroll speed from start.</li>
         <li><strong>Pixel Snapping:</strong> Quantise camera to pixel grid to reduce text shimmer.</li>
         <li><strong>Line Focus Blur:</strong> Toggle and set intensity.</li>
+        <li><strong>Line Highlight Tint:</strong> Choose a colour tint for the active line (Auto, Yellow, Cyan, Green, None) and set opacity.</li>
         <li><strong>Jump Distance:</strong> Percentage of visible width for jump mode (5&ndash;80%).</li>
       </ul>
 
@@ -722,6 +776,7 @@
         <tr><td>Ctrl+,</td><td>Settings</td></tr>
         <tr><td>Ctrl+M</td><td>Toggle minimap</td></tr>
         <tr><td>Ctrl+Shift+O</td><td>Toggle outline panel</td></tr>
+        <tr><td>Ctrl+Shift+B</td><td>Toggle bookmarks panel</td></tr>
         <tr><td>Ctrl+G</td><td>Go to page</td></tr>
         <tr><td>F1</td><td>Keyboard shortcuts dialog</td></tr>
         <tr><td>F11</td><td>Toggle fullscreen</td></tr>
@@ -741,6 +796,8 @@
         <tr><td>Home / End</td><td>Line start / end</td></tr>
         <tr><td>P</td><td>Toggle auto-scroll</td></tr>
         <tr><td>J</td><td>Toggle jump mode</td></tr>
+        <tr><td>B</td><td>Add bookmark for current page</td></tr>
+        <tr><td>` (backtick)</td><td>Navigate back to previous location</td></tr>
         <tr><td>C</td><td>Cycle colour effect on active tab</td></tr>
         <tr><td>F</td><td>Toggle line focus blur</td></tr>
         <tr><td>[ / ]</td><td>Adjust speed or jump distance</td></tr>

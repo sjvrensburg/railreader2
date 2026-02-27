@@ -44,7 +44,7 @@ At high zoom levels, navigation switches to "rail mode" — the viewer locks ont
 - **Multi-tab support** — open multiple PDFs with independent per-tab state
 - **Menu bar** — File, View, Navigation, Help menus with keyboard shortcuts
 - **Interactive minimap** — click or drag to navigate the page
-- **Outline panel** — table of contents with collapsible hierarchy
+- **Outline and bookmarks panel** — tabbed pane with table of contents and named bookmarks (Ctrl+Shift+O for outline, Ctrl+Shift+B for bookmarks)
 - **Settings panel** — live-editable rail reading parameters with persistence
 - **Keyboard shortcuts dialog** — press F1 or Help → Keyboard Shortcuts for a complete reference
 - **On-screen nav buttons** — ◀/▶ buttons in the status bar for mouse-only page navigation
@@ -75,6 +75,8 @@ At high zoom levels, navigation switches to "rail mode" — the viewer locks ont
 - **Rail toolbar** — docked vertical toolbar with toggle buttons (P/J/F) for auto-scroll, jump mode, and line focus blur, plus sliders for scroll speed (or jump distance) and motion blur intensity; auto-scroll and jump mode are mutually exclusive
 - **Vertical position preservation** — maintains your panned vertical offset when navigating lines in rail mode
 - **Line snap shortcuts** — Home/End keys snap to the start/end of the current line in rail mode
+- **Named bookmarks** — bookmark any page with a custom name (B key or + button in the bookmarks pane). Navigate to bookmarks with a single click. Rename and delete inline. "Back to previous location" button for quick return after jumping. Bookmarks persist in the annotation sidecar file
+- **Line highlight tint** — configurable colour tint on the active line in rail mode (Auto, Yellow, Cyan, Green, or None) with adjustable opacity. Auto adapts to the active colour effect
 - **Fullscreen mode** — F11 hides all chrome for distraction-free reading; Escape exits
 - **Tabbed settings** — organised settings panel with Appearance, Rail Reading, Auto-Scroll, and Advanced tabs
 - **Tooltips** — all interactive controls have descriptive tooltips
@@ -112,12 +114,15 @@ dotnet run -c Release --project src/RailReader2 --
 | Home / End | Line start / end (rail mode) or first / last page |
 | P | Toggle auto-scroll (rail mode), D/Right to boost |
 | J | Toggle jump mode (saccade-style advance) |
+| B | Add bookmark for current page |
+| ` (backtick) | Navigate back to previous location |
 | C | Cycle colour effect on active tab |
 | F | Toggle line focus blur (rail mode) |
 | Shift+Right / Shift+Left | Short jump — half distance (jump mode) |
 | [ / ] | Adjust scroll speed or jump distance (rail mode) |
 | Shift+[ / Shift+] | Adjust blur intensity (rail mode) |
 | D (shift) | Toggle debug overlay (shows detected blocks) |
+| Ctrl+Shift+B | Toggle bookmarks pane |
 | Ctrl+F | Open search bar |
 | F3 / Shift+F3 | Next / previous search match |
 | Right-click | Open annotation radial menu |
@@ -148,6 +153,8 @@ Rail reading parameters are editable via the Settings panel (gear icon in menu b
   "pixel_snapping": true,
   "line_focus_blur": false,
   "line_focus_blur_intensity": 0.5,
+  "line_highlight_tint": "Auto",
+  "line_highlight_opacity": 0.25,
   "auto_scroll_line_pause_ms": 400.0,
   "auto_scroll_block_pause_ms": 600.0,
   "jump_percentage": 25.0,
@@ -175,6 +182,8 @@ Rail reading parameters are editable via the Settings panel (gear icon in menu b
 | `pixel_snapping` | Quantise camera positions to pixel grid to reduce text shimmer (`true`/`false`) |
 | `line_focus_blur` | Gaussian blur on non-active lines in rail mode (`true`/`false`) |
 | `line_focus_blur_intensity` | Line focus blur strength from 0.0 (off) to 1.0 (maximum) |
+| `line_highlight_tint` | Colour tint on active line in rail mode: `Auto`, `Yellow`, `Cyan`, `Green`, `None` |
+| `line_highlight_opacity` | Line highlight tint opacity from 0.0 (off) to 1.0 (full) |
 | `auto_scroll_line_pause_ms` | Pause duration at line boundaries during auto-scroll (ms, 0 to disable) |
 | `auto_scroll_block_pause_ms` | Pause duration at block boundaries during auto-scroll (ms, 0 to disable) |
 | `jump_percentage` | Jump distance as percentage of visible width (5–80%) |

@@ -16,9 +16,10 @@ Everything you need to know to get the most out of railreader2.
 8. [Search](#search)
 9. [Annotations](#annotations)
 10. [Text Selection](#text-selection)
-11. [Settings](#settings)
-12. [Keyboard Shortcuts](#keyboard-shortcuts)
-13. [AI Agent CLI (Experimental)](#ai-agent-cli-experimental)
+11. [Bookmarks](#bookmarks)
+12. [Settings](#settings)
+13. [Keyboard Shortcuts](#keyboard-shortcuts)
+14. [AI Agent CLI (Experimental)](#ai-agent-cli-experimental)
 
 ---
 
@@ -62,7 +63,7 @@ Once a PDF is open, scroll through pages with `PgDn`/`PgUp`, zoom with `+`/`-` o
 
 Press `Ctrl+M` to toggle the **minimap** — a small page thumbnail in the corner. Click or drag on it to navigate.
 
-Press `Ctrl+Shift+O` to open the **outline panel** (table of contents). Click entries to jump to sections.
+Press `Ctrl+Shift+O` to open the **outline panel** (table of contents). Click entries to jump to sections. Press `Ctrl+Shift+B` to open the **bookmarks panel** — see [Bookmarks](#bookmarks).
 
 ### Multi-tab
 
@@ -133,6 +134,22 @@ When enabled, line focus blur applies a Gaussian blur to the entire page except 
 *Line focus blur — non-active lines are blurred to reduce distraction*
 
 Toggle with the `F` key, the **F** button on the rail toolbar, or in Settings > Rail Reading. Blur intensity is adjustable from 0 (off) to 1 (maximum).
+
+### Line highlight tint
+
+The active line in rail mode can have a configurable colour tint applied as an overlay. This makes the current line stand out more clearly, especially at high magnification.
+
+Choose from five presets in Settings > Rail Reading:
+
+| Tint | Description |
+|------|-------------|
+| **Auto** | Adapts to the active colour effect (amber tint for Amber, green for HighContrast/HighVisibility, etc.) |
+| **Yellow** | Warm yellow highlighter |
+| **Cyan** | Cool cyan tint |
+| **Green** | Soft green tint |
+| **None** | No tint — line is highlighted by dimming only |
+
+Opacity is adjustable from 0.0 (invisible) to 1.0 (fully opaque). The default is Auto at 25% opacity.
 
 ---
 
@@ -234,6 +251,29 @@ Press `Escape` to cancel selection and return to browse mode.
 
 ---
 
+## Bookmarks
+
+Press `B` to bookmark the current page, or click **+ Add Bookmark** in the bookmarks panel. A dialog lets you name the bookmark (pre-filled with "Page N").
+
+### Managing bookmarks
+
+Press `Ctrl+Shift+B` to open the bookmarks panel (a tab alongside the outline panel). Each bookmark shows its name and page number.
+
+- **Navigate:** Click a bookmark to jump to that page (zoom resets to fit the page).
+- **Rename:** Click the **Rename** button on a bookmark to change its name.
+- **Delete:** Click the **Delete** button to remove a bookmark.
+- **Back:** After navigating to a bookmark, a **"Back to previous location"** button appears at the top of the list. Click it or press `` ` `` (backtick) to return to where you were.
+
+### Duplicate handling
+
+If you bookmark a page that already has a bookmark, the existing bookmark's name is updated instead of creating a duplicate.
+
+### Persistence
+
+Bookmarks are stored in the same annotation sidecar file as highlights, notes, and other annotations (`<pdf>.railreader2.json`). They persist across sessions automatically.
+
+---
+
 ## Settings
 
 Press `Ctrl+,` or use the menu to open Settings. Changes take effect immediately and are saved automatically.
@@ -251,6 +291,7 @@ Press `Ctrl+,` or use the menu to open Settings. Changes take effect immediately
 - **Ramp Time:** Seconds to reach max scroll speed from start.
 - **Pixel Snapping:** Quantise camera to pixel grid to reduce text shimmer.
 - **Line Focus Blur:** Toggle and set intensity.
+- **Line Highlight Tint:** Choose a colour tint for the active line (Auto, Yellow, Cyan, Green, None) and set opacity.
 - **Jump Distance:** Percentage of visible width for jump mode (5–80%).
 
 ### Auto-Scroll
@@ -280,6 +321,7 @@ Configuration is stored at `~/.config/railreader2/config.json` (Linux) or `%APPD
 | `Ctrl+,` | Settings |
 | `Ctrl+M` | Toggle minimap |
 | `Ctrl+Shift+O` | Toggle outline panel |
+| `Ctrl+Shift+B` | Toggle bookmarks panel |
 | `Ctrl+G` | Go to page |
 | `F1` | Keyboard shortcuts dialog |
 | `F11` | Toggle fullscreen |
@@ -307,6 +349,8 @@ Configuration is stored at `~/.config/railreader2/config.json` (Linux) or `%APPD
 | `Home` / `End` | Line start / end |
 | `P` | Toggle auto-scroll |
 | `J` | Toggle jump mode |
+| `B` | Add bookmark for current page |
+| `` ` `` (backtick) | Navigate back to previous location |
 | `C` | Cycle colour effect on active tab |
 | `F` | Toggle line focus blur |
 | `[` / `]` | Adjust speed or jump distance |
