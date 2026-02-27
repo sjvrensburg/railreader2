@@ -14,6 +14,8 @@ namespace RailReader2.Controls;
 /// Each segment has a label, an icon (Font Awesome Unicode char), and an action.
 /// To add new segments, simply append to the list passed to SetSegments().
 /// Use IconChars constants for common icons, or any Font Awesome solid codepoint.
+/// When a segment has ColorOptions, tapping it shows an outer arc of colour dots
+/// instead of immediately activating the tool.
 /// </summary>
 public class RadialMenu : Control
 {
@@ -31,7 +33,10 @@ public class RadialMenu : Control
         public const string Xmark       = "\uf00d";
     }
 
-    public record Segment(string Label, string Icon, Action Action);
+    public record ColorOption(string HexColor, float Opacity, Action SelectAction);
+
+    public record Segment(string Label, string Icon, Action Action,
+        List<ColorOption>? ColorOptions = null, int ActiveColorIndex = 0);
 
     private static SKTypeface? s_iconTypeface;
     private readonly List<Segment> _segments = [];
@@ -39,10 +44,15 @@ public class RadialMenu : Control
     private bool _hoveringCentre;
     private Action? _onClose;
 
+    // Outer colour ring state
+    private int _expandedSegment = -1;
+    private int _hoveredColorIndex = -1;
+
     private double _scale = 1.0;
 
     public double InnerRadius { get; set; } = 30;
     public double OuterRadius { get; set; } = 95;
+    private double ColorRingRadius => OuterRadius + 22 * _scale;
 
     /// <summary>
     /// UI scale factor (typically AppConfig.UiFontScale). Scales radii, font sizes, and control dimensions.
@@ -70,8 +80,8 @@ public class RadialMenu : Control
         double s = _scale;
         InnerRadius = 30 * s;
         OuterRadius = 95 * s;
-        Width = 210 * s;
-        Height = 210 * s;
+        Width = 260 * s;  // Wider to accommodate colour ring
+        Height = 260 * s;
         InvalidateVisual();
     }
 
@@ -101,6 +111,19 @@ public class RadialMenu : Control
         _segments.Clear();
         _segments.AddRange(segments);
         _onClose = onClose;
+        _expandedSegment = -1;
+        _hoveredColorIndex = -1;
+        InvalidateVisual();
+    }
+
+    /// <summary>
+    /// Update the active colour index for a segment (e.g. after controller state changes).
+    /// </summary>
+    public void UpdateSegmentColorIndex(int segmentIndex, int colorIndex)
+    {
+        if (segmentIndex < 0 || segmentIndex >= _segments.Count) return;
+        var seg = _segments[segmentIndex];
+        _segments[segmentIndex] = seg with { ActiveColorIndex = colorIndex };
         InvalidateVisual();
     }
 
@@ -114,11 +137,26 @@ public class RadialMenu : Control
 
         int oldHover = _hoveredIndex;
         bool oldCentre = _hoveringCentre;
+        int oldColorHover = _hoveredColorIndex;
+
+        _hoveredColorIndex = -1;
 
         if (dist < InnerRadius)
         {
             _hoveringCentre = true;
             _hoveredIndex = -1;
+        }
+        else if (_expandedSegment >= 0 && dist >= OuterRadius && dist <= ColorRingRadius + 10 * _scale)
+        {
+            // Check if hovering a colour dot in the expanded segment
+            _hoveringCentre = false;
+            _hoveredIndex = _expandedSegment;
+            var seg = _segments[_expandedSegment];
+            if (seg.ColorOptions is { Count: > 0 } opts)
+            {
+                int hitIdx = HitTestColorDot(dx, dy, _expandedSegment, opts.Count);
+                _hoveredColorIndex = hitIdx;
+            }
         }
         else if (dist < OuterRadius && _segments.Count > 0)
         {
@@ -137,17 +175,68 @@ public class RadialMenu : Control
             _hoveredIndex = -1;
         }
 
-        if (_hoveredIndex != oldHover || _hoveringCentre != oldCentre)
+        if (_hoveredIndex != oldHover || _hoveringCentre != oldCentre || _hoveredColorIndex != oldColorHover)
             InvalidateVisual();
+    }
+
+    private int HitTestColorDot(double dx, double dy, int segIndex, int colorCount)
+    {
+        double segAngle = 2 * Math.PI / _segments.Count;
+        double startAngle = -Math.PI / 2 - segAngle / 2 + segIndex * segAngle;
+        double dotR = (OuterRadius + ColorRingRadius) / 2;
+        double dotSize = 7 * _scale;
+
+        for (int i = 0; i < colorCount; i++)
+        {
+            double t = (i + 0.5) / colorCount;
+            double angle = startAngle + t * segAngle;
+            double dotX = dotR * Math.Cos(angle);
+            double dotY = dotR * Math.Sin(angle);
+            double ddx = dx - dotX, ddy = dy - dotY;
+            if (ddx * ddx + ddy * ddy <= (dotSize + 4 * _scale) * (dotSize + 4 * _scale))
+                return i;
+        }
+        return -1;
     }
 
     protected override void OnPointerPressed(PointerPressedEventArgs e)
     {
         base.OnPointerPressed(e);
+
+        // Check colour dot tap first
+        if (_expandedSegment >= 0 && _hoveredColorIndex >= 0)
+        {
+            var seg = _segments[_expandedSegment];
+            if (seg.ColorOptions is { } opts && _hoveredColorIndex < opts.Count)
+            {
+                opts[_hoveredColorIndex].SelectAction.Invoke();
+                _expandedSegment = -1;
+                _hoveredColorIndex = -1;
+            }
+            e.Handled = true;
+            return;
+        }
+
         if (_hoveredIndex >= 0 && _hoveredIndex < _segments.Count)
-            _segments[_hoveredIndex].Action.Invoke();
+        {
+            var seg = _segments[_hoveredIndex];
+            if (seg.ColorOptions is { Count: > 0 })
+            {
+                // Toggle expanded state for this segment
+                _expandedSegment = _expandedSegment == _hoveredIndex ? -1 : _hoveredIndex;
+                InvalidateVisual();
+            }
+            else
+            {
+                _expandedSegment = -1;
+                seg.Action.Invoke();
+            }
+        }
         else
+        {
+            _expandedSegment = -1;
             _onClose?.Invoke();
+        }
         e.Handled = true;
     }
 
@@ -158,7 +247,8 @@ public class RadialMenu : Control
         double h = Height > 0 ? Height : Bounds.Height;
         context.Custom(new RadialMenuDrawOp(
             new Rect(0, 0, w, h), _segments, InnerRadius, OuterRadius,
-            _hoveredIndex, _hoveringCentre, s_iconTypeface, _scale));
+            _hoveredIndex, _hoveringCentre, s_iconTypeface, _scale,
+            _expandedSegment, _hoveredColorIndex, ColorRingRadius));
     }
 
     private sealed class RadialMenuDrawOp : ICustomDrawOperation
@@ -170,10 +260,14 @@ public class RadialMenu : Control
         private readonly bool _hoverCentre;
         private readonly SKTypeface? _iconTypeface;
         private readonly float _scale;
+        private readonly int _expandedSegment;
+        private readonly int _hoveredColorIndex;
+        private readonly double _colorRingR;
 
         public RadialMenuDrawOp(Rect bounds, List<Segment> segments,
             double innerR, double outerR, int hovered, bool hoverCentre,
-            SKTypeface? iconTypeface, double scale)
+            SKTypeface? iconTypeface, double scale,
+            int expandedSegment, int hoveredColorIndex, double colorRingR)
         {
             _bounds = bounds;
             _segments = [.. segments];
@@ -183,6 +277,9 @@ public class RadialMenu : Control
             _hoverCentre = hoverCentre;
             _iconTypeface = iconTypeface;
             _scale = (float)scale;
+            _expandedSegment = expandedSegment;
+            _hoveredColorIndex = hoveredColorIndex;
+            _colorRingR = colorRingR;
         }
 
         public Rect Bounds => _bounds;
@@ -234,11 +331,14 @@ public class RadialMenu : Control
                 {
                     float startA = startOffset + i * segAngle;
                     bool hovered = i == _hovered;
+                    bool expanded = i == _expandedSegment;
 
                     // Wedge fill
-                    var wedgeColor = hovered
-                        ? new SKColor(0, 120, 212, 210)
-                        : new SKColor(52, 52, 56, 220);
+                    var wedgeColor = expanded
+                        ? new SKColor(0, 100, 180, 210)
+                        : hovered
+                            ? new SKColor(0, 120, 212, 210)
+                            : new SKColor(52, 52, 56, 220);
                     using var wedgePaint = new SKPaint { Color = wedgeColor, IsAntialias = true };
 
                     using var wedgePath = new SKPath();
@@ -268,17 +368,116 @@ public class RadialMenu : Control
                     float tx = cx + midR * (float)Math.Cos(midAngle);
                     float ty = cy + midR * (float)Math.Sin(midAngle);
 
-                    var iconColor = hovered ? SKColors.White : new SKColor(210, 210, 214);
+                    var iconColor = hovered || expanded ? SKColors.White : new SKColor(210, 210, 214);
                     DrawIcon(canvas, _segments[i].Icon, tx, ty, 18f * _scale, iconColor);
 
+                    // Active colour indicator dot on segment
+                    if (_segments[i].ColorOptions is { Count: > 0 } opts)
+                    {
+                        int activeIdx = _segments[i].ActiveColorIndex;
+                        if (activeIdx >= 0 && activeIdx < opts.Count)
+                        {
+                            var ac = opts[activeIdx];
+                            var dotColor = ParseHexColor(ac.HexColor, (byte)(ac.Opacity * 255));
+                            float indicatorR = 4f * _scale;
+                            float indicatorDist = midR + 16 * _scale;
+                            float ix = cx + indicatorDist * (float)Math.Cos(midAngle);
+                            float iy = cy + indicatorDist * (float)Math.Sin(midAngle);
+                            using var dotPaint = new SKPaint { Color = dotColor, IsAntialias = true };
+                            canvas.DrawCircle(ix, iy, indicatorR, dotPaint);
+                            using var dotBorder = new SKPaint
+                            {
+                                Color = SKColors.White,
+                                Style = SKPaintStyle.Stroke,
+                                StrokeWidth = 1,
+                                IsAntialias = true,
+                            };
+                            canvas.DrawCircle(ix, iy, indicatorR, dotBorder);
+                        }
+                    }
+
                     // Label below icon on hover
-                    if (hovered)
+                    if (hovered && !expanded)
                     {
                         float labelSize = 11f * _scale;
                         using var labelFont = new SKFont(SKTypeface.Default, labelSize);
                         using var labelPaint = new SKPaint { Color = new SKColor(255, 255, 255, 220), IsAntialias = true };
                         float labelW = labelFont.MeasureText(_segments[i].Label);
                         canvas.DrawText(_segments[i].Label, tx - labelW / 2, ty + 16 * _scale, labelFont, labelPaint);
+                    }
+                }
+
+                // Draw colour ring for expanded segment
+                if (_expandedSegment >= 0 && _expandedSegment < _segments.Count)
+                {
+                    var seg = _segments[_expandedSegment];
+                    if (seg.ColorOptions is { Count: > 0 } colorOpts)
+                    {
+                        float segAngleRad = (float)(2 * Math.PI / _segments.Count);
+                        float startAngleRad = (float)(-Math.PI / 2 - segAngleRad / 2 + _expandedSegment * segAngleRad);
+                        float dotR = (float)((_outerR + _colorRingR) / 2);
+                        float dotSize = 7f * _scale;
+
+                        for (int ci = 0; ci < colorOpts.Count; ci++)
+                        {
+                            float t = (ci + 0.5f) / colorOpts.Count;
+                            float angle = startAngleRad + t * segAngleRad;
+                            float dotX = cx + dotR * (float)Math.Cos(angle);
+                            float dotY = cy + dotR * (float)Math.Sin(angle);
+
+                            var opt = colorOpts[ci];
+                            var fillColor = ParseHexColor(opt.HexColor, (byte)(opt.Opacity * 255));
+                            bool isHovered = ci == _hoveredColorIndex;
+
+                            // Background circle for visibility
+                            using var bgDot = new SKPaint
+                            {
+                                Color = new SKColor(38, 38, 42, 240),
+                                IsAntialias = true,
+                            };
+                            canvas.DrawCircle(dotX, dotY, dotSize + 2 * _scale, bgDot);
+
+                            // Colour fill
+                            using var colorPaint = new SKPaint { Color = fillColor, IsAntialias = true };
+                            canvas.DrawCircle(dotX, dotY, dotSize, colorPaint);
+
+                            // Full-opacity border for visibility
+                            var borderColor = ParseHexColor(opt.HexColor, 255);
+                            using var border = new SKPaint
+                            {
+                                Color = borderColor,
+                                Style = SKPaintStyle.Stroke,
+                                StrokeWidth = 1.5f,
+                                IsAntialias = true,
+                            };
+                            canvas.DrawCircle(dotX, dotY, dotSize, border);
+
+                            // Hover highlight
+                            if (isHovered)
+                            {
+                                using var hoverRing = new SKPaint
+                                {
+                                    Color = SKColors.White,
+                                    Style = SKPaintStyle.Stroke,
+                                    StrokeWidth = 2f,
+                                    IsAntialias = true,
+                                };
+                                canvas.DrawCircle(dotX, dotY, dotSize + 2 * _scale, hoverRing);
+                            }
+
+                            // Active indicator (small checkmark-like inner ring)
+                            if (ci == seg.ActiveColorIndex)
+                            {
+                                using var activePaint = new SKPaint
+                                {
+                                    Color = SKColors.White,
+                                    Style = SKPaintStyle.Stroke,
+                                    StrokeWidth = 2f,
+                                    IsAntialias = true,
+                                };
+                                canvas.DrawCircle(dotX, dotY, dotSize - 3 * _scale, activePaint);
+                            }
+                        }
                     }
                 }
             }
@@ -306,6 +505,18 @@ public class RadialMenu : Control
             float w = font.MeasureText(iconChar);
             // Centre vertically: offset by ~40% of font size (ascent approximation)
             canvas.DrawText(iconChar, x - w / 2, y + size * 0.38f, font, paint);
+        }
+
+        private static SKColor ParseHexColor(string hex, byte alpha)
+        {
+            if (hex.Length == 7 && hex[0] == '#')
+            {
+                byte r = Convert.ToByte(hex[1..3], 16);
+                byte g = Convert.ToByte(hex[3..5], 16);
+                byte b = Convert.ToByte(hex[5..7], 16);
+                return new SKColor(r, g, b, alpha);
+            }
+            return new SKColor(255, 255, 0, alpha);
         }
     }
 }

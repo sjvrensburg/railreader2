@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
+using RailReader.Core;
 using RailReader2.Controls;
 using RailReader.Core.Models;
 using RailReader2.ViewModels;
@@ -143,12 +144,42 @@ public partial class MainWindow : Window
 
         ToolBar.ViewModel = vm;
 
+        // Build colour options for Highlight
+        var highlightColors = new List<RadialMenu.ColorOption>();
+        for (int i = 0; i < DocumentController.HighlightColors.Length; i++)
+        {
+            int idx = i;
+            var (color, opacity) = DocumentController.HighlightColors[i];
+            highlightColors.Add(new RadialMenu.ColorOption(color, opacity, () =>
+            {
+                vm.Controller.SetAnnotationColorIndex(AnnotationTool.Highlight, idx);
+                vm.SetAnnotationTool(AnnotationTool.Highlight);
+                RadialMenuControl.UpdateSegmentColorIndex(0, idx);
+            }));
+        }
+
+        // Build colour options for Pen
+        var penColors = new List<RadialMenu.ColorOption>();
+        for (int i = 0; i < DocumentController.PenColors.Length; i++)
+        {
+            int idx = i;
+            var (color, opacity) = DocumentController.PenColors[i];
+            penColors.Add(new RadialMenu.ColorOption(color, opacity, () =>
+            {
+                vm.Controller.SetAnnotationColorIndex(AnnotationTool.Pen, idx);
+                vm.SetAnnotationTool(AnnotationTool.Pen);
+                RadialMenuControl.UpdateSegmentColorIndex(1, idx);
+            }));
+        }
+
         var segments = new List<RadialMenu.Segment>
         {
             new("Highlight", RadialMenu.IconChars.Highlighter,
-                () => vm.SetAnnotationTool(AnnotationTool.Highlight)),
+                () => vm.SetAnnotationTool(AnnotationTool.Highlight),
+                highlightColors, vm.Controller.GetAnnotationColorIndex(AnnotationTool.Highlight)),
             new("Pen", RadialMenu.IconChars.Pen,
-                () => vm.SetAnnotationTool(AnnotationTool.Pen)),
+                () => vm.SetAnnotationTool(AnnotationTool.Pen),
+                penColors, vm.Controller.GetAnnotationColorIndex(AnnotationTool.Pen)),
             new("Text", RadialMenu.IconChars.TextHeight,
                 () => vm.SetAnnotationTool(AnnotationTool.TextNote)),
             new("Rect", RadialMenu.IconChars.Square,

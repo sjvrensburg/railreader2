@@ -559,6 +559,53 @@ public sealed partial class MainWindowViewModel : ObservableObject
         InvalidateAnnotations();
     }
 
+    // --- Browse-mode annotation interaction ---
+
+    /// <summary>
+    /// Handle browse-mode pointer down. Returns true if an annotation was hit
+    /// (caller should not start camera pan).
+    /// </summary>
+    public bool HandleBrowsePointerDown(float pageX, float pageY)
+    {
+        bool hit = _controller.HandleBrowsePointerDown(pageX, pageY);
+        OnPropertyChanged(nameof(SelectedAnnotation));
+        InvalidateAnnotations();
+        return hit;
+    }
+
+    public bool HandleBrowsePointerMove(float pageX, float pageY)
+    {
+        if (_controller.HandleBrowsePointerMove(pageX, pageY))
+        {
+            InvalidateAnnotations();
+            return true;
+        }
+        return false;
+    }
+
+    public bool HandleBrowsePointerUp(float pageX, float pageY)
+    {
+        if (_controller.HandleBrowsePointerUp(pageX, pageY))
+        {
+            InvalidateAnnotations();
+            return true;
+        }
+        return false;
+    }
+
+    public (bool Handled, TextNoteAnnotation? EditNote) HandleBrowseClick(float pageX, float pageY)
+    {
+        var result = _controller.HandleBrowseClick(pageX, pageY);
+        if (result.Handled)
+        {
+            OnPropertyChanged(nameof(SelectedAnnotation));
+            InvalidateAnnotations();
+        }
+        if (result.EditNote is not null)
+            EditTextNote(result.EditNote);
+        return result;
+    }
+
     public void CopySelectedText()
     {
         _controller.CopySelectedText();

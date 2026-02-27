@@ -83,15 +83,42 @@ public static class AnnotationRenderer
         canvas.DrawPath(path, paint);
     }
 
+    private const float NoteIconSize = 16f;
+    private const float PopupMaxWidth = 200f;
+    private const float PopupPadding = 6f;
+
     private static void DrawTextNote(SKCanvas canvas, TextNoteAnnotation note, SKColor color)
     {
-        float size = 12f;
-        var markerRect = SKRect.Create(note.X - size / 2, note.Y - size / 2, size, size);
+        // Draw folded-corner note icon (16px)
+        float iconSize = NoteIconSize;
+        float ix = note.X - iconSize / 2;
+        float iy = note.Y - iconSize / 2;
+        float foldSize = 4f;
+
+        // Icon body (folded corner note shape)
+        using var iconPath = new SKPath();
+        iconPath.MoveTo(ix, iy);
+        iconPath.LineTo(ix + iconSize - foldSize, iy);
+        iconPath.LineTo(ix + iconSize, iy + foldSize);
+        iconPath.LineTo(ix + iconSize, iy + iconSize);
+        iconPath.LineTo(ix, iy + iconSize);
+        iconPath.Close();
 
         var fillPaint = GetFillPaint();
         fillPaint.Color = color;
-        canvas.DrawRect(markerRect, fillPaint);
+        canvas.DrawPath(iconPath, fillPaint);
 
+        // Fold triangle
+        using var foldPath = new SKPath();
+        foldPath.MoveTo(ix + iconSize - foldSize, iy);
+        foldPath.LineTo(ix + iconSize - foldSize, iy + foldSize);
+        foldPath.LineTo(ix + iconSize, iy + foldSize);
+        foldPath.Close();
+        var foldColor = color.WithAlpha((byte)(color.Alpha * 0.6f));
+        fillPaint.Color = foldColor;
+        canvas.DrawPath(foldPath, fillPaint);
+
+        // Border
         var borderPaint = s_noteBorderPaint ??= new SKPaint
         {
             Style = SKPaintStyle.Stroke,
@@ -99,18 +126,82 @@ public static class AnnotationRenderer
             IsAntialias = true,
         };
         borderPaint.Color = color.WithAlpha(255);
-        canvas.DrawRect(markerRect, borderPaint);
+        canvas.DrawPath(iconPath, borderPaint);
 
-        if (!string.IsNullOrEmpty(note.Text))
+        // Expanded popup
+        if (note.IsExpanded && !string.IsNullOrEmpty(note.Text))
         {
             var font = s_noteFont ??= new SKFont(SKTypeface.Default, 9);
             var textPaint = s_noteTextPaint ??= new SKPaint { Color = new SKColor(0, 0, 0, 220), IsAntialias = true };
-            var bgPaint = s_noteBgPaint ??= new SKPaint { Color = new SKColor(255, 255, 200, 230) };
-            float textWidth = font.MeasureText(note.Text);
-            var bgRect = SKRect.Create(note.X + size / 2 + 2, note.Y - 6, textWidth + 6, 14);
-            canvas.DrawRect(bgRect, bgPaint);
-            canvas.DrawText(note.Text, note.X + size / 2 + 5, note.Y + 4, font, textPaint);
+            var bgPaint = s_noteBgPaint ??= new SKPaint { Color = new SKColor(255, 255, 200, 240) };
+
+            // Word-wrap text
+            var lines = WrapText(note.Text, font, PopupMaxWidth - PopupPadding * 2);
+            float lineHeight = font.Size * 1.4f;
+            float popupW = PopupPadding * 2;
+            foreach (var line in lines)
+            {
+                float lw = font.MeasureText(line);
+                if (lw + PopupPadding * 2 > popupW) popupW = lw + PopupPadding * 2;
+            }
+            popupW = Math.Min(popupW, PopupMaxWidth);
+            float popupH = lines.Count * lineHeight + PopupPadding * 2;
+
+            float popupX = note.X + iconSize / 2 + 4;
+            float popupY = note.Y + iconSize / 2 + 2;
+
+            // Shadow
+            using var shadowPaint = new SKPaint
+            {
+                Color = new SKColor(0, 0, 0, 40),
+                MaskFilter = SKMaskFilter.CreateBlur(SKBlurStyle.Normal, 2),
+                IsAntialias = true,
+            };
+            canvas.DrawRoundRect(SKRect.Create(popupX + 1, popupY + 1, popupW, popupH), 3, 3, shadowPaint);
+
+            // Popup background
+            var popupRect = SKRect.Create(popupX, popupY, popupW, popupH);
+            canvas.DrawRoundRect(popupRect, 3, 3, bgPaint);
+
+            // Popup border
+            borderPaint.Color = new SKColor(180, 170, 100, 200);
+            canvas.DrawRoundRect(popupRect, 3, 3, borderPaint);
+
+            // Text lines
+            float ty = popupY + PopupPadding + font.Size;
+            foreach (var line in lines)
+            {
+                canvas.DrawText(line, popupX + PopupPadding, ty, font, textPaint);
+                ty += lineHeight;
+            }
         }
+    }
+
+    private static List<string> WrapText(string text, SKFont font, float maxWidth)
+    {
+        var lines = new List<string>();
+        foreach (var paragraph in text.Split('\n'))
+        {
+            if (string.IsNullOrEmpty(paragraph)) { lines.Add(""); continue; }
+
+            var words = paragraph.Split(' ');
+            string current = "";
+            foreach (var word in words)
+            {
+                string test = current.Length == 0 ? word : current + " " + word;
+                if (font.MeasureText(test) > maxWidth && current.Length > 0)
+                {
+                    lines.Add(current);
+                    current = word;
+                }
+                else
+                {
+                    current = test;
+                }
+            }
+            if (current.Length > 0) lines.Add(current);
+        }
+        return lines.Count > 0 ? lines : [""];
     }
 
     private static void DrawRect(SKCanvas canvas, RectAnnotation rect, SKColor color)
@@ -143,6 +234,67 @@ public static class AnnotationRenderer
         };
         var selRect = SKRect.Create(rect.Left - 3, rect.Top - 3, rect.Width + 6, rect.Height + 6);
         canvas.DrawRect(selRect, dashPaint);
+
+        // Draw resize handles for freehand annotations
+        if (annotation is FreehandAnnotation)
+            DrawResizeHandles(canvas, selRect);
+    }
+
+    private static void DrawResizeHandles(SKCanvas canvas, SKRect bounds)
+    {
+        const float size = 6f;
+        const float half = size / 2;
+
+        var positions = GetHandlePositions(bounds);
+        foreach (var (hx, hy) in positions)
+        {
+            var handleRect = SKRect.Create(hx - half, hy - half, size, size);
+            using var fill = new SKPaint { Color = SKColors.White, IsAntialias = true };
+            canvas.DrawRect(handleRect, fill);
+            using var stroke = new SKPaint
+            {
+                Color = new SKColor(0, 120, 212, 255),
+                Style = SKPaintStyle.Stroke,
+                StrokeWidth = 1.5f,
+                IsAntialias = true,
+            };
+            canvas.DrawRect(handleRect, stroke);
+        }
+    }
+
+    private static (float X, float Y)[] GetHandlePositions(SKRect bounds)
+    {
+        float cx = bounds.MidX, cy = bounds.MidY;
+        return
+        [
+            (bounds.Left, bounds.Top),      // TopLeft
+            (cx, bounds.Top),               // Top
+            (bounds.Right, bounds.Top),     // TopRight
+            (bounds.Right, cy),             // Right
+            (bounds.Right, bounds.Bottom),  // BottomRight
+            (cx, bounds.Bottom),            // Bottom
+            (bounds.Left, bounds.Bottom),   // BottomLeft
+            (bounds.Left, cy),              // Left
+        ];
+    }
+
+    public static ResizeHandle HitTestResizeHandle(FreehandAnnotation annotation, float pageX, float pageY, float tolerance = 8f)
+    {
+        var bounds = GetAnnotationBounds(annotation);
+        if (bounds is not { } rect) return ResizeHandle.None;
+
+        var selRect = SKRect.Create(rect.Left - 3, rect.Top - 3, rect.Width + 6, rect.Height + 6);
+        var positions = GetHandlePositions(selRect);
+
+        // ResizeHandle enum: None=0, TopLeft=1..Left=8
+        for (int i = 0; i < positions.Length; i++)
+        {
+            float dx = pageX - positions[i].X;
+            float dy = pageY - positions[i].Y;
+            if (dx * dx + dy * dy <= tolerance * tolerance)
+                return (ResizeHandle)(i + 1);
+        }
+        return ResizeHandle.None;
     }
 
     public static SKRect? GetAnnotationBounds(Annotation annotation)
@@ -172,7 +324,8 @@ public static class AnnotationRenderer
                 }
                 return new SKRect(fMinX, fMinY, fMaxX, fMaxY);
             case TextNoteAnnotation t:
-                return new SKRect(t.X - 6, t.Y - 6, t.X + 6, t.Y + 6);
+                float half = NoteIconSize / 2;
+                return new SKRect(t.X - half, t.Y - half, t.X + half, t.Y + half);
             case RectAnnotation r:
                 return new SKRect(r.X, r.Y, r.X + r.W, r.Y + r.H);
             default:

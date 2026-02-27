@@ -62,10 +62,36 @@ public sealed class DocumentController
     public float ActiveAnnotationOpacity { get; set; } = 0.4f;
     public float ActiveStrokeWidth { get; set; } = 2f;
 
+    // Colour palettes for tools with colour options
+    public static readonly (string Color, float Opacity)[] HighlightColors =
+    [
+        ("#FFFF00", 0.35f),  // Yellow
+        ("#90EE90", 0.35f),  // Green
+        ("#FFB6C1", 0.35f),  // Pink
+    ];
+
+    public static readonly (string Color, float Opacity)[] PenColors =
+    [
+        ("#FF0000", 0.8f),   // Red
+        ("#0000FF", 0.8f),   // Blue
+        ("#000000", 0.9f),   // Black
+    ];
+
+    private int _highlightColorIndex;
+    private int _penColorIndex;
+
     // In-progress annotation building state
     private List<PointF>? _freehandPoints;
     private float _rectStartX, _rectStartY;
     private int _highlightCharStart = -1;
+
+    // Browse-mode drag state (for moving/resizing annotations)
+    private Annotation? _dragAnnotation;
+    private float _dragStartPageX, _dragStartPageY;
+    private PositionSnapshot? _dragOriginalPosition;
+    private ResizeHandle _resizeHandle = ResizeHandle.None;
+    private SKRect _resizeStartBounds;
+    private List<PointF>? _resizeOriginalPoints;
 
     // Text selection state
     public string? SelectedText { get; set; }
@@ -618,12 +644,14 @@ public sealed class DocumentController
         switch (tool)
         {
             case AnnotationTool.Highlight:
-                ActiveAnnotationColor = "#FFFF00";
-                ActiveAnnotationOpacity = 0.35f;
+                var hc = HighlightColors[_highlightColorIndex];
+                ActiveAnnotationColor = hc.Color;
+                ActiveAnnotationOpacity = hc.Opacity;
                 break;
             case AnnotationTool.Pen:
-                ActiveAnnotationColor = "#FF0000";
-                ActiveAnnotationOpacity = 0.8f;
+                var pc = PenColors[_penColorIndex];
+                ActiveAnnotationColor = pc.Color;
+                ActiveAnnotationOpacity = pc.Opacity;
                 ActiveStrokeWidth = 2f;
                 break;
             case AnnotationTool.Rectangle:
@@ -640,6 +668,26 @@ public sealed class DocumentController
                 break;
         }
     }
+
+    public void SetAnnotationColorIndex(AnnotationTool tool, int index)
+    {
+        switch (tool)
+        {
+            case AnnotationTool.Highlight:
+                _highlightColorIndex = Math.Clamp(index, 0, HighlightColors.Length - 1);
+                break;
+            case AnnotationTool.Pen:
+                _penColorIndex = Math.Clamp(index, 0, PenColors.Length - 1);
+                break;
+        }
+    }
+
+    public int GetAnnotationColorIndex(AnnotationTool tool) => tool switch
+    {
+        AnnotationTool.Highlight => _highlightColorIndex,
+        AnnotationTool.Pen => _penColorIndex,
+        _ => 0,
+    };
 
     public void CancelAnnotationTool()
     {
@@ -843,6 +891,217 @@ public sealed class DocumentController
     public void RedoAnnotation()
     {
         ActiveDocument?.Redo();
+    }
+
+    // --- Browse-mode interaction (select, move, resize) ---
+
+    /// <summary>
+    /// Handle pointer down in browse mode. Returns true if an annotation was hit
+    /// (caller should not start camera pan).
+    /// </summary>
+    public bool HandleBrowsePointerDown(float pageX, float pageY)
+    {
+        if (ActiveDocument is not { } doc) return false;
+        var list = GetCurrentPageAnnotations(doc);
+
+        // First check resize handles on selected freehand
+        if (SelectedAnnotation is FreehandAnnotation selectedFreehand && list is not null)
+        {
+            var handle = AnnotationRenderer.HitTestResizeHandle(selectedFreehand, pageX, pageY);
+            if (handle != ResizeHandle.None)
+            {
+                _resizeHandle = handle;
+                _dragStartPageX = pageX;
+                _dragStartPageY = pageY;
+                var bounds = AnnotationRenderer.GetAnnotationBounds(selectedFreehand);
+                _resizeStartBounds = bounds ?? SKRect.Empty;
+                _resizeOriginalPoints = [.. selectedFreehand.Points];
+                return true;
+            }
+        }
+
+        // Hit-test annotations (top to bottom)
+        if (list is not null)
+        {
+            for (int i = list.Count - 1; i >= 0; i--)
+            {
+                if (AnnotationRenderer.HitTest(list[i], pageX, pageY))
+                {
+                    SelectedAnnotation = list[i];
+                    _dragAnnotation = list[i];
+                    _dragStartPageX = pageX;
+                    _dragStartPageY = pageY;
+                    _dragOriginalPosition = PositionSnapshot.Capture(list[i]);
+                    _resizeHandle = ResizeHandle.None;
+                    return true;
+                }
+            }
+        }
+
+        // Clicked empty space — deselect
+        SelectedAnnotation = null;
+        _dragAnnotation = null;
+        _resizeHandle = ResizeHandle.None;
+        return false;
+    }
+
+    /// <summary>
+    /// Handle pointer move in browse mode (dragging annotation or resizing).
+    /// Returns true if annotations changed.
+    /// </summary>
+    public bool HandleBrowsePointerMove(float pageX, float pageY)
+    {
+        if (_resizeHandle != ResizeHandle.None && _resizeOriginalPoints is not null
+            && SelectedAnnotation is FreehandAnnotation freehand)
+        {
+            ResizeFreehand(freehand, pageX, pageY);
+            return true;
+        }
+
+        if (_dragAnnotation is null) return false;
+
+        float dx = pageX - _dragStartPageX;
+        float dy = pageY - _dragStartPageY;
+
+        MoveAnnotation(_dragAnnotation, dx, dy, _dragOriginalPosition!);
+        return true;
+    }
+
+    /// <summary>
+    /// Handle pointer up in browse mode. Creates undo action if moved/resized.
+    /// Returns true if annotations changed.
+    /// </summary>
+    public bool HandleBrowsePointerUp(float pageX, float pageY)
+    {
+        if (ActiveDocument is not { } doc) return false;
+
+        if (_resizeHandle != ResizeHandle.None && _resizeOriginalPoints is not null
+            && SelectedAnnotation is FreehandAnnotation freehand)
+        {
+            List<PointF> newPoints = [.. freehand.Points];
+            if (!PointsEqual(_resizeOriginalPoints, newPoints))
+            {
+                doc.PushUndoAction(new ResizeFreehandAction(freehand, _resizeOriginalPoints, newPoints));
+            }
+            _resizeHandle = ResizeHandle.None;
+            _resizeOriginalPoints = null;
+            return true;
+        }
+
+        if (_dragAnnotation is not null && _dragOriginalPosition is not null)
+        {
+            var newPosition = PositionSnapshot.Capture(_dragAnnotation);
+            // Only push undo if actually moved
+            float dx = pageX - _dragStartPageX;
+            float dy = pageY - _dragStartPageY;
+            if (Math.Abs(dx) > 0.5f || Math.Abs(dy) > 0.5f)
+                doc.PushUndoAction(new MoveAnnotationAction(_dragAnnotation, _dragOriginalPosition, newPosition));
+            _dragAnnotation = null;
+            _dragOriginalPosition = null;
+            return true;
+        }
+
+        _dragAnnotation = null;
+        return false;
+    }
+
+    /// <summary>
+    /// Handle click in browse mode on text notes (toggle expand/collapse).
+    /// Returns true if a note was toggled. Sets EditNote if double-click editing needed.
+    /// </summary>
+    public (bool Handled, TextNoteAnnotation? EditNote) HandleBrowseClick(float pageX, float pageY)
+    {
+        if (ActiveDocument is not { } doc) return (false, null);
+        var list = GetCurrentPageAnnotations(doc);
+        if (list is null) return (false, null);
+
+        for (int i = list.Count - 1; i >= 0; i--)
+        {
+            if (list[i] is TextNoteAnnotation tn && AnnotationRenderer.HitTest(tn, pageX, pageY))
+            {
+                SelectedAnnotation = tn;
+                tn.IsExpanded = !tn.IsExpanded;
+                return (true, null);
+            }
+        }
+        return (false, null);
+    }
+
+    private static void MoveAnnotation(Annotation annotation, float dx, float dy, PositionSnapshot original)
+    {
+        switch (annotation)
+        {
+            case TextNoteAnnotation tn:
+                tn.X = original.X + dx;
+                tn.Y = original.Y + dy;
+                break;
+            case FreehandAnnotation f when original.Points is not null:
+                for (int i = 0; i < f.Points.Count && i < original.Points.Count; i++)
+                    f.Points[i] = new PointF(original.Points[i].X + dx, original.Points[i].Y + dy);
+                break;
+            case HighlightAnnotation h when original.Rects is not null:
+                for (int i = 0; i < h.Rects.Count && i < original.Rects.Count; i++)
+                {
+                    var or = original.Rects[i];
+                    h.Rects[i] = new HighlightRect(or.X + dx, or.Y + dy, or.W, or.H);
+                }
+                break;
+            case RectAnnotation r:
+                r.X = original.X + dx;
+                r.Y = original.Y + dy;
+                break;
+        }
+    }
+
+    private void ResizeFreehand(FreehandAnnotation freehand, float pageX, float pageY)
+    {
+        if (_resizeOriginalPoints is null) return;
+        var oldBounds = _resizeStartBounds;
+        if (oldBounds.Width < 1 || oldBounds.Height < 1) return;
+
+        var newBounds = ComputeNewBounds(oldBounds, _resizeHandle, pageX, pageY, _dragStartPageX, _dragStartPageY);
+
+        // Minimum size constraint
+        if (newBounds.Width < 10 || newBounds.Height < 10) return;
+
+        // Scale all points proportionally
+        for (int i = 0; i < freehand.Points.Count && i < _resizeOriginalPoints.Count; i++)
+        {
+            var op = _resizeOriginalPoints[i];
+            float nx = (op.X - oldBounds.Left) / oldBounds.Width;
+            float ny = (op.Y - oldBounds.Top) / oldBounds.Height;
+            freehand.Points[i] = new PointF(newBounds.Left + nx * newBounds.Width, newBounds.Top + ny * newBounds.Height);
+        }
+    }
+
+    private static SKRect ComputeNewBounds(SKRect old, ResizeHandle handle, float px, float py, float startX, float startY)
+    {
+        float dx = px - startX;
+        float dy = py - startY;
+        float l = old.Left, t = old.Top, r = old.Right, b = old.Bottom;
+
+        switch (handle)
+        {
+            case ResizeHandle.TopLeft:     l += dx; t += dy; break;
+            case ResizeHandle.Top:         t += dy; break;
+            case ResizeHandle.TopRight:    r += dx; t += dy; break;
+            case ResizeHandle.Right:       r += dx; break;
+            case ResizeHandle.BottomRight: r += dx; b += dy; break;
+            case ResizeHandle.Bottom:      b += dy; break;
+            case ResizeHandle.BottomLeft:  l += dx; b += dy; break;
+            case ResizeHandle.Left:        l += dx; break;
+        }
+
+        return new SKRect(Math.Min(l, r), Math.Min(t, b), Math.Max(l, r), Math.Max(t, b));
+    }
+
+    private static bool PointsEqual(List<PointF> a, List<PointF> b)
+    {
+        if (a.Count != b.Count) return false;
+        for (int i = 0; i < a.Count; i++)
+            if (Math.Abs(a[i].X - b[i].X) > 0.1f || Math.Abs(a[i].Y - b[i].Y) > 0.1f)
+                return false;
+        return true;
     }
 
     // --- Search ---
