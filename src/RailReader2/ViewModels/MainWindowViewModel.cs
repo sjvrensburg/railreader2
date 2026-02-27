@@ -9,7 +9,6 @@ using RailReader.Core;
 using RailReader.Core.Models;
 using RailReader.Core.Services;
 using RailReader2.Views;
-using SkiaSharp;
 
 namespace RailReader2.ViewModels;
 
@@ -298,16 +297,14 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public void FitPage()
     {
         _controller.FitPage();
-        OnPropertyChanged(nameof(ActiveTab));
-        InvalidateCamera();
+        InvalidateCameraAndTab();
     }
 
     [RelayCommand]
     public void FitWidth()
     {
         _controller.FitWidth();
-        OnPropertyChanged(nameof(ActiveTab));
-        InvalidateCamera();
+        InvalidateCameraAndTab();
     }
 
     // --- Camera ---
@@ -315,23 +312,20 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public void HandleZoom(double scrollDelta, double cursorX, double cursorY, bool ctrlHeld)
     {
         _controller.HandleZoom(scrollDelta, cursorX, cursorY, ctrlHeld);
-        InvalidateCamera();
-        OnPropertyChanged(nameof(ActiveTab));
+        InvalidateCameraAndTab();
         RequestAnimationFrame();
     }
 
     public void HandlePan(double dx, double dy)
     {
         _controller.HandlePan(dx, dy);
-        InvalidateCamera();
-        OnPropertyChanged(nameof(ActiveTab));
+        InvalidateCameraAndTab();
     }
 
     public void HandleZoomKey(bool zoomIn)
     {
         _controller.HandleZoomKey(zoomIn);
-        InvalidateCamera();
-        OnPropertyChanged(nameof(ActiveTab));
+        InvalidateCameraAndTab();
         RequestAnimationFrame();
     }
 
@@ -354,31 +348,27 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public void HandleArrowRight(bool shortJump = false)
     {
         _controller.HandleArrowRight(shortJump);
-        InvalidateCamera();
-        OnPropertyChanged(nameof(ActiveTab));
+        InvalidateCameraAndTab();
         RequestAnimationFrame();
     }
 
     public void HandleArrowLeft(bool shortJump = false)
     {
         _controller.HandleArrowLeft(shortJump);
-        InvalidateCamera();
-        OnPropertyChanged(nameof(ActiveTab));
+        InvalidateCameraAndTab();
         RequestAnimationFrame();
     }
 
     public void HandleLineHome()
     {
         _controller.HandleLineHome();
-        InvalidateCamera();
-        OnPropertyChanged(nameof(ActiveTab));
+        InvalidateCameraAndTab();
     }
 
     public void HandleLineEnd()
     {
         _controller.HandleLineEnd();
-        InvalidateCamera();
-        OnPropertyChanged(nameof(ActiveTab));
+        InvalidateCameraAndTab();
     }
 
     public void HandleArrowRelease(bool isHorizontal)
@@ -434,7 +424,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _controller.SetColourEffect(effect);
         InvalidatePage();
         InvalidateOverlay();
-        OnPropertyChanged(nameof(ActiveTab));
     }
 
     // --- Config ---
@@ -706,6 +695,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private void InvalidateOverlay() => _invalidation?.InvalidateOverlay?.Invoke();
     private void InvalidateSearch() => _invalidation?.InvalidateSearch?.Invoke();
     private void InvalidateAnnotations() => _invalidation?.InvalidateAnnotations?.Invoke();
+
+    private void InvalidateCameraAndTab()
+    {
+        InvalidateCamera();
+        OnPropertyChanged(nameof(ActiveTab));
+    }
 
     private void InvalidateNavigation()
     {

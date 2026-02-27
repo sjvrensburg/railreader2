@@ -57,12 +57,12 @@ public sealed class LayoutAnalyzer : IDisposable
         var image = new DenseTensor<float>(chwData, new[] { 1, 3, target, target });
         var scaleFactor = new DenseTensor<float>(new float[] { scaleH, scaleW }, new[] { 1, 2 });
 
-        var inputs = new List<NamedOnnxValue>
-        {
+        List<NamedOnnxValue> inputs =
+        [
             NamedOnnxValue.CreateFromTensor("im_shape", imShape),
             NamedOnnxValue.CreateFromTensor("image", image),
             NamedOnnxValue.CreateFromTensor("scale_factor", scaleFactor),
-        };
+        ];
 
         using var results = _session.Run(inputs);
 
@@ -72,22 +72,24 @@ public sealed class LayoutAnalyzer : IDisposable
         int detRows = 0, detCols = 0;
         foreach (var r in results)
         {
-            var t = r.Value as Tensor<float>;
-            if (t is null) continue;
+            if (r.Value is not Tensor<float> t) continue;
+
+            bool isDetection = detectionData is null && t.Dimensions.Length == 2 && t.Dimensions[1] >= 6;
+
+            if (isDetection)
+            {
+                detRows = t.Dimensions[0];
+                detCols = t.Dimensions[1];
+                detectionData = t.ToArray();
+            }
 
             if (!_loggedOutputShapes)
             {
                 Console.Error.WriteLine($"[ONNX] Output '{r.Name}': dims=[{string.Join(",", t.Dimensions.ToArray())}]");
-                var flat = t.ToArray();
+                // Reuse detectionData if already copied, otherwise take a snapshot for preview
+                var flat = isDetection ? detectionData! : t.ToArray();
                 var preview = string.Join(", ", flat.Take(Math.Min(14, flat.Length)).Select(v => v.ToString("F2")));
                 Console.Error.WriteLine($"[ONNX]   First values: [{preview}]");
-            }
-
-            if (detectionData is null && t.Dimensions.Length == 2 && t.Dimensions[1] >= 6)
-            {
-                detRows = t.Dimensions[0];
-                detCols = t.Dimensions[1];
-                detectionData = t.ToArray(); // copy before results are consumed
             }
         }
         _loggedOutputShapes = true;
@@ -165,16 +167,16 @@ public sealed class LayoutAnalyzer : IDisposable
 
         for (int y = 0; y < target; y++)
         {
+            int srcY = Math.Min((int)(y / scaleH), origH - 1);
+            int srcRow = srcY * origW;
             for (int x = 0; x < target; x++)
             {
-                int srcY = Math.Min((int)(y / scaleH), origH - 1);
                 int srcX = Math.Min((int)(x / scaleW), origW - 1);
-                int srcIdx = (srcY * origW + srcX) * 3;
+                int srcIdx = (srcRow + srcX) * 3;
                 int dstIdx = y * target + x;
-                for (int c = 0; c < 3; c++)
-                {
-                    chwData[c * pixelCount + dstIdx] = rgbBytes[srcIdx + c] / 255.0f;
-                }
+                chwData[dstIdx] = rgbBytes[srcIdx] / 255.0f;                     // R
+                chwData[pixelCount + dstIdx] = rgbBytes[srcIdx + 1] / 255.0f;    // G
+                chwData[2 * pixelCount + dstIdx] = rgbBytes[srcIdx + 2] / 255.0f; // B
             }
         }
         return chwData;
@@ -211,10 +213,7 @@ public sealed class LayoutAnalyzer : IDisposable
             }
         }
 
-        for (int i = blocks.Count - 1; i >= 0; i--)
-        {
-            if (!keep[i]) blocks.RemoveAt(i);
-        }
+        RemoveFlagged(blocks, keep);
     }
 
     /// <summary>
@@ -225,36 +224,37 @@ public sealed class LayoutAnalyzer : IDisposable
     private static void SuppressNestedBlocks(List<LayoutBlock> blocks)
     {
         const float margin = 2f; // tolerance in page points
-        var suppress = new bool[blocks.Count];
+        var keep = new bool[blocks.Count];
+        Array.Fill(keep, true);
 
         for (int i = 0; i < blocks.Count; i++)
         {
-            if (suppress[i]) continue;
+            if (!keep[i]) continue;
             for (int j = 0; j < blocks.Count; j++)
             {
-                if (i == j || suppress[j]) continue;
+                if (i == j || !keep[j]) continue;
 
-                // Check if block j is contained within block i
                 var outer = blocks[i].BBox;
                 var inner = blocks[j].BBox;
 
-                if (inner.X >= outer.X - margin &&
+                bool contained = inner.X >= outer.X - margin &&
                     inner.Y >= outer.Y - margin &&
                     inner.X + inner.W <= outer.X + outer.W + margin &&
-                    inner.Y + inner.H <= outer.Y + outer.H + margin)
-                {
-                    // j is inside i — suppress the smaller one
-                    float areaI = outer.W * outer.H;
-                    float areaJ = inner.W * inner.H;
-                    if (areaJ < areaI)
-                        suppress[j] = true;
-                }
+                    inner.Y + inner.H <= outer.Y + outer.H + margin;
+
+                if (contained && inner.W * inner.H < outer.W * outer.H)
+                    keep[j] = false;
             }
         }
 
+        RemoveFlagged(blocks, keep);
+    }
+
+    private static void RemoveFlagged(List<LayoutBlock> blocks, bool[] keep)
+    {
         for (int i = blocks.Count - 1; i >= 0; i--)
         {
-            if (suppress[i]) blocks.RemoveAt(i);
+            if (!keep[i]) blocks.RemoveAt(i);
         }
     }
 

@@ -66,16 +66,14 @@ public class ViewportPanel : Panel
             _browseAnnotationDrag = false;
             e.Handled = true;
 
-            if (ViewModel is { IsAnnotating: true } avm)
+            var (pageX, pageY) = ScreenToPage(_pressPos);
+            if (ViewModel!.IsAnnotating)
             {
-                var (pageX, pageY) = ScreenToPage(_pressPos);
-                avm.HandleAnnotationPointerDown(pageX, pageY);
+                ViewModel.HandleAnnotationPointerDown(pageX, pageY);
             }
-            else if (ViewModel is { IsAnnotating: false } bvm)
+            else
             {
-                // Browse mode: check if clicking an annotation
-                var (pageX, pageY) = ScreenToPage(_pressPos);
-                if (bvm.HandleBrowsePointerDown((float)pageX, (float)pageY))
+                if (ViewModel.HandleBrowsePointerDown((float)pageX, (float)pageY))
                     _browseAnnotationDrag = true;
             }
         }
@@ -115,6 +113,7 @@ public class ViewportPanel : Panel
         if (_dragging && ViewModel is not null)
         {
             var pos = e.GetPosition(this);
+            bool isClick = IsClick(pos);
 
             if (ViewModel.IsAnnotating)
             {
@@ -124,32 +123,26 @@ public class ViewportPanel : Panel
             else if (_browseAnnotationDrag)
             {
                 var (pageX, pageY) = ScreenToPage(pos);
-                double dx = pos.X - _pressPos.X;
-                double dy = pos.Y - _pressPos.Y;
-                double dist = Math.Sqrt(dx * dx + dy * dy);
-
-                if (dist < 5.0)
-                {
-                    // It was a click, not a drag — toggle popup / select
+                if (isClick)
                     ViewModel.HandleBrowseClick((float)pageX, (float)pageY);
-                }
                 else
-                {
                     ViewModel.HandleBrowsePointerUp((float)pageX, (float)pageY);
-                }
             }
-            else
+            else if (isClick)
             {
-                double dx = pos.X - _pressPos.X;
-                double dy = pos.Y - _pressPos.Y;
-                double dist = Math.Sqrt(dx * dx + dy * dy);
-                if (dist < 5.0)
-                    ViewModel.HandleClick(pos.X, pos.Y);
+                ViewModel.HandleClick(pos.X, pos.Y);
             }
         }
         _dragging = false;
         _browseAnnotationDrag = false;
         e.Handled = true;
+    }
+
+    private bool IsClick(Point pos)
+    {
+        double dx = pos.X - _pressPos.X;
+        double dy = pos.Y - _pressPos.Y;
+        return dx * dx + dy * dy < 25.0; // 5px threshold squared
     }
 
     private (double PageX, double PageY) ScreenToPage(Point screenPos)

@@ -74,6 +74,9 @@ public sealed class RailNav
     public PageAnalysis? Analysis => _analysis;
     public int NavigableCount => _navigableIndices.Count;
 
+    /// <summary>True when rail mode is active and has navigable blocks.</summary>
+    private bool CanNavigate => Active && _navigableIndices.Count > 0;
+
     public int CurrentLineCount =>
         _navigableIndices.Count == 0 ? 0 : CurrentNavigableBlock.Lines.Count;
 
@@ -119,7 +122,7 @@ public sealed class RailNav
 
     public NavResult NextLine()
     {
-        if (!Active || _navigableIndices.Count == 0) return NavResult.Ok;
+        if (!CanNavigate) return NavResult.Ok;
 
         var block = CurrentNavigableBlock;
         if (CurrentLine + 1 < block.Lines.Count)
@@ -138,7 +141,7 @@ public sealed class RailNav
 
     public NavResult PrevLine()
     {
-        if (!Active || _navigableIndices.Count == 0) return NavResult.Ok;
+        if (!CanNavigate) return NavResult.Ok;
 
         if (CurrentLine > 0)
         {
@@ -156,7 +159,7 @@ public sealed class RailNav
 
     public void StartScroll(ScrollDirection dir, double currentCameraX)
     {
-        if (!Active || _navigableIndices.Count == 0) return;
+        if (!CanNavigate) return;
         if (_scrollDir != dir)
         {
             _scrollDir = dir;
@@ -183,7 +186,7 @@ public sealed class RailNav
     public void Jump(bool forward, double zoom, double windowWidth, double windowHeight,
                      double cameraX, double cameraY, bool half = false)
     {
-        if (!Active || _navigableIndices.Count == 0) return;
+        if (!CanNavigate) return;
 
         double jumpPx = windowWidth * (_config.JumpPercentage / 100.0);
         if (half) jumpPx *= 0.5;
@@ -206,7 +209,7 @@ public sealed class RailNav
 
     public void StartSnapToCurrent(double cameraX, double cameraY, double zoom, double windowWidth, double windowHeight)
     {
-        if (!Active || _navigableIndices.Count == 0) return;
+        if (!CanNavigate) return;
 
         var (targetX, targetY) = ComputeTargetCamera(zoom, windowWidth, windowHeight);
         _snap = new SnapAnimation
@@ -243,7 +246,7 @@ public sealed class RailNav
     /// </summary>
     public void CaptureVerticalBias(double cameraY, double zoom, double windowHeight)
     {
-        if (!Active || _navigableIndices.Count == 0) return;
+        if (!CanNavigate) return;
         var line = CurrentLineInfo;
         double centeredY = windowHeight / 2.0 - line.Y * zoom;
         VerticalBias = cameraY - centeredY;
@@ -257,7 +260,7 @@ public sealed class RailNav
 
     private double? ComputeLineEdgeX(double zoom, double windowWidth, bool start)
     {
-        if (!Active || _navigableIndices.Count == 0) return null;
+        if (!CanNavigate) return null;
         var block = CurrentNavigableBlock;
         double x = start
             ? windowWidth * 0.05 - block.BBox.X * zoom
@@ -396,7 +399,7 @@ public sealed class RailNav
     /// </summary>
     public void StartAutoScroll(double speed)
     {
-        if (!Active || _navigableIndices.Count == 0) return;
+        if (!CanNavigate) return;
         AutoScrolling = true;
         _autoScrollSpeed = speed;
         _autoScrollBoost = false;

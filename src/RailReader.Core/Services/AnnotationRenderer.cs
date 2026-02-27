@@ -17,6 +17,8 @@ public static class AnnotationRenderer
     [ThreadStatic] private static SKPaint? s_noteBgPaint;
     [ThreadStatic] private static SKFont? s_noteFont;
     [ThreadStatic] private static SKPaint? s_dashPaint;
+    [ThreadStatic] private static SKPaint? s_handleFillPaint;
+    [ThreadStatic] private static SKPaint? s_handleStrokePaint;
 
     public static void DrawAnnotations(SKCanvas canvas, List<Annotation> annotations, Annotation? selected)
     {
@@ -89,19 +91,17 @@ public static class AnnotationRenderer
 
     private static void DrawTextNote(SKCanvas canvas, TextNoteAnnotation note, SKColor color)
     {
-        // Draw folded-corner note icon (16px)
-        float iconSize = NoteIconSize;
-        float ix = note.X - iconSize / 2;
-        float iy = note.Y - iconSize / 2;
+        float ix = note.X - NoteIconSize / 2;
+        float iy = note.Y - NoteIconSize / 2;
         float foldSize = 4f;
 
         // Icon body (folded corner note shape)
         using var iconPath = new SKPath();
         iconPath.MoveTo(ix, iy);
-        iconPath.LineTo(ix + iconSize - foldSize, iy);
-        iconPath.LineTo(ix + iconSize, iy + foldSize);
-        iconPath.LineTo(ix + iconSize, iy + iconSize);
-        iconPath.LineTo(ix, iy + iconSize);
+        iconPath.LineTo(ix + NoteIconSize - foldSize, iy);
+        iconPath.LineTo(ix + NoteIconSize, iy + foldSize);
+        iconPath.LineTo(ix + NoteIconSize, iy + NoteIconSize);
+        iconPath.LineTo(ix, iy + NoteIconSize);
         iconPath.Close();
 
         var fillPaint = GetFillPaint();
@@ -110,9 +110,9 @@ public static class AnnotationRenderer
 
         // Fold triangle
         using var foldPath = new SKPath();
-        foldPath.MoveTo(ix + iconSize - foldSize, iy);
-        foldPath.LineTo(ix + iconSize - foldSize, iy + foldSize);
-        foldPath.LineTo(ix + iconSize, iy + foldSize);
+        foldPath.MoveTo(ix + NoteIconSize - foldSize, iy);
+        foldPath.LineTo(ix + NoteIconSize - foldSize, iy + foldSize);
+        foldPath.LineTo(ix + NoteIconSize, iy + foldSize);
         foldPath.Close();
         var foldColor = color.WithAlpha((byte)(color.Alpha * 0.6f));
         fillPaint.Color = foldColor;
@@ -147,8 +147,8 @@ public static class AnnotationRenderer
             popupW = Math.Min(popupW, PopupMaxWidth);
             float popupH = lines.Count * lineHeight + PopupPadding * 2;
 
-            float popupX = note.X + iconSize / 2 + 4;
-            float popupY = note.Y + iconSize / 2 + 2;
+            float popupX = note.X + NoteIconSize / 2 + 4;
+            float popupY = note.Y + NoteIconSize / 2 + 2;
 
             // Shadow
             using var shadowPaint = new SKPaint
@@ -245,19 +245,20 @@ public static class AnnotationRenderer
         const float size = 6f;
         const float half = size / 2;
 
+        var fill = s_handleFillPaint ??= new SKPaint { Color = SKColors.White, IsAntialias = true };
+        var stroke = s_handleStrokePaint ??= new SKPaint
+        {
+            Color = new SKColor(0, 120, 212, 255),
+            Style = SKPaintStyle.Stroke,
+            StrokeWidth = 1.5f,
+            IsAntialias = true,
+        };
+
         var positions = GetHandlePositions(bounds);
         foreach (var (hx, hy) in positions)
         {
             var handleRect = SKRect.Create(hx - half, hy - half, size, size);
-            using var fill = new SKPaint { Color = SKColors.White, IsAntialias = true };
             canvas.DrawRect(handleRect, fill);
-            using var stroke = new SKPaint
-            {
-                Color = new SKColor(0, 120, 212, 255),
-                Style = SKPaintStyle.Stroke,
-                StrokeWidth = 1.5f,
-                IsAntialias = true,
-            };
             canvas.DrawRect(handleRect, stroke);
         }
     }
@@ -313,16 +314,7 @@ public static class AnnotationRenderer
                 }
                 return new SKRect(minX, minY, maxX, maxY);
             case FreehandAnnotation f when f.Points.Count > 0:
-                float fMinX = float.MaxValue, fMinY = float.MaxValue;
-                float fMaxX = float.MinValue, fMaxY = float.MinValue;
-                foreach (var p in f.Points)
-                {
-                    if (p.X < fMinX) fMinX = p.X;
-                    if (p.Y < fMinY) fMinY = p.Y;
-                    if (p.X > fMaxX) fMaxX = p.X;
-                    if (p.Y > fMaxY) fMaxY = p.Y;
-                }
-                return new SKRect(fMinX, fMinY, fMaxX, fMaxY);
+                return ComputePointsBounds(f.Points);
             case TextNoteAnnotation t:
                 float half = NoteIconSize / 2;
                 return new SKRect(t.X - half, t.Y - half, t.X + half, t.Y + half);
@@ -331,6 +323,20 @@ public static class AnnotationRenderer
             default:
                 return null;
         }
+    }
+
+    private static SKRect ComputePointsBounds(List<PointF> points)
+    {
+        float minX = float.MaxValue, minY = float.MaxValue;
+        float maxX = float.MinValue, maxY = float.MinValue;
+        foreach (var p in points)
+        {
+            if (p.X < minX) minX = p.X;
+            if (p.Y < minY) minY = p.Y;
+            if (p.X > maxX) maxX = p.X;
+            if (p.Y > maxY) maxY = p.Y;
+        }
+        return new SKRect(minX, minY, maxX, maxY);
     }
 
     public static bool HitTest(Annotation annotation, float pageX, float pageY, float tolerance = 4f)

@@ -8,10 +8,7 @@ public sealed class ColourEffectShaders : IDisposable
     public ColourEffect Effect { get; set; }
     public float Intensity { get; set; } = 1.0f;
 
-    private SKRuntimeEffect? _highContrast;
-    private SKRuntimeEffect? _highVisibility;
-    private SKRuntimeEffect? _amber;
-    private SKRuntimeEffect? _invert;
+    private readonly Dictionary<ColourEffect, SKRuntimeEffect> _effects = [];
 
     private const string HighContrastSksl = """
         uniform float intensity;
@@ -57,35 +54,27 @@ public sealed class ColourEffectShaders : IDisposable
 
     public ColourEffectShaders()
     {
-        _highContrast = Compile("HighContrast", HighContrastSksl);
-        _highVisibility = Compile("HighVisibility", HighVisibilitySksl);
-        _amber = Compile("Amber", AmberSksl);
-        _invert = Compile("Invert", InvertSksl);
+        CompileAndStore(ColourEffect.HighContrast, HighContrastSksl);
+        CompileAndStore(ColourEffect.HighVisibility, HighVisibilitySksl);
+        CompileAndStore(ColourEffect.Amber, AmberSksl);
+        CompileAndStore(ColourEffect.Invert, InvertSksl);
     }
 
-    private static SKRuntimeEffect? Compile(string name, string sksl)
+    private void CompileAndStore(ColourEffect effect, string sksl)
     {
-        var effect = SKRuntimeEffect.CreateColorFilter(sksl, out var error);
-        if (effect is null)
-            Console.Error.WriteLine($"Failed to compile {name} shader: {error}");
-        return effect;
+        var compiled = SKRuntimeEffect.CreateColorFilter(sksl, out var error);
+        if (compiled is not null)
+            _effects[effect] = compiled;
+        else
+            Console.Error.WriteLine($"Failed to compile {effect} shader: {error}");
     }
 
-    private SKRuntimeEffect? RuntimeEffect => Effect switch
-    {
-        ColourEffect.HighContrast => _highContrast,
-        ColourEffect.HighVisibility => _highVisibility,
-        ColourEffect.Amber => _amber,
-        ColourEffect.Invert => _invert,
-        _ => null,
-    };
-
-    public bool HasActiveEffect => Effect != ColourEffect.None && RuntimeEffect is not null;
+    public bool HasActiveEffect => Effect != ColourEffect.None && _effects.ContainsKey(Effect);
 
     public SKColorFilter? CreateColorFilter()
     {
-        var rt = RuntimeEffect;
-        if (rt is null) return null;
+        if (!_effects.TryGetValue(Effect, out var rt))
+            return null;
 
         var builder = new SKRuntimeColorFilterBuilder(rt);
         builder.Uniforms["intensity"] = Intensity;
@@ -101,9 +90,8 @@ public sealed class ColourEffectShaders : IDisposable
 
     public void Dispose()
     {
-        _highContrast?.Dispose();
-        _highVisibility?.Dispose();
-        _amber?.Dispose();
-        _invert?.Dispose();
+        foreach (var effect in _effects.Values)
+            effect.Dispose();
+        _effects.Clear();
     }
 }

@@ -52,7 +52,6 @@ public partial class MainWindow : Window
                 InvalidateAnnotations = () => AnnotationLayer.InvalidateVisual(),
             });
 
-
             // Keep ViewModel's viewport size in sync with the actual drawable area.
             // SizeChanged fires during the initial layout pass (before window.Opened),
             // so OpenDocument will already see correct dimensions when it runs.
@@ -144,33 +143,8 @@ public partial class MainWindow : Window
 
         ToolBar.ViewModel = vm;
 
-        // Build colour options for Highlight
-        var highlightColors = new List<RadialMenu.ColorOption>();
-        for (int i = 0; i < DocumentController.HighlightColors.Length; i++)
-        {
-            int idx = i;
-            var (color, opacity) = DocumentController.HighlightColors[i];
-            highlightColors.Add(new RadialMenu.ColorOption(color, opacity, () =>
-            {
-                vm.Controller.SetAnnotationColorIndex(AnnotationTool.Highlight, idx);
-                vm.SetAnnotationTool(AnnotationTool.Highlight);
-                RadialMenuControl.UpdateSegmentColorIndex(0, idx);
-            }));
-        }
-
-        // Build colour options for Pen
-        var penColors = new List<RadialMenu.ColorOption>();
-        for (int i = 0; i < DocumentController.PenColors.Length; i++)
-        {
-            int idx = i;
-            var (color, opacity) = DocumentController.PenColors[i];
-            penColors.Add(new RadialMenu.ColorOption(color, opacity, () =>
-            {
-                vm.Controller.SetAnnotationColorIndex(AnnotationTool.Pen, idx);
-                vm.SetAnnotationTool(AnnotationTool.Pen);
-                RadialMenuControl.UpdateSegmentColorIndex(1, idx);
-            }));
-        }
+        var highlightColors = BuildColorOptions(vm, AnnotationTool.Highlight, DocumentController.HighlightColors, 0);
+        var penColors = BuildColorOptions(vm, AnnotationTool.Pen, DocumentController.PenColors, 1);
 
         var segments = new List<RadialMenu.Segment>
         {
@@ -188,6 +162,25 @@ public partial class MainWindow : Window
                 () => vm.SetAnnotationTool(AnnotationTool.Eraser)),
         };
         RadialMenuControl.SetSegments(segments, onClose: () => vm.CloseRadialMenu());
+    }
+
+    private List<RadialMenu.ColorOption> BuildColorOptions(
+        MainWindowViewModel vm, AnnotationTool tool,
+        (string Color, float Opacity)[] palette, int segmentIndex)
+    {
+        var options = new List<RadialMenu.ColorOption>(palette.Length);
+        for (int i = 0; i < palette.Length; i++)
+        {
+            int idx = i;
+            var (color, opacity) = palette[i];
+            options.Add(new RadialMenu.ColorOption(color, opacity, () =>
+            {
+                vm.Controller.SetAnnotationColorIndex(tool, idx);
+                vm.SetAnnotationTool(tool);
+                RadialMenuControl.UpdateSegmentColorIndex(segmentIndex, idx);
+            }));
+        }
+        return options;
     }
 
     private void UpdateLayerBindings(TabViewModel? tab)

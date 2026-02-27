@@ -9,6 +9,8 @@ namespace RailReader.Core.Services;
 /// </summary>
 public static class PdfTextService
 {
+    private static readonly PageText s_empty = new("", []);
+
     /// <summary>
     /// Extracts all text and per-character bounding boxes for a given page.
     /// PDFium returns coordinates in PDF user space (origin bottom-left, Y-up).
@@ -27,21 +29,21 @@ public static class PdfTextService
             pinned = GCHandle.Alloc(pdfBytes, GCHandleType.Pinned);
             doc = FPDF_LoadMemDocument(pinned.AddrOfPinnedObject(), pdfBytes.Length, null);
             if (doc == IntPtr.Zero)
-                return new PageText("", []);
+                return s_empty;
 
             page = FPDF_LoadPage(doc, pageIndex);
             if (page == IntPtr.Zero)
-                return new PageText("", []);
+                return s_empty;
 
             double pageHeight = FPDF_GetPageHeight(page);
 
             textPage = FPDFText_LoadPage(page);
             if (textPage == IntPtr.Zero)
-                return new PageText("", []);
+                return s_empty;
 
             int charCount = FPDFText_CountChars(textPage);
             if (charCount <= 0)
-                return new PageText("", []);
+                return s_empty;
 
             // Extract full text (UTF-16LE, two-pass pattern)
             // Buffer size is in bytes, including null terminator (2 bytes per char + 2)
@@ -83,7 +85,7 @@ public static class PdfTextService
         catch (Exception ex)
         {
             Console.Error.WriteLine($"[PdfText] Failed to extract text for page {pageIndex}: {ex.Message}");
-            return new PageText("", []);
+            return s_empty;
         }
         finally
         {

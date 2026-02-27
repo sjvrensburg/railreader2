@@ -43,22 +43,22 @@ public static class CleanupService
                 if (IsProtectedFile(Path.GetFileName(entry)))
                     continue;
 
-                if (File.Exists(entry))
+                try
                 {
-                    try
+                    var info = new FileInfo(entry);
+                    if (info.Attributes.HasFlag(FileAttributes.Directory))
                     {
-                        var info = new FileInfo(entry);
+                        CleanDirectory(entry, ref filesRemoved, ref bytesFreed);
+                        Directory.Delete(entry);
+                    }
+                    else
+                    {
                         bytesFreed += info.Length;
-                        File.Delete(entry);
+                        info.Delete();
                         filesRemoved++;
                     }
-                    catch { /* skip */ }
                 }
-                else if (Directory.Exists(entry))
-                {
-                    CleanDirectory(entry, ref filesRemoved, ref bytesFreed);
-                    try { Directory.Delete(entry); } catch { /* skip */ }
-                }
+                catch { /* skip */ }
             }
         }
         catch { /* skip */ }
@@ -80,7 +80,7 @@ public static class CleanupService
                     if (maxAge is not null && DateTime.UtcNow - info.LastWriteTimeUtc < maxAge.Value)
                         continue;
                     bytesFreed += info.Length;
-                    File.Delete(file);
+                    info.Delete();
                     filesRemoved++;
                 }
                 catch { /* skip */ }

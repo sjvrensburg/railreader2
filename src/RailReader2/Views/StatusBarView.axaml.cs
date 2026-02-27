@@ -8,13 +8,18 @@ namespace RailReader2.Views;
 
 public partial class StatusBarView : UserControl
 {
+    private static readonly IBrush RailModeBrush = new SolidColorBrush(Color.FromRgb(66, 133, 244));
+    private static readonly IBrush AutoScrollBrush = new SolidColorBrush(Color.FromRgb(76, 175, 80));
+    private static readonly IBrush AmberBrush = new SolidColorBrush(Color.FromRgb(255, 170, 0));
+    private static readonly IBrush DangerBrush = new SolidColorBrush(Color.FromRgb(255, 100, 100));
+
+    private TabViewModel? _subscribedTab;
+
     public StatusBarView()
     {
         InitializeComponent();
         DataContextChanged += (_, _) => UpdateStatus();
     }
-
-    private TabViewModel? _subscribedTab;
 
     protected override void OnLoaded(RoutedEventArgs e)
     {
@@ -61,8 +66,22 @@ public partial class StatusBarView : UserControl
         return btn;
     }
 
+    private static Button MakeDangerButton(string text, EventHandler<RoutedEventArgs> handler, string? tooltip = null)
+    {
+        var btn = MakeNavButton(text, handler, tooltip);
+        btn.Foreground = DangerBrush;
+        return btn;
+    }
+
     private void AddSeparator() =>
         StatusPanel.Children.Add(new TextBlock { Text = "|", Opacity = 0.5 });
+
+    private static TextBlock MakeBoldLabel(string text, IBrush foreground) => new()
+    {
+        Text = text,
+        Foreground = foreground,
+        FontWeight = FontWeight.Bold,
+    };
 
     private void UpdateStatus()
     {
@@ -76,14 +95,14 @@ public partial class StatusBarView : UserControl
         }
 
         int zoomPct = (int)Math.Round(tab.Camera.Zoom * 100);
-        StatusPanel.Children.Add(MakeNavButton("◀", (_, _) =>
+        StatusPanel.Children.Add(MakeNavButton("\u25c0", (_, _) =>
         { if (vm?.ActiveTab is { } t) vm.GoToPage(t.CurrentPage - 1); }, "Previous page (PgUp)"));
         StatusPanel.Children.Add(new TextBlock
         {
             Text = $"Page {tab.CurrentPage + 1}/{tab.PageCount}",
             VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
         });
-        StatusPanel.Children.Add(MakeNavButton("▶", (_, _) =>
+        StatusPanel.Children.Add(MakeNavButton("\u25b6", (_, _) =>
         { if (vm?.ActiveTab is { } t) vm.GoToPage(t.CurrentPage + 1); }, "Next page (PgDn)"));
         AddSeparator();
         StatusPanel.Children.Add(new TextBlock { Text = $"Zoom: {zoomPct}%" });
@@ -93,7 +112,7 @@ public partial class StatusBarView : UserControl
             AddSeparator();
             StatusPanel.Children.Add(new TextBlock
             {
-                Text = "Analyzing…",
+                Text = "Analyzing\u2026",
                 Opacity = 0.6,
                 FontStyle = Avalonia.Media.FontStyle.Italic,
             });
@@ -107,39 +126,20 @@ public partial class StatusBarView : UserControl
                        $"Line {tab.Rail.CurrentLine + 1}/{tab.Rail.CurrentLineCount}"
             });
             AddSeparator();
-            StatusPanel.Children.Add(new TextBlock
-            {
-                Text = "Rail Mode",
-                Foreground = new SolidColorBrush(Color.FromRgb(66, 133, 244)),
-                FontWeight = FontWeight.Bold,
-            });
+            StatusPanel.Children.Add(MakeBoldLabel("Rail Mode", RailModeBrush));
 
             if (vm is { AutoScrollActive: true })
             {
                 AddSeparator();
-                StatusPanel.Children.Add(new TextBlock
-                {
-                    Text = "Auto-Scroll",
-                    Foreground = new SolidColorBrush(Color.FromRgb(76, 175, 80)),
-                    FontWeight = FontWeight.Bold,
-                });
-                var stopBtn = MakeNavButton("\u23f8", (_, _) => vm.StopAutoScroll(), "Stop auto-scroll (P)");
-                stopBtn.Foreground = new SolidColorBrush(Color.FromRgb(255, 100, 100));
-                StatusPanel.Children.Add(stopBtn);
+                StatusPanel.Children.Add(MakeBoldLabel("Auto-Scroll", AutoScrollBrush));
+                StatusPanel.Children.Add(MakeDangerButton("\u23f8", (_, _) => vm.StopAutoScroll(), "Stop auto-scroll (P)"));
             }
 
             if (vm is { JumpMode: true })
             {
                 AddSeparator();
-                StatusPanel.Children.Add(new TextBlock
-                {
-                    Text = "Jump",
-                    Foreground = new SolidColorBrush(Color.FromRgb(255, 170, 0)),
-                    FontWeight = FontWeight.Bold,
-                });
-                var exitBtn = MakeNavButton("\u2715", (_, _) => vm.JumpMode = false, "Exit jump mode (J)");
-                exitBtn.Foreground = new SolidColorBrush(Color.FromRgb(255, 100, 100));
-                StatusPanel.Children.Add(exitBtn);
+                StatusPanel.Children.Add(MakeBoldLabel("Jump", AmberBrush));
+                StatusPanel.Children.Add(MakeDangerButton("\u2715", (_, _) => vm.JumpMode = false, "Exit jump mode (J)"));
             }
         }
 
@@ -156,15 +156,8 @@ public partial class StatusBarView : UserControl
                 AnnotationTool.TextSelect => "Text Select",
                 _ => "Annotating",
             };
-            StatusPanel.Children.Add(new TextBlock
-            {
-                Text = $"{toolName} Tool",
-                Foreground = new SolidColorBrush(Color.FromRgb(255, 170, 0)),
-                FontWeight = FontWeight.Bold,
-            });
-            var exitBtn = MakeNavButton("\u2715", (_, _) => vm.CancelAnnotationTool(), "Cancel tool (Escape)");
-            exitBtn.Foreground = new SolidColorBrush(Color.FromRgb(255, 100, 100));
-            StatusPanel.Children.Add(exitBtn);
+            StatusPanel.Children.Add(MakeBoldLabel($"{toolName} Tool", AmberBrush));
+            StatusPanel.Children.Add(MakeDangerButton("\u2715", (_, _) => vm.CancelAnnotationTool(), "Cancel tool (Escape)"));
         }
     }
 }
