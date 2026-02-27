@@ -108,19 +108,7 @@ public sealed class RailNav
         double centerX = (windowWidth / 2.0 - cameraX) / zoom;
         double centerY = (windowHeight / 2.0 - cameraY) / zoom;
 
-        double bestDist = double.MaxValue;
-        int bestIdx = 0;
-
-        for (int i = 0; i < _navigableIndices.Count; i++)
-        {
-            var block = _analysis.Blocks[_navigableIndices[i]];
-            double bx = block.BBox.X + block.BBox.W / 2.0;
-            double by = block.BBox.Y + block.BBox.H / 2.0;
-            double dist = (bx - centerX) * (bx - centerX) + (by - centerY) * (by - centerY);
-            if (dist < bestDist) { bestDist = dist; bestIdx = i; }
-        }
-
-        CurrentBlock = bestIdx;
+        CurrentBlock = FindNearestNavigableIndex(centerX, centerY);
         CurrentLine = 0;
     }
 
@@ -132,28 +120,24 @@ public sealed class RailNav
     {
         if (_analysis is null || _navigableIndices.Count == 0) return;
 
-        // Try direct hit-test first
         int? hit = FindBlockAtPoint(pageX, pageY);
-        if (hit.HasValue)
-        {
-            CurrentBlock = hit.Value;
-            CurrentLine = FindNearestLine(CurrentNavigableBlock, pageY);
-            return;
-        }
+        CurrentBlock = hit ?? FindNearestNavigableIndex(pageX, pageY);
+        CurrentLine = FindNearestLine(CurrentNavigableBlock, pageY);
+    }
 
-        // Fall back to nearest block center
+    private int FindNearestNavigableIndex(double pageX, double pageY)
+    {
         double bestDist = double.MaxValue;
         int bestIdx = 0;
         for (int i = 0; i < _navigableIndices.Count; i++)
         {
-            var block = _analysis.Blocks[_navigableIndices[i]];
-            double bx = block.BBox.X + block.BBox.W / 2.0;
-            double by = block.BBox.Y + block.BBox.H / 2.0;
-            double dist = (bx - pageX) * (bx - pageX) + (by - pageY) * (by - pageY);
+            var block = _analysis!.Blocks[_navigableIndices[i]];
+            double dx = block.BBox.X + block.BBox.W / 2.0 - pageX;
+            double dy = block.BBox.Y + block.BBox.H / 2.0 - pageY;
+            double dist = dx * dx + dy * dy;
             if (dist < bestDist) { bestDist = dist; bestIdx = i; }
         }
-        CurrentBlock = bestIdx;
-        CurrentLine = FindNearestLine(CurrentNavigableBlock, pageY);
+        return bestIdx;
     }
 
     private static int FindNearestLine(LayoutBlock block, double pageY)

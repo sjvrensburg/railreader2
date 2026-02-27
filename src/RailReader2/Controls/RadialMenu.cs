@@ -36,8 +36,7 @@ public class RadialMenu : Control
     public record ColorOption(string HexColor, float Opacity, Action SelectAction);
 
     public record Segment(string Label, string Icon, Action Action,
-        List<ColorOption>? ColorOptions = null, int ActiveColorIndex = 0,
-        Action? DefaultAction = null);
+        List<ColorOption>? ColorOptions = null, int ActiveColorIndex = 0);
 
     private static SKTypeface? s_iconTypeface;
     private readonly List<Segment> _segments = [];
@@ -235,9 +234,9 @@ public class RadialMenu : Control
         }
         else if (_expandedSegment >= 0)
         {
-            // Clicking outside (or on centre) while colour ring is expanded:
+            // Clicking outside while colour ring is expanded:
             // activate the tool with the last-used colour, then close.
-            _segments[_expandedSegment].DefaultAction?.Invoke();
+            _segments[_expandedSegment].Action.Invoke();
             _expandedSegment = -1;
             _onClose?.Invoke();
         }
