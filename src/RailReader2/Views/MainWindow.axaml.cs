@@ -409,6 +409,8 @@ public partial class MainWindow : Window
                 vm.SetAnnotationTool(AnnotationTool.TextNote); e.Handled = true; break;
             case Key.D5 when !searchFocused:
                 vm.SetAnnotationTool(AnnotationTool.Eraser); e.Handled = true; break;
+            case Key.Delete or Key.Back when !searchFocused && !vm.IsAnnotating && vm.SelectedAnnotation is not null:
+                vm.DeleteSelectedAnnotation(); e.Handled = true; break;
             case Key.F11:
                 vm.IsFullScreen = !vm.IsFullScreen; e.Handled = true; break;
             case Key.Escape when vm.AutoScrollActive:

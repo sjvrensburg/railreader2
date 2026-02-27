@@ -893,6 +893,18 @@ public sealed class DocumentController
         ActiveDocument?.Redo();
     }
 
+    /// <summary>
+    /// Delete the currently selected annotation (if any) in browse mode.
+    /// Returns true if an annotation was deleted.
+    /// </summary>
+    public bool DeleteSelectedAnnotation()
+    {
+        if (ActiveDocument is not { } doc || SelectedAnnotation is null) return false;
+        doc.RemoveAnnotation(doc.CurrentPage, SelectedAnnotation);
+        SelectedAnnotation = null;
+        return true;
+    }
+
     // --- Browse-mode interaction (select, move, resize) ---
 
     /// <summary>

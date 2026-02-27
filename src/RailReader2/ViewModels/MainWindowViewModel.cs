@@ -612,6 +612,15 @@ public sealed partial class MainWindowViewModel : ObservableObject
         CloseRadialMenu();
     }
 
+    public void DeleteSelectedAnnotation()
+    {
+        if (_controller.DeleteSelectedAnnotation())
+        {
+            OnPropertyChanged(nameof(SelectedAnnotation));
+            InvalidateAnnotations();
+        }
+    }
+
     public void UndoAnnotation()
     {
         _controller.UndoAnnotation();
