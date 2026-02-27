@@ -25,17 +25,17 @@ public sealed class OverlayPalette
         byte a = (byte)(Math.Clamp(opacity, 0, 1) * 255);
         if (tint == LineHighlightTint.Auto)
             return LineHighlight.WithAlpha(a);
-        var (r, g, b) = tint switch
+        SKColor baseColor = tint switch
         {
-            LineHighlightTint.Yellow => ((byte)255, (byte)220, (byte)50),
-            LineHighlightTint.Cyan   => ((byte)0,   (byte)255, (byte)255),
-            LineHighlightTint.Green  => ((byte)0,   (byte)220, (byte)120),
-            LineHighlightTint.Pink   => ((byte)255, (byte)130, (byte)180),
-            LineHighlightTint.Orange => ((byte)255, (byte)180, (byte)60),
-            LineHighlightTint.Blue   => ((byte)100, (byte)160, (byte)255),
-            _ => ((byte)255, (byte)220, (byte)50),
+            LineHighlightTint.Yellow => new(255, 220, 50),
+            LineHighlightTint.Cyan   => new(0,   255, 255),
+            LineHighlightTint.Green  => new(0,   220, 120),
+            LineHighlightTint.Pink   => new(255, 130, 180),
+            LineHighlightTint.Orange => new(255, 180, 60),
+            LineHighlightTint.Blue   => new(100, 160, 255),
+            _                        => new(255, 220, 50),
         };
-        return new SKColor(r, g, b, a);
+        return baseColor.WithAlpha(a);
     }
 }
 

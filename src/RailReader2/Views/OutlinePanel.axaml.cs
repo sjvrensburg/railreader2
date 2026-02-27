@@ -1,4 +1,3 @@
-using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.VisualTree;
@@ -86,8 +85,7 @@ public partial class OutlinePanel : UserControl
     private void OnBookmarkClick(object? sender, RoutedEventArgs e)
     {
         if (_vm is not { } vm) return;
-        if (sender is not Button btn) return;
-        if (btn.DataContext is not BookmarkEntry bm) return;
+        if (sender is not Button { DataContext: BookmarkEntry bm }) return;
 
         var bookmarks = vm.ActiveTab?.Annotations?.Bookmarks;
         if (bookmarks is null) return;
@@ -103,8 +101,7 @@ public partial class OutlinePanel : UserControl
     {
         if (_vm is not { } vm || vm.ActiveTab is not { } tab) return;
 
-        var window = TopLevel.GetTopLevel(this) as Window;
-        if (window is null) return;
+        if (TopLevel.GetTopLevel(this) is not Window window) return;
 
         var dialog = new BookmarkNameDialog(tab.CurrentPage + 1) { FontSize = vm.CurrentFontSize };
         var name = await dialog.ShowDialog<string?>(window);
@@ -118,21 +115,9 @@ public partial class OutlinePanel : UserControl
 
     private void OnDeleteBookmarkClick(object? sender, RoutedEventArgs e)
     {
-        // Stop the click from bubbling up to the parent bookmark button
         e.Handled = true;
-
         if (_vm is not { } vm) return;
-        if (sender is not Button btn) return;
-
-        // Walk up to find the BookmarkEntry from the outer button's DataContext
-        var bm = FindBookmarkEntry(btn);
-        if (bm is null) return;
-
-        var bookmarks = vm.ActiveTab?.Annotations?.Bookmarks;
-        if (bookmarks is null) return;
-
-        int index = bookmarks.IndexOf(bm);
-        if (index < 0) return;
+        if (ResolveBookmarkIndex(sender) is not (var bm, var index)) return;
 
         vm.Controller.RemoveBookmark(index);
         UpdateBookmarkSource();
@@ -140,23 +125,10 @@ public partial class OutlinePanel : UserControl
 
     private async void OnRenameBookmarkClick(object? sender, RoutedEventArgs e)
     {
-        // Stop the click from bubbling up to the parent bookmark button
         e.Handled = true;
-
         if (_vm is not { } vm) return;
-        if (sender is not Button btn) return;
-
-        var bm = FindBookmarkEntry(btn);
-        if (bm is null) return;
-
-        var bookmarks = vm.ActiveTab?.Annotations?.Bookmarks;
-        if (bookmarks is null) return;
-
-        int index = bookmarks.IndexOf(bm);
-        if (index < 0) return;
-
-        var window = TopLevel.GetTopLevel(this) as Window;
-        if (window is null) return;
+        if (ResolveBookmarkIndex(sender) is not (var bm, var index)) return;
+        if (TopLevel.GetTopLevel(this) is not Window window) return;
 
         var dialog = new BookmarkNameDialog(bm.Page + 1) { FontSize = vm.CurrentFontSize };
         dialog.SetName(bm.Name);
@@ -169,18 +141,24 @@ public partial class OutlinePanel : UserControl
     }
 
     /// <summary>
-    /// Walk up the visual tree to find the BookmarkEntry DataContext
-    /// from the outer Button in the ItemTemplate.
+    /// Resolves a bookmark entry and its index from a nested button's click sender
+    /// by walking up the visual tree to the parent bookmark button.
     /// </summary>
-    private static BookmarkEntry? FindBookmarkEntry(Visual control)
+    private (BookmarkEntry Entry, int Index)? ResolveBookmarkIndex(object? sender)
     {
-        for (var v = control.GetVisualParent(); v is not null; v = v.GetVisualParent())
+        if (sender is not Button btn) return null;
+        var bookmarks = _vm?.ActiveTab?.Annotations?.Bookmarks;
+        if (bookmarks is null) return null;
+
+        BookmarkEntry? bm = null;
+        for (var v = btn.GetVisualParent(); v is not null; v = v.GetVisualParent())
         {
-            if (v is Button { DataContext: BookmarkEntry bm })
-                return bm;
-            if (v is ItemsControl)
-                break;
+            if (v is Button { DataContext: BookmarkEntry entry }) { bm = entry; break; }
+            if (v is ItemsControl) break;
         }
-        return null;
+        if (bm is null) return null;
+
+        int index = bookmarks.IndexOf(bm);
+        return index >= 0 ? (bm, index) : null;
     }
 }

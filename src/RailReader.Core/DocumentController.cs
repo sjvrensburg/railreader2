@@ -238,10 +238,9 @@ public sealed class DocumentController
     /// </summary>
     public bool AddBookmark(string name)
     {
-        if (ActiveDocument is not { } doc) return false;
-        if (doc.Annotations is null) return false;
+        if (ActiveDocument is not { Annotations: { } annotations } doc) return false;
 
-        var existing = doc.Annotations.Bookmarks.FindIndex(b => b.Page == doc.CurrentPage);
+        var existing = annotations.Bookmarks.FindIndex(b => b.Page == doc.CurrentPage);
         if (existing >= 0)
         {
             doc.RenameBookmark(existing, name);
@@ -267,11 +266,10 @@ public sealed class DocumentController
 
     public void NavigateToBookmark(int index)
     {
-        if (ActiveDocument is not { } doc) return;
-        if (doc.Annotations is null || index < 0 || index >= doc.Annotations.Bookmarks.Count) return;
-        var bm = doc.Annotations.Bookmarks[index];
+        if (ActiveDocument is not { Annotations: { } annotations } doc) return;
+        if ((uint)index >= (uint)annotations.Bookmarks.Count) return;
         LastPositionPage = doc.CurrentPage;
-        GoToPage(bm.Page);
+        GoToPage(annotations.Bookmarks[index].Page);
         FitPage();
     }
 
