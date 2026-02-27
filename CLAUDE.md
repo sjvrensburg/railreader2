@@ -9,8 +9,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Build and Development Commands
 
 ```bash
-# Build all projects
+# Build app + tests (default solution, excludes AI agent)
 dotnet build RailReader2.slnx
+
+# Build everything including the AI agent CLI
+dotnet build RailReader2-full.slnx
 
 # Run the application (note: src/RailReader2 is the correct project path; -- separates dotnet args from app args)
 dotnet run -c Release --project src/RailReader2 -- <path-to-pdf>
@@ -21,7 +24,7 @@ dotnet run -c Release --project src/RailReader2
 # Run tests
 dotnet test tests/RailReader.Core.Tests
 
-# Run the AI agent CLI
+# Run the AI agent CLI (requires RailReader2-full.slnx or direct project build)
 dotnet run --project src/RailReader.Agent -- "Open test.pdf and tell me how many pages it has"
 
 # Publish self-contained release (Linux)
@@ -36,14 +39,16 @@ dotnet publish src/RailReader2 -c Release -r win-x64 --self-contained
 
 ## Architecture
 
-The codebase is split into four projects:
+The codebase is split into four projects across two solution files:
 
 ```
-RailReader2.slnx
+RailReader2.slnx              # Default: app + core + tests (no agent)
 ├── src/RailReader.Core/        # UI-free library: all business logic, models, services
 ├── src/RailReader2/            # Thin Avalonia UI shell (references Core)
-├── src/RailReader.Agent/       # AI agent CLI via Microsoft.Extensions.AI (references Core)
 └── tests/RailReader.Core.Tests/# xUnit headless tests against Core
+
+RailReader2-full.slnx         # Full: includes experimental AI agent CLI
+└── src/RailReader.Agent/       # AI agent CLI via Microsoft.Extensions.AI (references Core)
 ```
 
 ### RailReader.Core (UI-free library)

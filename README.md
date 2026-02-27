@@ -176,13 +176,16 @@ Rail reading parameters are editable via the Settings panel (gear icon in menu b
 
 ## Architecture
 
-The codebase is split into a UI-free core library, a thin Avalonia UI shell, an AI agent CLI, and headless tests:
+The codebase is split into a UI-free core library, a thin Avalonia UI shell, and headless tests. An experimental AI agent CLI is available separately for developers:
 
 ```
-src/RailReader.Core/          # All business logic (zero Avalonia dependencies)
-src/RailReader2/              # Thin Avalonia UI shell
-src/RailReader.Agent/         # AI agent CLI (Microsoft.Extensions.AI)
-tests/RailReader.Core.Tests/  # xUnit headless tests
+RailReader2.slnx              # Default solution (app + core + tests)
+├── src/RailReader.Core/        # All business logic (zero Avalonia dependencies)
+├── src/RailReader2/            # Thin Avalonia UI shell
+└── tests/RailReader.Core.Tests/  # xUnit headless tests
+
+RailReader2-full.slnx         # Full solution (adds AI agent CLI)
+└── src/RailReader.Agent/       # AI agent CLI (Microsoft.Extensions.AI)
 ```
 
 **RailReader.Core** contains `DocumentController` (the headless orchestration facade), `DocumentState` (per-document state), all Models and Services. It can be driven programmatically without any UI — the agent CLI and test project both use it directly.
@@ -209,7 +212,11 @@ The model is placed in `models/PP-DocLayoutV3.onnx`. Without it, a simple fallba
 ### Build
 
 ```bash
+# Build app + tests (default, no AI agent dependencies)
 dotnet build RailReader2.slnx
+
+# Build everything including the AI agent CLI
+dotnet build RailReader2-full.slnx
 ```
 
 ### Test
@@ -219,6 +226,8 @@ dotnet test tests/RailReader.Core.Tests
 ```
 
 ### Run the AI agent (experimental, source builds only)
+
+The AI agent CLI is not included in the default solution or binary releases. Build it via the full solution or directly:
 
 ```bash
 # Set your API key and optional model/base URL
