@@ -53,7 +53,10 @@ At high zoom levels, navigation switches to "rail mode" — the viewer locks ont
 - **About dialog** — version info and credits (Help → About)
 - **Disk cleanup** — removes cache, old logs, temp files (Help → Clean Up Temp Files)
 - **Analysis lookahead** — pre-analyzes upcoming pages in the background for instant navigation
-- **Colour effects** — GPU-accelerated accessibility filters (High Contrast, High Visibility, Amber, Invert) with adjustable intensity
+- **Colour effects** — GPU-accelerated accessibility filters (High Contrast, High Visibility, Amber, Invert) with adjustable intensity. Per-document: each tab keeps its own effect, persisted across sessions
+- **Colour effect cycling** — press `C` to cycle through colour effects on the active tab, with a brief status bar toast showing the current effect
+- **Smooth zoom** — scroll wheel and +/- key zooms animate over 180ms with cubic ease-out; rapid scrolling accumulates smoothly
+- **Dark mode** — toggle via Settings → Appearance; switches the Avalonia Fluent theme to dark variant
 - **Motion blur** — subtle directional blur during horizontal scroll and zoom for perceptual smoothness, with configurable intensity
 - **Splash screen** — startup splash while ONNX model loads
 - **Analysis indicator** — status bar shows "Analyzing..." during layout inference
@@ -109,6 +112,7 @@ dotnet run -c Release --project src/RailReader2 --
 | Home / End | Line start / end (rail mode) or first / last page |
 | P | Toggle auto-scroll (rail mode), D/Right to boost |
 | J | Toggle jump mode (saccade-style advance) |
+| C | Cycle colour effect on active tab |
 | F | Toggle line focus blur (rail mode) |
 | Shift+Right / Shift+Left | Short jump — half distance (jump mode) |
 | [ / ] | Adjust scroll speed or jump distance (rail mode) |
@@ -147,6 +151,7 @@ Rail reading parameters are editable via the Settings panel (gear icon in menu b
   "auto_scroll_line_pause_ms": 400.0,
   "auto_scroll_block_pause_ms": 600.0,
   "jump_percentage": 25.0,
+  "dark_mode": false,
   "navigable_classes": [
     "abstract", "algorithm", "display_formula",
     "footnote", "paragraph_title", "text"
@@ -173,6 +178,7 @@ Rail reading parameters are editable via the Settings panel (gear icon in menu b
 | `auto_scroll_line_pause_ms` | Pause duration at line boundaries during auto-scroll (ms, 0 to disable) |
 | `auto_scroll_block_pause_ms` | Pause duration at block boundaries during auto-scroll (ms, 0 to disable) |
 | `jump_percentage` | Jump distance as percentage of visible width (5–80%) |
+| `dark_mode` | Enable dark UI theme (`true`/`false`) |
 | `navigable_classes` | Which block types rail mode navigates (array of class names). Configurable via Settings → Advanced. |
 
 ## Architecture

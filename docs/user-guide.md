@@ -45,7 +45,7 @@ Once a PDF is open, scroll through pages with `PgDn`/`PgUp`, zoom with `+`/`-` o
 
 ### Zoom and pan
 
-**Mouse wheel** zooms towards the cursor. `+` and `-` keys zoom in and out. Press `0` to fit the page to the window. Use **View > Fit Width** to fill the viewport horizontally.
+**Mouse wheel** zooms towards the cursor. `+` and `-` keys zoom in and out. All zoom actions animate smoothly over ~180ms with cubic ease-out. Rapid scroll wheel inputs accumulate into the in-progress animation for fluid zooming. Press `0` to fit the page to the window. Use **View > Fit Width** to fill the viewport horizontally.
 
 **Click and drag** to pan. Arrow keys also pan when not in rail mode.
 
@@ -138,7 +138,9 @@ Toggle with the `F` key, the **F** button on the rail toolbar, or in Settings > 
 
 ## Colour Effects
 
-Four GPU-accelerated colour filters are available, applied only to PDF content (not the UI). Access via **View > Colour Effect** or Settings > Appearance.
+Four GPU-accelerated colour filters are available, applied only to PDF content (not the UI). Access via **View > Colour Effect**, Settings > Appearance, or press `C` to cycle through effects on the active tab.
+
+Each tab keeps its own colour effect independently — you can have one PDF in Amber and another in High Contrast. The per-tab effect is saved with the reading position and restored when you reopen the file.
 
 | Effect | Description |
 |--------|-------------|
@@ -154,6 +156,8 @@ Four GPU-accelerated colour filters are available, applied only to PDF content (
 </p>
 
 Each effect has adjustable intensity (0.0 to 1.0). Rail mode overlay colours automatically adapt to the active colour effect for readable contrast.
+
+> **Tip:** Press `C` to quickly cycle through colour effects. The status bar briefly shows the active effect name.
 
 ---
 
@@ -236,8 +240,9 @@ Press `Ctrl+,` or use the menu to open Settings. Changes take effect immediately
 
 ### Appearance
 - **UI Font Scale:** Adjust the size of all UI text (default 1.25x).
+- **Dark Mode:** Switch the UI to a dark theme. Takes effect immediately.
 - **Motion Blur:** Toggle and adjust intensity of directional blur during scroll/zoom.
-- **Colour Effect:** Select and configure the active colour filter.
+- **Colour Effect:** Select and configure the active colour filter (applies globally via Settings; use `C` key for per-tab cycling).
 
 ### Rail Reading
 - **Zoom Threshold:** Zoom level at which rail mode activates (default 3.0x).
@@ -302,6 +307,7 @@ Configuration is stored at `~/.config/railreader2/config.json` (Linux) or `%APPD
 | `Home` / `End` | Line start / end |
 | `P` | Toggle auto-scroll |
 | `J` | Toggle jump mode |
+| `C` | Cycle colour effect on active tab |
 | `F` | Toggle line focus blur |
 | `[` / `]` | Adjust speed or jump distance |
 | `Shift+[` / `Shift+]` | Adjust blur intensity |
