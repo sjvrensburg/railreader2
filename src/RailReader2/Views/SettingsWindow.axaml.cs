@@ -112,11 +112,9 @@ public partial class SettingsWindow : Window
 
     private void OnBlurIntensityChanged(object? sender, Avalonia.AvaloniaPropertyChangedEventArgs e)
     {
-        if (e.Property.Name == "Value" && Vm is { } vm && !_loading)
-        {
-            vm.Config.MotionBlurIntensity = BlurIntensitySlider.Value;
-            vm.OnConfigChanged();
-        }
+        if (e.Property.Name != "Value" || Vm is not { } vm || _loading) return;
+        vm.Config.MotionBlurIntensity = BlurIntensitySlider.Value;
+        vm.OnConfigChanged();
     }
 
     private void OnPixelSnappingChanged(object? sender, RoutedEventArgs e)
@@ -135,11 +133,9 @@ public partial class SettingsWindow : Window
 
     private void OnLineFocusBlurIntensityChanged(object? sender, Avalonia.AvaloniaPropertyChangedEventArgs e)
     {
-        if (e.Property.Name == "Value" && Vm is { } vm && !_loading)
-        {
-            vm.Config.LineFocusBlurIntensity = LineFocusBlurSlider.Value;
-            vm.OnConfigChanged();
-        }
+        if (e.Property.Name != "Value" || Vm is not { } vm || _loading) return;
+        vm.Config.LineFocusBlurIntensity = LineFocusBlurSlider.Value;
+        vm.OnConfigChanged();
     }
 
     private void OnSettingChanged(object? sender, NumericUpDownValueChangedEventArgs e) => SaveToConfig();
@@ -151,7 +147,8 @@ public partial class SettingsWindow : Window
     }
     private void OnIntensityChanged(object? sender, Avalonia.AvaloniaPropertyChangedEventArgs e)
     {
-        if (e.Property.Name == "Value") SaveToConfig();
+        if (e.Property.Name != "Value") return;
+        SaveToConfig();
     }
 
     private void OnResetDefaults(object? sender, RoutedEventArgs e)

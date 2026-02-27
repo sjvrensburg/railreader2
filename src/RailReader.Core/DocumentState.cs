@@ -24,40 +24,49 @@ public sealed class DocumentState : IDisposable
     /// <summary>Fires when a property changes. Parameter is the property name.</summary>
     public Action<string>? StateChanged;
 
+    /// <summary>Sets a backing field and fires StateChanged if the value changed.</summary>
+    private bool SetField<T>(ref T field, T value, string propertyName) where T : IEquatable<T>
+    {
+        if (EqualityComparer<T>.Default.Equals(field, value)) return false;
+        field = value;
+        StateChanged?.Invoke(propertyName);
+        return true;
+    }
+
     public string Title
     {
         get => _title;
-        set { if (_title != value) { _title = value; StateChanged?.Invoke(nameof(Title)); } }
+        set => SetField(ref _title, value, nameof(Title));
     }
 
     public int CurrentPage
     {
         get => _currentPage;
-        set { if (_currentPage != value) { _currentPage = value; StateChanged?.Invoke(nameof(CurrentPage)); } }
+        set => SetField(ref _currentPage, value, nameof(CurrentPage));
     }
 
     public double PageWidth
     {
         get => _pageWidth;
-        set { if (_pageWidth != value) { _pageWidth = value; StateChanged?.Invoke(nameof(PageWidth)); } }
+        set => SetField(ref _pageWidth, value, nameof(PageWidth));
     }
 
     public double PageHeight
     {
         get => _pageHeight;
-        set { if (_pageHeight != value) { _pageHeight = value; StateChanged?.Invoke(nameof(PageHeight)); } }
+        set => SetField(ref _pageHeight, value, nameof(PageHeight));
     }
 
     public bool DebugOverlay
     {
         get => _debugOverlay;
-        set { if (_debugOverlay != value) { _debugOverlay = value; StateChanged?.Invoke(nameof(DebugOverlay)); } }
+        set => SetField(ref _debugOverlay, value, nameof(DebugOverlay));
     }
 
     public bool PendingRailSetup
     {
         get => _pendingRailSetup;
-        set { if (_pendingRailSetup != value) { _pendingRailSetup = value; StateChanged?.Invoke(nameof(PendingRailSetup)); } }
+        set => SetField(ref _pendingRailSetup, value, nameof(PendingRailSetup));
     }
 
     public string FilePath { get; }
@@ -397,9 +406,10 @@ public sealed class DocumentState : IDisposable
     {
         AnnotationsDirty = true;
         // Debounced auto-save: restart the timer on each modification
-        _autoSaveTimer?.Change(Timeout.Infinite, Timeout.Infinite);
-        _autoSaveTimer?.Dispose();
-        _autoSaveTimer = new Timer(_ => _marshaller.Post(SaveAnnotations), null, 1000, Timeout.Infinite);
+        if (_autoSaveTimer is not null)
+            _autoSaveTimer.Change(1000, Timeout.Infinite);
+        else
+            _autoSaveTimer = new Timer(_ => _marshaller.Post(SaveAnnotations), null, 1000, Timeout.Infinite);
     }
 
     public void AddAnnotation(int page, Annotation annotation)

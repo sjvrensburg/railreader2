@@ -97,17 +97,22 @@ public sealed class AnalysisWorker : IDisposable
         var key = (request.FilePath, request.Page);
         if (!_inFlight.Add(key))
             return false;
-        return _requestChannel.Writer.TryWrite(request);
+
+        if (!_requestChannel.Writer.TryWrite(request))
+        {
+            _inFlight.Remove(key);
+            return false;
+        }
+        return true;
     }
 
     public AnalysisResult? Poll()
     {
-        if (_resultChannel.Reader.TryRead(out var result))
-        {
-            _inFlight.Remove((result.FilePath, result.Page));
-            return result;
-        }
-        return null;
+        if (!_resultChannel.Reader.TryRead(out var result))
+            return null;
+
+        _inFlight.Remove((result.FilePath, result.Page));
+        return result;
     }
 
     public bool IsInFlight(string filePath, int page) => _inFlight.Contains((filePath, page));

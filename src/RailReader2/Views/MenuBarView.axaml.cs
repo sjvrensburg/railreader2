@@ -7,16 +7,19 @@ namespace RailReader2.Views;
 
 public partial class MenuBarView : UserControl
 {
+    private MainWindowViewModel? _vm;
+
     public MenuBarView() => InitializeComponent();
 
-    private MainWindowViewModel? Vm => DataContext as MainWindowViewModel;
+    private MainWindowViewModel? Vm => _vm;
 
     protected override void OnLoaded(RoutedEventArgs e)
     {
         base.OnLoaded(e);
+        _vm = DataContext as MainWindowViewModel;
         UpdateRecentFiles();
-        if (DataContext is MainWindowViewModel vm)
-            vm.PropertyChanged += (_, args) =>
+        if (_vm is not null)
+            _vm.PropertyChanged += (_, args) =>
             {
                 if (args.PropertyName == nameof(MainWindowViewModel.ActiveTab))
                     UpdateRecentFiles();

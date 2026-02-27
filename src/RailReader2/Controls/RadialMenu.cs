@@ -334,11 +334,13 @@ public class RadialMenu : Control
                     bool expanded = i == _expandedSegment;
 
                     // Wedge fill
-                    var wedgeColor = expanded
-                        ? new SKColor(0, 100, 180, 210)
-                        : hovered
-                            ? new SKColor(0, 120, 212, 210)
-                            : new SKColor(52, 52, 56, 220);
+                    SKColor wedgeColor;
+                    if (expanded)
+                        wedgeColor = new SKColor(0, 100, 180, 210);
+                    else if (hovered)
+                        wedgeColor = new SKColor(0, 120, 212, 210);
+                    else
+                        wedgeColor = new SKColor(52, 52, 56, 220);
                     using var wedgePaint = new SKPaint { Color = wedgeColor, IsAntialias = true };
 
                     using var wedgePath = new SKPath();

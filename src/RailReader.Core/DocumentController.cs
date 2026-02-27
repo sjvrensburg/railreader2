@@ -146,10 +146,7 @@ public sealed class DocumentController
     /// Creates a DocumentState for the given path (synchronous). Call LoadDocumentAsync for bitmap loading.
     /// </summary>
     public DocumentState CreateDocument(string path)
-    {
-        var state = new DocumentState(path, _config, _marshaller);
-        return state;
-    }
+        => new(path, _config, _marshaller);
 
     /// <summary>
     /// Adds a document to the tab list, restores reading position, and submits analysis.
@@ -182,8 +179,7 @@ public sealed class DocumentController
             doc.Camera.Zoom, doc.Camera.OffsetX, doc.Camera.OffsetY);
         Documents.RemoveAt(index);
         doc.Dispose();
-        if (Documents.Count == 0) ActiveDocumentIndex = 0;
-        else if (ActiveDocumentIndex >= Documents.Count) ActiveDocumentIndex = Documents.Count - 1;
+        ActiveDocumentIndex = Math.Clamp(ActiveDocumentIndex, 0, Math.Max(Documents.Count - 1, 0));
     }
 
     public void SelectDocument(int index)
@@ -194,9 +190,10 @@ public sealed class DocumentController
 
     public void MoveDocument(int fromIndex, int toIndex)
     {
-        if (fromIndex == toIndex) return;
-        if (fromIndex < 0 || fromIndex >= Documents.Count) return;
-        if (toIndex < 0 || toIndex >= Documents.Count) return;
+        if (fromIndex == toIndex
+            || fromIndex < 0 || fromIndex >= Documents.Count
+            || toIndex < 0 || toIndex >= Documents.Count)
+            return;
 
         var selected = ActiveDocument;
         var doc = Documents[fromIndex];
@@ -498,7 +495,6 @@ public sealed class DocumentController
         bool cameraChanged = false;
         bool pageChanged = false;
         bool overlayChanged = false;
-        bool annotationsChanged = false;
         bool animating = false;
 
         // Rail snap animation
@@ -510,7 +506,7 @@ public sealed class DocumentController
             doc.Camera.OffsetY = cy;
             cameraChanged = true;
         }
-        if (railAnimating) animating = true;
+        animating |= railAnimating;
 
         // Snap Y to integer pixel when rail mode is stable
         if (_config.PixelSnapping && doc.Rail.Active && !animating)
@@ -564,14 +560,17 @@ public sealed class DocumentController
         }
 
         // Decay zoom blur speed
-        bool wasZooming = doc.Camera.ZoomSpeed > 0;
-        doc.Camera.DecayZoomSpeed(dt);
-        if (wasZooming) { animating = true; cameraChanged = true; }
+        if (doc.Camera.ZoomSpeed > 0)
+        {
+            doc.Camera.DecayZoomSpeed(dt);
+            animating = true;
+            cameraChanged = true;
+        }
 
         // Poll analysis results
         var (gotResults, needsAnim) = PollAnalysisResults();
-        if (needsAnim) animating = true;
-        if (gotResults) overlayChanged = true;
+        animating |= needsAnim;
+        overlayChanged |= gotResults;
 
         if (!animating)
             doc.SubmitPendingLookahead(_worker);
@@ -585,7 +584,7 @@ public sealed class DocumentController
 
         if (animating) cameraChanged = true;
 
-        return new TickResult(cameraChanged, pageChanged, overlayChanged, false, annotationsChanged, animating);
+        return new TickResult(cameraChanged, pageChanged, overlayChanged, false, false, animating);
     }
 
     /// <summary>
@@ -883,15 +882,9 @@ public sealed class DocumentController
             CopyToClipboard?.Invoke(SelectedText);
     }
 
-    public void UndoAnnotation()
-    {
-        ActiveDocument?.Undo();
-    }
+    public void UndoAnnotation() => ActiveDocument?.Undo();
 
-    public void RedoAnnotation()
-    {
-        ActiveDocument?.Redo();
-    }
+    public void RedoAnnotation() => ActiveDocument?.Redo();
 
     /// <summary>
     /// Delete the currently selected annotation (if any) in browse mode.
@@ -992,9 +985,7 @@ public sealed class DocumentController
         {
             List<PointF> newPoints = [.. freehand.Points];
             if (!PointsEqual(_resizeOriginalPoints, newPoints))
-            {
                 doc.PushUndoAction(new ResizeFreehandAction(freehand, _resizeOriginalPoints, newPoints));
-            }
             _resizeHandle = ResizeHandle.None;
             _resizeOriginalPoints = null;
             return true;
@@ -1003,7 +994,6 @@ public sealed class DocumentController
         if (_dragAnnotation is not null && _dragOriginalPosition is not null)
         {
             var newPosition = PositionSnapshot.Capture(_dragAnnotation);
-            // Only push undo if actually moved
             float dx = pageX - _dragStartPageX;
             float dy = pageY - _dragStartPageY;
             if (Math.Abs(dx) > 0.5f || Math.Abs(dy) > 0.5f)
@@ -1013,7 +1003,6 @@ public sealed class DocumentController
             return true;
         }
 
-        _dragAnnotation = null;
         return false;
     }
 

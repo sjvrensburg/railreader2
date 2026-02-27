@@ -48,20 +48,19 @@ public sealed class PdfService : IDisposable
             options: new RenderOptions(Width: pixW, Height: pixH));
 
         // Convert BGRA (PDFium/SkiaSharp native) to RGB for ONNX
-        int actualW = bitmap.Width;
-        int actualH = bitmap.Height;
         var pixels = bitmap.GetPixelSpan();
-        var rgb = new byte[actualW * actualH * 3];
-        int srcIdx = 0, dstIdx = 0;
-        for (int i = 0; i < actualW * actualH; i++)
+        int pixelCount = bitmap.Width * bitmap.Height;
+        var rgb = new byte[pixelCount * 3];
+        for (int i = 0; i < pixelCount; i++)
         {
-            rgb[dstIdx++] = pixels[srcIdx + 2]; // R (BGRA → RGB)
-            rgb[dstIdx++] = pixels[srcIdx + 1]; // G
-            rgb[dstIdx++] = pixels[srcIdx];     // B
-            srcIdx += 4;
+            int src = i * 4;
+            int dst = i * 3;
+            rgb[dst] = pixels[src + 2];     // R (BGRA -> RGB)
+            rgb[dst + 1] = pixels[src + 1]; // G
+            rgb[dst + 2] = pixels[src];     // B
         }
 
-        return (rgb, actualW, actualH);
+        return (rgb, bitmap.Width, bitmap.Height);
     }
 
     /// <summary>

@@ -55,7 +55,6 @@ public class RectAnnotation : Annotation
     public bool Filled { get; set; }
 }
 
-// Undo system
 public interface IUndoAction
 {
     void Undo(AnnotationFile file);
@@ -122,10 +121,6 @@ public class RemoveAnnotationAction : IUndoAction
     }
 }
 
-/// <summary>
-/// Undo action for moving an annotation by delta.
-/// Stores position snapshots to restore on undo.
-/// </summary>
 public class MoveAnnotationAction : IUndoAction
 {
     private readonly Annotation _annotation;
@@ -143,9 +138,6 @@ public class MoveAnnotationAction : IUndoAction
     public void Redo(AnnotationFile file) => _newPosition.ApplyTo(_annotation);
 }
 
-/// <summary>
-/// Snapshot of an annotation's position for undo/redo.
-/// </summary>
 public class PositionSnapshot
 {
     public float X { get; init; }
@@ -182,9 +174,6 @@ public class PositionSnapshot
     }
 }
 
-/// <summary>
-/// Resize handle positions on a bounding box.
-/// </summary>
 public enum ResizeHandle
 {
     None,
@@ -194,9 +183,6 @@ public enum ResizeHandle
     Left,
 }
 
-/// <summary>
-/// Undo action for resizing a freehand annotation.
-/// </summary>
 public class ResizeFreehandAction : IUndoAction
 {
     private readonly FreehandAnnotation _annotation;
