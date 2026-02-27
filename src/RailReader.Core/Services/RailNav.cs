@@ -80,14 +80,18 @@ public sealed class RailNav
     public int CurrentLineCount =>
         _navigableIndices.Count == 0 ? 0 : CurrentNavigableBlock.Lines.Count;
 
-    public void UpdateZoom(double zoom, double cameraX, double cameraY, double windowWidth, double windowHeight)
+    public void UpdateZoom(double zoom, double cameraX, double cameraY, double windowWidth, double windowHeight,
+        double? cursorPageX = null, double? cursorPageY = null)
     {
         bool shouldBeActive = zoom >= _config.RailZoomThreshold && HasAnalysis;
 
         if (shouldBeActive && !Active)
         {
             Active = true;
-            FindNearestBlock(cameraX, cameraY, zoom, windowWidth, windowHeight);
+            if (cursorPageX.HasValue && cursorPageY.HasValue)
+                FindBlockNearPoint(cursorPageX.Value, cursorPageY.Value);
+            else
+                FindNearestBlock(cameraX, cameraY, zoom, windowWidth, windowHeight);
         }
         else if (!shouldBeActive && Active)
         {
@@ -116,6 +120,38 @@ public sealed class RailNav
             if (dist < bestDist) { bestDist = dist; bestIdx = i; }
         }
 
+        CurrentBlock = bestIdx;
+        CurrentLine = 0;
+    }
+
+    /// <summary>
+    /// Finds the navigable block nearest to a point in page coordinates.
+    /// Tries a direct bounding-box hit first; falls back to nearest-center distance.
+    /// </summary>
+    public void FindBlockNearPoint(double pageX, double pageY)
+    {
+        if (_analysis is null || _navigableIndices.Count == 0) return;
+
+        // Try direct hit-test first
+        int? hit = FindBlockAtPoint(pageX, pageY);
+        if (hit.HasValue)
+        {
+            CurrentBlock = hit.Value;
+            CurrentLine = 0;
+            return;
+        }
+
+        // Fall back to nearest block center
+        double bestDist = double.MaxValue;
+        int bestIdx = 0;
+        for (int i = 0; i < _navigableIndices.Count; i++)
+        {
+            var block = _analysis.Blocks[_navigableIndices[i]];
+            double bx = block.BBox.X + block.BBox.W / 2.0;
+            double by = block.BBox.Y + block.BBox.H / 2.0;
+            double dist = (bx - pageX) * (bx - pageX) + (by - pageY) * (by - pageY);
+            if (dist < bestDist) { bestDist = dist; bestIdx = i; }
+        }
         CurrentBlock = bestIdx;
         CurrentLine = 0;
     }
