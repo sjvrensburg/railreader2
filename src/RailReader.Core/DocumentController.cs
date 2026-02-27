@@ -275,32 +275,10 @@ public sealed class DocumentController
         }
         else
         {
-            // Accumulate target from in-progress animation or current state
-            double baseZoom = _zoomAnim?.TargetZoom ?? doc.Camera.Zoom;
-            double baseOx = _zoomAnim?.TargetOffsetX ?? doc.Camera.OffsetX;
-            double baseOy = _zoomAnim?.TargetOffsetY ?? doc.Camera.OffsetY;
-
             double factor = 1.0 + scrollDelta * ZoomScrollSensitivity;
+            double baseZoom = _zoomAnim?.TargetZoom ?? doc.Camera.Zoom;
             double newZoom = Math.Clamp(baseZoom * factor, Camera.ZoomMin, Camera.ZoomMax);
-
-            // Compute final offsets for zoom-toward-cursor at target
-            double targetOx = cursorX - (cursorX - baseOx) * (newZoom / baseZoom);
-            double targetOy = cursorY - (cursorY - baseOy) * (newZoom / baseZoom);
-
-            double pageX = (cursorX - targetOx) / newZoom;
-            double pageY = (cursorY - targetOy) / newZoom;
-
-            _zoomAnim = new ZoomAnimation
-            {
-                StartZoom = doc.Camera.Zoom,
-                TargetZoom = newZoom,
-                StartOffsetX = doc.Camera.OffsetX,
-                StartOffsetY = doc.Camera.OffsetY,
-                TargetOffsetX = targetOx,
-                TargetOffsetY = targetOy,
-                CursorPageX = pageX,
-                CursorPageY = pageY,
-            };
+            StartZoomAnimation(doc, newZoom, cursorX, cursorY);
         }
     }
 
@@ -323,20 +301,26 @@ public sealed class DocumentController
         var (ww, wh) = GetViewportSize();
 
         double baseZoom = _zoomAnim?.TargetZoom ?? doc.Camera.Zoom;
-        double baseOx = _zoomAnim?.TargetOffsetX ?? doc.Camera.OffsetX;
-        double baseOy = _zoomAnim?.TargetOffsetY ?? doc.Camera.OffsetY;
-
         double newZoom = Math.Clamp(
             zoomIn ? baseZoom * ZoomStep : baseZoom / ZoomStep,
             Camera.ZoomMin, Camera.ZoomMax);
 
-        // Zoom toward viewport centre
-        double cx = ww / 2.0, cy = wh / 2.0;
-        double targetOx = cx - (cx - baseOx) * (newZoom / baseZoom);
-        double targetOy = cy - (cy - baseOy) * (newZoom / baseZoom);
+        StartZoomAnimation(doc, newZoom, ww / 2.0, wh / 2.0);
+        if (!doc.Rail.Active && AutoScrollActive) StopAutoScroll();
+    }
 
-        double pageX = (cx - targetOx) / newZoom;
-        double pageY = (cy - targetOy) / newZoom;
+    /// <summary>
+    /// Starts a smooth zoom animation toward <paramref name="focusX"/>,<paramref name="focusY"/>
+    /// (screen coordinates). Accumulates from any in-progress animation.
+    /// </summary>
+    private void StartZoomAnimation(DocumentState doc, double newZoom, double focusX, double focusY)
+    {
+        double baseOx = _zoomAnim?.TargetOffsetX ?? doc.Camera.OffsetX;
+        double baseOy = _zoomAnim?.TargetOffsetY ?? doc.Camera.OffsetY;
+        double baseZoom = _zoomAnim?.TargetZoom ?? doc.Camera.Zoom;
+
+        double targetOx = focusX - (focusX - baseOx) * (newZoom / baseZoom);
+        double targetOy = focusY - (focusY - baseOy) * (newZoom / baseZoom);
 
         _zoomAnim = new ZoomAnimation
         {
@@ -346,11 +330,9 @@ public sealed class DocumentController
             StartOffsetY = doc.Camera.OffsetY,
             TargetOffsetX = targetOx,
             TargetOffsetY = targetOy,
-            CursorPageX = pageX,
-            CursorPageY = pageY,
+            CursorPageX = (focusX - targetOx) / newZoom,
+            CursorPageY = (focusY - targetOy) / newZoom,
         };
-
-        if (!doc.Rail.Active && AutoScrollActive) StopAutoScroll();
     }
 
     // --- Rail navigation ---

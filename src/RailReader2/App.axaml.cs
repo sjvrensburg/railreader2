@@ -34,10 +34,8 @@ public partial class App : Application
                 await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Background);
 
                 var config = AppConfig.Load();
-                if (config.DarkMode)
-                    Application.Current!.RequestedThemeVariant = ThemeVariant.Dark;
-                else
-                    Application.Current!.RequestedThemeVariant = ThemeVariant.Light;
+                Application.Current!.RequestedThemeVariant =
+                    config.DarkMode ? ThemeVariant.Dark : ThemeVariant.Light;
                 CleanupService.RunCleanup();
 
                 var vm = new MainWindowViewModel(config);
