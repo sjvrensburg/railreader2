@@ -86,6 +86,8 @@ public sealed record ScreenshotOptions
     public bool DebugOverlay { get; init; } = false;
     public bool LineFocusBlur { get; init; } = false;
     public float LineFocusBlurIntensity { get; init; } = 0.5f;
+    public LineHighlightTint LineHighlightTint { get; init; } = LineHighlightTint.Auto;
+    public double LineHighlightOpacity { get; init; } = 0.25;
 
     /// <summary>
     /// When true, crop the output to simulate what's visible in the viewport

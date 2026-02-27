@@ -2,11 +2,21 @@ using System.Text.Json.Serialization;
 
 namespace RailReader.Core.Models;
 
+public class BookmarkEntry
+{
+    public string Name { get; set; } = "";
+    public int Page { get; set; }
+
+    [JsonIgnore]
+    public string PageDisplay => $"Page {Page + 1}";
+}
+
 public class AnnotationFile
 {
     public int Version { get; set; } = 1;
     public string SourcePdf { get; set; } = "";
     public Dictionary<int, List<Annotation>> Pages { get; set; } = [];
+    public List<BookmarkEntry> Bookmarks { get; set; } = [];
 }
 
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "type")]

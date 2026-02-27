@@ -15,6 +15,8 @@ public class RailOverlayLayer : Control
     public TabViewModel? Tab { get; set; }
     public ColourEffectShaders? ColourEffects { get; set; }
     public bool LineFocusBlurActive { get; set; }
+    public LineHighlightTint Tint { get; set; }
+    public double TintOpacity { get; set; } = 0.25;
 
     public RailOverlayLayer()
     {
@@ -33,7 +35,7 @@ public class RailOverlayLayer : Control
         var tab = Tab;
         double w = tab?.PageWidth > 0 ? tab.PageWidth : Bounds.Width;
         double h = tab?.PageHeight > 0 ? tab.PageHeight : Bounds.Height;
-        context.Custom(new OverlayDrawOperation(new Rect(0, 0, w, h), tab, ColourEffects, LineFocusBlurActive));
+        context.Custom(new OverlayDrawOperation(new Rect(0, 0, w, h), tab, ColourEffects, LineFocusBlurActive, Tint, TintOpacity));
     }
 
     private sealed class OverlayDrawOperation : ICustomDrawOperation
@@ -42,6 +44,8 @@ public class RailOverlayLayer : Control
         private readonly TabViewModel? _tab;
         private readonly ColourEffectShaders? _effects;
         private readonly bool _lineFocusBlur;
+        private readonly LineHighlightTint _tint;
+        private readonly double _tintOpacity;
 
         // Cached paints — one set per render thread to avoid cross-thread mutation.
         // Reused every frame; only Color/BlendMode/StrokeWidth are mutated between draws.
@@ -55,12 +59,15 @@ public class RailOverlayLayer : Control
         [ThreadStatic] private static SKPaint? s_debugTextPaint;
         [ThreadStatic] private static SKFont? s_debugFont;
 
-        public OverlayDrawOperation(Rect bounds, TabViewModel? tab, ColourEffectShaders? effects, bool lineFocusBlur)
+        public OverlayDrawOperation(Rect bounds, TabViewModel? tab, ColourEffectShaders? effects, bool lineFocusBlur,
+            LineHighlightTint tint, double tintOpacity)
         {
             _bounds = bounds;
             _tab = tab;
             _effects = effects;
             _lineFocusBlur = lineFocusBlur;
+            _tint = tint;
+            _tintOpacity = tintOpacity;
         }
 
         public Rect Bounds => _bounds;
@@ -82,14 +89,15 @@ public class RailOverlayLayer : Control
             if (tab.Rail.Active && tab.Rail.HasAnalysis)
             {
                 var effect = _effects?.Effect ?? ColourEffect.None;
-                DrawRailOverlays(canvas, tab, effect.GetOverlayPalette(), _lineFocusBlur);
+                DrawRailOverlays(canvas, tab, effect.GetOverlayPalette(), _lineFocusBlur, _tint, _tintOpacity);
             }
 
             if (tab.DebugOverlay && tab.AnalysisCache.TryGetValue(tab.CurrentPage, out var debugAnalysis))
                 DrawDebugOverlay(canvas, tab, debugAnalysis);
         }
 
-        private static void DrawRailOverlays(SKCanvas canvas, TabViewModel tab, OverlayPalette palette, bool lineFocusBlur)
+        private static void DrawRailOverlays(SKCanvas canvas, TabViewModel tab, OverlayPalette palette, bool lineFocusBlur,
+            LineHighlightTint tint, double tintOpacity)
         {
             if (tab.Rail.NavigableCount == 0) return;
             var block = tab.Rail.CurrentNavigableBlock;
@@ -155,7 +163,7 @@ public class RailOverlayLayer : Control
             }
             else
             {
-                linePaint.Color = palette.LineHighlight;
+                linePaint.Color = palette.ResolveLineHighlight(tint, tintOpacity);
                 canvas.DrawRect(SKRect.Create(block.BBox.X, line.Y - line.Height / 2, block.BBox.W, line.Height), linePaint);
             }
         }

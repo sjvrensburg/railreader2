@@ -34,7 +34,7 @@
                        PanePlacement="Left"
                        OpenPaneLength="220">
                 <SplitView.Pane>
-                    <v:OutlinePanel DataContext="{Binding}" />
+                    <v:OutlinePanel Name="OutlinePanel" DataContext="{Binding}" />
                 </SplitView.Pane>
                 <SplitView.Content>
                     <!-- DockPanel so RailToolBar docks right, viewport fills remainder -->

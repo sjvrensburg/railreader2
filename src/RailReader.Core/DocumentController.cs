@@ -229,6 +229,60 @@ public sealed class DocumentController
                 doc.Camera.Zoom, doc.Camera.OffsetX, doc.Camera.OffsetY, doc.ColourEffect);
     }
 
+    // --- Bookmarks ---
+
+    /// <summary>
+    /// Adds a bookmark for the current page. If a bookmark already exists
+    /// for this page, its name is updated instead of creating a duplicate.
+    /// Returns true if a new bookmark was added, false if an existing one was renamed.
+    /// </summary>
+    public bool AddBookmark(string name)
+    {
+        if (ActiveDocument is not { Annotations: { } annotations } doc) return false;
+
+        var existing = annotations.Bookmarks.FindIndex(b => b.Page == doc.CurrentPage);
+        if (existing >= 0)
+        {
+            doc.RenameBookmark(existing, name);
+            return false;
+        }
+
+        doc.AddBookmark(name, doc.CurrentPage);
+        return true;
+    }
+
+    public void RemoveBookmark(int index)
+    {
+        ActiveDocument?.RemoveBookmark(index);
+    }
+
+    public void RenameBookmark(int index, string newName)
+    {
+        ActiveDocument?.RenameBookmark(index, newName);
+    }
+
+    /// <summary>Page the user was on before the last bookmark navigation. -1 = none.</summary>
+    public int LastPositionPage { get; private set; } = -1;
+
+    public void NavigateToBookmark(int index)
+    {
+        if (ActiveDocument is not { Annotations: { } annotations } doc) return;
+        if ((uint)index >= (uint)annotations.Bookmarks.Count) return;
+        LastPositionPage = doc.CurrentPage;
+        GoToPage(annotations.Bookmarks[index].Page);
+        FitPage();
+    }
+
+    public void NavigateBack()
+    {
+        if (ActiveDocument is not { } doc) return;
+        if (LastPositionPage < 0) return;
+        int backPage = LastPositionPage;
+        LastPositionPage = doc.CurrentPage;
+        GoToPage(backPage);
+        FitPage();
+    }
+
     // --- Navigation ---
 
     public void GoToPage(int page)

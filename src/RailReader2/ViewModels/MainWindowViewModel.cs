@@ -32,6 +32,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     [ObservableProperty] private bool _showSearch;
     [ObservableProperty] private bool _isFullScreen;
     [ObservableProperty] private bool _isRadialMenuOpen;
+    [ObservableProperty] private bool _showBookmarkDialog;
     [ObservableProperty] private double _radialMenuX;
     [ObservableProperty] private double _radialMenuY;
 
@@ -282,6 +283,24 @@ public sealed partial class MainWindowViewModel : ObservableObject
     }
 
     // --- Navigation ---
+
+    public void NavigateToBookmark(int index)
+    {
+        _controller.NavigateToBookmark(index);
+        OnPropertyChanged(nameof(ActiveTab));
+        InvalidateAll();
+        InvalidateSearch();
+        RequestAnimationFrame();
+    }
+
+    public void NavigateBack()
+    {
+        _controller.NavigateBack();
+        OnPropertyChanged(nameof(ActiveTab));
+        InvalidateAll();
+        InvalidateSearch();
+        RequestAnimationFrame();
+    }
 
     [RelayCommand]
     public void GoToPage(int page)
