@@ -46,6 +46,8 @@ public partial class MainWindow : Window
                 InvalidateOverlay = () =>
                 {
                     OverlayLayer.LineFocusBlurActive = vm.Config.LineFocusBlur;
+                    OverlayLayer.Tint = vm.Config.LineHighlightTint;
+                    OverlayLayer.TintOpacity = vm.Config.LineHighlightOpacity;
                     OverlayLayer.InvalidateVisual();
                 },
                 InvalidateSearch = () => SearchLayer.InvalidateVisual(),
@@ -198,6 +200,8 @@ public partial class MainWindow : Window
         OverlayLayer.Tab = tab;
         OverlayLayer.ColourEffects = Vm?.ColourEffects;
         OverlayLayer.LineFocusBlurActive = Vm?.Config.LineFocusBlur ?? false;
+        OverlayLayer.Tint = Vm?.Config.LineHighlightTint ?? LineHighlightTint.Auto;
+        OverlayLayer.TintOpacity = Vm?.Config.LineHighlightOpacity ?? 0.25;
 
         if (tab is not null)
             tab.OnDpiRenderComplete = () => Vm?.RequestAnimationFrame();

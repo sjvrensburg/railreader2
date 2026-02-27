@@ -19,6 +19,24 @@ public sealed class OverlayPalette
     public SKColor BlockOutline { get; init; }
     public float BlockOutlineWidth { get; init; }
     public SKColor LineHighlight { get; init; }
+
+    public SKColor ResolveLineHighlight(LineHighlightTint tint, double opacity)
+    {
+        byte a = (byte)(Math.Clamp(opacity, 0, 1) * 255);
+        if (tint == LineHighlightTint.Auto)
+            return LineHighlight.WithAlpha(a);
+        var (r, g, b) = tint switch
+        {
+            LineHighlightTint.Yellow => ((byte)255, (byte)220, (byte)50),
+            LineHighlightTint.Cyan   => ((byte)0,   (byte)255, (byte)255),
+            LineHighlightTint.Green  => ((byte)0,   (byte)220, (byte)120),
+            LineHighlightTint.Pink   => ((byte)255, (byte)130, (byte)180),
+            LineHighlightTint.Orange => ((byte)255, (byte)180, (byte)60),
+            LineHighlightTint.Blue   => ((byte)100, (byte)160, (byte)255),
+            _ => ((byte)255, (byte)220, (byte)50),
+        };
+        return new SKColor(r, g, b, a);
+    }
 }
 
 public static class ColourEffectExtensions

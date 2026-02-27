@@ -24,6 +24,8 @@ public sealed class AppConfig
     public double AutoScrollBlockPauseMs { get; set; } = 600.0;
     public double JumpPercentage { get; set; } = 25.0;
     public bool DarkMode { get; set; }
+    public LineHighlightTint LineHighlightTint { get; set; } = LineHighlightTint.Auto;
+    public double LineHighlightOpacity { get; set; } = 0.25;
 
     [JsonConverter(typeof(RecentFilesConverter))]
     public List<RecentFileEntry> RecentFiles { get; set; } = [];

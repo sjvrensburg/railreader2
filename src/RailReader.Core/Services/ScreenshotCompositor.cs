@@ -108,7 +108,8 @@ public static class ScreenshotCompositor
         if (options.RailOverlay && doc.Rail.Active && doc.Rail.HasAnalysis)
         {
             var effect = colourEffects.Effect;
-            DrawRailOverlay(canvas, doc, effect.GetOverlayPalette(), options.LineFocusBlur);
+            DrawRailOverlay(canvas, doc, effect.GetOverlayPalette(), options.LineFocusBlur,
+                options.LineHighlightTint, options.LineHighlightOpacity);
         }
 
         // --- Layer 3: Search highlights ---
@@ -197,7 +198,8 @@ public static class ScreenshotCompositor
         data.SaveTo(stream);
     }
 
-    private static void DrawRailOverlay(SKCanvas canvas, DocumentState doc, OverlayPalette palette, bool lineFocusBlur)
+    private static void DrawRailOverlay(SKCanvas canvas, DocumentState doc, OverlayPalette palette, bool lineFocusBlur,
+        LineHighlightTint tint = LineHighlightTint.Auto, double tintOpacity = 0.25)
     {
         if (doc.Rail.NavigableCount == 0) return;
         var block = doc.Rail.CurrentNavigableBlock;
@@ -256,7 +258,7 @@ public static class ScreenshotCompositor
         }
         else
         {
-            linePaint.Color = palette.LineHighlight;
+            linePaint.Color = palette.ResolveLineHighlight(tint, tintOpacity);
             canvas.DrawRect(SKRect.Create(block.BBox.X, line.Y - line.Height / 2, block.BBox.W, line.Height), linePaint);
         }
     }

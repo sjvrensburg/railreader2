@@ -57,6 +57,10 @@ public partial class SettingsWindow : Window
         AutoScrollBlockPause.Value = (decimal)c.AutoScrollBlockPauseMs;
         JumpPercentage.Value = (decimal)c.JumpPercentage;
 
+        LineHighlightTintCombo.ItemsSource = Enum.GetNames<LineHighlightTint>();
+        LineHighlightTintCombo.SelectedIndex = (int)c.LineHighlightTint;
+        LineHighlightOpacitySlider.Value = c.LineHighlightOpacity;
+
         _classItems.Clear();
         for (int i = 0; i < LayoutConstants.LayoutClasses.Length; i++)
         {
@@ -145,6 +149,20 @@ public partial class SettingsWindow : Window
         vm.OnConfigChanged();
     }
 
+    private void OnLineHighlightTintChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (Vm is not { } vm || _loading) return;
+        vm.Config.LineHighlightTint = (LineHighlightTint)LineHighlightTintCombo.SelectedIndex;
+        vm.OnConfigChanged();
+    }
+
+    private void OnLineHighlightOpacityChanged(object? sender, Avalonia.AvaloniaPropertyChangedEventArgs e)
+    {
+        if (e.Property.Name != "Value" || Vm is not { } vm || _loading) return;
+        vm.Config.LineHighlightOpacity = LineHighlightOpacitySlider.Value;
+        vm.OnConfigChanged();
+    }
+
     private void OnSettingChanged(object? sender, NumericUpDownValueChangedEventArgs e) => SaveToConfig();
     private void OnEffectChanged(object? sender, SelectionChangedEventArgs e)
     {
@@ -181,6 +199,8 @@ public partial class SettingsWindow : Window
         vm.Config.AutoScrollLinePauseMs = defaults.AutoScrollLinePauseMs;
         vm.Config.AutoScrollBlockPauseMs = defaults.AutoScrollBlockPauseMs;
         vm.Config.JumpPercentage = defaults.JumpPercentage;
+        vm.Config.LineHighlightTint = defaults.LineHighlightTint;
+        vm.Config.LineHighlightOpacity = defaults.LineHighlightOpacity;
         _loading = true;
         LoadFromConfig();
         _loading = false;
