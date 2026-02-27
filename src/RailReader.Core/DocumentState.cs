@@ -404,7 +404,8 @@ public sealed class DocumentState : IDisposable
     {
         if (Annotations is not null && AnnotationsDirty)
         {
-            bool hasAnnotations = Annotations.Pages.Values.Any(list => list.Count > 0);
+            bool hasAnnotations = Annotations.Pages.Values.Any(list => list.Count > 0)
+                || Annotations.Bookmarks.Count > 0;
             var sidecarPath = AnnotationService.GetSidecarPath(FilePath);
             if (hasAnnotations)
             {
@@ -427,6 +428,28 @@ public sealed class DocumentState : IDisposable
             _autoSaveTimer.Change(1000, Timeout.Infinite);
         else
             _autoSaveTimer = new Timer(_ => _marshaller.Post(SaveAnnotations), null, 1000, Timeout.Infinite);
+    }
+
+    // --- Bookmarks ---
+
+    public void AddBookmark(string name, int page)
+    {
+        Annotations?.Bookmarks.Add(new BookmarkEntry { Name = name, Page = page });
+        MarkAnnotationsDirty();
+    }
+
+    public void RemoveBookmark(int index)
+    {
+        if (Annotations is null || index < 0 || index >= Annotations.Bookmarks.Count) return;
+        Annotations.Bookmarks.RemoveAt(index);
+        MarkAnnotationsDirty();
+    }
+
+    public void RenameBookmark(int index, string newName)
+    {
+        if (Annotations is null || index < 0 || index >= Annotations.Bookmarks.Count) return;
+        Annotations.Bookmarks[index].Name = newName;
+        MarkAnnotationsDirty();
     }
 
     public void AddAnnotation(int page, Annotation annotation)

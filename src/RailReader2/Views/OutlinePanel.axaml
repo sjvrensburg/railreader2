@@ -4,19 +4,71 @@
              xmlns:m="using:RailReader.Core.Models"
              x:Class="RailReader2.Views.OutlinePanel"
              x:DataType="vm:MainWindowViewModel">
-    <DockPanel>
-        <TextBlock DockPanel.Dock="Top" Text="Outline" FontWeight="Bold"
-                   Margin="8,8,8,4" />
-        <Separator DockPanel.Dock="Top" />
-        <ScrollViewer>
-            <TreeView Name="OutlineTree"
-                      SelectionChanged="OnOutlineSelectionChanged">
-                <TreeView.ItemTemplate>
-                    <TreeDataTemplate ItemsSource="{Binding Children}" x:DataType="m:OutlineEntry">
-                        <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
-                    </TreeDataTemplate>
-                </TreeView.ItemTemplate>
-            </TreeView>
-        </ScrollViewer>
-    </DockPanel>
+    <TabControl Name="PaneTabs">
+        <!-- Outline tab -->
+        <TabItem Header="Outline">
+            <ScrollViewer>
+                <TreeView Name="OutlineTree"
+                          SelectionChanged="OnOutlineSelectionChanged">
+                    <TreeView.ItemTemplate>
+                        <TreeDataTemplate ItemsSource="{Binding Children}" x:DataType="m:OutlineEntry">
+                            <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
+                        </TreeDataTemplate>
+                    </TreeView.ItemTemplate>
+                </TreeView>
+            </ScrollViewer>
+        </TabItem>
+
+        <!-- Bookmarks tab -->
+        <TabItem Header="Bookmarks">
+            <DockPanel>
+                <Button Name="AddBookmarkButton" DockPanel.Dock="Top"
+                        Content="+ Add Bookmark" Margin="4"
+                        HorizontalAlignment="Stretch"
+                        Click="OnAddBookmarkClick" />
+                <ScrollViewer>
+                    <StackPanel>
+                        <!-- Back to previous location -->
+                        <Button Name="BackButton"
+                                Content="&#x2190; Back to previous location"
+                                IsVisible="False"
+                                HorizontalAlignment="Stretch"
+                                HorizontalContentAlignment="Left"
+                                Margin="4,0,4,4" Padding="8,6"
+                                FontStyle="Italic" Opacity="0.8"
+                                Click="OnBackClick" />
+                        <!-- Use ItemsControl instead of ListBox to avoid SelectionChanged issues -->
+                        <ItemsControl Name="BookmarkList">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="m:BookmarkEntry">
+                                    <Button Click="OnBookmarkClick"
+                                            HorizontalAlignment="Stretch"
+                                            HorizontalContentAlignment="Stretch"
+                                            Margin="2,1" Padding="6,4">
+                                        <DockPanel>
+                                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="4">
+                                                <Button Content="Rename" FontSize="11"
+                                                        Padding="6,3"
+                                                        ToolTip.Tip="Rename bookmark"
+                                                        Click="OnRenameBookmarkClick" />
+                                                <Button Content="Delete" FontSize="11"
+                                                        Padding="6,3"
+                                                        ToolTip.Tip="Delete bookmark"
+                                                        Click="OnDeleteBookmarkClick" />
+                                            </StackPanel>
+                                            <StackPanel Orientation="Vertical">
+                                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold"
+                                                           TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Text="{Binding PageDisplay}" FontSize="11" Opacity="0.6" />
+                                            </StackPanel>
+                                        </DockPanel>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </ScrollViewer>
+            </DockPanel>
+        </TabItem>
+    </TabControl>
 </UserControl>

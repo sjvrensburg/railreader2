@@ -116,6 +116,21 @@ public partial class MainWindow : Window
                         WindowState = vm.IsFullScreen ? WindowState.FullScreen : WindowState.Normal;
                         SystemDecorations = vm.IsFullScreen ? SystemDecorations.None : SystemDecorations.Full;
                         break;
+                    case nameof(MainWindowViewModel.ShowBookmarkDialog) when vm.ShowBookmarkDialog:
+                        vm.ShowBookmarkDialog = false;
+                        if (vm.ActiveTab is { } bmTab)
+                        {
+                            var bmDialog = new BookmarkNameDialog(bmTab.CurrentPage + 1)
+                                { FontSize = vm.CurrentFontSize };
+                            var bmName = await bmDialog.ShowDialog<string?>(this);
+                            if (bmName is not null)
+                            {
+                                bool added = vm.Controller.AddBookmark(bmName);
+                                OutlinePanel.UpdateBookmarkSource();
+                                vm.ShowStatusToast(added ? $"Bookmark: {bmName}" : $"Updated bookmark: {bmName}");
+                            }
+                        }
+                        break;
                     case nameof(MainWindowViewModel.ShowGoToPage) when vm.ShowGoToPage:
                         vm.ShowGoToPage = false;
                         if (vm.ActiveTab is { } gotoTab)
@@ -276,7 +291,23 @@ public partial class MainWindow : Window
             switch (e.Key)
             {
                 case Key.O when shift:
-                    vm.ShowOutline = !vm.ShowOutline; e.Handled = true; return;
+                    if (vm.ShowOutline && !OutlinePanel.IsBookmarksTabActive)
+                        vm.ShowOutline = false;
+                    else
+                    {
+                        vm.ShowOutline = true;
+                        OutlinePanel.SwitchToOutlineTab();
+                    }
+                    e.Handled = true; return;
+                case Key.B when shift:
+                    if (vm.ShowOutline && OutlinePanel.IsBookmarksTabActive)
+                        vm.ShowOutline = false;
+                    else
+                    {
+                        vm.ShowOutline = true;
+                        OutlinePanel.SwitchToBookmarksTab();
+                    }
+                    e.Handled = true; return;
                 case Key.O:
                     _ = vm.OpenFileCommand.ExecuteAsync(null); e.Handled = true; return;
                 case Key.W: vm.CloseTab(vm.ActiveTabIndex); e.Handled = true; return;
@@ -358,6 +389,13 @@ public partial class MainWindow : Window
                 vm.ShowStatusToast($"Colour: {name}");
                 e.Handled = true; break;
             }
+            case Key.B when !searchFocused:
+                vm.ShowBookmarkDialog = true;
+                e.Handled = true; break;
+            case Key.OemTilde when !searchFocused:
+                vm.NavigateBack();
+                OutlinePanel.UpdateBookmarkSource();
+                e.Handled = true; break;
             case Key.F when !searchFocused:
                 vm.ToggleLineFocusBlur();
                 RailToolBar.UpdateToggleStates();
