@@ -339,6 +339,21 @@ public partial class MainWindow : Window
                 RailToolBar.SetJumpMode(vm.JumpMode);
                 RailToolBar.UpdateToggleStates();
                 e.Handled = true; break;
+            case Key.C when !searchFocused:
+            {
+                var effect = vm.CycleColourEffect();
+                string name = effect switch
+                {
+                    ColourEffect.None => "None",
+                    ColourEffect.HighContrast => "High Contrast",
+                    ColourEffect.HighVisibility => "High Visibility",
+                    ColourEffect.Amber => "Amber Filter",
+                    ColourEffect.Invert => "Invert",
+                    _ => effect.ToString(),
+                };
+                vm.ShowStatusToast($"Colour: {name}");
+                e.Handled = true; break;
+            }
             case Key.F when !searchFocused:
                 vm.ToggleLineFocusBlur();
                 RailToolBar.UpdateToggleStates();

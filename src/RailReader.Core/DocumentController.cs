@@ -37,6 +37,18 @@ public sealed class DocumentController
     private double _vpWidth = 1200;
     private double _vpHeight = 900;
 
+    // Smooth zoom animation
+    private sealed class ZoomAnimation
+    {
+        public double StartZoom, TargetZoom;
+        public double StartOffsetX, StartOffsetY;
+        public double TargetOffsetX, TargetOffsetY;
+        public double CursorPageX, CursorPageY;
+        public Stopwatch Timer = Stopwatch.StartNew();
+        public const double DurationMs = 180;
+    }
+    private ZoomAnimation? _zoomAnim;
+
     public List<DocumentState> Documents { get; } = [];
     public int ActiveDocumentIndex { get; set; }
     public AppConfig Config => _config;
@@ -159,6 +171,8 @@ public sealed class DocumentController
         var saved = _config.GetReadingPosition(state.FilePath);
         if (saved is not null && saved.Page > 0)
             state.GoToPage(Math.Clamp(saved.Page, 0, state.PageCount - 1), _worker, ww, wh);
+        if (saved?.ColourEffect is { } savedEffect)
+            state.ColourEffect = savedEffect;
 
         state.CenterPage(ww, wh);
         state.UpdateRailZoom(ww, wh);
@@ -166,6 +180,7 @@ public sealed class DocumentController
         Documents.Add(state);
         _config.AddRecentFile(state.FilePath);
         ActiveDocumentIndex = Documents.Count - 1;
+        _colourEffects.Effect = state.ColourEffect;
 
         state.SubmitAnalysis(_worker);
         state.QueueLookahead(_config.AnalysisLookaheadPages);
@@ -176,7 +191,7 @@ public sealed class DocumentController
         if (index < 0 || index >= Documents.Count) return;
         var doc = Documents[index];
         _config.SaveReadingPosition(doc.FilePath, doc.CurrentPage,
-            doc.Camera.Zoom, doc.Camera.OffsetX, doc.Camera.OffsetY);
+            doc.Camera.Zoom, doc.Camera.OffsetX, doc.Camera.OffsetY, doc.ColourEffect);
         Documents.RemoveAt(index);
         doc.Dispose();
         ActiveDocumentIndex = Math.Clamp(ActiveDocumentIndex, 0, Math.Max(Documents.Count - 1, 0));
@@ -185,7 +200,10 @@ public sealed class DocumentController
     public void SelectDocument(int index)
     {
         if (index >= 0 && index < Documents.Count)
+        {
             ActiveDocumentIndex = index;
+            _colourEffects.Effect = Documents[index].ColourEffect;
+        }
     }
 
     public void MoveDocument(int fromIndex, int toIndex)
@@ -208,13 +226,14 @@ public sealed class DocumentController
     {
         foreach (var doc in Documents)
             _config.SaveReadingPosition(doc.FilePath, doc.CurrentPage,
-                doc.Camera.Zoom, doc.Camera.OffsetX, doc.Camera.OffsetY);
+                doc.Camera.Zoom, doc.Camera.OffsetX, doc.Camera.OffsetY, doc.ColourEffect);
     }
 
     // --- Navigation ---
 
     public void GoToPage(int page)
     {
+        _zoomAnim = null;
         if (ActiveDocument is not { } doc) return;
         var (ww, wh) = GetViewportSize();
         doc.GoToPage(page, _worker, ww, wh);
@@ -224,6 +243,7 @@ public sealed class DocumentController
 
     public void FitPage()
     {
+        _zoomAnim = null;
         if (ActiveDocument is not { } doc) return;
         var (ww, wh) = GetViewportSize();
         doc.CenterPage(ww, wh);
@@ -232,6 +252,7 @@ public sealed class DocumentController
 
     public void FitWidth()
     {
+        _zoomAnim = null;
         if (ActiveDocument is not { } doc) return;
         var (ww, wh) = GetViewportSize();
         doc.FitWidth(ww, wh);
@@ -254,28 +275,38 @@ public sealed class DocumentController
         }
         else
         {
-            double oldZoom = doc.Camera.Zoom;
+            // Accumulate target from in-progress animation or current state
+            double baseZoom = _zoomAnim?.TargetZoom ?? doc.Camera.Zoom;
+            double baseOx = _zoomAnim?.TargetOffsetX ?? doc.Camera.OffsetX;
+            double baseOy = _zoomAnim?.TargetOffsetY ?? doc.Camera.OffsetY;
+
             double factor = 1.0 + scrollDelta * ZoomScrollSensitivity;
-            double newZoom = Math.Clamp(oldZoom * factor, Camera.ZoomMin, Camera.ZoomMax);
+            double newZoom = Math.Clamp(baseZoom * factor, Camera.ZoomMin, Camera.ZoomMax);
 
-            doc.Camera.OffsetX = cursorX - (cursorX - doc.Camera.OffsetX) * (newZoom / oldZoom);
-            doc.Camera.OffsetY = cursorY - (cursorY - doc.Camera.OffsetY) * (newZoom / oldZoom);
-            doc.Camera.Zoom = newZoom;
-            doc.Camera.NotifyZoomChange();
+            // Compute final offsets for zoom-toward-cursor at target
+            double targetOx = cursorX - (cursorX - baseOx) * (newZoom / baseZoom);
+            double targetOy = cursorY - (cursorY - baseOy) * (newZoom / baseZoom);
 
-            // Compute cursor position in page coordinates for block selection on rail entry
-            double pageX = (cursorX - doc.Camera.OffsetX) / newZoom;
-            double pageY = (cursorY - doc.Camera.OffsetY) / newZoom;
-            doc.UpdateRailZoom(ww, wh, pageX, pageY);
-            if (doc.Rail.Active)
-                doc.StartSnap(ww, wh);
-            doc.ClampCamera(ww, wh);
-            doc.UpdateRenderDpiIfNeeded();
+            double pageX = (cursorX - targetOx) / newZoom;
+            double pageY = (cursorY - targetOy) / newZoom;
+
+            _zoomAnim = new ZoomAnimation
+            {
+                StartZoom = doc.Camera.Zoom,
+                TargetZoom = newZoom,
+                StartOffsetX = doc.Camera.OffsetX,
+                StartOffsetY = doc.Camera.OffsetY,
+                TargetOffsetX = targetOx,
+                TargetOffsetY = targetOy,
+                CursorPageX = pageX,
+                CursorPageY = pageY,
+            };
         }
     }
 
     public void HandlePan(double dx, double dy)
     {
+        _zoomAnim = null;
         if (ActiveDocument is not { } doc) return;
         if (AutoScrollActive) StopAutoScroll();
         var (ww, wh) = GetViewportSize();
@@ -290,10 +321,35 @@ public sealed class DocumentController
     {
         if (ActiveDocument is not { } doc) return;
         var (ww, wh) = GetViewportSize();
-        double newZoom = zoomIn ? doc.Camera.Zoom * ZoomStep : doc.Camera.Zoom / ZoomStep;
-        doc.ApplyZoom(newZoom, ww, wh);
-        doc.Camera.NotifyZoomChange();
-        doc.UpdateRenderDpiIfNeeded();
+
+        double baseZoom = _zoomAnim?.TargetZoom ?? doc.Camera.Zoom;
+        double baseOx = _zoomAnim?.TargetOffsetX ?? doc.Camera.OffsetX;
+        double baseOy = _zoomAnim?.TargetOffsetY ?? doc.Camera.OffsetY;
+
+        double newZoom = Math.Clamp(
+            zoomIn ? baseZoom * ZoomStep : baseZoom / ZoomStep,
+            Camera.ZoomMin, Camera.ZoomMax);
+
+        // Zoom toward viewport centre
+        double cx = ww / 2.0, cy = wh / 2.0;
+        double targetOx = cx - (cx - baseOx) * (newZoom / baseZoom);
+        double targetOy = cy - (cy - baseOy) * (newZoom / baseZoom);
+
+        double pageX = (cx - targetOx) / newZoom;
+        double pageY = (cy - targetOy) / newZoom;
+
+        _zoomAnim = new ZoomAnimation
+        {
+            StartZoom = doc.Camera.Zoom,
+            TargetZoom = newZoom,
+            StartOffsetX = doc.Camera.OffsetX,
+            StartOffsetY = doc.Camera.OffsetY,
+            TargetOffsetX = targetOx,
+            TargetOffsetY = targetOy,
+            CursorPageX = pageX,
+            CursorPageY = pageY,
+        };
+
         if (!doc.Rail.Active && AutoScrollActive) StopAutoScroll();
     }
 
@@ -457,16 +513,34 @@ public sealed class DocumentController
 
     public void SetColourEffect(ColourEffect effect)
     {
+        if (ActiveDocument is { } doc)
+            doc.ColourEffect = effect;
+        _colourEffects.Effect = effect;
+    }
+
+    public void SetGlobalColourEffect(ColourEffect effect)
+    {
         _config.ColourEffect = effect;
         _config.Save();
-        _colourEffects.Effect = effect;
+        SetColourEffect(effect);
+    }
+
+    public ColourEffect CycleColourEffect()
+    {
+        var values = Enum.GetValues<ColourEffect>();
+        var current = ActiveDocument?.ColourEffect ?? _colourEffects.Effect;
+        int idx = (Array.IndexOf(values, current) + 1) % values.Length;
+        var next = values[idx];
+        SetColourEffect(next);
+        return next;
     }
 
     // --- Config ---
 
     public void OnConfigChanged()
     {
-        _colourEffects.Effect = _config.ColourEffect;
+        if (ActiveDocument is { } activeDoc)
+            _colourEffects.Effect = activeDoc.ColourEffect;
         _colourEffects.Intensity = (float)_config.ColourEffectIntensity;
         foreach (var doc in Documents)
         {
@@ -500,16 +574,48 @@ public sealed class DocumentController
         bool overlayChanged = false;
         bool animating = false;
 
-        // Rail snap animation
-        double cx = doc.Camera.OffsetX, cy = doc.Camera.OffsetY;
-        bool railAnimating = doc.Rail.Tick(ref cx, ref cy, dt, doc.Camera.Zoom, ww);
-        if (cx != doc.Camera.OffsetX || cy != doc.Camera.OffsetY)
+        // Smooth zoom animation
+        if (_zoomAnim is { } za)
         {
-            doc.Camera.OffsetX = cx;
-            doc.Camera.OffsetY = cy;
+            double elapsed = za.Timer.Elapsed.TotalMilliseconds;
+            double t = Math.Clamp(elapsed / ZoomAnimation.DurationMs, 0, 1);
+            // Cubic ease-out: 1 - (1-t)^3
+            double ease = 1.0 - (1.0 - t) * (1.0 - t) * (1.0 - t);
+
+            doc.Camera.Zoom = za.StartZoom + (za.TargetZoom - za.StartZoom) * ease;
+            doc.Camera.OffsetX = za.StartOffsetX + (za.TargetOffsetX - za.StartOffsetX) * ease;
+            doc.Camera.OffsetY = za.StartOffsetY + (za.TargetOffsetY - za.StartOffsetY) * ease;
+            doc.Camera.NotifyZoomChange();
+            doc.UpdateRailZoom(ww, wh, za.CursorPageX, za.CursorPageY);
             cameraChanged = true;
+
+            if (t >= 1.0)
+            {
+                _zoomAnim = null;
+                doc.ClampCamera(ww, wh);
+                if (doc.Rail.Active)
+                    doc.StartSnap(ww, wh);
+                doc.UpdateRenderDpiIfNeeded();
+            }
+            else
+            {
+                animating = true;
+            }
         }
-        animating |= railAnimating;
+
+        // Rail snap animation (skip while zoom is animating — snap starts after zoom completes)
+        if (_zoomAnim is null)
+        {
+            double cx = doc.Camera.OffsetX, cy = doc.Camera.OffsetY;
+            bool railAnimating = doc.Rail.Tick(ref cx, ref cy, dt, doc.Camera.Zoom, ww);
+            if (cx != doc.Camera.OffsetX || cy != doc.Camera.OffsetY)
+            {
+                doc.Camera.OffsetX = cx;
+                doc.Camera.OffsetY = cy;
+                cameraChanged = true;
+            }
+            animating |= railAnimating;
+        }
 
         // Snap Y to integer pixel when rail mode is stable
         if (_config.PixelSnapping && doc.Rail.Active && !animating)
@@ -525,7 +631,7 @@ public sealed class DocumentController
         // Auto-scroll
         if (doc.Rail.AutoScrolling)
         {
-            cx = doc.Camera.OffsetX;
+            double cx = doc.Camera.OffsetX;
             bool reachedEnd = doc.Rail.TickAutoScroll(ref cx, dt, doc.Camera.Zoom, ww);
             if (cx != doc.Camera.OffsetX)
             {

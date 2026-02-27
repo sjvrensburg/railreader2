@@ -23,6 +23,7 @@ public sealed class AppConfig
     public double AutoScrollLinePauseMs { get; set; } = 400.0;
     public double AutoScrollBlockPauseMs { get; set; } = 600.0;
     public double JumpPercentage { get; set; } = 25.0;
+    public bool DarkMode { get; set; }
 
     [JsonConverter(typeof(RecentFilesConverter))]
     public List<RecentFileEntry> RecentFiles { get; set; } = [];
@@ -91,7 +92,8 @@ public sealed class AppConfig
         Save();
     }
 
-    public void SaveReadingPosition(string filePath, int page, double zoom, double offsetX, double offsetY)
+    public void SaveReadingPosition(string filePath, int page, double zoom, double offsetX, double offsetY,
+        ColourEffect? colourEffect = null)
     {
         AddRecentFile(filePath); // ensures entry exists at index 0
         var entry = RecentFiles[0];
@@ -99,6 +101,7 @@ public sealed class AppConfig
         entry.Zoom = zoom;
         entry.OffsetX = offsetX;
         entry.OffsetY = offsetY;
+        entry.ColourEffect = colourEffect;
         Save();
     }
 
@@ -130,6 +133,7 @@ internal sealed class RecentFilesConverter : JsonConverter<List<RecentFileEntry>
     private static readonly JsonSerializerOptions s_entryOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
+        Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) },
     };
 
     public override List<RecentFileEntry>? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)

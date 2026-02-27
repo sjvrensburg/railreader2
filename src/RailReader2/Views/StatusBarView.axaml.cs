@@ -32,7 +32,8 @@ public partial class StatusBarView : UserControl
                     nameof(MainWindowViewModel.ActiveTabIndex) or
                     nameof(MainWindowViewModel.ActiveTool) or
                     nameof(MainWindowViewModel.AutoScrollActive) or
-                    nameof(MainWindowViewModel.JumpMode))
+                    nameof(MainWindowViewModel.JumpMode) or
+                    nameof(MainWindowViewModel.StatusToast))
                 {
                     SubscribeToTab(vm.ActiveTab);
                     UpdateStatus();
@@ -158,6 +159,12 @@ public partial class StatusBarView : UserControl
             };
             StatusPanel.Children.Add(MakeBoldLabel($"{toolName} Tool", AmberBrush));
             StatusPanel.Children.Add(MakeDangerButton("\u2715", (_, _) => vm.CancelAnnotationTool(), "Cancel tool (Escape)"));
+        }
+
+        if (vm?.StatusToast is { } toast)
+        {
+            AddSeparator();
+            StatusPanel.Children.Add(MakeBoldLabel(toast, AmberBrush));
         }
     }
 }

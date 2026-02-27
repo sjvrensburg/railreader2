@@ -39,6 +39,7 @@ public partial class SettingsWindow : Window
         if (Vm is not { } vm) return;
         var c = vm.Config;
         FontScale.Value = (decimal)c.UiFontScale;
+        DarkModeCheck.IsChecked = c.DarkMode;
         MotionBlurCheck.IsChecked = c.MotionBlur;
         BlurIntensitySlider.Value = c.MotionBlurIntensity;
         ZoomThreshold.Value = (decimal)c.RailZoomThreshold;
@@ -103,6 +104,12 @@ public partial class SettingsWindow : Window
         vm.OnConfigChanged();
     }
 
+    private void OnDarkModeChanged(object? sender, RoutedEventArgs e)
+    {
+        if (Vm is not { } vm || _loading) return;
+        vm.SetDarkMode(DarkModeCheck.IsChecked == true);
+    }
+
     private void OnMotionBlurChanged(object? sender, RoutedEventArgs e)
     {
         if (Vm is not { } vm || _loading) return;
@@ -142,7 +149,7 @@ public partial class SettingsWindow : Window
     private void OnEffectChanged(object? sender, SelectionChangedEventArgs e)
     {
         if (Vm is not { } vm || _loading) return;
-        vm.Config.ColourEffect = (ColourEffect)EffectCombo.SelectedIndex;
+        vm.Controller.SetGlobalColourEffect((ColourEffect)EffectCombo.SelectedIndex);
         SaveToConfig();
     }
     private void OnIntensityChanged(object? sender, Avalonia.AvaloniaPropertyChangedEventArgs e)
@@ -162,7 +169,8 @@ public partial class SettingsWindow : Window
         vm.Config.ScrollRampTime = defaults.ScrollRampTime;
         vm.Config.AnalysisLookaheadPages = defaults.AnalysisLookaheadPages;
         vm.Config.UiFontScale = defaults.UiFontScale;
-        vm.Config.ColourEffect = defaults.ColourEffect;
+        vm.SetDarkMode(defaults.DarkMode);
+        vm.Controller.SetGlobalColourEffect(defaults.ColourEffect);
         vm.Config.ColourEffectIntensity = defaults.ColourEffectIntensity;
         vm.Config.MotionBlur = defaults.MotionBlur;
         vm.Config.MotionBlurIntensity = defaults.MotionBlurIntensity;

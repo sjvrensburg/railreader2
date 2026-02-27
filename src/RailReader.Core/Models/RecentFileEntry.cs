@@ -7,4 +7,5 @@ public class RecentFileEntry
     public double Zoom { get; set; } = 1.0;
     public double OffsetX { get; set; }
     public double OffsetY { get; set; }
+    public ColourEffect? ColourEffect { get; set; }
 }

@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using Avalonia.Styling;
 using Avalonia.Threading;
 using RailReader.Core.Services;
 using RailReader2.ViewModels;
@@ -33,6 +34,10 @@ public partial class App : Application
                 await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Background);
 
                 var config = AppConfig.Load();
+                if (config.DarkMode)
+                    Application.Current!.RequestedThemeVariant = ThemeVariant.Dark;
+                else
+                    Application.Current!.RequestedThemeVariant = ThemeVariant.Light;
                 CleanupService.RunCleanup();
 
                 var vm = new MainWindowViewModel(config);

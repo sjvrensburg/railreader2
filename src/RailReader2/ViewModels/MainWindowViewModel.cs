@@ -426,6 +426,28 @@ public sealed partial class MainWindowViewModel : ObservableObject
         InvalidateOverlay();
     }
 
+    public ColourEffect CycleColourEffect()
+    {
+        var effect = _controller.CycleColourEffect();
+        InvalidatePage();
+        InvalidateOverlay();
+        return effect;
+    }
+
+    // --- Status toast ---
+
+    [ObservableProperty] private string? _statusToast;
+    private Timer? _toastTimer;
+
+    public void ShowStatusToast(string message)
+    {
+        StatusToast = message;
+        _toastTimer?.Dispose();
+        _toastTimer = new Timer(_ =>
+            Dispatcher.UIThread.Post(() => StatusToast = null),
+            null, 1500, Timeout.Infinite);
+    }
+
     // --- Config ---
 
     [RelayCommand]
@@ -433,6 +455,14 @@ public sealed partial class MainWindowViewModel : ObservableObject
     {
         var (removed, freed) = CleanupService.RunCleanup();
         CleanupMessage = CleanupService.FormatReport(removed, freed);
+    }
+
+    public void SetDarkMode(bool dark)
+    {
+        Config.DarkMode = dark;
+        Config.Save();
+        Avalonia.Application.Current!.RequestedThemeVariant =
+            dark ? Avalonia.Styling.ThemeVariant.Dark : Avalonia.Styling.ThemeVariant.Light;
     }
 
     public void OnConfigChanged()

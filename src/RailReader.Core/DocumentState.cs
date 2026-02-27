@@ -20,6 +20,7 @@ public sealed class DocumentState : IDisposable
     private double _pageHeight;
     private bool _debugOverlay;
     private bool _pendingRailSetup;
+    private ColourEffect _colourEffect;
 
     /// <summary>Fires when a property changes. Parameter is the property name.</summary>
     public Action<string>? StateChanged;
@@ -69,6 +70,19 @@ public sealed class DocumentState : IDisposable
         set => SetField(ref _pendingRailSetup, value, nameof(PendingRailSetup));
     }
 
+    public ColourEffect ColourEffect
+    {
+        get => _colourEffect;
+        set
+        {
+            if (_colourEffect != value)
+            {
+                _colourEffect = value;
+                StateChanged?.Invoke(nameof(ColourEffect));
+            }
+        }
+    }
+
     public string FilePath { get; }
     public int PageCount { get; }
     public PdfService Pdf => _pdf;
@@ -102,6 +116,7 @@ public sealed class DocumentState : IDisposable
         _pdf = new PdfService(filePath);
         PageCount = _pdf.PageCount;
         _title = Path.GetFileName(filePath);
+        _colourEffect = config.ColourEffect;
         Rail = new RailNav(config);
         Outline = _pdf.Outline;
     }

@@ -21,6 +21,7 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
     [ObservableProperty] private double _pageHeight;
     [ObservableProperty] private bool _debugOverlay;
     [ObservableProperty] private bool _pendingRailSetup;
+    [ObservableProperty] private ColourEffect _colourEffect;
 
     // Read-only properties used by Views
     public string FilePath => State.FilePath;
@@ -51,6 +52,7 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
         _pageHeight = state.PageHeight;
         _debugOverlay = state.DebugOverlay;
         _pendingRailSetup = state.PendingRailSetup;
+        _colourEffect = state.ColourEffect;
 
         state.StateChanged += OnStateChanged;
     }
@@ -65,6 +67,7 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
             case nameof(PageHeight): PageHeight = State.PageHeight; break;
             case nameof(DebugOverlay): DebugOverlay = State.DebugOverlay; break;
             case nameof(PendingRailSetup): PendingRailSetup = State.PendingRailSetup; break;
+            case nameof(ColourEffect): ColourEffect = State.ColourEffect; break;
         }
     }
 
@@ -75,6 +78,7 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
     partial void OnPageHeightChanged(double value) => State.PageHeight = value;
     partial void OnDebugOverlayChanged(bool value) => State.DebugOverlay = value;
     partial void OnPendingRailSetupChanged(bool value) => State.PendingRailSetup = value;
+    partial void OnColourEffectChanged(ColourEffect value) => State.ColourEffect = value;
 
     // Methods used by Views (MinimapControl, MainWindow)
     public void CenterPage(double ww, double wh) => State.CenterPage(ww, wh);
