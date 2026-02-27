@@ -21,8 +21,14 @@ dotnet run -c Release --project src/RailReader2 -- <path-to-pdf>
 # Run without arguments (shows welcome screen)
 dotnet run -c Release --project src/RailReader2
 
-# Run tests
+# Run tests (all)
 dotnet test tests/RailReader.Core.Tests
+
+# Run specific test class
+dotnet test tests/RailReader.Core.Tests --filter "ClassName=RailReader.Core.Tests.CameraTests"
+
+# Run specific test method
+dotnet test tests/RailReader.Core.Tests --filter "FullyQualifiedName~TestMethodName"
 
 # Run the AI agent CLI (requires RailReader2-full.slnx or direct project build)
 dotnet run --project src/RailReader.Agent -- "Open test.pdf and tell me how many pages it has"
@@ -77,7 +83,8 @@ Thin wrapper delegating all logic to `DocumentController`/`DocumentState` in Cor
 ### RailReader.Agent (AI agent CLI)
 
 - `RailReaderTools.cs` — `[Description]`-annotated tool methods wrapping `DocumentController`
-- Configured via `OPENAI_API_KEY`, `RAILREADER_MODEL`, `RAILREADER_BASE_URL` env vars
+- Configured via env vars: `OPENAI_API_KEY` (required), `RAILREADER_MODEL` (optional, default `gpt-4o`), `RAILREADER_BASE_URL` (optional, for OpenAI-compatible APIs)
+- **Not included in binary releases** — build from source via `RailReader2-full.slnx` or direct project build
 
 ### Tests
 
@@ -93,6 +100,8 @@ PDF → PDFium rasterises to `SKBitmap` at zoom-proportional DPI (150–600, cap
 
 Page bitmap → BGRA-to-RGB → 800x800 rescale → CHW float tensor → PP-DocLayoutV3 ONNX → `[N,7]` tensor `[classId, confidence, xmin, ymin, xmax, ymax, readingOrder]` → confidence filter (0.4) → NMS (IoU 0.5) → sort by reading order → line detection per block. Pixmap prep runs on thread pool; inference on dedicated `AnalysisWorker` thread. Results cached per-tab in `DocumentState.AnalysisCache`.
 
+**Fallback (model unavailable)**: Without the ONNX model, layout falls back to simple horizontal strip detection. Rail mode still activates but with basic fixed-height blocks instead of detected regions. Download the model via `./scripts/download-model.sh` for full functionality.
+
 ### Rail Mode
 
 Activates above `rail_zoom_threshold` when analysis is available. Locks to detected text blocks, advances line-by-line with cubic ease-out snap. Key mechanics: hold-to-scroll with quadratic speed ramping, soft asymptotic block edge clamping (`SoftEase`), `VerticalBias` for preserving vertical offset, pixel snapping for text shimmer reduction. Sub-features: auto-scroll (`P`), jump mode (`J`), line focus blur (`F`), line highlight tint, named bookmarks (`B`).
@@ -103,7 +112,7 @@ Activates above `rail_zoom_threshold` when analysis is available. Locks to detec
 
 ### Annotations
 
-Five tools (Highlight, Pen, Rectangle, TextNote, Eraser) via right-click radial menu with colour pickers. Select/move/resize in browse mode. Undo/redo stack. Persisted as JSON sidecar files (`<pdf>.annotations.json`). Export to PDF via `AnnotationExportService`. Named bookmarks also stored in the sidecar file.
+Five tools (Highlight, Pen, Rectangle, TextNote, Eraser) via right-click radial menu with colour pickers. Select/move/resize in browse mode. Undo/redo stack. Persisted as JSON sidecar files (same directory as PDF, named `<pdf>.annotations.json`). Export to PDF via `AnnotationExportService`. Named bookmarks also stored in the same sidecar file. `AnnotationService` handles all persistence; annotations are per-document and isolated from other PDFs.
 
 ### Colour Effects
 
