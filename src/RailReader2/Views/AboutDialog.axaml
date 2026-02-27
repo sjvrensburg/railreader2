@@ -7,7 +7,7 @@
         CanResize="False">
     <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8">
         <TextBlock Text="railreader2" FontSize="24" FontWeight="Bold" HorizontalAlignment="Center" />
-        <TextBlock Text="Version 2.5.4" HorizontalAlignment="Center" Opacity="0.7" />
+        <TextBlock x:Name="VersionText" HorizontalAlignment="Center" Opacity="0.7" />
         <TextBlock Text="AI-guided rail reading PDF viewer" HorizontalAlignment="Center" Margin="0,8,0,0" />
         <Separator Margin="0,8" />
         <TextBlock Text="Built with Avalonia, SkiaSharp, ONNX Runtime" HorizontalAlignment="Center" FontSize="11" Opacity="0.6" />
