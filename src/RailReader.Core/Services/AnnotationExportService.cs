@@ -39,10 +39,25 @@ public static class AnnotationExportService
             // Draw annotations scaled to match the DPI
             if (annotations.Pages.TryGetValue(page, out var pageAnnotations) && pageAnnotations.Count > 0)
             {
+                // Expand all text notes so their popup text is rendered into the export
+                var collapsed = new List<TextNoteAnnotation>();
+                foreach (var ann in pageAnnotations)
+                {
+                    if (ann is TextNoteAnnotation tn && !tn.IsExpanded)
+                    {
+                        tn.IsExpanded = true;
+                        collapsed.Add(tn);
+                    }
+                }
+
                 canvas.Save();
                 canvas.Scale(scaleX, scaleY);
                 AnnotationRenderer.DrawAnnotations(canvas, pageAnnotations, null);
                 canvas.Restore();
+
+                // Restore original collapsed state
+                foreach (var tn in collapsed)
+                    tn.IsExpanded = false;
             }
 
             document.EndPage();
