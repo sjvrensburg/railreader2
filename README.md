@@ -59,7 +59,7 @@ At high zoom levels, navigation switches to "rail mode" — the viewer locks ont
 - **Analysis indicator** — status bar shows "Analyzing..." during layout inference
 - **Debug overlay** — visualise detected layout blocks with class labels and confidence
 - **Search** — full-text search with regex support, case sensitivity toggle, and match highlighting (Ctrl+F)
-- **Annotations** — highlight, freehand pen, rectangles, text notes, and eraser via radial menu (right-click)
+- **Annotations** — highlight, freehand pen, rectangles, text notes, and eraser via radial menu (right-click). Colour picker for highlight (yellow/green/pink) and pen (red/blue/black). Collapsible popup notes with folded-corner icon. Select, move, and resize annotations in browse mode. Delete selected annotations with the Delete key.
 - **Text selection** — select and copy text from PDF pages via the toolbar
 - **Toolbar** — floating Browse/Text Select/Copy toolbar for quick mode switching
 - **Annotation export** — export PDFs with embedded annotations (File → Export with Annotations)
@@ -118,6 +118,7 @@ dotnet run -c Release --project src/RailReader2 --
 | F3 / Shift+F3 | Next / previous search match |
 | Right-click | Open annotation radial menu |
 | Ctrl+Z / Ctrl+Y | Undo / redo annotation |
+| Delete / Backspace | Delete selected annotation (browse mode) |
 | Ctrl+C | Copy selected text |
 | F11 | Toggle fullscreen (hides chrome) |
 | Escape | Stop auto-scroll / cancel annotation tool / close search / exit fullscreen |

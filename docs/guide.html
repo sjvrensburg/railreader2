@@ -578,17 +578,44 @@
       </figure>
 
       <ul>
-        <li><strong>Highlight</strong> (<code>1</code>) &mdash; Click and drag over text to highlight. Uses character-level detection for precise selection.</li>
-        <li><strong>Pen</strong> (<code>2</code>) &mdash; Freehand drawing with configurable colour and stroke width.</li>
+        <li><strong>Highlight</strong> (<code>1</code>) &mdash; Click and drag over text to highlight. Uses character-level detection for precise selection. Choose from yellow, green, or pink via the radial menu colour picker.</li>
+        <li><strong>Pen</strong> (<code>2</code>) &mdash; Freehand drawing. Choose from red, blue, or black via the radial menu colour picker.</li>
         <li><strong>Rectangle</strong> (<code>3</code>) &mdash; Draw rectangular outlines or filled regions.</li>
-        <li><strong>Text Note</strong> (<code>4</code>) &mdash; Click to place a text note marker. A dialog opens for you to type the note text. Click an existing note to edit it.</li>
+        <li><strong>Text Note</strong> (<code>4</code>) &mdash; Click to place a note. Shows as a small folded-corner icon; click the icon in browse mode to expand/collapse the popup. Click an existing note in Text Note mode to edit.</li>
         <li><strong>Eraser</strong> (<code>5</code>) &mdash; Click on an annotation to remove it.</li>
       </ul>
 
+      <h3>Colour picker</h3>
+      <p>
+        The <strong>Highlight</strong> and <strong>Pen</strong> segments on the radial menu have colour options.
+        Tap the segment to reveal an outer ring of colour dots. Tap a colour to select it and activate the tool.
+        A small indicator dot on the segment shows the currently active colour.
+      </p>
+
+      <h3>Popup notes</h3>
+      <p>
+        Text notes display as a compact folded-corner icon (16px). In browse mode, click the icon to expand a
+        floating popup showing the full note text with word wrapping. Click again to collapse.
+      </p>
+
+      <h3>Select, move, and resize</h3>
+      <p>
+        In <strong>browse mode</strong> (no annotation tool active), click on any annotation to select it
+        (shown with a dashed blue outline). Drag a selected annotation to move it. For freehand annotations,
+        8 resize handles appear on the bounding box &mdash; drag a handle to scale proportionally.
+        All move and resize actions support undo/redo.
+      </p>
+
+      <h3>Delete selected annotation</h3>
+      <p>
+        Press <code>Delete</code> or <code>Backspace</code> in browse mode to remove the selected annotation.
+        This uses the same undo-supported removal as the eraser.
+      </p>
+
       <h3>Undo and redo</h3>
       <p>
-        <code>Ctrl+Z</code> undoes the last annotation action. <code>Ctrl+Y</code> or
-        <code>Ctrl+Shift+Z</code> redoes. Each tab has an independent undo/redo stack.
+        <code>Ctrl+Z</code> undoes the last annotation action (including moves, resizes, and deletions).
+        <code>Ctrl+Y</code> or <code>Ctrl+Shift+Z</code> redoes. Each tab has an independent undo/redo stack.
       </p>
 
       <h3>Persistence</h3>
@@ -708,9 +735,10 @@
         <tr><td>Ctrl+F</td><td>Open search bar</td></tr>
         <tr><td>F3 / Shift+F3</td><td>Next / previous match</td></tr>
         <tr><td>1 / 2 / 3 / 4 / 5</td><td>Highlight / Pen / Rectangle / Text Note / Eraser</td></tr>
-        <tr><td>Right-click</td><td>Open radial menu</td></tr>
+        <tr><td>Right-click</td><td>Open radial menu (colour picker for Highlight/Pen)</td></tr>
         <tr><td>Ctrl+Z</td><td>Undo</td></tr>
         <tr><td>Ctrl+Y</td><td>Redo</td></tr>
+        <tr><td>Delete / Backspace</td><td>Delete selected annotation (browse mode)</td></tr>
         <tr><td>Ctrl+C</td><td>Copy selected text</td></tr>
         <tr><td>Escape</td><td>Cancel tool / close search / stop auto-scroll / exit fullscreen</td></tr>
       </table>

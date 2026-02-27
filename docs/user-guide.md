@@ -182,15 +182,31 @@ Right-click anywhere on the page to open the **radial menu** with five annotatio
 
 | Tool | Key | Description |
 |------|-----|-------------|
-| **Highlight** | `1` | Click and drag over text to highlight. Uses character-level detection. |
-| **Pen** | `2` | Freehand drawing with configurable colour and stroke width. |
+| **Highlight** | `1` | Click and drag over text to highlight. Uses character-level detection. Choose from yellow, green, or pink via the radial menu colour picker. |
+| **Pen** | `2` | Freehand drawing. Choose from red, blue, or black via the radial menu colour picker. |
 | **Rectangle** | `3` | Draw rectangular outlines or filled regions. |
-| **Text Note** | `4` | Click to place a note marker. Dialog opens for text input. |
+| **Text Note** | `4` | Click to place a note. Shows as a small folded-corner icon; click the icon in browse mode to expand/collapse the popup. Click an existing note in Text Note mode to edit. |
 | **Eraser** | `5` | Click on an annotation to remove it. |
+
+### Colour picker
+
+The **Highlight** and **Pen** segments on the radial menu have colour options. Tap the segment to reveal an outer ring of colour dots. Tap a colour to select it and activate the tool. A small indicator dot on the segment shows the currently active colour.
+
+### Popup notes
+
+Text notes display as a compact folded-corner icon (16px). In browse mode, click the icon to expand a floating popup showing the full note text with word wrapping. Click again to collapse. Double-click or use the Text Note tool to edit.
+
+### Select, move, and resize
+
+In **browse mode** (no annotation tool active), click on any annotation to select it (shown with a dashed blue outline). Drag a selected annotation to move it. For freehand annotations, 8 resize handles appear on the bounding box — drag a handle to scale proportionally. All move and resize actions support undo/redo.
+
+### Delete selected annotation
+
+Press `Delete` or `Backspace` in browse mode to remove the selected annotation. This uses the same undo-supported removal as the eraser.
 
 ### Undo and redo
 
-`Ctrl+Z` undoes the last annotation action. `Ctrl+Y` or `Ctrl+Shift+Z` redoes. Each tab has an independent undo/redo stack.
+`Ctrl+Z` undoes the last annotation action (including moves, resizes, and deletions). `Ctrl+Y` or `Ctrl+Shift+Z` redoes. Each tab has an independent undo/redo stack.
 
 ### Persistence
 
@@ -298,9 +314,10 @@ Configuration is stored at `~/.config/railreader2/config.json` (Linux) or `%APPD
 | `Ctrl+F` | Open search bar |
 | `F3` / `Shift+F3` | Next / previous match |
 | `1` / `2` / `3` / `4` / `5` | Highlight / Pen / Rectangle / Text Note / Eraser |
-| Right-click | Open radial menu |
+| Right-click | Open radial menu (with colour picker for Highlight/Pen) |
 | `Ctrl+Z` | Undo |
 | `Ctrl+Y` | Redo |
+| `Delete` / `Backspace` | Delete selected annotation (browse mode) |
 | `Ctrl+C` | Copy selected text |
 | `Escape` | Cancel / close / stop / exit fullscreen |
 
