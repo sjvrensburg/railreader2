@@ -137,7 +137,7 @@ public sealed class RailNav
         if (hit.HasValue)
         {
             CurrentBlock = hit.Value;
-            CurrentLine = 0;
+            CurrentLine = FindNearestLine(CurrentNavigableBlock, pageY);
             return;
         }
 
@@ -153,7 +153,20 @@ public sealed class RailNav
             if (dist < bestDist) { bestDist = dist; bestIdx = i; }
         }
         CurrentBlock = bestIdx;
-        CurrentLine = 0;
+        CurrentLine = FindNearestLine(CurrentNavigableBlock, pageY);
+    }
+
+    private static int FindNearestLine(LayoutBlock block, double pageY)
+    {
+        double bestDist = double.MaxValue;
+        int bestLine = 0;
+        for (int j = 0; j < block.Lines.Count; j++)
+        {
+            double lineMid = block.Lines[j].Y + block.Lines[j].Height / 2.0;
+            double d = Math.Abs(lineMid - pageY);
+            if (d < bestDist) { bestDist = d; bestLine = j; }
+        }
+        return bestLine;
     }
 
     public NavResult NextLine()
