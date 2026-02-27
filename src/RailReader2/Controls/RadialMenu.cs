@@ -232,9 +232,16 @@ public class RadialMenu : Control
                 seg.Action.Invoke();
             }
         }
+        else if (_expandedSegment >= 0)
+        {
+            // Clicking outside while colour ring is expanded:
+            // activate the tool with the last-used colour, then close.
+            _segments[_expandedSegment].Action.Invoke();
+            _expandedSegment = -1;
+            _onClose?.Invoke();
+        }
         else
         {
-            _expandedSegment = -1;
             _onClose?.Invoke();
         }
         e.Handled = true;

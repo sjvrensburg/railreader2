@@ -365,9 +365,11 @@ public sealed class DocumentState : IDisposable
         ClampCamera(windowWidth, windowHeight);
     }
 
-    public void UpdateRailZoom(double windowWidth, double windowHeight)
+    public void UpdateRailZoom(double windowWidth, double windowHeight,
+        double? cursorPageX = null, double? cursorPageY = null)
     {
-        Rail.UpdateZoom(Camera.Zoom, Camera.OffsetX, Camera.OffsetY, windowWidth, windowHeight);
+        Rail.UpdateZoom(Camera.Zoom, Camera.OffsetX, Camera.OffsetY, windowWidth, windowHeight,
+            cursorPageX, cursorPageY);
     }
 
     public void StartSnap(double windowWidth, double windowHeight)

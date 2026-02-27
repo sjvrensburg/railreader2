@@ -263,7 +263,10 @@ public sealed class DocumentController
             doc.Camera.Zoom = newZoom;
             doc.Camera.NotifyZoomChange();
 
-            doc.UpdateRailZoom(ww, wh);
+            // Compute cursor position in page coordinates for block selection on rail entry
+            double pageX = (cursorX - doc.Camera.OffsetX) / newZoom;
+            double pageY = (cursorY - doc.Camera.OffsetY) / newZoom;
+            doc.UpdateRailZoom(ww, wh, pageX, pageY);
             if (doc.Rail.Active)
                 doc.StartSnap(ww, wh);
             doc.ClampCamera(ww, wh);
