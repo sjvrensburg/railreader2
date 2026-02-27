@@ -178,13 +178,15 @@ public sealed class RailNav
 
     /// <summary>
     /// Saccade-style jump: moves camera forward/backward by a percentage of visible width.
+    /// When <paramref name="half"/> is true, the jump distance is halved (short jump).
     /// </summary>
     public void Jump(bool forward, double zoom, double windowWidth, double windowHeight,
-                     double cameraX, double cameraY)
+                     double cameraX, double cameraY, bool half = false)
     {
         if (!Active || _navigableIndices.Count == 0) return;
 
         double jumpPx = windowWidth * (_config.JumpPercentage / 100.0);
+        if (half) jumpPx *= 0.5;
         double newX = forward ? cameraX - jumpPx : cameraX + jumpPx;
         newX = ClampX(newX, zoom, windowWidth);
 

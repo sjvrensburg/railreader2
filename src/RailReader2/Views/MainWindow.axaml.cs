@@ -299,10 +299,12 @@ public partial class MainWindow : Window
             case Key.W when !searchFocused:
                 vm.HandleArrowUp(); e.Handled = true; break;
             case Key.Right when !searchFocused:
-                vm.HandleArrowRight(); e.Handled = true; break;
+                vm.HandleArrowRight(e.KeyModifiers.HasFlag(KeyModifiers.Shift));
+                e.Handled = true; break;
             case Key.Left when !searchFocused:
             case Key.A when !searchFocused:
-                vm.HandleArrowLeft(); e.Handled = true; break;
+                vm.HandleArrowLeft(e.KeyModifiers.HasFlag(KeyModifiers.Shift));
+                e.Handled = true; break;
             case Key.P when !searchFocused:
                 vm.ToggleAutoScrollExclusive();
                 RailToolBar.SetJumpMode(vm.JumpMode);
@@ -311,6 +313,10 @@ public partial class MainWindow : Window
             case Key.J when !searchFocused:
                 vm.ToggleJumpModeExclusive();
                 RailToolBar.SetJumpMode(vm.JumpMode);
+                RailToolBar.UpdateToggleStates();
+                e.Handled = true; break;
+            case Key.F when !searchFocused:
+                vm.ToggleLineFocusBlur();
                 RailToolBar.UpdateToggleStates();
                 e.Handled = true; break;
             case Key.OemOpenBrackets when !searchFocused && e.KeyModifiers.HasFlag(KeyModifiers.Shift):

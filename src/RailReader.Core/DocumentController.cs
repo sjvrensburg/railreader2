@@ -310,29 +310,29 @@ public sealed class DocumentController
         }
     }
 
-    public void HandleArrowRight()
+    public void HandleArrowRight(bool shortJump = false)
     {
         if (AutoScrollActive && ActiveDocument is { } d && d.Rail.Active)
         {
             d.Rail.SetAutoScrollBoost(true);
             return;
         }
-        if (TryJump(forward: true)) return;
+        if (TryJump(forward: true, half: shortJump)) return;
         HandleHorizontalArrow(ScrollDirection.Forward, -PanStep);
     }
 
-    public void HandleArrowLeft()
+    public void HandleArrowLeft(bool shortJump = false)
     {
         if (AutoScrollActive) StopAutoScroll();
-        if (TryJump(forward: false)) return;
+        if (TryJump(forward: false, half: shortJump)) return;
         HandleHorizontalArrow(ScrollDirection.Backward, PanStep);
     }
 
-    private bool TryJump(bool forward)
+    private bool TryJump(bool forward, bool half = false)
     {
         if (!JumpMode || ActiveDocument is not { } doc || !doc.Rail.Active) return false;
         var (ww, wh) = GetViewportSize();
-        doc.Rail.Jump(forward, doc.Camera.Zoom, ww, wh, doc.Camera.OffsetX, doc.Camera.OffsetY);
+        doc.Rail.Jump(forward, doc.Camera.Zoom, ww, wh, doc.Camera.OffsetX, doc.Camera.OffsetY, half);
         return true;
     }
 

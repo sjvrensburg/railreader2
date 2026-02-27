@@ -66,7 +66,7 @@ At high zoom levels, navigation switches to "rail mode" — the viewer locks ont
 - **Undo/redo** — annotation history with Ctrl+Z / Ctrl+Y
 - **Annotation mode indicator** — status bar shows active tool name in amber with a clickable exit button
 - **Auto-scroll** — toggle continuous horizontal scrolling in rail mode (P key), hold D/Right to boost speed, with configurable pauses at line and block boundaries
-- **Jump mode** — saccade-style reading (J key) that advances by a configurable percentage of the visible width
+- **Jump mode** — saccade-style reading (J key) that advances by a configurable percentage of the visible width; Shift+Right/Left for half-distance short jumps
 - **Line focus blur** — Gaussian blur on non-active lines to reduce peripheral distraction and perceived jitter
 - **Pixel snapping** — quantises camera positions to the pixel grid to eliminate sub-pixel text shimmer at high zoom
 - **Rail toolbar** — docked vertical toolbar with toggle buttons (P/J/F) for auto-scroll, jump mode, and line focus blur, plus sliders for scroll speed (or jump distance) and motion blur intensity; auto-scroll and jump mode are mutually exclusive
@@ -109,6 +109,8 @@ dotnet run -c Release --project src/RailReader2 --
 | Home / End | Line start / end (rail mode) or first / last page |
 | P | Toggle auto-scroll (rail mode), D/Right to boost |
 | J | Toggle jump mode (saccade-style advance) |
+| F | Toggle line focus blur (rail mode) |
+| Shift+Right / Shift+Left | Short jump — half distance (jump mode) |
 | [ / ] | Adjust scroll speed or jump distance (rail mode) |
 | Shift+[ / Shift+] | Adjust blur intensity (rail mode) |
 | D (shift) | Toggle debug overlay (shows detected blocks) |
@@ -185,7 +187,7 @@ tests/RailReader.Core.Tests/  # xUnit headless tests
 
 **RailReader.Core** contains `DocumentController` (the headless orchestration facade), `DocumentState` (per-document state), all Models and Services. It can be driven programmatically without any UI — the agent CLI and test project both use it directly.
 
-**RailReader.Agent** exposes RailReader's capabilities as AI tool functions via `Microsoft.Extensions.AI`. It can open PDFs, navigate, extract text, search, annotate, and export — all driven by an LLM agent loop. Configure via environment variables (`OPENAI_API_KEY`, `RAILREADER_MODEL`, `RAILREADER_BASE_URL`).
+**RailReader.Agent** *(experimental)* exposes RailReader's capabilities as AI tool functions via `Microsoft.Extensions.AI`. It can open PDFs, navigate, extract text, search, annotate, and export — all driven by an LLM agent loop. This component is not included in the binary releases (AppImage or Windows installer) and is only available when building from source. Configure via environment variables (`OPENAI_API_KEY`, `RAILREADER_MODEL`, `RAILREADER_BASE_URL`).
 
 ## Building
 
@@ -216,7 +218,7 @@ dotnet build RailReader2.slnx
 dotnet test tests/RailReader.Core.Tests
 ```
 
-### Run the AI agent
+### Run the AI agent (experimental, source builds only)
 
 ```bash
 # Set your API key and optional model/base URL

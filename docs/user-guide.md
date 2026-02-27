@@ -17,8 +17,8 @@ Everything you need to know to get the most out of railreader2.
 9. [Annotations](#annotations)
 10. [Text Selection](#text-selection)
 11. [Settings](#settings)
-12. [AI Agent CLI](#ai-agent-cli)
-13. [Keyboard Shortcuts](#keyboard-shortcuts)
+12. [Keyboard Shortcuts](#keyboard-shortcuts)
+13. [AI Agent CLI (Experimental)](#ai-agent-cli-experimental)
 
 ---
 
@@ -117,6 +117,8 @@ The status bar shows a green **"Auto-Scroll"** indicator when active. Adjust spe
 
 Press `J` in rail mode to toggle **jump mode**. Instead of continuous scrolling, `Right`/`D` and `Left`/`A` perform saccade-style jumps — advancing by a configurable percentage of the visible width (default 25%).
 
+Hold `Shift` with `Right` or `Left` to perform a **short jump** at half the normal distance. This is useful for fine-grained positioning within a line.
+
 This mimics natural reading eye movements and is useful for scanning text quickly. Adjust jump distance with `[` / `]` or in Settings > Rail Reading.
 
 > **Note:** Auto-scroll and jump mode are mutually exclusive. Enabling one disables the other.
@@ -130,7 +132,7 @@ When enabled, line focus blur applies a Gaussian blur to the entire page except 
 ![Line focus blur](img/line_focus_blur.png)
 *Line focus blur — non-active lines are blurred to reduce distraction*
 
-Toggle via the **F** button on the rail toolbar, or in Settings > Rail Reading. Blur intensity is adjustable from 0 (off) to 1 (maximum).
+Toggle with the `F` key, the **F** button on the rail toolbar, or in Settings > Rail Reading. Blur intensity is adjustable from 0 (off) to 1 (maximum).
 
 ---
 
@@ -244,9 +246,71 @@ Configuration is stored at `~/.config/railreader2/config.json` (Linux) or `%APPD
 
 ---
 
-## AI Agent CLI
+## Keyboard Shortcuts
 
-RailReader includes a headless agent CLI that lets an LLM open PDFs, navigate, extract text, search, annotate, and export — all via structured tool calls.
+### General
+
+| Key | Action |
+|-----|--------|
+| `Ctrl+O` | Open file |
+| `Ctrl+W` | Close tab |
+| `Ctrl+Tab` | Next tab |
+| `Ctrl+Q` | Quit |
+| `Ctrl+,` | Settings |
+| `Ctrl+M` | Toggle minimap |
+| `Ctrl+Shift+O` | Toggle outline panel |
+| `Ctrl+G` | Go to page |
+| `F1` | Keyboard shortcuts dialog |
+| `F11` | Toggle fullscreen |
+
+### Navigation
+
+| Key | Action |
+|-----|--------|
+| `PgDn` / `PgUp` | Next / previous page |
+| `Home` / `End` | First / last page |
+| `Space` | Next line (rail) or next page |
+| `+` / `-` | Zoom in / out |
+| `0` | Fit page to window |
+| `Shift+D` | Toggle debug overlay |
+
+### Rail Mode
+
+| Key | Action |
+|-----|--------|
+| `Down` / `S` | Next line |
+| `Up` / `W` | Previous line |
+| `Right` / `D` | Scroll forward (hold) |
+| `Left` / `A` | Scroll backward (hold) |
+| `Shift+Right` / `Shift+Left` | Short jump — half distance (jump mode) |
+| `Home` / `End` | Line start / end |
+| `P` | Toggle auto-scroll |
+| `J` | Toggle jump mode |
+| `F` | Toggle line focus blur |
+| `[` / `]` | Adjust speed or jump distance |
+| `Shift+[` / `Shift+]` | Adjust blur intensity |
+| Click | Jump to block |
+
+### Search & Annotations
+
+| Key | Action |
+|-----|--------|
+| `Ctrl+F` | Open search bar |
+| `F3` / `Shift+F3` | Next / previous match |
+| `1` / `2` / `3` / `4` / `5` | Highlight / Pen / Rectangle / Text Note / Eraser |
+| Right-click | Open radial menu |
+| `Ctrl+Z` | Undo |
+| `Ctrl+Y` | Redo |
+| `Ctrl+C` | Copy selected text |
+| `Escape` | Cancel / close / stop / exit fullscreen |
+
+---
+
+## AI Agent CLI (Experimental)
+
+> **Note:** The AI Agent CLI is not included in the binary releases (AppImage or Windows installer). It is only available when building from source with the .NET SDK installed.
+
+RailReader includes a headless agent CLI that lets an LLM open PDFs, navigate, extract text, search, annotate, and export — all via structured tool calls. This feature is experimental and may change in future releases.
 
 ### Setup
 
@@ -290,61 +354,3 @@ dotnet run --project src/RailReader.Agent -- --capture-screenshots docs/img/
 | `ExportPageImage` | Screenshot export (PNG) |
 | `WaitForAnalysis` | Wait for layout analysis |
 | `SetColourEffect` | Set colour filter |
-
----
-
-## Keyboard Shortcuts
-
-### General
-
-| Key | Action |
-|-----|--------|
-| `Ctrl+O` | Open file |
-| `Ctrl+W` | Close tab |
-| `Ctrl+Tab` | Next tab |
-| `Ctrl+Q` | Quit |
-| `Ctrl+,` | Settings |
-| `Ctrl+M` | Toggle minimap |
-| `Ctrl+Shift+O` | Toggle outline panel |
-| `Ctrl+G` | Go to page |
-| `F1` | Keyboard shortcuts dialog |
-| `F11` | Toggle fullscreen |
-
-### Navigation
-
-| Key | Action |
-|-----|--------|
-| `PgDn` / `PgUp` | Next / previous page |
-| `Home` / `End` | First / last page |
-| `Space` | Next line (rail) or next page |
-| `+` / `-` | Zoom in / out |
-| `0` | Fit page to window |
-| `Shift+D` | Toggle debug overlay |
-
-### Rail Mode
-
-| Key | Action |
-|-----|--------|
-| `Down` / `S` | Next line |
-| `Up` / `W` | Previous line |
-| `Right` / `D` | Scroll forward (hold) |
-| `Left` / `A` | Scroll backward (hold) |
-| `Home` / `End` | Line start / end |
-| `P` | Toggle auto-scroll |
-| `J` | Toggle jump mode |
-| `[` / `]` | Adjust speed or jump distance |
-| `Shift+[` / `Shift+]` | Adjust blur intensity |
-| Click | Jump to block |
-
-### Search & Annotations
-
-| Key | Action |
-|-----|--------|
-| `Ctrl+F` | Open search bar |
-| `F3` / `Shift+F3` | Next / previous match |
-| `1` / `2` / `3` / `4` / `5` | Highlight / Pen / Rectangle / Text Note / Eraser |
-| Right-click | Open radial menu |
-| `Ctrl+Z` | Undo |
-| `Ctrl+Y` | Redo |
-| `Ctrl+C` | Copy selected text |
-| `Escape` | Cancel / close / stop / exit fullscreen |

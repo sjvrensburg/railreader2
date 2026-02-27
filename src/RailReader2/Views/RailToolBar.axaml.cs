@@ -86,7 +86,7 @@ public partial class RailToolBar : UserControl
         });
         ButtonPanel.Children.Add(_jumpBtn);
 
-        _focusBlurBtn = MakeToggleButton("F", "Toggle line focus blur", (_, _) =>
+        _focusBlurBtn = MakeToggleButton("F", "Toggle line focus blur (F)", (_, _) =>
         {
             if (ViewModel is { } vm)
             {
