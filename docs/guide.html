@@ -323,8 +323,8 @@
         <li><a href="#annotations">Annotations</a></li>
         <li><a href="#text-selection">Text Selection</a></li>
         <li><a href="#settings">Settings</a></li>
-        <li><a href="#agent-cli">AI Agent CLI</a></li>
         <li><a href="#shortcuts">Keyboard Shortcuts</a></li>
+        <li><a href="#agent-cli">AI Agent CLI (Experimental)</a></li>
       </ol>
     </nav>
 
@@ -476,6 +476,11 @@
         (default 25%).
       </p>
       <p>
+        Hold <code>Shift</code> with <code>Right</code> or <code>Left</code> to perform a
+        <strong>short jump</strong> at half the normal distance. This is useful for fine-grained
+        positioning within a line.
+      </p>
+      <p>
         This mimics natural reading eye movements and is useful for scanning text quickly.
         Adjust jump distance with <code>[</code> / <code>]</code> or in Settings &rarr; Rail Reading.
       </p>
@@ -500,7 +505,7 @@
       </figure>
 
       <p>
-        Toggle via the <strong>F</strong> button on the rail toolbar, or in Settings &rarr; Rail Reading.
+        Toggle with the <code>F</code> key, the <strong>F</strong> button on the rail toolbar, or in Settings &rarr; Rail Reading.
         Blur intensity is adjustable from 0 (off) to 1 (maximum, sigma 4.0).
       </p>
     </section>
@@ -664,9 +669,63 @@
       </p>
     </section>
 
-    <!-- 12. AI Agent CLI -->
+    <!-- 12. Keyboard Shortcuts -->
+    <section class="guide-section" id="shortcuts">
+      <h2>Keyboard Shortcuts</h2>
+      <table class="shortcuts-table">
+        <tr><th colspan="2">General</th></tr>
+        <tr><td>Ctrl+O</td><td>Open file</td></tr>
+        <tr><td>Ctrl+W</td><td>Close tab</td></tr>
+        <tr><td>Ctrl+Tab</td><td>Next tab</td></tr>
+        <tr><td>Ctrl+Q</td><td>Quit</td></tr>
+        <tr><td>Ctrl+,</td><td>Settings</td></tr>
+        <tr><td>Ctrl+M</td><td>Toggle minimap</td></tr>
+        <tr><td>Ctrl+Shift+O</td><td>Toggle outline panel</td></tr>
+        <tr><td>Ctrl+G</td><td>Go to page</td></tr>
+        <tr><td>F1</td><td>Keyboard shortcuts dialog</td></tr>
+        <tr><td>F11</td><td>Toggle fullscreen</td></tr>
+        <tr><th colspan="2">Navigation</th></tr>
+        <tr><td>PgDn / PgUp</td><td>Next / previous page</td></tr>
+        <tr><td>Home / End</td><td>First / last page</td></tr>
+        <tr><td>Space</td><td>Next line (rail) or next page</td></tr>
+        <tr><td>+ / -</td><td>Zoom in / out</td></tr>
+        <tr><td>0</td><td>Fit page to window</td></tr>
+        <tr><td>Shift+D</td><td>Toggle debug overlay</td></tr>
+        <tr><th colspan="2">Rail Mode</th></tr>
+        <tr><td>Down / S</td><td>Next line</td></tr>
+        <tr><td>Up / W</td><td>Previous line</td></tr>
+        <tr><td>Right / D</td><td>Scroll forward (hold)</td></tr>
+        <tr><td>Left / A</td><td>Scroll backward (hold)</td></tr>
+        <tr><td>Shift+Right / Shift+Left</td><td>Short jump &mdash; half distance (jump mode)</td></tr>
+        <tr><td>Home / End</td><td>Line start / end</td></tr>
+        <tr><td>P</td><td>Toggle auto-scroll</td></tr>
+        <tr><td>J</td><td>Toggle jump mode</td></tr>
+        <tr><td>F</td><td>Toggle line focus blur</td></tr>
+        <tr><td>[ / ]</td><td>Adjust speed or jump distance</td></tr>
+        <tr><td>Shift+[ / Shift+]</td><td>Adjust blur intensity</td></tr>
+        <tr><td>Click</td><td>Jump to block</td></tr>
+        <tr><th colspan="2">Search &amp; Annotations</th></tr>
+        <tr><td>Ctrl+F</td><td>Open search bar</td></tr>
+        <tr><td>F3 / Shift+F3</td><td>Next / previous match</td></tr>
+        <tr><td>1 / 2 / 3 / 4 / 5</td><td>Highlight / Pen / Rectangle / Text Note / Eraser</td></tr>
+        <tr><td>Right-click</td><td>Open radial menu</td></tr>
+        <tr><td>Ctrl+Z</td><td>Undo</td></tr>
+        <tr><td>Ctrl+Y</td><td>Redo</td></tr>
+        <tr><td>Ctrl+C</td><td>Copy selected text</td></tr>
+        <tr><td>Escape</td><td>Cancel tool / close search / stop auto-scroll / exit fullscreen</td></tr>
+      </table>
+    </section>
+
+    <!-- 13. AI Agent CLI (Experimental) -->
     <section class="guide-section" id="agent-cli">
-      <h2>AI Agent CLI</h2>
+      <h2>AI Agent CLI (Experimental)</h2>
+
+      <div class="tip">
+        <strong>Note:</strong> The AI Agent CLI is not included in the binary releases (AppImage or
+        Windows installer). It is only available when building from source with the .NET SDK installed.
+        This feature is experimental and may change in future releases.
+      </div>
+
       <p>
         RailReader includes a headless agent CLI that lets an LLM open PDFs, navigate, extract text,
         search, annotate, and export &mdash; all via structured tool calls.
@@ -703,51 +762,6 @@ dotnet run --project src/RailReader.Agent -- --capture-screenshots docs/img/</co
         <li><code>WaitForAnalysis</code> &mdash; Wait for layout analysis to complete</li>
         <li><code>SetColourEffect</code> &mdash; Colour filter control</li>
       </ul>
-    </section>
-
-    <!-- 13. Keyboard Shortcuts -->
-    <section class="guide-section" id="shortcuts">
-      <h2>Keyboard Shortcuts</h2>
-      <table class="shortcuts-table">
-        <tr><th colspan="2">General</th></tr>
-        <tr><td>Ctrl+O</td><td>Open file</td></tr>
-        <tr><td>Ctrl+W</td><td>Close tab</td></tr>
-        <tr><td>Ctrl+Tab</td><td>Next tab</td></tr>
-        <tr><td>Ctrl+Q</td><td>Quit</td></tr>
-        <tr><td>Ctrl+,</td><td>Settings</td></tr>
-        <tr><td>Ctrl+M</td><td>Toggle minimap</td></tr>
-        <tr><td>Ctrl+Shift+O</td><td>Toggle outline panel</td></tr>
-        <tr><td>Ctrl+G</td><td>Go to page</td></tr>
-        <tr><td>F1</td><td>Keyboard shortcuts dialog</td></tr>
-        <tr><td>F11</td><td>Toggle fullscreen</td></tr>
-        <tr><th colspan="2">Navigation</th></tr>
-        <tr><td>PgDn / PgUp</td><td>Next / previous page</td></tr>
-        <tr><td>Home / End</td><td>First / last page</td></tr>
-        <tr><td>Space</td><td>Next line (rail) or next page</td></tr>
-        <tr><td>+ / -</td><td>Zoom in / out</td></tr>
-        <tr><td>0</td><td>Fit page to window</td></tr>
-        <tr><td>Shift+D</td><td>Toggle debug overlay</td></tr>
-        <tr><th colspan="2">Rail Mode</th></tr>
-        <tr><td>Down / S</td><td>Next line</td></tr>
-        <tr><td>Up / W</td><td>Previous line</td></tr>
-        <tr><td>Right / D</td><td>Scroll forward (hold)</td></tr>
-        <tr><td>Left / A</td><td>Scroll backward (hold)</td></tr>
-        <tr><td>Home / End</td><td>Line start / end</td></tr>
-        <tr><td>P</td><td>Toggle auto-scroll</td></tr>
-        <tr><td>J</td><td>Toggle jump mode</td></tr>
-        <tr><td>[ / ]</td><td>Adjust speed or jump distance</td></tr>
-        <tr><td>Shift+[ / Shift+]</td><td>Adjust blur intensity</td></tr>
-        <tr><td>Click</td><td>Jump to block</td></tr>
-        <tr><th colspan="2">Search &amp; Annotations</th></tr>
-        <tr><td>Ctrl+F</td><td>Open search bar</td></tr>
-        <tr><td>F3 / Shift+F3</td><td>Next / previous match</td></tr>
-        <tr><td>1 / 2 / 3 / 4 / 5</td><td>Highlight / Pen / Rectangle / Text Note / Eraser</td></tr>
-        <tr><td>Right-click</td><td>Open radial menu</td></tr>
-        <tr><td>Ctrl+Z</td><td>Undo</td></tr>
-        <tr><td>Ctrl+Y</td><td>Redo</td></tr>
-        <tr><td>Ctrl+C</td><td>Copy selected text</td></tr>
-        <tr><td>Escape</td><td>Cancel tool / close search / stop auto-scroll / exit fullscreen</td></tr>
-      </table>
     </section>
 
   </div>

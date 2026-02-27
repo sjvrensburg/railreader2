@@ -70,7 +70,7 @@
             </Grid>
 
             <TextBlock Text="Rail Mode (active above zoom threshold)" FontWeight="Bold" FontSize="14" />
-            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" Margin="8,0">
+            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" Margin="8,0">
                 <TextBlock Grid.Row="0" Grid.Column="0" Text="Down / S" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
                 <TextBlock Grid.Row="0" Grid.Column="1" Text="Next line" Margin="0,2" />
                 <TextBlock Grid.Row="1" Grid.Column="0" Text="Up / W" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
@@ -79,22 +79,26 @@
                 <TextBlock Grid.Row="2" Grid.Column="1" Text="Scroll forward (jump in jump mode)" Margin="0,2" />
                 <TextBlock Grid.Row="3" Grid.Column="0" Text="Left / A" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
                 <TextBlock Grid.Row="3" Grid.Column="1" Text="Scroll backward (jump in jump mode)" Margin="0,2" />
-                <TextBlock Grid.Row="4" Grid.Column="0" Text="Home" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
-                <TextBlock Grid.Row="4" Grid.Column="1" Text="Snap to line start" Margin="0,2" />
-                <TextBlock Grid.Row="5" Grid.Column="0" Text="End" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
-                <TextBlock Grid.Row="5" Grid.Column="1" Text="Snap to line end" Margin="0,2" />
-                <TextBlock Grid.Row="6" Grid.Column="0" Text="P" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
-                <TextBlock Grid.Row="6" Grid.Column="1" Text="Toggle auto-scroll (D/Right to boost)" Margin="0,2" />
-                <TextBlock Grid.Row="7" Grid.Column="0" Text="Escape" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
-                <TextBlock Grid.Row="7" Grid.Column="1" Text="Stop auto-scroll" Margin="0,2" />
-                <TextBlock Grid.Row="8" Grid.Column="0" Text="J" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
-                <TextBlock Grid.Row="8" Grid.Column="1" Text="Toggle jump mode (saccade-style advance)" Margin="0,2" />
-                <TextBlock Grid.Row="9" Grid.Column="0" Text="[ / ]" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
-                <TextBlock Grid.Row="9" Grid.Column="1" Text="Adjust scroll speed" Margin="0,2" />
-                <TextBlock Grid.Row="10" Grid.Column="0" Text="Shift+[ / Shift+]" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
-                <TextBlock Grid.Row="10" Grid.Column="1" Text="Adjust blur intensity" Margin="0,2" />
-                <TextBlock Grid.Row="11" Grid.Column="0" Text="Click" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
-                <TextBlock Grid.Row="11" Grid.Column="1" Text="Jump to block" Margin="0,2" />
+                <TextBlock Grid.Row="4" Grid.Column="0" Text="Shift+Right / Shift+Left" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="4" Grid.Column="1" Text="Short jump (half distance, jump mode)" Margin="0,2" />
+                <TextBlock Grid.Row="5" Grid.Column="0" Text="Home" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="5" Grid.Column="1" Text="Snap to line start" Margin="0,2" />
+                <TextBlock Grid.Row="6" Grid.Column="0" Text="End" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="6" Grid.Column="1" Text="Snap to line end" Margin="0,2" />
+                <TextBlock Grid.Row="7" Grid.Column="0" Text="P" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="7" Grid.Column="1" Text="Toggle auto-scroll (D/Right to boost)" Margin="0,2" />
+                <TextBlock Grid.Row="8" Grid.Column="0" Text="Escape" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="8" Grid.Column="1" Text="Stop auto-scroll" Margin="0,2" />
+                <TextBlock Grid.Row="9" Grid.Column="0" Text="J" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="9" Grid.Column="1" Text="Toggle jump mode (saccade-style advance)" Margin="0,2" />
+                <TextBlock Grid.Row="10" Grid.Column="0" Text="F" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="10" Grid.Column="1" Text="Toggle line focus blur" Margin="0,2" />
+                <TextBlock Grid.Row="11" Grid.Column="0" Text="[ / ]" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="11" Grid.Column="1" Text="Adjust scroll speed" Margin="0,2" />
+                <TextBlock Grid.Row="12" Grid.Column="0" Text="Shift+[ / Shift+]" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="12" Grid.Column="1" Text="Adjust blur intensity" Margin="0,2" />
+                <TextBlock Grid.Row="13" Grid.Column="0" Text="Click" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="13" Grid.Column="1" Text="Jump to block" Margin="0,2" />
             </Grid>
 
             <TextBlock Text="Pan (below zoom threshold)" FontWeight="Bold" FontSize="14" />

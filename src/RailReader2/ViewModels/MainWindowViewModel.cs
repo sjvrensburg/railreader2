@@ -351,17 +351,17 @@ public sealed partial class MainWindowViewModel : ObservableObject
         InvalidateNavigation();
     }
 
-    public void HandleArrowRight()
+    public void HandleArrowRight(bool shortJump = false)
     {
-        _controller.HandleArrowRight();
+        _controller.HandleArrowRight(shortJump);
         InvalidateCamera();
         OnPropertyChanged(nameof(ActiveTab));
         RequestAnimationFrame();
     }
 
-    public void HandleArrowLeft()
+    public void HandleArrowLeft(bool shortJump = false)
     {
-        _controller.HandleArrowLeft();
+        _controller.HandleArrowLeft(shortJump);
         InvalidateCamera();
         OnPropertyChanged(nameof(ActiveTab));
         RequestAnimationFrame();
@@ -418,6 +418,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
     {
         if (AutoScrollActive) StopAutoScroll();
         JumpMode = !JumpMode;
+    }
+
+    public void ToggleLineFocusBlur()
+    {
+        Config.LineFocusBlur = !Config.LineFocusBlur;
+        OnConfigChanged();
     }
 
     // --- Colour effects ---

@@ -9,8 +9,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Build and Development Commands
 
 ```bash
-# Build all projects
+# Build app + tests (default solution, excludes AI agent)
 dotnet build RailReader2.slnx
+
+# Build everything including the AI agent CLI
+dotnet build RailReader2-full.slnx
 
 # Run the application (note: src/RailReader2 is the correct project path; -- separates dotnet args from app args)
 dotnet run -c Release --project src/RailReader2 -- <path-to-pdf>
@@ -21,7 +24,7 @@ dotnet run -c Release --project src/RailReader2
 # Run tests
 dotnet test tests/RailReader.Core.Tests
 
-# Run the AI agent CLI
+# Run the AI agent CLI (requires RailReader2-full.slnx or direct project build)
 dotnet run --project src/RailReader.Agent -- "Open test.pdf and tell me how many pages it has"
 
 # Publish self-contained release (Linux)
@@ -36,14 +39,16 @@ dotnet publish src/RailReader2 -c Release -r win-x64 --self-contained
 
 ## Architecture
 
-The codebase is split into four projects:
+The codebase is split into four projects across two solution files:
 
 ```
-RailReader2.slnx
+RailReader2.slnx              # Default: app + core + tests (no agent)
 ├── src/RailReader.Core/        # UI-free library: all business logic, models, services
 ├── src/RailReader2/            # Thin Avalonia UI shell (references Core)
-├── src/RailReader.Agent/       # AI agent CLI via Microsoft.Extensions.AI (references Core)
 └── tests/RailReader.Core.Tests/# xUnit headless tests against Core
+
+RailReader2-full.slnx         # Full: includes experimental AI agent CLI
+└── src/RailReader.Agent/       # AI agent CLI via Microsoft.Extensions.AI (references Core)
 ```
 
 ### RailReader.Core (UI-free library)
@@ -157,7 +162,7 @@ scripts/
 - **DPI tier rounding**: `PdfService.CalculateRenderDpi` rounds to nearest 75 DPI step (150, 225, 300, 375, 450, 525, 600) instead of continuous `zoom*150`, keeping GPU upsampling ratios closer to simple fractions and reducing anti-aliasing shimmer.
 - **Line focus blur**: When enabled, applies uniform Gaussian blur to the entire page except the active line in rail mode. Rendered in `PdfPageLayer` in two passes inside the colour effect layer: (1) blurred page with active line clipped out via `SKClipOperation.Difference`, (2) sharp active line on top. The blur spans the full page width (not just the active block). Sigma scales with `config.LineFocusBlurIntensity` (0.0–1.0, max sigma 4.0). Configured via `config.LineFocusBlur` and `config.LineFocusBlurIntensity`.
 - **Auto-scroll pause**: Auto-scroll pauses briefly at the end of each line before advancing. Configurable via `config.AutoScrollLinePauseMs` (default 400ms) and `config.AutoScrollBlockPauseMs` (default 600ms for block/page transitions). Implemented in `RailNav.TickAutoScroll` with a `Stopwatch`-based pause timer. Set to 0 to disable.
-- **Jump mode**: Toggled via `J` key. When active, D/Right and A/Left perform saccade-style jumps (percentage of visible width) instead of hold-to-scroll. Jump distance configurable via `config.JumpPercentage` (default 25%). Uses a fast 120ms snap animation. Status bar shows amber "Jump" indicator with exit button. `RailNav.Jump()` computes new camera position clamped to block bounds.
+- **Jump mode**: Toggled via `J` key. When active, D/Right and A/Left perform saccade-style jumps (percentage of visible width) instead of hold-to-scroll. Jump distance configurable via `config.JumpPercentage` (default 25%). Holding Shift with Right/Left performs a short jump at half the normal distance. Uses a fast 120ms snap animation. Status bar shows amber "Jump" indicator with exit button. `RailNav.Jump()` computes new camera position clamped to block bounds.
 - **Tabbed settings**: `SettingsWindow` uses a `TabControl` with four tabs: Appearance (font scale, motion blur, colour effects), Rail Reading (navigation params, pixel snapping, line focus blur, jump distance), Auto-Scroll (pause durations), Advanced (navigable block types).
 
 ### Dependencies
@@ -422,6 +427,8 @@ If the model is not found, the app logs a warning and falls back to horizontal-s
 | `End` | Line end (rail) / last page |
 | `P` | Toggle auto-scroll (rail) |
 | `J` | Toggle jump mode (rail) |
+| `F` | Toggle line focus blur (rail) |
+| `Shift+Right` / `Shift+Left` | Short jump — half distance (jump mode) |
 | `[` / `]` | Adjust scroll speed or jump distance (rail) |
 | `Shift+[` / `Shift+]` | Adjust blur intensity (rail) |
 | Click | Jump to block (rail mode) |
