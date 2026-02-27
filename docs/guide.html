@@ -367,8 +367,10 @@
       <h3>Zoom and pan</h3>
       <p>
         <strong>Mouse wheel</strong> zooms towards the cursor. <code>+</code> and <code>-</code> keys
-        zoom in and out. Press <code>0</code> to fit the page to the window. Use <strong>View &rarr;
-        Fit Width</strong> to fill the viewport horizontally.
+        zoom in and out. All zoom actions animate smoothly over ~180ms with cubic ease-out. Rapid scroll
+        wheel inputs accumulate into the in-progress animation for fluid zooming. Press <code>0</code>
+        to fit the page to the window. Use <strong>View &rarr; Fit Width</strong> to fill the viewport
+        horizontally.
       </p>
       <p>
         <strong>Click and drag</strong> to pan. Arrow keys also pan when not in rail mode.
@@ -515,7 +517,8 @@
       <h2>Colour Effects</h2>
       <p>
         Four GPU-accelerated colour filters are available, applied only to PDF content (not the UI).
-        Access via <strong>View &rarr; Colour Effect</strong> or Settings &rarr; Appearance.
+        Access via <strong>View &rarr; Colour Effect</strong>, Settings &rarr; Appearance, or press
+        <code>C</code> to cycle through effects on the active tab.
       </p>
       <ul>
         <li><strong>Amber Filter:</strong> Warm tint that reduces blue light and perceived haze. Good for extended reading.</li>
@@ -536,9 +539,19 @@
       </div>
 
       <p>
+        Each tab keeps its own colour effect independently &mdash; you can have one PDF in Amber
+        and another in High Contrast. The per-tab effect is saved with the reading position and
+        restored when you reopen the file.
+      </p>
+      <p>
         Each effect has adjustable intensity (0.0 to 1.0). Rail mode overlay colours automatically
         adapt to the active colour effect for readable contrast.
       </p>
+
+      <div class="tip">
+        <strong>Tip:</strong> Press <code>C</code> to quickly cycle through colour effects. The
+        status bar briefly shows the active effect name.
+      </div>
     </section>
 
     <!-- 8. Search -->
@@ -660,8 +673,9 @@
       <h3>Appearance</h3>
       <ul>
         <li><strong>UI Font Scale:</strong> Adjust the size of all UI text (default 1.25x).</li>
+        <li><strong>Dark Mode:</strong> Switch the UI to a dark theme. Takes effect immediately.</li>
         <li><strong>Motion Blur:</strong> Toggle and adjust intensity of directional blur during scroll/zoom.</li>
-        <li><strong>Colour Effect:</strong> Select and configure the active colour filter.</li>
+        <li><strong>Colour Effect:</strong> Select and configure the active colour filter (applies globally via Settings; use <code>C</code> key for per-tab cycling).</li>
       </ul>
 
       <h3>Rail Reading</h3>
@@ -727,6 +741,7 @@
         <tr><td>Home / End</td><td>Line start / end</td></tr>
         <tr><td>P</td><td>Toggle auto-scroll</td></tr>
         <tr><td>J</td><td>Toggle jump mode</td></tr>
+        <tr><td>C</td><td>Cycle colour effect on active tab</td></tr>
         <tr><td>F</td><td>Toggle line focus blur</td></tr>
         <tr><td>[ / ]</td><td>Adjust speed or jump distance</td></tr>
         <tr><td>Shift+[ / Shift+]</td><td>Adjust blur intensity</td></tr>

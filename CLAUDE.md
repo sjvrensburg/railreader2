@@ -141,7 +141,7 @@ scripts/
 - **IThreadMarshaller**: Abstracts UI thread posting. `AvaloniaThreadMarshaller` wraps `Dispatcher.UIThread.Post()`; `SynchronousThreadMarshaller` (in Core) executes inline for tests and agent CLI.
 - **TickResult**: `DocumentController.Tick(dt)` returns a `TickResult` record struct indicating what changed (camera, page, overlay, search, annotations, still animating). The UI maps this to granular invalidations.
 - **MVVM**: CommunityToolkit.Mvvm source generators (`[ObservableProperty]`, `[RelayCommand]`). Performance-sensitive paths (camera transforms, canvas invalidation) use direct method calls and `InvalidationCallbacks` for granular repaint targeting rather than pure data binding.
-- **Colour effects**: Four SkSL shaders compiled at startup via `SKRuntimeEffect.CreateColorFilter()` — HighContrast (luminance inversion + S-curve), HighVisibility (yellow-on-black), Amber (warm tint), Invert. Stored in a `Dictionary<ColourEffect, SKRuntimeEffect>` in `ColourEffectShaders`. Applied via `canvas.SaveLayer(paint)` around page drawing. Each effect has a matching `OverlayPalette` for rail overlay colours.
+- **Colour effects**: Four SkSL shaders compiled at startup via `SKRuntimeEffect.CreateColorFilter()` — HighContrast (luminance inversion + S-curve), HighVisibility (yellow-on-black), Amber (warm tint), Invert. Stored in a `Dictionary<ColourEffect, SKRuntimeEffect>` in `ColourEffectShaders`. Applied via `canvas.SaveLayer(paint)` around page drawing. Each effect has a matching `OverlayPalette` for rail overlay colours. **Per-document**: each `DocumentState` holds its own `ColourEffect`, synced to `ColourEffectShaders.Effect` on tab switch. Persisted in `RecentFileEntry` with nullable `ColourEffect?` for backward compatibility. `SetColourEffect` updates per-doc state; `SetGlobalColourEffect` (Settings panel) updates config and all tabs. Press `C` to cycle effects on the active tab via `CycleColourEffect()`, which shows a 1.5s status bar toast.
 - **Compositor camera**: `MainWindow.UpdateCameraTransform()` applies a `MatrixTransform` to `CameraPanel` for GPU-compositor-level pan/zoom — bitmap doesn't repaint on every frame, only on DPI changes. `GetWindowSize()` returns the actual viewport bounds (fed by `Viewport.SizeChanged`), not the full window `ClientSize`, so `CenterPage` positions correctly.
 - **Motion blur**: Subtle directional blur during rail horizontal scroll (horizontal-only) and zoom (uniform). Uses a cubic speed curve (`speed^3 * maxSigma * intensity`) so blur stays barely perceptible at low/medium speeds. Configurable via `motion_blur` (toggle) and `motion_blur_intensity` (0.0–1.0) in config/Settings. `Camera.ZoomSpeed` tracks zoom velocity with exponential decay (~80ms half-life); `RailNav.ScrollSpeed` is the normalized instantaneous scroll speed. Applied via `SKImageFilter.CreateBlur` in `PdfPageLayer`. The blur filter and layer `SKPaint` are cached per render thread (`[ThreadStatic]`) and only recreated when sigma values change, avoiding per-frame allocation and GC pressure during animation.
 - **Splash screen**: `SplashWindow` shows on startup while config loads and ONNX worker initializes. Heavy initialization (config, cleanup, ONNX) is deferred via `Dispatcher.UIThread.Post()` at `Background` priority with an extra yield, so the splash actually paints before blocking work begins (fixes splash not displaying on Linux/X11). Closed when the main window opens. Status bar shows "Analyzing..." while ONNX inference is in progress for the current page (`PendingRailSetup`).
@@ -163,7 +163,10 @@ scripts/
 - **Line focus blur**: When enabled, applies uniform Gaussian blur to the entire page except the active line in rail mode. Rendered in `PdfPageLayer` in two passes inside the colour effect layer: (1) blurred page with active line clipped out via `SKClipOperation.Difference`, (2) sharp active line on top. The blur spans the full page width (not just the active block). Sigma scales with `config.LineFocusBlurIntensity` (0.0–1.0, max sigma 4.0). Configured via `config.LineFocusBlur` and `config.LineFocusBlurIntensity`.
 - **Auto-scroll pause**: Auto-scroll pauses briefly at the end of each line before advancing. Configurable via `config.AutoScrollLinePauseMs` (default 400ms) and `config.AutoScrollBlockPauseMs` (default 600ms for block/page transitions). Implemented in `RailNav.TickAutoScroll` with a `Stopwatch`-based pause timer. Set to 0 to disable.
 - **Jump mode**: Toggled via `J` key. When active, D/Right and A/Left perform saccade-style jumps (percentage of visible width) instead of hold-to-scroll. Jump distance configurable via `config.JumpPercentage` (default 25%). Holding Shift with Right/Left performs a short jump at half the normal distance. Uses a fast 120ms snap animation. Status bar shows amber "Jump" indicator with exit button. `RailNav.Jump()` computes new camera position clamped to block bounds.
-- **Tabbed settings**: `SettingsWindow` uses a `TabControl` with four tabs: Appearance (font scale, motion blur, colour effects), Rail Reading (navigation params, pixel snapping, line focus blur, jump distance), Auto-Scroll (pause durations), Advanced (navigable block types).
+- **Tabbed settings**: `SettingsWindow` uses a `TabControl` with four tabs: Appearance (font scale, dark mode, motion blur, colour effects), Rail Reading (navigation params, pixel snapping, line focus blur, jump distance), Auto-Scroll (pause durations), Advanced (navigable block types).
+- **Dark mode**: `AppConfig.DarkMode` (default false). Applied at startup via `Application.Current!.RequestedThemeVariant = ThemeVariant.Dark`. Live toggle via `SetDarkMode()` in `MainWindowViewModel`. `App.axaml` uses `RequestedThemeVariant="Default"` so it can be overridden at runtime.
+- **Smooth zoom**: All zoom (scroll wheel + keyboard) animates over ~180ms with cubic ease-out. Private `ZoomAnimation` class in `DocumentController` tracks start/target zoom and offsets. Scroll wheel accumulates into in-progress animation's `TargetZoom`. `StartZoomAnimation()` helper computes zoom-toward-cursor offsets. Rail snap is skipped during zoom animation (`_zoomAnim` guard). Animation cancelled by pan, fit-page, fit-width, and go-to-page.
+- **Status toast**: `MainWindowViewModel.StatusToast` property (nullable string) displayed as bold amber label in `StatusBarView`. Auto-clears after 1.5s via `Timer`. Used by colour effect cycling to show current effect name.
 
 ### Dependencies
 
@@ -203,6 +206,7 @@ Config file location: `~/.config/railreader2/config.json` (Linux) or `%APPDATA%\
   "auto_scroll_line_pause_ms": 400.0,
   "auto_scroll_block_pause_ms": 600.0,
   "jump_percentage": 25.0,
+  "dark_mode": false,
   "navigable_classes": [
     "abstract", "algorithm", "display_formula",
     "footnote", "paragraph_title", "text"
@@ -431,6 +435,7 @@ If the model is not found, the app logs a warning and falls back to horizontal-s
 | `End` | Line end (rail) / last page |
 | `P` | Toggle auto-scroll (rail) |
 | `J` | Toggle jump mode (rail) |
+| `C` | Cycle colour effect on active tab |
 | `F` | Toggle line focus blur (rail) |
 | `Shift+Right` / `Shift+Left` | Short jump — half distance (jump mode) |
 | `[` / `]` | Adjust scroll speed or jump distance (rail) |
