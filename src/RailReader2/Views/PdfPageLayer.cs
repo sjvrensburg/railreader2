@@ -89,6 +89,36 @@ public class PdfPageLayer : Control
         public bool Equals(ICustomDrawOperation? other) => false;
         public bool HitTest(Point p) => _bounds.Contains(p);
 
+        /// <summary>
+        /// Draws the page image with optional bionic fade integrated into the draw.
+        /// Fixation regions draw at full contrast; fade regions draw with the bionic
+        /// color filter. This must be called INSIDE any blur layers so blur applies
+        /// uniformly on top.
+        /// </summary>
+        private void DrawPageImage(SKCanvas canvas, SKImage image, SKRect destRect,
+            SKPath? bionicPath, SKPaint? bionicPaint)
+        {
+            if (bionicPath is null || bionicPaint is null)
+            {
+                canvas.DrawImage(image, destRect, s_sampling);
+                return;
+            }
+
+            // Fixation regions: full contrast (everything outside fade rects)
+            canvas.Save();
+            canvas.ClipPath(bionicPath, SKClipOperation.Difference);
+            canvas.DrawImage(image, destRect, s_sampling);
+            canvas.Restore();
+
+            // Fade regions: bionic color filter applied
+            canvas.Save();
+            canvas.ClipPath(bionicPath);
+            canvas.SaveLayer(bionicPaint);
+            canvas.DrawImage(image, destRect, s_sampling);
+            canvas.Restore(); // layer
+            canvas.Restore(); // clip
+        }
+
         public void Render(ImmediateDrawingContext context)
         {
             if (context.TryGetFeature(typeof(ISkiaSharpApiLeaseFeature)) is not ISkiaSharpApiLeaseFeature leaseFeature)
@@ -152,10 +182,28 @@ public class PdfPageLayer : Control
 
             var destRect = SKRect.Create(0, 0, (float)tab.PageWidth, (float)tab.PageHeight);
 
+            // Build bionic clip path + paint once for use in all draw calls
+            SKPath? bionicPath = null;
+            SKPaint? bionicPaint = null;
+            SKColorFilter? bionicFilter = null;
+            if (_bionicEnabled && _bionicRects is { Count: > 0 } fadeRects && _effects is not null)
+            {
+                bionicFilter = _effects.CreateBionicColorFilter((float)_bionicIntensity);
+                if (bionicFilter is not null)
+                {
+                    bionicPath = new SKPath();
+                    foreach (var rect in fadeRects)
+                        bionicPath.AddRect(rect);
+                    bionicPaint = new SKPaint { ColorFilter = bionicFilter };
+                }
+            }
+
             // Line focus blur: draw the page in two passes inside the colour
             // effect layer so blur doesn't double-apply the tint.
             // Pass 1: blurred page everywhere except the active line.
             // Pass 2: sharp active line on top.
+            // Bionic fade is integrated into each pass so it composes correctly
+            // with the blur (faded text gets blurred on non-active lines).
             bool didLineFocusBlur = false;
             if (_lineFocusBlur && _lineFocusIntensity > 0
                 && tab.Rail is { Active: true, NavigableCount: > 0 } rail)
@@ -182,40 +230,26 @@ public class PdfPageLayer : Control
                     using var focusBlur = SKImageFilter.CreateBlur(sigma, sigma);
                     using var focusPaint = new SKPaint { ImageFilter = focusBlur };
                     canvas.SaveLayer(focusPaint);
-                    canvas.DrawImage(image, destRect, s_sampling);
+                    DrawPageImage(canvas, image, destRect, bionicPath, bionicPaint);
                     canvas.Restore(); // layer
                     canvas.Restore(); // clip
 
                     // Pass 2: Draw just the active line sharp
                     canvas.Save();
                     canvas.ClipRect(lineRect);
-                    canvas.DrawImage(image, destRect, s_sampling);
+                    DrawPageImage(canvas, image, destRect, bionicPath, bionicPaint);
                     canvas.Restore(); // clip
                 }
             }
 
             // If line focus blur didn't handle the page draw, do it now
             if (!didLineFocusBlur)
-                canvas.DrawImage(image, destRect, s_sampling);
+                DrawPageImage(canvas, image, destRect, bionicPath, bionicPaint);
 
-            // Bionic reading: fade non-fixation character regions
-            if (_bionicEnabled && _bionicRects is { Count: > 0 } fadeRects && _effects is not null)
-            {
-                using var path = new SKPath();
-                foreach (var rect in fadeRects)
-                    path.AddRect(rect);
-                canvas.Save();
-                canvas.ClipPath(path);
-                using var bionicFilter = _effects.CreateBionicColorFilter((float)_bionicIntensity);
-                if (bionicFilter is not null)
-                {
-                    using var bionicPaint = new SKPaint { ColorFilter = bionicFilter };
-                    canvas.SaveLayer(bionicPaint);
-                    canvas.DrawImage(image, destRect, s_sampling);
-                    canvas.Restore(); // layer
-                }
-                canvas.Restore(); // clip
-            }
+            // Dispose bionic resources
+            bionicPath?.Dispose();
+            bionicPaint?.Dispose();
+            bionicFilter?.Dispose();
 
             if (needsLayer)
             {
