@@ -43,8 +43,9 @@ public partial class MainWindow : Window
                     PageLayer.LineFocusPadding = vm.Config.LineFocusPadding;
                     PageLayer.BionicReadingEnabled = vm.Config.BionicReading;
                     PageLayer.BionicFadeIntensity = vm.Config.BionicFadeIntensity;
-                    PageLayer.BionicFadeRects = vm.Config.BionicReading && vm.ActiveTab is { } bionicTab
-                        ? bionicTab.State.GetOrComputeBionicOverlay(bionicTab.CurrentPage, vm.Config.BionicFixationPercent)
+                    var tab = vm.ActiveTab;
+                    PageLayer.BionicFadeRects = vm.Config.BionicReading && tab is not null
+                        ? tab.State.GetOrComputeBionicOverlay(tab.CurrentPage, vm.Config.BionicFixationPercent)
                         : null;
                     PageLayer.InvalidateVisual();
                     Minimap.InvalidateVisual();

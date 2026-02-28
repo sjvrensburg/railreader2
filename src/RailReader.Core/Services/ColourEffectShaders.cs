@@ -70,21 +70,22 @@ public sealed class ColourEffectShaders : IDisposable
         CompileAndStore(ColourEffect.HighVisibility, HighVisibilitySksl);
         CompileAndStore(ColourEffect.Amber, AmberSksl);
         CompileAndStore(ColourEffect.Invert, InvertSksl);
+        _bionicEffect = CompileColorFilter("BionicFade", BionicFadeSksl);
+    }
 
-        var bionicCompiled = SKRuntimeEffect.CreateColorFilter(BionicFadeSksl, out var bionicError);
-        if (bionicCompiled is not null)
-            _bionicEffect = bionicCompiled;
-        else
-            Console.Error.WriteLine($"Failed to compile bionic fade shader: {bionicError}");
+    private static SKRuntimeEffect? CompileColorFilter(string name, string sksl)
+    {
+        var compiled = SKRuntimeEffect.CreateColorFilter(sksl, out var error);
+        if (compiled is null)
+            Console.Error.WriteLine($"Failed to compile {name} shader: {error}");
+        return compiled;
     }
 
     private void CompileAndStore(ColourEffect effect, string sksl)
     {
-        var compiled = SKRuntimeEffect.CreateColorFilter(sksl, out var error);
+        var compiled = CompileColorFilter(effect.ToString(), sksl);
         if (compiled is not null)
             _effects[effect] = compiled;
-        else
-            Console.Error.WriteLine($"Failed to compile {effect} shader: {error}");
     }
 
     public bool HasActiveEffect => Effect != ColourEffect.None && _effects.ContainsKey(Effect);

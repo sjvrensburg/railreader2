@@ -125,12 +125,15 @@ public partial class SettingsWindow : Window
         vm.OnConfigChanged();
     }
 
-    private void OnBlurIntensityChanged(object? sender, Avalonia.AvaloniaPropertyChangedEventArgs e)
+    private void OnSliderChanged(Avalonia.AvaloniaPropertyChangedEventArgs e, Action<AppConfig> apply)
     {
         if (e.Property.Name != "Value" || Vm is not { } vm || _loading) return;
-        vm.Config.MotionBlurIntensity = BlurIntensitySlider.Value;
+        apply(vm.Config);
         vm.OnConfigChanged();
     }
+
+    private void OnBlurIntensityChanged(object? sender, Avalonia.AvaloniaPropertyChangedEventArgs e)
+        => OnSliderChanged(e, c => c.MotionBlurIntensity = BlurIntensitySlider.Value);
 
     private void OnPixelSnappingChanged(object? sender, RoutedEventArgs e)
     {
@@ -147,18 +150,10 @@ public partial class SettingsWindow : Window
     }
 
     private void OnLineFocusBlurIntensityChanged(object? sender, Avalonia.AvaloniaPropertyChangedEventArgs e)
-    {
-        if (e.Property.Name != "Value" || Vm is not { } vm || _loading) return;
-        vm.Config.LineFocusBlurIntensity = LineFocusBlurSlider.Value;
-        vm.OnConfigChanged();
-    }
+        => OnSliderChanged(e, c => c.LineFocusBlurIntensity = LineFocusBlurSlider.Value);
 
     private void OnLineFocusPaddingChanged(object? sender, Avalonia.AvaloniaPropertyChangedEventArgs e)
-    {
-        if (e.Property.Name != "Value" || Vm is not { } vm || _loading) return;
-        vm.Config.LineFocusPadding = LineFocusPaddingSlider.Value;
-        vm.OnConfigChanged();
-    }
+        => OnSliderChanged(e, c => c.LineFocusPadding = LineFocusPaddingSlider.Value);
 
     private void OnLineHighlightTintChanged(object? sender, SelectionChangedEventArgs e)
     {
@@ -168,11 +163,7 @@ public partial class SettingsWindow : Window
     }
 
     private void OnLineHighlightOpacityChanged(object? sender, Avalonia.AvaloniaPropertyChangedEventArgs e)
-    {
-        if (e.Property.Name != "Value" || Vm is not { } vm || _loading) return;
-        vm.Config.LineHighlightOpacity = LineHighlightOpacitySlider.Value;
-        vm.OnConfigChanged();
-    }
+        => OnSliderChanged(e, c => c.LineHighlightOpacity = LineHighlightOpacitySlider.Value);
 
     private void OnBionicReadingChanged(object? sender, RoutedEventArgs e)
     {
@@ -182,18 +173,10 @@ public partial class SettingsWindow : Window
     }
 
     private void OnBionicFixationChanged(object? sender, Avalonia.AvaloniaPropertyChangedEventArgs e)
-    {
-        if (e.Property.Name != "Value" || Vm is not { } vm || _loading) return;
-        vm.Config.BionicFixationPercent = BionicFixationSlider.Value;
-        vm.OnConfigChanged();
-    }
+        => OnSliderChanged(e, c => c.BionicFixationPercent = BionicFixationSlider.Value);
 
     private void OnBionicFadeChanged(object? sender, Avalonia.AvaloniaPropertyChangedEventArgs e)
-    {
-        if (e.Property.Name != "Value" || Vm is not { } vm || _loading) return;
-        vm.Config.BionicFadeIntensity = BionicFadeSlider.Value;
-        vm.OnConfigChanged();
-    }
+        => OnSliderChanged(e, c => c.BionicFadeIntensity = BionicFadeSlider.Value);
 
     private void OnSettingChanged(object? sender, NumericUpDownValueChangedEventArgs e) => SaveToConfig();
     private void OnEffectChanged(object? sender, SelectionChangedEventArgs e)

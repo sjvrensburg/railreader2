@@ -68,33 +68,30 @@ public static class BionicReadingService
         // across fixation portions of adjacent words.
         const float gapThreshold = 2f;
 
-        float curLeft = 0, curTop = 0, curRight = 0, curBottom = 0;
-        bool hasRect = false;
-
+        SKRect? current = null;
         foreach (var cb in boxes)
         {
-            if (!hasRect)
+            var r = new SKRect(cb.Left, cb.Top, cb.Right, cb.Bottom);
+            if (current is not { } cur)
             {
-                curLeft = cb.Left; curTop = cb.Top; curRight = cb.Right; curBottom = cb.Bottom;
-                hasRect = true;
+                current = r;
             }
-            else if (Math.Abs(cb.Top - curTop) < lineThreshold && cb.Left - curRight < gapThreshold)
+            else if (Math.Abs(cb.Top - cur.Top) < lineThreshold && cb.Left - cur.Right < gapThreshold)
             {
                 // Same line AND horizontally adjacent — extend
-                curRight = Math.Max(curRight, cb.Right);
-                curTop = Math.Min(curTop, cb.Top);
-                curBottom = Math.Max(curBottom, cb.Bottom);
+                current = new SKRect(cur.Left, Math.Min(cur.Top, r.Top),
+                    Math.Max(cur.Right, r.Right), Math.Max(cur.Bottom, r.Bottom));
             }
             else
             {
                 // Different line or horizontal gap — emit and start new
-                result.Add(new SKRect(curLeft, curTop, curRight, curBottom));
-                curLeft = cb.Left; curTop = cb.Top; curRight = cb.Right; curBottom = cb.Bottom;
+                result.Add(cur);
+                current = r;
             }
         }
 
-        if (hasRect)
-            result.Add(new SKRect(curLeft, curTop, curRight, curBottom));
+        if (current is { } last)
+            result.Add(last);
 
         return result;
     }

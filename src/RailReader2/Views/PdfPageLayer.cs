@@ -37,10 +37,17 @@ public class PdfPageLayer : Control
         var tab = Tab;
         double w = tab?.PageWidth > 0 ? tab.PageWidth : Bounds.Width;
         double h = tab?.PageHeight > 0 ? tab.PageHeight : Bounds.Height;
-        context.Custom(new PageDrawOperation(new Rect(0, 0, w, h), tab, ColourEffects,
-            MotionBlurEnabled, MotionBlurIntensity, LineFocusBlurEnabled, LineFocusBlurIntensity,
-            LineFocusPadding, BionicReadingEnabled, BionicFadeIntensity, BionicFadeRects));
+        var opts = new RenderOptions(
+            MotionBlurEnabled, MotionBlurIntensity,
+            LineFocusBlurEnabled, LineFocusBlurIntensity, LineFocusPadding,
+            BionicReadingEnabled, BionicFadeIntensity, BionicFadeRects);
+        context.Custom(new PageDrawOperation(new Rect(0, 0, w, h), tab, ColourEffects, opts));
     }
+
+    public record struct RenderOptions(
+        bool MotionBlur, double BlurIntensity,
+        bool LineFocusBlur, double LineFocusIntensity, double LineFocusPadding,
+        bool BionicEnabled, double BionicIntensity, List<SKRect>? BionicRects);
 
     private sealed class PageDrawOperation : ICustomDrawOperation
     {
@@ -61,30 +68,14 @@ public class PdfPageLayer : Control
         private readonly Rect _bounds;
         private readonly TabViewModel? _tab;
         private readonly ColourEffectShaders? _effects;
-        private readonly bool _motionBlur;
-        private readonly double _blurIntensity;
-        private readonly bool _lineFocusBlur;
-        private readonly double _lineFocusIntensity;
-        private readonly double _lineFocusPadding;
-        private readonly bool _bionicEnabled;
-        private readonly double _bionicIntensity;
-        private readonly List<SKRect>? _bionicRects;
+        private readonly RenderOptions _opts;
 
-        public PageDrawOperation(Rect bounds, TabViewModel? tab, ColourEffectShaders? effects,
-            bool motionBlur, double blurIntensity, bool lineFocusBlur, double lineFocusIntensity,
-            double lineFocusPadding, bool bionicEnabled, double bionicIntensity, List<SKRect>? bionicRects)
+        public PageDrawOperation(Rect bounds, TabViewModel? tab, ColourEffectShaders? effects, RenderOptions opts)
         {
             _bounds = bounds;
             _tab = tab;
             _effects = effects;
-            _motionBlur = motionBlur;
-            _blurIntensity = blurIntensity;
-            _lineFocusBlur = lineFocusBlur;
-            _lineFocusIntensity = lineFocusIntensity;
-            _lineFocusPadding = lineFocusPadding;
-            _bionicEnabled = bionicEnabled;
-            _bionicIntensity = bionicIntensity;
-            _bionicRects = bionicRects;
+            _opts = opts;
         }
 
         public Rect Bounds => _bounds;
@@ -137,9 +128,9 @@ public class PdfPageLayer : Control
 
             // Motion blur: horizontal during rail scroll, uniform during zoom.
             float sigmaX = 0, sigmaY = 0;
-            if (_motionBlur && _blurIntensity > 0)
+            if (_opts.MotionBlur && _opts.BlurIntensity > 0)
             {
-                float maxSigma = (float)(MaxBlurSigma * _blurIntensity);
+                float maxSigma = (float)(MaxBlurSigma * _opts.BlurIntensity);
 
                 if (tab.Rail.Active && tab.Rail.ScrollSpeed > MinSpeedThreshold)
                 {
@@ -186,20 +177,17 @@ public class PdfPageLayer : Control
             var destRect = SKRect.Create(0, 0, (float)tab.PageWidth, (float)tab.PageHeight);
 
             // Build bionic clip path + paint once for use in all draw calls
-            SKPath? bionicPath = null;
-            SKPaint? bionicPaint = null;
-            SKColorFilter? bionicFilter = null;
-            if (_bionicEnabled && _bionicRects is { Count: > 0 } fadeRects && _effects is not null)
+            using var bionicFilter = (_opts.BionicEnabled && _opts.BionicRects is { Count: > 0 } && _effects is not null)
+                ? _effects.CreateBionicColorFilter((float)_opts.BionicIntensity) : null;
+            SKPath? bp = null;
+            if (bionicFilter is not null && _opts.BionicRects is { } fadeRects)
             {
-                bionicFilter = _effects.CreateBionicColorFilter((float)_bionicIntensity);
-                if (bionicFilter is not null)
-                {
-                    bionicPath = new SKPath();
-                    foreach (var rect in fadeRects)
-                        bionicPath.AddRect(rect);
-                    bionicPaint = new SKPaint { ColorFilter = bionicFilter };
-                }
+                bp = new SKPath();
+                foreach (var rect in fadeRects)
+                    bp.AddRect(rect);
             }
+            using var bionicPath = bp;
+            using var bionicPaint = bionicFilter is not null ? new SKPaint { ColorFilter = bionicFilter } : null;
 
             // Draw page image (with bionic if active)
             DrawPageImage(canvas, image, destRect, bionicPath, bionicPaint);
@@ -210,11 +198,11 @@ public class PdfPageLayer : Control
             // transparent window at the active line that feathers to full
             // dim on both sides. Drawn inside the colour effect layer so
             // the white adapts to colour effects (e.g. becomes black for Invert).
-            if (_lineFocusBlur && _lineFocusIntensity > 0
+            if (_opts.LineFocusBlur && _opts.LineFocusIntensity > 0
                 && tab.Rail is { Active: true, NavigableCount: > 0 } rail)
             {
                 var line = rail.CurrentLineInfo;
-                float pad = line.Height * (float)_lineFocusPadding;
+                float pad = line.Height * (float)_opts.LineFocusPadding;
                 float lineTop = line.Y - line.Height / 2f - pad;
                 float lineBottom = line.Y + line.Height / 2f + pad;
                 float feather = line.Height * 0.5f;
@@ -225,7 +213,7 @@ public class PdfPageLayer : Control
                 float normTop = Math.Clamp(lineTop / h, 0f, 1f);
                 float normBottom = Math.Clamp(lineBottom / h, 0f, 1f);
 
-                var dimColor = new SKColor(255, 255, 255, (byte)(255 * _lineFocusIntensity));
+                var dimColor = new SKColor(255, 255, 255, (byte)(255 * _opts.LineFocusIntensity));
                 var clear = SKColors.Transparent;
 
                 using var gradient = SKShader.CreateLinearGradient(
@@ -236,11 +224,6 @@ public class PdfPageLayer : Control
                 using var dimPaint = new SKPaint { Shader = gradient };
                 canvas.DrawRect(destRect, dimPaint);
             }
-
-            // Dispose bionic resources
-            bionicPath?.Dispose();
-            bionicPaint?.Dispose();
-            bionicFilter?.Dispose();
 
             if (needsLayer)
             {

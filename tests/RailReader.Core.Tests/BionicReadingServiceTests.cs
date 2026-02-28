@@ -7,8 +7,6 @@ namespace RailReader.Core.Tests;
 
 public class BionicReadingServiceTests
 {
-    private static PageText MakePageText(string text, List<CharBox> boxes) => new(text, boxes);
-
     private static List<CharBox> MakeBoxes(string text, float charWidth = 10f, float height = 12f, float top = 0f)
     {
         var boxes = new List<CharBox>();
@@ -34,7 +32,7 @@ public class BionicReadingServiceTests
     {
         var text = "Hello";
         var boxes = MakeBoxes(text);
-        var pageText = MakePageText(text, boxes);
+        var pageText = new PageText(text, boxes);
 
         var rects = BionicReadingService.ComputeFadeRects(pageText, 0.4);
 
@@ -50,7 +48,7 @@ public class BionicReadingServiceTests
     {
         var text = "I a";
         var boxes = MakeBoxes(text);
-        var pageText = MakePageText(text, boxes);
+        var pageText = new PageText(text, boxes);
 
         var rects = BionicReadingService.ComputeFadeRects(pageText, 0.4);
 
@@ -60,7 +58,7 @@ public class BionicReadingServiceTests
     [Fact]
     public void EmptyText_ReturnsEmpty()
     {
-        var pageText = MakePageText("", []);
+        var pageText = new PageText("", []);
         var rects = BionicReadingService.ComputeFadeRects(pageText, 0.4);
         Assert.Empty(rects);
     }
@@ -70,7 +68,7 @@ public class BionicReadingServiceTests
     {
         var text = "   ";
         var boxes = MakeBoxes(text);
-        var pageText = MakePageText(text, boxes);
+        var pageText = new PageText(text, boxes);
 
         var rects = BionicReadingService.ComputeFadeRects(pageText, 0.4);
         Assert.Empty(rects);
@@ -82,7 +80,7 @@ public class BionicReadingServiceTests
         // "Hi there" — two words on same line
         var text = "Hi there";
         var boxes = MakeBoxes(text);
-        var pageText = MakePageText(text, boxes);
+        var pageText = new PageText(text, boxes);
 
         var rects = BionicReadingService.ComputeFadeRects(pageText, 0.4);
 
@@ -101,7 +99,7 @@ public class BionicReadingServiceTests
     {
         var text = "Hello";
         var boxes = MakeBoxes(text);
-        var pageText = MakePageText(text, boxes);
+        var pageText = new PageText(text, boxes);
 
         // 80% fixation: ceil(5*0.8) = 4 → only last char faded
         var rects = BionicReadingService.ComputeFadeRects(pageText, 0.8);
@@ -117,7 +115,7 @@ public class BionicReadingServiceTests
     {
         var text = "Hi";
         var boxes = MakeBoxes(text);
-        var pageText = MakePageText(text, boxes);
+        var pageText = new PageText(text, boxes);
 
         // fixation = ceil(2*0.4) = 1 → "H" kept, "i" faded
         var rects = BionicReadingService.ComputeFadeRects(pageText, 0.4);
@@ -139,7 +137,7 @@ public class BionicReadingServiceTests
             new(3, 0, 50, 10, 62),   // C — line 2 (different Y)
             new(4, 10, 50, 20, 62),  // D — line 2
         };
-        var pageText = MakePageText(text, boxes);
+        var pageText = new PageText(text, boxes);
 
         var rects = BionicReadingService.ComputeFadeRects(pageText, 0.4);
 
