@@ -11,15 +11,16 @@ Everything you need to know to get the most out of railreader2.
 3. [Rail Mode](#rail-mode)
 4. [Auto-Scroll](#auto-scroll)
 5. [Jump Mode](#jump-mode)
-6. [Line Focus Blur](#line-focus-blur)
-7. [Colour Effects](#colour-effects)
-8. [Search](#search)
-9. [Annotations](#annotations)
-10. [Text Selection](#text-selection)
-11. [Bookmarks](#bookmarks)
-12. [Settings](#settings)
-13. [Keyboard Shortcuts](#keyboard-shortcuts)
-14. [AI Agent CLI (Experimental)](#ai-agent-cli-experimental)
+6. [Line Focus Dim](#line-focus-dim)
+7. [Bionic Reading](#bionic-reading)
+8. [Colour Effects](#colour-effects)
+9. [Search](#search)
+10. [Annotations](#annotations)
+11. [Text Selection](#text-selection)
+12. [Bookmarks](#bookmarks)
+13. [Settings](#settings)
+14. [Keyboard Shortcuts](#keyboard-shortcuts)
+15. [AI Agent CLI (Experimental)](#ai-agent-cli-experimental)
 
 ---
 
@@ -126,14 +127,27 @@ This mimics natural reading eye movements and is useful for scanning text quickl
 
 ---
 
-## Line Focus Blur
+## Line Focus Dim
 
-When enabled, line focus blur applies a Gaussian blur to the entire page except the active line in rail mode. This reduces peripheral distraction and perceived jitter.
+When enabled, line focus dim applies a smooth feathered dimming overlay to the entire page except the active line in rail mode. Non-active lines fade toward the background colour, reducing peripheral distraction while maintaining a clean visual transition.
 
-![Line focus blur](img/line_focus_blur.png)
-*Line focus blur — non-active lines are blurred to reduce distraction*
+![Line focus dim](img/line_focus_blur.png)
+*Line focus dim — non-active lines are dimmed to reduce distraction*
 
-Toggle with the `F` key, the **F** button on the rail toolbar, or in Settings > Rail Reading. Blur intensity is adjustable from 0 (off) to 1 (maximum).
+Toggle with the `F` key, the **F** button on the rail toolbar, or in Settings > Rail Reading. Dim intensity is adjustable from 0 (off) to 1 (maximum). The padding around the active line (how much extra space stays fully visible) is also configurable.
+
+---
+
+## Bionic Reading
+
+Bionic reading is a reading aid that de-emphasises the trailing portion of each word, guiding your eye to fixation points at the start of words. The effect is applied as a GPU shader that fades non-fixation characters toward the background.
+
+Toggle with the `R` key, the **R** button on the rail toolbar, or in Settings > Rail Reading. Two parameters are configurable:
+
+- **Fixation percent** — the fraction of each word kept at full contrast (default 40%). Higher values keep more of each word sharp.
+- **Fade intensity** — how much the non-fixation characters are faded (default 0.6). Higher values produce a stronger effect.
+
+Bionic reading composes correctly with line focus dim and colour effects.
 
 ### Line highlight tint
 
@@ -290,7 +304,8 @@ Press `Ctrl+,` or use the menu to open Settings. Changes take effect immediately
 - **Scroll Speed:** Start and max speed for horizontal hold-to-scroll.
 - **Ramp Time:** Seconds to reach max scroll speed from start.
 - **Pixel Snapping:** Quantise camera to pixel grid to reduce text shimmer.
-- **Line Focus Blur:** Toggle and set intensity.
+- **Line Focus Dim:** Toggle and set intensity and padding.
+- **Bionic Reading:** Toggle and configure fixation percentage and fade intensity.
 - **Line Highlight Tint:** Choose a colour tint for the active line (Auto, Yellow, Cyan, Green, None) and set opacity.
 - **Jump Distance:** Percentage of visible width for jump mode (5–80%).
 
@@ -352,7 +367,8 @@ Configuration is stored at `~/.config/railreader2/config.json` (Linux) or `%APPD
 | `B` | Add bookmark for current page |
 | `` ` `` (backtick) | Navigate back to previous location |
 | `C` | Cycle colour effect on active tab |
-| `F` | Toggle line focus blur |
+| `F` | Toggle line focus dim |
+| `R` | Toggle bionic reading |
 | `[` / `]` | Adjust speed or jump distance |
 | `Shift+[` / `Shift+]` | Adjust blur intensity |
 | Click | Jump to block |

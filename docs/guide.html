@@ -317,7 +317,8 @@
         <li><a href="#rail-mode">Rail Mode</a></li>
         <li><a href="#auto-scroll">Auto-Scroll</a></li>
         <li><a href="#jump-mode">Jump Mode</a></li>
-        <li><a href="#line-focus-blur">Line Focus Blur</a></li>
+        <li><a href="#line-focus-blur">Line Focus Dim</a></li>
+        <li><a href="#bionic-reading">Bionic Reading</a></li>
         <li><a href="#colour-effects">Colour Effects</a></li>
         <li><a href="#search">Search</a></li>
         <li><a href="#annotations">Annotations</a></li>
@@ -496,21 +497,22 @@
 
     <!-- 6. Line Focus Blur -->
     <section class="guide-section" id="line-focus-blur">
-      <h2>Line Focus Blur</h2>
+      <h2>Line Focus Dim</h2>
       <p>
-        When enabled, line focus blur applies a Gaussian blur to the entire page except the active
-        line in rail mode. This reduces peripheral distraction and perceived jitter, making it
-        easier to focus on the line you're reading.
+        When enabled, line focus dim applies a smooth feathered dimming overlay to the entire page
+        except the active line in rail mode. Non-active lines fade toward the background colour,
+        reducing peripheral distraction while maintaining a clean visual transition.
       </p>
 
       <figure class="guide-screenshot">
-        <img src="img/line_focus_blur.png" alt="Line focus blur in rail mode" onclick="openLightbox(this)">
-        <figcaption>Line focus blur &mdash; non-active lines are blurred to reduce distraction</figcaption>
+        <img src="img/line_focus_blur.png" alt="Line focus dim in rail mode" onclick="openLightbox(this)">
+        <figcaption>Line focus dim &mdash; non-active lines are dimmed to reduce distraction</figcaption>
       </figure>
 
       <p>
         Toggle with the <code>F</code> key, the <strong>F</strong> button on the rail toolbar, or in Settings &rarr; Rail Reading.
-        Blur intensity is adjustable from 0 (off) to 1 (maximum, sigma 4.0).
+        Dim intensity is adjustable from 0 (off) to 1 (maximum). The padding around the active line
+        (how much extra space stays fully visible) is also configurable.
       </p>
 
       <h3>Line highlight tint</h3>
@@ -528,6 +530,29 @@
       </ul>
       <p>
         Opacity is adjustable from 0.0 (invisible) to 1.0 (fully opaque). The default is Auto at 25% opacity.
+      </p>
+    </section>
+
+    <!-- Bionic Reading -->
+    <section class="guide-section" id="bionic-reading">
+      <h2>Bionic Reading</h2>
+      <p>
+        Bionic reading is a reading aid that de-emphasises the trailing portion of each word,
+        guiding your eye to fixation points at the start of words. The effect is applied as a GPU
+        shader that fades non-fixation characters toward the background.
+      </p>
+      <p>
+        Toggle with the <code>R</code> key, the <strong>R</strong> button on the rail toolbar, or in
+        Settings &rarr; Rail Reading. Two parameters are configurable:
+      </p>
+      <ul>
+        <li><strong>Fixation percent</strong> &mdash; the fraction of each word kept at full contrast (default 40%).
+          Higher values keep more of each word sharp.</li>
+        <li><strong>Fade intensity</strong> &mdash; how much the non-fixation characters are faded (default 0.6).
+          Higher values produce a stronger effect.</li>
+      </ul>
+      <p>
+        Bionic reading composes correctly with line focus dim and colour effects.
       </p>
     </section>
 
@@ -738,8 +763,9 @@
         <li><strong>Scroll Speed:</strong> Start and max speed for horizontal hold-to-scroll.</li>
         <li><strong>Ramp Time:</strong> Seconds to reach max scroll speed from start.</li>
         <li><strong>Pixel Snapping:</strong> Quantise camera to pixel grid to reduce text shimmer.</li>
-        <li><strong>Line Focus Blur:</strong> Toggle and set intensity.</li>
+        <li><strong>Line Focus Dim:</strong> Toggle and set intensity. Adjust the focus padding (extra space around the active line that stays fully visible, 0&ndash;0.5).</li>
         <li><strong>Line Highlight Tint:</strong> Choose a colour tint for the active line (Auto, Yellow, Cyan, Green, None) and set opacity.</li>
+        <li><strong>Bionic Reading:</strong> Toggle bionic reading and configure fixation percent (fraction of each word at full contrast) and fade intensity.</li>
         <li><strong>Jump Distance:</strong> Percentage of visible width for jump mode (5&ndash;80%).</li>
       </ul>
 
@@ -799,7 +825,8 @@
         <tr><td>B</td><td>Add bookmark for current page</td></tr>
         <tr><td>` (backtick)</td><td>Navigate back to previous location</td></tr>
         <tr><td>C</td><td>Cycle colour effect on active tab</td></tr>
-        <tr><td>F</td><td>Toggle line focus blur</td></tr>
+        <tr><td>F</td><td>Toggle line focus dim</td></tr>
+        <tr><td>R</td><td>Toggle bionic reading</td></tr>
         <tr><td>[ / ]</td><td>Adjust speed or jump distance</td></tr>
         <tr><td>Shift+[ / Shift+]</td><td>Adjust blur intensity</td></tr>
         <tr><td>Click</td><td>Jump to block</td></tr>

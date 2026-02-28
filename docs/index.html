@@ -530,9 +530,18 @@
         <p>
           Press J or the toolbar button to toggle saccade-style jump navigation
           &mdash; advance by a configurable percentage of the visible width.
-          Enable line focus blur (F button) to Gaussian-blur non-active lines,
-          reducing peripheral distraction. All three modes have quick-toggle
+          Enable line focus dim (F button) to smoothly fade non-active lines,
+          reducing peripheral distraction. All modes have quick-toggle
           buttons on the rail toolbar.
+        </p>
+      </div>
+      <div class="feature">
+        <h3>Bionic Reading</h3>
+        <p>
+          Shader-based text fading de-emphasises the trailing portion of each
+          word, guiding the eye to fixation points. Toggle with <code>R</code>
+          or the toolbar button. Configurable fixation percentage and fade
+          intensity. Composes with line focus dim and colour effects.
         </p>
       </div>
       <div class="feature">
@@ -640,7 +649,7 @@
         <p>
           All business logic lives in a UI-free core library
           (<code>RailReader.Core</code>) with zero Avalonia dependencies.
-          The desktop app is a thin UI shell. Fully testable &mdash; 21
+          The desktop app is a thin UI shell. Fully testable &mdash; 29
           xUnit tests run without a display server.
         </p>
       </div>
@@ -705,7 +714,8 @@
       <tr><td>B</td><td>Add bookmark for current page</td></tr>
       <tr><td>` (backtick)</td><td>Navigate back to previous location</td></tr>
       <tr><td>C</td><td>Cycle colour effect on active tab</td></tr>
-      <tr><td>F</td><td>Toggle line focus blur</td></tr>
+      <tr><td>F</td><td>Toggle line focus dim</td></tr>
+      <tr><td>R</td><td>Toggle bionic reading</td></tr>
       <tr><td>Escape</td><td>Stop auto-scroll</td></tr>
       <tr><td>[ / ]</td><td>Adjust scroll speed or jump distance</td></tr>
       <tr><td>Shift+[ / ]</td><td>Adjust blur intensity</td></tr>

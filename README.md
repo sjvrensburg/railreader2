@@ -70,9 +70,10 @@ At high zoom levels, navigation switches to "rail mode" — the viewer locks ont
 - **Annotation mode indicator** — status bar shows active tool name in amber with a clickable exit button
 - **Auto-scroll** — toggle continuous horizontal scrolling in rail mode (P key), hold D/Right to boost speed, with configurable pauses at line and block boundaries
 - **Jump mode** — saccade-style reading (J key) that advances by a configurable percentage of the visible width; Shift+Right/Left for half-distance short jumps
-- **Line focus blur** — Gaussian blur on non-active lines to reduce peripheral distraction and perceived jitter
+- **Line focus dim** — smooth feathered dimming of non-active lines to reduce peripheral distraction, with configurable intensity and padding
+- **Bionic reading** — shader-based text fading that de-emphasises the trailing portion of each word, guiding the eye to fixation points. Configurable fixation percentage and fade intensity
 - **Pixel snapping** — quantises camera positions to the pixel grid to eliminate sub-pixel text shimmer at high zoom
-- **Rail toolbar** — docked vertical toolbar with toggle buttons (P/J/F) for auto-scroll, jump mode, and line focus blur, plus sliders for scroll speed (or jump distance) and motion blur intensity; auto-scroll and jump mode are mutually exclusive
+- **Rail toolbar** — docked vertical toolbar with toggle buttons (P/J/F/R) for auto-scroll, jump mode, line focus dim, and bionic reading, plus sliders for scroll speed (or jump distance) and motion blur intensity; auto-scroll and jump mode are mutually exclusive
 - **Vertical position preservation** — maintains your panned vertical offset when navigating lines in rail mode
 - **Line snap shortcuts** — Home/End keys snap to the start/end of the current line in rail mode
 - **Named bookmarks** — bookmark any page with a custom name (B key or + button in the bookmarks pane). Navigate to bookmarks with a single click. Rename and delete inline. "Back to previous location" button for quick return after jumping. Bookmarks persist in the annotation sidecar file
@@ -117,7 +118,8 @@ dotnet run -c Release --project src/RailReader2 --
 | B | Add bookmark for current page |
 | ` (backtick) | Navigate back to previous location |
 | C | Cycle colour effect on active tab |
-| F | Toggle line focus blur (rail mode) |
+| F | Toggle line focus dim (rail mode) |
+| R | Toggle bionic reading (rail mode) |
 | Shift+Right / Shift+Left | Short jump — half distance (jump mode) |
 | [ / ] | Adjust scroll speed or jump distance (rail mode) |
 | Shift+[ / Shift+] | Adjust blur intensity (rail mode) |
@@ -153,6 +155,10 @@ Rail reading parameters are editable via the Settings panel (gear icon in menu b
   "pixel_snapping": true,
   "line_focus_blur": false,
   "line_focus_blur_intensity": 0.5,
+  "line_focus_padding": 0.2,
+  "bionic_reading": false,
+  "bionic_fixation_percent": 0.4,
+  "bionic_fade_intensity": 0.6,
   "line_highlight_tint": "Auto",
   "line_highlight_opacity": 0.25,
   "auto_scroll_line_pause_ms": 400.0,
@@ -180,8 +186,12 @@ Rail reading parameters are editable via the Settings panel (gear icon in menu b
 | `motion_blur` | Enable subtle directional blur during scroll and zoom (`true`/`false`) |
 | `motion_blur_intensity` | Motion blur strength from 0.0 (off) to 1.0 (maximum) |
 | `pixel_snapping` | Quantise camera positions to pixel grid to reduce text shimmer (`true`/`false`) |
-| `line_focus_blur` | Gaussian blur on non-active lines in rail mode (`true`/`false`) |
-| `line_focus_blur_intensity` | Line focus blur strength from 0.0 (off) to 1.0 (maximum) |
+| `line_focus_blur` | Dim non-active lines in rail mode (`true`/`false`) |
+| `line_focus_blur_intensity` | Line focus dim strength from 0.0 (off) to 1.0 (maximum) |
+| `line_focus_padding` | Padding around active line as fraction of line height (0.0–0.5) |
+| `bionic_reading` | Enable bionic reading text fading (`true`/`false`) |
+| `bionic_fixation_percent` | Fraction of each word kept at full contrast (0.0–1.0, default 0.4) |
+| `bionic_fade_intensity` | Bionic fade strength from 0.0 (off) to 1.0 (maximum) |
 | `line_highlight_tint` | Colour tint on active line in rail mode: `Auto`, `Yellow`, `Cyan`, `Green`, `None` |
 | `line_highlight_opacity` | Line highlight tint opacity from 0.0 (off) to 1.0 (full) |
 | `auto_scroll_line_pause_ms` | Pause duration at line boundaries during auto-scroll (ms, 0 to disable) |
