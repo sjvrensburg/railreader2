@@ -17,6 +17,7 @@ public class PdfPageLayer : Control
     public double MotionBlurIntensity { get; set; } = 0.5;
     public bool LineFocusBlurEnabled { get; set; }
     public double LineFocusBlurIntensity { get; set; } = 0.5;
+    public double LineFocusPadding { get; set; } = 0.2;
     public bool BionicReadingEnabled { get; set; }
     public double BionicFadeIntensity { get; set; } = 0.6;
     public List<SKRect>? BionicFadeRects { get; set; }
@@ -38,7 +39,7 @@ public class PdfPageLayer : Control
         double h = tab?.PageHeight > 0 ? tab.PageHeight : Bounds.Height;
         context.Custom(new PageDrawOperation(new Rect(0, 0, w, h), tab, ColourEffects,
             MotionBlurEnabled, MotionBlurIntensity, LineFocusBlurEnabled, LineFocusBlurIntensity,
-            BionicReadingEnabled, BionicFadeIntensity, BionicFadeRects));
+            LineFocusPadding, BionicReadingEnabled, BionicFadeIntensity, BionicFadeRects));
     }
 
     private sealed class PageDrawOperation : ICustomDrawOperation
@@ -64,13 +65,14 @@ public class PdfPageLayer : Control
         private readonly double _blurIntensity;
         private readonly bool _lineFocusBlur;
         private readonly double _lineFocusIntensity;
+        private readonly double _lineFocusPadding;
         private readonly bool _bionicEnabled;
         private readonly double _bionicIntensity;
         private readonly List<SKRect>? _bionicRects;
 
         public PageDrawOperation(Rect bounds, TabViewModel? tab, ColourEffectShaders? effects,
             bool motionBlur, double blurIntensity, bool lineFocusBlur, double lineFocusIntensity,
-            bool bionicEnabled, double bionicIntensity, List<SKRect>? bionicRects)
+            double lineFocusPadding, bool bionicEnabled, double bionicIntensity, List<SKRect>? bionicRects)
         {
             _bounds = bounds;
             _tab = tab;
@@ -79,6 +81,7 @@ public class PdfPageLayer : Control
             _blurIntensity = blurIntensity;
             _lineFocusBlur = lineFocusBlur;
             _lineFocusIntensity = lineFocusIntensity;
+            _lineFocusPadding = lineFocusPadding;
             _bionicEnabled = bionicEnabled;
             _bionicIntensity = bionicIntensity;
             _bionicRects = bionicRects;
@@ -198,53 +201,41 @@ public class PdfPageLayer : Control
                 }
             }
 
-            // Line focus blur: draw the page in two passes inside the colour
-            // effect layer so blur doesn't double-apply the tint.
-            // Pass 1: blurred page everywhere except the active line.
-            // Pass 2: sharp active line on top.
-            // Bionic fade is integrated into each pass so it composes correctly
-            // with the blur (faded text gets blurred on non-active lines).
-            bool didLineFocusBlur = false;
+            // Draw page image (with bionic if active)
+            DrawPageImage(canvas, image, destRect, bionicPath, bionicPaint);
+
+            // Line focus dim: draw a feathered white overlay that dims
+            // everything except the active line, with smooth transitions.
+            // Uses a vertical linear gradient with 6 stops to create a
+            // transparent window at the active line that feathers to full
+            // dim on both sides. Drawn inside the colour effect layer so
+            // the white adapts to colour effects (e.g. becomes black for Invert).
             if (_lineFocusBlur && _lineFocusIntensity > 0
                 && tab.Rail is { Active: true, NavigableCount: > 0 } rail)
             {
                 var line = rail.CurrentLineInfo;
-                // Pad the sharp region by 25% of line height on each side so
-                // descenders (g, q, y) and ascenders aren't clipped by the blur.
-                float pad = line.Height * 0.25f;
-                // Snap clip rect edges to integer page-space pixels to prevent
-                // shimmer at the blur boundary during sub-pixel camera panning.
-                float lineTop = MathF.Floor(line.Y - line.Height / 2f - pad);
-                float lineBottom = MathF.Ceiling(line.Y + line.Height / 2f + pad);
-                // Use full page width so blur extends beyond the block
-                var lineRect = new SKRect(0, lineTop, (float)tab.PageWidth, lineBottom);
+                float pad = line.Height * (float)_lineFocusPadding;
+                float lineTop = line.Y - line.Height / 2f - pad;
+                float lineBottom = line.Y + line.Height / 2f + pad;
+                float feather = line.Height * 0.5f;
+                float h = (float)tab.PageHeight;
 
-                float sigma = (float)(4.0 * _lineFocusIntensity);
-                if (sigma >= 0.5f)
-                {
-                    didLineFocusBlur = true;
+                float featherTop = Math.Max(0, lineTop - feather) / h;
+                float featherBottom = Math.Min(h, lineBottom + feather) / h;
+                float normTop = Math.Clamp(lineTop / h, 0f, 1f);
+                float normBottom = Math.Clamp(lineBottom / h, 0f, 1f);
 
-                    // Pass 1: Draw entire page blurred, clipping out the active line
-                    canvas.Save();
-                    canvas.ClipRect(lineRect, SKClipOperation.Difference);
-                    using var focusBlur = SKImageFilter.CreateBlur(sigma, sigma);
-                    using var focusPaint = new SKPaint { ImageFilter = focusBlur };
-                    canvas.SaveLayer(focusPaint);
-                    DrawPageImage(canvas, image, destRect, bionicPath, bionicPaint);
-                    canvas.Restore(); // layer
-                    canvas.Restore(); // clip
+                var dimColor = new SKColor(255, 255, 255, (byte)(255 * _lineFocusIntensity));
+                var clear = SKColors.Transparent;
 
-                    // Pass 2: Draw just the active line sharp
-                    canvas.Save();
-                    canvas.ClipRect(lineRect);
-                    DrawPageImage(canvas, image, destRect, bionicPath, bionicPaint);
-                    canvas.Restore(); // clip
-                }
+                using var gradient = SKShader.CreateLinearGradient(
+                    new SKPoint(0, 0), new SKPoint(0, h),
+                    new[] { dimColor, dimColor, clear, clear, dimColor, dimColor },
+                    new[] { 0f, featherTop, normTop, normBottom, featherBottom, 1f },
+                    SKShaderTileMode.Clamp);
+                using var dimPaint = new SKPaint { Shader = gradient };
+                canvas.DrawRect(destRect, dimPaint);
             }
-
-            // If line focus blur didn't handle the page draw, do it now
-            if (!didLineFocusBlur)
-                DrawPageImage(canvas, image, destRect, bionicPath, bionicPaint);
 
             // Dispose bionic resources
             bionicPath?.Dispose();

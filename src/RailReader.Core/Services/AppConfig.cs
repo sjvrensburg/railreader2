@@ -20,6 +20,7 @@ public sealed class AppConfig
     public bool PixelSnapping { get; set; } = true;
     public bool LineFocusBlur { get; set; }
     public double LineFocusBlurIntensity { get; set; } = 0.5;
+    public double LineFocusPadding { get; set; } = 0.2;
     public double AutoScrollLinePauseMs { get; set; } = 400.0;
     public double AutoScrollBlockPauseMs { get; set; } = 600.0;
     public double JumpPercentage { get; set; } = 25.0;

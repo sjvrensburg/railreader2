@@ -56,6 +56,7 @@ public partial class SettingsWindow : Window
         PixelSnappingCheck.IsChecked = c.PixelSnapping;
         LineFocusBlurCheck.IsChecked = c.LineFocusBlur;
         LineFocusBlurSlider.Value = c.LineFocusBlurIntensity;
+        LineFocusPaddingSlider.Value = c.LineFocusPadding;
         AutoScrollLinePause.Value = (decimal)c.AutoScrollLinePauseMs;
         AutoScrollBlockPause.Value = (decimal)c.AutoScrollBlockPauseMs;
         JumpPercentage.Value = (decimal)c.JumpPercentage;
@@ -149,6 +150,13 @@ public partial class SettingsWindow : Window
     {
         if (e.Property.Name != "Value" || Vm is not { } vm || _loading) return;
         vm.Config.LineFocusBlurIntensity = LineFocusBlurSlider.Value;
+        vm.OnConfigChanged();
+    }
+
+    private void OnLineFocusPaddingChanged(object? sender, Avalonia.AvaloniaPropertyChangedEventArgs e)
+    {
+        if (e.Property.Name != "Value" || Vm is not { } vm || _loading) return;
+        vm.Config.LineFocusPadding = LineFocusPaddingSlider.Value;
         vm.OnConfigChanged();
     }
 
