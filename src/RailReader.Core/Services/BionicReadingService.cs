@@ -51,15 +51,23 @@ public static class BionicReadingService
             }
         }
 
-        return MergeIntoLineRects(fadeBoxes);
+        return MergeAdjacentRects(fadeBoxes);
     }
 
-    private static List<SKRect> MergeIntoLineRects(List<CharBox> boxes)
+    /// <summary>
+    /// Merges only horizontally adjacent boxes (within the same word's fade run).
+    /// A gap between boxes (e.g. fixation portion of the next word) starts a new rect.
+    /// </summary>
+    private static List<SKRect> MergeAdjacentRects(List<CharBox> boxes)
     {
         var result = new List<SKRect>();
         if (boxes.Count == 0) return result;
 
         const float lineThreshold = 4f;
+        // Max horizontal gap before starting a new rect — prevents merging
+        // across fixation portions of adjacent words.
+        const float gapThreshold = 2f;
+
         float curLeft = 0, curTop = 0, curRight = 0, curBottom = 0;
         bool hasRect = false;
 
@@ -70,15 +78,16 @@ public static class BionicReadingService
                 curLeft = cb.Left; curTop = cb.Top; curRight = cb.Right; curBottom = cb.Bottom;
                 hasRect = true;
             }
-            else if (Math.Abs(cb.Top - curTop) < lineThreshold)
+            else if (Math.Abs(cb.Top - curTop) < lineThreshold && cb.Left - curRight < gapThreshold)
             {
-                curLeft = Math.Min(curLeft, cb.Left);
+                // Same line AND horizontally adjacent — extend
                 curRight = Math.Max(curRight, cb.Right);
                 curTop = Math.Min(curTop, cb.Top);
                 curBottom = Math.Max(curBottom, cb.Bottom);
             }
             else
             {
+                // Different line or horizontal gap — emit and start new
                 result.Add(new SKRect(curLeft, curTop, curRight, curBottom));
                 curLeft = cb.Left; curTop = cb.Top; curRight = cb.Right; curBottom = cb.Bottom;
             }

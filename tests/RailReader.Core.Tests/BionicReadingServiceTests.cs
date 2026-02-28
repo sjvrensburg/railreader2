@@ -77,7 +77,7 @@ public class BionicReadingServiceTests
     }
 
     [Fact]
-    public void MultipleWords_MergesSameLineRects()
+    public void MultipleWords_SeparateRectsPerWord()
     {
         // "Hi there" — two words on same line
         var text = "Hi there";
@@ -86,10 +86,14 @@ public class BionicReadingServiceTests
 
         var rects = BionicReadingService.ComputeFadeRects(pageText, 0.4);
 
-        // "Hi": fixation=1 ("H"), fade="i" (index 1)
-        // "there": fixation=ceil(5*0.4)=2 ("th"), fade="ere" (indices 5,6,7)
-        // Both on same line → merged into one rect
-        Assert.Single(rects);
+        // "Hi": fixation=1 ("H"), fade="i" (index 1, x=10..20)
+        // "there": fixation=ceil(5*0.4)=2 ("th"), fade="ere" (indices 5,6,7, x=50..80)
+        // Different words have a gap → separate rects preserving fixation portions
+        Assert.Equal(2, rects.Count);
+        Assert.Equal(10f, rects[0].Left);   // "i"
+        Assert.Equal(20f, rects[0].Right);
+        Assert.Equal(50f, rects[1].Left);   // "ere"
+        Assert.Equal(80f, rects[1].Right);
     }
 
     [Fact]
