@@ -582,6 +582,7 @@ public sealed class DocumentController
         {
             doc.Rail.UpdateConfig(_config);
             doc.ReapplyNavigableClasses();
+            doc.InvalidateBionicCache();
         }
         _config.Save();
     }

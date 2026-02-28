@@ -40,6 +40,13 @@ public partial class MainWindow : Window
                     PageLayer.MotionBlurIntensity = vm.Config.MotionBlurIntensity;
                     PageLayer.LineFocusBlurEnabled = vm.Config.LineFocusBlur;
                     PageLayer.LineFocusBlurIntensity = vm.Config.LineFocusBlurIntensity;
+                    PageLayer.LineFocusPadding = vm.Config.LineFocusPadding;
+                    PageLayer.BionicReadingEnabled = vm.Config.BionicReading;
+                    PageLayer.BionicFadeIntensity = vm.Config.BionicFadeIntensity;
+                    var tab = vm.ActiveTab;
+                    PageLayer.BionicFadeRects = vm.Config.BionicReading && tab is not null
+                        ? tab.State.GetOrComputeBionicOverlay(tab.CurrentPage, vm.Config.BionicFixationPercent)
+                        : null;
                     PageLayer.InvalidateVisual();
                     Minimap.InvalidateVisual();
                 },
@@ -208,6 +215,7 @@ public partial class MainWindow : Window
         PageLayer.MotionBlurIntensity = Vm?.Config.MotionBlurIntensity ?? 0.5;
         PageLayer.LineFocusBlurEnabled = Vm?.Config.LineFocusBlur ?? false;
         PageLayer.LineFocusBlurIntensity = Vm?.Config.LineFocusBlurIntensity ?? 0.5;
+        PageLayer.LineFocusPadding = Vm?.Config.LineFocusPadding ?? 0.2;
         SearchLayer.Tab = tab;
         SearchLayer.ViewModel = Vm;
         AnnotationLayer.Tab = tab;
@@ -398,6 +406,10 @@ public partial class MainWindow : Window
                 e.Handled = true; break;
             case Key.F when !searchFocused:
                 vm.ToggleLineFocusBlur();
+                RailToolBar.UpdateToggleStates();
+                e.Handled = true; break;
+            case Key.R when !searchFocused:
+                vm.ToggleBionicReading();
                 RailToolBar.UpdateToggleStates();
                 e.Handled = true; break;
             case Key.OemOpenBrackets when !searchFocused && e.KeyModifiers.HasFlag(KeyModifiers.Shift):

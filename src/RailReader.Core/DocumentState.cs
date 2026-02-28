@@ -90,6 +90,7 @@ public sealed class DocumentState : IDisposable
     public RailNav Rail { get; }
     public Dictionary<int, PageAnalysis> AnalysisCache { get; } = [];
     public Dictionary<int, PageText> TextCache { get; } = [];
+    public Dictionary<int, (double FixationPercent, List<SkiaSharp.SKRect> Rects)> BionicCache { get; } = [];
     public Queue<int> PendingAnalysis { get; } = new();
     public List<OutlineEntry> Outline { get; }
 
@@ -521,6 +522,18 @@ public sealed class DocumentState : IDisposable
         TextCache[pageIndex] = text;
         return text;
     }
+
+    public List<SkiaSharp.SKRect> GetOrComputeBionicOverlay(int pageIndex, double fixationPercent)
+    {
+        if (BionicCache.TryGetValue(pageIndex, out var cached) && cached.FixationPercent == fixationPercent)
+            return cached.Rects;
+        var text = GetOrExtractText(pageIndex);
+        var rects = Services.BionicReadingService.ComputeFadeRects(text, fixationPercent);
+        BionicCache[pageIndex] = (fixationPercent, rects);
+        return rects;
+    }
+
+    public void InvalidateBionicCache() => BionicCache.Clear();
 
     public void Dispose()
     {

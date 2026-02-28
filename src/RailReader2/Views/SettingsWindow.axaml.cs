@@ -48,11 +48,15 @@ public partial class SettingsWindow : Window
         ScrollMax.Value = (decimal)c.ScrollSpeedMax;
         RampTime.Value = (decimal)c.ScrollRampTime;
         Lookahead.Value = c.AnalysisLookaheadPages;
+        BionicReadingCheck.IsChecked = c.BionicReading;
+        BionicFixationSlider.Value = c.BionicFixationPercent;
+        BionicFadeSlider.Value = c.BionicFadeIntensity;
         EffectCombo.SelectedIndex = (int)c.ColourEffect;
         IntensitySlider.Value = c.ColourEffectIntensity;
         PixelSnappingCheck.IsChecked = c.PixelSnapping;
         LineFocusBlurCheck.IsChecked = c.LineFocusBlur;
         LineFocusBlurSlider.Value = c.LineFocusBlurIntensity;
+        LineFocusPaddingSlider.Value = c.LineFocusPadding;
         AutoScrollLinePause.Value = (decimal)c.AutoScrollLinePauseMs;
         AutoScrollBlockPause.Value = (decimal)c.AutoScrollBlockPauseMs;
         JumpPercentage.Value = (decimal)c.JumpPercentage;
@@ -121,12 +125,15 @@ public partial class SettingsWindow : Window
         vm.OnConfigChanged();
     }
 
-    private void OnBlurIntensityChanged(object? sender, Avalonia.AvaloniaPropertyChangedEventArgs e)
+    private void OnSliderChanged(Avalonia.AvaloniaPropertyChangedEventArgs e, Action<AppConfig> apply)
     {
         if (e.Property.Name != "Value" || Vm is not { } vm || _loading) return;
-        vm.Config.MotionBlurIntensity = BlurIntensitySlider.Value;
+        apply(vm.Config);
         vm.OnConfigChanged();
     }
+
+    private void OnBlurIntensityChanged(object? sender, Avalonia.AvaloniaPropertyChangedEventArgs e)
+        => OnSliderChanged(e, c => c.MotionBlurIntensity = BlurIntensitySlider.Value);
 
     private void OnPixelSnappingChanged(object? sender, RoutedEventArgs e)
     {
@@ -143,11 +150,10 @@ public partial class SettingsWindow : Window
     }
 
     private void OnLineFocusBlurIntensityChanged(object? sender, Avalonia.AvaloniaPropertyChangedEventArgs e)
-    {
-        if (e.Property.Name != "Value" || Vm is not { } vm || _loading) return;
-        vm.Config.LineFocusBlurIntensity = LineFocusBlurSlider.Value;
-        vm.OnConfigChanged();
-    }
+        => OnSliderChanged(e, c => c.LineFocusBlurIntensity = LineFocusBlurSlider.Value);
+
+    private void OnLineFocusPaddingChanged(object? sender, Avalonia.AvaloniaPropertyChangedEventArgs e)
+        => OnSliderChanged(e, c => c.LineFocusPadding = LineFocusPaddingSlider.Value);
 
     private void OnLineHighlightTintChanged(object? sender, SelectionChangedEventArgs e)
     {
@@ -157,11 +163,20 @@ public partial class SettingsWindow : Window
     }
 
     private void OnLineHighlightOpacityChanged(object? sender, Avalonia.AvaloniaPropertyChangedEventArgs e)
+        => OnSliderChanged(e, c => c.LineHighlightOpacity = LineHighlightOpacitySlider.Value);
+
+    private void OnBionicReadingChanged(object? sender, RoutedEventArgs e)
     {
-        if (e.Property.Name != "Value" || Vm is not { } vm || _loading) return;
-        vm.Config.LineHighlightOpacity = LineHighlightOpacitySlider.Value;
+        if (Vm is not { } vm || _loading) return;
+        vm.Config.BionicReading = BionicReadingCheck.IsChecked == true;
         vm.OnConfigChanged();
     }
+
+    private void OnBionicFixationChanged(object? sender, Avalonia.AvaloniaPropertyChangedEventArgs e)
+        => OnSliderChanged(e, c => c.BionicFixationPercent = BionicFixationSlider.Value);
+
+    private void OnBionicFadeChanged(object? sender, Avalonia.AvaloniaPropertyChangedEventArgs e)
+        => OnSliderChanged(e, c => c.BionicFadeIntensity = BionicFadeSlider.Value);
 
     private void OnSettingChanged(object? sender, NumericUpDownValueChangedEventArgs e) => SaveToConfig();
     private void OnEffectChanged(object? sender, SelectionChangedEventArgs e)
@@ -201,6 +216,9 @@ public partial class SettingsWindow : Window
         vm.Config.JumpPercentage = defaults.JumpPercentage;
         vm.Config.LineHighlightTint = defaults.LineHighlightTint;
         vm.Config.LineHighlightOpacity = defaults.LineHighlightOpacity;
+        vm.Config.BionicReading = defaults.BionicReading;
+        vm.Config.BionicFixationPercent = defaults.BionicFixationPercent;
+        vm.Config.BionicFadeIntensity = defaults.BionicFadeIntensity;
         _loading = true;
         LoadFromConfig();
         _loading = false;
