@@ -26,6 +26,9 @@ public sealed class AppConfig
     public bool DarkMode { get; set; }
     public LineHighlightTint LineHighlightTint { get; set; } = LineHighlightTint.Auto;
     public double LineHighlightOpacity { get; set; } = 0.25;
+    public bool BionicReading { get; set; }
+    public double BionicFixationPercent { get; set; } = 0.4;
+    public double BionicFadeIntensity { get; set; } = 0.6;
 
     [JsonConverter(typeof(RecentFilesConverter))]
     public List<RecentFileEntry> RecentFiles { get; set; } = [];

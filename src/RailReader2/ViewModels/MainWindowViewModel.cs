@@ -435,6 +435,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnConfigChanged();
     }
 
+    public void ToggleBionicReading()
+    {
+        Config.BionicReading = !Config.BionicReading;
+        ShowStatusToast(Config.BionicReading ? "Bionic reading ON" : "Bionic reading OFF");
+        OnConfigChanged();
+    }
+
     // --- Colour effects ---
 
     [RelayCommand]

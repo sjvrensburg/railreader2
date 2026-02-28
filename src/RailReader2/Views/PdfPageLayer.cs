@@ -17,6 +17,9 @@ public class PdfPageLayer : Control
     public double MotionBlurIntensity { get; set; } = 0.5;
     public bool LineFocusBlurEnabled { get; set; }
     public double LineFocusBlurIntensity { get; set; } = 0.5;
+    public bool BionicReadingEnabled { get; set; }
+    public double BionicFadeIntensity { get; set; } = 0.6;
+    public List<SKRect>? BionicFadeRects { get; set; }
 
     protected override void OnSizeChanged(SizeChangedEventArgs e)
     {
@@ -34,7 +37,8 @@ public class PdfPageLayer : Control
         double w = tab?.PageWidth > 0 ? tab.PageWidth : Bounds.Width;
         double h = tab?.PageHeight > 0 ? tab.PageHeight : Bounds.Height;
         context.Custom(new PageDrawOperation(new Rect(0, 0, w, h), tab, ColourEffects,
-            MotionBlurEnabled, MotionBlurIntensity, LineFocusBlurEnabled, LineFocusBlurIntensity));
+            MotionBlurEnabled, MotionBlurIntensity, LineFocusBlurEnabled, LineFocusBlurIntensity,
+            BionicReadingEnabled, BionicFadeIntensity, BionicFadeRects));
     }
 
     private sealed class PageDrawOperation : ICustomDrawOperation
@@ -60,9 +64,13 @@ public class PdfPageLayer : Control
         private readonly double _blurIntensity;
         private readonly bool _lineFocusBlur;
         private readonly double _lineFocusIntensity;
+        private readonly bool _bionicEnabled;
+        private readonly double _bionicIntensity;
+        private readonly List<SKRect>? _bionicRects;
 
         public PageDrawOperation(Rect bounds, TabViewModel? tab, ColourEffectShaders? effects,
-            bool motionBlur, double blurIntensity, bool lineFocusBlur, double lineFocusIntensity)
+            bool motionBlur, double blurIntensity, bool lineFocusBlur, double lineFocusIntensity,
+            bool bionicEnabled, double bionicIntensity, List<SKRect>? bionicRects)
         {
             _bounds = bounds;
             _tab = tab;
@@ -71,6 +79,9 @@ public class PdfPageLayer : Control
             _blurIntensity = blurIntensity;
             _lineFocusBlur = lineFocusBlur;
             _lineFocusIntensity = lineFocusIntensity;
+            _bionicEnabled = bionicEnabled;
+            _bionicIntensity = bionicIntensity;
+            _bionicRects = bionicRects;
         }
 
         public Rect Bounds => _bounds;
@@ -186,6 +197,25 @@ public class PdfPageLayer : Control
             // If line focus blur didn't handle the page draw, do it now
             if (!didLineFocusBlur)
                 canvas.DrawImage(image, destRect, s_sampling);
+
+            // Bionic reading: fade non-fixation character regions
+            if (_bionicEnabled && _bionicRects is { Count: > 0 } fadeRects && _effects is not null)
+            {
+                using var path = new SKPath();
+                foreach (var rect in fadeRects)
+                    path.AddRect(rect);
+                canvas.Save();
+                canvas.ClipPath(path);
+                using var bionicFilter = _effects.CreateBionicColorFilter((float)_bionicIntensity);
+                if (bionicFilter is not null)
+                {
+                    using var bionicPaint = new SKPaint { ColorFilter = bionicFilter };
+                    canvas.SaveLayer(bionicPaint);
+                    canvas.DrawImage(image, destRect, s_sampling);
+                    canvas.Restore(); // layer
+                }
+                canvas.Restore(); // clip
+            }
 
             if (needsLayer)
             {
