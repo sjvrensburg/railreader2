@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,6 +8,13 @@
   <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;600;700&family=Fira+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
     :root {
+      --max-width: 860px;
+      --font-body: 'Nunito Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'Fira Mono', 'Consolas', 'Courier New', monospace;
+    }
+
+    /* ---- Dark theme (default) ---- */
+    [data-theme="dark"] {
       --bg: #141c2b;
       --fg: #fff;
       --fg-muted: #a0aec0;
@@ -16,9 +23,34 @@
       --card-bg: #1a2435;
       --card-border: #2d3a4e;
       --stripe-color: #fff;
-      --max-width: 860px;
-      --font-body: 'Nunito Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-      --font-mono: 'Fira Mono', 'Consolas', 'Courier New', monospace;
+      --logo-bg: #fff;
+      --logo-fg: #141c2b;
+      --toggle-bg: #1a2435;
+      --toggle-border: #2d3a4e;
+      --toggle-icon: '☀️';
+      --lightbox-bg: rgba(0, 0, 0, 0.85);
+      --note-bg: #1a2435;
+      --note-border: #63b3ed;
+    }
+
+    /* ---- Light theme ---- */
+    [data-theme="light"] {
+      --bg: #f7f8fa;
+      --fg: #1a202c;
+      --fg-muted: #5a6577;
+      --accent: #2b6cb0;
+      --accent-hover: #1a4d80;
+      --card-bg: #ffffff;
+      --card-border: #d8dde6;
+      --stripe-color: #1a202c;
+      --logo-bg: #1a202c;
+      --logo-fg: #f7f8fa;
+      --toggle-bg: #ffffff;
+      --toggle-border: #d8dde6;
+      --toggle-icon: '🌙';
+      --lightbox-bg: rgba(0, 0, 0, 0.7);
+      --note-bg: #eef5fc;
+      --note-border: #2b6cb0;
     }
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -29,6 +61,7 @@
       font-family: var(--font-body);
       font-size: 16px;
       line-height: 1.7;
+      transition: background-color 0.3s, color 0.3s;
     }
 
     a {
@@ -46,25 +79,42 @@
       padding: 2rem 1.5rem 0;
       max-width: var(--max-width);
       margin: 0 auto;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    .header__left {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
     }
 
     .header__logo {
       display: inline-flex;
       align-items: center;
-      gap: 0.5rem;
-      padding: 0.3rem 0.8rem;
-      background-color: var(--fg);
-      color: var(--bg);
+      gap: 0.65rem;
+      padding: 0.45rem 1rem;
+      background-color: var(--logo-bg);
+      color: var(--logo-fg);
       font-family: var(--font-mono);
       font-weight: 700;
-      font-size: 1.1rem;
+      font-size: 1.35rem;
       position: relative;
       margin-right: 0.5rem;
+      transition: background-color 0.3s, color 0.3s;
     }
 
     .header__logo img {
-      height: 22px;
+      height: 32px;
       width: auto;
+      transition: filter 0.3s;
+    }
+
+    [data-theme="light"] .header__logo img {
+      filter: invert(1);
     }
 
     .header__logo::after {
@@ -72,9 +122,9 @@
       display: block;
       position: absolute;
       top: 0;
-      right: -10px;
+      right: -12px;
       bottom: 0;
-      width: 40px;
+      width: 48px;
       background: repeating-linear-gradient(
         90deg,
         var(--stripe-color),
@@ -82,10 +132,10 @@
         transparent 0,
         transparent 10px
       );
+      transition: background 0.3s;
     }
 
     .header nav {
-      margin-top: 1rem;
       font-family: var(--font-mono);
       font-size: 0.9rem;
     }
@@ -93,6 +143,27 @@
     .header nav a {
       margin-right: 1.5rem;
       color: var(--accent);
+    }
+
+    /* ---- Theme toggle ---- */
+    .theme-toggle {
+      background: var(--toggle-bg);
+      border: 1px solid var(--toggle-border);
+      color: var(--fg);
+      font-size: 1.2rem;
+      width: 2.4rem;
+      height: 2.4rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: background-color 0.3s, border-color 0.3s;
+      flex-shrink: 0;
+      margin-top: 0.1rem;
+    }
+
+    .theme-toggle:hover {
+      border-color: var(--accent);
     }
 
     /* ---- Hero ---- */
@@ -147,6 +218,32 @@
       color: var(--fg);
     }
 
+    /* ---- Demo ---- */
+    .demo {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: 0 1.5rem 2rem;
+    }
+
+    .demo__container {
+      background-color: var(--card-bg);
+      border: 1px solid var(--card-border);
+      overflow: hidden;
+      transition: background-color 0.3s, border-color 0.3s;
+    }
+
+    .demo__container img {
+      width: 100%;
+      display: block;
+    }
+
+    .demo__caption {
+      padding: 0.8rem 1rem;
+      font-size: 0.9rem;
+      color: var(--fg-muted);
+      font-family: var(--font-mono);
+    }
+
     /* ---- Sections ---- */
     .section {
       max-width: var(--max-width);
@@ -174,6 +271,7 @@
       padding: 1.5rem 1.8rem;
       margin-bottom: 1rem;
       line-height: 1.8;
+      transition: background-color 0.3s, border-color 0.3s;
     }
 
     .story p {
@@ -187,6 +285,23 @@
     }
 
     .story strong {
+      color: var(--fg);
+    }
+
+    /* ---- Note callout ---- */
+    .note {
+      background-color: var(--note-bg);
+      border: 1px solid var(--note-border);
+      border-left: 3px solid var(--note-border);
+      padding: 1rem 1.4rem;
+      margin-top: 1rem;
+      font-size: 0.9rem;
+      line-height: 1.7;
+      color: var(--fg-muted);
+      transition: background-color 0.3s, border-color 0.3s;
+    }
+
+    .note strong {
       color: var(--fg);
     }
 
@@ -208,6 +323,7 @@
       background-color: var(--card-bg);
       border: 1px solid var(--card-border);
       overflow: hidden;
+      transition: background-color 0.3s, border-color 0.3s;
     }
 
     .screenshot img {
@@ -233,7 +349,7 @@
       position: fixed;
       inset: 0;
       z-index: 1000;
-      background: rgba(0, 0, 0, 0.85);
+      background: var(--lightbox-bg);
       align-items: center;
       justify-content: center;
       cursor: pointer;
@@ -261,6 +377,7 @@
       background-color: var(--card-bg);
       border: 1px solid var(--card-border);
       padding: 1.2rem;
+      transition: background-color 0.3s, border-color 0.3s;
     }
 
     .feature h3 {
@@ -304,6 +421,7 @@
       padding: 0.15rem 0.4rem;
       font-size: 0.85em;
       border: 1px solid var(--card-border);
+      transition: background-color 0.3s, border-color 0.3s;
     }
 
     /* ---- Keyboard shortcuts table ---- */
@@ -374,6 +492,18 @@
       .btn {
         text-align: center;
       }
+
+      .header {
+        flex-direction: column;
+      }
+
+      .header__logo {
+        font-size: 1.15rem;
+      }
+
+      .header__logo img {
+        height: 26px;
+      }
     }
   </style>
 </head>
@@ -381,16 +511,21 @@
 
   <!-- Header -->
   <header class="header">
-    <span class="header__logo"><img src="img/logo.png" alt="railreader2 icon">railreader2</span>
-    <nav>
-      <a href="#story">Story</a>
-      <a href="#features">Features</a>
-      <a href="#screenshots">Screenshots</a>
-      <a href="#getting-started">Get Started</a>
-      <a href="#shortcuts">Shortcuts</a>
-      <a href="guide.html">User Guide</a>
-      <a href="https://github.com/sjvrensburg/railreader2">GitHub</a>
-    </nav>
+    <div class="header__left">
+      <span class="header__logo"><img src="img/logo.png" alt="railreader2 icon">railreader2</span>
+      <nav>
+        <a href="#story">Story</a>
+        <a href="#features">Features</a>
+        <a href="#screenshots">Screenshots</a>
+        <a href="#getting-started">Get Started</a>
+        <a href="#shortcuts">Shortcuts</a>
+        <a href="guide.html">User Guide</a>
+        <a href="https://github.com/sjvrensburg/railreader2">GitHub</a>
+      </nav>
+    </div>
+    <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle light/dark mode" title="Toggle light/dark mode">
+      <span id="theme-icon"></span>
+    </button>
   </header>
 
   <!-- Hero -->
@@ -399,11 +534,19 @@
     <p>
       A desktop PDF viewer that uses deep learning layout analysis to guide
       high-magnification reading &mdash; line by line, block by block.
-      Built for accessibility and comfort.
+      Built for comfortable, sustained reading of academic documents.
     </p>
     <div class="hero__buttons">
       <a href="https://github.com/sjvrensburg/railreader2/releases/latest" class="btn btn--primary">Download Latest Release</a>
       <a href="https://github.com/sjvrensburg/railreader2" class="btn">View Source</a>
+    </div>
+  </section>
+
+  <!-- Demo GIF -->
+  <section class="demo">
+    <div class="demo__container">
+      <img src="img/RailReader2_Demo.gif" alt="RailReader2 in action &mdash; AI-guided rail reading through an academic PDF at high magnification">
+      <p class="demo__caption">Rail mode in action &mdash; navigating an academic paper line by line at high magnification</p>
     </div>
   </section>
 
@@ -412,33 +555,49 @@
     <h2>Why I built this</h2>
     <div class="story">
       <p>
-        I'm a statistics lecturer at Nelson Mandela University in South Africa,
-        and I'm visually impaired. I needed a PDF viewer that works comfortably
-        at high magnification, but the tech industry rarely builds for this
-        "missing middle": the market is too niche for standard software
-        companies, and tools designed for full blindness aren't appropriate when
-        you have poor-but-usable vision.
+        I'm a statistics lecturer at Nelson Mandela University in South Africa.
+        I prefer to read academic PDFs at high magnification &mdash; it's simply
+        more comfortable for me &mdash; but high magnification turns even
+        simple reading into a navigation puzzle. You lose context, scrolling
+        becomes inefficient, and most viewers simply aren't designed for
+        sustained use at 3&times; zoom and above.
       </p>
       <p>
-        High magnification turns even simple reading into a navigation puzzle.
-        You lose context, scrolling becomes inefficient, and most viewers
-        simply aren't designed for sustained use at 3&times; zoom and above.
+        The problem isn't unique to people with visual impairments. Anyone who
+        works with dense academic documents &mdash; papers packed with
+        equations, tables, and multi-column layouts &mdash; can benefit from
+        structured, guided navigation at higher zoom levels. Standard PDF
+        viewers just aren't built for this kind of sustained, focused reading.
+      </p>
+      <p>
         RailReader2 solves this with <strong>AI-guided rail reading</strong>:
         a layout analysis model
         (<a href="https://huggingface.co/PaddlePaddle/PP-DocLayoutV3">PP-DocLayoutV3</a>)
         detects text blocks and reading order, then the viewer guides you
-        through the document line by line, block by block.
+        through the document line by line, block by block. It's not a screen
+        magnifier &mdash; it's a purpose-built reading environment that
+        understands document structure.
       </p>
       <p>
         There is an "AI inception" to the whole project: RailReader2 was built
         almost entirely with
         <a href="https://docs.anthropic.com/en/docs/claude-code">Claude Code</a>,
         an AI coding agent. So it is an AI agent that wrote the code for an
-        accessibility app that itself leverages an AI vision model to function.
+        app that itself leverages an AI vision model to function.
         It's a small example of how AI-assisted development can bring niche,
         genuinely needed tools into existence when the traditional software
         market would never justify building them.
       </p>
+    </div>
+    <div class="note">
+      <strong>A note on accessibility:</strong> While RailReader2 includes
+      features that can help readers with visual impairments (colour filters,
+      line focus, high contrast modes), it is primarily designed for
+      <em>comfortable</em> reading at high magnification rather than as a
+      full assistive technology solution. It is not a screen magnifier, and it
+      may not be appropriate for users with severe visual impairments who
+      require dedicated accessibility software with features like screen
+      reader integration, cursor tracking, or system-wide magnification.
     </div>
   </section>
 
@@ -463,7 +622,7 @@
         </figure>
         <figure class="screenshot">
           <img src="img/line_focus_blur.png" alt="Line focus blur in rail mode" onclick="openLightbox(this)">
-          <figcaption>Line focus blur &mdash; non-active lines blurred for focus</figcaption>
+          <figcaption>Line focus dim &mdash; non-active lines faded for focus</figcaption>
         </figure>
       </div>
       <div class="screenshots__row">
@@ -753,6 +912,28 @@
     document.addEventListener('keydown', function(e) {
       if (e.key === 'Escape') closeLightbox();
     });
+
+    // Theme toggle
+    function getPreferredTheme() {
+      var stored = localStorage.getItem('rr2-theme');
+      if (stored) return stored;
+      return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+    }
+
+    function applyTheme(theme) {
+      document.documentElement.setAttribute('data-theme', theme);
+      document.getElementById('theme-icon').textContent = theme === 'dark' ? '\u2600\uFE0F' : '\uD83C\uDF19';
+    }
+
+    function toggleTheme() {
+      var current = document.documentElement.getAttribute('data-theme');
+      var next = current === 'dark' ? 'light' : 'dark';
+      localStorage.setItem('rr2-theme', next);
+      applyTheme(next);
+    }
+
+    // Apply on load
+    applyTheme(getPreferredTheme());
   </script>
 </body>
 </html>
