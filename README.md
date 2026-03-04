@@ -107,13 +107,13 @@ chmod +x railreader2-linux-x86_64.AppImage
 
 ## Usage
 
-```bash
-# Open a specific PDF
-dotnet run -c Release --project src/RailReader2 -- <path-to-pdf>
+After installing, launch RailReader2 from your application menu or desktop shortcut. You can also open a PDF directly from your file manager by double-clicking (once associated) or by passing the file as a command-line argument:
 
-# Or launch without arguments and use File → Open (Ctrl+O)
-dotnet run -c Release --project src/RailReader2 --
 ```
+railreader2 <path-to-pdf>
+```
+
+Use **File → Open** (Ctrl+O) to open a PDF from within the app.
 
 ### Controls
 
@@ -272,6 +272,16 @@ dotnet build RailReader2-full.slnx
 
 ```bash
 dotnet test tests/RailReader.Core.Tests
+```
+
+### Run from source
+
+```bash
+# Open a specific PDF
+dotnet run -c Release --project src/RailReader2 -- <path-to-pdf>
+
+# Launch without arguments and use File → Open (Ctrl+O)
+dotnet run -c Release --project src/RailReader2 --
 ```
 
 ### Run the AI agent (experimental, source builds only)
