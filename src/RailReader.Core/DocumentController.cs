@@ -685,6 +685,7 @@ public sealed class DocumentController
                     case NavResult.PageBoundaryNext:
                         doc.GoToPage(currentPage + 1, _worker, ww, wh);
                         doc.QueueLookahead(_config.AnalysisLookaheadPages);
+                        pageChanged = true;
                         if (doc.Rail.Active)
                         {
                             doc.StartSnap(ww, wh);
