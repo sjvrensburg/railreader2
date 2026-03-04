@@ -391,6 +391,28 @@ public sealed class DocumentController
 
     // --- Rail navigation ---
 
+    private enum LineAdvanceResult { NoChange, LineAdvanced, PageChanged, PageChangedRailLost }
+
+    private LineAdvanceResult AdvanceLine(DocumentState doc, bool forward, double ww, double wh)
+    {
+        int currentPage = doc.CurrentPage;
+        var result = forward ? doc.Rail.NextLine() : doc.Rail.PrevLine();
+        var boundary = forward ? NavResult.PageBoundaryNext : NavResult.PageBoundaryPrev;
+        if (result == boundary)
+        {
+            doc.GoToPage(currentPage + (forward ? 1 : -1), _worker, ww, wh);
+            doc.QueueLookahead(_config.AnalysisLookaheadPages);
+            if (doc.Rail.Active)
+            {
+                if (!forward) doc.Rail.JumpToEnd();
+                doc.StartSnap(ww, wh);
+                return LineAdvanceResult.PageChanged;
+            }
+            return LineAdvanceResult.PageChangedRailLost;
+        }
+        return result == NavResult.Ok ? LineAdvanceResult.LineAdvanced : LineAdvanceResult.NoChange;
+    }
+
     public void HandleArrowDown() => HandleVerticalNav(forward: true);
     public void HandleArrowUp() => HandleVerticalNav(forward: false);
 
@@ -402,24 +424,9 @@ public sealed class DocumentController
 
         if (doc.Rail.Active)
         {
-            int currentPage = doc.CurrentPage;
-            var result = forward ? doc.Rail.NextLine() : doc.Rail.PrevLine();
-            var boundary = forward ? NavResult.PageBoundaryNext : NavResult.PageBoundaryPrev;
-
-            if (result == boundary)
-            {
-                doc.GoToPage(currentPage + (forward ? 1 : -1), _worker, ww, wh);
-                doc.QueueLookahead(_config.AnalysisLookaheadPages);
-                if (doc.Rail.Active)
-                {
-                    if (!forward) doc.Rail.JumpToEnd();
-                    doc.StartSnap(ww, wh);
-                }
-            }
-            else if (result == NavResult.Ok)
-            {
+            var adv = AdvanceLine(doc, forward, ww, wh);
+            if (adv == LineAdvanceResult.LineAdvanced)
                 doc.StartSnap(ww, wh);
-            }
         }
         else
         {
@@ -652,6 +659,24 @@ public sealed class DocumentController
                 cameraChanged = true;
             }
             animating |= railAnimating;
+
+            // Edge-hold advance: D/Right held at line end → NextLine; A/Left held at line start → PrevLine
+            if (!doc.Rail.AutoScrolling && doc.Rail.ConsumePendingEdgeAdvance() is { } edgeDir)
+            {
+                bool forward = edgeDir == ScrollDirection.Forward;
+                var adv = AdvanceLine(doc, forward, ww, wh);
+                if (adv is LineAdvanceResult.PageChanged or LineAdvanceResult.PageChangedRailLost)
+                    pageChanged = true;
+                else if (adv == LineAdvanceResult.LineAdvanced)
+                {
+                    // Backward: snap to the END of the previous line so the user lands where
+                    // they can continue scrolling left without immediately hitting another edge.
+                    if (forward) doc.StartSnap(ww, wh);
+                    else doc.StartSnapToEnd(ww, wh);
+                }
+                overlayChanged = true;
+                cameraChanged = true;
+            }
         }
 
         // Snap Y to integer pixel when rail mode is stable
@@ -679,25 +704,19 @@ public sealed class DocumentController
 
             if (reachedEnd)
             {
-                int currentPage = doc.CurrentPage;
-                switch (doc.Rail.NextLine())
+                var adv = AdvanceLine(doc, forward: true, ww, wh);
+                switch (adv)
                 {
-                    case NavResult.PageBoundaryNext:
-                        doc.GoToPage(currentPage + 1, _worker, ww, wh);
-                        doc.QueueLookahead(_config.AnalysisLookaheadPages);
+                    case LineAdvanceResult.PageChanged:
                         pageChanged = true;
-                        if (doc.Rail.Active)
-                        {
-                            doc.StartSnap(ww, wh);
-                            doc.Rail.StartAutoScroll(AutoScrollSpeed);
-                            doc.Rail.PauseAutoScroll(_config.AutoScrollBlockPauseMs);
-                        }
-                        else
-                        {
-                            StopAutoScroll();
-                        }
+                        doc.Rail.StartAutoScroll(AutoScrollSpeed);
+                        doc.Rail.PauseAutoScroll(_config.AutoScrollBlockPauseMs);
                         break;
-                    case NavResult.Ok:
+                    case LineAdvanceResult.PageChangedRailLost:
+                        pageChanged = true;
+                        StopAutoScroll();
+                        break;
+                    case LineAdvanceResult.LineAdvanced:
                         doc.StartSnap(ww, wh);
                         doc.Rail.PauseAutoScroll(_config.AutoScrollLinePauseMs);
                         break;

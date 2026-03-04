@@ -193,6 +193,17 @@ public partial class RailToolBar : UserControl
     };
 
     /// <summary>
+    /// Convenience method combining SetJumpMode + UpdateToggleStates.
+    /// Call after any keyboard shortcut that may change toggle state.
+    /// </summary>
+    public void SyncState()
+    {
+        if (ViewModel is not { } vm) return;
+        SetJumpMode(vm.JumpMode);
+        UpdateToggleStates();
+    }
+
+    /// <summary>
     /// Switches the speed slider between scroll speed and jump distance modes.
     /// </summary>
     public void SetJumpMode(bool jumpMode)
