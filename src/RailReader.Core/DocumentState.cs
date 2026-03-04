@@ -393,6 +393,11 @@ public sealed class DocumentState : IDisposable
         Rail.StartSnapToCurrent(Camera.OffsetX, Camera.OffsetY, Camera.Zoom, windowWidth, windowHeight);
     }
 
+    public void StartSnapToEnd(double windowWidth, double windowHeight)
+    {
+        Rail.StartSnapToCurrentEnd(Camera.OffsetX, Camera.OffsetY, Camera.Zoom, windowWidth, windowHeight);
+    }
+
     public void LoadAnnotations()
     {
         Annotations = AnnotationService.Load(FilePath) ?? new AnnotationFile

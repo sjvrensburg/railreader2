@@ -652,6 +652,35 @@ public sealed class DocumentController
                 cameraChanged = true;
             }
             animating |= railAnimating;
+
+            // Edge-hold advance: D/Right held at line end → NextLine; A/Left held at line start → PrevLine
+            if (!doc.Rail.AutoScrolling && doc.Rail.ConsumePendingEdgeAdvance() is { } edgeDir)
+            {
+                bool forward = edgeDir == ScrollDirection.Forward;
+                int currentPage = doc.CurrentPage;
+                var navResult = forward ? doc.Rail.NextLine() : doc.Rail.PrevLine();
+                var boundary = forward ? NavResult.PageBoundaryNext : NavResult.PageBoundaryPrev;
+                if (navResult == boundary)
+                {
+                    doc.GoToPage(currentPage + (forward ? 1 : -1), _worker, ww, wh);
+                    doc.QueueLookahead(_config.AnalysisLookaheadPages);
+                    pageChanged = true;
+                    if (doc.Rail.Active)
+                    {
+                        if (!forward) doc.Rail.JumpToEnd();
+                        doc.StartSnap(ww, wh);
+                    }
+                }
+                else if (navResult == NavResult.Ok)
+                {
+                    // Backward: snap to the END of the previous line so the user lands where
+                    // they can continue scrolling left without immediately hitting another edge.
+                    if (forward) doc.StartSnap(ww, wh);
+                    else doc.StartSnapToEnd(ww, wh);
+                }
+                overlayChanged = true;
+                cameraChanged = true;
+            }
         }
 
         // Snap Y to integer pixel when rail mode is stable

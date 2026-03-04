@@ -35,6 +35,13 @@ public sealed class RailNav
     private bool _autoScrollPauseAdvances; // true = end-of-line pause that triggers advance
     private double _autoScrollPendingPauseMs; // deferred pause that starts after snap completes
 
+    // Edge-hold advance: when the user holds D/Right (or A/Left) against the line boundary
+    // for EdgeAdvanceHoldMs, trigger a NextLine/PrevLine as if they had pressed Down/Up.
+    private Stopwatch? _edgeHoldTimer;
+    private ScrollDirection? _edgeHoldDir;
+    private ScrollDirection? _pendingEdgeAdvance;
+    private const double EdgeAdvanceHoldMs = 400.0;
+
     public RailNav(AppConfig config) => _config = config;
 
     public void SetAnalysis(PageAnalysis analysis, HashSet<int> navigable)
@@ -197,7 +204,18 @@ public sealed class RailNav
         {
             _scrollDir = dir;
             _scrollHoldTimer = Stopwatch.StartNew();
-            _scrollStartX = currentCameraX;
+            // If a snap is in progress, jump to its target and start scrolling from there.
+            // This avoids a stale _scrollStartX when key-repeat fires during a line-advance snap
+            // (e.g. edge-hold advance), which would otherwise produce a displaced starting position.
+            if (_snap is { } activeSnap)
+            {
+                _scrollStartX = activeSnap.TargetX;
+                _snap = null;
+            }
+            else
+            {
+                _scrollStartX = currentCameraX;
+            }
             // Seed one frame ahead (~16ms) so the first Tick() produces
             // visible displacement instead of near-zero movement.
             _scrollSeedSecs = 1.0 / 60.0;
@@ -210,6 +228,44 @@ public sealed class RailNav
         _scrollHoldTimer = null;
         _scrollSeedSecs = 0;
         ScrollSpeed = 0.0;
+        _edgeHoldTimer = null;
+        _edgeHoldDir = null;
+    }
+
+    /// <summary>
+    /// Returns the direction of a pending edge-advance (triggered by holding D/Right or A/Left
+    /// against the line boundary) and clears it. Returns null if none pending.
+    /// </summary>
+    public ScrollDirection? ConsumePendingEdgeAdvance()
+    {
+        var result = _pendingEdgeAdvance;
+        _pendingEdgeAdvance = null;
+        return result;
+    }
+
+    /// <summary>
+    /// Returns true when the camera is effectively at the hard scroll boundary for the
+    /// given direction (i.e. there is nowhere left to scroll that way).
+    /// </summary>
+    private bool IsAtHardEdge(double cameraX, double zoom, double windowWidth, ScrollDirection dir)
+    {
+        if (_navigableIndices.Count == 0) return false;
+        var block = CurrentNavigableBlock;
+        double margin = block.BBox.W * 0.05;
+        double blockLeft = block.BBox.X - margin;
+        double blockRight = block.BBox.X + block.BBox.W + margin;
+        double blockWidthPx = (blockRight - blockLeft) * zoom;
+
+        // If the whole block fits in the window it is centred and cannot scroll at all.
+        if (blockWidthPx <= windowWidth) return true;
+
+        const double epsilon = 2.0; // pixels of tolerance
+        double maxX = -blockLeft * zoom;          // left boundary (scrolled all the way left)
+        double minX = windowWidth - blockRight * zoom; // right boundary (scrolled all the way right)
+
+        return dir == ScrollDirection.Forward
+            ? cameraX <= minX + epsilon   // can't scroll further right (content end)
+            : cameraX >= maxX - epsilon;  // can't scroll further left (content start)
     }
 
     /// <summary>
@@ -245,6 +301,43 @@ public sealed class RailNav
         if (!CanNavigate) return;
 
         var (targetX, targetY) = ComputeTargetCamera(zoom, windowWidth, windowHeight);
+        _snap = new SnapAnimation
+        {
+            StartX = cameraX,
+            StartY = cameraY,
+            TargetX = targetX,
+            TargetY = targetY,
+            Timer = Stopwatch.StartNew(),
+            DurationMs = _config.SnapDurationMs,
+        };
+    }
+
+    /// <summary>
+    /// Snap to the right (end) edge of the current line. Used when navigating backward
+    /// via edge-hold so the user lands at the end of the previous line and can continue scrolling.
+    /// </summary>
+    public void StartSnapToCurrentEnd(double cameraX, double cameraY, double zoom, double windowWidth, double windowHeight)
+    {
+        if (!CanNavigate) return;
+
+        var block = CurrentNavigableBlock;
+        double margin = block.BBox.W * 0.05;
+        double blockLeft = block.BBox.X - margin;
+        double blockRight = block.BBox.X + block.BBox.W + margin;
+        double blockWidthPx = (blockRight - blockLeft) * zoom;
+
+        double targetX = blockWidthPx <= windowWidth
+            ? windowWidth / 2.0 - (blockLeft + blockRight) / 2.0 * zoom // centred (fits in window)
+            : windowWidth - blockRight * zoom;                            // right edge (minX)
+
+        var (_, targetY) = ComputeTargetCamera(zoom, windowWidth, windowHeight);
+
+        if (_config.PixelSnapping)
+        {
+            targetX = Math.Round(targetX * 4.0) / 4.0;
+            targetY = Math.Round(targetY);
+        }
+
         _snap = new SnapAnimation
         {
             StartX = cameraX,
@@ -393,6 +486,28 @@ public sealed class RailNav
             double sign = dir == ScrollDirection.Forward ? -1.0 : 1.0;
             cameraX = ClampX(_scrollStartX + sign * totalDisplacement * zoom, zoom, windowWidth);
             animating = true;
+
+            // Edge-hold advance: if the camera is pinned against the line boundary,
+            // accumulate hold time and trigger a line advance when the threshold is reached.
+            if (IsAtHardEdge(cameraX, zoom, windowWidth, dir))
+            {
+                if (_edgeHoldDir != dir)
+                {
+                    _edgeHoldTimer = Stopwatch.StartNew();
+                    _edgeHoldDir = dir;
+                }
+                else if (_edgeHoldTimer is not null
+                    && _edgeHoldTimer.Elapsed.TotalMilliseconds >= EdgeAdvanceHoldMs)
+                {
+                    _pendingEdgeAdvance = dir;
+                    StopScroll(); // clear scroll state; key-repeat will restart it on the new line
+                }
+            }
+            else
+            {
+                _edgeHoldTimer = null;
+                _edgeHoldDir = null;
+            }
         }
         else
         {
@@ -520,7 +635,14 @@ public sealed class RailNav
         return false;
     }
 
-    public void UpdateConfig(AppConfig config) => _config = config;
+    public void UpdateConfig(AppConfig config)
+    {
+        _config = config;
+        // If autoscroll is running, apply the updated speed immediately so
+        // [ / ] key adjustments take effect without stopping and restarting.
+        if (AutoScrolling)
+            _autoScrollSpeed = (config.ScrollSpeedStart + config.ScrollSpeedMax) / 2.0;
+    }
 
     private sealed class SnapAnimation
     {
