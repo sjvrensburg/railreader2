@@ -82,6 +82,29 @@ At high zoom levels, navigation switches to "rail mode" — the viewer locks ont
 - **Tabbed settings** — organised settings panel with Appearance, Rail Reading, Auto-Scroll, and Advanced tabs
 - **Tooltips** — all interactive controls have descriptive tooltips
 
+## Installation
+
+Download the latest release from [GitHub Releases](https://github.com/sjvrensburg/railreader2/releases/latest). The AI layout model is bundled in both packages.
+
+**Linux:** Download `railreader2-linux-x86_64.AppImage`, make it executable, and run it:
+
+```bash
+chmod +x railreader2-linux-x86_64.AppImage
+./railreader2-linux-x86_64.AppImage
+```
+
+**Windows:** Download `railreader2-setup-x64.exe` and run the installer.
+
+> **Windows SmartScreen warning**
+>
+> Windows may show a "Windows protected your PC" SmartScreen warning because the installer is not code-signed. This is expected for open-source projects distributed outside the Microsoft Store.
+>
+> To proceed:
+> 1. Click **More info** in the SmartScreen dialog.
+> 2. Click **Run anyway**.
+>
+> If your browser warns that the file "may be harmful", choose **Keep** (Chrome) or **Keep anyway** (Edge) before running it. The source code is fully public on GitHub — you can verify what is being installed.
+
 ## Usage
 
 ```bash
