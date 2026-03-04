@@ -216,6 +216,11 @@ public partial class MainWindow : Window
         PageLayer.LineFocusBlurEnabled = Vm?.Config.LineFocusBlur ?? false;
         PageLayer.LineFocusBlurIntensity = Vm?.Config.LineFocusBlurIntensity ?? 0.5;
         PageLayer.LineFocusPadding = Vm?.Config.LineFocusPadding ?? 0.2;
+        PageLayer.BionicReadingEnabled = Vm?.Config.BionicReading ?? false;
+        PageLayer.BionicFadeIntensity = Vm?.Config.BionicFadeIntensity ?? 0.6;
+        PageLayer.BionicFadeRects = (Vm?.Config.BionicReading ?? false) && tab is not null
+            ? tab.State.GetOrComputeBionicOverlay(tab.CurrentPage, Vm?.Config.BionicFixationPercent ?? 0.4)
+            : null;
         SearchLayer.Tab = tab;
         SearchLayer.ViewModel = Vm;
         AnnotationLayer.Tab = tab;

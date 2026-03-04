@@ -762,6 +762,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     {
         InvalidateCamera();
         InvalidateOverlay();
+        InvalidatePage();
         OnPropertyChanged(nameof(ActiveTab));
         RequestAnimationFrame();
     }
