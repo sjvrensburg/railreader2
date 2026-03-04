@@ -250,11 +250,7 @@ public sealed class RailNav
     private bool IsAtHardEdge(double cameraX, double zoom, double windowWidth, ScrollDirection dir)
     {
         if (_navigableIndices.Count == 0) return false;
-        var block = CurrentNavigableBlock;
-        double margin = block.BBox.W * 0.05;
-        double blockLeft = block.BBox.X - margin;
-        double blockRight = block.BBox.X + block.BBox.W + margin;
-        double blockWidthPx = (blockRight - blockLeft) * zoom;
+        var (blockLeft, blockRight, blockWidthPx) = GetBlockBounds(zoom);
 
         // If the whole block fits in the window it is centred and cannot scroll at all.
         if (blockWidthPx <= windowWidth) return true;
@@ -320,11 +316,7 @@ public sealed class RailNav
     {
         if (!CanNavigate) return;
 
-        var block = CurrentNavigableBlock;
-        double margin = block.BBox.W * 0.05;
-        double blockLeft = block.BBox.X - margin;
-        double blockRight = block.BBox.X + block.BBox.W + margin;
-        double blockWidthPx = (blockRight - blockLeft) * zoom;
+        var (blockLeft, blockRight, blockWidthPx) = GetBlockBounds(zoom);
 
         double targetX = blockWidthPx <= windowWidth
             ? windowWidth / 2.0 - (blockLeft + blockRight) / 2.0 * zoom // centred (fits in window)
@@ -399,11 +391,7 @@ public sealed class RailNav
     {
         if (_navigableIndices.Count == 0) return cameraX;
 
-        var block = CurrentNavigableBlock;
-        double margin = block.BBox.W * 0.05;
-        double blockLeft = block.BBox.X - margin;
-        double blockRight = block.BBox.X + block.BBox.W + margin;
-        double blockWidthPx = (blockRight - blockLeft) * zoom;
+        var (blockLeft, blockRight, blockWidthPx) = GetBlockBounds(zoom);
 
         double result;
         if (blockWidthPx <= windowWidth)
@@ -429,6 +417,15 @@ public sealed class RailNav
         }
 
         return _config.PixelSnapping ? Math.Round(result * 4.0) / 4.0 : result;
+    }
+
+    private (double Left, double Right, double WidthPx) GetBlockBounds(double zoom)
+    {
+        var block = CurrentNavigableBlock;
+        double margin = block.BBox.W * 0.05;
+        double left = block.BBox.X - margin;
+        double right = block.BBox.X + block.BBox.W + margin;
+        return (left, right, (right - left) * zoom);
     }
 
     /// <summary>Asymptotic ease: approaches <paramref name="limit"/> as overshoot grows.</summary>
@@ -613,14 +610,13 @@ public sealed class RailNav
         cameraX = ClampX(cameraX, zoom, windowWidth);
 
         // Check if we've reached the right edge of the block
-        var block = CurrentNavigableBlock;
-        double blockRight = block.BBox.X + block.BBox.W + block.BBox.W * 0.05;
+        var (_, blockRight, _) = GetBlockBounds(zoom);
         double visibleRight = (-cameraX + windowWidth) / zoom;
 
         if (visibleRight >= blockRight)
         {
             // Determine pause: longer for block/page boundaries
-            bool isBlockEnd = CurrentLine + 1 >= block.Lines.Count;
+            bool isBlockEnd = CurrentLine + 1 >= CurrentNavigableBlock.Lines.Count;
             double pauseMs = isBlockEnd ? _config.AutoScrollBlockPauseMs : _config.AutoScrollLinePauseMs;
 
             if (pauseMs > 0)

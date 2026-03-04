@@ -419,14 +419,17 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public void ToggleAutoScrollExclusive()
     {
-        JumpMode = false;
-        ToggleAutoScroll();
+        _controller.ToggleAutoScrollExclusive();
+        JumpMode = _controller.JumpMode;
+        OnPropertyChanged(nameof(AutoScrollActive));
+        RequestAnimationFrame();
     }
 
     public void ToggleJumpModeExclusive()
     {
-        if (AutoScrollActive) StopAutoScroll();
-        JumpMode = !JumpMode;
+        _controller.ToggleJumpModeExclusive();
+        JumpMode = _controller.JumpMode;
+        OnPropertyChanged(nameof(AutoScrollActive));
     }
 
     public void ToggleLineFocusBlur()
