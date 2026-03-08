@@ -23,6 +23,12 @@
   <img src="docs/img/rail_mode.png" alt="Rail mode" width="45%">
 </p>
 
+## License
+
+RailReader2 is licensed under the [MIT License](LICENSE).
+
+Versions prior to 3.0.0 were released under the GNU General Public License v3 (GPLv3). Starting with version 3.0.0, the project is licensed under the MIT License. As the sole author and copyright holder, this relicensing applies to all new releases going forward. Previous releases remain available under the terms of the GPLv3.
+
 ## Why I built this
 
 As a visually impaired user, I need a PDF viewer that works comfortably at high magnification. The tech industry rarely builds for this "missing middle": the market is too niche for standard software companies, and tools designed for full blindness aren't appropriate when you have poor-but-usable vision.
