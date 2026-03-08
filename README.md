@@ -15,6 +15,11 @@
   <a href="https://sjvrensburg.github.io/railreader2/guide.html">User Guide</a>
 </p>
 
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License"></a>
+  <a href="https://claude.ai/code"><img src="https://img.shields.io/badge/built%20with-Claude%20Code-blueviolet?logo=claude" alt="Built with Claude Code"></a>
+</p>
+
 ---
 
 <p align="center">
