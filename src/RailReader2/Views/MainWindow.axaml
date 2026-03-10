@@ -26,77 +26,78 @@
         <v:StatusBarView DockPanel.Dock="Bottom" DataContext="{Binding}"
                          IsVisible="{Binding !IsFullScreen}" />
 
-        <!-- Main Content -->
-        <Panel>
-            <!-- Outline Panel -->
-            <SplitView IsPaneOpen="{Binding ShowOutline}"
-                       DisplayMode="Inline"
-                       PanePlacement="Left"
-                       OpenPaneLength="220">
-                <SplitView.Pane>
-                    <v:OutlinePanel Name="OutlinePanel" DataContext="{Binding}" />
-                </SplitView.Pane>
-                <SplitView.Content>
-                    <!-- DockPanel so RailToolBar docks right, viewport fills remainder -->
-                    <DockPanel>
-                        <v:RailToolBar Name="RailToolBar"
-                                       DockPanel.Dock="Right"
-                                       IsVisible="False" />
+        <!-- Main Content: resizable sidebar + viewport -->
+        <Grid Name="MainGrid" ColumnDefinitions="220,Auto,*">
+            <!-- Outline Panel (resizable via GridSplitter) -->
+            <v:OutlinePanel Name="OutlinePanel" Grid.Column="0"
+                            DataContext="{Binding}"
+                            MinWidth="120" MaxWidth="600"
+                            IsVisible="{Binding ShowOutline}" />
 
-                        <Panel>
-                            <!-- Layered PDF viewport with compositor-driven camera -->
-                            <v:ViewportPanel Name="Viewport">
-                                <Panel Name="CameraPanel" RenderTransformOrigin="0%,0%">
-                                    <Panel Name="PagePanel"
-                                           HorizontalAlignment="Left"
-                                           VerticalAlignment="Top">
-                                        <v:PdfPageLayer Name="PageLayer" />
-                                        <v:SearchHighlightLayer Name="SearchLayer" />
-                                        <v:AnnotationLayer Name="AnnotationLayer" />
-                                        <v:RailOverlayLayer Name="OverlayLayer" />
-                                    </Panel>
-                                </Panel>
-                            </v:ViewportPanel>
+            <!-- Drag handle to resize sidebar -->
+            <GridSplitter Grid.Column="1" Width="4"
+                          ResizeDirection="Columns"
+                          Background="Transparent"
+                          IsVisible="{Binding ShowOutline}" />
 
-                            <!-- Minimap overlay -->
-                            <v:MinimapControl Name="Minimap"
-                                              IsVisible="{Binding ShowMinimap}" />
+            <!-- Content area -->
+            <DockPanel Grid.Column="2">
+                <v:RailToolBar Name="RailToolBar"
+                               DockPanel.Dock="Right"
+                               IsVisible="False" />
 
-                            <!-- Toolbar overlay (Browse/Select/Copy) -->
-                            <v:ToolBarView Name="ToolBar"
-                                           VerticalAlignment="Top"
-                                           HorizontalAlignment="Left"
-                                           Margin="16,4,0,0"
-                                           IsVisible="{Binding Tabs.Count}" />
-
-                            <!-- Search bar overlay -->
-                            <v:SearchBarView Name="SearchBar"
-                                             IsVisible="{Binding ShowSearch}"
-                                             VerticalAlignment="Top"
-                                             HorizontalAlignment="Right"
-                                             Margin="0,4,16,0" />
-
-                            <!-- Radial annotation menu (screen-space overlay) -->
-                            <Canvas Name="RadialMenuCanvas"
-                                    IsHitTestVisible="{Binding IsRadialMenuOpen}"
-                                    IsVisible="{Binding IsRadialMenuOpen}">
-                                <c:RadialMenu Name="RadialMenuControl"
-                                              Canvas.Left="{Binding RadialMenuX}"
-                                              Canvas.Top="{Binding RadialMenuY}" />
-                            </Canvas>
-
-                            <!-- Welcome text when no document open -->
-                            <TextBlock Name="WelcomeText"
-                                       Text="Open a PDF file (Ctrl+O)"
-                                       HorizontalAlignment="Center"
-                                       VerticalAlignment="Center"
-                                       FontSize="18"
-                                       Foreground="White"
-                                       IsVisible="{Binding !Tabs.Count}" />
+                <Panel>
+                    <!-- Layered PDF viewport with compositor-driven camera -->
+                    <v:ViewportPanel Name="Viewport">
+                        <Panel Name="CameraPanel" RenderTransformOrigin="0%,0%">
+                            <Panel Name="PagePanel"
+                                   HorizontalAlignment="Left"
+                                   VerticalAlignment="Top">
+                                <v:PdfPageLayer Name="PageLayer" />
+                                <v:SearchHighlightLayer Name="SearchLayer" />
+                                <v:AnnotationLayer Name="AnnotationLayer" />
+                                <v:RailOverlayLayer Name="OverlayLayer" />
+                            </Panel>
                         </Panel>
-                    </DockPanel>
-                </SplitView.Content>
-            </SplitView>
-        </Panel>
+                    </v:ViewportPanel>
+
+                    <!-- Minimap overlay -->
+                    <v:MinimapControl Name="Minimap"
+                                      IsVisible="{Binding ShowMinimap}" />
+
+                    <!-- Toolbar overlay (Browse/Select/Copy) -->
+                    <v:ToolBarView Name="ToolBar"
+                                   VerticalAlignment="Top"
+                                   HorizontalAlignment="Left"
+                                   Margin="16,4,0,0"
+                                   IsVisible="{Binding Tabs.Count}" />
+
+                    <!-- Search bar overlay -->
+                    <v:SearchBarView Name="SearchBar"
+                                     IsVisible="{Binding ShowSearch}"
+                                     VerticalAlignment="Top"
+                                     HorizontalAlignment="Right"
+                                     Margin="0,4,16,0" />
+
+                    <!-- Radial annotation menu (screen-space overlay) -->
+                    <Canvas Name="RadialMenuCanvas"
+                            IsHitTestVisible="{Binding IsRadialMenuOpen}"
+                            IsVisible="{Binding IsRadialMenuOpen}">
+                        <c:RadialMenu Name="RadialMenuControl"
+                                      Canvas.Left="{Binding RadialMenuX}"
+                                      Canvas.Top="{Binding RadialMenuY}" />
+                    </Canvas>
+
+                    <!-- Welcome text when no document open -->
+                    <TextBlock Name="WelcomeText"
+                               Text="Open a PDF file (Ctrl+O)"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               FontSize="18"
+                               Foreground="White"
+                               IsVisible="{Binding !Tabs.Count}" />
+                </Panel>
+            </DockPanel>
+        </Grid>
     </DockPanel>
 </Window>

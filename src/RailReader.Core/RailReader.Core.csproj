@@ -9,6 +9,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="RailReader.Core.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="PDFtoImage" Version="5.*" />
     <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.*" />
 

@@ -5,6 +5,7 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.Styling;
 using RailReader2.ViewModels;
 
 namespace RailReader2.Views;
@@ -14,7 +15,8 @@ public partial class TabBarView : UserControl
     private static readonly IBrush AccentBrush = new SolidColorBrush(Color.FromRgb(66, 133, 244));
     private static readonly IBrush ActiveTabFg = Brushes.White;
     private static readonly IBrush InactiveTabBg = new SolidColorBrush(Color.FromArgb(30, 0, 0, 0));
-    private static readonly IBrush InactiveTabFg = new SolidColorBrush(Color.FromRgb(80, 80, 80));
+    private static readonly IBrush InactiveTabFgLight = new SolidColorBrush(Color.FromRgb(80, 80, 80));
+    private static readonly IBrush InactiveTabFgDark = new SolidColorBrush(Color.FromRgb(180, 180, 180));
     private static readonly IBrush SeparatorBrush = new SolidColorBrush(Color.FromArgb(30, 0, 0, 0));
 
     private const double DragThreshold = 5.0;
@@ -28,6 +30,7 @@ public partial class TabBarView : UserControl
     {
         InitializeComponent();
         DataContextChanged += (_, _) => WireViewModel();
+        ActualThemeVariantChanged += (_, _) => UpdateTabStyles();
 
         // Use tunnelling events on the panel so we see pointer events before buttons consume them
         TabPanel.AddHandler(PointerPressedEvent, OnPanelPointerPressed, RoutingStrategies.Tunnel);
@@ -148,8 +151,10 @@ public partial class TabBarView : UserControl
 
                 if (dock.Children[1] is Button tabBtn)
                 {
+                    var isDark = Application.Current?.ActualThemeVariant == ThemeVariant.Dark;
+                    var inactiveFg = isDark ? InactiveTabFgDark : InactiveTabFgLight;
                     tabBtn.Background = isActive ? AccentBrush : InactiveTabBg;
-                    tabBtn.Foreground = isActive ? ActiveTabFg : InactiveTabFg;
+                    tabBtn.Foreground = isActive ? ActiveTabFg : inactiveFg;
                     tabBtn.FontWeight = isActive ? FontWeight.Bold : FontWeight.Normal;
                 }
             }

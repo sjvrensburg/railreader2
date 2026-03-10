@@ -258,7 +258,7 @@ public sealed class LayoutAnalyzer : IDisposable
         }
     }
 
-    private static float[] ComputeRowDensities(byte[] rgbBytes, int imgW, int cropX, int cropY, int cropW, int cropH)
+    internal static float[] ComputeRowDensities(byte[] rgbBytes, int imgW, int cropX, int cropY, int cropW, int cropH)
     {
         var profile = new float[cropH];
         for (int row = 0; row < cropH; row++)
@@ -293,14 +293,56 @@ public sealed class LayoutAnalyzer : IDisposable
         return smoothed;
     }
 
-    private static List<(int Start, int Height)> FindLineRuns(float[] densities)
+    /// <summary>
+    /// Detects line runs using adaptive density thresholding with recovery for short lines.
+    /// The primary pass uses a density-fraction threshold (15% of average) which reliably
+    /// segments dense text. A second recovery pass scans any uncovered regions at the top
+    /// and bottom of the block with a low absolute threshold to catch short lines (e.g. the
+    /// last few words of a paragraph) that fall below the density-fraction threshold.
+    /// </summary>
+    internal static List<(int Start, int Height)> FindLineRuns(float[] densities)
     {
+        // Primary pass: density-fraction threshold — works well for dense text
         var nonZero = densities.Where(v => v > 0.005f).ToArray();
         float threshold = nonZero.Length == 0
             ? 0.005f
             : Math.Max(nonZero.Average() * LayoutConstants.DensityThresholdFraction, 0.005f);
 
-        var runs = new List<(int, int)>();
+        var runs = FindRunsAboveThreshold(densities, threshold);
+
+        if (runs.Count == 0) return runs;
+
+        // Recovery pass: check for uncovered regions at top and bottom of the block.
+        // If the first/last detected line is far from the block edge, re-scan that
+        // region with a low absolute threshold to catch short lines.
+        int medianHeight = runs.Select(r => r.Height).OrderBy(h => h).ElementAt(runs.Count / 2);
+        float recoveryThreshold = 0.005f;
+
+        // Top recovery: region before the first detected line
+        int firstLineStart = runs[0].Start;
+        if (firstLineStart > medianHeight / 2)
+        {
+            var topRuns = FindRunsAboveThreshold(densities[..firstLineStart], recoveryThreshold);
+            runs.InsertRange(0, topRuns);
+        }
+
+        // Bottom recovery: region after the last detected line
+        var lastRun = runs[^1];
+        int lastLineEnd = lastRun.Start + lastRun.Height;
+        int remaining = densities.Length - lastLineEnd;
+        if (remaining > medianHeight / 2)
+        {
+            var bottomRuns = FindRunsAboveThreshold(densities[lastLineEnd..], recoveryThreshold);
+            // Offset the recovered runs to block-relative coordinates
+            runs.AddRange(bottomRuns.Select(r => (r.Start + lastLineEnd, r.Height)));
+        }
+
+        return runs;
+    }
+
+    private static List<(int Start, int Height)> FindRunsAboveThreshold(float[] densities, float threshold)
+    {
+        var runs = new List<(int Start, int Height)>();
         int? runStart = null;
 
         for (int r = 0; r < densities.Length; r++)
