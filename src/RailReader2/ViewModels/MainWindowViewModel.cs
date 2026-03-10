@@ -29,7 +29,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     [ObservableProperty] private bool _showShortcuts;
     [ObservableProperty] private bool _showGoToPage;
     [ObservableProperty] private string? _cleanupMessage;
-    [ObservableProperty] private bool _showSearch;
+
     [ObservableProperty] private bool _isFullScreen;
     [ObservableProperty] private bool _isRadialMenuOpen;
     [ObservableProperty] private bool _showBookmarkDialog;
@@ -722,11 +722,16 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     // --- Search ---
 
-    public void OpenSearch() => ShowSearch = true;
+    public event Action? SearchRequested;
+
+    public void OpenSearch()
+    {
+        ShowOutline = true;
+        SearchRequested?.Invoke();
+    }
 
     public void CloseSearch()
     {
-        ShowSearch = false;
         _controller.CloseSearch();
         InvalidateSearch();
     }
@@ -736,6 +741,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _controller.ExecuteSearch(query, caseSensitive, useRegex);
         InvalidateSearch();
     }
+
+    public void InvalidateSearchLayer() => InvalidateSearch();
 
     public void NextMatch()
     {
@@ -747,6 +754,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public void PreviousMatch()
     {
         _controller.PreviousMatch();
+        OnPropertyChanged(nameof(ActiveTab));
+        InvalidateSearch();
+    }
+
+    public void GoToMatch(int matchIndex)
+    {
+        _controller.GoToMatch(matchIndex);
         OnPropertyChanged(nameof(ActiveTab));
         InvalidateSearch();
     }

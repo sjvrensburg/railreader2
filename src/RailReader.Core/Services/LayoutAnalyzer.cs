@@ -48,14 +48,16 @@ public sealed class LayoutAnalyzer : IDisposable
     public PageAnalysis RunAnalysis(byte[] rgbBytes, int pxW, int pxH, double pageW, double pageH)
     {
         int target = LayoutConstants.InputSize;
-        float scaleH = (float)target / pxH;
-        float scaleW = (float)target / pxW;
 
+        // Letterbox: place undistorted image at (0,0) in target×target canvas.
+        // FitPageToTarget already ensures max(pxW, pxH) == target, so no resizing
+        // is needed — just padding the shorter dimension with black pixels.
+        // scale_factor = [1, 1] since the image pixels map 1:1 to canvas pixels.
         var chwData = PreprocessImage(rgbBytes, pxW, pxH, target);
 
         var imShape = new DenseTensor<float>(new float[] { target, target }, new[] { 1, 2 });
         var image = new DenseTensor<float>(chwData, new[] { 1, 3, target, target });
-        var scaleFactor = new DenseTensor<float>(new float[] { scaleH, scaleW }, new[] { 1, 2 });
+        var scaleFactor = new DenseTensor<float>(new float[] { 1.0f, 1.0f }, new[] { 1, 2 });
 
         List<NamedOnnxValue> inputs =
         [
@@ -160,20 +162,20 @@ public sealed class LayoutAnalyzer : IDisposable
     private static float[] PreprocessImage(byte[] rgbBytes, int origW, int origH, int target)
     {
         // PP-DocLayoutV3 uses mean=[0,0,0] std=[1,1,1] (no ImageNet normalization)
-        // Just scale pixels to [0, 1] and convert to CHW layout
-        float scaleH = (float)target / origH;
-        float scaleW = (float)target / origW;
+        // Letterbox: place image at (0,0) in target×target canvas with black padding.
+        // FitPageToTarget ensures max(origW, origH) == target, so pixels copy 1:1.
         int pixelCount = target * target;
-        var chwData = new float[3 * pixelCount];
+        var chwData = new float[3 * pixelCount]; // zero-initialized = black padding
 
-        for (int y = 0; y < target; y++)
+        int copyW = Math.Min(origW, target);
+        int copyH = Math.Min(origH, target);
+
+        for (int y = 0; y < copyH; y++)
         {
-            int srcY = Math.Min((int)(y / scaleH), origH - 1);
-            int srcRow = srcY * origW;
-            for (int x = 0; x < target; x++)
+            int srcRow = y * origW;
+            for (int x = 0; x < copyW; x++)
             {
-                int srcX = Math.Min((int)(x / scaleW), origW - 1);
-                int srcIdx = (srcRow + srcX) * 3;
+                int srcIdx = (srcRow + x) * 3;
                 int dstIdx = y * target + x;
                 chwData[dstIdx] = rgbBytes[srcIdx] / 255.0f;                     // R
                 chwData[pixelCount + dstIdx] = rgbBytes[srcIdx + 1] / 255.0f;    // G

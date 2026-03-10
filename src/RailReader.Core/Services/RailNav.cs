@@ -40,7 +40,20 @@ public sealed class RailNav
     private Stopwatch? _edgeHoldTimer;
     private ScrollDirection? _edgeHoldDir;
     private ScrollDirection? _pendingEdgeAdvance;
+    private bool _edgeAdvanceJustFired; // suppresses Jump()/StartScroll() so the snap-to-start/end isn't overwritten
     private const double EdgeAdvanceHoldMs = 400.0;
+
+    /// <summary>
+    /// Returns true if input should be suppressed because an edge-hold advance
+    /// snap animation is still in progress.
+    /// </summary>
+    private bool ShouldSuppressAfterEdgeAdvance()
+    {
+        if (!_edgeAdvanceJustFired) return false;
+        if (_snap is not null) return true; // snap still running
+        _edgeAdvanceJustFired = false;
+        return false;
+    }
 
     public RailNav(AppConfig config) => _config = config;
 
@@ -200,6 +213,9 @@ public sealed class RailNav
     public void StartScroll(ScrollDirection dir, double currentCameraX)
     {
         if (!CanNavigate) return;
+
+        if (ShouldSuppressAfterEdgeAdvance()) return;
+
         if (_scrollDir != dir)
         {
             _scrollDir = dir;
@@ -228,6 +244,12 @@ public sealed class RailNav
         _scrollHoldTimer = null;
         _scrollSeedSecs = 0;
         ScrollSpeed = 0.0;
+    }
+
+    /// <summary>Clears both scroll and edge-hold state (e.g. on key release or mode change).</summary>
+    public void StopScrollAndEdgeHold()
+    {
+        StopScroll();
         _edgeHoldTimer = null;
         _edgeHoldDir = null;
     }
@@ -273,6 +295,8 @@ public sealed class RailNav
     {
         if (!CanNavigate) return;
 
+        if (ShouldSuppressAfterEdgeAdvance()) return;
+
         double jumpPx = windowWidth * (_config.JumpPercentage / 100.0);
         if (half) jumpPx *= 0.5;
         double newX = forward ? cameraX - jumpPx : cameraX + jumpPx;
@@ -293,6 +317,7 @@ public sealed class RailNav
                 && _edgeHoldTimer.Elapsed.TotalMilliseconds >= EdgeAdvanceHoldMs)
             {
                 _pendingEdgeAdvance = dir;
+                _edgeAdvanceJustFired = true;
                 _edgeHoldTimer = null;
                 _edgeHoldDir = null;
                 return; // controller will advance line and snap
@@ -523,7 +548,8 @@ public sealed class RailNav
                     && _edgeHoldTimer.Elapsed.TotalMilliseconds >= EdgeAdvanceHoldMs)
                 {
                     _pendingEdgeAdvance = dir;
-                    StopScroll(); // clear scroll state; key-repeat will restart it on the new line
+                    _edgeAdvanceJustFired = true;
+                    StopScrollAndEdgeHold(); // clear scroll state; key-repeat will restart it on the new line
                 }
             }
             else
@@ -577,7 +603,7 @@ public sealed class RailNav
         _autoScrollPauseTimer = null;
         _autoScrollPendingPauseMs = 0;
         // Stop any manual scroll
-        StopScroll();
+        StopScrollAndEdgeHold();
     }
 
     public void StopAutoScroll()

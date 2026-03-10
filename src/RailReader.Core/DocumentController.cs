@@ -492,7 +492,7 @@ public sealed class DocumentController
     {
         if (isHorizontal)
         {
-            ActiveDocument?.Rail.StopScroll();
+            ActiveDocument?.Rail.StopScrollAndEdgeHold();
             if (AutoScrollActive)
                 ActiveDocument?.Rail.SetAutoScrollBoost(false);
         }
@@ -666,11 +666,14 @@ public sealed class DocumentController
                 bool forward = edgeDir == ScrollDirection.Forward;
                 var adv = AdvanceLine(doc, forward, ww, wh);
                 if (adv is LineAdvanceResult.PageChanged or LineAdvanceResult.PageChangedRailLost)
+                {
                     pageChanged = true;
+                    // AdvanceLine already snaps to start; override with snap-to-end for backward
+                    if (!forward && adv == LineAdvanceResult.PageChanged)
+                        doc.StartSnapToEnd(ww, wh);
+                }
                 else if (adv == LineAdvanceResult.LineAdvanced)
                 {
-                    // Backward: snap to the END of the previous line so the user lands where
-                    // they can continue scrolling left without immediately hitting another edge.
                     if (forward) doc.StartSnap(ww, wh);
                     else doc.StartSnapToEnd(ww, wh);
                 }
@@ -1289,6 +1292,22 @@ public sealed class DocumentController
         if (string.IsNullOrEmpty(query) || ActiveDocument is not { } doc)
             return;
 
+        var (regex, comparison) = PrepareSearchParams(query, caseSensitive, useRegex);
+        if (useRegex && regex is null) return; // invalid regex
+
+        var allMatches = new List<SearchMatch>();
+        for (int page = 0; page < doc.PageCount; page++)
+            SearchPage(doc, page, query, regex, comparison, allMatches);
+
+        FinalizeSearch(doc, allMatches);
+    }
+
+    /// <summary>
+    /// Prepares search parameters. Returns null regex for invalid regex patterns.
+    /// </summary>
+    public static (Regex? Regex, StringComparison Comparison) PrepareSearchParams(
+        string query, bool caseSensitive, bool useRegex)
+    {
         Regex? regex = null;
         if (useRegex)
         {
@@ -1297,34 +1316,47 @@ public sealed class DocumentController
                 var options = caseSensitive ? RegexOptions.None : RegexOptions.IgnoreCase;
                 regex = new Regex(query, options);
             }
-            catch (RegexParseException)
-            {
-                return;
-            }
+            catch (RegexParseException) { }
         }
-
-        var allMatches = new List<SearchMatch>();
         var comparison = caseSensitive ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
+        return (regex, comparison);
+    }
 
-        for (int page = 0; page < doc.PageCount; page++)
+    /// <summary>
+    /// Searches a single page and appends matches to the list.
+    /// Uses PDFium's FPDFText_CountRects/GetRect for accurate highlight positioning.
+    /// </summary>
+    public static void SearchPage(DocumentState doc, int page, string query,
+        Regex? regex, StringComparison comparison, List<SearchMatch> results)
+    {
+        var pageText = doc.GetOrExtractText(page);
+        if (string.IsNullOrEmpty(pageText.Text)) return;
+
+        IEnumerable<(int Index, int Length)> hits;
+        if (regex is not null)
+            hits = regex.Matches(pageText.Text).Select(m => (m.Index, m.Length));
+        else
+            hits = FindAllOccurrences(pageText.Text, query, comparison);
+
+        // Collect all hits first so we can batch the PDFium rect query
+        var hitList = hits.ToList();
+        if (hitList.Count == 0) return;
+
+        var allRects = PdfTextService.GetTextRangeRects(doc.Pdf.PdfBytes, page, hitList);
+
+        for (int i = 0; i < hitList.Count; i++)
         {
-            var pageText = doc.GetOrExtractText(page);
-            if (string.IsNullOrEmpty(pageText.Text)) continue;
-
-            IEnumerable<(int Index, int Length)> hits;
-            if (regex is not null)
-                hits = regex.Matches(pageText.Text).Select(m => (m.Index, m.Length));
-            else
-                hits = FindAllOccurrences(pageText.Text, query, comparison);
-
-            foreach (var (index, length) in hits)
-            {
-                var rects = BuildMatchRects(pageText, index, length);
-                if (rects.Count > 0)
-                    allMatches.Add(new SearchMatch(page, index, length, rects));
-            }
+            var rects = allRects[i];
+            if (rects.Count > 0)
+                results.Add(new SearchMatch(page, hitList[i].Index, hitList[i].Length, rects));
         }
+    }
 
+    /// <summary>
+    /// Finalizes search results: sets active match, navigates, updates current page matches.
+    /// </summary>
+    public void FinalizeSearch(DocumentState doc, List<SearchMatch> allMatches)
+    {
         SearchMatches = allMatches;
         if (allMatches.Count > 0)
         {
@@ -1332,7 +1364,6 @@ public sealed class DocumentController
             ActiveMatchIndex = firstOnCurrentOrAfter >= 0 ? firstOnCurrentOrAfter : 0;
             NavigateToActiveMatch();
         }
-
         UpdateCurrentPageMatches();
     }
 
@@ -1350,6 +1381,35 @@ public sealed class DocumentController
         ActiveMatchIndex = (ActiveMatchIndex - 1 + SearchMatches.Count) % SearchMatches.Count;
         NavigateToActiveMatch();
         UpdateCurrentPageMatches();
+    }
+
+    public void GoToMatch(int matchIndex)
+    {
+        if (matchIndex < 0 || matchIndex >= SearchMatches.Count) return;
+        ActiveMatchIndex = matchIndex;
+        NavigateToActiveMatch();
+        UpdateCurrentPageMatches();
+    }
+
+    public (string Pre, string Match, string Post) GetMatchSnippet(SearchMatch match, int contextChars = 40)
+    {
+        var text = ActiveDocument?.GetOrExtractText(match.PageIndex).Text;
+        if (text is null) return ("", "", "");
+
+        int start = Math.Max(0, match.CharStart - contextChars);
+        int end = Math.Min(text.Length, match.CharStart + match.CharLength + contextChars);
+        int matchEnd = Math.Min(match.CharStart + match.CharLength, text.Length);
+
+        string pre = (start > 0 ? "\u2026" : "") + text[start..match.CharStart];
+        string matchStr = text[match.CharStart..matchEnd];
+        string post = text[matchEnd..end] + (end < text.Length ? "\u2026" : "");
+
+        // Clean up whitespace for display
+        pre = pre.Replace('\n', ' ').Replace('\r', ' ');
+        matchStr = matchStr.Replace('\n', ' ').Replace('\r', ' ');
+        post = post.Replace('\n', ' ').Replace('\r', ' ');
+
+        return (pre, matchStr, post);
     }
 
     private void NavigateToActiveMatch()
@@ -1504,14 +1564,6 @@ public sealed class DocumentController
         var rects = new List<HighlightRect>();
         foreach (var (l, t, r, b) in MergeCharBoxesIntoLines(pageText, charStart, charLength))
             rects.Add(new HighlightRect(l - 1, t, r - l + 2, b - t));
-        return rects;
-    }
-
-    private static List<SKRect> BuildMatchRects(PageText pageText, int charStart, int charLength)
-    {
-        var rects = new List<SKRect>();
-        foreach (var (l, t, r, b) in MergeCharBoxesIntoLines(pageText, charStart, charLength))
-            rects.Add(new SKRect(l, t, r, b));
         return rects;
     }
 

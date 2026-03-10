@@ -72,13 +72,6 @@
                                    Margin="16,4,0,0"
                                    IsVisible="{Binding Tabs.Count}" />
 
-                    <!-- Search bar overlay -->
-                    <v:SearchBarView Name="SearchBar"
-                                     IsVisible="{Binding ShowSearch}"
-                                     VerticalAlignment="Top"
-                                     HorizontalAlignment="Right"
-                                     Margin="0,4,16,0" />
-
                     <!-- Radial annotation menu (screen-space overlay) -->
                     <Canvas Name="RadialMenuCanvas"
                             IsHitTestVisible="{Binding IsRadialMenuOpen}"

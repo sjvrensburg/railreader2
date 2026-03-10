@@ -628,7 +628,7 @@
       <div class="screenshots__row">
         <figure class="screenshot">
           <img src="img/search_highlights.png" alt="Search results with highlighted matches" onclick="openLightbox(this)">
-          <figcaption>Search &mdash; full-text with regex, matches highlighted</figcaption>
+          <figcaption>Search &mdash; sidebar panel with grouped results and page highlights</figcaption>
         </figure>
         <figure class="screenshot">
           <img src="img/annotations.png" alt="Annotations on a PDF page" onclick="openLightbox(this)">
@@ -769,9 +769,11 @@
       <div class="feature">
         <h3>Search</h3>
         <p>
-          Full-text search across all pages with regex and case-sensitivity
-          toggles. Matches are highlighted on the page with the active match
-          emphasized. Navigate between matches with F3 / Shift+F3.
+          Full-text search across all pages in a sidebar panel. Results are
+          grouped by page with text snippets showing matches in context.
+          Click any result to jump to that match. Regex and case-sensitivity
+          toggles. Matches highlighted on the page &mdash; navigate with
+          F3 / Shift+F3 or Enter / Shift+Enter.
         </p>
       </div>
       <div class="feature">
@@ -808,7 +810,7 @@
         <p>
           All business logic lives in a UI-free core library
           (<code>RailReader.Core</code>) with zero Avalonia dependencies.
-          The desktop app is a thin UI shell. Fully testable &mdash; 29
+          The desktop app is a thin UI shell. Fully testable &mdash; 37
           xUnit tests run without a display server.
         </p>
       </div>
@@ -888,7 +890,7 @@
       <tr><td>[ / ]</td><td>Adjust scroll speed or jump distance</td></tr>
       <tr><td>Shift+[ / ]</td><td>Adjust blur intensity</td></tr>
       <tr><th colspan="2">Search &amp; Annotations</th></tr>
-      <tr><td>Ctrl+F</td><td>Open search bar</td></tr>
+      <tr><td>Ctrl+F</td><td>Open search panel</td></tr>
       <tr><td>F3 / Shift+F3</td><td>Next / previous match</td></tr>
       <tr><td>Escape</td><td>Stop auto-scroll / close search / cancel tool / exit fullscreen</td></tr>
       <tr><td>Right-click</td><td>Open annotation radial menu (colour picker for Highlight/Pen)</td></tr>

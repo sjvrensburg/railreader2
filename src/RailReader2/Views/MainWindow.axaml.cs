@@ -59,7 +59,11 @@ public partial class MainWindow : Window
                     OverlayLayer.TintOpacity = vm.Config.LineHighlightOpacity;
                     OverlayLayer.InvalidateVisual();
                 },
-                InvalidateSearch = () => SearchLayer.InvalidateVisual(),
+                InvalidateSearch = () =>
+                {
+                    SearchLayer.InvalidateVisual();
+                    OutlinePanel.OnSearchInvalidated();
+                },
                 InvalidateAnnotations = () => AnnotationLayer.InvalidateVisual(),
             });
 
@@ -318,7 +322,8 @@ public partial class MainWindow : Window
             switch (e.Key)
             {
                 case Key.O when shift:
-                    if (vm.ShowOutline && !OutlinePanel.IsBookmarksTabActive)
+                    if (vm.ShowOutline && !OutlinePanel.IsBookmarksTabActive
+                        && !OutlinePanel.IsSearchTabActive)
                         vm.ShowOutline = false;
                     else
                     {
@@ -345,7 +350,6 @@ public partial class MainWindow : Window
                     vm.ShowSettings = true; e.Handled = true; return;
                 case Key.F:
                     vm.OpenSearch();
-                    SearchBar.FocusSearch();
                     e.Handled = true; return;
                 case Key.G:
                     vm.ShowGoToPage = true; e.Handled = true; return;
@@ -372,7 +376,7 @@ public partial class MainWindow : Window
 
         // When the search TextBox has focus, let text input keys through.
         // Only intercept non-text keys (F-keys, Escape, PgUp/PgDn, etc.).
-        bool searchFocused = vm.ShowSearch && SearchBar.IsSearchInputFocused;
+        bool searchFocused = vm.ShowOutline && OutlinePanel.IsSearchInputFocused;
 
         // Navigation and toggle keys — only when search is not focused.
         if (!searchFocused)
@@ -488,8 +492,10 @@ public partial class MainWindow : Window
                     vm.CloseRadialMenu(); e.Handled = true; break;
                 case Key.Escape when vm.IsAnnotating:
                     vm.CancelAnnotationTool(); e.Handled = true; break;
-                case Key.Escape when vm.ShowSearch:
-                    vm.CloseSearch(); e.Handled = true; break;
+                case Key.Escape when vm.ShowOutline && OutlinePanel.IsSearchTabActive:
+                    vm.CloseSearch();
+                    OutlinePanel.SwitchToOutlineTab();
+                    e.Handled = true; break;
             }
         }
 
