@@ -45,25 +45,16 @@ public static class PdfTextService
             if (charCount <= 0)
                 return s_empty;
 
-            // Extract full text (UTF-16LE, two-pass pattern)
-            // Buffer size is in bytes, including null terminator (2 bytes per char + 2)
-            int bufferLen = (charCount + 1) * 2;
-            var textBuffer = Marshal.AllocHGlobal(bufferLen);
-            string text;
-            try
-            {
-                int written = FPDFText_GetText(textPage, 0, charCount, textBuffer);
-                text = Marshal.PtrToStringUni(textBuffer, Math.Max(0, written - 1)) ?? "";
-            }
-            finally
-            {
-                Marshal.FreeHGlobal(textBuffer);
-            }
-
-            // Extract per-character bounding boxes
+            // Build text character-by-character using FPDFText_GetUnicode to ensure
+            // 1:1 index correspondence with FPDFText_GetCharBox.
+            // FPDFText_GetText can produce different indexing than GetCharBox/GetUnicode.
+            var textChars = new char[charCount];
             var charBoxes = new List<CharBox>(charCount);
             for (int i = 0; i < charCount; i++)
             {
+                uint unicode = FPDFText_GetUnicode(textPage, i);
+                textChars[i] = unicode <= 0xFFFF ? (char)unicode : '\uFFFD';
+
                 double left = 0, right = 0, bottom = 0, top = 0;
                 if (FPDFText_GetCharBox(textPage, i, ref left, ref right, ref bottom, ref top))
                 {
@@ -79,6 +70,7 @@ public static class PdfTextService
                     charBoxes.Add(new CharBox(i, 0, 0, 0, 0));
                 }
             }
+            string text = new string(textChars);
 
             return new PageText(text, charBoxes);
         }
@@ -107,7 +99,7 @@ public static class PdfTextService
     [DllImport(Lib)] private static extern IntPtr FPDFText_LoadPage(IntPtr page);
     [DllImport(Lib)] private static extern void FPDFText_ClosePage(IntPtr textPage);
     [DllImport(Lib)] private static extern int FPDFText_CountChars(IntPtr textPage);
-    [DllImport(Lib)] private static extern int FPDFText_GetText(IntPtr textPage, int startIndex, int count, IntPtr result);
+    [DllImport(Lib)] private static extern uint FPDFText_GetUnicode(IntPtr textPage, int index);
     [DllImport(Lib)] private static extern bool FPDFText_GetCharBox(IntPtr textPage, int index,
         ref double left, ref double right, ref double bottom, ref double top);
 }
