@@ -146,6 +146,7 @@ public sealed class LayoutAnalyzer : IDisposable
         for (int i = 0; i < rawBlocks.Count; i++)
             rawBlocks[i].Order = i;
 
+        ResolveVerticalOverlaps(rawBlocks);
         DetectLinesForBlocks(rawBlocks, rgbBytes, pxW, pxH, mapScaleX, mapScaleY);
 
         return new PageAnalysis
@@ -255,6 +256,51 @@ public sealed class LayoutAnalyzer : IDisposable
         for (int i = blocks.Count - 1; i >= 0; i--)
         {
             if (!keep[i]) blocks.RemoveAt(i);
+        }
+    }
+
+    /// <summary>
+    /// Trims vertically overlapping blocks so each block's bounding box covers only
+    /// its own content. When two blocks overlap vertically with similar X ranges,
+    /// the later block's top is pushed down to the earlier block's bottom.
+    /// This prevents line detection from finding text belonging to an adjacent block.
+    /// </summary>
+    private static void ResolveVerticalOverlaps(List<LayoutBlock> blocks)
+    {
+        // Blocks are already sorted by reading order / Y position.
+        for (int i = 0; i < blocks.Count; i++)
+        {
+            var a = blocks[i];
+            float aBottom = a.BBox.Y + a.BBox.H;
+
+            for (int j = i + 1; j < blocks.Count; j++)
+            {
+                var b = blocks[j];
+                float bBottom = b.BBox.Y + b.BBox.H;
+
+                // Check horizontal overlap: blocks must share significant X range
+                float overlapX = Math.Min(a.BBox.X + a.BBox.W, b.BBox.X + b.BBox.W)
+                    - Math.Max(a.BBox.X, b.BBox.X);
+                float minW = Math.Min(a.BBox.W, b.BBox.W);
+                if (overlapX < minW * 0.5f) continue; // not horizontally aligned
+
+                // Check vertical overlap: block A's bottom extends past block B's top
+                float overlapY = aBottom - b.BBox.Y;
+                if (overlapY <= 0) continue; // no vertical overlap
+
+                // Trim the later block's top to start at the earlier block's bottom
+                float newY = aBottom;
+                float newH = bBottom - newY;
+                if (newH < 5) continue; // don't shrink to nothing
+
+                blocks[j] = new LayoutBlock
+                {
+                    BBox = new BBox(b.BBox.X, newY, b.BBox.W, newH),
+                    ClassId = b.ClassId,
+                    Confidence = b.Confidence,
+                    Order = b.Order,
+                };
+            }
         }
     }
 

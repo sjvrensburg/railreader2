@@ -21,6 +21,8 @@ public sealed class DocumentState : IDisposable
     private bool _debugOverlay;
     private bool _pendingRailSetup;
     private ColourEffect _colourEffect;
+    private bool _lineFocusBlur;
+    private bool _bionicReading;
 
     /// <summary>Fires when a property changes. Parameter is the property name.</summary>
     public Action<string>? StateChanged;
@@ -75,12 +77,22 @@ public sealed class DocumentState : IDisposable
         get => _colourEffect;
         set
         {
-            if (_colourEffect != value)
-            {
-                _colourEffect = value;
-                StateChanged?.Invoke(nameof(ColourEffect));
-            }
+            if (_colourEffect == value) return;
+            _colourEffect = value;
+            StateChanged?.Invoke(nameof(ColourEffect));
         }
+    }
+
+    public bool LineFocusBlur
+    {
+        get => _lineFocusBlur;
+        set => SetField(ref _lineFocusBlur, value, nameof(LineFocusBlur));
+    }
+
+    public bool BionicReading
+    {
+        get => _bionicReading;
+        set => SetField(ref _bionicReading, value, nameof(BionicReading));
     }
 
     public string FilePath { get; }
@@ -118,6 +130,8 @@ public sealed class DocumentState : IDisposable
         PageCount = _pdf.PageCount;
         _title = Path.GetFileName(filePath);
         _colourEffect = config.ColourEffect;
+        _lineFocusBlur = config.LineFocusBlur;
+        _bionicReading = config.BionicReading;
         Rail = new RailNav(config);
         Outline = _pdf.Outline;
     }

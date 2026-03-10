@@ -57,7 +57,7 @@ public static class ColourEffectExtensions
         ColourEffect.HighVisibility => "High Visibility",
         ColourEffect.Amber => "Amber Filter",
         ColourEffect.Invert => "Invert",
-        _ => effect.ToString()
+        _ => effect.ToString(),
     };
 
     public static OverlayPalette GetOverlayPalette(this ColourEffect effect) => effect switch

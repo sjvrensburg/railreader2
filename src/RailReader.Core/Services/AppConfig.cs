@@ -101,14 +101,14 @@ public sealed class AppConfig
     public void SaveReadingPosition(string filePath, int page, double zoom, double offsetX, double offsetY,
         ColourEffect? colourEffect = null)
     {
-        AddRecentFile(filePath); // ensures entry exists at index 0
+        AddRecentFile(filePath); // ensures entry exists at index 0 and calls Save()
         var entry = RecentFiles[0];
         entry.Page = page;
         entry.Zoom = zoom;
         entry.OffsetX = offsetX;
         entry.OffsetY = offsetY;
         entry.ColourEffect = colourEffect;
-        Save();
+        Save(); // save updated reading position fields
     }
 
     public RecentFileEntry? GetReadingPosition(string filePath)

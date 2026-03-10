@@ -91,8 +91,7 @@ public partial class RailToolBar : UserControl
         {
             if (ViewModel is { } vm)
             {
-                vm.Config.LineFocusBlur = !vm.Config.LineFocusBlur;
-                vm.OnConfigChanged();
+                vm.ToggleLineFocusBlur();
                 UpdateToggleStates();
             }
         });
@@ -114,8 +113,8 @@ public partial class RailToolBar : UserControl
         if (ViewModel is not { } vm) return;
         ApplyToggleStyle(_autoScrollBtn, vm.AutoScrollActive);
         ApplyToggleStyle(_jumpBtn, vm.JumpMode);
-        ApplyToggleStyle(_focusBlurBtn, vm.Config.LineFocusBlur);
-        ApplyToggleStyle(_bionicBtn, vm.Config.BionicReading);
+        ApplyToggleStyle(_focusBlurBtn, vm.ActiveTab?.LineFocusBlur ?? false);
+        ApplyToggleStyle(_bionicBtn, vm.ActiveTab?.BionicReading ?? false);
     }
 
     private static void ApplyToggleStyle(Button? btn, bool active)
