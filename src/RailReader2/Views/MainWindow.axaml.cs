@@ -80,6 +80,7 @@ public partial class MainWindow : Window
             SetupRadialMenu(vm);
             RailToolBar.ViewModel = vm;
             RailToolBar.SyncFromConfig();
+            UpdateSidebarColumnWidth(vm.ShowOutline);
 
             // window.Opened (which calls OpenDocument) can fire before OnLoaded
             // finishes wiring _invalidation. If a tab is already present, the
@@ -106,6 +107,9 @@ public partial class MainWindow : Window
                         AnnotationLayer.InvalidateVisual();
                         OverlayLayer.InvalidateVisual();
                         Minimap.InvalidateVisual();
+                        break;
+                    case nameof(MainWindowViewModel.ShowOutline):
+                        UpdateSidebarColumnWidth(vm.ShowOutline);
                         break;
                     case nameof(MainWindowViewModel.ShowShortcuts) when vm.ShowShortcuts:
                         vm.ShowShortcuts = false;
@@ -252,6 +256,12 @@ public partial class MainWindow : Window
             RailToolBar.SetJumpMode(v.JumpMode);
             RailToolBar.UpdateToggleStates();
         }
+    }
+
+    private void UpdateSidebarColumnWidth(bool showOutline)
+    {
+        var col = MainGrid.ColumnDefinitions[0];
+        col.Width = showOutline ? new GridLength(220) : new GridLength(0);
     }
 
     private void UpdateCameraTransform()
