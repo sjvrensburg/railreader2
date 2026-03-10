@@ -40,6 +40,7 @@ public sealed class RailNav
     private Stopwatch? _edgeHoldTimer;
     private ScrollDirection? _edgeHoldDir;
     private ScrollDirection? _pendingEdgeAdvance;
+    private bool _edgeAdvanceJustFired; // suppresses next Jump() so the snap-to-start/end isn't overwritten
     private const double EdgeAdvanceHoldMs = 400.0;
 
     public RailNav(AppConfig config) => _config = config;
@@ -228,6 +229,12 @@ public sealed class RailNav
         _scrollHoldTimer = null;
         _scrollSeedSecs = 0;
         ScrollSpeed = 0.0;
+    }
+
+    /// <summary>Clears both scroll and edge-hold state (e.g. on key release or mode change).</summary>
+    public void StopScrollAndEdgeHold()
+    {
+        StopScroll();
         _edgeHoldTimer = null;
         _edgeHoldDir = null;
     }
@@ -273,6 +280,14 @@ public sealed class RailNav
     {
         if (!CanNavigate) return;
 
+        // After an edge-hold advance, suppress jumps until the snap-to-start/end
+        // animation completes so key repeat doesn't overwrite it.
+        if (_edgeAdvanceJustFired)
+        {
+            if (_snap is not null) return; // snap still running
+            _edgeAdvanceJustFired = false;
+        }
+
         double jumpPx = windowWidth * (_config.JumpPercentage / 100.0);
         if (half) jumpPx *= 0.5;
         double newX = forward ? cameraX - jumpPx : cameraX + jumpPx;
@@ -293,6 +308,7 @@ public sealed class RailNav
                 && _edgeHoldTimer.Elapsed.TotalMilliseconds >= EdgeAdvanceHoldMs)
             {
                 _pendingEdgeAdvance = dir;
+                _edgeAdvanceJustFired = true;
                 _edgeHoldTimer = null;
                 _edgeHoldDir = null;
                 return; // controller will advance line and snap
@@ -523,7 +539,7 @@ public sealed class RailNav
                     && _edgeHoldTimer.Elapsed.TotalMilliseconds >= EdgeAdvanceHoldMs)
                 {
                     _pendingEdgeAdvance = dir;
-                    StopScroll(); // clear scroll state; key-repeat will restart it on the new line
+                    StopScrollAndEdgeHold(); // clear scroll state; key-repeat will restart it on the new line
                 }
             }
             else
@@ -577,7 +593,7 @@ public sealed class RailNav
         _autoScrollPauseTimer = null;
         _autoScrollPendingPauseMs = 0;
         // Stop any manual scroll
-        StopScroll();
+        StopScrollAndEdgeHold();
     }
 
     public void StopAutoScroll()

@@ -492,7 +492,7 @@ public sealed class DocumentController
     {
         if (isHorizontal)
         {
-            ActiveDocument?.Rail.StopScroll();
+            ActiveDocument?.Rail.StopScrollAndEdgeHold();
             if (AutoScrollActive)
                 ActiveDocument?.Rail.SetAutoScrollBoost(false);
         }
