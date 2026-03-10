@@ -38,13 +38,15 @@ public partial class MainWindow : Window
                 {
                     PageLayer.MotionBlurEnabled = vm.Config.MotionBlur;
                     PageLayer.MotionBlurIntensity = vm.Config.MotionBlurIntensity;
-                    PageLayer.LineFocusBlurEnabled = vm.Config.LineFocusBlur;
+                    var tab = vm.ActiveTab;
+                    bool blur = tab?.LineFocusBlur ?? false;
+                    bool bionic = tab?.BionicReading ?? false;
+                    PageLayer.LineFocusBlurEnabled = blur;
                     PageLayer.LineFocusBlurIntensity = vm.Config.LineFocusBlurIntensity;
                     PageLayer.LineFocusPadding = vm.Config.LineFocusPadding;
-                    PageLayer.BionicReadingEnabled = vm.Config.BionicReading;
+                    PageLayer.BionicReadingEnabled = bionic;
                     PageLayer.BionicFadeIntensity = vm.Config.BionicFadeIntensity;
-                    var tab = vm.ActiveTab;
-                    PageLayer.BionicFadeRects = vm.Config.BionicReading && tab is not null
+                    PageLayer.BionicFadeRects = bionic && tab is not null
                         ? tab.State.GetOrComputeBionicOverlay(tab.CurrentPage, vm.Config.BionicFixationPercent)
                         : null;
                     PageLayer.InvalidateVisual();
@@ -52,7 +54,7 @@ public partial class MainWindow : Window
                 },
                 InvalidateOverlay = () =>
                 {
-                    OverlayLayer.LineFocusBlurActive = vm.Config.LineFocusBlur;
+                    OverlayLayer.LineFocusBlurActive = vm.ActiveTab?.LineFocusBlur ?? false;
                     OverlayLayer.Tint = vm.Config.LineHighlightTint;
                     OverlayLayer.TintOpacity = vm.Config.LineHighlightOpacity;
                     OverlayLayer.InvalidateVisual();
@@ -217,12 +219,14 @@ public partial class MainWindow : Window
         PageLayer.ColourEffects = Vm?.ColourEffects;
         PageLayer.MotionBlurEnabled = Vm?.Config.MotionBlur ?? true;
         PageLayer.MotionBlurIntensity = Vm?.Config.MotionBlurIntensity ?? 0.5;
-        PageLayer.LineFocusBlurEnabled = Vm?.Config.LineFocusBlur ?? false;
+        bool blur = tab?.LineFocusBlur ?? false;
+        bool bionic = tab?.BionicReading ?? false;
+        PageLayer.LineFocusBlurEnabled = blur;
         PageLayer.LineFocusBlurIntensity = Vm?.Config.LineFocusBlurIntensity ?? 0.5;
         PageLayer.LineFocusPadding = Vm?.Config.LineFocusPadding ?? 0.2;
-        PageLayer.BionicReadingEnabled = Vm?.Config.BionicReading ?? false;
+        PageLayer.BionicReadingEnabled = bionic;
         PageLayer.BionicFadeIntensity = Vm?.Config.BionicFadeIntensity ?? 0.6;
-        PageLayer.BionicFadeRects = (Vm?.Config.BionicReading ?? false) && tab is not null
+        PageLayer.BionicFadeRects = bionic && tab is not null
             ? tab.State.GetOrComputeBionicOverlay(tab.CurrentPage, Vm?.Config.BionicFixationPercent ?? 0.4)
             : null;
         SearchLayer.Tab = tab;
@@ -231,7 +235,7 @@ public partial class MainWindow : Window
         AnnotationLayer.ViewModel = Vm;
         OverlayLayer.Tab = tab;
         OverlayLayer.ColourEffects = Vm?.ColourEffects;
-        OverlayLayer.LineFocusBlurActive = Vm?.Config.LineFocusBlur ?? false;
+        OverlayLayer.LineFocusBlurActive = tab?.LineFocusBlur ?? false;
         OverlayLayer.Tint = Vm?.Config.LineHighlightTint ?? LineHighlightTint.Auto;
         OverlayLayer.TintOpacity = Vm?.Config.LineHighlightOpacity ?? 0.25;
 

@@ -145,7 +145,9 @@ public partial class SettingsWindow : Window
     private void OnLineFocusBlurChanged(object? sender, RoutedEventArgs e)
     {
         if (Vm is not { } vm || _loading) return;
-        vm.Config.LineFocusBlur = LineFocusBlurCheck.IsChecked == true;
+        bool value = LineFocusBlurCheck.IsChecked == true;
+        vm.Config.LineFocusBlur = value; // update default for new documents
+        if (vm.ActiveTab is { } tab) tab.LineFocusBlur = value;
         vm.OnConfigChanged();
     }
 
@@ -168,7 +170,9 @@ public partial class SettingsWindow : Window
     private void OnBionicReadingChanged(object? sender, RoutedEventArgs e)
     {
         if (Vm is not { } vm || _loading) return;
-        vm.Config.BionicReading = BionicReadingCheck.IsChecked == true;
+        bool value = BionicReadingCheck.IsChecked == true;
+        vm.Config.BionicReading = value; // update default for new documents
+        if (vm.ActiveTab is { } tab) tab.BionicReading = value;
         vm.OnConfigChanged();
     }
 
@@ -211,6 +215,11 @@ public partial class SettingsWindow : Window
         vm.Config.PixelSnapping = defaults.PixelSnapping;
         vm.Config.LineFocusBlur = defaults.LineFocusBlur;
         vm.Config.LineFocusBlurIntensity = defaults.LineFocusBlurIntensity;
+        if (vm.ActiveTab is { } resetTab)
+        {
+            resetTab.LineFocusBlur = defaults.LineFocusBlur;
+            resetTab.BionicReading = defaults.BionicReading;
+        }
         vm.Config.AutoScrollLinePauseMs = defaults.AutoScrollLinePauseMs;
         vm.Config.AutoScrollBlockPauseMs = defaults.AutoScrollBlockPauseMs;
         vm.Config.JumpPercentage = defaults.JumpPercentage;

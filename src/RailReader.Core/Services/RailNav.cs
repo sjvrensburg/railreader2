@@ -278,6 +278,32 @@ public sealed class RailNav
         double newX = forward ? cameraX - jumpPx : cameraX + jumpPx;
         newX = ClampX(newX, zoom, windowWidth);
 
+        // Edge-hold advance: if the jump can't move the camera (at boundary),
+        // accumulate hold time across repeated key-press events and trigger
+        // a line advance when the threshold is reached.
+        var dir = forward ? ScrollDirection.Forward : ScrollDirection.Backward;
+        if (IsAtHardEdge(newX, zoom, windowWidth, dir))
+        {
+            if (_edgeHoldDir != dir)
+            {
+                _edgeHoldTimer = Stopwatch.StartNew();
+                _edgeHoldDir = dir;
+            }
+            else if (_edgeHoldTimer is not null
+                && _edgeHoldTimer.Elapsed.TotalMilliseconds >= EdgeAdvanceHoldMs)
+            {
+                _pendingEdgeAdvance = dir;
+                _edgeHoldTimer = null;
+                _edgeHoldDir = null;
+                return; // controller will advance line and snap
+            }
+        }
+        else
+        {
+            _edgeHoldTimer = null;
+            _edgeHoldDir = null;
+        }
+
         var (_, targetY) = ComputeTargetCamera(zoom, windowWidth, windowHeight);
 
         _snap = new SnapAnimation

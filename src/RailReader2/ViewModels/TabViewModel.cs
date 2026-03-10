@@ -22,6 +22,8 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
     [ObservableProperty] private bool _debugOverlay;
     [ObservableProperty] private bool _pendingRailSetup;
     [ObservableProperty] private ColourEffect _colourEffect;
+    [ObservableProperty] private bool _lineFocusBlur;
+    [ObservableProperty] private bool _bionicReading;
 
     // Read-only properties used by Views
     public string FilePath => State.FilePath;
@@ -53,6 +55,8 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
         _debugOverlay = state.DebugOverlay;
         _pendingRailSetup = state.PendingRailSetup;
         _colourEffect = state.ColourEffect;
+        _lineFocusBlur = state.LineFocusBlur;
+        _bionicReading = state.BionicReading;
 
         state.StateChanged += OnStateChanged;
     }
@@ -68,6 +72,8 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
             case nameof(DebugOverlay): DebugOverlay = State.DebugOverlay; break;
             case nameof(PendingRailSetup): PendingRailSetup = State.PendingRailSetup; break;
             case nameof(ColourEffect): ColourEffect = State.ColourEffect; break;
+            case nameof(LineFocusBlur): LineFocusBlur = State.LineFocusBlur; break;
+            case nameof(BionicReading): BionicReading = State.BionicReading; break;
         }
     }
 
@@ -79,6 +85,8 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
     partial void OnDebugOverlayChanged(bool value) => State.DebugOverlay = value;
     partial void OnPendingRailSetupChanged(bool value) => State.PendingRailSetup = value;
     partial void OnColourEffectChanged(ColourEffect value) => State.ColourEffect = value;
+    partial void OnLineFocusBlurChanged(bool value) => State.LineFocusBlur = value;
+    partial void OnBionicReadingChanged(bool value) => State.BionicReading = value;
 
     // Methods used by Views (MinimapControl, MainWindow)
     public void CenterPage(double ww, double wh) => State.CenterPage(ww, wh);

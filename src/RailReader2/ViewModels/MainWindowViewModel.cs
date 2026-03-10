@@ -434,15 +434,21 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public void ToggleLineFocusBlur()
     {
-        Config.LineFocusBlur = !Config.LineFocusBlur;
-        OnConfigChanged();
+        if (_controller.ActiveDocument is { } doc)
+        {
+            doc.LineFocusBlur = !doc.LineFocusBlur;
+            InvalidatePage();
+        }
     }
 
     public void ToggleBionicReading()
     {
-        Config.BionicReading = !Config.BionicReading;
-        ShowStatusToast(Config.BionicReading ? "Bionic reading ON" : "Bionic reading OFF");
-        OnConfigChanged();
+        if (_controller.ActiveDocument is { } doc)
+        {
+            doc.BionicReading = !doc.BionicReading;
+            ShowStatusToast(doc.BionicReading ? "Bionic reading ON" : "Bionic reading OFF");
+            InvalidatePage();
+        }
     }
 
     // --- Colour effects ---
