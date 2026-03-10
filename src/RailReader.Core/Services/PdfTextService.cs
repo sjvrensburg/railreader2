@@ -36,14 +36,7 @@ public static class PdfTextService
             if (page == IntPtr.Zero)
                 return s_empty;
 
-            // PDFium text APIs return coordinates in MediaBox space.
-            // If the page has a CropBox offset from MediaBox origin, adjust
-            // so coordinates match the rendered (CropBox) area.
-            float cropLeft = 0, cropBottom = 0, cropRight = 0, cropTop = 0;
-            bool hasCropBox = FPDFPage_GetCropBox(page, ref cropLeft, ref cropBottom, ref cropRight, ref cropTop);
-            float offsetX = hasCropBox ? cropLeft : 0;
-            float offsetY = hasCropBox ? cropBottom : 0;
-            double visibleHeight = hasCropBox ? cropTop - cropBottom : FPDF_GetPageHeight(page);
+            var (offsetX, offsetY, visibleHeight) = GetCropBoxTransform(page);
 
             textPage = FPDFText_LoadPage(page);
             if (textPage == IntPtr.Zero)
@@ -122,15 +115,7 @@ public static class PdfTextService
             page = FPDF_LoadPage(doc, pageIndex);
             if (page == IntPtr.Zero) return result;
 
-            // PDFium text APIs return coordinates in MediaBox space.
-            // PDFtoImage renders the CropBox area. If CropBox is offset from
-            // MediaBox origin, we must subtract the CropBox origin to align
-            // text coordinates with the rendered page.
-            float cropLeft = 0, cropBottom = 0, cropRight = 0, cropTop = 0;
-            bool hasCropBox = FPDFPage_GetCropBox(page, ref cropLeft, ref cropBottom, ref cropRight, ref cropTop);
-            float offsetX = hasCropBox ? cropLeft : 0;
-            float offsetY = hasCropBox ? cropBottom : 0;
-            double visibleHeight = hasCropBox ? cropTop - cropBottom : FPDF_GetPageHeight(page);
+            var (offsetX, offsetY, visibleHeight) = GetCropBoxTransform(page);
 
             textPage = FPDFText_LoadPage(page);
             if (textPage == IntPtr.Zero) return result;
@@ -170,6 +155,22 @@ public static class PdfTextService
         return result;
     }
 
+    /// <summary>
+    /// Computes the CropBox-to-page-point-space transform for a loaded page.
+    /// PDFium text APIs return coordinates in MediaBox space; if the page has a
+    /// CropBox offset from the MediaBox origin, we subtract it so coordinates
+    /// align with the rendered (CropBox) area.
+    /// </summary>
+    private static (float OffsetX, float OffsetY, double VisibleHeight) GetCropBoxTransform(IntPtr page)
+    {
+        float cropLeft = 0, cropBottom = 0, cropRight = 0, cropTop = 0;
+        bool hasCropBox = FPDFPage_GetCropBox(page, ref cropLeft, ref cropBottom, ref cropRight, ref cropTop);
+        float offsetX = hasCropBox ? cropLeft : 0;
+        float offsetY = hasCropBox ? cropBottom : 0;
+        double visibleHeight = hasCropBox ? cropTop - cropBottom : FPDF_GetPageHeight(page);
+        return (offsetX, offsetY, visibleHeight);
+    }
+
     // PDFium P/Invoke declarations
     private const string Lib = "pdfium";
 
@@ -184,8 +185,6 @@ public static class PdfTextService
     [DllImport(Lib)] private static extern uint FPDFText_GetUnicode(IntPtr textPage, int index);
     [DllImport(Lib)] private static extern bool FPDFText_GetCharBox(IntPtr textPage, int index,
         ref double left, ref double right, ref double bottom, ref double top);
-    [DllImport(Lib)] private static extern bool FPDFPage_GetMediaBox(IntPtr page,
-        ref float left, ref float bottom, ref float right, ref float top);
     [DllImport(Lib)] private static extern bool FPDFPage_GetCropBox(IntPtr page,
         ref float left, ref float bottom, ref float right, ref float top);
     [DllImport(Lib)] private static extern int FPDFText_CountRects(IntPtr textPage, int startIndex, int count);

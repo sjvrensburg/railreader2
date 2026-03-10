@@ -1339,8 +1339,7 @@ public sealed class DocumentController
         var hitList = hits.ToList();
         if (hitList.Count == 0) return;
 
-        var ranges = hitList.Select(h => (h.Index, h.Length)).ToList();
-        var allRects = PdfTextService.GetTextRangeRects(doc.Pdf.PdfBytes, page, ranges);
+        var allRects = PdfTextService.GetTextRangeRects(doc.Pdf.PdfBytes, page, hitList);
 
         for (int i = 0; i < hitList.Count; i++)
         {
