@@ -1321,6 +1321,7 @@ public sealed class DocumentController
 
     /// <summary>
     /// Searches a single page and appends matches to the list.
+    /// Uses PDFium's FPDFText_CountRects/GetRect for accurate highlight positioning.
     /// </summary>
     public static void SearchPage(DocumentState doc, int page, string query,
         Regex? regex, StringComparison comparison, List<SearchMatch> results)
@@ -1334,11 +1335,18 @@ public sealed class DocumentController
         else
             hits = FindAllOccurrences(pageText.Text, query, comparison);
 
-        foreach (var (index, length) in hits)
+        // Collect all hits first so we can batch the PDFium rect query
+        var hitList = hits.ToList();
+        if (hitList.Count == 0) return;
+
+        var ranges = hitList.Select(h => (h.Index, h.Length)).ToList();
+        var allRects = PdfTextService.GetTextRangeRects(doc.Pdf.PdfBytes, page, ranges);
+
+        for (int i = 0; i < hitList.Count; i++)
         {
-            var rects = BuildMatchRects(pageText, index, length);
+            var rects = allRects[i];
             if (rects.Count > 0)
-                results.Add(new SearchMatch(page, index, length, rects));
+                results.Add(new SearchMatch(page, hitList[i].Index, hitList[i].Length, rects));
         }
     }
 
@@ -1554,14 +1562,6 @@ public sealed class DocumentController
         var rects = new List<HighlightRect>();
         foreach (var (l, t, r, b) in MergeCharBoxesIntoLines(pageText, charStart, charLength))
             rects.Add(new HighlightRect(l - 1, t, r - l + 2, b - t));
-        return rects;
-    }
-
-    private static List<SKRect> BuildMatchRects(PageText pageText, int charStart, int charLength)
-    {
-        var rects = new List<SKRect>();
-        foreach (var (l, t, r, b) in MergeCharBoxesIntoLines(pageText, charStart, charLength))
-            rects.Add(new SKRect(l, t, r, b));
         return rects;
     }
 
