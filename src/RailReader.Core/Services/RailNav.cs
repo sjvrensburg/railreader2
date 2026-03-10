@@ -40,8 +40,20 @@ public sealed class RailNav
     private Stopwatch? _edgeHoldTimer;
     private ScrollDirection? _edgeHoldDir;
     private ScrollDirection? _pendingEdgeAdvance;
-    private bool _edgeAdvanceJustFired; // suppresses next Jump() so the snap-to-start/end isn't overwritten
+    private bool _edgeAdvanceJustFired; // suppresses Jump()/StartScroll() so the snap-to-start/end isn't overwritten
     private const double EdgeAdvanceHoldMs = 400.0;
+
+    /// <summary>
+    /// Returns true if input should be suppressed because an edge-hold advance
+    /// snap animation is still in progress.
+    /// </summary>
+    private bool ShouldSuppressAfterEdgeAdvance()
+    {
+        if (!_edgeAdvanceJustFired) return false;
+        if (_snap is not null) return true; // snap still running
+        _edgeAdvanceJustFired = false;
+        return false;
+    }
 
     public RailNav(AppConfig config) => _config = config;
 
@@ -202,13 +214,7 @@ public sealed class RailNav
     {
         if (!CanNavigate) return;
 
-        // After an edge-hold advance, suppress scroll start until the
-        // snap-to-start/end animation completes (same as Jump suppression).
-        if (_edgeAdvanceJustFired)
-        {
-            if (_snap is not null) return;
-            _edgeAdvanceJustFired = false;
-        }
+        if (ShouldSuppressAfterEdgeAdvance()) return;
 
         if (_scrollDir != dir)
         {
@@ -289,13 +295,7 @@ public sealed class RailNav
     {
         if (!CanNavigate) return;
 
-        // After an edge-hold advance, suppress jumps until the snap-to-start/end
-        // animation completes so key repeat doesn't overwrite it.
-        if (_edgeAdvanceJustFired)
-        {
-            if (_snap is not null) return; // snap still running
-            _edgeAdvanceJustFired = false;
-        }
+        if (ShouldSuppressAfterEdgeAdvance()) return;
 
         double jumpPx = windowWidth * (_config.JumpPercentage / 100.0);
         if (half) jumpPx *= 0.5;
