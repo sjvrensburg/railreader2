@@ -3,7 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.Rendering.SceneGraph;
 using Avalonia.Skia;
-using RailReader.Core.Models;
+using RailReader.Core.Services;
 using RailReader2.ViewModels;
 using SkiaSharp;
 
@@ -69,31 +69,12 @@ public class SearchHighlightLayer : Control
             var matches = _vm.CurrentPageSearchMatches;
             if (matches is null || matches.Count == 0) return;
 
-            int activeGlobal = _vm.ActiveMatchIndex;
-            int pageIndex = _tab.CurrentPage;
-
             var highlightPaint = s_highlightPaint ??= new SKPaint { Color = new SKColor(255, 255, 0, 100), IsAntialias = true };
             var activePaint = s_activePaint ??= new SKPaint { Color = new SKColor(255, 165, 0, 160), IsAntialias = true };
 
-            // Determine which match in the current page list is the active one
-            int activeLocalIndex = -1;
-            if (activeGlobal >= 0 && activeGlobal < _vm.SearchMatches.Count)
-            {
-                var activeMatch = _vm.SearchMatches[activeGlobal];
-                if (activeMatch.PageIndex == pageIndex)
-                {
-                    activeLocalIndex = matches.IndexOf(activeMatch);
-                }
-            }
-
-            for (int i = 0; i < matches.Count; i++)
-            {
-                var paint = i == activeLocalIndex ? activePaint : highlightPaint;
-                foreach (var rect in matches[i].Rects)
-                {
-                    canvas.DrawRect(rect, paint);
-                }
-            }
+            int activeLocalIndex = OverlayRenderer.ComputeActiveLocalIndex(
+                _vm.SearchMatches, matches, _vm.ActiveMatchIndex, _tab.CurrentPage);
+            OverlayRenderer.DrawSearchHighlights(canvas, matches, activeLocalIndex, highlightPaint, activePaint);
         }
     }
 }

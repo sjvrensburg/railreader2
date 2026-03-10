@@ -75,11 +75,9 @@ public sealed class DocumentState : IDisposable
         get => _colourEffect;
         set
         {
-            if (_colourEffect != value)
-            {
-                _colourEffect = value;
-                StateChanged?.Invoke(nameof(ColourEffect));
-            }
+            if (_colourEffect == value) return;
+            _colourEffect = value;
+            StateChanged?.Invoke(nameof(ColourEffect));
         }
     }
 
