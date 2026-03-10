@@ -201,6 +201,15 @@ public sealed class RailNav
     public void StartScroll(ScrollDirection dir, double currentCameraX)
     {
         if (!CanNavigate) return;
+
+        // After an edge-hold advance, suppress scroll start until the
+        // snap-to-start/end animation completes (same as Jump suppression).
+        if (_edgeAdvanceJustFired)
+        {
+            if (_snap is not null) return;
+            _edgeAdvanceJustFired = false;
+        }
+
         if (_scrollDir != dir)
         {
             _scrollDir = dir;
@@ -539,6 +548,7 @@ public sealed class RailNav
                     && _edgeHoldTimer.Elapsed.TotalMilliseconds >= EdgeAdvanceHoldMs)
                 {
                     _pendingEdgeAdvance = dir;
+                    _edgeAdvanceJustFired = true;
                     StopScrollAndEdgeHold(); // clear scroll state; key-repeat will restart it on the new line
                 }
             }

@@ -666,11 +666,14 @@ public sealed class DocumentController
                 bool forward = edgeDir == ScrollDirection.Forward;
                 var adv = AdvanceLine(doc, forward, ww, wh);
                 if (adv is LineAdvanceResult.PageChanged or LineAdvanceResult.PageChangedRailLost)
+                {
                     pageChanged = true;
+                    // AdvanceLine already snaps to start; override with snap-to-end for backward
+                    if (!forward && adv == LineAdvanceResult.PageChanged)
+                        doc.StartSnapToEnd(ww, wh);
+                }
                 else if (adv == LineAdvanceResult.LineAdvanced)
                 {
-                    // Backward: snap to the END of the previous line so the user lands where
-                    // they can continue scrolling left without immediately hitting another edge.
                     if (forward) doc.StartSnap(ww, wh);
                     else doc.StartSnapToEnd(ww, wh);
                 }
