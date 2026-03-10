@@ -88,7 +88,18 @@
             <DockPanel>
                 <!-- Search input area -->
                 <StackPanel DockPanel.Dock="Top" Margin="4">
-                    <TextBox Name="SearchInput" Watermark="Find..." />
+                    <DockPanel>
+                        <Button DockPanel.Dock="Right"
+                                Content="&#x2715;"
+                                ToolTip.Tip="Clear Search (Esc)"
+                                Width="26" Height="26"
+                                FontSize="11"
+                                HorizontalContentAlignment="Center"
+                                VerticalContentAlignment="Center"
+                                Padding="0" Margin="4,0,0,0"
+                                Click="OnClearSearchClick" />
+                        <TextBox Name="SearchInput" Watermark="Find..." />
+                    </DockPanel>
                     <StackPanel Orientation="Horizontal" Spacing="4" Margin="0,4,0,0">
                         <ToggleButton Name="CaseSensitiveToggle"
                                       Content="Aa"

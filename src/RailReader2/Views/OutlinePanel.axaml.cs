@@ -248,12 +248,22 @@ public partial class OutlinePanel : UserControl
                 break;
             case Key.Escape:
                 _vm?.CloseSearch();
+                _vm?.InvalidateSearchLayer();
                 SearchInput.Text = "";
                 SearchResultsList.ItemsSource = null;
                 SearchMatchCount.Text = "";
                 e.Handled = true;
                 break;
         }
+    }
+
+    private void OnClearSearchClick(object? sender, RoutedEventArgs e)
+    {
+        _vm?.CloseSearch();
+        _vm?.InvalidateSearchLayer();
+        SearchInput.Text = "";
+        SearchResultsList.ItemsSource = null;
+        SearchMatchCount.Text = "";
     }
 
     private void OnPrevMatchClick(object? sender, RoutedEventArgs e)
