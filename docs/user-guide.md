@@ -194,17 +194,17 @@ Each effect has adjustable intensity (0.0 to 1.0). Rail mode overlay colours aut
 
 ## Search
 
-Press `Ctrl+F` to open the search bar. Type your query and press `Enter` to search across all pages.
+Press `Ctrl+F` to open the search panel in the sidebar. The search tab sits alongside the Outline and Bookmarks tabs. Type your query — results appear automatically after a brief debounce.
 
 ![Search highlights](img/search_highlights.png)
-*Search results — matches highlighted in yellow, active match in orange*
+*Search results — matches grouped by page in the sidebar, highlighted on the page in yellow with the active match in orange*
 
-- **Navigate matches:** `F3` / `Shift+F3` or the arrow buttons in the search bar.
-- **Case sensitivity:** Toggle with the `Aa` button in the search bar.
+- **Results panel:** Matches are grouped by page with text snippets showing the match term in context (bolded). Click any result to jump directly to that match.
+- **Navigate matches:** `Enter` / `Shift+Enter` in the search input, `F3` / `Shift+F3` globally, or the arrow buttons in the panel.
+- **Case sensitivity:** Toggle with the `Aa` button.
 - **Regex:** Toggle with the `.*` button for regular expression search.
-- **Match count:** The search bar shows the current match index and total count.
-
-Press `Escape` to close the search bar and clear highlights.
+- **Match count:** The panel shows the current match index and total count (e.g. "3 of 42").
+- **Clear:** Click the clear button (✕) to remove all highlights and results, or press `Escape`.
 
 ---
 
@@ -377,7 +377,7 @@ Configuration is stored at `~/.config/railreader2/config.json` (Linux) or `%APPD
 
 | Key | Action |
 |-----|--------|
-| `Ctrl+F` | Open search bar |
+| `Ctrl+F` | Open search panel |
 | `F3` / `Shift+F3` | Next / previous match |
 | `1` / `2` / `3` / `4` / `5` | Highlight / Pen / Rectangle / Text Note / Eraser |
 | Right-click | Open radial menu (with colour picker for Highlight/Pen) |

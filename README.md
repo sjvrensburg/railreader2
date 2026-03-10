@@ -72,7 +72,7 @@ At high zoom levels, navigation switches to "rail mode" — the viewer locks ont
 - **Splash screen** — startup splash while ONNX model loads
 - **Analysis indicator** — status bar shows "Analyzing..." during layout inference
 - **Debug overlay** — visualise detected layout blocks with class labels and confidence
-- **Search** — full-text search with regex support, case sensitivity toggle, and match highlighting (Ctrl+F)
+- **Search** — full-text search in a sidebar panel with results grouped by page, text snippets with highlighted match terms, regex and case sensitivity toggles, and match highlighting on the page (Ctrl+F)
 - **Annotations** — highlight, freehand pen, rectangles, text notes, and eraser via radial menu (right-click). Colour picker for highlight (yellow/green/pink) and pen (red/blue/black). Collapsible popup notes with folded-corner icon. Select, move, and resize annotations in browse mode. Delete selected annotations with the Delete key.
 - **Text selection** — select and copy text from PDF pages via the toolbar
 - **Toolbar** — floating Browse/Text Select/Copy toolbar for quick mode switching
@@ -159,7 +159,7 @@ Use **File → Open** (Ctrl+O) to open a PDF from within the app.
 | Shift+[ / Shift+] | Adjust blur intensity (rail mode) |
 | D (shift) | Toggle debug overlay (shows detected blocks) |
 | Ctrl+Shift+B | Toggle bookmarks pane |
-| Ctrl+F | Open search bar |
+| Ctrl+F | Open search panel |
 | F3 / Shift+F3 | Next / previous search match |
 | Right-click | Open annotation radial menu |
 | Ctrl+Z / Ctrl+Y | Undo / redo annotation |

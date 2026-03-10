@@ -679,24 +679,25 @@
     <section class="guide-section" id="search">
       <h2>Search</h2>
       <p>
-        Press <code>Ctrl+F</code> to open the search bar. Type your query and press <code>Enter</code>
-        to search across all pages.
+        Press <code>Ctrl+F</code> to open the search panel in the sidebar. The search tab sits alongside
+        the Outline and Bookmarks tabs. Type your query &mdash; results appear automatically after a brief debounce.
       </p>
 
       <figure class="guide-screenshot">
         <img src="img/search_highlights.png" alt="Search highlights on page" onclick="openLightbox(this)">
-        <figcaption>Search results &mdash; matches highlighted in yellow, active match in orange</figcaption>
+        <figcaption>Search results &mdash; grouped by page in the sidebar, highlighted on the page with the active match in orange</figcaption>
       </figure>
 
       <ul>
-        <li><strong>Navigate matches:</strong> <code>F3</code> / <code>Shift+F3</code> or the arrow buttons in the search bar.</li>
-        <li><strong>Case sensitivity:</strong> Toggle with the <code>Aa</code> button in the search bar.</li>
+        <li><strong>Results panel:</strong> Matches are grouped by page with text snippets showing the match term in
+          context (bolded). Click any result to jump directly to that match.</li>
+        <li><strong>Navigate matches:</strong> <code>Enter</code> / <code>Shift+Enter</code> in the search input,
+          <code>F3</code> / <code>Shift+F3</code> globally, or the arrow buttons in the panel.</li>
+        <li><strong>Case sensitivity:</strong> Toggle with the <code>Aa</code> button.</li>
         <li><strong>Regex:</strong> Toggle with the <code>.*</code> button for regular expression search.</li>
-        <li><strong>Match count:</strong> The search bar shows the current match index and total count.</li>
+        <li><strong>Match count:</strong> The panel shows the current match index and total count (e.g. &ldquo;3 of 42&rdquo;).</li>
+        <li><strong>Clear:</strong> Click the clear button (&times;) to remove all highlights and results, or press <code>Escape</code>.</li>
       </ul>
-      <p>
-        Press <code>Escape</code> to close the search bar and clear highlights.
-      </p>
     </section>
 
     <!-- 9. Annotations -->
@@ -908,7 +909,7 @@
         <tr><td>Shift+[ / Shift+]</td><td>Adjust blur intensity</td></tr>
         <tr><td>Click</td><td>Jump to block</td></tr>
         <tr><th colspan="2">Search &amp; Annotations</th></tr>
-        <tr><td>Ctrl+F</td><td>Open search bar</td></tr>
+        <tr><td>Ctrl+F</td><td>Open search panel</td></tr>
         <tr><td>F3 / Shift+F3</td><td>Next / previous match</td></tr>
         <tr><td>1 / 2 / 3 / 4 / 5</td><td>Highlight / Pen / Rectangle / Text Note / Eraser</td></tr>
         <tr><td>Right-click</td><td>Open radial menu (colour picker for Highlight/Pen)</td></tr>
