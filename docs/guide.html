@@ -34,6 +34,7 @@
       --accent-hover: #90cdf4;
       --card-bg: #1a2435;
       --card-border: #2d3a4e;
+      --stripe-color: #fff;
       --logo-bg: #fff;
       --logo-fg: #141c2b;
       --toggle-bg: #1a2435;
@@ -49,6 +50,7 @@
       --accent-hover: #1a4d80;
       --card-bg: #ffffff;
       --card-border: #d8dde6;
+      --stripe-color: #1a202c;
       --logo-bg: #1a202c;
       --logo-fg: #f7f8fa;
       --toggle-bg: #ffffff;
@@ -84,8 +86,6 @@
       display: flex;
       flex-direction: column;
       gap: 1rem;
-      flex: 1;
-      min-width: 0;
     }
 
     .header__logo {
@@ -122,7 +122,11 @@
       bottom: 0;
       width: 48px;
       background: repeating-linear-gradient(
-        90deg, var(--fg), var(--fg) 2px, transparent 0, transparent 10px
+        90deg,
+        var(--stripe-color),
+        var(--stripe-color) 2px,
+        transparent 0,
+        transparent 10px
       );
       transition: background 0.3s;
     }
@@ -133,10 +137,6 @@
     }
 
     .header nav a { margin-right: 1.5rem; }
-
-    .header__left > a {
-      display: contents;
-    }
 
     .theme-toggle {
       background: var(--toggle-bg);
@@ -409,9 +409,7 @@
 
   <header class="header">
     <div class="header__left">
-      <a href="index.html">
-        <span class="header__logo"><img src="img/logo.png" alt="railreader2 icon" width="59" height="32">railreader2</span>
-      </a>
+      <span class="header__logo"><img src="img/logo.png" alt="railreader2 icon" width="59" height="32">railreader2</span>
       <nav>
         <a href="index.html">Home</a>
         <a href="#getting-started">Getting Started</a>
