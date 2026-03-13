@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://sjvrensburg.github.io/railreader2/sitemap.xml
