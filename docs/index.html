@@ -4,6 +4,19 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>railreader2 — AI-Guided Rail Reading PDF Viewer</title>
+  <meta name="description" content="railreader2 is a desktop PDF viewer with AI-guided rail reading. Deep learning layout analysis navigates documents line by line at high magnification — built for comfortable, sustained reading of academic papers and technical documents.">
+  <meta name="author" content="Stéfan Janse van Rensburg">
+  <link rel="canonical" href="https://sjvrensburg.github.io/railreader2/">
+  <link rel="icon" href="img/logo.png" type="image/png">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://sjvrensburg.github.io/railreader2/">
+  <meta property="og:title" content="railreader2 — AI-Guided Rail Reading PDF Viewer">
+  <meta property="og:description" content="A desktop PDF viewer that uses deep learning layout analysis to guide high-magnification reading — line by line, block by block. Built for comfortable, sustained reading of academic documents.">
+  <meta property="og:image" content="https://sjvrensburg.github.io/railreader2/img/RailReader2_Demo.gif">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="railreader2 — AI-Guided Rail Reading PDF Viewer">
+  <meta name="twitter:description" content="A desktop PDF viewer that uses deep learning layout analysis to guide high-magnification reading — line by line, block by block.">
+  <meta name="twitter:image" content="https://sjvrensburg.github.io/railreader2/img/RailReader2_Demo.gif">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;600;700&family=Fira+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
@@ -234,6 +247,7 @@
 
     .demo__container img {
       width: 100%;
+      height: auto;
       display: block;
     }
 
@@ -328,6 +342,7 @@
 
     .screenshot img {
       width: 100%;
+      height: auto;
       display: block;
       cursor: pointer;
       transition: opacity 0.2s;
@@ -475,6 +490,36 @@
     }
 
     /* ---- Responsive ---- */
+    /* ---- Skip link ---- */
+    .skip-link {
+      position: absolute;
+      top: -3rem;
+      left: 1rem;
+      background: var(--fg);
+      color: var(--bg);
+      padding: 0.5rem 1rem;
+      font-family: var(--font-mono);
+      font-size: 0.9rem;
+      z-index: 9999;
+      transition: top 0.2s;
+    }
+    .skip-link:focus {
+      top: 1rem;
+    }
+
+    /* ---- Screen-reader only ---- */
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0,0,0,0);
+      white-space: nowrap;
+      border: 0;
+    }
+
     @media (max-width: 600px) {
       .screenshots__row,
       .features {
@@ -506,13 +551,39 @@
       }
     }
   </style>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "railreader2",
+    "description": "A desktop PDF viewer with AI-guided rail reading. Uses deep learning layout analysis to navigate documents line by line at high magnification — built for comfortable, sustained reading of academic papers and technical documents.",
+    "url": "https://sjvrensburg.github.io/railreader2/",
+    "downloadUrl": "https://github.com/sjvrensburg/railreader2/releases/latest",
+    "applicationCategory": "UtilitiesApplication",
+    "operatingSystem": ["Linux", "Windows"],
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD"
+    },
+    "softwareVersion": "3.1.2",
+    "license": "https://opensource.org/licenses/MIT",
+    "author": {
+      "@type": "Person",
+      "name": "Stéfan Janse van Rensburg"
+    },
+    "codeRepository": "https://github.com/sjvrensburg/railreader2"
+  }
+  </script>
 </head>
 <body>
+
+  <a href="#main-content" class="skip-link">Skip to main content</a>
 
   <!-- Header -->
   <header class="header">
     <div class="header__left">
-      <span class="header__logo"><img src="img/logo.png" alt="railreader2 icon">railreader2</span>
+      <span class="header__logo"><img src="img/logo.png" alt="railreader2 icon" width="59" height="32">railreader2</span>
       <nav>
         <a href="#story">Story</a>
         <a href="#features">Features</a>
@@ -527,6 +598,8 @@
       <span id="theme-icon"></span>
     </button>
   </header>
+
+  <main id="main-content">
 
   <!-- Hero -->
   <section class="hero">
@@ -545,7 +618,7 @@
   <!-- Demo GIF -->
   <section class="demo">
     <div class="demo__container">
-      <img src="img/RailReader2_Demo.gif" alt="RailReader2 in action &mdash; AI-guided rail reading through an academic PDF at high magnification">
+      <img src="img/RailReader2_Demo.gif" alt="RailReader2 in action &mdash; AI-guided rail reading through an academic PDF at high magnification" width="480" height="270">
       <p class="demo__caption">Rail mode in action &mdash; navigating an academic paper line by line at high magnification</p>
     </div>
   </section>
@@ -607,41 +680,41 @@
     <div class="screenshots">
       <div class="screenshots__row">
         <figure class="screenshot">
-          <img src="img/full_page_view_no_analysis.png" alt="Full page view of a PDF document" onclick="openLightbox(this)">
+          <img src="img/full_page_view_no_analysis.png" alt="Full page view of a PDF document" width="1275" height="1649" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}">
           <figcaption>Full page view &mdash; vector-sharp rendering at any zoom level</figcaption>
         </figure>
         <figure class="screenshot">
-          <img src="img/full_page_view_with_analysis.png" alt="Page view with layout analysis overlay" onclick="openLightbox(this)">
+          <img src="img/full_page_view_with_analysis.png" alt="Page view with layout analysis overlay" width="1275" height="1649" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}">
           <figcaption>Layout analysis &mdash; AI-detected blocks with reading order</figcaption>
         </figure>
       </div>
       <div class="screenshots__row">
         <figure class="screenshot">
-          <img src="img/rail_mode.png" alt="Rail mode reading a text block line by line" onclick="openLightbox(this)">
+          <img src="img/rail_mode.png" alt="Rail mode reading a text block line by line" width="1534" height="1186" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}">
           <figcaption>Rail mode &mdash; line-by-line reading at high magnification</figcaption>
         </figure>
         <figure class="screenshot">
-          <img src="img/line_focus_blur.png" alt="Line focus blur in rail mode" onclick="openLightbox(this)">
+          <img src="img/line_focus_blur.png" alt="Line focus blur in rail mode" width="1534" height="1186" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}">
           <figcaption>Line focus dim &mdash; non-active lines faded for focus</figcaption>
         </figure>
       </div>
       <div class="screenshots__row">
         <figure class="screenshot">
-          <img src="img/search_highlights.png" alt="Search results with highlighted matches" onclick="openLightbox(this)">
+          <img src="img/search_highlights.png" alt="Search results with highlighted matches" width="1935" height="1229" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}">
           <figcaption>Search &mdash; sidebar panel with grouped results and page highlights</figcaption>
         </figure>
         <figure class="screenshot">
-          <img src="img/annotations.png" alt="Annotations on a PDF page" onclick="openLightbox(this)">
+          <img src="img/annotations.png" alt="Annotations on a PDF page" width="1534" height="1186" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}">
           <figcaption>Annotations &mdash; highlights, text notes, freehand, and more</figcaption>
         </figure>
       </div>
       <div class="screenshots__row">
         <figure class="screenshot">
-          <img src="img/colour_effects.png" alt="Amber colour filter applied to PDF content" onclick="openLightbox(this)">
+          <img src="img/colour_effects.png" alt="Amber colour filter applied to PDF content" width="1275" height="1649" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}">
           <figcaption>Amber colour filter &mdash; GPU-accelerated, PDF content only</figcaption>
         </figure>
         <figure class="screenshot">
-          <img src="img/colour_effect_high_contrast.png" alt="High contrast colour effect with rail mode" onclick="openLightbox(this)">
+          <img src="img/colour_effect_high_contrast.png" alt="High contrast colour effect with rail mode" width="1200" height="900" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}">
           <figcaption>High contrast + rail &mdash; maximum readability</figcaption>
         </figure>
       </div>
@@ -649,7 +722,7 @@
   </section>
 
   <!-- Lightbox -->
-  <div class="lightbox" id="lightbox" onclick="closeLightbox()">
+  <div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="Screenshot preview" tabindex="-1" onclick="closeLightbox()">
     <img id="lightbox-img" src="" alt="">
   </div>
 
@@ -853,53 +926,71 @@
   <section class="section" id="shortcuts">
     <h2>Keyboard Shortcuts</h2>
     <table class="shortcuts-table">
-      <tr><th colspan="2">General</th></tr>
-      <tr><td>Ctrl+O</td><td>Open file</td></tr>
-      <tr><td>Ctrl+W</td><td>Close tab</td></tr>
-      <tr><td>Ctrl+Tab</td><td>Next tab</td></tr>
-      <tr><td>Ctrl+Q</td><td>Quit</td></tr>
-      <tr><td>Ctrl+,</td><td>Settings</td></tr>
-      <tr><td>Ctrl+M</td><td>Toggle minimap</td></tr>
-      <tr><td>Ctrl+Shift+O</td><td>Toggle outline panel</td></tr>
-      <tr><td>Ctrl+Shift+B</td><td>Toggle bookmarks panel</td></tr>
-      <tr><td>F1</td><td>Keyboard shortcuts</td></tr>
-      <tr><th colspan="2">Navigation</th></tr>
-      <tr><td>PgDn / PgUp</td><td>Next / previous page</td></tr>
-      <tr><td>Home / End</td><td>First / last page</td></tr>
-      <tr><td>Ctrl+Home / Ctrl+End</td><td>First / last page (also from menu)</td></tr>
-      <tr><td>Space</td><td>Next line (rail mode) or next page</td></tr>
-      <tr><th colspan="2">View</th></tr>
-      <tr><td>+ / -</td><td>Zoom in / out</td></tr>
-      <tr><td>0</td><td>Fit page to window</td></tr>
-      <tr><td>F11</td><td>Toggle fullscreen</td></tr>
-      <tr><td>Shift+D</td><td>Toggle debug overlay</td></tr>
-      <tr><th colspan="2">Rail Mode</th></tr>
-      <tr><td>Down / S</td><td>Next line</td></tr>
-      <tr><td>Up / W</td><td>Previous line</td></tr>
-      <tr><td>Right / D</td><td>Scroll forward (hold)</td></tr>
-      <tr><td>Left / A</td><td>Scroll backward (hold)</td></tr>
-      <tr><td>Home / End</td><td>Line start / end</td></tr>
-      <tr><td>P</td><td>Toggle auto-scroll (D/Right to boost)</td></tr>
-      <tr><td>J</td><td>Toggle jump mode (saccade-style advance)</td></tr>
-      <tr><td>B</td><td>Add bookmark for current page</td></tr>
-      <tr><td>` (backtick)</td><td>Navigate back to previous location</td></tr>
-      <tr><td>C</td><td>Cycle colour effect on active tab</td></tr>
-      <tr><td>F</td><td>Toggle line focus dim</td></tr>
-      <tr><td>R</td><td>Toggle bionic reading</td></tr>
-      <tr><td>Escape</td><td>Stop auto-scroll</td></tr>
-      <tr><td>[ / ]</td><td>Adjust scroll speed or jump distance</td></tr>
-      <tr><td>Shift+[ / ]</td><td>Adjust blur intensity</td></tr>
-      <tr><th colspan="2">Search &amp; Annotations</th></tr>
-      <tr><td>Ctrl+F</td><td>Open search panel</td></tr>
-      <tr><td>F3 / Shift+F3</td><td>Next / previous match</td></tr>
-      <tr><td>Escape</td><td>Stop auto-scroll / close search / cancel tool / exit fullscreen</td></tr>
-      <tr><td>Right-click</td><td>Open annotation radial menu (colour picker for Highlight/Pen)</td></tr>
-      <tr><td>Ctrl+Z</td><td>Undo annotation</td></tr>
-      <tr><td>Ctrl+Y</td><td>Redo annotation</td></tr>
-      <tr><td>Delete</td><td>Delete selected annotation (browse mode)</td></tr>
-      <tr><td>Ctrl+C</td><td>Copy selected text</td></tr>
+      <thead class="sr-only">
+        <tr>
+          <th scope="col">Key</th>
+          <th scope="col">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><th colspan="2" scope="rowgroup">General</th></tr>
+        <tr><td>Ctrl+O</td><td>Open file</td></tr>
+        <tr><td>Ctrl+W</td><td>Close tab</td></tr>
+        <tr><td>Ctrl+Tab</td><td>Next tab</td></tr>
+        <tr><td>Ctrl+Q</td><td>Quit</td></tr>
+        <tr><td>Ctrl+,</td><td>Settings</td></tr>
+        <tr><td>Ctrl+M</td><td>Toggle minimap</td></tr>
+        <tr><td>Ctrl+Shift+O</td><td>Toggle outline panel</td></tr>
+        <tr><td>Ctrl+Shift+B</td><td>Toggle bookmarks panel</td></tr>
+        <tr><td>F1</td><td>Keyboard shortcuts</td></tr>
+      </tbody>
+      <tbody>
+        <tr><th colspan="2" scope="rowgroup">Navigation</th></tr>
+        <tr><td>PgDn / PgUp</td><td>Next / previous page</td></tr>
+        <tr><td>Home / End</td><td>First / last page</td></tr>
+        <tr><td>Ctrl+Home / Ctrl+End</td><td>First / last page (also from menu)</td></tr>
+        <tr><td>Space</td><td>Next line (rail mode) or next page</td></tr>
+      </tbody>
+      <tbody>
+        <tr><th colspan="2" scope="rowgroup">View</th></tr>
+        <tr><td>+ / -</td><td>Zoom in / out</td></tr>
+        <tr><td>0</td><td>Fit page to window</td></tr>
+        <tr><td>F11</td><td>Toggle fullscreen</td></tr>
+        <tr><td>Shift+D</td><td>Toggle debug overlay</td></tr>
+      </tbody>
+      <tbody>
+        <tr><th colspan="2" scope="rowgroup">Rail Mode</th></tr>
+        <tr><td>Down / S</td><td>Next line</td></tr>
+        <tr><td>Up / W</td><td>Previous line</td></tr>
+        <tr><td>Right / D</td><td>Scroll forward (hold)</td></tr>
+        <tr><td>Left / A</td><td>Scroll backward (hold)</td></tr>
+        <tr><td>Home / End</td><td>Line start / end</td></tr>
+        <tr><td>P</td><td>Toggle auto-scroll (D/Right to boost)</td></tr>
+        <tr><td>J</td><td>Toggle jump mode (saccade-style advance)</td></tr>
+        <tr><td>B</td><td>Add bookmark for current page</td></tr>
+        <tr><td>` (backtick)</td><td>Navigate back to previous location</td></tr>
+        <tr><td>C</td><td>Cycle colour effect on active tab</td></tr>
+        <tr><td>F</td><td>Toggle line focus dim</td></tr>
+        <tr><td>R</td><td>Toggle bionic reading</td></tr>
+        <tr><td>Escape</td><td>Stop auto-scroll</td></tr>
+        <tr><td>[ / ]</td><td>Adjust scroll speed or jump distance</td></tr>
+        <tr><td>Shift+[ / ]</td><td>Adjust blur intensity</td></tr>
+      </tbody>
+      <tbody>
+        <tr><th colspan="2" scope="rowgroup">Search &amp; Annotations</th></tr>
+        <tr><td>Ctrl+F</td><td>Open search panel</td></tr>
+        <tr><td>F3 / Shift+F3</td><td>Next / previous match</td></tr>
+        <tr><td>Escape</td><td>Stop auto-scroll / close search / cancel tool / exit fullscreen</td></tr>
+        <tr><td>Right-click</td><td>Open annotation radial menu (colour picker for Highlight/Pen)</td></tr>
+        <tr><td>Ctrl+Z</td><td>Undo annotation</td></tr>
+        <tr><td>Ctrl+Y</td><td>Redo annotation</td></tr>
+        <tr><td>Delete</td><td>Delete selected annotation (browse mode)</td></tr>
+        <tr><td>Ctrl+C</td><td>Copy selected text</td></tr>
+      </tbody>
     </table>
   </section>
+
+  </main>
 
   <!-- Footer -->
   <footer class="footer">
@@ -912,13 +1003,19 @@
   </footer>
 
   <script>
+    var _lightboxTrigger = null;
     function openLightbox(img) {
+      _lightboxTrigger = img;
       var lb = document.getElementById('lightbox');
-      document.getElementById('lightbox-img').src = img.src;
+      var lbImg = document.getElementById('lightbox-img');
+      lbImg.src = img.src;
+      lbImg.alt = img.alt;
       lb.classList.add('active');
+      lb.focus();
     }
     function closeLightbox() {
       document.getElementById('lightbox').classList.remove('active');
+      if (_lightboxTrigger) { _lightboxTrigger.focus(); _lightboxTrigger = null; }
     }
     document.addEventListener('keydown', function(e) {
       if (e.key === 'Escape') closeLightbox();
