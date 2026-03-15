@@ -138,7 +138,7 @@ Four SkSL shaders compiled at startup via `SKRuntimeEffect.CreateColorFilter()`.
 
 ## Configuration
 
-Config: `~/.config/railreader2/config.json` (Linux) or `%APPDATA%\railreader2\config.json` (Windows). Auto-created with defaults. Editable live via Settings panel. See `Services/AppConfig.cs` for all fields and defaults.
+Config: `~/.config/railreader2/config.json` (Linux), `%APPDATA%\railreader2\config.json` (Windows), or `~/Library/Application Support/railreader2/config.json` (macOS). Auto-created with defaults. Editable live via Settings panel. See `Services/AppConfig.cs` for all fields and defaults.
 
 Key fields: `rail_zoom_threshold`, `snap_duration_ms`, `scroll_speed_start/max`, `scroll_ramp_time`, `analysis_lookahead_pages`, `ui_font_scale`, `colour_effect/intensity`, `motion_blur/intensity`, `pixel_snapping`, `line_focus_blur/intensity`, `line_highlight_tint/opacity`, `auto_scroll_line_pause_ms/block_pause_ms`, `jump_percentage`, `dark_mode`, `navigable_classes[]`, `recent_files[]`.
 
@@ -148,6 +148,8 @@ Key fields: `rail_zoom_threshold`, `snap_duration_ms`, `scroll_speed_start/max`,
 
 - ONNX model outputs `[N, 7]` tensors with reading order as the 7th column (Global Pointer Mechanism)
 - `PdfOutlineExtractor` uses direct PDFium P/Invoke (`FPDF_*`/`FPDFBookmark_*`) since PDFtoImage doesn't expose bookmarks
+- `PdfiumResolver.Initialize()` must be called before any PDFium P/Invoke — registers a `DllImportResolver` that maps "pdfium" to the correct platform-specific native library (pdfium.dll / libpdfium.so / libpdfium.dylib). Called in all entry points (GUI, CLI, Agent)
+- ONNX runtime pre-loading in `LayoutAnalyzer` static constructor handles Linux (.so) and macOS (.dylib); Windows uses OnnxRuntime's own resolver
 - SkiaSharp 3.x explicitly overrides Avalonia 11's bundled 2.88 — required for `SKRuntimeEffect.CreateColorFilter()`
 - TODO.md and DISTRIBUTION.md are legacy Rust files — disregard them
 - Without the ONNX model, layout falls back to simple horizontal strip detection

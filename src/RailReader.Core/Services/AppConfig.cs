@@ -48,9 +48,15 @@ public sealed class AppConfig
     {
         get
         {
-            var baseDir = OperatingSystem.IsWindows()
-                ? Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData)
-                : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".config");
+            string baseDir;
+            if (OperatingSystem.IsWindows())
+                baseDir = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            else if (OperatingSystem.IsMacOS())
+                baseDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                    "Library", "Application Support");
+            else
+                baseDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".config");
+
             var dir = Path.Combine(baseDir, "railreader2");
             Directory.CreateDirectory(dir);
             return dir;

@@ -2,6 +2,9 @@ using System.CommandLine;
 using RailReader.Cli;
 using RailReader.Cli.Commands;
 using RailReader.Cli.Output;
+using RailReader.Core.Services;
+
+PdfiumResolver.Initialize();
 
 var jsonOption = new Option<bool>("--json") { Description = "Output in JSON format for machine consumption", Recursive = true };
 

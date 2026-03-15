@@ -17,15 +17,29 @@ public sealed class LayoutAnalyzer : IDisposable
         // P/Invoke inside OnnxRuntime finds it already loaded — no resolver conflict.
         // (SetDllImportResolver can only be called once per assembly and OnnxRuntime
         // registers its own, so we must not use it.)
-        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Linux)) return;
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) return;
 
+        // Platform-specific library name and fallback RIDs
+        string ext, fallbackRid;
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+        {
+            ext = ".dylib";
+            fallbackRid = "osx-arm64";
+        }
+        else
+        {
+            ext = ".so";
+            fallbackRid = "linux-x64";
+        }
+
+        string libName = $"libonnxruntime{ext}";
         string[] candidates =
         [
             Path.Combine(AppContext.BaseDirectory,
-                "runtimes", RuntimeInformation.RuntimeIdentifier, "native", "libonnxruntime.so"),
+                "runtimes", RuntimeInformation.RuntimeIdentifier, "native", libName),
             Path.Combine(AppContext.BaseDirectory,
-                "runtimes", "linux-x64", "native", "libonnxruntime.so"),
-            Path.Combine(AppContext.BaseDirectory, "libonnxruntime.so"),
+                "runtimes", fallbackRid, "native", libName),
+            Path.Combine(AppContext.BaseDirectory, libName),
         ];
 
         foreach (var path in candidates)

@@ -6,6 +6,8 @@ using RailReader.Core.Models;
 using RailReader.Core.Services;
 using RailReader.Agent;
 
+PdfiumResolver.Initialize();
+
 // --- Check for --capture-screenshots mode ---
 if (args.Length >= 1 && args[0] == "--capture-screenshots")
 {
