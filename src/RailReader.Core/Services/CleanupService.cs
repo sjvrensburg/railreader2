@@ -6,18 +6,24 @@ public static class CleanupService
     {
         int filesRemoved = 0;
         long bytesFreed = 0;
-        var cwd = Directory.GetCurrentDirectory();
 
-        // Remove cache/ directory contents
-        var cacheDir = Path.Combine(cwd, "cache");
+        // Clean cache/ and temp files in the app config directory
+        var configDir = AppConfig.ConfigDir;
+
+        var cacheDir = Path.Combine(configDir, "cache");
         if (Directory.Exists(cacheDir))
             CleanDirectory(cacheDir, ref filesRemoved, ref bytesFreed);
 
-        // Remove *.tmp files
-        RemoveMatchingFiles(cwd, ".tmp", null, ref filesRemoved, ref bytesFreed);
+        // Remove *.tmp files in config dir
+        RemoveMatchingFiles(configDir, ".tmp", null, ref filesRemoved, ref bytesFreed);
 
         // Remove *.log files older than 7 days
-        RemoveMatchingFiles(cwd, ".log", TimeSpan.FromDays(7), ref filesRemoved, ref bytesFreed);
+        RemoveMatchingFiles(configDir, ".log", TimeSpan.FromDays(7), ref filesRemoved, ref bytesFreed);
+
+        // Clean orphaned annotation files (source PDF no longer exists)
+        var (orphansRemoved, orphanBytes) = AnnotationService.CleanOrphaned();
+        filesRemoved += orphansRemoved;
+        bytesFreed += orphanBytes;
 
         if (filesRemoved > 0)
             Console.Error.WriteLine($"Cleanup: removed {filesRemoved} files, freed {bytesFreed} bytes");

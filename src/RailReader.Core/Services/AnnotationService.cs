@@ -1,9 +1,17 @@
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using RailReader.Core.Models;
 
 namespace RailReader.Core.Services;
 
+/// <summary>
+/// Manages annotation persistence. Annotations are stored internally in the
+/// app config directory (ConfigDir/annotations/), keyed by a hash of the PDF
+/// path. Legacy sidecar files (alongside the PDF) are loaded as a migration
+/// fallback but never written to.
+/// </summary>
 public static class AnnotationService
 {
     private static readonly JsonSerializerOptions s_options = new()
@@ -13,6 +21,25 @@ public static class AnnotationService
         Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) },
     };
 
+    /// <summary>Internal storage directory for annotation files.</summary>
+    public static string AnnotationDir
+    {
+        get
+        {
+            var dir = Path.Combine(AppConfig.ConfigDir, "annotations");
+            Directory.CreateDirectory(dir);
+            return dir;
+        }
+    }
+
+    /// <summary>Get the internal storage path for a PDF's annotations.</summary>
+    public static string GetInternalPath(string pdfPath)
+    {
+        var hash = GetPathHash(pdfPath);
+        return Path.Combine(AnnotationDir, $"{hash}.json");
+    }
+
+    /// <summary>Get the legacy sidecar path (for migration only).</summary>
     public static string GetSidecarPath(string pdfPath)
     {
         var dir = Path.GetDirectoryName(pdfPath) ?? ".";
@@ -20,11 +47,109 @@ public static class AnnotationService
         return Path.Combine(dir, $"{name}.railreader2.json");
     }
 
+    /// <summary>
+    /// Load annotations for a PDF. Checks internal storage first,
+    /// falls back to legacy sidecar file (and migrates it to internal).
+    /// </summary>
     public static AnnotationFile? Load(string pdfPath)
     {
-        var path = GetSidecarPath(pdfPath);
-        if (!File.Exists(path)) return null;
+        // Try internal storage first
+        var internalPath = GetInternalPath(pdfPath);
+        if (File.Exists(internalPath))
+            return LoadFromFile(internalPath);
 
+        // Fall back to legacy sidecar (migration)
+        var sidecarPath = GetSidecarPath(pdfPath);
+        if (File.Exists(sidecarPath))
+        {
+            var annotations = LoadFromFile(sidecarPath);
+            if (annotations is not null)
+            {
+                // Set the full path for orphan detection
+                annotations.SourcePdfPath = Path.GetFullPath(pdfPath);
+                // Migrate to internal storage
+                SaveToFile(GetInternalPath(pdfPath), annotations);
+                Console.Error.WriteLine($"[Annotations] Migrated sidecar to internal storage: {Path.GetFileName(pdfPath)}");
+            }
+            return annotations;
+        }
+
+        return null;
+    }
+
+    /// <summary>Save annotations to internal storage.</summary>
+    public static void Save(string pdfPath, AnnotationFile annotations)
+    {
+        annotations.SourcePdfPath = Path.GetFullPath(pdfPath);
+        SaveToFile(GetInternalPath(pdfPath), annotations);
+    }
+
+    /// <summary>Delete internal annotation file for a PDF.</summary>
+    public static bool Delete(string pdfPath)
+    {
+        var path = GetInternalPath(pdfPath);
+        if (!File.Exists(path)) return false;
+        try { File.Delete(path); return true; }
+        catch { return false; }
+    }
+
+    /// <summary>List all internally stored annotation files with metadata.</summary>
+    public static List<AnnotationStorageInfo> ListStored()
+    {
+        var result = new List<AnnotationStorageInfo>();
+        if (!Directory.Exists(AnnotationDir)) return result;
+
+        foreach (var file in Directory.EnumerateFiles(AnnotationDir, "*.json"))
+        {
+            try
+            {
+                var json = File.ReadAllText(file);
+                var af = JsonSerializer.Deserialize<AnnotationFile>(json, s_options);
+                if (af is null) continue;
+
+                var fi = new FileInfo(file);
+                result.Add(new AnnotationStorageInfo
+                {
+                    InternalPath = file,
+                    SourcePdf = af.SourcePdf,
+                    SourcePdfPath = af.SourcePdfPath,
+                    Size = fi.Length,
+                    LastModified = fi.LastWriteTime,
+                    AnnotationCount = af.Pages.Values.Sum(p => p.Count),
+                    BookmarkCount = af.Bookmarks.Count,
+                    SourcePdfExists = !string.IsNullOrEmpty(af.SourcePdfPath) && File.Exists(af.SourcePdfPath),
+                });
+            }
+            catch { /* skip corrupt files */ }
+        }
+        return result;
+    }
+
+    /// <summary>Remove annotation files whose source PDFs no longer exist.</summary>
+    public static (int Removed, long BytesFreed) CleanOrphaned()
+    {
+        int removed = 0;
+        long bytesFreed = 0;
+
+        foreach (var info in ListStored())
+        {
+            if (info.SourcePdfExists || string.IsNullOrEmpty(info.SourcePdfPath))
+                continue;
+
+            try
+            {
+                bytesFreed += info.Size;
+                File.Delete(info.InternalPath);
+                removed++;
+            }
+            catch { /* skip */ }
+        }
+
+        return (removed, bytesFreed);
+    }
+
+    private static AnnotationFile? LoadFromFile(string path)
+    {
         try
         {
             var json = File.ReadAllText(path);
@@ -37,9 +162,8 @@ public static class AnnotationService
         }
     }
 
-    public static void Save(string pdfPath, AnnotationFile annotations)
+    private static void SaveToFile(string path, AnnotationFile annotations)
     {
-        var path = GetSidecarPath(pdfPath);
         try
         {
             var json = JsonSerializer.Serialize(annotations, s_options);
@@ -50,4 +174,25 @@ public static class AnnotationService
             Console.Error.WriteLine($"[Annotations] Failed to save {path}: {ex.Message}");
         }
     }
+
+    private static string GetPathHash(string pdfPath)
+    {
+        var fullPath = Path.GetFullPath(pdfPath);
+        var bytes = Encoding.UTF8.GetBytes(fullPath);
+        var hash = SHA256.HashData(bytes);
+        return Convert.ToHexString(hash)[..16].ToLowerInvariant();
+    }
+}
+
+/// <summary>Metadata about a stored annotation file, for display and cleanup.</summary>
+public class AnnotationStorageInfo
+{
+    public string InternalPath { get; init; } = "";
+    public string SourcePdf { get; init; } = "";
+    public string SourcePdfPath { get; init; } = "";
+    public long Size { get; init; }
+    public DateTime LastModified { get; init; }
+    public int AnnotationCount { get; init; }
+    public int BookmarkCount { get; init; }
+    public bool SourcePdfExists { get; init; }
 }
