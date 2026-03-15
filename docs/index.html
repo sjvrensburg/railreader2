@@ -8,549 +8,19 @@
   <meta name="author" content="Stéfan Janse van Rensburg">
   <link rel="canonical" href="https://sjvrensburg.github.io/railreader2/">
   <link rel="icon" href="img/logo.png" type="image/png">
+  <link rel="sitemap" type="application/xml" href="sitemap.xml">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://sjvrensburg.github.io/railreader2/">
   <meta property="og:title" content="railreader2 — AI-Guided Rail Reading PDF Viewer">
   <meta property="og:description" content="A desktop PDF viewer that uses deep learning layout analysis to guide high-magnification reading — line by line, block by block. Built for comfortable, sustained reading of academic documents.">
-  <meta property="og:image" content="https://sjvrensburg.github.io/railreader2/img/RailReader2_Demo.gif">
+  <meta property="og:image" content="https://sjvrensburg.github.io/railreader2/img/rail_mode.png">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="railreader2 — AI-Guided Rail Reading PDF Viewer">
   <meta name="twitter:description" content="A desktop PDF viewer that uses deep learning layout analysis to guide high-magnification reading — line by line, block by block.">
-  <meta name="twitter:image" content="https://sjvrensburg.github.io/railreader2/img/RailReader2_Demo.gif">
+  <meta name="twitter:image" content="https://sjvrensburg.github.io/railreader2/img/rail_mode.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;600;700&family=Fira+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <style>
-    :root {
-      --max-width: 860px;
-      --font-body: 'Nunito Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-      --font-mono: 'Fira Mono', 'Consolas', 'Courier New', monospace;
-    }
-
-    /* ---- Dark theme (default) ---- */
-    [data-theme="dark"] {
-      --bg: #141c2b;
-      --fg: #fff;
-      --fg-muted: #a0aec0;
-      --accent: #63b3ed;
-      --accent-hover: #90cdf4;
-      --card-bg: #1a2435;
-      --card-border: #2d3a4e;
-      --stripe-color: #fff;
-      --logo-bg: #fff;
-      --logo-fg: #141c2b;
-      --toggle-bg: #1a2435;
-      --toggle-border: #2d3a4e;
-      --toggle-icon: '☀️';
-      --lightbox-bg: rgba(0, 0, 0, 0.85);
-      --note-bg: #1a2435;
-      --note-border: #63b3ed;
-    }
-
-    /* ---- Light theme ---- */
-    [data-theme="light"] {
-      --bg: #f7f8fa;
-      --fg: #1a202c;
-      --fg-muted: #5a6577;
-      --accent: #2b6cb0;
-      --accent-hover: #1a4d80;
-      --card-bg: #ffffff;
-      --card-border: #d8dde6;
-      --stripe-color: #1a202c;
-      --logo-bg: #1a202c;
-      --logo-fg: #f7f8fa;
-      --toggle-bg: #ffffff;
-      --toggle-border: #d8dde6;
-      --toggle-icon: '🌙';
-      --lightbox-bg: rgba(0, 0, 0, 0.7);
-      --note-bg: #eef5fc;
-      --note-border: #2b6cb0;
-    }
-
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-
-    body {
-      background-color: var(--bg);
-      color: var(--fg);
-      font-family: var(--font-body);
-      font-size: 16px;
-      line-height: 1.7;
-      transition: background-color 0.3s, color 0.3s;
-    }
-
-    a {
-      color: var(--accent);
-      text-decoration: none;
-      transition: color 0.2s;
-    }
-
-    a:hover {
-      color: var(--accent-hover);
-    }
-
-    /* ---- Header ---- */
-    .header {
-      padding: 2rem 1.5rem 0;
-      max-width: var(--max-width);
-      margin: 0 auto;
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      flex-wrap: wrap;
-      gap: 1rem;
-    }
-
-    .header__left {
-      display: flex;
-      flex-direction: column;
-      gap: 1rem;
-    }
-
-    .header__logo {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.65rem;
-      padding: 0.45rem 1rem;
-      background-color: var(--logo-bg);
-      color: var(--logo-fg);
-      font-family: var(--font-mono);
-      font-weight: 700;
-      font-size: 1.35rem;
-      position: relative;
-      margin-right: 0.5rem;
-      transition: background-color 0.3s, color 0.3s;
-    }
-
-    .header__logo img {
-      height: 32px;
-      width: auto;
-      transition: filter 0.3s;
-    }
-
-    [data-theme="light"] .header__logo img {
-      filter: invert(1);
-    }
-
-    .header__logo::after {
-      content: '';
-      display: block;
-      position: absolute;
-      top: 0;
-      right: -12px;
-      bottom: 0;
-      width: 48px;
-      background: repeating-linear-gradient(
-        90deg,
-        var(--stripe-color),
-        var(--stripe-color) 2px,
-        transparent 0,
-        transparent 10px
-      );
-      transition: background 0.3s;
-    }
-
-    .header nav {
-      font-family: var(--font-mono);
-      font-size: 0.9rem;
-    }
-
-    .header nav a {
-      margin-right: 1.5rem;
-      color: var(--accent);
-    }
-
-    /* ---- Theme toggle ---- */
-    .theme-toggle {
-      background: var(--toggle-bg);
-      border: 1px solid var(--toggle-border);
-      color: var(--fg);
-      font-size: 1.2rem;
-      width: 2.4rem;
-      height: 2.4rem;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      transition: background-color 0.3s, border-color 0.3s;
-      flex-shrink: 0;
-      margin-top: 0.1rem;
-    }
-
-    .theme-toggle:hover {
-      border-color: var(--accent);
-    }
-
-    /* ---- Hero ---- */
-    .hero {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: 3rem 1.5rem 2rem;
-    }
-
-    .hero h1 {
-      font-size: 2rem;
-      font-weight: 700;
-      margin-bottom: 0.75rem;
-    }
-
-    .hero p {
-      color: var(--fg-muted);
-      font-size: 1.1rem;
-      max-width: 600px;
-      margin-bottom: 1.5rem;
-    }
-
-    .hero__buttons {
-      display: flex;
-      gap: 1rem;
-      flex-wrap: wrap;
-    }
-
-    .btn {
-      display: inline-block;
-      padding: 0.6rem 1.4rem;
-      font-family: var(--font-mono);
-      font-size: 0.9rem;
-      font-weight: 500;
-      border: 2px solid var(--fg);
-      color: var(--fg);
-      transition: background-color 0.2s, color 0.2s;
-    }
-
-    .btn:hover {
-      background-color: var(--fg);
-      color: var(--bg);
-    }
-
-    .btn--primary {
-      background-color: var(--fg);
-      color: var(--bg);
-    }
-
-    .btn--primary:hover {
-      background-color: transparent;
-      color: var(--fg);
-    }
-
-    /* ---- Demo ---- */
-    .demo {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: 0 1.5rem 2rem;
-    }
-
-    .demo__container {
-      background-color: var(--card-bg);
-      border: 1px solid var(--card-border);
-      overflow: hidden;
-      transition: background-color 0.3s, border-color 0.3s;
-    }
-
-    .demo__container img {
-      width: 100%;
-      height: auto;
-      display: block;
-    }
-
-    .demo__caption {
-      padding: 0.8rem 1rem;
-      font-size: 0.9rem;
-      color: var(--fg-muted);
-      font-family: var(--font-mono);
-    }
-
-    /* ---- Sections ---- */
-    .section {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: 2rem 1.5rem;
-    }
-
-    .section h2 {
-      font-size: 1.3rem;
-      font-weight: 700;
-      margin-bottom: 1.5rem;
-      font-family: var(--font-mono);
-    }
-
-    .section h2::before {
-      content: '# ';
-      color: var(--accent);
-    }
-
-    /* ---- Story ---- */
-    .story {
-      background-color: var(--card-bg);
-      border: 1px solid var(--card-border);
-      border-left: 3px solid var(--accent);
-      padding: 1.5rem 1.8rem;
-      margin-bottom: 1rem;
-      line-height: 1.8;
-      transition: background-color 0.3s, border-color 0.3s;
-    }
-
-    .story p {
-      color: var(--fg-muted);
-      font-size: 0.95rem;
-      margin-bottom: 1rem;
-    }
-
-    .story p:last-child {
-      margin-bottom: 0;
-    }
-
-    .story strong {
-      color: var(--fg);
-    }
-
-    /* ---- Note callout ---- */
-    .note {
-      background-color: var(--note-bg);
-      border: 1px solid var(--note-border);
-      border-left: 3px solid var(--note-border);
-      padding: 1rem 1.4rem;
-      margin-top: 1rem;
-      font-size: 0.9rem;
-      line-height: 1.7;
-      color: var(--fg-muted);
-      transition: background-color 0.3s, border-color 0.3s;
-    }
-
-    .note strong {
-      color: var(--fg);
-    }
-
-    /* ---- Screenshots ---- */
-    .screenshots {
-      display: flex;
-      flex-direction: column;
-      gap: 1.5rem;
-      margin-bottom: 1rem;
-    }
-
-    .screenshots__row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 1.5rem;
-    }
-
-    .screenshot {
-      background-color: var(--card-bg);
-      border: 1px solid var(--card-border);
-      overflow: hidden;
-      transition: background-color 0.3s, border-color 0.3s;
-    }
-
-    .screenshot img {
-      width: 100%;
-      height: auto;
-      display: block;
-      cursor: pointer;
-      transition: opacity 0.2s;
-    }
-
-    .screenshot img:hover {
-      opacity: 0.9;
-    }
-
-    .screenshot figcaption {
-      padding: 0.6rem 0.8rem;
-      font-size: 0.85rem;
-      color: var(--fg-muted);
-    }
-
-    /* ---- Lightbox ---- */
-    .lightbox {
-      display: none;
-      position: fixed;
-      inset: 0;
-      z-index: 1000;
-      background: var(--lightbox-bg);
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-    }
-
-    .lightbox.active {
-      display: flex;
-    }
-
-    .lightbox img {
-      max-width: 90vw;
-      max-height: 90vh;
-      object-fit: contain;
-      border: 1px solid var(--card-border);
-    }
-
-    /* ---- Features ---- */
-    .features {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 1.5rem;
-    }
-
-    .feature {
-      background-color: var(--card-bg);
-      border: 1px solid var(--card-border);
-      padding: 1.2rem;
-      transition: background-color 0.3s, border-color 0.3s;
-    }
-
-    .feature h3 {
-      font-size: 1rem;
-      font-weight: 700;
-      margin-bottom: 0.4rem;
-      font-family: var(--font-mono);
-    }
-
-    .feature p {
-      color: var(--fg-muted);
-      font-size: 0.9rem;
-      line-height: 1.6;
-    }
-
-    /* ---- Getting Started ---- */
-    .steps {
-      counter-reset: step;
-      list-style: none;
-    }
-
-    .steps li {
-      counter-increment: step;
-      margin-bottom: 1rem;
-      padding-left: 2rem;
-      position: relative;
-    }
-
-    .steps li::before {
-      content: counter(step) '.';
-      position: absolute;
-      left: 0;
-      font-family: var(--font-mono);
-      font-weight: 700;
-      color: var(--accent);
-    }
-
-    code {
-      font-family: var(--font-mono);
-      background-color: var(--card-bg);
-      padding: 0.15rem 0.4rem;
-      font-size: 0.85em;
-      border: 1px solid var(--card-border);
-      transition: background-color 0.3s, border-color 0.3s;
-    }
-
-    /* ---- Keyboard shortcuts table ---- */
-    .shortcuts-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 0.9rem;
-      margin-bottom: 1rem;
-    }
-
-    .shortcuts-table th {
-      text-align: left;
-      font-family: var(--font-mono);
-      color: var(--accent);
-      padding: 0.5rem 0.8rem;
-      border-bottom: 1px solid var(--card-border);
-    }
-
-    .shortcuts-table td {
-      padding: 0.4rem 0.8rem;
-      border-bottom: 1px solid var(--card-border);
-    }
-
-    .shortcuts-table td:first-child {
-      font-family: var(--font-mono);
-      white-space: nowrap;
-      width: 140px;
-    }
-
-    .shortcuts-table td:last-child {
-      color: var(--fg-muted);
-    }
-
-    /* ---- Footer ---- */
-    .footer {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: 2rem 1.5rem 3rem;
-      font-size: 0.85rem;
-      color: var(--fg-muted);
-      font-family: var(--font-mono);
-      border-top: 1px solid var(--card-border);
-    }
-
-    .footer a {
-      color: var(--fg-muted);
-    }
-
-    .footer a:hover {
-      color: var(--fg);
-    }
-
-    /* ---- Responsive ---- */
-    /* ---- Skip link ---- */
-    .skip-link {
-      position: absolute;
-      top: -3rem;
-      left: 1rem;
-      background: var(--fg);
-      color: var(--bg);
-      padding: 0.5rem 1rem;
-      font-family: var(--font-mono);
-      font-size: 0.9rem;
-      z-index: 9999;
-      transition: top 0.2s;
-    }
-    .skip-link:focus {
-      top: 1rem;
-    }
-
-    /* ---- Screen-reader only ---- */
-    .sr-only {
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      padding: 0;
-      margin: -1px;
-      overflow: hidden;
-      clip: rect(0,0,0,0);
-      white-space: nowrap;
-      border: 0;
-    }
-
-    @media (max-width: 600px) {
-      .screenshots__row,
-      .features {
-        grid-template-columns: 1fr;
-      }
-
-      .hero h1 {
-        font-size: 1.5rem;
-      }
-
-      .hero__buttons {
-        flex-direction: column;
-      }
-
-      .btn {
-        text-align: center;
-      }
-
-      .header {
-        flex-direction: column;
-      }
-
-      .header__logo {
-        font-size: 1.15rem;
-      }
-
-      .header__logo img {
-        height: 26px;
-      }
-    }
-  </style>
+  <link rel="stylesheet" href="style.css">
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -567,6 +37,8 @@
       "priceCurrency": "USD"
     },
     "softwareVersion": "3.1.2",
+    "datePublished": "2026-02-18",
+    "dateModified": "2026-03-13",
     "license": "https://opensource.org/licenses/MIT",
     "author": {
       "@type": "Person",
@@ -680,41 +152,41 @@
     <div class="screenshots">
       <div class="screenshots__row">
         <figure class="screenshot">
-          <img src="img/full_page_view_no_analysis.png" alt="Full page view of a PDF document" width="1275" height="1649" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}">
+          <img src="img/full_page_view_no_analysis.png" alt="railreader2 rendering an academic PDF at full page zoom with sharp text and navigation controls visible" loading="lazy" width="1275" height="1649" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}">
           <figcaption>Full page view &mdash; vector-sharp rendering at any zoom level</figcaption>
         </figure>
         <figure class="screenshot">
-          <img src="img/full_page_view_with_analysis.png" alt="Page view with layout analysis overlay" width="1275" height="1649" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}">
+          <img src="img/full_page_view_with_analysis.png" alt="railreader2 showing AI layout analysis overlay with detected text blocks, figures, and reading order numbers on an academic PDF" loading="lazy" width="1275" height="1649" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}">
           <figcaption>Layout analysis &mdash; AI-detected blocks with reading order</figcaption>
         </figure>
       </div>
       <div class="screenshots__row">
         <figure class="screenshot">
-          <img src="img/rail_mode.png" alt="Rail mode reading a text block line by line" width="1534" height="1186" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}">
+          <img src="img/rail_mode.png" alt="railreader2 rail mode navigating a text block line by line at high magnification with the current line highlighted" loading="lazy" width="1534" height="1186" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}">
           <figcaption>Rail mode &mdash; line-by-line reading at high magnification</figcaption>
         </figure>
         <figure class="screenshot">
-          <img src="img/line_focus_blur.png" alt="Line focus blur in rail mode" width="1534" height="1186" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}">
+          <img src="img/line_focus_blur.png" alt="railreader2 line focus dim effect fading non-active lines to reduce distraction during rail reading" loading="lazy" width="1534" height="1186" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}">
           <figcaption>Line focus dim &mdash; non-active lines faded for focus</figcaption>
         </figure>
       </div>
       <div class="screenshots__row">
         <figure class="screenshot">
-          <img src="img/search_highlights.png" alt="Search results with highlighted matches" width="1935" height="1229" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}">
+          <img src="img/search_highlights.png" alt="railreader2 full-text search with sidebar results panel and highlighted matches on the PDF page" loading="lazy" width="1935" height="1229" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}">
           <figcaption>Search &mdash; sidebar panel with grouped results and page highlights</figcaption>
         </figure>
         <figure class="screenshot">
-          <img src="img/annotations.png" alt="Annotations on a PDF page" width="1534" height="1186" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}">
+          <img src="img/annotations.png" alt="railreader2 annotation tools showing highlights, freehand pen marks, rectangles, and text notes on a PDF page" loading="lazy" width="1534" height="1186" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}">
           <figcaption>Annotations &mdash; highlights, text notes, freehand, and more</figcaption>
         </figure>
       </div>
       <div class="screenshots__row">
         <figure class="screenshot">
-          <img src="img/colour_effects.png" alt="Amber colour filter applied to PDF content" width="1275" height="1649" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}">
+          <img src="img/colour_effects.png" alt="railreader2 amber colour filter applied to PDF content via GPU-accelerated shader" loading="lazy" width="1275" height="1649" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}">
           <figcaption>Amber colour filter &mdash; GPU-accelerated, PDF content only</figcaption>
         </figure>
         <figure class="screenshot">
-          <img src="img/colour_effect_high_contrast.png" alt="High contrast colour effect with rail mode" width="1200" height="900" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}">
+          <img src="img/colour_effect_high_contrast.png" alt="railreader2 high contrast colour effect combined with rail mode for maximum readability" loading="lazy" width="1200" height="900" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}">
           <figcaption>High contrast + rail &mdash; maximum readability</figcaption>
         </figure>
       </div>
