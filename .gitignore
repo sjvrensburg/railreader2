@@ -13,7 +13,6 @@ models/*.onnx
 
 # Project-local
 config.json
-DISTRIBUTION.md
 TODO.md
 
 # Installer build artifacts

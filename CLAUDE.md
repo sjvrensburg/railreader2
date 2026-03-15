@@ -151,7 +151,8 @@ Key fields: `rail_zoom_threshold`, `snap_duration_ms`, `scroll_speed_start/max`,
 - `PdfiumResolver.Initialize()` must be called before any PDFium P/Invoke — registers a `DllImportResolver` that maps "pdfium" to the correct platform-specific native library (pdfium.dll / libpdfium.so / libpdfium.dylib). Called in all entry points (GUI, CLI, Agent)
 - ONNX runtime pre-loading in `LayoutAnalyzer` static constructor handles Linux (.so) and macOS (.dylib); Windows uses OnnxRuntime's own resolver
 - SkiaSharp 3.x explicitly overrides Avalonia 11's bundled 2.88 — required for `SKRuntimeEffect.CreateColorFilter()`
-- TODO.md and DISTRIBUTION.md are legacy Rust files — disregard them
+- TODO.md is a legacy Rust file — disregard it
+- DISTRIBUTION.md documents the release process for all channels (GitHub, Microsoft Store)
 - Without the ONNX model, layout falls back to simple horizontal strip detection
 - `CleanupService.RunCleanup()` runs at startup and via Help menu (removes cache, temp, old logs)
 - `SplashWindow` shows during startup; heavy init deferred via `Dispatcher.Post` at Background priority
@@ -171,7 +172,7 @@ Releases triggered by pushing a `v*` tag (`.github/workflows/release.yml`).
 
 - **Linux**: `appimagetool` (not `linuxdeploy` — avoids ELF dependency tracing issues with .NET self-contained). Model at `$APPDIR/models/`.
 - **Windows (Inno Setup)**: `installer/railreader2.iss`. **Gotcha**: `.iss` paths are relative to the `.iss` file's directory, not CWD.
-- **Windows (Microsoft Store)**: MSIX packaging via `msix/build-msix.ps1`. Manifest at `msix/Package.appxmanifest`, visual assets in `msix/Assets/`. Publisher identity: `CN=1760E4F3-7B38-4A64-8D2D-B4F7703D7D10` (Probity Data Analytics). Requires Windows SDK (`makeappx.exe`, `signtool.exe`).
+- **Windows (Microsoft Store)**: MSIX built by CI `build-msix` job (unsigned — Microsoft re-signs during Store review). Manifest at `msix/Package.appxmanifest`, visual assets in `msix/Assets/`. See `DISTRIBUTION.md` for the Store release workflow.
 - **Model search order** (`FindModelPath()`): `AppContext.BaseDirectory/models/` → `$APPDIR/models/` → `LocalApplicationData/railreader2/models/` → `CWD/models/` → walk-up `../models/`
 
 ## Debugging
