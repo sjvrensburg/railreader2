@@ -107,8 +107,55 @@ jobs:
           name: windows-setup
           path: installer/output/railreader2-setup-x64.exe
 
+  build-msix:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Publish
+        run: dotnet publish src/RailReader2/RailReader2.csproj -c Release -r win-x64 --self-contained -o publish/msix/
+
+      - name: Download ONNX model
+        run: |
+          New-Item -ItemType Directory -Force -Path publish\msix\models
+          Invoke-WebRequest -Uri "$env:MODEL_URL" -OutFile "publish\msix\models\$env:MODEL_NAME"
+
+      - name: Copy MSIX manifest and assets
+        run: |
+          Copy-Item msix\Package.appxmanifest -Destination publish\msix\AppxManifest.xml
+          New-Item -ItemType Directory -Force -Path publish\msix\Assets
+          Copy-Item msix\Assets\* -Destination publish\msix\Assets\
+
+      - name: Update manifest version
+        run: |
+          $version = "${{ github.ref_name }}".TrimStart('v')
+          # MSIX requires 4-part version (x.y.z.0)
+          $parts = $version.Split('.')
+          while ($parts.Count -lt 4) { $parts += '0' }
+          $msixVersion = ($parts[0..3]) -join '.'
+          $manifest = Get-Content publish\msix\AppxManifest.xml -Raw
+          $manifest = $manifest -replace 'Version="[^"]*"', "Version=`"$msixVersion`""
+          Set-Content publish\msix\AppxManifest.xml $manifest
+
+      - name: Build MSIX package
+        run: |
+          $makeappx = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\makeappx.exe" -ErrorAction SilentlyContinue | Sort-Object -Descending | Select-Object -First 1
+          if (-not $makeappx) { throw "makeappx.exe not found" }
+          & $makeappx.FullName pack /d publish\msix /p railreader2-win-x64.msix /o
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-msix
+          path: railreader2-win-x64.msix
+
   release:
-    needs: [build-linux, build-windows]
+    needs: [build-linux, build-windows, build-msix]
     runs-on: ubuntu-latest
     steps:
       - name: Download all artifacts
@@ -124,3 +171,4 @@ jobs:
           files: |
             railreader2-linux-x86_64.AppImage
             railreader2-setup-x64.exe
+            railreader2-win-x64.msix
