@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy Policy — railreader2</title>
+  <meta name="description" content="Privacy policy for railreader2 — a desktop PDF viewer that collects no personal data.">
+  <meta name="author" content="Stéfan Janse van Rensburg">
+  <link rel="canonical" href="https://sjvrensburg.github.io/railreader2/privacy.html">
+  <link rel="icon" href="img/logo.png" type="image/png">
+  <link rel="sitemap" type="application/xml" href="sitemap.xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;600;700&family=Fira+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+
+  <header class="header">
+    <div class="header__left">
+      <span class="header__logo"><img src="img/logo.png" alt="railreader2 icon" width="59" height="32">railreader2</span>
+      <nav>
+        <a href="index.html">Home</a>
+        <a href="guide.html">User Guide</a>
+        <a href="https://github.com/sjvrensburg/railreader2">GitHub</a>
+      </nav>
+    </div>
+    <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle light/dark mode" title="Toggle light/dark mode">
+      <span id="theme-icon"></span>
+    </button>
+  </header>
+
+  <main class="content" id="main-content">
+    <h1>Privacy Policy</h1>
+    <p class="subtitle">Last updated: 15 March 2026</p>
+
+    <section class="guide-section">
+      <h2>Summary</h2>
+      <p>
+        <strong>railreader2 does not collect, transmit, or store any personal data.</strong>
+        It is a fully offline desktop application. No analytics, no telemetry, no network
+        requests, no accounts.
+      </p>
+    </section>
+
+    <section class="guide-section">
+      <h2>Data stored locally</h2>
+      <p>
+        railreader2 stores the following data on your computer only, in the
+        platform-standard application data directory:
+      </p>
+      <ul>
+        <li><strong>Configuration</strong> &mdash; your settings (zoom thresholds, colour effects,
+          UI preferences) in a JSON file. No personal information is included.</li>
+        <li><strong>Annotations and bookmarks</strong> &mdash; highlights, notes, and bookmarks
+          you create on PDF documents, stored as JSON files in the application data directory.</li>
+        <li><strong>Recent files list</strong> &mdash; paths to recently opened PDFs, stored in
+          the configuration file for convenience. These are local file paths only.</li>
+      </ul>
+      <p>
+        None of this data leaves your computer. You can delete all stored data at any time
+        via <strong>Help &rarr; Clean Up Temp Files</strong> in the application, or by
+        removing the configuration directory manually:
+      </p>
+      <ul>
+        <li><strong>Linux:</strong> <code>~/.config/railreader2/</code></li>
+        <li><strong>Windows:</strong> <code>%APPDATA%\railreader2\</code></li>
+        <li><strong>macOS:</strong> <code>~/Library/Application Support/railreader2/</code></li>
+      </ul>
+    </section>
+
+    <section class="guide-section">
+      <h2>Network access</h2>
+      <p>
+        railreader2 makes <strong>no network requests</strong>. PDF rendering, layout analysis
+        (via the bundled ONNX model), and all other features run entirely on your device.
+        The application does not check for updates, send crash reports, or communicate with
+        any server.
+      </p>
+    </section>
+
+    <section class="guide-section">
+      <h2>Third-party services</h2>
+      <p>
+        railreader2 does not integrate with any third-party services, advertising networks,
+        or analytics platforms.
+      </p>
+      <p>
+        The optional <strong>AI Agent CLI</strong> (available only when building from source)
+        can connect to an OpenAI-compatible API if you configure it with your own API key.
+        This component is not included in the distributed application and is entirely
+        opt-in. Your API key and any data sent to the API are governed by the respective
+        API provider's privacy policy, not this one.
+      </p>
+    </section>
+
+    <section class="guide-section">
+      <h2>Children's privacy</h2>
+      <p>
+        railreader2 does not collect any data from any user, including children.
+      </p>
+    </section>
+
+    <section class="guide-section">
+      <h2>Changes to this policy</h2>
+      <p>
+        If this policy changes, the updated version will be posted at this URL. Since
+        railreader2 collects no data, substantive changes are unlikely.
+      </p>
+    </section>
+
+    <section class="guide-section">
+      <h2>Contact</h2>
+      <p>
+        For questions about this privacy policy, open an issue on
+        <a href="https://github.com/sjvrensburg/railreader2/issues">GitHub</a>.
+      </p>
+    </section>
+
+  </main>
+
+  <footer class="footer">
+    <p>
+      railreader2 &mdash;
+      <a href="index.html">Home</a> &middot;
+      <a href="https://github.com/sjvrensburg/railreader2">Source</a> &middot;
+      <a href="https://github.com/sjvrensburg/railreader2/releases">Releases</a> &middot;
+      MIT License
+    </p>
+  </footer>
+
+  <script>
+    function getPreferredTheme() {
+      var stored = localStorage.getItem('rr2-theme');
+      if (stored) return stored;
+      return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+    }
+
+    function applyTheme(theme) {
+      document.documentElement.setAttribute('data-theme', theme);
+      document.getElementById('theme-icon').textContent = theme === 'dark' ? '\u2600\uFE0F' : '\uD83C\uDF19';
+    }
+
+    function toggleTheme() {
+      var current = document.documentElement.getAttribute('data-theme');
+      var next = current === 'dark' ? 'light' : 'dark';
+      localStorage.setItem('rr2-theme', next);
+      applyTheme(next);
+    }
+
+    applyTheme(getPreferredTheme());
+  </script>
+</body>
+</html>
