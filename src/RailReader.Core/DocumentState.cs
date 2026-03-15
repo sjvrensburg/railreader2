@@ -417,6 +417,7 @@ public sealed class DocumentState : IDisposable
         Annotations = AnnotationService.Load(FilePath) ?? new AnnotationFile
         {
             SourcePdf = Path.GetFileName(FilePath),
+            SourcePdfPath = Path.GetFullPath(FilePath),
         };
     }
 
@@ -426,15 +427,14 @@ public sealed class DocumentState : IDisposable
         {
             bool hasAnnotations = Annotations.Pages.Values.Any(list => list.Count > 0)
                 || Annotations.Bookmarks.Count > 0;
-            var sidecarPath = AnnotationService.GetSidecarPath(FilePath);
             if (hasAnnotations)
             {
                 AnnotationService.Save(FilePath, Annotations);
             }
-            else if (File.Exists(sidecarPath))
+            else
             {
-                try { File.Delete(sidecarPath); }
-                catch { /* ignore */ }
+                // No annotations left — remove internal storage file
+                AnnotationService.Delete(FilePath);
             }
             AnnotationsDirty = false;
         }

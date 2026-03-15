@@ -130,7 +130,7 @@ Activates above `rail_zoom_threshold` when analysis is available. Locks to detec
 
 ### Annotations
 
-Five tools (Highlight, Pen, Rectangle, TextNote, Eraser) via right-click radial menu with colour pickers. Select/move/resize in browse mode. Undo/redo stack. Persisted as JSON sidecar files (same directory as PDF, named `<pdf>.annotations.json`). Export to PDF via `AnnotationExportService`. Named bookmarks also stored in the same sidecar file. `AnnotationService` handles all persistence; annotations are per-document and isolated from other PDFs.
+Five tools (Highlight, Pen, Rectangle, TextNote, Eraser) via right-click radial menu with colour pickers. Select/move/resize in browse mode. Undo/redo stack. Stored internally in `ConfigDir/annotations/<hash>.json`, keyed by SHA256 hash of the PDF's full path. Legacy sidecar files (alongside the PDF) are loaded as a migration fallback but never written to. Export to PDF via `AnnotationExportService`. Named bookmarks also stored in the annotation file. `AnnotationService` handles all persistence; `AnnotationService.CleanOrphaned()` removes annotation files whose source PDFs no longer exist.
 
 ### Colour Effects
 
@@ -170,7 +170,8 @@ Key fields: `rail_zoom_threshold`, `snap_duration_ms`, `scroll_speed_start/max`,
 Releases triggered by pushing a `v*` tag (`.github/workflows/release.yml`).
 
 - **Linux**: `appimagetool` (not `linuxdeploy` — avoids ELF dependency tracing issues with .NET self-contained). Model at `$APPDIR/models/`.
-- **Windows**: Inno Setup (`installer/railreader2.iss`). **Gotcha**: `.iss` paths are relative to the `.iss` file's directory, not CWD.
+- **Windows (Inno Setup)**: `installer/railreader2.iss`. **Gotcha**: `.iss` paths are relative to the `.iss` file's directory, not CWD.
+- **Windows (Microsoft Store)**: MSIX packaging via `msix/build-msix.ps1`. Manifest at `msix/Package.appxmanifest`, visual assets in `msix/Assets/`. Publisher identity: `CN=1760E4F3-7B38-4A64-8D2D-B4F7703D7D10` (Probity Data Analytics). Requires Windows SDK (`makeappx.exe`, `signtool.exe`).
 - **Model search order** (`FindModelPath()`): `AppContext.BaseDirectory/models/` → `$APPDIR/models/` → `LocalApplicationData/railreader2/models/` → `CWD/models/` → walk-up `../models/`
 
 ## Debugging

@@ -15,6 +15,8 @@ public class AnnotationFile
 {
     public int Version { get; set; } = 1;
     public string SourcePdf { get; set; } = "";
+    /// <summary>Full path to the source PDF. Used for orphan detection in internal storage.</summary>
+    public string SourcePdfPath { get; set; } = "";
     public Dictionary<int, List<Annotation>> Pages { get; set; } = [];
     public List<BookmarkEntry> Bookmarks { get; set; } = [];
 }
