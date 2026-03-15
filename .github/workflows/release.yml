@@ -155,7 +155,7 @@ jobs:
           path: railreader2-win-x64.msix
 
   release:
-    needs: [build-linux, build-windows, build-msix]
+    needs: [build-linux, build-windows]
     runs-on: ubuntu-latest
     steps:
       - name: Download all artifacts
@@ -171,4 +171,3 @@ jobs:
           files: |
             railreader2-linux-x86_64.AppImage
             railreader2-setup-x64.exe
-            railreader2-win-x64.msix
