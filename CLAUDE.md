@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Build and Development Commands
 
 ```bash
-# Build app + tests (default solution, excludes AI agent)
+# Build app + CLI + tests (default solution, excludes AI agent)
 dotnet build RailReader2.slnx
 
 # Build everything including the AI agent CLI
@@ -30,6 +30,11 @@ dotnet test tests/RailReader.Core.Tests --filter "ClassName=RailReader.Core.Test
 # Run specific test method
 dotnet test tests/RailReader.Core.Tests --filter "FullyQualifiedName~TestMethodName"
 
+# Run the CLI (one-shot or REPL)
+dotnet run -c Release --project src/RailReader.Cli -- document open test.pdf
+dotnet run -c Release --project src/RailReader.Cli -- repl
+dotnet run -c Release --project src/RailReader.Cli -- --json text extract --page 1
+
 # Run the AI agent CLI (requires RailReader2-full.slnx or direct project build)
 dotnet run --project src/RailReader.Agent -- "Open test.pdf and tell me how many pages it has"
 
@@ -46,9 +51,10 @@ dotnet publish src/RailReader2 -c Release -r win-x64 --self-contained     # Wind
 ## Architecture
 
 ```
-RailReader2.slnx              # Default: app + core + tests (no agent)
+RailReader2.slnx              # Default: app + core + CLI + tests (no agent)
 ├── src/RailReader.Core/        # UI-free library: all business logic, models, services
 ├── src/RailReader2/            # Thin Avalonia UI shell (references Core)
+├── src/RailReader.Cli/         # Command-line interface (System.CommandLine, references Core)
 └── tests/RailReader.Core.Tests/# xUnit headless tests against Core
 
 RailReader2-full.slnx         # Full: includes experimental AI agent CLI
@@ -79,6 +85,18 @@ Thin wrapper delegating all logic to `DocumentController`/`DocumentState` in Cor
 - `Views/MainWindow.axaml.cs` — keyboard shortcuts, camera transform, animation frame scheduling
 - `Views/` — layers (PdfPageLayer, RailOverlayLayer, AnnotationLayer, SearchHighlightLayer), dialogs, panels
 - `Controls/RadialMenu.cs` — Skia-rendered radial context menu with Font Awesome icons
+
+### RailReader.Cli (command-line interface)
+
+Native C# CLI built on `System.CommandLine` (v2.0.5). References `RailReader.Core` directly — no subprocess overhead. Included in the default solution.
+
+- `Program.cs` — entry point, root command setup, global `--json` option
+- `CliSession.cs` — shared session state (`DocumentController`, `AppConfig`, ONNX worker)
+- `Commands/` — one file per command group: `DocumentCommands`, `TextCommands`, `NavCommands`, `AnalysisCommands`, `AnnotationCommands`, `BookmarkCommands`, `ConfigCommands`, `ExportCommands`, `ReplCommand`
+- `Output/` — `IOutputFormatter` with `HumanFormatter` (tables/text) and `JsonFormatter` (JSON envelope with `ok`/`data`/`error`)
+- `SessionBinder.cs` — static context providing session and formatter to command handlers
+
+Command groups: `document`, `text`, `nav`, `analysis`, `annotation`, `bookmark`, `config`, `export`, `repl`. All commands support `--json` for machine-readable output. Page numbers are 1-based in CLI, converted to 0-based internally.
 
 ### RailReader.Agent (AI agent CLI)
 

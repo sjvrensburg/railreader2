@@ -236,21 +236,95 @@ Rail reading parameters are editable via the Settings panel (gear icon in menu b
 
 ## Architecture
 
-The codebase is split into a UI-free core library, a thin Avalonia UI shell, and headless tests. An experimental AI agent CLI is available separately for developers:
+The codebase is split into a UI-free core library, a thin Avalonia UI shell, a CLI, and headless tests. An experimental AI agent CLI is available separately for developers:
 
 ```
-RailReader2.slnx              # Default solution (app + core + tests)
+RailReader2.slnx              # Default solution (app + core + CLI + tests)
 ├── src/RailReader.Core/        # All business logic (zero Avalonia dependencies)
 ├── src/RailReader2/            # Thin Avalonia UI shell
+├── src/RailReader.Cli/         # Command-line interface
 └── tests/RailReader.Core.Tests/  # xUnit headless tests
 
 RailReader2-full.slnx         # Full solution (adds AI agent CLI)
 └── src/RailReader.Agent/       # AI agent CLI (Microsoft.Extensions.AI)
 ```
 
-**RailReader.Core** contains `DocumentController` (the headless orchestration facade), `DocumentState` (per-document state), all Models and Services. It can be driven programmatically without any UI — the agent CLI and test project both use it directly.
+**RailReader.Core** contains `DocumentController` (the headless orchestration facade), `DocumentState` (per-document state), all Models and Services. It can be driven programmatically without any UI — the CLI, agent, and test project all use it directly.
+
+**RailReader.Cli** is a command-line interface built on `System.CommandLine` that provides full headless access to RailReader's capabilities. See the [CLI section](#command-line-interface) below.
 
 **RailReader.Agent** *(experimental)* exposes RailReader's capabilities as AI tool functions via `Microsoft.Extensions.AI`. It can open PDFs, navigate, extract text, search, annotate, and export — all driven by an LLM agent loop. This component is not included in the binary releases (AppImage or Windows installer) and is only available when building from source. Configure via environment variables (`OPENAI_API_KEY`, `RAILREADER_MODEL`, `RAILREADER_BASE_URL`).
+
+## Command-line interface
+
+RailReader includes a CLI (`RailReader.Cli`) for headless PDF operations — text extraction, search, layout analysis, annotations, bookmarks, page export, and configuration management. It references `RailReader.Core` directly with no subprocess overhead.
+
+### Quick start
+
+```bash
+# Run from source
+dotnet run -c Release --project src/RailReader.Cli -- document open paper.pdf
+
+# Interactive REPL mode
+dotnet run -c Release --project src/RailReader.Cli -- repl
+```
+
+### Command groups
+
+| Group | Commands | Description |
+|-------|----------|-------------|
+| `document` | `open`, `info`, `list`, `close`, `pages`, `outline` | Open, inspect, and manage PDF documents |
+| `text` | `extract`, `search` | Extract page text and search with regex/case-sensitivity |
+| `nav` | `goto`, `next`, `prev`, `status` | Navigate pages |
+| `analysis` | `run`, `status`, `list-blocks` | Run ONNX layout analysis and inspect detected blocks |
+| `annotation` | `list`, `add-highlight`, `add-note`, `remove`, `export-pdf`, `save`, `undo`, `redo` | Manage annotations on PDF pages |
+| `bookmark` | `list`, `add`, `remove` | Manage named bookmarks |
+| `config` | `show`, `set`, `reset`, `path` | View and modify application settings |
+| `export` | `page-image`, `page-range` | Export pages as PNG images |
+
+### JSON output
+
+All commands support a `--json` flag for machine-readable output:
+
+```bash
+dotnet run -c Release --project src/RailReader.Cli -- --json document open paper.pdf
+```
+
+```json
+{
+  "ok": true,
+  "data": {
+    "file_path": "/path/to/paper.pdf",
+    "title": "paper.pdf",
+    "page_count": 12,
+    "current_page": 1,
+    "analysis_available": true
+  }
+}
+```
+
+### REPL mode
+
+The `repl` command enters an interactive session where the open document persists across commands:
+
+```
+railreader> document open paper.pdf
+Opened paper.pdf (12 pages)
+
+railreader> text search "regression"
+Found 8 matches across 4 pages
+
+railreader> analysis run --page 3
+Analysis complete: 6 blocks detected on page 3
+
+railreader> bookmark add "Key result" --page 5
+Added bookmark "Key result" at page 5
+
+railreader> export page-image screenshot.png --page 3 --dpi 300 --annotations
+Exported page 3 to screenshot.png (1275x1649, 412,301 bytes)
+
+railreader> exit
+```
 
 ## Building
 
@@ -293,6 +367,19 @@ dotnet run -c Release --project src/RailReader2 -- <path-to-pdf>
 
 # Launch without arguments and use File → Open (Ctrl+O)
 dotnet run -c Release --project src/RailReader2 --
+```
+
+### Run the CLI
+
+```bash
+# One-shot command
+dotnet run -c Release --project src/RailReader.Cli -- document open paper.pdf
+
+# Interactive REPL
+dotnet run -c Release --project src/RailReader.Cli -- repl
+
+# JSON output for scripting
+dotnet run -c Release --project src/RailReader.Cli -- --json text extract --page 1
 ```
 
 ### Run the AI agent (experimental, source builds only)
