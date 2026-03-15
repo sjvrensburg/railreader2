@@ -139,8 +139,8 @@ jobs:
           while ($parts.Count -lt 4) { $parts += '0' }
           $msixVersion = ($parts[0..3]) -join '.'
           $manifest = Get-Content publish\msix\AppxManifest.xml -Raw
-          $manifest = $manifest -replace 'Version="[^"]*"', "Version=`"$msixVersion`""
-          Set-Content publish\msix\AppxManifest.xml $manifest
+          $manifest = $manifest -replace '(<Identity[^>]*)\bVersion="[^"]*"', "`$1Version=`"$msixVersion`""
+          [System.IO.File]::WriteAllText("publish\msix\AppxManifest.xml", $manifest, [System.Text.UTF8Encoding]::new($false))
 
       - name: Build MSIX package
         run: |
