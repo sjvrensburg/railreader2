@@ -508,13 +508,9 @@ public sealed class DocumentController
         double pageX = (canvasX - doc.Camera.OffsetX) / doc.Camera.Zoom;
         double pageY = (canvasY - doc.Camera.OffsetY) / doc.Camera.Zoom;
 
-        if (doc.Rail.FindBlockAtPoint(pageX, pageY) is { } navIdx)
-        {
-            doc.Rail.CurrentBlock = navIdx;
-            doc.Rail.CurrentLine = 0;
-            var (ww, wh) = GetViewportSize();
-            doc.StartSnap(ww, wh);
-        }
+        doc.Rail.FindBlockNearPoint(pageX, pageY);
+        var (ww, wh) = GetViewportSize();
+        doc.StartSnap(ww, wh);
     }
 
     // --- Auto-scroll ---
@@ -1446,7 +1442,20 @@ public sealed class DocumentController
         var match = SearchMatches[ActiveMatchIndex];
         if (match.PageIndex != doc.CurrentPage)
             GoToPage(match.PageIndex);
-        ScrollToMatchRect(doc, match);
+
+        if (doc.Rail.Active && doc.Rail.HasAnalysis && match.Rects.Count > 0)
+        {
+            // Set rail to the block/line containing the match center
+            var rect = match.Rects[0];
+            double matchCenterY = (rect.Top + rect.Bottom) / 2.0;
+            doc.Rail.FindBlockNearPoint((rect.Left + rect.Right) / 2.0, matchCenterY);
+            var (ww, wh) = GetViewportSize();
+            doc.StartSnap(ww, wh);
+        }
+        else
+        {
+            ScrollToMatchRect(doc, match);
+        }
     }
 
     private void ScrollToMatchRect(DocumentState doc, SearchMatch match)
