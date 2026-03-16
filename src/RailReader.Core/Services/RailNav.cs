@@ -392,6 +392,36 @@ public sealed class RailNav
         };
     }
 
+    /// <summary>
+    /// Snap to the current line, centering a specific page X coordinate horizontally.
+    /// Used for search result navigation so the match is visible rather than
+    /// snapping to the block's left edge.
+    /// </summary>
+    public void StartSnapToPoint(double cameraX, double cameraY, double zoom,
+        double windowWidth, double windowHeight, double pageX)
+    {
+        if (!CanNavigate) return;
+
+        var (_, targetY) = ComputeTargetCamera(zoom, windowWidth, windowHeight);
+        double targetX = ClampX(windowWidth / 2.0 - pageX * zoom, zoom, windowWidth);
+
+        if (_config.PixelSnapping)
+        {
+            targetX = Math.Round(targetX * 4.0) / 4.0;
+            targetY = Math.Round(targetY);
+        }
+
+        _snap = new SnapAnimation
+        {
+            StartX = cameraX,
+            StartY = cameraY,
+            TargetX = targetX,
+            TargetY = targetY,
+            Timer = Stopwatch.StartNew(),
+            DurationMs = _config.SnapDurationMs,
+        };
+    }
+
     private (double X, double Y) ComputeTargetCamera(double zoom, double windowWidth, double windowHeight)
     {
         var block = CurrentNavigableBlock;

@@ -1445,12 +1445,15 @@ public sealed class DocumentController
 
         if (doc.Rail.Active && doc.Rail.HasAnalysis && match.Rects.Count > 0)
         {
-            // Set rail to the block/line containing the match center
+            // Set rail to the block/line containing the match, then snap
+            // horizontally to center the match rather than the block start
             var rect = match.Rects[0];
+            double matchCenterX = (rect.Left + rect.Right) / 2.0;
             double matchCenterY = (rect.Top + rect.Bottom) / 2.0;
-            doc.Rail.FindBlockNearPoint((rect.Left + rect.Right) / 2.0, matchCenterY);
+            doc.Rail.FindBlockNearPoint(matchCenterX, matchCenterY);
             var (ww, wh) = GetViewportSize();
-            doc.StartSnap(ww, wh);
+            doc.Rail.StartSnapToPoint(doc.Camera.OffsetX, doc.Camera.OffsetY,
+                doc.Camera.Zoom, ww, wh, matchCenterX);
         }
         else
         {
