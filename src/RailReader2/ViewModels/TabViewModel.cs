@@ -33,7 +33,7 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
     public RailNav Rail => State.Rail;
     public Dictionary<int, PageAnalysis> AnalysisCache => State.AnalysisCache;
     public List<OutlineEntry> Outline => State.Outline;
-    public AnnotationFile? Annotations => State.Annotations;
+    public AnnotationFile Annotations => State.Annotations;
     public SKImage? CachedImage => State.CachedImage;
     public int CachedDpi => State.CachedDpi;
     public SKBitmap? MinimapBitmap => State.MinimapBitmap;

@@ -117,17 +117,23 @@ return 0;
 // ============================================================
 static int CaptureScreenshots(string outputDir)
 {
-    const string attentionPath = "/home/stefan/Downloads/PDFs/NIPS-2017-attention-is-all-you-need-Paper.pdf";
-    const string islrPath = "/home/stefan/Downloads/PDFs/ISLRv2_corrected_June_2023.pdf";
+    string attentionPath = Environment.GetEnvironmentVariable("RAILREADER_ATTENTION_PDF")
+        ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            "Downloads", "PDFs", "NIPS-2017-attention-is-all-you-need-Paper.pdf");
+    string islrPath = Environment.GetEnvironmentVariable("RAILREADER_ISLR_PDF")
+        ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            "Downloads", "PDFs", "ISLRv2_corrected_June_2023.pdf");
 
     if (!File.Exists(attentionPath))
     {
         Console.Error.WriteLine($"PDF not found: {attentionPath}");
+        Console.Error.WriteLine("Set RAILREADER_ATTENTION_PDF environment variable to override.");
         return 1;
     }
     if (!File.Exists(islrPath))
     {
         Console.Error.WriteLine($"PDF not found: {islrPath}");
+        Console.Error.WriteLine("Set RAILREADER_ISLR_PDF environment variable to override.");
         return 1;
     }
 

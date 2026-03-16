@@ -20,7 +20,7 @@ public static class AnnotationCommands
             var fmt = SessionBinder.Formatter;
             var doc = session.RequireActiveDocument();
             var page = pr.GetValue(listPageOpt);
-            if (doc.Annotations is null || doc.Annotations.Pages.Count == 0) { fmt.WriteMessage("No annotations."); return; }
+            if (doc.Annotations.Pages.Count == 0) { fmt.WriteMessage("No annotations."); return; }
 
             var pages = doc.Annotations.Pages;
             if (page.HasValue)
@@ -117,7 +117,7 @@ public static class AnnotationCommands
             var pg = pr.GetValue(rPage);
             var index = pr.GetValue(rIndex);
             int p = session.ValidatePage(doc, pg);
-            if (doc.Annotations is null || !doc.Annotations.Pages.TryGetValue(p, out var list) || index < 0 || index >= list.Count)
+            if (!doc.Annotations.Pages.TryGetValue(p, out var list) || index < 0 || index >= list.Count)
             { fmt.WriteError($"No annotation at page {pg}, index {index}"); return; }
             doc.RemoveAnnotation(p, list[index]);
             fmt.WriteMessage($"Removed annotation {index} from page {pg}");
@@ -133,13 +133,13 @@ public static class AnnotationCommands
             var fmt = SessionBinder.Formatter;
             var doc = session.RequireActiveDocument();
             var output = Path.GetFullPath(pr.GetValue(exportPath));
-            AnnotationExportService.Export(doc.Pdf, doc.Annotations!, output);
+            AnnotationExportService.Export(doc.Pdf, doc.Annotations, output);
             var size = new FileInfo(output).Length;
             fmt.WriteMessage($"Exported to {output} ({size:N0} bytes)");
             fmt.WriteResult(new { path = output, size });
         });
 
-        var saveCmd = new Command("save", "Save annotations to sidecar file");
+        var saveCmd = new Command("save", "Save annotations");
         saveCmd.SetAction(pr =>
         {
             SessionBinder.Session.RequireActiveDocument().SaveAnnotations();

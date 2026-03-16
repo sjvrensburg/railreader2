@@ -53,6 +53,8 @@ public sealed class DocumentController
     public int ActiveDocumentIndex { get; set; }
     public AppConfig Config => _config;
     public ColourEffectShaders ColourEffects => _colourEffects;
+    public ColourEffect ActiveColourEffect => ActiveDocument?.ColourEffect ?? _config.ColourEffect;
+    public float ActiveColourIntensity => (float)_config.ColourEffectIntensity;
     public AnalysisWorker? Worker => _worker;
 
     public DocumentState? ActiveDocument =>
@@ -62,6 +64,7 @@ public sealed class DocumentController
 
     // Search state
     public List<SearchMatch> SearchMatches { get; private set; } = [];
+    private Dictionary<int, List<SearchMatch>> _searchMatchesByPage = [];
     public List<SearchMatch>? CurrentPageSearchMatches { get; private set; }
     public int ActiveMatchIndex { get; set; }
 
@@ -126,8 +129,6 @@ public sealed class DocumentController
     {
         _config = config;
         _marshaller = marshaller;
-        _colourEffects.Effect = config.ColourEffect;
-        _colourEffects.Intensity = (float)config.ColourEffectIntensity;
     }
 
     /// <summary>
@@ -170,7 +171,7 @@ public sealed class DocumentController
 
         var saved = _config.GetReadingPosition(state.FilePath);
         if (saved is not null && saved.Page > 0)
-            state.GoToPage(Math.Clamp(saved.Page, 0, state.PageCount - 1), _worker, ww, wh);
+            state.GoToPage(Math.Clamp(saved.Page, 0, state.PageCount - 1), _worker, _config.NavigableClasses, ww, wh);
         if (saved?.ColourEffect is { } savedEffect)
             state.ColourEffect = savedEffect;
 
@@ -180,9 +181,8 @@ public sealed class DocumentController
         Documents.Add(state);
         _config.AddRecentFile(state.FilePath);
         ActiveDocumentIndex = Documents.Count - 1;
-        _colourEffects.Effect = state.ColourEffect;
 
-        state.SubmitAnalysis(_worker);
+        state.SubmitAnalysis(_worker, _config.NavigableClasses);
         state.QueueLookahead(_config.AnalysisLookaheadPages);
     }
 
@@ -195,6 +195,7 @@ public sealed class DocumentController
         Documents.RemoveAt(index);
         doc.Dispose();
         ActiveDocumentIndex = Math.Clamp(ActiveDocumentIndex, 0, Math.Max(Documents.Count - 1, 0));
+        CloseSearch();
     }
 
     public void SelectDocument(int index)
@@ -202,7 +203,6 @@ public sealed class DocumentController
         if (index >= 0 && index < Documents.Count)
         {
             ActiveDocumentIndex = index;
-            _colourEffects.Effect = Documents[index].ColourEffect;
         }
     }
 
@@ -290,7 +290,7 @@ public sealed class DocumentController
         _zoomAnim = null;
         if (ActiveDocument is not { } doc) return;
         var (ww, wh) = GetViewportSize();
-        doc.GoToPage(page, _worker, ww, wh);
+        doc.GoToPage(page, _worker, _config.NavigableClasses, ww, wh);
         doc.QueueLookahead(_config.AnalysisLookaheadPages);
         UpdateCurrentPageMatches();
     }
@@ -400,7 +400,7 @@ public sealed class DocumentController
         var boundary = forward ? NavResult.PageBoundaryNext : NavResult.PageBoundaryPrev;
         if (result == boundary)
         {
-            doc.GoToPage(currentPage + (forward ? 1 : -1), _worker, ww, wh);
+            doc.GoToPage(currentPage + (forward ? 1 : -1), _worker, _config.NavigableClasses, ww, wh);
             doc.QueueLookahead(_config.AnalysisLookaheadPages);
             if (doc.Rail.Active)
             {
@@ -498,20 +498,17 @@ public sealed class DocumentController
         }
     }
 
-    public void HandleClick(double canvasX, double canvasY)
+    public bool HandleClick(double canvasX, double canvasY)
     {
-        if (ActiveDocument is not { } doc || !doc.Rail.Active || !doc.Rail.HasAnalysis) return;
+        if (ActiveDocument is not { } doc || !doc.Rail.Active || !doc.Rail.HasAnalysis) return false;
 
         double pageX = (canvasX - doc.Camera.OffsetX) / doc.Camera.Zoom;
         double pageY = (canvasY - doc.Camera.OffsetY) / doc.Camera.Zoom;
 
-        if (doc.Rail.FindBlockAtPoint(pageX, pageY) is { } navIdx)
-        {
-            doc.Rail.CurrentBlock = navIdx;
-            doc.Rail.CurrentLine = 0;
-            var (ww, wh) = GetViewportSize();
-            doc.StartSnap(ww, wh);
-        }
+        doc.Rail.FindBlockNearPoint(pageX, pageY);
+        var (ww, wh) = GetViewportSize();
+        doc.StartSnap(ww, wh);
+        return true;
     }
 
     // --- Auto-scroll ---
@@ -558,7 +555,6 @@ public sealed class DocumentController
     {
         if (ActiveDocument is { } doc)
             doc.ColourEffect = effect;
-        _colourEffects.Effect = effect;
     }
 
     public void SetGlobalColourEffect(ColourEffect effect)
@@ -571,7 +567,7 @@ public sealed class DocumentController
     public ColourEffect CycleColourEffect()
     {
         var values = Enum.GetValues<ColourEffect>();
-        var current = ActiveDocument?.ColourEffect ?? _colourEffects.Effect;
+        var current = ActiveDocument?.ColourEffect ?? ActiveColourEffect;
         int idx = (Array.IndexOf(values, current) + 1) % values.Length;
         var next = values[idx];
         SetColourEffect(next);
@@ -582,13 +578,10 @@ public sealed class DocumentController
 
     public void OnConfigChanged()
     {
-        if (ActiveDocument is { } activeDoc)
-            _colourEffects.Effect = activeDoc.ColourEffect;
-        _colourEffects.Intensity = (float)_config.ColourEffectIntensity;
         foreach (var doc in Documents)
         {
             doc.Rail.UpdateConfig(_config);
-            doc.ReapplyNavigableClasses();
+            doc.ReapplyNavigableClasses(_config.NavigableClasses);
             doc.InvalidateBionicCache();
         }
         _config.Save();
@@ -618,7 +611,54 @@ public sealed class DocumentController
         bool overlayChanged = false;
         bool animating = false;
 
-        // Smooth zoom animation
+        TickZoomAnimation(doc, ww, wh, ref cameraChanged, ref animating);
+        TickRailSnap(doc, dt, ww, wh, ref cameraChanged, ref pageChanged, ref overlayChanged, ref animating);
+
+        // Snap Y to integer pixel when rail mode is stable
+        if (_config.PixelSnapping && doc.Rail.Active && !animating)
+        {
+            double snapped = Math.Round(doc.Camera.OffsetY);
+            if (snapped != doc.Camera.OffsetY)
+            {
+                doc.Camera.OffsetY = snapped;
+                cameraChanged = true;
+            }
+        }
+
+        TickAutoScroll(doc, dt, ww, wh, ref cameraChanged, ref pageChanged, ref overlayChanged, ref animating);
+
+        // Decay zoom blur speed
+        if (doc.Camera.ZoomSpeed > 0)
+        {
+            doc.Camera.DecayZoomSpeed(dt);
+            animating = true;
+            cameraChanged = true;
+        }
+
+        // Poll analysis results
+        var (gotResults, needsAnim) = PollAnalysisResults();
+        animating |= needsAnim;
+        overlayChanged |= gotResults;
+
+        if (!animating)
+            doc.SubmitPendingLookahead(_worker);
+
+        // DPI bitmap swap
+        if (doc.DpiRenderReady)
+        {
+            doc.DpiRenderReady = false;
+            pageChanged = true;
+        }
+
+        if (animating) cameraChanged = true;
+
+        return new TickResult(cameraChanged, pageChanged, overlayChanged, false, false, animating);
+    }
+
+    /// <summary>Smooth zoom animation step.</summary>
+    private void TickZoomAnimation(DocumentState doc, double ww, double wh,
+        ref bool cameraChanged, ref bool animating)
+    {
         if (_zoomAnim is { } za)
         {
             double elapsed = za.Timer.Elapsed.TotalMilliseconds;
@@ -646,8 +686,12 @@ public sealed class DocumentController
                 animating = true;
             }
         }
+    }
 
-        // Rail snap animation (skip while zoom is animating — snap starts after zoom completes)
+    /// <summary>Rail snap animation and edge-hold line advance (skipped while zoom is animating).</summary>
+    private void TickRailSnap(DocumentState doc, double dt, double ww, double wh,
+        ref bool cameraChanged, ref bool pageChanged, ref bool overlayChanged, ref bool animating)
+    {
         if (_zoomAnim is null)
         {
             double cx = doc.Camera.OffsetX, cy = doc.Camera.OffsetY;
@@ -681,19 +725,12 @@ public sealed class DocumentController
                 cameraChanged = true;
             }
         }
+    }
 
-        // Snap Y to integer pixel when rail mode is stable
-        if (_config.PixelSnapping && doc.Rail.Active && !animating)
-        {
-            double snapped = Math.Round(doc.Camera.OffsetY);
-            if (snapped != doc.Camera.OffsetY)
-            {
-                doc.Camera.OffsetY = snapped;
-                cameraChanged = true;
-            }
-        }
-
-        // Auto-scroll
+    /// <summary>Auto-scroll tick: advance along the current line, then advance to the next line/page.</summary>
+    private void TickAutoScroll(DocumentState doc, double dt, double ww, double wh,
+        ref bool cameraChanged, ref bool pageChanged, ref bool overlayChanged, ref bool animating)
+    {
         if (doc.Rail.AutoScrolling)
         {
             double cx = doc.Camera.OffsetX;
@@ -727,33 +764,6 @@ public sealed class DocumentController
                 overlayChanged = true;
             }
         }
-
-        // Decay zoom blur speed
-        if (doc.Camera.ZoomSpeed > 0)
-        {
-            doc.Camera.DecayZoomSpeed(dt);
-            animating = true;
-            cameraChanged = true;
-        }
-
-        // Poll analysis results
-        var (gotResults, needsAnim) = PollAnalysisResults();
-        animating |= needsAnim;
-        overlayChanged |= gotResults;
-
-        if (!animating)
-            doc.SubmitPendingLookahead(_worker);
-
-        // DPI bitmap swap
-        if (doc.DpiRenderReady)
-        {
-            doc.DpiRenderReady = false;
-            pageChanged = true;
-        }
-
-        if (animating) cameraChanged = true;
-
-        return new TickResult(cameraChanged, pageChanged, overlayChanged, false, false, animating);
     }
 
     /// <summary>
@@ -1279,6 +1289,7 @@ public sealed class DocumentController
     public void CloseSearch()
     {
         SearchMatches = [];
+        _searchMatchesByPage = [];
         CurrentPageSearchMatches = null;
         ActiveMatchIndex = 0;
     }
@@ -1286,6 +1297,7 @@ public sealed class DocumentController
     public void ExecuteSearch(string query, bool caseSensitive, bool useRegex)
     {
         SearchMatches = [];
+        _searchMatchesByPage = [];
         CurrentPageSearchMatches = null;
         ActiveMatchIndex = 0;
 
@@ -1358,6 +1370,9 @@ public sealed class DocumentController
     public void FinalizeSearch(DocumentState doc, List<SearchMatch> allMatches)
     {
         SearchMatches = allMatches;
+        _searchMatchesByPage = allMatches
+            .GroupBy(m => m.PageIndex)
+            .ToDictionary(g => g.Key, g => g.ToList());
         if (allMatches.Count > 0)
         {
             int firstOnCurrentOrAfter = allMatches.FindIndex(m => m.PageIndex >= doc.CurrentPage);
@@ -1419,6 +1434,47 @@ public sealed class DocumentController
         var match = SearchMatches[ActiveMatchIndex];
         if (match.PageIndex != doc.CurrentPage)
             GoToPage(match.PageIndex);
+
+        if (doc.Rail.Active && doc.Rail.HasAnalysis && match.Rects.Count > 0)
+        {
+            // Set rail to the block/line containing the match, then snap
+            // horizontally to center the match rather than the block start
+            var rect = match.Rects[0];
+            double matchCenterX = (rect.Left + rect.Right) / 2.0;
+            double matchCenterY = (rect.Top + rect.Bottom) / 2.0;
+            doc.Rail.FindBlockNearPoint(matchCenterX, matchCenterY);
+            var (ww, wh) = GetViewportSize();
+            doc.Rail.StartSnapToPoint(doc.Camera.OffsetX, doc.Camera.OffsetY,
+                doc.Camera.Zoom, ww, wh, matchCenterX);
+        }
+        else
+        {
+            ScrollToMatchRect(doc, match);
+        }
+    }
+
+    private void ScrollToMatchRect(DocumentState doc, SearchMatch match)
+    {
+        if (match.Rects.Count == 0) return;
+        var (ww, wh) = GetViewportSize();
+
+        // Compute bounding box of all match rects
+        float minX = float.MaxValue, minY = float.MaxValue;
+        float maxX = float.MinValue, maxY = float.MinValue;
+        foreach (var r in match.Rects)
+        {
+            if (r.Left < minX) minX = r.Left;
+            if (r.Top < minY) minY = r.Top;
+            if (r.Right > maxX) maxX = r.Right;
+            if (r.Bottom > maxY) maxY = r.Bottom;
+        }
+
+        // Center the match bounding box in the viewport
+        double centerX = (minX + maxX) / 2.0;
+        double centerY = (minY + maxY) / 2.0;
+        doc.Camera.OffsetX = ww / 2.0 - centerX * doc.Camera.Zoom;
+        doc.Camera.OffsetY = wh / 2.0 - centerY * doc.Camera.Zoom;
+        doc.ClampCamera(ww, wh);
     }
 
     public void UpdateCurrentPageMatches()
@@ -1428,9 +1484,8 @@ public sealed class DocumentController
             CurrentPageSearchMatches = null;
             return;
         }
-        CurrentPageSearchMatches = SearchMatches
-            .Where(m => m.PageIndex == doc.CurrentPage)
-            .ToList();
+        _searchMatchesByPage.TryGetValue(doc.CurrentPage, out var matches);
+        CurrentPageSearchMatches = matches;
     }
 
     // --- Query methods (for agent / headless use) ---
@@ -1525,7 +1580,6 @@ public sealed class DocumentController
 
     private static List<Annotation>? GetCurrentPageAnnotations(DocumentState doc)
     {
-        if (doc.Annotations is null) return null;
         return doc.Annotations.Pages.TryGetValue(doc.CurrentPage, out var list) ? list : null;
     }
 

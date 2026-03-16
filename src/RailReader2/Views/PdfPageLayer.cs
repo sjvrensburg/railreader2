@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.Rendering.SceneGraph;
 using Avalonia.Skia;
+using RailReader.Core.Models;
 using RailReader.Core.Services;
 using RailReader2.ViewModels;
 using SkiaSharp;
@@ -13,6 +14,8 @@ public class PdfPageLayer : Control
 {
     public TabViewModel? Tab { get; set; }
     public ColourEffectShaders? ColourEffects { get; set; }
+    public ColourEffect ActiveEffect { get; set; }
+    public float ActiveIntensity { get; set; } = 1.0f;
     public bool MotionBlurEnabled { get; set; } = true;
     public double MotionBlurIntensity { get; set; } = 0.5;
     public bool LineFocusBlurEnabled { get; set; }
@@ -40,14 +43,16 @@ public class PdfPageLayer : Control
         var opts = new RenderOptions(
             MotionBlurEnabled, MotionBlurIntensity,
             LineFocusBlurEnabled, LineFocusBlurIntensity, LineFocusPadding,
-            BionicReadingEnabled, BionicFadeIntensity, BionicFadeRects);
+            BionicReadingEnabled, BionicFadeIntensity, BionicFadeRects,
+            ActiveEffect, ActiveIntensity);
         context.Custom(new PageDrawOperation(new Rect(0, 0, w, h), tab, ColourEffects, opts));
     }
 
     public record struct RenderOptions(
         bool MotionBlur, double BlurIntensity,
         bool LineFocusBlur, double LineFocusIntensity, double LineFocusPadding,
-        bool BionicEnabled, double BionicIntensity, List<SKRect>? BionicRects);
+        bool BionicEnabled, double BionicIntensity, List<SKRect>? BionicRects,
+        ColourEffect ActiveEffect, float ActiveIntensity);
 
     private sealed class PageDrawOperation : ICustomDrawOperation
     {
@@ -124,7 +129,8 @@ public class PdfPageLayer : Control
             var tab = _tab;
             if (tab?.CachedImage is not { } image) return;
 
-            var effectPaint = _effects?.CreatePaint();
+            var effectPaint = _effects?.HasActiveEffect(_opts.ActiveEffect) == true
+                ? _effects.CreatePaint(_opts.ActiveEffect, _opts.ActiveIntensity) : null;
 
             // Motion blur: horizontal during rail scroll, uniform during zoom.
             float sigmaX = 0, sigmaY = 0;

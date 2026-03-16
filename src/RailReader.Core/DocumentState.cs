@@ -11,7 +11,6 @@ namespace RailReader.Core;
 public sealed class DocumentState : IDisposable
 {
     private readonly PdfService _pdf;
-    private readonly AppConfig _config;
     private readonly IThreadMarshaller _marshaller;
 
     private string _title;
@@ -28,7 +27,7 @@ public sealed class DocumentState : IDisposable
     public Action<string>? StateChanged;
 
     /// <summary>Sets a backing field and fires StateChanged if the value changed.</summary>
-    private bool SetField<T>(ref T field, T value, string propertyName) where T : IEquatable<T>
+    private bool SetField<T>(ref T field, T value, string propertyName)
     {
         if (EqualityComparer<T>.Default.Equals(field, value)) return false;
         field = value;
@@ -75,12 +74,7 @@ public sealed class DocumentState : IDisposable
     public ColourEffect ColourEffect
     {
         get => _colourEffect;
-        set
-        {
-            if (_colourEffect == value) return;
-            _colourEffect = value;
-            StateChanged?.Invoke(nameof(ColourEffect));
-        }
+        set => SetField(ref _colourEffect, value, nameof(ColourEffect));
     }
 
     public bool LineFocusBlur
@@ -102,12 +96,12 @@ public sealed class DocumentState : IDisposable
     public RailNav Rail { get; }
     public Dictionary<int, PageAnalysis> AnalysisCache { get; } = [];
     public Dictionary<int, PageText> TextCache { get; } = [];
-    public Dictionary<int, (double FixationPercent, List<SkiaSharp.SKRect> Rects)> BionicCache { get; } = [];
+    public Dictionary<int, (double FixationPercent, List<SKRect> Rects)> BionicCache { get; } = [];
     public Queue<int> PendingAnalysis { get; } = new();
     public List<OutlineEntry> Outline { get; }
 
     // Annotations
-    public AnnotationFile? Annotations { get; set; }
+    public AnnotationFile Annotations { get; set; } = new();
     public bool AnnotationsDirty { get; set; }
     public Stack<IUndoAction> UndoStack { get; } = new();
     public Stack<IUndoAction> RedoStack { get; } = new();
@@ -123,7 +117,6 @@ public sealed class DocumentState : IDisposable
 
     public DocumentState(string filePath, AppConfig config, IThreadMarshaller marshaller)
     {
-        _config = config;
         _marshaller = marshaller;
         FilePath = filePath;
         _pdf = new PdfService(filePath);
@@ -231,12 +224,12 @@ public sealed class DocumentState : IDisposable
         return false;
     }
 
-    public void SubmitAnalysis(AnalysisWorker? worker)
+    public void SubmitAnalysis(AnalysisWorker? worker, HashSet<int> navigableClasses)
     {
         if (AnalysisCache.TryGetValue(CurrentPage, out var cached))
         {
             Console.Error.WriteLine($"[SubmitAnalysis] Page {CurrentPage}: cache hit, {cached.Blocks.Count} blocks");
-            ApplyAnalysis(cached);
+            ApplyAnalysis(cached, navigableClasses);
             return;
         }
 
@@ -264,16 +257,7 @@ public sealed class DocumentState : IDisposable
                 _marshaller.Post(() =>
                 {
                     if (CurrentPage != page) return;
-                    worker.Submit(new AnalysisRequest
-                    {
-                        FilePath = filePath,
-                        Page = page,
-                        RgbBytes = rgb,
-                        PxW = pxW,
-                        PxH = pxH,
-                        PageW = pageW,
-                        PageH = pageH,
-                    });
+                    worker.Submit(new AnalysisRequest(filePath, page, rgb, pxW, pxH, pageW, pageH));
                 });
             }
             catch (Exception ex)
@@ -284,15 +268,15 @@ public sealed class DocumentState : IDisposable
         });
     }
 
-    public void ReapplyNavigableClasses()
+    public void ReapplyNavigableClasses(HashSet<int> navigableClasses)
     {
         if (AnalysisCache.TryGetValue(CurrentPage, out var cached))
-            Rail.SetAnalysis(cached, _config.NavigableClasses);
+            Rail.SetAnalysis(cached, navigableClasses);
     }
 
-    private void ApplyAnalysis(PageAnalysis analysis)
+    private void ApplyAnalysis(PageAnalysis analysis, HashSet<int> navigableClasses)
     {
-        Rail.SetAnalysis(analysis, _config.NavigableClasses);
+        Rail.SetAnalysis(analysis, navigableClasses);
         PendingRailSetup = false;
     }
 
@@ -320,11 +304,7 @@ public sealed class DocumentState : IDisposable
             try
             {
                 var (rgb, pxW, pxH) = _pdf.RenderPagePixmap(page, LayoutConstants.InputSize);
-                worker.Submit(new AnalysisRequest
-                {
-                    FilePath = FilePath, Page = page, RgbBytes = rgb, PxW = pxW, PxH = pxH,
-                    PageW = PageWidth, PageH = PageHeight,
-                });
+                worker.Submit(new AnalysisRequest(FilePath, page, rgb, pxW, pxH, PageWidth, PageHeight));
                 return true;
             }
             catch (Exception ex)
@@ -335,7 +315,7 @@ public sealed class DocumentState : IDisposable
         return false;
     }
 
-    public void GoToPage(int page, AnalysisWorker? worker, double windowWidth, double windowHeight)
+    public void GoToPage(int page, AnalysisWorker? worker, HashSet<int> navigableClasses, double windowWidth, double windowHeight)
     {
         page = Math.Clamp(page, 0, PageCount - 1);
         if (page == CurrentPage) return;
@@ -343,7 +323,7 @@ public sealed class DocumentState : IDisposable
         double oldZoom = Camera.Zoom;
         CurrentPage = page;
         LoadPageBitmap();
-        SubmitAnalysis(worker);
+        SubmitAnalysis(worker, navigableClasses);
         Camera.Zoom = oldZoom;
         ClampCamera(windowWidth, windowHeight);
     }
@@ -421,9 +401,10 @@ public sealed class DocumentState : IDisposable
         };
     }
 
+
     public void SaveAnnotations()
     {
-        if (Annotations is not null && AnnotationsDirty)
+        if (AnnotationsDirty)
         {
             bool hasAnnotations = Annotations.Pages.Values.Any(list => list.Count > 0)
                 || Annotations.Bookmarks.Count > 0;
@@ -454,27 +435,26 @@ public sealed class DocumentState : IDisposable
 
     public void AddBookmark(string name, int page)
     {
-        Annotations?.Bookmarks.Add(new BookmarkEntry { Name = name, Page = page });
+        Annotations.Bookmarks.Add(new BookmarkEntry { Name = name, Page = page });
         MarkAnnotationsDirty();
     }
 
     public void RemoveBookmark(int index)
     {
-        if (Annotations is null || index < 0 || index >= Annotations.Bookmarks.Count) return;
+        if (index < 0 || index >= Annotations.Bookmarks.Count) return;
         Annotations.Bookmarks.RemoveAt(index);
         MarkAnnotationsDirty();
     }
 
     public void RenameBookmark(int index, string newName)
     {
-        if (Annotations is null || index < 0 || index >= Annotations.Bookmarks.Count) return;
+        if (index < 0 || index >= Annotations.Bookmarks.Count) return;
         Annotations.Bookmarks[index].Name = newName;
         MarkAnnotationsDirty();
     }
 
     public void AddAnnotation(int page, Annotation annotation)
     {
-        if (Annotations is null) return;
         if (!Annotations.Pages.TryGetValue(page, out var list))
         {
             list = [];
@@ -503,7 +483,6 @@ public sealed class DocumentState : IDisposable
 
     public void RemoveAnnotation(int page, Annotation annotation)
     {
-        if (Annotations is null) return;
         var action = new RemoveAnnotationAction(page, annotation);
         action.Redo(Annotations);
 
@@ -514,7 +493,7 @@ public sealed class DocumentState : IDisposable
 
     public void Undo()
     {
-        if (UndoStack.Count == 0 || Annotations is null) return;
+        if (UndoStack.Count == 0) return;
         var action = UndoStack.Pop();
         action.Undo(Annotations);
         RedoStack.Push(action);
@@ -523,7 +502,7 @@ public sealed class DocumentState : IDisposable
 
     public void Redo()
     {
-        if (RedoStack.Count == 0 || Annotations is null) return;
+        if (RedoStack.Count == 0) return;
         var action = RedoStack.Pop();
         action.Redo(Annotations);
         UndoStack.Push(action);
@@ -542,7 +521,7 @@ public sealed class DocumentState : IDisposable
         return text;
     }
 
-    public List<SkiaSharp.SKRect> GetOrComputeBionicOverlay(int pageIndex, double fixationPercent)
+    public List<SKRect> GetOrComputeBionicOverlay(int pageIndex, double fixationPercent)
     {
         if (BionicCache.TryGetValue(pageIndex, out var cached) && cached.FixationPercent == fixationPercent)
             return cached.Rects;
@@ -567,6 +546,5 @@ public sealed class DocumentState : IDisposable
         var mmBmp = MinimapBitmap;
         MinimapBitmap = null;
         mmBmp?.Dispose();
-        _pdf.Dispose();
     }
 }

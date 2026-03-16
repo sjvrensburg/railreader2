@@ -108,17 +108,11 @@ public static class AnnotationService
                 if (af is null) continue;
 
                 var fi = new FileInfo(file);
-                result.Add(new AnnotationStorageInfo
-                {
-                    InternalPath = file,
-                    SourcePdf = af.SourcePdf,
-                    SourcePdfPath = af.SourcePdfPath,
-                    Size = fi.Length,
-                    LastModified = fi.LastWriteTime,
-                    AnnotationCount = af.Pages.Values.Sum(p => p.Count),
-                    BookmarkCount = af.Bookmarks.Count,
-                    SourcePdfExists = !string.IsNullOrEmpty(af.SourcePdfPath) && File.Exists(af.SourcePdfPath),
-                });
+                result.Add(new AnnotationStorageInfo(
+                    file, af.SourcePdf, af.SourcePdfPath,
+                    fi.Length, fi.LastWriteTime,
+                    af.Pages.Values.Sum(p => p.Count), af.Bookmarks.Count,
+                    !string.IsNullOrEmpty(af.SourcePdfPath) && File.Exists(af.SourcePdfPath)));
             }
             catch { /* skip corrupt files */ }
         }
@@ -185,14 +179,7 @@ public static class AnnotationService
 }
 
 /// <summary>Metadata about a stored annotation file, for display and cleanup.</summary>
-public class AnnotationStorageInfo
-{
-    public string InternalPath { get; init; } = "";
-    public string SourcePdf { get; init; } = "";
-    public string SourcePdfPath { get; init; } = "";
-    public long Size { get; init; }
-    public DateTime LastModified { get; init; }
-    public int AnnotationCount { get; init; }
-    public int BookmarkCount { get; init; }
-    public bool SourcePdfExists { get; init; }
-}
+public sealed record AnnotationStorageInfo(
+    string InternalPath, string SourcePdf, string SourcePdfPath,
+    long Size, DateTime LastModified,
+    int AnnotationCount, int BookmarkCount, bool SourcePdfExists);

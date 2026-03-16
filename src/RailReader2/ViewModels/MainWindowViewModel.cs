@@ -287,29 +287,20 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public void NavigateToBookmark(int index)
     {
         _controller.NavigateToBookmark(index);
-        OnPropertyChanged(nameof(ActiveTab));
-        InvalidateAll();
-        InvalidateSearch();
-        RequestAnimationFrame();
+        InvalidateAfterNavigation();
     }
 
     public void NavigateBack()
     {
         _controller.NavigateBack();
-        OnPropertyChanged(nameof(ActiveTab));
-        InvalidateAll();
-        InvalidateSearch();
-        RequestAnimationFrame();
+        InvalidateAfterNavigation();
     }
 
     [RelayCommand]
     public void GoToPage(int page)
     {
         _controller.GoToPage(page);
-        OnPropertyChanged(nameof(ActiveTab));
-        InvalidateAll();
-        InvalidateSearch();
-        RequestAnimationFrame();
+        InvalidateAfterNavigation();
     }
 
     [RelayCommand]
@@ -398,8 +389,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public void HandleClick(double canvasX, double canvasY)
     {
-        _controller.HandleClick(canvasX, canvasY);
-        InvalidateNavigation();
+        if (_controller.HandleClick(canvasX, canvasY))
+            InvalidateNavigation();
     }
 
     // --- Auto-scroll ---
@@ -438,6 +429,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         {
             doc.LineFocusBlur = !doc.LineFocusBlur;
             InvalidatePage();
+            InvalidateOverlay();
         }
     }
 
@@ -690,7 +682,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     [RelayCommand]
     public async Task ExportAnnotated()
     {
-        if (_window is null || ActiveTab is not { } tab || tab.Annotations is null) return;
+        if (_window is null || ActiveTab is not { } tab) return;
 
         var file = await _window.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
         {
@@ -747,22 +739,19 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public void NextMatch()
     {
         _controller.NextMatch();
-        OnPropertyChanged(nameof(ActiveTab));
-        InvalidateSearch();
+        InvalidateAfterNavigation();
     }
 
     public void PreviousMatch()
     {
         _controller.PreviousMatch();
-        OnPropertyChanged(nameof(ActiveTab));
-        InvalidateSearch();
+        InvalidateAfterNavigation();
     }
 
     public void GoToMatch(int matchIndex)
     {
         _controller.GoToMatch(matchIndex);
-        OnPropertyChanged(nameof(ActiveTab));
-        InvalidateSearch();
+        InvalidateAfterNavigation();
     }
 
     public void UpdateCurrentPageMatches() => _controller.UpdateCurrentPageMatches();
@@ -774,6 +763,14 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private void InvalidateOverlay() => _invalidation?.InvalidateOverlay?.Invoke();
     private void InvalidateSearch() => _invalidation?.InvalidateSearch?.Invoke();
     private void InvalidateAnnotations() => _invalidation?.InvalidateAnnotations?.Invoke();
+
+    private void InvalidateAfterNavigation()
+    {
+        OnPropertyChanged(nameof(ActiveTab));
+        InvalidateAll();
+        InvalidateSearch();
+        RequestAnimationFrame();
+    }
 
     private void InvalidateCameraAndTab()
     {

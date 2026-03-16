@@ -10,7 +10,6 @@
         <Button DockPanel.Dock="Top"
                 Content="&#x2715; Close"
                 HorizontalAlignment="Right"
-                FontSize="11"
                 Padding="8,2"
                 Margin="4,2"
                 Opacity="0.7"
@@ -93,7 +92,6 @@
                                 Content="&#x2715;"
                                 ToolTip.Tip="Clear Search (Esc)"
                                 Width="26" Height="26"
-                                FontSize="11"
                                 HorizontalContentAlignment="Center"
                                 VerticalContentAlignment="Center"
                                 Padding="0" Margin="4,0,0,0"
@@ -105,7 +103,6 @@
                                       Content="Aa"
                                       ToolTip.Tip="Case Sensitive"
                                       Width="32" Height="26"
-                                      FontSize="12"
                                       HorizontalContentAlignment="Center"
                                       VerticalContentAlignment="Center"
                                       Padding="0" />
@@ -113,21 +110,18 @@
                                       Content=".*"
                                       ToolTip.Tip="Regex"
                                       Width="32" Height="26"
-                                      FontSize="12"
                                       HorizontalContentAlignment="Center"
                                       VerticalContentAlignment="Center"
                                       Padding="0" />
                         <TextBlock Name="SearchMatchCount"
                                    Text=""
                                    VerticalAlignment="Center"
-                                   FontSize="12"
                                    Opacity="0.7"
                                    Margin="4,0" />
                         <Button Name="PrevMatchBtn"
                                 Content="&#x25B2;"
                                 ToolTip.Tip="Previous Match"
                                 Width="26" Height="26"
-                                FontSize="10"
                                 HorizontalContentAlignment="Center"
                                 VerticalContentAlignment="Center"
                                 Padding="0"
@@ -136,7 +130,6 @@
                                 Content="&#x25BC;"
                                 ToolTip.Tip="Next Match"
                                 Width="26" Height="26"
-                                FontSize="10"
                                 HorizontalContentAlignment="Center"
                                 VerticalContentAlignment="Center"
                                 Padding="0"
@@ -152,7 +145,6 @@
                                 <StackPanel Margin="0,2,0,0">
                                     <TextBlock Text="{Binding PageHeader}"
                                                FontWeight="SemiBold"
-                                               FontSize="12"
                                                Opacity="0.7"
                                                Margin="6,4,0,2" />
                                     <ItemsControl ItemsSource="{Binding Items}">
@@ -163,7 +155,7 @@
                                                         HorizontalContentAlignment="Left"
                                                         Margin="2,1" Padding="6,4"
                                                         Tag="{Binding MatchIndex}">
-                                                    <TextBlock TextWrapping="Wrap" FontSize="12">
+                                                    <TextBlock TextWrapping="Wrap">
                                                         <Run Text="{Binding PreText}" />
                                                         <Run Text="{Binding MatchText}" FontWeight="Bold"
                                                              Foreground="#F0A030" />

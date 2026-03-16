@@ -14,6 +14,7 @@ public class RailOverlayLayer : Control
 {
     public TabViewModel? Tab { get; set; }
     public ColourEffectShaders? ColourEffects { get; set; }
+    public ColourEffect ActiveEffect { get; set; }
     public bool LineFocusBlurActive { get; set; }
     public LineHighlightTint Tint { get; set; }
     public double TintOpacity { get; set; } = 0.25;
@@ -35,14 +36,14 @@ public class RailOverlayLayer : Control
         var tab = Tab;
         double w = tab?.PageWidth > 0 ? tab.PageWidth : Bounds.Width;
         double h = tab?.PageHeight > 0 ? tab.PageHeight : Bounds.Height;
-        context.Custom(new OverlayDrawOperation(new Rect(0, 0, w, h), tab, ColourEffects, LineFocusBlurActive, Tint, TintOpacity));
+        context.Custom(new OverlayDrawOperation(new Rect(0, 0, w, h), tab, ActiveEffect, LineFocusBlurActive, Tint, TintOpacity));
     }
 
     private sealed class OverlayDrawOperation : ICustomDrawOperation
     {
         private readonly Rect _bounds;
         private readonly TabViewModel? _tab;
-        private readonly ColourEffectShaders? _effects;
+        private readonly ColourEffect _effect;
         private readonly bool _lineFocusBlur;
         private readonly LineHighlightTint _tint;
         private readonly double _tintOpacity;
@@ -59,12 +60,12 @@ public class RailOverlayLayer : Control
         [ThreadStatic] private static SKPaint? s_debugTextPaint;
         [ThreadStatic] private static SKFont? s_debugFont;
 
-        public OverlayDrawOperation(Rect bounds, TabViewModel? tab, ColourEffectShaders? effects, bool lineFocusBlur,
+        public OverlayDrawOperation(Rect bounds, TabViewModel? tab, ColourEffect effect, bool lineFocusBlur,
             LineHighlightTint tint, double tintOpacity)
         {
             _bounds = bounds;
             _tab = tab;
-            _effects = effects;
+            _effect = effect;
             _lineFocusBlur = lineFocusBlur;
             _tint = tint;
             _tintOpacity = tintOpacity;
@@ -88,8 +89,7 @@ public class RailOverlayLayer : Control
 
             if (tab.Rail.Active && tab.Rail.HasAnalysis && tab.Rail.NavigableCount > 0)
             {
-                var effect = _effects?.Effect ?? ColourEffect.None;
-                var palette = effect.GetOverlayPalette();
+                var palette = _effect.GetOverlayPalette();
                 var dimPaint = s_dimPaint ??= new SKPaint();
                 var revealPaint = s_revealPaint ??= new SKPaint();
                 var outlinePaint = s_outlinePaint ??= new SKPaint { Style = SKPaintStyle.Stroke, IsAntialias = true };

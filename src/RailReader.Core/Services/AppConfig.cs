@@ -87,6 +87,25 @@ public sealed class AppConfig
 
     public void AddRecentFile(string filePath)
     {
+        EnsureRecentEntry(filePath);
+        Save();
+    }
+
+    public void SaveReadingPosition(string filePath, int page, double zoom, double offsetX, double offsetY,
+        ColourEffect? colourEffect = null)
+    {
+        EnsureRecentEntry(filePath);
+        var entry = RecentFiles[0];
+        entry.Page = page;
+        entry.Zoom = zoom;
+        entry.OffsetX = offsetX;
+        entry.OffsetY = offsetY;
+        entry.ColourEffect = colourEffect;
+        Save();
+    }
+
+    private void EnsureRecentEntry(string filePath)
+    {
         var idx = RecentFiles.FindIndex(e => e.FilePath == filePath);
         RecentFileEntry entry;
         if (idx >= 0)
@@ -101,20 +120,6 @@ public sealed class AppConfig
         RecentFiles.Insert(0, entry);
         if (RecentFiles.Count > 10)
             RecentFiles.RemoveRange(10, RecentFiles.Count - 10);
-        Save();
-    }
-
-    public void SaveReadingPosition(string filePath, int page, double zoom, double offsetX, double offsetY,
-        ColourEffect? colourEffect = null)
-    {
-        AddRecentFile(filePath); // ensures entry exists at index 0 and calls Save()
-        var entry = RecentFiles[0];
-        entry.Page = page;
-        entry.Zoom = zoom;
-        entry.OffsetX = offsetX;
-        entry.OffsetY = offsetY;
-        entry.ColourEffect = colourEffect;
-        Save(); // save updated reading position fields
     }
 
     public RecentFileEntry? GetReadingPosition(string filePath)

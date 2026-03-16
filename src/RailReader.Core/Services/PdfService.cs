@@ -4,16 +4,14 @@ using SkiaSharp;
 
 namespace RailReader.Core.Services;
 
-public sealed class PdfService : IDisposable
+public sealed class PdfService
 {
     public byte[] PdfBytes { get; }
-    public string FilePath { get; }
     public int PageCount { get; }
     public List<OutlineEntry> Outline { get; }
 
     public PdfService(string filePath)
     {
-        FilePath = filePath;
         PdfBytes = File.ReadAllBytes(filePath);
         PageCount = Conversion.GetPageCount(PdfBytes);
         Outline = PdfOutlineExtractor.Extract(PdfBytes);
@@ -92,5 +90,4 @@ public sealed class PdfService : IDisposable
         return Math.Clamp(rounded, 150, 600);
     }
 
-    public void Dispose() { }
 }
