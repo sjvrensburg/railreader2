@@ -438,6 +438,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         {
             doc.LineFocusBlur = !doc.LineFocusBlur;
             InvalidatePage();
+            InvalidateOverlay();
         }
     }
 
