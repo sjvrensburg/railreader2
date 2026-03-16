@@ -640,9 +640,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
         return false;
     }
 
-    public (bool Handled, TextNoteAnnotation? EditNote) HandleBrowseClick(float pageX, float pageY)
+    public (bool Handled, TextNoteAnnotation? EditNote) HandleBrowseClick(float pageX, float pageY, bool isDoubleClick = false)
     {
-        var result = _controller.HandleBrowseClick(pageX, pageY);
+        var result = _controller.HandleBrowseClick(pageX, pageY, isDoubleClick);
         if (result.Handled)
         {
             OnPropertyChanged(nameof(SelectedAnnotation));

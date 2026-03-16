@@ -15,6 +15,7 @@ public class ViewportPanel : Panel
 
     // Browse-mode annotation drag state
     private bool _browseAnnotationDrag;
+    private int _pressClickCount;
 
     public ViewportPanel()
     {
@@ -64,6 +65,7 @@ public class ViewportPanel : Panel
             _lastPos = _pressPos;
             _dragging = true;
             _browseAnnotationDrag = false;
+            _pressClickCount = e.ClickCount;
             e.Handled = true;
 
             var (pageX, pageY) = ScreenToPage(_pressPos);
@@ -134,7 +136,7 @@ public class ViewportPanel : Panel
             {
                 var (pageX, pageY) = ScreenToPage(pos);
                 if (isClick)
-                    ViewModel.HandleBrowseClick((float)pageX, (float)pageY);
+                    ViewModel.HandleBrowseClick((float)pageX, (float)pageY, _pressClickCount >= 2);
                 else
                     ViewModel.HandleBrowsePointerUp((float)pageX, (float)pageY);
             }
