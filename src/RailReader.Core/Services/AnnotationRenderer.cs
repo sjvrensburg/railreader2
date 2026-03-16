@@ -348,15 +348,5 @@ public static class AnnotationRenderer
     }
 
     private static SKColor ParseColor(string hex, float opacity)
-    {
-        byte a = (byte)(opacity * 255);
-        if (hex.Length == 7 && hex[0] == '#')
-        {
-            byte r = Convert.ToByte(hex[1..3], 16);
-            byte g = Convert.ToByte(hex[3..5], 16);
-            byte b = Convert.ToByte(hex[5..7], 16);
-            return new SKColor(r, g, b, a);
-        }
-        return new SKColor(255, 255, 0, a); // fallback yellow
-    }
+        => ColorUtils.ParseHexColor(hex, (byte)(opacity * 255));
 }

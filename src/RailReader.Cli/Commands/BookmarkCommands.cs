@@ -15,8 +15,8 @@ public static class BookmarkCommands
             var session = SessionBinder.Session;
             var fmt = SessionBinder.Formatter;
             var doc = session.RequireActiveDocument();
-            var bookmarks = doc.Annotations?.Bookmarks;
-            if (bookmarks is null || bookmarks.Count == 0) { fmt.WriteMessage("No bookmarks."); return; }
+            var bookmarks = doc.Annotations.Bookmarks;
+            if (bookmarks.Count == 0) { fmt.WriteMessage("No bookmarks."); return; }
 
             if (fmt is JsonFormatter)
             {
@@ -56,8 +56,8 @@ public static class BookmarkCommands
             var fmt = SessionBinder.Formatter;
             var doc = session.RequireActiveDocument();
             var index = pr.GetValue(indexArg);
-            var bookmarks = doc.Annotations?.Bookmarks;
-            if (bookmarks is null || index < 0 || index >= bookmarks.Count) { fmt.WriteError($"Invalid bookmark index: {index}"); return; }
+            var bookmarks = doc.Annotations.Bookmarks;
+            if (index < 0 || index >= bookmarks.Count) { fmt.WriteError($"Invalid bookmark index: {index}"); return; }
             var name = bookmarks[index].Name;
             doc.RemoveBookmark(index);
             fmt.WriteMessage($"Removed bookmark \"{name}\"");

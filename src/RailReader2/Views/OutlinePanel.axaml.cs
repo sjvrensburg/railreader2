@@ -83,7 +83,7 @@ public partial class OutlinePanel : UserControl
 
     public void UpdateBookmarkSource()
     {
-        var bookmarks = _vm?.ActiveTab?.Annotations?.Bookmarks;
+        var bookmarks = _vm?.ActiveTab?.Annotations.Bookmarks;
         BookmarkList.ItemsSource = bookmarks is not null ? new List<BookmarkEntry>(bookmarks) : null;
         UpdateBackButton();
     }
@@ -144,7 +144,7 @@ public partial class OutlinePanel : UserControl
         if (_vm is not { } vm) return;
         if (sender is not Button { DataContext: BookmarkEntry bm }) return;
 
-        var bookmarks = vm.ActiveTab?.Annotations?.Bookmarks;
+        var bookmarks = vm.ActiveTab?.Annotations.Bookmarks;
         if (bookmarks is null) return;
 
         int index = bookmarks.IndexOf(bm);
@@ -200,7 +200,7 @@ public partial class OutlinePanel : UserControl
     private (BookmarkEntry Entry, int Index)? ResolveBookmarkIndex(object? sender)
     {
         if (sender is not Button btn) return null;
-        var bookmarks = _vm?.ActiveTab?.Annotations?.Bookmarks;
+        var bookmarks = _vm?.ActiveTab?.Annotations.Bookmarks;
         if (bookmarks is null) return null;
 
         BookmarkEntry? bm = null;

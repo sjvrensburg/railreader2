@@ -155,7 +155,7 @@ public sealed class RailReaderTools
     public bool ExportPdf(string outputPath)
     {
         var doc = _controller.ActiveDocument;
-        if (doc is null || doc.Annotations is null) return false;
+        if (doc is null) return false;
 
         try
         {
@@ -257,7 +257,7 @@ public sealed class RailReaderTools
         if (!Enum.TryParse<ColourEffect>(effect, ignoreCase: true, out var parsed))
             return false;
 
-        _controller.ColourEffects.Intensity = Math.Clamp(intensity, 0f, 1f);
+        _controller.SetColourIntensity(Math.Clamp(intensity, 0f, 1f));
         _controller.SetColourEffect(parsed);
         return true;
     }

@@ -485,85 +485,96 @@ public sealed class RailNav
 
     public bool Tick(ref double cameraX, ref double cameraY, double dtSecs, double zoom, double windowWidth)
     {
-        bool animating = false;
+        bool animating = TickSnapAnimation(ref cameraX, ref cameraY);
 
-        if (_snap is { } snap)
-        {
-            double elapsed = snap.Timer.Elapsed.TotalMilliseconds;
-            double t = Math.Min(elapsed / snap.DurationMs, 1.0);
-            double eased = 1.0 - Math.Pow(1.0 - t, 3); // cubic ease-out
-
-            cameraX = snap.StartX + (snap.TargetX - snap.StartX) * eased;
-            cameraY = snap.StartY + (snap.TargetY - snap.StartY) * eased;
-
-            if (t >= 1.0)
-                _snap = null;
-            else
-                animating = true;
-        }
-
-        if (_scrollDir is { } dir && _scrollHoldTimer is not null)
-        {
-            // Compute total displacement from absolute elapsed time (integral of speed curve).
-            // This eliminates frame-rate dependent jitter from variable dt.
-            // speed(t) = start + (max - start) * (t/ramp)^2
-            // integral: start*T + (max-start) * T^3 / (3*ramp^2)  for T <= ramp
-            double holdSecs = _scrollHoldTimer.Elapsed.TotalSeconds + _scrollSeedSecs;
-            double ramp = _config.ScrollRampTime;
-            double sStart = _config.ScrollSpeedStart;
-            double sMax = _config.ScrollSpeedMax;
-
-            double totalDisplacement;
-            if (holdSecs <= ramp)
-            {
-                totalDisplacement = sStart * holdSecs
-                    + (sMax - sStart) * holdSecs * holdSecs * holdSecs / (3.0 * ramp * ramp);
-            }
-            else
-            {
-                // Integral up to ramp + constant max speed after ramp
-                double rampDisplacement = sStart * ramp + (sMax - sStart) * ramp / 3.0;
-                totalDisplacement = rampDisplacement + sMax * (holdSecs - ramp);
-            }
-
-            double instantSpeed = holdSecs <= ramp
-                ? sStart + (sMax - sStart) * (holdSecs / ramp) * (holdSecs / ramp)
-                : sMax;
-            ScrollSpeed = sMax > 0 ? instantSpeed / sMax : 0.0;
-
-            double sign = dir == ScrollDirection.Forward ? -1.0 : 1.0;
-            cameraX = ClampX(_scrollStartX + sign * totalDisplacement * zoom, zoom, windowWidth);
+        if (TickScrollHold(ref cameraX, zoom, windowWidth))
             animating = true;
 
-            // Edge-hold advance: if the camera is pinned against the line boundary,
-            // accumulate hold time and trigger a line advance when the threshold is reached.
-            if (IsAtHardEdge(cameraX, zoom, windowWidth, dir))
+        return animating;
+    }
+
+    private bool TickSnapAnimation(ref double cameraX, ref double cameraY)
+    {
+        if (_snap is not { } snap)
+            return false;
+
+        double elapsed = snap.Timer.Elapsed.TotalMilliseconds;
+        double t = Math.Min(elapsed / snap.DurationMs, 1.0);
+        double eased = 1.0 - Math.Pow(1.0 - t, 3); // cubic ease-out
+
+        cameraX = snap.StartX + (snap.TargetX - snap.StartX) * eased;
+        cameraY = snap.StartY + (snap.TargetY - snap.StartY) * eased;
+
+        if (t >= 1.0)
+        {
+            _snap = null;
+            return false;
+        }
+        return true;
+    }
+
+    private bool TickScrollHold(ref double cameraX, double zoom, double windowWidth)
+    {
+        if (_scrollDir is not { } dir || _scrollHoldTimer is null)
+        {
+            ScrollSpeed = 0.0;
+            return false;
+        }
+
+        // Compute total displacement from absolute elapsed time (integral of speed curve).
+        // This eliminates frame-rate dependent jitter from variable dt.
+        // speed(t) = start + (max - start) * (t/ramp)^2
+        // integral: start*T + (max-start) * T^3 / (3*ramp^2)  for T <= ramp
+        double holdSecs = _scrollHoldTimer.Elapsed.TotalSeconds + _scrollSeedSecs;
+        double ramp = _config.ScrollRampTime;
+        double sStart = _config.ScrollSpeedStart;
+        double sMax = _config.ScrollSpeedMax;
+
+        double totalDisplacement;
+        if (holdSecs <= ramp)
+        {
+            totalDisplacement = sStart * holdSecs
+                + (sMax - sStart) * holdSecs * holdSecs * holdSecs / (3.0 * ramp * ramp);
+        }
+        else
+        {
+            // Integral up to ramp + constant max speed after ramp
+            double rampDisplacement = sStart * ramp + (sMax - sStart) * ramp / 3.0;
+            totalDisplacement = rampDisplacement + sMax * (holdSecs - ramp);
+        }
+
+        double instantSpeed = holdSecs <= ramp
+            ? sStart + (sMax - sStart) * (holdSecs / ramp) * (holdSecs / ramp)
+            : sMax;
+        ScrollSpeed = sMax > 0 ? instantSpeed / sMax : 0.0;
+
+        double sign = dir == ScrollDirection.Forward ? -1.0 : 1.0;
+        cameraX = ClampX(_scrollStartX + sign * totalDisplacement * zoom, zoom, windowWidth);
+
+        // Edge-hold advance: if the camera is pinned against the line boundary,
+        // accumulate hold time and trigger a line advance when the threshold is reached.
+        if (IsAtHardEdge(cameraX, zoom, windowWidth, dir))
+        {
+            if (_edgeHoldDir != dir)
             {
-                if (_edgeHoldDir != dir)
-                {
-                    _edgeHoldTimer = Stopwatch.StartNew();
-                    _edgeHoldDir = dir;
-                }
-                else if (_edgeHoldTimer is not null
-                    && _edgeHoldTimer.Elapsed.TotalMilliseconds >= EdgeAdvanceHoldMs)
-                {
-                    _pendingEdgeAdvance = dir;
-                    _edgeAdvanceJustFired = true;
-                    StopScrollAndEdgeHold(); // clear scroll state; key-repeat will restart it on the new line
-                }
+                _edgeHoldTimer = Stopwatch.StartNew();
+                _edgeHoldDir = dir;
             }
-            else
+            else if (_edgeHoldTimer is not null
+                && _edgeHoldTimer.Elapsed.TotalMilliseconds >= EdgeAdvanceHoldMs)
             {
-                _edgeHoldTimer = null;
-                _edgeHoldDir = null;
+                _pendingEdgeAdvance = dir;
+                _edgeAdvanceJustFired = true;
+                StopScrollAndEdgeHold(); // clear scroll state; key-repeat will restart it on the new line
             }
         }
         else
         {
-            ScrollSpeed = 0.0;
+            _edgeHoldTimer = null;
+            _edgeHoldDir = null;
         }
 
-        return animating;
+        return true;
     }
 
     public void JumpToEnd()

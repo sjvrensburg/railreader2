@@ -3,23 +3,12 @@ using RailReader.Core.Models;
 
 namespace RailReader.Core.Services;
 
-public sealed class AnalysisRequest
-{
-    public required string FilePath { get; init; }
-    public required int Page { get; init; }
-    public required byte[] RgbBytes { get; init; }
-    public required int PxW { get; init; }
-    public required int PxH { get; init; }
-    public required double PageW { get; init; }
-    public required double PageH { get; init; }
-}
+public sealed record AnalysisRequest(
+    string FilePath, int Page, byte[] RgbBytes,
+    int PxW, int PxH, double PageW, double PageH);
 
-public sealed class AnalysisResult
-{
-    public required string FilePath { get; init; }
-    public required int Page { get; init; }
-    public required PageAnalysis Analysis { get; init; }
-}
+public sealed record AnalysisResult(
+    string FilePath, int Page, PageAnalysis Analysis);
 
 public sealed class AnalysisWorker : IDisposable
 {
@@ -82,12 +71,8 @@ public sealed class AnalysisWorker : IDisposable
                     request.RgbBytes, request.PxW, request.PxH, request.PageW, request.PageH);
                 Console.Error.WriteLine($"[Worker] Page {request.Page}: {analysis.Blocks.Count} blocks detected");
 
-                await _resultChannel.Writer.WriteAsync(new AnalysisResult
-                {
-                    FilePath = request.FilePath,
-                    Page = request.Page,
-                    Analysis = analysis,
-                }, ct);
+                await _resultChannel.Writer.WriteAsync(
+                    new AnalysisResult(request.FilePath, request.Page, analysis), ct);
             }
         }
     }

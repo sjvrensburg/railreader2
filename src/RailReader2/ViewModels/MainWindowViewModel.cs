@@ -691,7 +691,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     [RelayCommand]
     public async Task ExportAnnotated()
     {
-        if (_window is null || ActiveTab is not { } tab || tab.Annotations is null) return;
+        if (_window is null || ActiveTab is not { } tab) return;
 
         var file = await _window.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
         {

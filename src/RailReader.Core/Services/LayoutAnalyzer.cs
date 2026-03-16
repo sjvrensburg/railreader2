@@ -82,6 +82,26 @@ public sealed class LayoutAnalyzer : IDisposable
 
         using var results = _session.Run(inputs);
 
+        var rawBlocks = ExtractDetections(results, pxW, pxH, pageW, pageH);
+        if (rawBlocks is null)
+            return new PageAnalysis { Blocks = [], PageWidth = pageW, PageHeight = pageH };
+
+        float mapScaleX = (float)(pageW / pxW);
+        float mapScaleY = (float)(pageH / pxH);
+        PostProcessBlocks(rawBlocks, rgbBytes, pxW, pxH, mapScaleX, mapScaleY);
+
+        return new PageAnalysis
+        {
+            Blocks = rawBlocks,
+            PageWidth = pageW,
+            PageHeight = pageH,
+        };
+    }
+
+    private List<LayoutBlock>? ExtractDetections(
+        IDisposableReadOnlyCollection<DisposableNamedOnnxValue> results,
+        int pxW, int pxH, double pageW, double pageH)
+    {
         // Single pass: log output shapes (first call only) and find detection tensor.
         // Copy tensor data immediately since the results collection owns the memory.
         float[]? detectionData = null;
@@ -111,10 +131,7 @@ public sealed class LayoutAnalyzer : IDisposable
         _loggedOutputShapes = true;
 
         if (detectionData is null)
-        {
-            // No suitable detection tensor found; return empty analysis
-            return new PageAnalysis { Blocks = [], PageWidth = pageW, PageHeight = pageH };
-        }
+            return null;
 
         float mapScaleX = (float)(pageW / pxW);
         float mapScaleY = (float)(pageH / pxH);
@@ -151,6 +168,13 @@ public sealed class LayoutAnalyzer : IDisposable
             });
         }
 
+        return rawBlocks;
+    }
+
+    private static void PostProcessBlocks(
+        List<LayoutBlock> rawBlocks, byte[] rgbBytes, int pxW, int pxH,
+        float mapScaleX, float mapScaleY)
+    {
         Nms(rawBlocks, LayoutConstants.NmsIouThreshold);
         SuppressNestedBlocks(rawBlocks);
 
@@ -164,13 +188,6 @@ public sealed class LayoutAnalyzer : IDisposable
 
         ResolveVerticalOverlaps(rawBlocks);
         DetectLinesForBlocks(rawBlocks, rgbBytes, pxW, pxH, mapScaleX, mapScaleY);
-
-        return new PageAnalysis
-        {
-            Blocks = rawBlocks,
-            PageWidth = pageW,
-            PageHeight = pageH,
-        };
     }
 
     private static float[] PreprocessImage(byte[] rgbBytes, int origW, int origH, int target)

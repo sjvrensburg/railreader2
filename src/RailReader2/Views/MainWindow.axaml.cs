@@ -36,6 +36,8 @@ public partial class MainWindow : Window
                 InvalidateCamera = UpdateCameraTransform,
                 InvalidatePage = () =>
                 {
+                    PageLayer.ActiveEffect = vm.Controller.ActiveColourEffect;
+                    PageLayer.ActiveIntensity = vm.Controller.ActiveColourIntensity;
                     PageLayer.MotionBlurEnabled = vm.Config.MotionBlur;
                     PageLayer.MotionBlurIntensity = vm.Config.MotionBlurIntensity;
                     var tab = vm.ActiveTab;
@@ -54,6 +56,7 @@ public partial class MainWindow : Window
                 },
                 InvalidateOverlay = () =>
                 {
+                    OverlayLayer.ActiveEffect = vm.Controller.ActiveColourEffect;
                     OverlayLayer.LineFocusBlurActive = vm.ActiveTab?.LineFocusBlur ?? false;
                     OverlayLayer.Tint = vm.Config.LineHighlightTint;
                     OverlayLayer.TintOpacity = vm.Config.LineHighlightOpacity;
@@ -221,6 +224,8 @@ public partial class MainWindow : Window
     {
         PageLayer.Tab = tab;
         PageLayer.ColourEffects = Vm?.ColourEffects;
+        PageLayer.ActiveEffect = Vm?.Controller.ActiveColourEffect ?? ColourEffect.None;
+        PageLayer.ActiveIntensity = Vm?.Controller.ActiveColourIntensity ?? 1.0f;
         PageLayer.MotionBlurEnabled = Vm?.Config.MotionBlur ?? true;
         PageLayer.MotionBlurIntensity = Vm?.Config.MotionBlurIntensity ?? 0.5;
         bool blur = tab?.LineFocusBlur ?? false;
@@ -238,7 +243,7 @@ public partial class MainWindow : Window
         AnnotationLayer.Tab = tab;
         AnnotationLayer.ViewModel = Vm;
         OverlayLayer.Tab = tab;
-        OverlayLayer.ColourEffects = Vm?.ColourEffects;
+        OverlayLayer.ActiveEffect = Vm?.Controller.ActiveColourEffect ?? ColourEffect.None;
         OverlayLayer.LineFocusBlurActive = tab?.LineFocusBlur ?? false;
         OverlayLayer.Tint = Vm?.Config.LineHighlightTint ?? LineHighlightTint.Auto;
         OverlayLayer.TintOpacity = Vm?.Config.LineHighlightOpacity ?? 0.25;
@@ -314,196 +319,204 @@ public partial class MainWindow : Window
     protected override void OnKeyDown(KeyEventArgs e)
     {
         if (Vm is not { } vm) { base.OnKeyDown(e); return; }
-        bool ctrl = e.KeyModifiers.HasFlag(KeyModifiers.Control);
 
-        if (ctrl)
-        {
-            bool shift = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
-            switch (e.Key)
-            {
-                case Key.O when shift:
-                    if (vm.ShowOutline && !OutlinePanel.IsBookmarksTabActive
-                        && !OutlinePanel.IsSearchTabActive)
-                        vm.ShowOutline = false;
-                    else
-                    {
-                        vm.ShowOutline = true;
-                        OutlinePanel.SwitchToOutlineTab();
-                    }
-                    e.Handled = true; return;
-                case Key.B when shift:
-                    if (vm.ShowOutline && OutlinePanel.IsBookmarksTabActive)
-                        vm.ShowOutline = false;
-                    else
-                    {
-                        vm.ShowOutline = true;
-                        OutlinePanel.SwitchToBookmarksTab();
-                    }
-                    e.Handled = true; return;
-                case Key.O:
-                    _ = vm.OpenFileCommand.ExecuteAsync(null); e.Handled = true; return;
-                case Key.W: vm.CloseTab(vm.ActiveTabIndex); e.Handled = true; return;
-                case Key.Q: Close(); e.Handled = true; return;
-                case Key.M:
-                    vm.ShowMinimap = !vm.ShowMinimap; e.Handled = true; return;
-                case Key.OemComma:
-                    vm.ShowSettings = true; e.Handled = true; return;
-                case Key.F:
-                    vm.OpenSearch();
-                    e.Handled = true; return;
-                case Key.G:
-                    vm.ShowGoToPage = true; e.Handled = true; return;
-                case Key.Z when shift:
-                    vm.RedoAnnotation(); e.Handled = true; return;
-                case Key.Z:
-                    vm.UndoAnnotation(); e.Handled = true; return;
-                case Key.Y:
-                    vm.RedoAnnotation(); e.Handled = true; return;
-                case Key.C:
-                    if (vm.SelectedText is not null) vm.CopySelectedText();
-                    e.Handled = true; return;
-                case Key.Home:
-                    vm.GoToPage(0); e.Handled = true; return;
-                case Key.End:
-                    if (vm.ActiveTab is { } tEnd) vm.GoToPage(tEnd.PageCount - 1);
-                    e.Handled = true; return;
-                case Key.Tab:
-                    if (vm.Tabs.Count > 0)
-                        vm.SelectTab((vm.ActiveTabIndex + 1) % vm.Tabs.Count);
-                    e.Handled = true; return;
-            }
-        }
+        if (e.KeyModifiers.HasFlag(KeyModifiers.Control) && HandleCtrlShortcut(vm, e))
+            { RailToolBar.SyncState(); return; }
 
         // When the search TextBox has focus, let text input keys through.
         // Only intercept non-text keys (F-keys, Escape, PgUp/PgDn, etc.).
         bool searchFocused = vm.ShowOutline && OutlinePanel.IsSearchInputFocused;
 
-        // Navigation and toggle keys — only when search is not focused.
-        if (!searchFocused)
+        if (!searchFocused && HandleNavigationKey(vm, e))
+            { RailToolBar.SyncState(); return; }
+
+        if (HandleGlobalKey(vm, e))
+            { RailToolBar.SyncState(); return; }
+
+        base.OnKeyDown(e);
+    }
+
+    /// <summary>Ctrl+ keyboard shortcuts. Returns true if the key was handled.</summary>
+    private bool HandleCtrlShortcut(MainWindowViewModel vm, KeyEventArgs e)
+    {
+        bool shift = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
+        switch (e.Key)
         {
-            switch (e.Key)
-            {
-                case Key.Down or Key.S:
-                    vm.HandleArrowDown(); e.Handled = true; break;
-                case Key.Up or Key.W:
-                    vm.HandleArrowUp(); e.Handled = true; break;
-                case Key.Right:
-                    vm.HandleArrowRight(e.KeyModifiers.HasFlag(KeyModifiers.Shift));
-                    e.Handled = true; break;
-                case Key.Left or Key.A:
-                    vm.HandleArrowLeft(e.KeyModifiers.HasFlag(KeyModifiers.Shift));
-                    e.Handled = true; break;
-                case Key.P:
-                    vm.ToggleAutoScrollExclusive(); e.Handled = true; break;
-                case Key.J:
-                    vm.ToggleJumpModeExclusive(); e.Handled = true; break;
-                case Key.C:
+            case Key.O when shift:
+                if (vm.ShowOutline && !OutlinePanel.IsBookmarksTabActive
+                    && !OutlinePanel.IsSearchTabActive)
+                    vm.ShowOutline = false;
+                else
                 {
-                    var effect = vm.CycleColourEffect();
-                    vm.ShowStatusToast($"Colour: {effect.DisplayName()}");
-                    e.Handled = true; break;
-                }
-                case Key.B:
-                    vm.ShowBookmarkDialog = true; e.Handled = true; break;
-                case Key.OemTilde:
-                    vm.NavigateBack();
-                    OutlinePanel.UpdateBookmarkSource();
-                    e.Handled = true; break;
-                case Key.F:
-                    vm.ToggleLineFocusBlur(); e.Handled = true; break;
-                case Key.R:
-                    vm.ToggleBionicReading(); e.Handled = true; break;
-                case Key.OemOpenBrackets when e.KeyModifiers.HasFlag(KeyModifiers.Shift):
-                    RailToolBar.AdjustBlur(-0.05); e.Handled = true; break;
-                case Key.OemCloseBrackets when e.KeyModifiers.HasFlag(KeyModifiers.Shift):
-                    RailToolBar.AdjustBlur(0.05); e.Handled = true; break;
-                case Key.OemOpenBrackets:
-                    RailToolBar.AdjustSpeed(-5); e.Handled = true; break;
-                case Key.OemCloseBrackets:
-                    RailToolBar.AdjustSpeed(5); e.Handled = true; break;
-                case Key.D when e.KeyModifiers.HasFlag(KeyModifiers.Shift):
-                    if (vm.ActiveTab is { } dbgTab)
-                    {
-                        dbgTab.DebugOverlay = !dbgTab.DebugOverlay;
-                        OverlayLayer.InvalidateVisual();
-                    }
-                    e.Handled = true; break;
-                case Key.D:
-                    vm.HandleArrowRight(); e.Handled = true; break;
-                case Key.Home:
-                    if (vm.ActiveTab is { } tH && tH.Rail.Active)
-                        vm.HandleLineHome();
-                    else
-                        vm.GoToPage(0);
-                    e.Handled = true; break;
-                case Key.End:
-                    if (vm.ActiveTab is { } tE2 && tE2.Rail.Active)
-                        vm.HandleLineEnd();
-                    else if (vm.ActiveTab is { } tE3)
-                        vm.GoToPage(tE3.PageCount - 1);
-                    e.Handled = true; break;
-                case Key.OemPlus or Key.Add:
-                    vm.HandleZoomKey(true); e.Handled = true; break;
-                case Key.OemMinus or Key.Subtract:
-                    vm.HandleZoomKey(false); e.Handled = true; break;
-                case Key.D0 or Key.NumPad0:
-                    vm.HandleResetZoom(); e.Handled = true; break;
-                case Key.Space:
-                    vm.HandleArrowDown(); e.Handled = true; break;
-                case Key.D1:
-                    vm.SetAnnotationTool(AnnotationTool.Highlight); e.Handled = true; break;
-                case Key.D2:
-                    vm.SetAnnotationTool(AnnotationTool.Pen); e.Handled = true; break;
-                case Key.D3:
-                    vm.SetAnnotationTool(AnnotationTool.Rectangle); e.Handled = true; break;
-                case Key.D4:
-                    vm.SetAnnotationTool(AnnotationTool.TextNote); e.Handled = true; break;
-                case Key.D5:
-                    vm.SetAnnotationTool(AnnotationTool.Eraser); e.Handled = true; break;
-                case Key.Delete or Key.Back when !vm.IsAnnotating && vm.SelectedAnnotation is not null:
-                    vm.DeleteSelectedAnnotation(); e.Handled = true; break;
-            }
-        }
-
-        // Global keys — work even when search is focused.
-        if (!e.Handled)
-        {
-            switch (e.Key)
-            {
-                case Key.PageDown:
-                    if (vm.ActiveTab is { } t1) vm.GoToPage(t1.CurrentPage + 1);
-                    e.Handled = true; break;
-                case Key.PageUp:
-                    if (vm.ActiveTab is { } t2) vm.GoToPage(t2.CurrentPage - 1);
-                    e.Handled = true; break;
-                case Key.F1:
-                    vm.ShowShortcuts = true; e.Handled = true; break;
-                case Key.F3 when e.KeyModifiers.HasFlag(KeyModifiers.Shift):
-                    vm.PreviousMatch(); e.Handled = true; break;
-                case Key.F3:
-                    vm.NextMatch(); e.Handled = true; break;
-                case Key.F11:
-                    vm.IsFullScreen = !vm.IsFullScreen; e.Handled = true; break;
-                case Key.Escape when vm.AutoScrollActive:
-                    vm.StopAutoScroll(); e.Handled = true; break;
-                case Key.Escape when vm.IsFullScreen:
-                    vm.IsFullScreen = false; e.Handled = true; break;
-                case Key.Escape when vm.IsRadialMenuOpen:
-                    vm.CloseRadialMenu(); e.Handled = true; break;
-                case Key.Escape when vm.IsAnnotating:
-                    vm.CancelAnnotationTool(); e.Handled = true; break;
-                case Key.Escape when vm.ShowOutline && OutlinePanel.IsSearchTabActive:
-                    vm.CloseSearch();
+                    vm.ShowOutline = true;
                     OutlinePanel.SwitchToOutlineTab();
-                    e.Handled = true; break;
-            }
+                }
+                e.Handled = true; return true;
+            case Key.B when shift:
+                if (vm.ShowOutline && OutlinePanel.IsBookmarksTabActive)
+                    vm.ShowOutline = false;
+                else
+                {
+                    vm.ShowOutline = true;
+                    OutlinePanel.SwitchToBookmarksTab();
+                }
+                e.Handled = true; return true;
+            case Key.O:
+                _ = vm.OpenFileCommand.ExecuteAsync(null); e.Handled = true; return true;
+            case Key.W: vm.CloseTab(vm.ActiveTabIndex); e.Handled = true; return true;
+            case Key.Q: Close(); e.Handled = true; return true;
+            case Key.M:
+                vm.ShowMinimap = !vm.ShowMinimap; e.Handled = true; return true;
+            case Key.OemComma:
+                vm.ShowSettings = true; e.Handled = true; return true;
+            case Key.F:
+                vm.OpenSearch();
+                e.Handled = true; return true;
+            case Key.G:
+                vm.ShowGoToPage = true; e.Handled = true; return true;
+            case Key.Z when shift:
+                vm.RedoAnnotation(); e.Handled = true; return true;
+            case Key.Z:
+                vm.UndoAnnotation(); e.Handled = true; return true;
+            case Key.Y:
+                vm.RedoAnnotation(); e.Handled = true; return true;
+            case Key.C:
+                if (vm.SelectedText is not null) vm.CopySelectedText();
+                e.Handled = true; return true;
+            case Key.Home:
+                vm.GoToPage(0); e.Handled = true; return true;
+            case Key.End:
+                if (vm.ActiveTab is { } tEnd) vm.GoToPage(tEnd.PageCount - 1);
+                e.Handled = true; return true;
+            case Key.Tab:
+                if (vm.Tabs.Count > 0)
+                    vm.SelectTab((vm.ActiveTabIndex + 1) % vm.Tabs.Count);
+                e.Handled = true; return true;
+            default: return false;
         }
+    }
 
-        if (e.Handled)
-            RailToolBar.SyncState();
+    /// <summary>Navigation and toggle keys — only when search is not focused. Returns true if handled.</summary>
+    private bool HandleNavigationKey(MainWindowViewModel vm, KeyEventArgs e)
+    {
+        switch (e.Key)
+        {
+            case Key.Down or Key.S:
+                vm.HandleArrowDown(); e.Handled = true; return true;
+            case Key.Up or Key.W:
+                vm.HandleArrowUp(); e.Handled = true; return true;
+            case Key.Right:
+                vm.HandleArrowRight(e.KeyModifiers.HasFlag(KeyModifiers.Shift));
+                e.Handled = true; return true;
+            case Key.Left or Key.A:
+                vm.HandleArrowLeft(e.KeyModifiers.HasFlag(KeyModifiers.Shift));
+                e.Handled = true; return true;
+            case Key.P:
+                vm.ToggleAutoScrollExclusive(); e.Handled = true; return true;
+            case Key.J:
+                vm.ToggleJumpModeExclusive(); e.Handled = true; return true;
+            case Key.C:
+            {
+                var effect = vm.CycleColourEffect();
+                vm.ShowStatusToast($"Colour: {effect.DisplayName()}");
+                e.Handled = true; return true;
+            }
+            case Key.B:
+                vm.ShowBookmarkDialog = true; e.Handled = true; return true;
+            case Key.OemTilde:
+                vm.NavigateBack();
+                OutlinePanel.UpdateBookmarkSource();
+                e.Handled = true; return true;
+            case Key.F:
+                vm.ToggleLineFocusBlur(); e.Handled = true; return true;
+            case Key.R:
+                vm.ToggleBionicReading(); e.Handled = true; return true;
+            case Key.OemOpenBrackets when e.KeyModifiers.HasFlag(KeyModifiers.Shift):
+                RailToolBar.AdjustBlur(-0.05); e.Handled = true; return true;
+            case Key.OemCloseBrackets when e.KeyModifiers.HasFlag(KeyModifiers.Shift):
+                RailToolBar.AdjustBlur(0.05); e.Handled = true; return true;
+            case Key.OemOpenBrackets:
+                RailToolBar.AdjustSpeed(-5); e.Handled = true; return true;
+            case Key.OemCloseBrackets:
+                RailToolBar.AdjustSpeed(5); e.Handled = true; return true;
+            case Key.D when e.KeyModifiers.HasFlag(KeyModifiers.Shift):
+                if (vm.ActiveTab is { } dbgTab)
+                {
+                    dbgTab.DebugOverlay = !dbgTab.DebugOverlay;
+                    OverlayLayer.InvalidateVisual();
+                }
+                e.Handled = true; return true;
+            case Key.D:
+                vm.HandleArrowRight(); e.Handled = true; return true;
+            case Key.Home:
+                if (vm.ActiveTab is { } tH && tH.Rail.Active)
+                    vm.HandleLineHome();
+                else
+                    vm.GoToPage(0);
+                e.Handled = true; return true;
+            case Key.End:
+                if (vm.ActiveTab is { } tE2 && tE2.Rail.Active)
+                    vm.HandleLineEnd();
+                else if (vm.ActiveTab is { } tE3)
+                    vm.GoToPage(tE3.PageCount - 1);
+                e.Handled = true; return true;
+            case Key.OemPlus or Key.Add:
+                vm.HandleZoomKey(true); e.Handled = true; return true;
+            case Key.OemMinus or Key.Subtract:
+                vm.HandleZoomKey(false); e.Handled = true; return true;
+            case Key.D0 or Key.NumPad0:
+                vm.HandleResetZoom(); e.Handled = true; return true;
+            case Key.Space:
+                vm.HandleArrowDown(); e.Handled = true; return true;
+            case Key.D1:
+                vm.SetAnnotationTool(AnnotationTool.Highlight); e.Handled = true; return true;
+            case Key.D2:
+                vm.SetAnnotationTool(AnnotationTool.Pen); e.Handled = true; return true;
+            case Key.D3:
+                vm.SetAnnotationTool(AnnotationTool.Rectangle); e.Handled = true; return true;
+            case Key.D4:
+                vm.SetAnnotationTool(AnnotationTool.TextNote); e.Handled = true; return true;
+            case Key.D5:
+                vm.SetAnnotationTool(AnnotationTool.Eraser); e.Handled = true; return true;
+            case Key.Delete or Key.Back when !vm.IsAnnotating && vm.SelectedAnnotation is not null:
+                vm.DeleteSelectedAnnotation(); e.Handled = true; return true;
+            default: return false;
+        }
+    }
 
-        if (!e.Handled)
-            base.OnKeyDown(e);
+    /// <summary>Global keys — work even when search is focused. Returns true if handled.</summary>
+    private bool HandleGlobalKey(MainWindowViewModel vm, KeyEventArgs e)
+    {
+        switch (e.Key)
+        {
+            case Key.PageDown:
+                if (vm.ActiveTab is { } t1) vm.GoToPage(t1.CurrentPage + 1);
+                e.Handled = true; return true;
+            case Key.PageUp:
+                if (vm.ActiveTab is { } t2) vm.GoToPage(t2.CurrentPage - 1);
+                e.Handled = true; return true;
+            case Key.F1:
+                vm.ShowShortcuts = true; e.Handled = true; return true;
+            case Key.F3 when e.KeyModifiers.HasFlag(KeyModifiers.Shift):
+                vm.PreviousMatch(); e.Handled = true; return true;
+            case Key.F3:
+                vm.NextMatch(); e.Handled = true; return true;
+            case Key.F11:
+                vm.IsFullScreen = !vm.IsFullScreen; e.Handled = true; return true;
+            case Key.Escape when vm.AutoScrollActive:
+                vm.StopAutoScroll(); e.Handled = true; return true;
+            case Key.Escape when vm.IsFullScreen:
+                vm.IsFullScreen = false; e.Handled = true; return true;
+            case Key.Escape when vm.IsRadialMenuOpen:
+                vm.CloseRadialMenu(); e.Handled = true; return true;
+            case Key.Escape when vm.IsAnnotating:
+                vm.CancelAnnotationTool(); e.Handled = true; return true;
+            case Key.Escape when vm.ShowOutline && OutlinePanel.IsSearchTabActive:
+                vm.CloseSearch();
+                OutlinePanel.SwitchToOutlineTab();
+                e.Handled = true; return true;
+            default: return false;
+        }
     }
 
     protected override void OnKeyUp(KeyEventArgs e)

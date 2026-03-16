@@ -517,15 +517,6 @@ public class RadialMenu : Control
         }
 
         private static SKColor ParseHexColor(string hex, byte alpha)
-        {
-            if (hex.Length == 7 && hex[0] == '#')
-            {
-                byte r = Convert.ToByte(hex[1..3], 16);
-                byte g = Convert.ToByte(hex[3..5], 16);
-                byte b = Convert.ToByte(hex[5..7], 16);
-                return new SKColor(r, g, b, alpha);
-            }
-            return new SKColor(255, 255, 0, alpha);
-        }
+            => RailReader.Core.Services.ColorUtils.ParseHexColor(hex, alpha);
     }
 }

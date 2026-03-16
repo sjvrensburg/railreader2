@@ -49,11 +49,14 @@ public static class ScreenshotCompositor
         using var pageImage = SKImage.FromBitmap(pageBitmap);
         var destRect = SKRect.Create(0, 0, bitmapW, bitmapH);
         var colourEffects = controller.ColourEffects;
+        var activeEffect = controller.ActiveColourEffect;
+        var activeIntensity = controller.ActiveColourIntensity;
 
         // --- Layer 1: Page bitmap with optional line focus blur ---
         // Line focus blur and colour effect are composed together:
         // colour effect wraps the page draw (including blur passes).
-        using var effectPaint = colourEffects.HasActiveEffect ? colourEffects.CreatePaint() : null;
+        using var effectPaint = colourEffects.HasActiveEffect(activeEffect)
+            ? colourEffects.CreatePaint(activeEffect, activeIntensity) : null;
         bool needsColourLayer = effectPaint is not null;
 
         if (needsColourLayer)
@@ -107,8 +110,7 @@ public static class ScreenshotCompositor
         // --- Layer 2: Rail overlay ---
         if (options.RailOverlay && doc.Rail.Active && doc.Rail.HasAnalysis)
         {
-            var effect = colourEffects.Effect;
-            DrawRailOverlay(canvas, doc, effect.GetOverlayPalette(), options.LineFocusBlur,
+            DrawRailOverlay(canvas, doc, activeEffect.GetOverlayPalette(), options.LineFocusBlur,
                 options.LineHighlightTint, options.LineHighlightOpacity);
         }
 

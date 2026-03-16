@@ -5,9 +5,6 @@ namespace RailReader.Core.Services;
 
 public sealed class ColourEffectShaders : IDisposable
 {
-    public ColourEffect Effect { get; set; }
-    public float Intensity { get; set; } = 1.0f;
-
     private readonly Dictionary<ColourEffect, SKRuntimeEffect> _effects = [];
 
     private const string HighContrastSksl = """
@@ -88,21 +85,21 @@ public sealed class ColourEffectShaders : IDisposable
             _effects[effect] = compiled;
     }
 
-    public bool HasActiveEffect => Effect != ColourEffect.None && _effects.ContainsKey(Effect);
+    public bool HasActiveEffect(ColourEffect effect) => effect != ColourEffect.None && _effects.ContainsKey(effect);
 
-    public SKColorFilter? CreateColorFilter()
+    public SKColorFilter? CreateColorFilter(ColourEffect effect, float intensity)
     {
-        if (!_effects.TryGetValue(Effect, out var rt))
+        if (!_effects.TryGetValue(effect, out var rt))
             return null;
 
         var builder = new SKRuntimeColorFilterBuilder(rt);
-        builder.Uniforms["intensity"] = Intensity;
+        builder.Uniforms["intensity"] = intensity;
         return builder.Build();
     }
 
-    public SKPaint? CreatePaint()
+    public SKPaint? CreatePaint(ColourEffect effect, float intensity)
     {
-        var filter = CreateColorFilter();
+        var filter = CreateColorFilter(effect, intensity);
         if (filter is null) return null;
         return new SKPaint { ColorFilter = filter };
     }
