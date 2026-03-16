@@ -7,6 +7,17 @@ namespace RailReader.Core.Tests;
 /// </summary>
 public static class TestFixtures
 {
+    private static readonly List<string> s_tempFiles = [];
+
+    static TestFixtures()
+    {
+        AppDomain.CurrentDomain.ProcessExit += (_, _) =>
+        {
+            foreach (var file in s_tempFiles)
+                try { File.Delete(file); } catch { }
+        };
+    }
+
     /// <summary>
     /// Returns path to a new 3-page test PDF. Each call creates a unique file
     /// to avoid file locking conflicts between concurrent tests.
@@ -15,6 +26,7 @@ public static class TestFixtures
     {
         var path = Path.Combine(Path.GetTempPath(), $"railreader_test_{Guid.NewGuid():N}.pdf");
         CreateTestPdf(path, pageCount: 3);
+        s_tempFiles.Add(path);
         return path;
     }
 

@@ -95,7 +95,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public MainWindowViewModel(AppConfig config)
     {
         _controller = new DocumentController(config, new AvaloniaThreadMarshaller());
-        _controller.InitializeWorker();
+        try { _controller.InitializeWorker(); }
+        catch (FileNotFoundException) { /* ONNX model not found — layout analysis disabled */ }
         _controller.StateChanged += OnControllerStateChanged;
         SetupPollTimer();
     }
@@ -768,7 +769,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(ActiveTab));
         InvalidateAll();
-        InvalidateSearch();
         RequestAnimationFrame();
     }
 
@@ -792,6 +792,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
         InvalidateCamera();
         InvalidatePage();
         InvalidateOverlay();
+        InvalidateSearch();
+        InvalidateAnnotations();
     }
 
     public void RequestCameraUpdate() => InvalidateCamera();

@@ -100,16 +100,6 @@ public sealed class HumanFormatter : IOutputFormatter
         }
     }
 
-    private static string FormatLabel(string name)
-    {
-        // PascalCase -> spaced: "PageCount" -> "Page Count"
-        var chars = new List<char>();
-        for (int i = 0; i < name.Length; i++)
-        {
-            if (i > 0 && char.IsUpper(name[i]) && !char.IsUpper(name[i - 1]))
-                chars.Add(' ');
-            chars.Add(i == 0 ? char.ToUpper(name[i]) : name[i]);
-        }
-        return new string(chars.ToArray());
-    }
+    private static string FormatLabel(string name) =>
+        PascalCaseHelper.SplitPascalCase(name, ' ');
 }

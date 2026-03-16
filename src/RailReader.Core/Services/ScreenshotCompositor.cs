@@ -119,7 +119,7 @@ public static class ScreenshotCompositor
             DrawSearchHighlights(canvas, controller);
 
         // --- Layer 4: Annotations ---
-        if (options.Annotations && doc.Annotations is not null)
+        if (options.Annotations)
         {
             var pageAnnotations = doc.Annotations.Pages.TryGetValue(doc.CurrentPage, out var list) ? list : null;
             if (pageAnnotations is not null && pageAnnotations.Count > 0)

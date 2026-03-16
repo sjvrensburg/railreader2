@@ -66,9 +66,7 @@ public class AnnotationLayer : Control
             using var lease = leaseFeature.Lease();
             var canvas = lease.SkCanvas;
 
-            var annotations = _tab.Annotations;
-            if (annotations is not null &&
-                annotations.Pages.TryGetValue(_tab.CurrentPage, out var pageAnnotations))
+            if (_tab.Annotations.Pages.TryGetValue(_tab.CurrentPage, out var pageAnnotations))
             {
                 AnnotationRenderer.DrawAnnotations(canvas, pageAnnotations, _vm.SelectedAnnotation);
             }
