@@ -749,21 +749,27 @@ public sealed partial class MainWindowViewModel : ObservableObject
     {
         _controller.NextMatch();
         OnPropertyChanged(nameof(ActiveTab));
+        InvalidateAll();
         InvalidateSearch();
+        RequestAnimationFrame();
     }
 
     public void PreviousMatch()
     {
         _controller.PreviousMatch();
         OnPropertyChanged(nameof(ActiveTab));
+        InvalidateAll();
         InvalidateSearch();
+        RequestAnimationFrame();
     }
 
     public void GoToMatch(int matchIndex)
     {
         _controller.GoToMatch(matchIndex);
         OnPropertyChanged(nameof(ActiveTab));
+        InvalidateAll();
         InvalidateSearch();
+        RequestAnimationFrame();
     }
 
     public void UpdateCurrentPageMatches() => _controller.UpdateCurrentPageMatches();
