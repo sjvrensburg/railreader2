@@ -16,6 +16,7 @@ public static class AnnotationRenderer
     [ThreadStatic] private static SKPaint? s_noteTextPaint;
     [ThreadStatic] private static SKPaint? s_noteBgPaint;
     [ThreadStatic] private static SKFont? s_noteFont;
+    [ThreadStatic] private static SKPaint? s_shadowPaint;
     [ThreadStatic] private static SKPaint? s_dashPaint;
     [ThreadStatic] private static SKPaint? s_handleFillPaint;
     [ThreadStatic] private static SKPaint? s_handleStrokePaint;
@@ -151,7 +152,7 @@ public static class AnnotationRenderer
             float popupY = note.Y + NoteIconSize / 2 + 2;
 
             // Shadow
-            using var shadowPaint = new SKPaint
+            var shadowPaint = s_shadowPaint ??= new SKPaint
             {
                 Color = new SKColor(0, 0, 0, 40),
                 MaskFilter = SKMaskFilter.CreateBlur(SKBlurStyle.Normal, 2),

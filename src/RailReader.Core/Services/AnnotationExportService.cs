@@ -19,6 +19,8 @@ public static class AnnotationExportService
         using var stream = File.Create(outputPath);
         using var document = SKDocument.CreatePdf(stream);
 
+        var collapsed = new List<TextNoteAnnotation>();
+
         for (int page = 0; page < pdf.PageCount; page++)
         {
             onProgress?.Invoke(page, pdf.PageCount);
@@ -40,7 +42,7 @@ public static class AnnotationExportService
             if (annotations.Pages.TryGetValue(page, out var pageAnnotations) && pageAnnotations.Count > 0)
             {
                 // Expand all text notes so their popup text is rendered into the export
-                var collapsed = new List<TextNoteAnnotation>();
+                collapsed.Clear();
                 foreach (var ann in pageAnnotations)
                 {
                     if (ann is TextNoteAnnotation tn && !tn.IsExpanded)

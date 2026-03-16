@@ -9,6 +9,7 @@ public sealed class LayoutAnalyzer : IDisposable
 {
     private readonly InferenceSession _session;
     private bool _loggedOutputShapes;
+    private float[]? _chwBuffer;
 
     static LayoutAnalyzer()
     {
@@ -67,7 +68,7 @@ public sealed class LayoutAnalyzer : IDisposable
         // FitPageToTarget already ensures max(pxW, pxH) == target, so no resizing
         // is needed — just padding the shorter dimension with black pixels.
         // scale_factor = [1, 1] since the image pixels map 1:1 to canvas pixels.
-        var chwData = PreprocessImage(rgbBytes, pxW, pxH, target);
+        var chwData = PreprocessImage(rgbBytes, pxW, pxH, target, ref _chwBuffer);
 
         var imShape = new DenseTensor<float>(new float[] { target, target }, new[] { 1, 2 });
         var image = new DenseTensor<float>(chwData, new[] { 1, 3, target, target });
@@ -190,13 +191,18 @@ public sealed class LayoutAnalyzer : IDisposable
         DetectLinesForBlocks(rawBlocks, rgbBytes, pxW, pxH, mapScaleX, mapScaleY);
     }
 
-    private static float[] PreprocessImage(byte[] rgbBytes, int origW, int origH, int target)
+    private static float[] PreprocessImage(byte[] rgbBytes, int origW, int origH, int target, ref float[]? buffer)
     {
         // PP-DocLayoutV3 uses mean=[0,0,0] std=[1,1,1] (no ImageNet normalization)
         // Letterbox: place image at (0,0) in target×target canvas with black padding.
         // FitPageToTarget ensures max(origW, origH) == target, so pixels copy 1:1.
         int pixelCount = target * target;
-        var chwData = new float[3 * pixelCount]; // zero-initialized = black padding
+        int needed = 3 * pixelCount;
+        if (buffer is null || buffer.Length != needed)
+            buffer = new float[needed];
+        else
+            Array.Clear(buffer);
+        var chwData = buffer;
 
         int copyW = Math.Min(origW, target);
         int copyH = Math.Min(origH, target);

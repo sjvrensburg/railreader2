@@ -10,6 +10,7 @@ public sealed class AppConfig
     public double SnapDurationMs { get; set; } = 300.0;
     public double ScrollSpeedStart { get; set; } = 10.0;
     public double ScrollSpeedMax { get; set; } = 30.0;
+    public double DefaultAutoScrollSpeed => (ScrollSpeedStart + ScrollSpeedMax) / 2.0;
     public double ScrollRampTime { get; set; } = 1.5;
     public int AnalysisLookaheadPages { get; set; } = 2;
     public float UiFontScale { get; set; } = 1.25f;

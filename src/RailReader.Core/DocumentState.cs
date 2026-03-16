@@ -301,16 +301,24 @@ public sealed class DocumentState : IDisposable
             int page = PendingAnalysis.Dequeue();
             if (AnalysisCache.ContainsKey(page) || worker.IsInFlight(FilePath, page)) continue;
 
-            try
+            string filePath = FilePath;
+            double pageW = PageWidth, pageH = PageHeight;
+            Task.Run(() =>
             {
-                var (rgb, pxW, pxH) = _pdf.RenderPagePixmap(page, LayoutConstants.InputSize);
-                worker.Submit(new AnalysisRequest(FilePath, page, rgb, pxW, pxH, PageWidth, PageHeight));
-                return true;
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine($"Lookahead prepare failed for page {page + 1}: {ex.Message}");
-            }
+                try
+                {
+                    var (rgb, pxW, pxH) = _pdf.RenderPagePixmap(page, LayoutConstants.InputSize);
+                    _marshaller.Post(() =>
+                    {
+                        worker.Submit(new AnalysisRequest(filePath, page, rgb, pxW, pxH, pageW, pageH));
+                    });
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine($"Lookahead prepare failed for page {page + 1}: {ex.Message}");
+                }
+            });
+            return true;
         }
         return false;
     }

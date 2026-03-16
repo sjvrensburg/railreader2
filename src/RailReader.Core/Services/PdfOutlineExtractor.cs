@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using RailReader.Core.Models;
+using static RailReader.Core.Services.PdfiumNative;
 
 namespace RailReader.Core.Services;
 
@@ -90,17 +91,4 @@ public static class PdfOutlineExtractor
         int page = FPDFDest_GetDestPageIndex(doc, dest);
         return page >= 0 ? page : null;
     }
-
-    // PDFium P/Invoke declarations
-    private const string Lib = "pdfium";
-
-    [DllImport(Lib)] private static extern IntPtr FPDF_LoadMemDocument(IntPtr data, int size, string? password);
-    [DllImport(Lib)] private static extern void FPDF_CloseDocument(IntPtr document);
-    [DllImport(Lib)] private static extern IntPtr FPDFBookmark_GetFirstChild(IntPtr document, IntPtr bookmark);
-    [DllImport(Lib)] private static extern IntPtr FPDFBookmark_GetNextSibling(IntPtr document, IntPtr bookmark);
-    [DllImport(Lib)] private static extern uint FPDFBookmark_GetTitle(IntPtr bookmark, IntPtr buffer, uint buflen);
-    [DllImport(Lib)] private static extern IntPtr FPDFBookmark_GetDest(IntPtr document, IntPtr bookmark);
-    [DllImport(Lib)] private static extern IntPtr FPDFBookmark_GetAction(IntPtr bookmark);
-    [DllImport(Lib)] private static extern IntPtr FPDFAction_GetDest(IntPtr document, IntPtr action);
-    [DllImport(Lib)] private static extern int FPDFDest_GetDestPageIndex(IntPtr document, IntPtr dest);
 }

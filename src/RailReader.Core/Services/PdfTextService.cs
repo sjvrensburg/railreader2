@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
 using RailReader.Core.Models;
 using SkiaSharp;
+using static RailReader.Core.Services.PdfiumNative;
 
 namespace RailReader.Core.Services;
 
@@ -170,24 +171,4 @@ public static class PdfTextService
         double visibleHeight = hasCropBox ? cropTop - cropBottom : FPDF_GetPageHeight(page);
         return (offsetX, offsetY, visibleHeight);
     }
-
-    // PDFium P/Invoke declarations
-    private const string Lib = "pdfium";
-
-    [DllImport(Lib)] private static extern IntPtr FPDF_LoadMemDocument(IntPtr data, int size, string? password);
-    [DllImport(Lib)] private static extern void FPDF_CloseDocument(IntPtr document);
-    [DllImport(Lib)] private static extern IntPtr FPDF_LoadPage(IntPtr document, int pageIndex);
-    [DllImport(Lib)] private static extern void FPDF_ClosePage(IntPtr page);
-    [DllImport(Lib)] private static extern double FPDF_GetPageHeight(IntPtr page);
-    [DllImport(Lib)] private static extern IntPtr FPDFText_LoadPage(IntPtr page);
-    [DllImport(Lib)] private static extern void FPDFText_ClosePage(IntPtr textPage);
-    [DllImport(Lib)] private static extern int FPDFText_CountChars(IntPtr textPage);
-    [DllImport(Lib)] private static extern uint FPDFText_GetUnicode(IntPtr textPage, int index);
-    [DllImport(Lib)] private static extern bool FPDFText_GetCharBox(IntPtr textPage, int index,
-        ref double left, ref double right, ref double bottom, ref double top);
-    [DllImport(Lib)] private static extern bool FPDFPage_GetCropBox(IntPtr page,
-        ref float left, ref float bottom, ref float right, ref float top);
-    [DllImport(Lib)] private static extern int FPDFText_CountRects(IntPtr textPage, int startIndex, int count);
-    [DllImport(Lib)] private static extern bool FPDFText_GetRect(IntPtr textPage, int rectIndex,
-        ref double left, ref double top, ref double right, ref double bottom);
 }

@@ -547,8 +547,7 @@ public sealed class DocumentController
         JumpMode = !JumpMode;
     }
 
-    private double AutoScrollSpeed =>
-        (_config.ScrollSpeedStart + _config.ScrollSpeedMax) / 2.0;
+    private double AutoScrollSpeed => _config.DefaultAutoScrollSpeed;
 
     // --- Colour effects ---
 
@@ -1300,10 +1299,7 @@ public sealed class DocumentController
 
     public void ExecuteSearch(string query, bool caseSensitive, bool useRegex)
     {
-        SearchMatches = [];
-        _searchMatchesByPage = [];
-        CurrentPageSearchMatches = null;
-        ActiveMatchIndex = 0;
+        CloseSearch();
 
         if (string.IsNullOrEmpty(query) || ActiveDocument is not { } doc)
             return;
@@ -1549,9 +1545,7 @@ public sealed class DocumentController
 
     public SearchResult GetSearchState()
     {
-        var perPage = SearchMatches
-            .GroupBy(m => m.PageIndex)
-            .ToDictionary(g => g.Key, g => g.Count());
+        var perPage = _searchMatchesByPage.ToDictionary(kv => kv.Key, kv => kv.Value.Count);
         return new SearchResult(SearchMatches.Count, ActiveMatchIndex, perPage);
     }
 

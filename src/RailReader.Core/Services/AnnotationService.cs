@@ -21,15 +21,16 @@ public static class AnnotationService
         Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) },
     };
 
+    private static string? _annotationDir;
+
     /// <summary>Internal storage directory for annotation files.</summary>
-    public static string AnnotationDir
+    public static string AnnotationDir => _annotationDir ??= InitAnnotationDir();
+
+    private static string InitAnnotationDir()
     {
-        get
-        {
-            var dir = Path.Combine(AppConfig.ConfigDir, "annotations");
-            Directory.CreateDirectory(dir);
-            return dir;
-        }
+        var dir = Path.Combine(AppConfig.ConfigDir, "annotations");
+        Directory.CreateDirectory(dir);
+        return dir;
     }
 
     /// <summary>Get the internal storage path for a PDF's annotations.</summary>

@@ -705,7 +705,7 @@ public sealed class RailNav
         // If autoscroll is running, apply the updated speed immediately so
         // [ / ] key adjustments take effect without stopping and restarting.
         if (AutoScrolling)
-            _autoScrollSpeed = (config.ScrollSpeedStart + config.ScrollSpeedMax) / 2.0;
+            _autoScrollSpeed = config.DefaultAutoScrollSpeed;
     }
 
     private sealed class SnapAnimation

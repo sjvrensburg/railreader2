@@ -112,16 +112,8 @@ public static class ConfigCommands
         throw new NotSupportedException($"Cannot convert to {t.Name}");
     }
 
-    private static string ToSnakeCase(string name)
-    {
-        var chars = new List<char>();
-        for (int i = 0; i < name.Length; i++)
-        {
-            if (i > 0 && char.IsUpper(name[i]) && !char.IsUpper(name[i - 1])) chars.Add('_');
-            chars.Add(char.ToLower(name[i]));
-        }
-        return new string(chars.ToArray());
-    }
+    private static string ToSnakeCase(string name) =>
+        PascalCaseHelper.SplitPascalCase(name, '_').ToLowerInvariant();
 
     private static string FormatValue(object? value) => value switch
     {

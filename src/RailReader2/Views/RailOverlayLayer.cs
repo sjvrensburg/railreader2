@@ -13,7 +13,6 @@ namespace RailReader2.Views;
 public class RailOverlayLayer : Control
 {
     public TabViewModel? Tab { get; set; }
-    public ColourEffectShaders? ColourEffects { get; set; }
     public ColourEffect ActiveEffect { get; set; }
     public bool LineFocusBlurActive { get; set; }
     public LineHighlightTint Tint { get; set; }
