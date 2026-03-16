@@ -1446,6 +1446,31 @@ public sealed class DocumentController
         var match = SearchMatches[ActiveMatchIndex];
         if (match.PageIndex != doc.CurrentPage)
             GoToPage(match.PageIndex);
+        ScrollToMatchRect(doc, match);
+    }
+
+    private void ScrollToMatchRect(DocumentState doc, SearchMatch match)
+    {
+        if (match.Rects.Count == 0) return;
+        var (ww, wh) = GetViewportSize();
+
+        // Compute bounding box of all match rects
+        float minX = float.MaxValue, minY = float.MaxValue;
+        float maxX = float.MinValue, maxY = float.MinValue;
+        foreach (var r in match.Rects)
+        {
+            if (r.Left < minX) minX = r.Left;
+            if (r.Top < minY) minY = r.Top;
+            if (r.Right > maxX) maxX = r.Right;
+            if (r.Bottom > maxY) maxY = r.Bottom;
+        }
+
+        // Center the match bounding box in the viewport
+        double centerX = (minX + maxX) / 2.0;
+        double centerY = (minY + maxY) / 2.0;
+        doc.Camera.OffsetX = ww / 2.0 - centerX * doc.Camera.Zoom;
+        doc.Camera.OffsetY = wh / 2.0 - centerY * doc.Camera.Zoom;
+        doc.ClampCamera(ww, wh);
     }
 
     public void UpdateCurrentPageMatches()
