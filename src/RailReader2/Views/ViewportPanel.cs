@@ -84,6 +84,16 @@ public class ViewportPanel : Panel
         base.OnPointerMoved(e);
         if (!_dragging || ViewModel is null) return;
 
+        // If left button was released outside the viewport (e.g. on toolbar),
+        // we never got OnPointerReleased — cancel the drag now.
+        var point = e.GetCurrentPoint(this);
+        if (!point.Properties.IsLeftButtonPressed)
+        {
+            _dragging = false;
+            _browseAnnotationDrag = false;
+            return;
+        }
+
         var pos = e.GetPosition(this);
 
         if (ViewModel.IsAnnotating)

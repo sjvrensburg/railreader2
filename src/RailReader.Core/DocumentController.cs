@@ -107,6 +107,7 @@ public sealed class DocumentController
     private ResizeHandle _resizeHandle = ResizeHandle.None;
     private SKRect _resizeStartBounds;
     private List<PointF>? _resizeOriginalPoints;
+    private bool _browseClickWasAlreadySelected;
 
     // Text selection state
     public string? SelectedText { get; set; }
@@ -1111,6 +1112,7 @@ public sealed class DocumentController
             {
                 if (AnnotationRenderer.HitTest(list[i], pageX, pageY))
                 {
+                    _browseClickWasAlreadySelected = list[i] == SelectedAnnotation;
                     SelectedAnnotation = list[i];
                     _dragAnnotation = list[i];
                     _dragStartPageX = pageX;
@@ -1186,8 +1188,8 @@ public sealed class DocumentController
     }
 
     /// <summary>
-    /// Handle click in browse mode on text notes (toggle expand/collapse).
-    /// Returns true if a note was toggled. Sets EditNote if double-click editing needed.
+    /// Handle click in browse mode on text notes.
+    /// First click: select and expand. Second click on already-selected note: open edit dialog.
     /// </summary>
     public (bool Handled, TextNoteAnnotation? EditNote) HandleBrowseClick(float pageX, float pageY)
     {
@@ -1200,7 +1202,9 @@ public sealed class DocumentController
             if (list[i] is TextNoteAnnotation tn && AnnotationRenderer.HitTest(tn, pageX, pageY))
             {
                 SelectedAnnotation = tn;
-                tn.IsExpanded = !tn.IsExpanded;
+                if (_browseClickWasAlreadySelected)
+                    return (true, tn);
+                tn.IsExpanded = true;
                 return (true, null);
             }
         }
