@@ -346,17 +346,8 @@ public sealed class RailNav
     public void StartSnapToCurrent(double cameraX, double cameraY, double zoom, double windowWidth, double windowHeight)
     {
         if (!CanNavigate) return;
-
         var (targetX, targetY) = ComputeTargetCamera(zoom, windowWidth, windowHeight);
-        _snap = new SnapAnimation
-        {
-            StartX = cameraX,
-            StartY = cameraY,
-            TargetX = targetX,
-            TargetY = targetY,
-            Timer = Stopwatch.StartNew(),
-            DurationMs = _config.SnapDurationMs,
-        };
+        BeginSnap(cameraX, cameraY, targetX, targetY);
     }
 
     /// <summary>
@@ -368,28 +359,12 @@ public sealed class RailNav
         if (!CanNavigate) return;
 
         var (blockLeft, blockRight, blockWidthPx) = GetBlockBounds(zoom);
-
         double targetX = blockWidthPx <= windowWidth
-            ? windowWidth / 2.0 - (blockLeft + blockRight) / 2.0 * zoom // centred (fits in window)
-            : windowWidth - blockRight * zoom;                            // right edge (minX)
-
+            ? windowWidth / 2.0 - (blockLeft + blockRight) / 2.0 * zoom
+            : windowWidth - blockRight * zoom;
         var (_, targetY) = ComputeTargetCamera(zoom, windowWidth, windowHeight);
 
-        if (_config.PixelSnapping)
-        {
-            targetX = Math.Round(targetX * 4.0) / 4.0;
-            targetY = Math.Round(targetY);
-        }
-
-        _snap = new SnapAnimation
-        {
-            StartX = cameraX,
-            StartY = cameraY,
-            TargetX = targetX,
-            TargetY = targetY,
-            Timer = Stopwatch.StartNew(),
-            DurationMs = _config.SnapDurationMs,
-        };
+        BeginSnap(cameraX, cameraY, SnapX(targetX), SnapY(targetY));
     }
 
     /// <summary>
@@ -405,22 +380,22 @@ public sealed class RailNav
         var (_, targetY) = ComputeTargetCamera(zoom, windowWidth, windowHeight);
         double targetX = ClampX(windowWidth / 2.0 - pageX * zoom, zoom, windowWidth);
 
-        if (_config.PixelSnapping)
-        {
-            targetX = Math.Round(targetX * 4.0) / 4.0;
-            targetY = Math.Round(targetY);
-        }
+        BeginSnap(cameraX, cameraY, SnapX(targetX), SnapY(targetY));
+    }
 
+    private void BeginSnap(double startX, double startY, double targetX, double targetY)
+    {
         _snap = new SnapAnimation
         {
-            StartX = cameraX,
-            StartY = cameraY,
-            TargetX = targetX,
-            TargetY = targetY,
+            StartX = startX, StartY = startY,
+            TargetX = targetX, TargetY = targetY,
             Timer = Stopwatch.StartNew(),
             DurationMs = _config.SnapDurationMs,
         };
     }
+
+    private double SnapX(double x) => _config.PixelSnapping ? Math.Round(x * 4.0) / 4.0 : x;
+    private double SnapY(double y) => _config.PixelSnapping ? Math.Round(y) : y;
 
     private (double X, double Y) ComputeTargetCamera(double zoom, double windowWidth, double windowHeight)
     {

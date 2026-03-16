@@ -53,8 +53,8 @@ public sealed class DocumentController
     public int ActiveDocumentIndex { get; set; }
     public AppConfig Config => _config;
     public ColourEffectShaders ColourEffects => _colourEffects;
-    public ColourEffect ActiveColourEffect { get; private set; }
-    public float ActiveColourIntensity { get; private set; } = 1.0f;
+    public ColourEffect ActiveColourEffect => ActiveDocument?.ColourEffect ?? _config.ColourEffect;
+    public float ActiveColourIntensity => (float)_config.ColourEffectIntensity;
     public AnalysisWorker? Worker => _worker;
 
     public DocumentState? ActiveDocument =>
@@ -129,8 +129,6 @@ public sealed class DocumentController
     {
         _config = config;
         _marshaller = marshaller;
-        ActiveColourEffect = config.ColourEffect;
-        ActiveColourIntensity = (float)config.ColourEffectIntensity;
     }
 
     /// <summary>
@@ -183,7 +181,6 @@ public sealed class DocumentController
         Documents.Add(state);
         _config.AddRecentFile(state.FilePath);
         ActiveDocumentIndex = Documents.Count - 1;
-        ActiveColourEffect = state.ColourEffect;
 
         state.SubmitAnalysis(_worker, _config.NavigableClasses);
         state.QueueLookahead(_config.AnalysisLookaheadPages);
@@ -198,6 +195,7 @@ public sealed class DocumentController
         Documents.RemoveAt(index);
         doc.Dispose();
         ActiveDocumentIndex = Math.Clamp(ActiveDocumentIndex, 0, Math.Max(Documents.Count - 1, 0));
+        CloseSearch();
     }
 
     public void SelectDocument(int index)
@@ -205,7 +203,6 @@ public sealed class DocumentController
         if (index >= 0 && index < Documents.Count)
         {
             ActiveDocumentIndex = index;
-            ActiveColourEffect = Documents[index].ColourEffect;
         }
     }
 
@@ -501,9 +498,9 @@ public sealed class DocumentController
         }
     }
 
-    public void HandleClick(double canvasX, double canvasY)
+    public bool HandleClick(double canvasX, double canvasY)
     {
-        if (ActiveDocument is not { } doc || !doc.Rail.Active || !doc.Rail.HasAnalysis) return;
+        if (ActiveDocument is not { } doc || !doc.Rail.Active || !doc.Rail.HasAnalysis) return false;
 
         double pageX = (canvasX - doc.Camera.OffsetX) / doc.Camera.Zoom;
         double pageY = (canvasY - doc.Camera.OffsetY) / doc.Camera.Zoom;
@@ -511,6 +508,7 @@ public sealed class DocumentController
         doc.Rail.FindBlockNearPoint(pageX, pageY);
         var (ww, wh) = GetViewportSize();
         doc.StartSnap(ww, wh);
+        return true;
     }
 
     // --- Auto-scroll ---
@@ -553,13 +551,10 @@ public sealed class DocumentController
 
     // --- Colour effects ---
 
-    public void SetColourIntensity(float intensity) => ActiveColourIntensity = intensity;
-
     public void SetColourEffect(ColourEffect effect)
     {
         if (ActiveDocument is { } doc)
             doc.ColourEffect = effect;
-        ActiveColourEffect = effect;
     }
 
     public void SetGlobalColourEffect(ColourEffect effect)
@@ -583,9 +578,6 @@ public sealed class DocumentController
 
     public void OnConfigChanged()
     {
-        if (ActiveDocument is { } activeDoc)
-            ActiveColourEffect = activeDoc.ColourEffect;
-        ActiveColourIntensity = (float)_config.ColourEffectIntensity;
         foreach (var doc in Documents)
         {
             doc.Rail.UpdateConfig(_config);

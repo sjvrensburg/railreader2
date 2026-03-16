@@ -257,7 +257,7 @@ public sealed class RailReaderTools
         if (!Enum.TryParse<ColourEffect>(effect, ignoreCase: true, out var parsed))
             return false;
 
-        _controller.SetColourIntensity(Math.Clamp(intensity, 0f, 1f));
+        _controller.Config.ColourEffectIntensity = Math.Clamp(intensity, 0f, 1f);
         _controller.SetColourEffect(parsed);
         return true;
     }
