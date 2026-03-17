@@ -21,6 +21,10 @@
   <a href="https://claude.ai/code"><img src="https://img.shields.io/badge/built%20with-Claude%20Code-blueviolet?logo=claude" alt="Built with Claude Code"></a>
 </p>
 
+<p align="center">
+  <a href="https://apps.microsoft.com/store/detail/9P9J8KZ6RVZP"><img src="https://get.microsoft.com/images/en-us%20dark.svg" alt="Get it from Microsoft" width="200"></a>
+</p>
+
 ---
 
 <p align="center">
