@@ -316,6 +316,7 @@ pre code {
   display: flex;
   gap: 1rem;
   flex-wrap: wrap;
+  align-items: center;
 }
 
 .btn {
@@ -345,10 +346,11 @@ pre code {
 }
 
 /* Microsoft Store badge — theme-aware */
-.ms-store-badge { display: inline-flex; align-items: center; }
+.ms-store-badge { display: inline-flex; align-items: center; transition: opacity 0.2s, transform 0.2s; }
+.ms-store-badge:hover { opacity: 0.8; transform: scale(1.04); }
 .ms-badge-dark, .ms-badge-light { display: none; }
-[data-theme="dark"] .ms-badge-light { display: block; }
-[data-theme="light"] .ms-badge-dark { display: block; }
+[data-theme="dark"] .ms-badge-dark { display: block; }
+[data-theme="light"] .ms-badge-light { display: block; }
 
 /* ---- Demo ---- */
 .demo {
