@@ -134,10 +134,10 @@ jobs:
       - name: Update manifest version
         run: |
           $version = "${{ github.ref_name }}".TrimStart('v')
-          # MSIX requires 4-part version (x.y.z.0)
+          # MSIX requires 4-part version with revision = 0 (Microsoft Store requirement)
           $parts = $version.Split('.')
-          while ($parts.Count -lt 4) { $parts += '0' }
-          $msixVersion = ($parts[0..3]) -join '.'
+          while ($parts.Count -lt 3) { $parts += '0' }
+          $msixVersion = ($parts[0..2] + '0') -join '.'
           $manifest = Get-Content publish\msix\AppxManifest.xml -Raw
           $manifest = $manifest -replace '(<Identity[^>]*)\bVersion="[^"]*"', "`$1Version=`"$msixVersion`""
           [System.IO.File]::WriteAllText("publish\msix\AppxManifest.xml", $manifest, [System.Text.UTF8Encoding]::new($false))
