@@ -344,6 +344,14 @@ pre code {
   color: var(--fg);
 }
 
+/* Microsoft Store badge — theme-aware */
+.ms-store-badge { display: inline-flex; align-items: center; }
+[data-theme="dark"] .ms-badge-light { display: none; }
+[data-theme="dark"] .ms-badge-dark { display: inline; }
+[data-theme="light"] .ms-badge-dark { display: none; }
+[data-theme="light"] .ms-badge-light { display: inline;
+}
+
 /* ---- Demo ---- */
 .demo {
   max-width: var(--max-width);
