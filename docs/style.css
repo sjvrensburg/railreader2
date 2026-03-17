@@ -293,23 +293,10 @@ pre code {
    ============================================================ */
 
 /* ---- Hero ---- */
-.hero-bg {
-  background: url('img/banner.png') no-repeat right center / auto 100%;
-  position: relative;
-}
-.hero-bg::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(to right, var(--bg) 35%, transparent 65%, var(--bg) 100%);
-  pointer-events: none;
-}
 .hero {
   max-width: var(--max-width);
   margin: 0 auto;
   padding: 3rem 1.5rem 2rem;
-  position: relative;
-  z-index: 1;
 }
 
 .hero h1 {
