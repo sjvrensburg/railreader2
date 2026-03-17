@@ -330,6 +330,13 @@ pre code {
   transition: background-color 0.2s, color 0.2s;
 }
 
+.btn__icon {
+  width: 1.1em;
+  height: 1.1em;
+  vertical-align: -0.15em;
+  margin-right: 0.4em;
+}
+
 .btn:hover {
   background-color: var(--fg);
   color: var(--bg);
