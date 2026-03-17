@@ -11,6 +11,7 @@
 
 <p align="center">
   <a href="https://github.com/sjvrensburg/railreader2/releases/latest">Download</a> &middot;
+  <a href="https://apps.microsoft.com/store/detail/9P9J8KZ6RVZP">Microsoft Store</a> &middot;
   <a href="https://sjvrensburg.github.io/railreader2/">Website</a> &middot;
   <a href="https://sjvrensburg.github.io/railreader2/guide.html">User Guide</a>
 </p>
@@ -95,20 +96,28 @@ At high zoom levels, navigation switches to "rail mode" — the viewer locks ont
 
 ## Installation
 
-Download the latest release from [GitHub Releases](https://github.com/sjvrensburg/railreader2/releases/latest). The AI layout model is bundled in both packages.
+Download the latest release from [GitHub Releases](https://github.com/sjvrensburg/railreader2/releases/latest). The AI layout model is bundled in all packages.
 
-**Linux:** Download `railreader2-linux-x86_64.AppImage`, make it executable, and run it:
+### Linux
+
+Download `railreader2-linux-x86_64.AppImage`, make it executable, and run it:
 
 ```bash
 chmod +x railreader2-linux-x86_64.AppImage
 ./railreader2-linux-x86_64.AppImage
 ```
 
-**Windows:** Download `railreader2-setup-x64.exe` and run the installer.
+### Windows
 
-> **Windows SmartScreen warning**
+There are two ways to install on Windows:
+
+**Microsoft Store** (recommended): Install directly from the [Microsoft Store](https://apps.microsoft.com/store/detail/9P9J8KZ6RVZP). This provides automatic updates, no SmartScreen warnings, and clean install/uninstall. Note: the Store release may lag behind the GitHub release by a few days due to certification review.
+
+**Standalone installer**: Download `railreader2-setup-x64.exe` from [GitHub Releases](https://github.com/sjvrensburg/railreader2/releases/latest) and run it. This always has the latest version immediately.
+
+> **Windows SmartScreen warning** (standalone installer only)
 >
-> Windows may show a "Windows protected your PC" SmartScreen warning because the installer is not code-signed. This is expected for open-source projects distributed outside the Microsoft Store.
+> Windows may show a "Windows protected your PC" SmartScreen warning because the standalone installer is not code-signed. This does not apply to the Microsoft Store version.
 >
 > To proceed:
 > 1. Click **More info** in the SmartScreen dialog.
