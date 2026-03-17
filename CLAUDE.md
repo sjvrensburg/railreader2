@@ -106,7 +106,7 @@ Command groups: `document`, `text`, `nav`, `analysis`, `annotation`, `bookmark`,
 
 ### Tests
 
-21 xUnit tests in `tests/RailReader.Core.Tests/` — DocumentController, Camera, Annotations, AppConfig. `TestFixtures.cs` generates test PDFs via SkiaSharp.
+37 xUnit tests in `tests/RailReader.Core.Tests/` — DocumentController, Camera, Annotations, AppConfig. `TestFixtures.cs` generates test PDFs via SkiaSharp.
 
 ## Key Concepts
 
@@ -172,7 +172,7 @@ Releases triggered by pushing a `v*` tag (`.github/workflows/release.yml`).
 
 - **Linux**: `appimagetool` (not `linuxdeploy` — avoids ELF dependency tracing issues with .NET self-contained). Model at `$APPDIR/models/`.
 - **Windows (Inno Setup)**: `installer/railreader2.iss`. **Gotcha**: `.iss` paths are relative to the `.iss` file's directory, not CWD.
-- **Windows (Microsoft Store)**: MSIX built by CI `build-msix` job (unsigned — Microsoft re-signs during Store review). Manifest at `msix/Package.appxmanifest`, visual assets in `msix/Assets/`. See `DISTRIBUTION.md` for the Store release workflow.
+- **Windows (Microsoft Store)**: MSIX built by CI `build-msix` job (unsigned — Microsoft re-signs during Store review). Manifest at `msix/Package.appxmanifest`, visual assets in `msix/Assets/`. **Gotcha**: Store requires the version's 4th component (revision) to be `0` — CI forces this regardless of the git tag. See `DISTRIBUTION.md` for the Store release workflow.
 - **Model search order** (`FindModelPath()`): `AppContext.BaseDirectory/models/` → `$APPDIR/models/` → `LocalApplicationData/railreader2/models/` → `CWD/models/` → walk-up `../models/`
 
 ## Debugging
