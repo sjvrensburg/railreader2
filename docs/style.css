@@ -345,12 +345,17 @@ pre code {
   color: var(--fg);
 }
 
-/* Microsoft Store badge — theme-aware */
-.ms-store-badge { display: inline-flex; align-items: center; transition: opacity 0.2s, transform 0.2s; }
-.ms-store-badge:hover { opacity: 0.8; transform: scale(1.04); }
+/* Microsoft Store badge — theme-aware, swap variant on hover */
+.ms-store-badge { display: inline-flex; align-items: center; }
 .ms-badge-dark, .ms-badge-light { display: none; }
-[data-theme="dark"] .ms-badge-dark { display: block; }
-[data-theme="light"] .ms-badge-light { display: block; }
+[data-theme="light"] .ms-badge-dark { display: block; }
+[data-theme="light"] .ms-badge-light { display: none; }
+[data-theme="light"] .ms-store-badge:hover .ms-badge-dark { display: none; }
+[data-theme="light"] .ms-store-badge:hover .ms-badge-light { display: block; }
+[data-theme="dark"] .ms-badge-light { display: block; }
+[data-theme="dark"] .ms-badge-dark { display: none; }
+[data-theme="dark"] .ms-store-badge:hover .ms-badge-light { display: none; }
+[data-theme="dark"] .ms-store-badge:hover .ms-badge-dark { display: block; }
 
 /* ---- Demo ---- */
 .demo {
