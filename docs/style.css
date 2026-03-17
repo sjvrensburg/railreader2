@@ -347,8 +347,8 @@ pre code {
 /* Microsoft Store badge — theme-aware */
 .ms-store-badge { display: inline-flex; align-items: center; }
 .ms-badge-dark, .ms-badge-light { display: none; }
-[data-theme="dark"] .ms-badge-dark { display: block; }
-[data-theme="light"] .ms-badge-light { display: block; }
+[data-theme="dark"] .ms-badge-light { display: block; }
+[data-theme="light"] .ms-badge-dark { display: block; }
 
 /* ---- Demo ---- */
 .demo {
