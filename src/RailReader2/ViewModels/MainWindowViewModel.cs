@@ -23,6 +23,14 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     [ObservableProperty] private int _activeTabIndex;
     [ObservableProperty] private bool _showOutline;
+
+    partial void OnShowOutlineChanged(bool value)
+    {
+        // Keep the active tab's sidebar state in sync
+        if (ActiveTab is { } tab)
+            tab.ShowSidePanel = value;
+    }
+
     [ObservableProperty] private bool _showMinimap;
     [ObservableProperty] private bool _showSettings;
     [ObservableProperty] private bool _showAbout;
@@ -31,10 +39,22 @@ public sealed partial class MainWindowViewModel : ObservableObject
     [ObservableProperty] private string? _cleanupMessage;
 
     [ObservableProperty] private bool _isFullScreen;
+    [ObservableProperty] private bool _showFullScreenHeader;
     [ObservableProperty] private bool _isRadialMenuOpen;
     [ObservableProperty] private bool _showBookmarkDialog;
     [ObservableProperty] private double _radialMenuX;
     [ObservableProperty] private double _radialMenuY;
+
+    /// <summary>True when the tab bar should be visible (not fullscreen, or hovering at top edge).</summary>
+    public bool IsTabBarVisible => !IsFullScreen || ShowFullScreenHeader;
+
+    partial void OnIsFullScreenChanged(bool value)
+    {
+        OnPropertyChanged(nameof(IsTabBarVisible));
+        if (!value) ShowFullScreenHeader = false;
+    }
+
+    partial void OnShowFullScreenHeaderChanged(bool value) => OnPropertyChanged(nameof(IsTabBarVisible));
 
     public ObservableCollection<TabViewModel> Tabs { get; } = [];
 
@@ -98,6 +118,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         try { _controller.InitializeWorker(); }
         catch (FileNotFoundException) { /* ONNX model not found — layout analysis disabled */ }
         _controller.StateChanged += OnControllerStateChanged;
+        _controller.StatusMessage += ShowStatusToast;
         SetupPollTimer();
     }
 
@@ -239,8 +260,16 @@ public sealed partial class MainWindowViewModel : ObservableObject
         var tab = Tabs[index];
         _controller.CloseDocument(_controller.Documents.IndexOf(tab.State));
         Tabs.RemoveAt(index);
-        if (Tabs.Count == 0) ActiveTabIndex = 0;
-        else if (ActiveTabIndex >= Tabs.Count) ActiveTabIndex = Tabs.Count - 1;
+        if (Tabs.Count == 0)
+        {
+            ActiveTabIndex = 0;
+            ShowOutline = false;
+        }
+        else
+        {
+            if (ActiveTabIndex >= Tabs.Count) ActiveTabIndex = Tabs.Count - 1;
+            ShowOutline = Tabs[ActiveTabIndex].ShowSidePanel;
+        }
         OnPropertyChanged(nameof(ActiveTab));
         InvalidateAll();
     }
@@ -252,8 +281,16 @@ public sealed partial class MainWindowViewModel : ObservableObject
     {
         if (index >= 0 && index < Tabs.Count)
         {
+            // Save sidebar state to outgoing tab
+            if (ActiveTab is { } oldTab)
+                oldTab.ShowSidePanel = ShowOutline;
+
             ActiveTabIndex = index;
             _controller.SelectDocument(index);
+
+            // Restore sidebar state from incoming tab
+            ShowOutline = Tabs[index].ShowSidePanel;
+
             OnPropertyChanged(nameof(ActiveTab));
             InvalidateAll();
         }

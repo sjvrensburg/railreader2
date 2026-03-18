@@ -125,6 +125,11 @@ public sealed class DocumentController
     /// </summary>
     public Action<string>? StateChanged;
 
+    /// <summary>
+    /// Fired when a transient status message should be shown to the user.
+    /// </summary>
+    public Action<string>? StatusMessage;
+
     public DocumentController(AppConfig config, IThreadMarshaller marshaller)
     {
         _config = config;
@@ -400,17 +405,96 @@ public sealed class DocumentController
         var boundary = forward ? NavResult.PageBoundaryNext : NavResult.PageBoundaryPrev;
         if (result == boundary)
         {
-            doc.GoToPage(currentPage + (forward ? 1 : -1), _worker, _config.NavigableClasses, ww, wh);
-            doc.QueueLookahead(_config.AnalysisLookaheadPages);
-            if (doc.Rail.Active)
+            return SkipToNavigablePage(doc, forward, 0, ww, wh) switch
             {
-                if (!forward) doc.Rail.JumpToEnd();
-                doc.StartSnap(ww, wh);
-                return LineAdvanceResult.PageChanged;
-            }
-            return LineAdvanceResult.PageChangedRailLost;
+                SkipResult.FoundNavigable => LineAdvanceResult.PageChanged,
+                _ => LineAdvanceResult.PageChangedRailLost,
+            };
         }
         return result == NavResult.Ok ? LineAdvanceResult.LineAdvanced : LineAdvanceResult.NoChange;
+    }
+
+    private enum SkipResult { FoundNavigable, Deferred, Exhausted }
+
+    /// <summary>
+    /// Advance through pages in the given direction, skipping pages with no
+    /// navigable blocks. Cached analysis is checked without rasterizing.
+    /// If analysis is pending (async), stores skip state on the document for
+    /// deferred continuation via <see cref="TryResumeSkip"/>.
+    /// </summary>
+    private SkipResult SkipToNavigablePage(DocumentState doc, bool forward, int skipped, double ww, double wh)
+    {
+        int step = forward ? 1 : -1;
+        int targetPage = doc.CurrentPage + step;
+
+        while (targetPage >= 0 && targetPage < doc.PageCount)
+        {
+            // Fast path: skip cached pages with no navigable blocks without rasterizing
+            if (doc.AnalysisCache.TryGetValue(targetPage, out var cached)
+                && !HasNavigableBlocks(cached))
+            {
+                skipped++;
+                targetPage += step;
+                continue;
+            }
+
+            // Either has navigable blocks (land on it) or needs async analysis
+            doc.GoToPage(targetPage, _worker, _config.NavigableClasses, ww, wh);
+            doc.UpdateRailZoom(ww, wh);
+
+            if (doc.Rail.Active)
+            {
+                doc.PendingSkipDirection = 0;
+                doc.PendingSkipCount = 0;
+                doc.QueueLookahead(_config.AnalysisLookaheadPages);
+                if (!forward) doc.Rail.JumpToEnd();
+                doc.StartSnap(ww, wh);
+                if (skipped > 0) NotifyPagesSkipped(skipped);
+                return SkipResult.FoundNavigable;
+            }
+
+            if (doc.PendingRailSetup)
+            {
+                doc.PendingSkipDirection = step;
+                doc.PendingSkipCount = skipped;
+                doc.QueueLookahead(_config.AnalysisLookaheadPages);
+                return SkipResult.Deferred;
+            }
+
+            skipped++;
+            targetPage += step;
+        }
+
+        doc.PendingSkipDirection = 0;
+        doc.PendingSkipCount = 0;
+        return SkipResult.Exhausted;
+    }
+
+    private bool HasNavigableBlocks(PageAnalysis analysis)
+    {
+        foreach (var block in analysis.Blocks)
+            if (_config.NavigableClasses.Contains(block.ClassId))
+                return true;
+        return false;
+    }
+
+    private void NotifyPagesSkipped(int count)
+    {
+        StatusMessage?.Invoke(count == 1
+            ? "Skipped 1 page (no text blocks)"
+            : $"Skipped {count} pages (no text blocks)");
+    }
+
+    /// <summary>
+    /// Resume a deferred skip after analysis arrived with no navigable blocks.
+    /// Called from <see cref="PollAnalysisResults"/>.
+    /// </summary>
+    private bool TryResumeSkip(DocumentState doc, double ww, double wh)
+    {
+        // The current page (whose analysis just arrived with no blocks) counts as skipped
+        int skipped = doc.PendingSkipCount + 1;
+        bool forward = doc.PendingSkipDirection > 0;
+        return SkipToNavigablePage(doc, forward, skipped, ww, wh) == SkipResult.FoundNavigable;
     }
 
     public void HandleArrowDown() => HandleVerticalNav(forward: true);
@@ -792,8 +876,21 @@ public sealed class DocumentController
                     Console.Error.WriteLine($"[Analysis] Rail has {doc.Rail.NavigableCount} navigable blocks, Active={doc.Rail.Active}");
                     if (doc.Rail.Active)
                     {
+                        doc.PendingSkipDirection = 0;
                         doc.StartSnap(ww, wh);
                         needsAnim = true;
+                    }
+                    else if (doc.PendingSkipDirection != 0)
+                    {
+                        // Analysis arrived but no navigable blocks — skip to next page.
+                        // Only resume if this is the active document; clear stale state otherwise.
+                        if (doc == ActiveDocument)
+                            needsAnim |= TryResumeSkip(doc, ww, wh);
+                        else
+                        {
+                            doc.PendingSkipDirection = 0;
+                            doc.PendingSkipCount = 0;
+                        }
                     }
                 }
             }

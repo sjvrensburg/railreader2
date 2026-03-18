@@ -25,6 +25,9 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
     [ObservableProperty] private bool _lineFocusBlur;
     [ObservableProperty] private bool _bionicReading;
 
+    /// <summary>Whether the side panel (outline/bookmarks/search) is visible for this tab.</summary>
+    public bool ShowSidePanel { get; set; }
+
     // Read-only properties used by Views
     public string FilePath => State.FilePath;
     public int PageCount => State.PageCount;

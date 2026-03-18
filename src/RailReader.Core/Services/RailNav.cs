@@ -44,6 +44,12 @@ public sealed class RailNav
     private const double EdgeAdvanceHoldMs = 400.0;
 
     /// <summary>
+    /// When a block's width is less than this fraction of the viewport,
+    /// center it horizontally instead of left-aligning.
+    /// </summary>
+    private const double CenterBlockThreshold = 0.75;
+
+    /// <summary>
     /// Returns true if input should be suppressed because an edge-hold advance
     /// snap animation is still in progress.
     /// </summary>
@@ -402,7 +408,20 @@ public sealed class RailNav
         var block = CurrentNavigableBlock;
         var line = CurrentLineInfo;
         double targetY = windowHeight / 2.0 - line.Y * zoom + VerticalBias;
-        double targetX = windowWidth * 0.05 - block.BBox.X * zoom;
+
+        double blockWidthPx = block.BBox.W * zoom;
+        double targetX;
+        if (blockWidthPx < windowWidth * CenterBlockThreshold)
+        {
+            // Block is narrow relative to viewport — center it horizontally
+            double blockCenterX = block.BBox.X + block.BBox.W / 2.0;
+            targetX = windowWidth / 2.0 - blockCenterX * zoom;
+        }
+        else
+        {
+            // Block fills most of the viewport — left-align with 5% margin
+            targetX = windowWidth * 0.05 - block.BBox.X * zoom;
+        }
 
         if (_config.PixelSnapping)
         {

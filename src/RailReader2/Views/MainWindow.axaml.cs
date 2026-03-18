@@ -15,6 +15,10 @@ public partial class MainWindow : Window
     private double _lastMinimapOy;
     private double _lastMinimapZoom;
 
+    // Fullscreen tab reveal: show threshold < hide threshold for hysteresis
+    private const double FullScreenShowThreshold = 5.0;
+    private const double FullScreenHideThreshold = 60.0;
+
     public MainWindow()
     {
         InitializeComponent();
@@ -529,5 +533,18 @@ public partial class MainWindow : Window
 
         if (!e.Handled)
             base.OnKeyUp(e);
+    }
+
+    protected override void OnPointerMoved(PointerEventArgs e)
+    {
+        base.OnPointerMoved(e);
+        if (Vm is { IsFullScreen: true } vm)
+        {
+            var pos = e.GetPosition(this);
+            if (!vm.ShowFullScreenHeader && pos.Y <= FullScreenShowThreshold)
+                vm.ShowFullScreenHeader = true;
+            else if (vm.ShowFullScreenHeader && pos.Y > FullScreenHideThreshold)
+                vm.ShowFullScreenHeader = false;
+        }
     }
 }
