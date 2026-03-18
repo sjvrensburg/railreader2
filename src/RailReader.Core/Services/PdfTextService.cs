@@ -21,73 +21,42 @@ public static class PdfTextService
     /// </summary>
     public static PageText ExtractPageText(byte[] pdfBytes, int pageIndex)
     {
-        IntPtr doc = IntPtr.Zero;
-        IntPtr page = IntPtr.Zero;
-        IntPtr textPage = IntPtr.Zero;
-        GCHandle pinned = default;
-
-        try
-        {
-            pinned = GCHandle.Alloc(pdfBytes, GCHandleType.Pinned);
-            doc = FPDF_LoadMemDocument(pinned.AddrOfPinnedObject(), pdfBytes.Length, null);
-            if (doc == IntPtr.Zero)
-                return s_empty;
-
-            page = FPDF_LoadPage(doc, pageIndex);
-            if (page == IntPtr.Zero)
-                return s_empty;
-
-            var (offsetX, offsetY, visibleHeight) = GetCropBoxTransform(page);
-
-            textPage = FPDFText_LoadPage(page);
-            if (textPage == IntPtr.Zero)
-                return s_empty;
-
-            int charCount = FPDFText_CountChars(textPage);
-            if (charCount <= 0)
-                return s_empty;
-
-            // Build text character-by-character using FPDFText_GetUnicode to ensure
-            // 1:1 index correspondence with FPDFText_GetCharBox.
-            var textChars = new char[charCount];
-            var charBoxes = new List<CharBox>(charCount);
-            for (int i = 0; i < charCount; i++)
+        return WithTextPage(pdfBytes, pageIndex, s_empty, "extract text",
+            (textPage, offsetX, offsetY, visibleHeight) =>
             {
-                uint unicode = FPDFText_GetUnicode(textPage, i);
-                textChars[i] = unicode <= 0xFFFF ? (char)unicode : '\uFFFD';
+                int charCount = FPDFText_CountChars(textPage);
+                if (charCount <= 0)
+                    return s_empty;
 
-                double left = 0, right = 0, bottom = 0, top = 0;
-                if (FPDFText_GetCharBox(textPage, i, ref left, ref right, ref bottom, ref top))
+                // Build text character-by-character using FPDFText_GetUnicode to ensure
+                // 1:1 index correspondence with FPDFText_GetCharBox.
+                var textChars = new char[charCount];
+                var charBoxes = new List<CharBox>(charCount);
+                for (int i = 0; i < charCount; i++)
                 {
-                    // Shift from MediaBox to CropBox space, then convert
-                    // from PDF user space (Y-up) to page-point space (Y-down)
-                    float adjLeft = (float)(left - offsetX);
-                    float adjRight = (float)(right - offsetX);
-                    float tlY = (float)(visibleHeight - (top - offsetY));
-                    float brY = (float)(visibleHeight - (bottom - offsetY));
-                    charBoxes.Add(new CharBox(i, adjLeft, tlY, adjRight, brY));
-                }
-                else
-                {
-                    charBoxes.Add(new CharBox(i, 0, 0, 0, 0));
-                }
-            }
-            string text = new string(textChars);
+                    uint unicode = FPDFText_GetUnicode(textPage, i);
+                    textChars[i] = unicode <= 0xFFFF ? (char)unicode : '\uFFFD';
 
-            return new PageText(text, charBoxes);
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"[PdfText] Failed to extract text for page {pageIndex}: {ex.Message}");
-            return s_empty;
-        }
-        finally
-        {
-            if (textPage != IntPtr.Zero) FPDFText_ClosePage(textPage);
-            if (page != IntPtr.Zero) FPDF_ClosePage(page);
-            if (doc != IntPtr.Zero) FPDF_CloseDocument(doc);
-            if (pinned.IsAllocated) pinned.Free();
-        }
+                    double left = 0, right = 0, bottom = 0, top = 0;
+                    if (FPDFText_GetCharBox(textPage, i, ref left, ref right, ref bottom, ref top))
+                    {
+                        // Shift from MediaBox to CropBox space, then convert
+                        // from PDF user space (Y-up) to page-point space (Y-down)
+                        float adjLeft = (float)(left - offsetX);
+                        float adjRight = (float)(right - offsetX);
+                        float tlY = (float)(visibleHeight - (top - offsetY));
+                        float brY = (float)(visibleHeight - (bottom - offsetY));
+                        charBoxes.Add(new CharBox(i, adjLeft, tlY, adjRight, brY));
+                    }
+                    else
+                    {
+                        charBoxes.Add(new CharBox(i, 0, 0, 0, 0));
+                    }
+                }
+                string text = new string(textChars);
+
+                return new PageText(text, charBoxes);
+            });
     }
 
     /// <summary>
@@ -102,6 +71,43 @@ public static class PdfTextService
         for (int i = 0; i < ranges.Count; i++)
             result.Add([]);
 
+        return WithTextPage(pdfBytes, pageIndex, result, "get text range rects",
+            (textPage, offsetX, offsetY, visibleHeight) =>
+            {
+                for (int i = 0; i < ranges.Count; i++)
+                {
+                    var (charStart, charLength) = ranges[i];
+                    int rectCount = FPDFText_CountRects(textPage, charStart, charLength);
+                    for (int r = 0; r < rectCount; r++)
+                    {
+                        double left = 0, top = 0, right = 0, bottom = 0;
+                        if (FPDFText_GetRect(textPage, r, ref left, ref top, ref right, ref bottom))
+                        {
+                            // Shift from MediaBox space to CropBox space, then
+                            // convert from PDF user space (Y-up) to page-point space (Y-down)
+                            float adjLeft = (float)(left - offsetX);
+                            float adjRight = (float)(right - offsetX);
+                            float tlY = (float)(visibleHeight - (top - offsetY));
+                            float brY = (float)(visibleHeight - (bottom - offsetY));
+                            result[i].Add(new SKRect(adjLeft, tlY, adjRight, brY));
+                        }
+                    }
+                }
+
+                return result;
+            });
+    }
+
+    /// <summary>
+    /// Loads a PDFium document and text page from in-memory PDF bytes, invokes
+    /// <paramref name="action"/> with the text page handle and CropBox transform,
+    /// then tears everything down in a finally block.
+    /// Returns <paramref name="defaultValue"/> if the document, page, or text page
+    /// fails to load, or if an exception is thrown.
+    /// </summary>
+    private static T WithTextPage<T>(byte[] pdfBytes, int pageIndex, T defaultValue,
+        string operationName, Func<IntPtr, float, float, double, T> action)
+    {
         IntPtr doc = IntPtr.Zero;
         IntPtr page = IntPtr.Zero;
         IntPtr textPage = IntPtr.Zero;
@@ -111,39 +117,25 @@ public static class PdfTextService
         {
             pinned = GCHandle.Alloc(pdfBytes, GCHandleType.Pinned);
             doc = FPDF_LoadMemDocument(pinned.AddrOfPinnedObject(), pdfBytes.Length, null);
-            if (doc == IntPtr.Zero) return result;
+            if (doc == IntPtr.Zero)
+                return defaultValue;
 
             page = FPDF_LoadPage(doc, pageIndex);
-            if (page == IntPtr.Zero) return result;
+            if (page == IntPtr.Zero)
+                return defaultValue;
 
             var (offsetX, offsetY, visibleHeight) = GetCropBoxTransform(page);
 
             textPage = FPDFText_LoadPage(page);
-            if (textPage == IntPtr.Zero) return result;
+            if (textPage == IntPtr.Zero)
+                return defaultValue;
 
-            for (int i = 0; i < ranges.Count; i++)
-            {
-                var (charStart, charLength) = ranges[i];
-                int rectCount = FPDFText_CountRects(textPage, charStart, charLength);
-                for (int r = 0; r < rectCount; r++)
-                {
-                    double left = 0, top = 0, right = 0, bottom = 0;
-                    if (FPDFText_GetRect(textPage, r, ref left, ref top, ref right, ref bottom))
-                    {
-                        // Shift from MediaBox space to CropBox space, then
-                        // convert from PDF user space (Y-up) to page-point space (Y-down)
-                        float adjLeft = (float)(left - offsetX);
-                        float adjRight = (float)(right - offsetX);
-                        float tlY = (float)(visibleHeight - (top - offsetY));
-                        float brY = (float)(visibleHeight - (bottom - offsetY));
-                        result[i].Add(new SKRect(adjLeft, tlY, adjRight, brY));
-                    }
-                }
-            }
+            return action(textPage, offsetX, offsetY, visibleHeight);
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"[PdfText] Failed to get text range rects for page {pageIndex}: {ex.Message}");
+            Console.Error.WriteLine($"[PdfText] Failed to {operationName} for page {pageIndex}: {ex.Message}");
+            return defaultValue;
         }
         finally
         {
@@ -152,8 +144,6 @@ public static class PdfTextService
             if (doc != IntPtr.Zero) FPDF_CloseDocument(doc);
             if (pinned.IsAllocated) pinned.Free();
         }
-
-        return result;
     }
 
     /// <summary>

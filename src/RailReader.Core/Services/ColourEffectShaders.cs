@@ -92,9 +92,7 @@ public sealed class ColourEffectShaders : IDisposable
         if (!_effects.TryGetValue(effect, out var rt))
             return null;
 
-        var builder = new SKRuntimeColorFilterBuilder(rt);
-        builder.Uniforms["intensity"] = intensity;
-        return builder.Build();
+        return BuildColorFilter(rt, intensity);
     }
 
     public SKPaint? CreatePaint(ColourEffect effect, float intensity)
@@ -105,9 +103,12 @@ public sealed class ColourEffectShaders : IDisposable
     }
 
     public SKColorFilter? CreateBionicColorFilter(float intensity)
+        => BuildColorFilter(_bionicEffect, intensity);
+
+    private static SKColorFilter? BuildColorFilter(SKRuntimeEffect? effect, float intensity)
     {
-        if (_bionicEffect is null) return null;
-        var builder = new SKRuntimeColorFilterBuilder(_bionicEffect);
+        if (effect is null) return null;
+        var builder = new SKRuntimeColorFilterBuilder(effect);
         builder.Uniforms["intensity"] = intensity;
         return builder.Build();
     }

@@ -16,28 +16,15 @@ public class AppConfigTests
     }
 
     [Fact]
-    public void SaveAndLoad_RoundTrips()
+    public void PropertySetting_WorksCorrectly()
     {
-        var tempDir = Path.Combine(Path.GetTempPath(), $"railreader_test_{Guid.NewGuid():N}");
-        Directory.CreateDirectory(tempDir);
-        var configPath = Path.Combine(tempDir, "config.json");
+        var config = new AppConfig { RailZoomThreshold = 5.0 };
+        config.SnapDurationMs = 500.0;
+        config.PixelSnapping = false;
 
-        try
-        {
-            var config = new AppConfig { RailZoomThreshold = 5.0 };
-            // Use reflection or direct file write to test save/load
-            config.RailZoomThreshold = 5.0;
-            config.SnapDurationMs = 500.0;
-            config.PixelSnapping = false;
-
-            Assert.Equal(5.0, config.RailZoomThreshold);
-            Assert.Equal(500.0, config.SnapDurationMs);
-            Assert.False(config.PixelSnapping);
-        }
-        finally
-        {
-            try { Directory.Delete(tempDir, true); } catch { }
-        }
+        Assert.Equal(5.0, config.RailZoomThreshold);
+        Assert.Equal(500.0, config.SnapDurationMs);
+        Assert.False(config.PixelSnapping);
     }
 
     [Fact]

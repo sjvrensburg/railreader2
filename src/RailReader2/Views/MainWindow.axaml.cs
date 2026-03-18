@@ -232,31 +232,34 @@ public partial class MainWindow : Window
 
     private void UpdateLayerBindings(TabViewModel? tab)
     {
+        var config = Vm?.Config;
+        var ctrl = Vm?.Controller;
+
         PageLayer.Tab = tab;
         PageLayer.ColourEffects = Vm?.ColourEffects;
-        PageLayer.ActiveEffect = Vm?.Controller.ActiveColourEffect ?? ColourEffect.None;
-        PageLayer.ActiveIntensity = Vm?.Controller.ActiveColourIntensity ?? 1.0f;
-        PageLayer.MotionBlurEnabled = Vm?.Config.MotionBlur ?? true;
-        PageLayer.MotionBlurIntensity = Vm?.Config.MotionBlurIntensity ?? 0.5;
+        PageLayer.ActiveEffect = ctrl?.ActiveColourEffect ?? ColourEffect.None;
+        PageLayer.ActiveIntensity = ctrl?.ActiveColourIntensity ?? 1.0f;
+        PageLayer.MotionBlurEnabled = config?.MotionBlur ?? true;
+        PageLayer.MotionBlurIntensity = config?.MotionBlurIntensity ?? 0.5;
         bool blur = tab?.LineFocusBlur ?? false;
         bool bionic = tab?.BionicReading ?? false;
         PageLayer.LineFocusBlurEnabled = blur;
-        PageLayer.LineFocusBlurIntensity = Vm?.Config.LineFocusBlurIntensity ?? 0.5;
-        PageLayer.LineFocusPadding = Vm?.Config.LineFocusPadding ?? 0.2;
+        PageLayer.LineFocusBlurIntensity = config?.LineFocusBlurIntensity ?? 0.5;
+        PageLayer.LineFocusPadding = config?.LineFocusPadding ?? 0.2;
         PageLayer.BionicReadingEnabled = bionic;
-        PageLayer.BionicFadeIntensity = Vm?.Config.BionicFadeIntensity ?? 0.6;
+        PageLayer.BionicFadeIntensity = config?.BionicFadeIntensity ?? 0.6;
         PageLayer.BionicFadeRects = bionic && tab is not null
-            ? tab.State.GetOrComputeBionicOverlay(tab.CurrentPage, Vm?.Config.BionicFixationPercent ?? 0.4)
+            ? tab.State.GetOrComputeBionicOverlay(tab.CurrentPage, config?.BionicFixationPercent ?? 0.4)
             : null;
         SearchLayer.Tab = tab;
         SearchLayer.ViewModel = Vm;
         AnnotationLayer.Tab = tab;
         AnnotationLayer.ViewModel = Vm;
         OverlayLayer.Tab = tab;
-        OverlayLayer.ActiveEffect = Vm?.Controller.ActiveColourEffect ?? ColourEffect.None;
+        OverlayLayer.ActiveEffect = ctrl?.ActiveColourEffect ?? ColourEffect.None;
         OverlayLayer.LineFocusBlurActive = tab?.LineFocusBlur ?? false;
-        OverlayLayer.Tint = Vm?.Config.LineHighlightTint ?? LineHighlightTint.Auto;
-        OverlayLayer.TintOpacity = Vm?.Config.LineHighlightOpacity ?? 0.25;
+        OverlayLayer.Tint = config?.LineHighlightTint ?? LineHighlightTint.Auto;
+        OverlayLayer.TintOpacity = config?.LineHighlightOpacity ?? 0.25;
 
         if (tab is not null)
             tab.OnDpiRenderComplete = () => Vm?.RequestAnimationFrame();
