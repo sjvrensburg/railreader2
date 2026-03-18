@@ -83,12 +83,12 @@ public sealed class LayoutAnalyzer : IDisposable
 
         using var results = _session.Run(inputs);
 
-        var rawBlocks = ExtractDetections(results, pxW, pxH, pageW, pageH);
-        if (rawBlocks is null)
-            return new PageAnalysis { Blocks = [], PageWidth = pageW, PageHeight = pageH };
-
         float mapScaleX = (float)(pageW / pxW);
         float mapScaleY = (float)(pageH / pxH);
+
+        var rawBlocks = ExtractDetections(results, pxW, pxH, mapScaleX, mapScaleY);
+        if (rawBlocks is null)
+            return new PageAnalysis { Blocks = [], PageWidth = pageW, PageHeight = pageH };
         PostProcessBlocks(rawBlocks, rgbBytes, pxW, pxH, mapScaleX, mapScaleY);
 
         return new PageAnalysis
@@ -101,7 +101,7 @@ public sealed class LayoutAnalyzer : IDisposable
 
     private List<LayoutBlock>? ExtractDetections(
         IDisposableReadOnlyCollection<DisposableNamedOnnxValue> results,
-        int pxW, int pxH, double pageW, double pageH)
+        int pxW, int pxH, float mapScaleX, float mapScaleY)
     {
         // Single pass: log output shapes (first call only) and find detection tensor.
         // Copy tensor data immediately since the results collection owns the memory.
@@ -134,8 +134,6 @@ public sealed class LayoutAnalyzer : IDisposable
         if (detectionData is null)
             return null;
 
-        float mapScaleX = (float)(pageW / pxW);
-        float mapScaleY = (float)(pageH / pxH);
         bool hasReadingOrder = detCols >= 7;
 
         var rawBlocks = new List<LayoutBlock>();

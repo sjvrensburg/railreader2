@@ -45,10 +45,14 @@ public sealed class AppConfig
         Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) },
     };
 
+    private static string? s_configDir;
+
     public static string ConfigDir
     {
         get
         {
+            if (s_configDir is not null) return s_configDir;
+
             string baseDir;
             if (OperatingSystem.IsWindows())
                 baseDir = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
@@ -60,6 +64,7 @@ public sealed class AppConfig
 
             var dir = Path.Combine(baseDir, "railreader2");
             Directory.CreateDirectory(dir);
+            s_configDir = dir;
             return dir;
         }
     }

@@ -965,14 +965,7 @@ public sealed class DocumentController
 
     public void CancelAnnotationTool()
     {
-        PreviewAnnotation = null;
-        _freehandPoints = null;
-        _highlightCharStart = -1;
-        _textSelectCharStart = -1;
-        SelectedText = null;
-        TextSelectionRects = null;
-        ActiveTool = AnnotationTool.None;
-        SelectedAnnotation = null;
+        SetAnnotationTool(AnnotationTool.None);
     }
 
     /// <summary>
@@ -1652,8 +1645,8 @@ public sealed class DocumentController
     public static string? FindModelPath()
     {
         const string filename = "PP-DocLayoutV3.onnx";
-        string?[] candidates =
-        [
+        var candidates = new List<string?>
+        {
             Path.Combine(AppContext.BaseDirectory, "models", filename),
             Environment.GetEnvironmentVariable("APPDIR") is { } appDir
                 ? Path.Combine(appDir, "models", filename) : null,
@@ -1661,10 +1654,14 @@ public sealed class DocumentController
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 "railreader2", "models", filename),
             Path.Combine("models", filename),
-            Path.Combine("..", "models", filename),
-            Path.Combine("..", "..", "models", filename),
-            Path.Combine("..", "..", "..", "models", filename),
-        ];
+        };
+
+        // Walk up from CWD
+        for (int i = 1; i <= 3; i++)
+        {
+            var walkUp = string.Concat(Enumerable.Repeat("../", i));
+            candidates.Add(Path.Combine(walkUp, "models", filename));
+        }
 
         foreach (var path in candidates)
         {

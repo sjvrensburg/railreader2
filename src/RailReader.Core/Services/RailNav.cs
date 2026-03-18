@@ -272,6 +272,38 @@ public sealed class RailNav
     }
 
     /// <summary>
+    /// Checks whether the camera is at the hard edge for the given direction and, if so,
+    /// accumulates hold time. Returns true when the hold threshold is reached and
+    /// an edge advance has been triggered (sets <see cref="_pendingEdgeAdvance"/> and
+    /// <see cref="_edgeAdvanceJustFired"/>). The caller is responsible for its own
+    /// cleanup (e.g. clearing edge-hold state or stopping scroll).
+    /// </summary>
+    private bool CheckEdgeHoldAdvance(double cameraX, double zoom, double windowWidth, ScrollDirection dir)
+    {
+        if (IsAtHardEdge(cameraX, zoom, windowWidth, dir))
+        {
+            if (_edgeHoldDir != dir)
+            {
+                _edgeHoldTimer = Stopwatch.StartNew();
+                _edgeHoldDir = dir;
+            }
+            else if (_edgeHoldTimer is not null
+                && _edgeHoldTimer.Elapsed.TotalMilliseconds >= EdgeAdvanceHoldMs)
+            {
+                _pendingEdgeAdvance = dir;
+                _edgeAdvanceJustFired = true;
+                return true;
+            }
+        }
+        else
+        {
+            _edgeHoldTimer = null;
+            _edgeHoldDir = null;
+        }
+        return false;
+    }
+
+    /// <summary>
     /// Returns true when the camera is effectively at the hard scroll boundary for the
     /// given direction (i.e. there is nowhere left to scroll that way).
     /// </summary>
@@ -312,27 +344,11 @@ public sealed class RailNav
         // accumulate hold time across repeated key-press events and trigger
         // a line advance when the threshold is reached.
         var dir = forward ? ScrollDirection.Forward : ScrollDirection.Backward;
-        if (IsAtHardEdge(newX, zoom, windowWidth, dir))
-        {
-            if (_edgeHoldDir != dir)
-            {
-                _edgeHoldTimer = Stopwatch.StartNew();
-                _edgeHoldDir = dir;
-            }
-            else if (_edgeHoldTimer is not null
-                && _edgeHoldTimer.Elapsed.TotalMilliseconds >= EdgeAdvanceHoldMs)
-            {
-                _pendingEdgeAdvance = dir;
-                _edgeAdvanceJustFired = true;
-                _edgeHoldTimer = null;
-                _edgeHoldDir = null;
-                return; // controller will advance line and snap
-            }
-        }
-        else
+        if (CheckEdgeHoldAdvance(newX, zoom, windowWidth, dir))
         {
             _edgeHoldTimer = null;
             _edgeHoldDir = null;
+            return; // controller will advance line and snap
         }
 
         var (_, targetY) = ComputeTargetCamera(zoom, windowWidth, windowHeight);
@@ -577,25 +593,9 @@ public sealed class RailNav
 
         // Edge-hold advance: if the camera is pinned against the line boundary,
         // accumulate hold time and trigger a line advance when the threshold is reached.
-        if (IsAtHardEdge(cameraX, zoom, windowWidth, dir))
+        if (CheckEdgeHoldAdvance(cameraX, zoom, windowWidth, dir))
         {
-            if (_edgeHoldDir != dir)
-            {
-                _edgeHoldTimer = Stopwatch.StartNew();
-                _edgeHoldDir = dir;
-            }
-            else if (_edgeHoldTimer is not null
-                && _edgeHoldTimer.Elapsed.TotalMilliseconds >= EdgeAdvanceHoldMs)
-            {
-                _pendingEdgeAdvance = dir;
-                _edgeAdvanceJustFired = true;
-                StopScrollAndEdgeHold(); // clear scroll state; key-repeat will restart it on the new line
-            }
-        }
-        else
-        {
-            _edgeHoldTimer = null;
-            _edgeHoldDir = null;
+            StopScrollAndEdgeHold(); // clear scroll state; key-repeat will restart it on the new line
         }
 
         return true;
