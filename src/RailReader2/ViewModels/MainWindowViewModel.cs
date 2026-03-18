@@ -24,11 +24,32 @@ public sealed partial class MainWindowViewModel : ObservableObject
     [ObservableProperty] private int _activeTabIndex;
     [ObservableProperty] private bool _showOutline;
 
+    /// <summary>
+    /// Callback set by the code-behind to read the current sidebar column width
+    /// from the grid (which may have been resized via GridSplitter).
+    /// </summary>
+    public Func<double>? ReadSidePanelWidth { get; set; }
+
     partial void OnShowOutlineChanged(bool value)
     {
         // Keep the active tab's sidebar state in sync
         if (ActiveTab is { } tab)
             tab.ShowSidePanel = value;
+    }
+
+    /// <summary>Save sidebar visibility and width to the given tab.</summary>
+    private void SaveSidebarState(TabViewModel tab)
+    {
+        tab.ShowSidePanel = ShowOutline;
+        if (ShowOutline && ReadSidePanelWidth is { } getWidth)
+            tab.SidePanelWidth = getWidth();
+    }
+
+    /// <summary>Restore sidebar visibility and width from the given tab.</summary>
+    private void RestoreSidebarState(TabViewModel tab)
+    {
+        ShowOutline = tab.ShowSidePanel;
+        // Width is applied by UpdateSidebarColumnWidth via the ShowOutline PropertyChanged handler
     }
 
     [ObservableProperty] private bool _showMinimap;
@@ -217,8 +238,18 @@ public sealed partial class MainWindowViewModel : ObservableObject
             Console.Error.WriteLine($"[OpenDocument] Loaded: {tab.PageCount} pages, {tab.PageWidth}x{tab.PageHeight}");
             tab.LoadAnnotations();
 
+            // Save sidebar state from outgoing tab before switching
+            if (ActiveTab is { } oldTab)
+                SaveSidebarState(oldTab);
+
             _controller.AddDocument(tab.State);
             Tabs.Add(tab);
+
+            // New tab inherits the current sidebar state
+            tab.ShowSidePanel = ShowOutline;
+            if (ReadSidePanelWidth is { } getWidth)
+                tab.SidePanelWidth = getWidth();
+
             ActiveTabIndex = Tabs.Count - 1;
             OnPropertyChanged(nameof(ActiveTab));
             InvalidateAll();
@@ -268,7 +299,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         else
         {
             if (ActiveTabIndex >= Tabs.Count) ActiveTabIndex = Tabs.Count - 1;
-            ShowOutline = Tabs[ActiveTabIndex].ShowSidePanel;
+            RestoreSidebarState(Tabs[ActiveTabIndex]);
         }
         OnPropertyChanged(nameof(ActiveTab));
         InvalidateAll();
@@ -281,15 +312,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
     {
         if (index >= 0 && index < Tabs.Count)
         {
-            // Save sidebar state to outgoing tab
             if (ActiveTab is { } oldTab)
-                oldTab.ShowSidePanel = ShowOutline;
+                SaveSidebarState(oldTab);
 
             ActiveTabIndex = index;
             _controller.SelectDocument(index);
-
-            // Restore sidebar state from incoming tab
-            ShowOutline = Tabs[index].ShowSidePanel;
+            RestoreSidebarState(Tabs[index]);
 
             OnPropertyChanged(nameof(ActiveTab));
             InvalidateAll();

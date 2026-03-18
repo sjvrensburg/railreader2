@@ -93,6 +93,12 @@ public partial class MainWindow : Window
             SetupRadialMenu(vm);
             RailToolBar.ViewModel = vm;
             RailToolBar.SyncFromConfig();
+
+            vm.ReadSidePanelWidth = () =>
+            {
+                var w = MainGrid.ColumnDefinitions[0].Width;
+                return w.Value > 0 ? w.Value : 220;
+            };
             UpdateSidebarColumnWidth(vm.ShowOutline);
 
             // window.Opened (which calls OpenDocument) can fire before OnLoaded
@@ -278,7 +284,8 @@ public partial class MainWindow : Window
     private void UpdateSidebarColumnWidth(bool showOutline)
     {
         var col = MainGrid.ColumnDefinitions[0];
-        col.Width = showOutline ? new GridLength(220) : new GridLength(0);
+        double width = Vm?.ActiveTab?.SidePanelWidth ?? 220;
+        col.Width = showOutline ? new GridLength(width) : new GridLength(0);
     }
 
     private void UpdateCameraTransform()

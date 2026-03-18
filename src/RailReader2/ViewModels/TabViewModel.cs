@@ -28,6 +28,9 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
     /// <summary>Whether the side panel (outline/bookmarks/search) is visible for this tab.</summary>
     public bool ShowSidePanel { get; set; }
 
+    /// <summary>Width of the side panel in pixels (preserved across tab switches).</summary>
+    public double SidePanelWidth { get; set; } = 220;
+
     // Read-only properties used by Views
     public string FilePath => State.FilePath;
     public int PageCount => State.PageCount;
