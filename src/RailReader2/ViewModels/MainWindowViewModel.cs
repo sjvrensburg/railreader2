@@ -23,6 +23,35 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     [ObservableProperty] private int _activeTabIndex;
     [ObservableProperty] private bool _showOutline;
+
+    /// <summary>
+    /// Callback set by the code-behind to read the current sidebar column width
+    /// from the grid (which may have been resized via GridSplitter).
+    /// </summary>
+    public Func<double>? ReadSidePanelWidth { get; set; }
+
+    partial void OnShowOutlineChanged(bool value)
+    {
+        // Keep the active tab's sidebar state in sync
+        if (ActiveTab is { } tab)
+            tab.ShowSidePanel = value;
+    }
+
+    /// <summary>Save sidebar visibility and width to the given tab.</summary>
+    private void SaveSidebarState(TabViewModel tab)
+    {
+        tab.ShowSidePanel = ShowOutline;
+        if (ShowOutline && ReadSidePanelWidth is { } getWidth)
+            tab.SidePanelWidth = getWidth();
+    }
+
+    /// <summary>Restore sidebar visibility and width from the given tab.</summary>
+    private void RestoreSidebarState(TabViewModel tab)
+    {
+        ShowOutline = tab.ShowSidePanel;
+        // Width is applied by UpdateSidebarColumnWidth via the ShowOutline PropertyChanged handler
+    }
+
     [ObservableProperty] private bool _showMinimap;
     [ObservableProperty] private bool _showSettings;
     [ObservableProperty] private bool _showAbout;
@@ -31,10 +60,22 @@ public sealed partial class MainWindowViewModel : ObservableObject
     [ObservableProperty] private string? _cleanupMessage;
 
     [ObservableProperty] private bool _isFullScreen;
+    [ObservableProperty] private bool _showFullScreenHeader;
     [ObservableProperty] private bool _isRadialMenuOpen;
     [ObservableProperty] private bool _showBookmarkDialog;
     [ObservableProperty] private double _radialMenuX;
     [ObservableProperty] private double _radialMenuY;
+
+    /// <summary>True when the tab bar should be visible (not fullscreen, or hovering at top edge).</summary>
+    public bool IsTabBarVisible => !IsFullScreen || ShowFullScreenHeader;
+
+    partial void OnIsFullScreenChanged(bool value)
+    {
+        OnPropertyChanged(nameof(IsTabBarVisible));
+        if (!value) ShowFullScreenHeader = false;
+    }
+
+    partial void OnShowFullScreenHeaderChanged(bool value) => OnPropertyChanged(nameof(IsTabBarVisible));
 
     public ObservableCollection<TabViewModel> Tabs { get; } = [];
 
@@ -98,6 +139,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         try { _controller.InitializeWorker(); }
         catch (FileNotFoundException) { /* ONNX model not found — layout analysis disabled */ }
         _controller.StateChanged += OnControllerStateChanged;
+        _controller.StatusMessage += ShowStatusToast;
         SetupPollTimer();
     }
 
@@ -196,8 +238,18 @@ public sealed partial class MainWindowViewModel : ObservableObject
             Console.Error.WriteLine($"[OpenDocument] Loaded: {tab.PageCount} pages, {tab.PageWidth}x{tab.PageHeight}");
             tab.LoadAnnotations();
 
+            // Save sidebar state from outgoing tab before switching
+            if (ActiveTab is { } oldTab)
+                SaveSidebarState(oldTab);
+
             _controller.AddDocument(tab.State);
             Tabs.Add(tab);
+
+            // New tab inherits the current sidebar state
+            tab.ShowSidePanel = ShowOutline;
+            if (ReadSidePanelWidth is { } getWidth)
+                tab.SidePanelWidth = getWidth();
+
             ActiveTabIndex = Tabs.Count - 1;
             OnPropertyChanged(nameof(ActiveTab));
             InvalidateAll();
@@ -239,8 +291,16 @@ public sealed partial class MainWindowViewModel : ObservableObject
         var tab = Tabs[index];
         _controller.CloseDocument(_controller.Documents.IndexOf(tab.State));
         Tabs.RemoveAt(index);
-        if (Tabs.Count == 0) ActiveTabIndex = 0;
-        else if (ActiveTabIndex >= Tabs.Count) ActiveTabIndex = Tabs.Count - 1;
+        if (Tabs.Count == 0)
+        {
+            ActiveTabIndex = 0;
+            ShowOutline = false;
+        }
+        else
+        {
+            if (ActiveTabIndex >= Tabs.Count) ActiveTabIndex = Tabs.Count - 1;
+            RestoreSidebarState(Tabs[ActiveTabIndex]);
+        }
         OnPropertyChanged(nameof(ActiveTab));
         InvalidateAll();
     }
@@ -252,8 +312,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
     {
         if (index >= 0 && index < Tabs.Count)
         {
+            if (ActiveTab is { } oldTab)
+                SaveSidebarState(oldTab);
+
             ActiveTabIndex = index;
             _controller.SelectDocument(index);
+            RestoreSidebarState(Tabs[index]);
+
             OnPropertyChanged(nameof(ActiveTab));
             InvalidateAll();
         }
