@@ -67,6 +67,17 @@ public class PdfPageLayer : Control
         // Cached paint objects to avoid per-frame allocation
         [ThreadStatic] private static SKPaint? s_layerPaint;
 
+        // Cached colour effect filter — reused when effect/intensity unchanged
+        [ThreadStatic] private static SKColorFilter? s_cachedEffectFilter;
+        [ThreadStatic] private static ColourEffect s_cachedEffectType;
+        [ThreadStatic] private static float s_cachedEffectIntensity;
+
+        // Cached line focus dim paint — reused when line position unchanged
+        [ThreadStatic] private static SKPaint? s_cachedDimPaint;
+        [ThreadStatic] private static SKShader? s_cachedDimGradient;
+        [ThreadStatic] private static float s_cachedDimLineY, s_cachedDimLineH, s_cachedDimPageH;
+        [ThreadStatic] private static double s_cachedDimIntensity, s_cachedDimPadding;
+
         // Cached sampling options (struct, but avoids repeated construction)
         private static readonly SKSamplingOptions s_sampling = new(SKCubicResampler.Mitchell);
 
@@ -129,8 +140,21 @@ public class PdfPageLayer : Control
             var tab = _tab;
             if (tab?.CachedImage is not { } image) return;
 
-            var effectPaint = _effects?.HasActiveEffect(_opts.ActiveEffect) == true
-                ? _effects.CreatePaint(_opts.ActiveEffect, _opts.ActiveIntensity) : null;
+            // Get or update cached colour effect filter
+            SKColorFilter? effectFilter = null;
+            if (_effects?.HasActiveEffect(_opts.ActiveEffect) == true)
+            {
+                if (s_cachedEffectFilter is null
+                    || s_cachedEffectType != _opts.ActiveEffect
+                    || s_cachedEffectIntensity != _opts.ActiveIntensity)
+                {
+                    s_cachedEffectFilter?.Dispose();
+                    s_cachedEffectFilter = _effects.CreateColorFilter(_opts.ActiveEffect, _opts.ActiveIntensity);
+                    s_cachedEffectType = _opts.ActiveEffect;
+                    s_cachedEffectIntensity = _opts.ActiveIntensity;
+                }
+                effectFilter = s_cachedEffectFilter;
+            }
 
             // Motion blur: horizontal during rail scroll, uniform during zoom.
             float sigmaX = 0, sigmaY = 0;
@@ -171,11 +195,11 @@ public class PdfPageLayer : Control
 
             // Outer layer: colour effect + motion blur. Everything drawn inside
             // this layer gets the colour filter applied uniformly (once).
-            bool needsLayer = effectPaint is not null || blurFilter is not null;
+            bool needsLayer = effectFilter is not null || blurFilter is not null;
             if (needsLayer)
             {
                 s_layerPaint ??= new SKPaint();
-                s_layerPaint.ColorFilter = effectPaint?.ColorFilter;
+                s_layerPaint.ColorFilter = effectFilter;
                 s_layerPaint.ImageFilter = blurFilter;
                 canvas.SaveLayer(s_layerPaint);
             }
@@ -208,27 +232,47 @@ public class PdfPageLayer : Control
                 && tab.Rail is { Active: true, NavigableCount: > 0 } rail)
             {
                 var line = rail.CurrentLineInfo;
-                float pad = line.Height * (float)_opts.LineFocusPadding;
-                float lineTop = line.Y - line.Height / 2f - pad;
-                float lineBottom = line.Y + line.Height / 2f + pad;
-                float feather = line.Height * 0.5f;
                 float h = (float)tab.PageHeight;
 
-                float featherTop = Math.Max(0, lineTop - feather) / h;
-                float featherBottom = Math.Min(h, lineBottom + feather) / h;
-                float normTop = Math.Clamp(lineTop / h, 0f, 1f);
-                float normBottom = Math.Clamp(lineBottom / h, 0f, 1f);
+                // Reuse cached dim paint when line position and settings are unchanged
+                if (s_cachedDimPaint is null
+                    || s_cachedDimLineY != line.Y
+                    || s_cachedDimLineH != line.Height
+                    || s_cachedDimPageH != h
+                    || s_cachedDimIntensity != _opts.LineFocusIntensity
+                    || s_cachedDimPadding != _opts.LineFocusPadding)
+                {
+                    s_cachedDimGradient?.Dispose();
+                    s_cachedDimPaint?.Dispose();
 
-                var dimColor = new SKColor(255, 255, 255, (byte)(255 * _opts.LineFocusIntensity));
-                var clear = SKColors.Transparent;
+                    float pad = line.Height * (float)_opts.LineFocusPadding;
+                    float lineTop = line.Y - line.Height / 2f - pad;
+                    float lineBottom = line.Y + line.Height / 2f + pad;
+                    float feather = line.Height * 0.5f;
 
-                using var gradient = SKShader.CreateLinearGradient(
-                    new SKPoint(0, 0), new SKPoint(0, h),
-                    new[] { dimColor, dimColor, clear, clear, dimColor, dimColor },
-                    new[] { 0f, featherTop, normTop, normBottom, featherBottom, 1f },
-                    SKShaderTileMode.Clamp);
-                using var dimPaint = new SKPaint { Shader = gradient };
-                canvas.DrawRect(destRect, dimPaint);
+                    float featherTop = Math.Max(0, lineTop - feather) / h;
+                    float featherBottom = Math.Min(h, lineBottom + feather) / h;
+                    float normTop = Math.Clamp(lineTop / h, 0f, 1f);
+                    float normBottom = Math.Clamp(lineBottom / h, 0f, 1f);
+
+                    var dimColor = new SKColor(255, 255, 255, (byte)(255 * _opts.LineFocusIntensity));
+                    var clear = SKColors.Transparent;
+
+                    s_cachedDimGradient = SKShader.CreateLinearGradient(
+                        new SKPoint(0, 0), new SKPoint(0, h),
+                        [dimColor, dimColor, clear, clear, dimColor, dimColor],
+                        [0f, featherTop, normTop, normBottom, featherBottom, 1f],
+                        SKShaderTileMode.Clamp);
+                    s_cachedDimPaint = new SKPaint { Shader = s_cachedDimGradient };
+
+                    s_cachedDimLineY = line.Y;
+                    s_cachedDimLineH = line.Height;
+                    s_cachedDimPageH = h;
+                    s_cachedDimIntensity = _opts.LineFocusIntensity;
+                    s_cachedDimPadding = _opts.LineFocusPadding;
+                }
+
+                canvas.DrawRect(destRect, s_cachedDimPaint);
             }
 
             if (needsLayer)
@@ -238,7 +282,7 @@ public class PdfPageLayer : Control
                 s_layerPaint.ImageFilter = null;
             }
 
-            effectPaint?.Dispose();
+            // effectFilter is cached (s_cachedEffectFilter) — do not dispose here
         }
     }
 }
