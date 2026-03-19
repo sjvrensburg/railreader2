@@ -81,8 +81,9 @@ public class PdfPageLayer : Control
         [ThreadStatic] private static ColourEffect s_cachedDimEffect;
         [ThreadStatic] private static float s_cachedDimEffectIntensity;
 
-        // Cached sampling options (struct, but avoids repeated construction)
+        // Cached sampling options — Mitchell for crisp text at rest, bilinear during animation
         private static readonly SKSamplingOptions s_sampling = new(SKCubicResampler.Mitchell);
+        private static readonly SKSamplingOptions s_samplingFast = new(SKFilterMode.Linear);
 
         private readonly Rect _bounds;
         private readonly TabViewModel? _tab;
@@ -134,25 +135,25 @@ public class PdfPageLayer : Control
         /// uniformly on top.
         /// </summary>
         private void DrawPageImage(SKCanvas canvas, SKImage image, SKRect destRect,
-            SKPath? bionicPath, SKPaint? bionicPaint)
+            SKPath? bionicPath, SKPaint? bionicPaint, SKSamplingOptions sampling)
         {
             if (bionicPath is null || bionicPaint is null)
             {
-                canvas.DrawImage(image, destRect, s_sampling);
+                canvas.DrawImage(image, destRect, sampling);
                 return;
             }
 
             // Fixation regions: full contrast (everything outside fade rects)
             canvas.Save();
             canvas.ClipPath(bionicPath, SKClipOperation.Difference);
-            canvas.DrawImage(image, destRect, s_sampling);
+            canvas.DrawImage(image, destRect, sampling);
             canvas.Restore();
 
             // Fade regions: bionic color filter applied
             canvas.Save();
             canvas.ClipPath(bionicPath);
             canvas.SaveLayer(bionicPaint);
-            canvas.DrawImage(image, destRect, s_sampling);
+            canvas.DrawImage(image, destRect, sampling);
             canvas.Restore(); // layer
             canvas.Restore(); // clip
         }
@@ -167,6 +168,11 @@ public class PdfPageLayer : Control
 
             var tab = _tab;
             if (tab?.CachedImage is not { } image) return;
+
+            // Use bilinear during animation (scroll/zoom) for speed,
+            // Mitchell cubic when stable for crisp text rendering.
+            bool animating = _scrollSpeed > MinSpeedThreshold || _zoomSpeed > MinSpeedThreshold;
+            var sampling = animating ? s_samplingFast : s_sampling;
 
             // Get or update cached colour effect filter
             SKColorFilter? effectFilter = null;
@@ -268,11 +274,11 @@ public class PdfPageLayer : Control
                 s_imagePaint ??= new SKPaint();
                 s_imagePaint.ColorFilter = effectFilter;
                 var srcRect = SKRect.Create(image.Width, image.Height);
-                canvas.DrawImage(image, srcRect, destRect, s_sampling, s_imagePaint);
+                canvas.DrawImage(image, srcRect, destRect, sampling, s_imagePaint);
             }
             else
             {
-                DrawPageImage(canvas, image, destRect, bionicPath, bionicPaint);
+                DrawPageImage(canvas, image, destRect, bionicPath, bionicPaint, sampling);
             }
 
             // Line focus dim: draw a feathered white overlay that dims
