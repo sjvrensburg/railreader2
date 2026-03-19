@@ -140,9 +140,9 @@ Four SkSL shaders compiled at startup via `SKRuntimeEffect.CreateColorFilter()`.
 
 Config: `~/.config/railreader2/config.json` (Linux), `%APPDATA%\railreader2\config.json` (Windows), or `~/Library/Application Support/railreader2/config.json` (macOS). Auto-created with defaults. Editable live via Settings panel. See `Services/AppConfig.cs` for all fields and defaults.
 
-Key fields: `rail_zoom_threshold`, `snap_duration_ms`, `scroll_speed_start/max`, `scroll_ramp_time`, `analysis_lookahead_pages`, `ui_font_scale`, `colour_effect/intensity`, `motion_blur/intensity`, `pixel_snapping`, `line_focus_blur/intensity`, `line_highlight_tint/opacity`, `auto_scroll_line_pause_ms/block_pause_ms`, `jump_percentage`, `dark_mode`, `navigable_classes[]`, `recent_files[]`.
+Key fields: `rail_zoom_threshold`, `snap_duration_ms`, `scroll_speed_start/max`, `scroll_ramp_time`, `analysis_lookahead_pages`, `ui_font_scale`, `colour_effect/intensity`, `motion_blur/intensity`, `pixel_snapping`, `line_focus_blur/intensity`, `line_highlight_tint/opacity`, `auto_scroll_line_pause_ms/block_pause_ms`, `jump_percentage`, `dark_mode`, `navigable_classes[]`, `centering_classes[]`, `recent_files[]`.
 
-`navigable_classes` controls which block types are navigable in rail mode. Line detection runs for all blocks regardless, so toggling classes doesn't require ONNX re-inference.
+`navigable_classes` controls which block types are navigable in rail mode. `centering_classes` controls which block types are horizontally centered when narrower than the viewport (excludes headings by default). Line detection runs for all blocks regardless, so toggling classes doesn't require ONNX re-inference.
 
 ## Key Development Notes
 

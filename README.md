@@ -57,7 +57,7 @@ At high zoom levels, navigation switches to "rail mode" — the viewer locks ont
 
 ### Features
 
-- **Multi-tab support** — open multiple PDFs with independent per-tab state
+- **Multi-tab support** — open multiple PDFs with independent per-tab state. Right-click a tab for a context menu (Duplicate, Detach to new window, Close)
 - **Menu bar** — File, View, Navigation, Help menus with keyboard shortcuts
 - **Interactive minimap** — click or drag to navigate the page
 - **Outline and bookmarks panel** — tabbed pane with table of contents and named bookmarks (Ctrl+Shift+O for outline, Ctrl+Shift+B for bookmarks)
@@ -84,6 +84,8 @@ At high zoom levels, navigation switches to "rail mode" — the viewer locks ont
 - **Annotation export** — export PDFs with embedded annotations (File → Export with Annotations)
 - **Undo/redo** — annotation history with Ctrl+Z / Ctrl+Y
 - **Annotation mode indicator** — status bar shows active tool name in amber with a clickable exit button
+- **Annotation tool cursors** — each annotation tool shows a distinct mouse cursor (crosshair for drawing tools, I-beam for text select, no-entry for eraser) so you always know the active mode
+- **Tab-switch tool reset** — switching tabs automatically exits any active annotation mode to prevent accidental edits
 - **Auto-scroll** — toggle continuous horizontal scrolling in rail mode (P key), hold D/Right to boost speed, with configurable pauses at line and block boundaries
 - **Jump mode** — saccade-style reading (J key) that advances by a configurable percentage of the visible width; Shift+Right/Left for half-distance short jumps
 - **Line focus dim** — smooth feathered dimming of non-active lines to reduce peripheral distraction, with configurable intensity and padding
@@ -215,6 +217,10 @@ Rail reading parameters are editable via the Settings panel (gear icon in menu b
   "navigable_classes": [
     "abstract", "algorithm", "display_formula",
     "footnote", "paragraph_title", "text"
+  ],
+  "centering_classes": [
+    "abstract", "algorithm", "display_formula",
+    "footnote", "text"
   ]
 }
 ```
@@ -246,6 +252,7 @@ Rail reading parameters are editable via the Settings panel (gear icon in menu b
 | `jump_percentage` | Jump distance as percentage of visible width (5–80%) |
 | `dark_mode` | Enable dark UI theme (`true`/`false`) |
 | `navigable_classes` | Which block types rail mode navigates (array of class names). Configurable via Settings → Advanced. |
+| `centering_classes` | Which block types are horizontally centered when narrower than the viewport (array of class names). Excludes headings by default. Configurable via Settings → Advanced. |
 
 ## Architecture
 

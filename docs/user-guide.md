@@ -71,6 +71,13 @@ Press `Ctrl+Shift+O` to open the **outline panel** (table of contents). Click en
 
 Open multiple PDFs in tabs with `Ctrl+O`. Each tab has independent zoom, position, and analysis state. Switch tabs with `Ctrl+Tab` or by clicking. Drag tabs to reorder.
 
+**Right-click any tab** to open a context menu with:
+- **Duplicate Tab** — opens the same PDF in a new tab
+- **Detach Tab** — moves the tab to a new window
+- **Close Tab** — closes the tab
+
+Switching tabs automatically exits any active annotation mode to prevent accidental edits on the wrong document.
+
 ---
 
 ## Rail Mode
@@ -224,6 +231,14 @@ Right-click anywhere on the page to open the **radial menu** with five annotatio
 | **Text Note** | `4` | Click to place a note. Shows as a small folded-corner icon; click the icon in browse mode to expand/collapse the popup. Click an existing note in Text Note mode to edit. |
 | **Eraser** | `5` | Click on an annotation to remove it. |
 
+### Tool cursors
+
+Each annotation tool shows a distinct mouse cursor so you always know the active mode:
+- **Highlight, Pen, Rectangle, Text Note** — crosshair cursor
+- **Eraser** — no-entry cursor
+- **Text Select** — I-beam cursor
+- **Browse (no tool)** — default arrow cursor
+
 ### Colour picker
 
 The **Highlight** and **Pen** segments on the radial menu have colour options. Tap the segment to reveal an outer ring of colour dots. Tap a colour to select it and activate the tool. A small indicator dot on the segment shows the currently active colour.
@@ -316,6 +331,7 @@ Press `Ctrl+,` or use the menu to open Settings. Changes take effect immediately
 
 ### Advanced
 - **Navigable Block Types:** Choose which PP-DocLayoutV3 block types are navigable in rail mode.
+- **Centered Block Types:** Choose which block types are horizontally centered when they are narrower than the viewport. By default, headings (paragraph_title, doc_title) are excluded so they stay left-aligned with surrounding text, while formulae and body text are centered.
 - **Analysis Lookahead:** Number of pages to pre-analyze ahead (0 to disable).
 
 ### Config file
