@@ -213,25 +213,25 @@ public class PdfPageLayer : Control
             // screens. Only use it when motion blur is active (image filter must operate
             // on the composite). For colour-filter-only mode, apply the filter directly
             // to each draw paint instead, avoiding the offscreen buffer entirely.
+            // IMPORTANT: line focus blur also requires SaveLayer because the dim overlay
+            // must blend with the page BEFORE the colour filter is applied:
+            // correct = filter(blend(page, dim)), wrong = blend(filter(page), filter(dim)).
             bool needsBlurLayer = blurFilter is not null;
             bool hasBionic = bionicPath is not null;
-            // Per-paint colour filter: used when no blur layer and no bionic
-            // (bionic uses clip regions that need uniform filter application).
-            bool perPaintFilter = effectFilter is not null && !needsBlurLayer && !hasBionic;
+            bool hasLineFocusDim = _opts.LineFocusBlur && _opts.LineFocusIntensity > 0
+                && tab.Rail is { Active: true, NavigableCount: > 0 };
+            // Per-paint colour filter: only when drawing the page image alone
+            // (no blur, no bionic, no line focus dim that needs composite filtering).
+            bool perPaintFilter = effectFilter is not null && !needsBlurLayer && !hasBionic && !hasLineFocusDim;
 
-            if (needsBlurLayer)
+            // Use SaveLayer when blur is active, or when colour filter needs to apply
+            // uniformly to composite (bionic clip regions, line focus dim overlay).
+            bool useLayer = needsBlurLayer || (effectFilter is not null && !perPaintFilter);
+            if (useLayer)
             {
                 s_layerPaint ??= new SKPaint();
                 s_layerPaint.ColorFilter = effectFilter;
                 s_layerPaint.ImageFilter = blurFilter;
-                canvas.SaveLayer(s_layerPaint);
-            }
-            else if (effectFilter is not null && hasBionic)
-            {
-                // Bionic + colour filter but no blur: need SaveLayer for uniform filter
-                s_layerPaint ??= new SKPaint();
-                s_layerPaint.ColorFilter = effectFilter;
-                s_layerPaint.ImageFilter = null;
                 canvas.SaveLayer(s_layerPaint);
             }
 
@@ -310,8 +310,7 @@ public class PdfPageLayer : Control
                     s_cachedDimPaint!.ColorFilter = null;
             }
 
-            bool usedLayer = needsBlurLayer || (effectFilter is not null && hasBionic);
-            if (usedLayer)
+            if (useLayer)
             {
                 canvas.Restore();
                 s_layerPaint!.ColorFilter = null;
