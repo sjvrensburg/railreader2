@@ -78,6 +78,8 @@ public class PdfPageLayer : Control
         [ThreadStatic] private static SKShader? s_cachedDimGradient;
         [ThreadStatic] private static float s_cachedDimLineY, s_cachedDimLineH, s_cachedDimPageH;
         [ThreadStatic] private static double s_cachedDimIntensity, s_cachedDimPadding;
+        [ThreadStatic] private static ColourEffect s_cachedDimEffect;
+        [ThreadStatic] private static float s_cachedDimEffectIntensity;
 
         // Cached sampling options (struct, but avoids repeated construction)
         private static readonly SKSamplingOptions s_sampling = new(SKCubicResampler.Mitchell);
@@ -260,13 +262,23 @@ public class PdfPageLayer : Control
                 var line = rail.CurrentLineInfo;
                 float h = (float)tab.PageHeight;
 
-                // Reuse cached dim paint when line position and settings are unchanged
+                // When using per-paint filter, bake the filtered dim colour into the
+                // gradient instead of applying the colour filter to the paint. Applying
+                // a colour filter to the gradient paint corrupts transparent pixels:
+                // e.g. Invert transforms (0,0,0,0) → (255,255,255,0), violating
+                // premultiplied alpha and causing bright white artifacts.
+                var activeEffect = perPaintFilter ? _opts.ActiveEffect : ColourEffect.None;
+                float activeIntensity = perPaintFilter ? _opts.ActiveIntensity : 0f;
+
+                // Reuse cached dim paint when line position, settings, and effect are unchanged
                 if (s_cachedDimPaint is null
                     || s_cachedDimLineY != line.Y
                     || s_cachedDimLineH != line.Height
                     || s_cachedDimPageH != h
                     || s_cachedDimIntensity != _opts.LineFocusIntensity
-                    || s_cachedDimPadding != _opts.LineFocusPadding)
+                    || s_cachedDimPadding != _opts.LineFocusPadding
+                    || s_cachedDimEffect != activeEffect
+                    || s_cachedDimEffectIntensity != activeIntensity)
                 {
                     s_cachedDimGradient?.Dispose();
                     s_cachedDimPaint?.Dispose();
@@ -281,7 +293,21 @@ public class PdfPageLayer : Control
                     float normTop = Math.Clamp(lineTop / h, 0f, 1f);
                     float normBottom = Math.Clamp(lineBottom / h, 0f, 1f);
 
-                    var dimColor = new SKColor(255, 255, 255, (byte)(255 * _opts.LineFocusIntensity));
+                    // Compute the dim colour with the effect baked in.
+                    // All SkSL shaders map white via: result = mix(white, effect(white), intensity)
+                    // where effect(white) is black for Invert/HighContrast/HighVisibility,
+                    // and slightly amber for Amber. This avoids applying a colour filter
+                    // to the paint (which would corrupt transparent gradient stops).
+                    byte dimRgb = (byte)(255 * (1.0 - activeIntensity));
+                    var dimColor = activeEffect switch
+                    {
+                        ColourEffect.Invert or ColourEffect.HighContrast or ColourEffect.HighVisibility
+                            => new SKColor(dimRgb, dimRgb, dimRgb, (byte)(255 * _opts.LineFocusIntensity)),
+                        ColourEffect.Amber
+                            => new SKColor(255, 255, (byte)(255 * (1.0 - 0.15 * activeIntensity)),
+                                           (byte)(255 * _opts.LineFocusIntensity)),
+                        _ => new SKColor(255, 255, 255, (byte)(255 * _opts.LineFocusIntensity)),
+                    };
                     var clear = SKColors.Transparent;
 
                     s_cachedDimGradient = SKShader.CreateLinearGradient(
@@ -296,17 +322,11 @@ public class PdfPageLayer : Control
                     s_cachedDimPageH = h;
                     s_cachedDimIntensity = _opts.LineFocusIntensity;
                     s_cachedDimPadding = _opts.LineFocusPadding;
+                    s_cachedDimEffect = activeEffect;
+                    s_cachedDimEffectIntensity = activeIntensity;
                 }
 
-                // When using per-paint filter (no SaveLayer), apply colour filter
-                // to the dim paint so it matches the effect (e.g. white→black for Invert).
-                if (perPaintFilter)
-                    s_cachedDimPaint!.ColorFilter = effectFilter;
-
                 canvas.DrawRect(destRect, s_cachedDimPaint);
-
-                if (perPaintFilter)
-                    s_cachedDimPaint!.ColorFilter = null;
             }
 
             if (useLayer)
