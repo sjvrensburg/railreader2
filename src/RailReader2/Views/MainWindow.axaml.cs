@@ -318,8 +318,8 @@ public partial class MainWindow : Window
         // The minimap is ≤200×280px — sub-pixel viewport indicator movement is
         // invisible. Use thresholds large enough to skip redraws during smooth
         // scrolling frames where the visual change is imperceptible.
-        if (Math.Abs(tab.Camera.OffsetX - _lastMinimapOx) > 8.0 ||
-            Math.Abs(tab.Camera.OffsetY - _lastMinimapOy) > 8.0 ||
+        if (Math.Abs(tab.Camera.OffsetX - _lastMinimapOx) > 24.0 ||
+            Math.Abs(tab.Camera.OffsetY - _lastMinimapOy) > 24.0 ||
             Math.Abs(tab.Camera.Zoom - _lastMinimapZoom) > 0.02)
         {
             _lastMinimapOx = tab.Camera.OffsetX;

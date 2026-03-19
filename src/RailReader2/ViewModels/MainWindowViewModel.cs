@@ -446,17 +446,20 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public void HandleArrowRight(bool shortJump = false)
     {
         _controller.HandleArrowRight(shortJump);
-        // Only update the camera transform — don't fire OnPropertyChanged(ActiveTab)
-        // which triggers a full re-render of every layer (page, overlay, annotations,
-        // search, minimap) on every key repeat. The animation loop handles all updates.
-        InvalidateCamera();
+        // In rail mode, the animation loop drives all camera updates via Tick().
+        // Key repeats only keep StartScroll alive (a no-op when direction unchanged).
+        // Calling InvalidateCamera here would redundantly update the MatrixTransform
+        // at key-repeat rate (~30-40 Hz) on top of the animation frame updates.
+        if (ActiveTab?.Rail.Active != true)
+            InvalidateCamera();
         RequestAnimationFrame();
     }
 
     public void HandleArrowLeft(bool shortJump = false)
     {
         _controller.HandleArrowLeft(shortJump);
-        InvalidateCamera();
+        if (ActiveTab?.Rail.Active != true)
+            InvalidateCamera();
         RequestAnimationFrame();
     }
 
