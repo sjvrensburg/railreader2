@@ -216,6 +216,20 @@
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
+
+                        <TextBlock Text="Centered Block Types" FontWeight="Bold" FontSize="14" Margin="0,12,0,0" />
+                        <Separator />
+                        <TextBlock Text="Select which block types are horizontally centered when narrower than the viewport:"
+                                   TextWrapping="Wrap" Opacity="0.7" FontSize="12" />
+                        <ItemsControl Name="CenteringClassesList">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="v:NavigableClassItem">
+                                    <CheckBox Content="{Binding Name}"
+                                              IsChecked="{Binding IsChecked}"
+                                              Margin="0,1" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>

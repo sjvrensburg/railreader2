@@ -19,6 +19,7 @@ public partial class SettingsWindow : Window
 {
     private bool _loading = true;
     private readonly ObservableCollection<NavigableClassItem> _classItems = [];
+    private readonly ObservableCollection<NavigableClassItem> _centeringClassItems = [];
 
     public SettingsWindow()
     {
@@ -82,6 +83,24 @@ public partial class SettingsWindow : Window
             _classItems.Add(item);
         }
         NavigableClassesList.ItemsSource = _classItems;
+
+        _centeringClassItems.Clear();
+        for (int i = 0; i < LayoutConstants.LayoutClasses.Length; i++)
+        {
+            var item = new NavigableClassItem
+            {
+                Name = LayoutConstants.LayoutClasses[i],
+                ClassId = i,
+                IsChecked = c.CenteringClasses.Contains(i),
+            };
+            item.PropertyChanged += (_, args) =>
+            {
+                if (args.PropertyName == nameof(NavigableClassItem.IsChecked))
+                    OnCenteringClassChanged();
+            };
+            _centeringClassItems.Add(item);
+        }
+        CenteringClassesList.ItemsSource = _centeringClassItems;
     }
 
     private void SaveToConfig()
@@ -106,6 +125,16 @@ public partial class SettingsWindow : Window
     {
         if (Vm is not { } vm || _loading) return;
         vm.Config.NavigableClasses = _classItems
+            .Where(item => item.IsChecked)
+            .Select(item => item.ClassId)
+            .ToHashSet();
+        vm.OnConfigChanged();
+    }
+
+    private void OnCenteringClassChanged()
+    {
+        if (Vm is not { } vm || _loading) return;
+        vm.Config.CenteringClasses = _centeringClassItems
             .Where(item => item.IsChecked)
             .Select(item => item.ClassId)
             .ToHashSet();
@@ -212,6 +241,7 @@ public partial class SettingsWindow : Window
         vm.Config.MotionBlur = defaults.MotionBlur;
         vm.Config.MotionBlurIntensity = defaults.MotionBlurIntensity;
         vm.Config.NavigableClasses = LayoutConstants.DefaultNavigableClasses();
+        vm.Config.CenteringClasses = LayoutConstants.DefaultCenteringClasses();
         vm.Config.PixelSnapping = defaults.PixelSnapping;
         vm.Config.LineFocusBlur = defaults.LineFocusBlur;
         vm.Config.LineFocusBlurIntensity = defaults.LineFocusBlurIntensity;

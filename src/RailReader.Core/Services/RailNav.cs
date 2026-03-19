@@ -45,9 +45,15 @@ public sealed class RailNav
 
     /// <summary>
     /// When a block's width is less than this fraction of the viewport,
-    /// center it horizontally instead of left-aligning.
+    /// center it horizontally instead of left-aligning (if the block type allows centering).
     /// </summary>
     private const double CenterBlockThreshold = 0.75;
+
+    /// <summary>
+    /// Whether the current navigable block's type is in the centering class set.
+    /// </summary>
+    private bool ShouldCenterBlock() =>
+        _config.CenteringClasses.Contains(CurrentNavigableBlock.ClassId);
 
     /// <summary>
     /// Returns true if input should be suppressed because an edge-hold advance
@@ -381,9 +387,11 @@ public sealed class RailNav
         if (!CanNavigate) return;
 
         var (blockLeft, blockRight, blockWidthPx) = GetBlockBounds(zoom);
-        double targetX = blockWidthPx <= windowWidth
-            ? windowWidth / 2.0 - (blockLeft + blockRight) / 2.0 * zoom
-            : windowWidth - blockRight * zoom;
+        double targetX;
+        if (blockWidthPx <= windowWidth && ShouldCenterBlock())
+            targetX = windowWidth / 2.0 - (blockLeft + blockRight) / 2.0 * zoom;
+        else
+            targetX = windowWidth - blockRight * zoom;
         var (_, targetY) = ComputeTargetCamera(zoom, windowWidth, windowHeight);
 
         BeginSnap(cameraX, cameraY, SnapX(targetX), SnapY(targetY));
@@ -427,7 +435,7 @@ public sealed class RailNav
 
         double blockWidthPx = block.BBox.W * zoom;
         double targetX;
-        if (blockWidthPx < windowWidth * CenterBlockThreshold)
+        if (blockWidthPx < windowWidth * CenterBlockThreshold && ShouldCenterBlock())
         {
             // Block is narrow relative to viewport — center it horizontally
             double blockCenterX = block.BBox.X + block.BBox.W / 2.0;
@@ -487,8 +495,16 @@ public sealed class RailNav
         double result;
         if (blockWidthPx <= windowWidth)
         {
-            double center = (blockLeft + blockRight) / 2.0;
-            result = windowWidth / 2.0 - center * zoom;
+            if (ShouldCenterBlock())
+            {
+                double center = (blockLeft + blockRight) / 2.0;
+                result = windowWidth / 2.0 - center * zoom;
+            }
+            else
+            {
+                // Left-align with 5% margin (block fully visible, no scroll needed)
+                result = windowWidth * 0.05 - blockLeft * zoom;
+            }
         }
         else
         {

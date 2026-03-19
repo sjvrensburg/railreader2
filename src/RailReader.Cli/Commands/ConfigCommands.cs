@@ -90,7 +90,7 @@ public static class ConfigCommands
 
     private static PropertyInfo[] GetConfigProperties() =>
         typeof(AppConfig).GetProperties(BindingFlags.Public | BindingFlags.Instance)
-            .Where(p => p.CanRead && p.Name != "NavigableClasses").ToArray();
+            .Where(p => p.CanRead && p.Name is not "NavigableClasses" and not "CenteringClasses").ToArray();
 
     private static PropertyInfo? FindProperty(PropertyInfo[] props, string key) =>
         props.FirstOrDefault(p =>

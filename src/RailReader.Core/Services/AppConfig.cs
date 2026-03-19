@@ -38,6 +38,9 @@ public sealed class AppConfig
     [JsonConverter(typeof(NavigableClassesConverter))]
     public HashSet<int> NavigableClasses { get; set; } = LayoutConstants.DefaultNavigableClasses();
 
+    [JsonConverter(typeof(NavigableClassesConverter))]
+    public HashSet<int> CenteringClasses { get; set; } = LayoutConstants.DefaultCenteringClasses();
+
     private static readonly JsonSerializerOptions s_options = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
