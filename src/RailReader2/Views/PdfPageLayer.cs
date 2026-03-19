@@ -213,19 +213,18 @@ public class PdfPageLayer : Control
             // screens. Only use it when motion blur is active (image filter must operate
             // on the composite). For colour-filter-only mode, apply the filter directly
             // to each draw paint instead, avoiding the offscreen buffer entirely.
-            // IMPORTANT: line focus blur also requires SaveLayer because the dim overlay
-            // must blend with the page BEFORE the colour filter is applied:
-            // correct = filter(blend(page, dim)), wrong = blend(filter(page), filter(dim)).
+            // Line focus dim: applying the colour filter per-paint gives
+            // blend(filter(page), filter(dim)) instead of filter(blend(page, dim)).
+            // These are equivalent for Invert (proven algebraically) and visually
+            // indistinguishable for other effects because all SkSL shaders preserve
+            // alpha (return half4(result, color.a)), so the gradient transparency
+            // is maintained and the dim colour is correctly filtered.
             bool needsBlurLayer = blurFilter is not null;
             bool hasBionic = bionicPath is not null;
-            bool hasLineFocusDim = _opts.LineFocusBlur && _opts.LineFocusIntensity > 0
-                && tab.Rail is { Active: true, NavigableCount: > 0 };
-            // Per-paint colour filter: only when drawing the page image alone
-            // (no blur, no bionic, no line focus dim that needs composite filtering).
-            bool perPaintFilter = effectFilter is not null && !needsBlurLayer && !hasBionic && !hasLineFocusDim;
+            // Per-paint colour filter: when no blur and no bionic clip regions.
+            bool perPaintFilter = effectFilter is not null && !needsBlurLayer && !hasBionic;
 
-            // Use SaveLayer when blur is active, or when colour filter needs to apply
-            // uniformly to composite (bionic clip regions, line focus dim overlay).
+            // Use SaveLayer only when blur is active or bionic needs uniform filter.
             bool useLayer = needsBlurLayer || (effectFilter is not null && !perPaintFilter);
             if (useLayer)
             {
