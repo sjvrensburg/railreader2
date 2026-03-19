@@ -812,7 +812,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public void SearchForSelectedText()
     {
-        if (SelectedText is not { Length: > 0 } text) return;
+        if (SelectedText?.Trim() is not { Length: > 0 } text) return;
         ShowOutline = true;
         SearchRequested?.Invoke(text);
     }
