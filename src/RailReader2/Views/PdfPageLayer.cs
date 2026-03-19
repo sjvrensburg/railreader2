@@ -89,17 +89,42 @@ public class PdfPageLayer : Control
         private readonly ColourEffectShaders? _effects;
         private readonly RenderOptions _opts;
 
+        // Snapshot of dynamic tab state for Equals comparison.
+        // When these match, the render output is identical and Avalonia can
+        // skip re-executing the draw operation (only the parent transform changed).
+        private readonly SKImage? _image;
+        private readonly double _scrollSpeed, _zoomSpeed;
+        private readonly float _lineY, _lineH;
+
         public PageDrawOperation(Rect bounds, TabViewModel? tab, ColourEffectShaders? effects, RenderOptions opts)
         {
             _bounds = bounds;
             _tab = tab;
             _effects = effects;
             _opts = opts;
+            _image = tab?.CachedImage;
+            _scrollSpeed = tab?.Rail.ScrollSpeed ?? 0;
+            _zoomSpeed = tab?.Camera.ZoomSpeed ?? 0;
+            if (tab?.Rail is { Active: true, NavigableCount: > 0 })
+            {
+                var line = tab.Rail.CurrentLineInfo;
+                _lineY = line.Y;
+                _lineH = line.Height;
+            }
         }
 
         public Rect Bounds => _bounds;
         public void Dispose() { }
-        public bool Equals(ICustomDrawOperation? other) => false;
+
+        public bool Equals(ICustomDrawOperation? other)
+            => other is PageDrawOperation op
+            && _bounds == op._bounds
+            && _opts == op._opts
+            && ReferenceEquals(_image, op._image)
+            && _scrollSpeed == op._scrollSpeed
+            && _zoomSpeed == op._zoomSpeed
+            && _lineY == op._lineY
+            && _lineH == op._lineH;
         public bool HitTest(Point p) => _bounds.Contains(p);
 
         /// <summary>
