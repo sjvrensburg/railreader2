@@ -158,8 +158,8 @@ public class PdfPageLayer : Control
             if (sigmaX > 0 || sigmaY > 0)
             {
                 if (s_cachedBlurFilter is null
-                    || Math.Abs(sigmaX - s_cachedSigmaX) > 0.001f
-                    || Math.Abs(sigmaY - s_cachedSigmaY) > 0.001f)
+                    || Math.Abs(sigmaX - s_cachedSigmaX) > 0.05f
+                    || Math.Abs(sigmaY - s_cachedSigmaY) > 0.05f)
                 {
                     s_cachedBlurFilter?.Dispose();
                     s_cachedBlurFilter = SKImageFilter.CreateBlur(sigmaX, sigmaY);
