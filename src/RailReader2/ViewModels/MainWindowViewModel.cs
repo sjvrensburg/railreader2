@@ -446,14 +446,17 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public void HandleArrowRight(bool shortJump = false)
     {
         _controller.HandleArrowRight(shortJump);
-        InvalidateCameraAndTab();
+        // Only update the camera transform — don't fire OnPropertyChanged(ActiveTab)
+        // which triggers a full re-render of every layer (page, overlay, annotations,
+        // search, minimap) on every key repeat. The animation loop handles all updates.
+        InvalidateCamera();
         RequestAnimationFrame();
     }
 
     public void HandleArrowLeft(bool shortJump = false)
     {
         _controller.HandleArrowLeft(shortJump);
-        InvalidateCameraAndTab();
+        InvalidateCamera();
         RequestAnimationFrame();
     }
 

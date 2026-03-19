@@ -302,13 +302,16 @@ public partial class MainWindow : Window
             CameraPanel.RenderTransform = null;
             PagePanel.Width = 0;
             PagePanel.Height = 0;
-            UpdateRailToolBarVisibility();
             return;
         }
 
-        CameraPanel.RenderTransform = new MatrixTransform(
-            new Matrix(tab.Camera.Zoom, 0, 0, tab.Camera.Zoom,
-                       tab.Camera.OffsetX, tab.Camera.OffsetY));
+        // Reuse the MatrixTransform to avoid heap allocation every frame.
+        var matrix = new Matrix(tab.Camera.Zoom, 0, 0, tab.Camera.Zoom,
+                                tab.Camera.OffsetX, tab.Camera.OffsetY);
+        if (CameraPanel.RenderTransform is MatrixTransform mt)
+            mt.Matrix = matrix;
+        else
+            CameraPanel.RenderTransform = new MatrixTransform(matrix);
         PagePanel.Width = tab.PageWidth;
         PagePanel.Height = tab.PageHeight;
 
@@ -324,8 +327,6 @@ public partial class MainWindow : Window
             _lastMinimapZoom = tab.Camera.Zoom;
             Minimap.InvalidateVisual();
         }
-
-        UpdateRailToolBarVisibility();
     }
 
     /// <summary>
