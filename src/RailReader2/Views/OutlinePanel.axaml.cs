@@ -60,9 +60,11 @@ public partial class OutlinePanel : UserControl
         }
     }
 
-    private void OnSearchRequested()
+    private void OnSearchRequested(string? prefill)
     {
         SwitchToSearchTab();
+        if (prefill is not null)
+            SearchInput.Text = prefill;
         // Delay focus so the tab switch completes first
         Dispatcher.UIThread.Post(FocusSearch, DispatcherPriority.Input);
     }

@@ -68,10 +68,14 @@ public class ViewportPanel : Panel
 
         var point = e.GetCurrentPoint(this);
 
-        // Right-click: open radial menu or cancel tool
+        // Right-click: context menu for text selection, radial menu, or cancel tool
         if (point.Properties.IsRightButtonPressed && ViewModel is { } vm)
         {
-            if (vm.IsAnnotating)
+            if (vm.ActiveTool == AnnotationTool.TextSelect && vm.SelectedText is not null)
+            {
+                ShowTextSelectionContextMenu();
+            }
+            else if (vm.IsAnnotating)
             {
                 vm.CancelAnnotationTool();
             }
@@ -173,6 +177,23 @@ public class ViewportPanel : Panel
         _dragging = false;
         _browseAnnotationDrag = false;
         e.Handled = true;
+    }
+
+    private void ShowTextSelectionContextMenu()
+    {
+        if (ViewModel is not { } vm || vm.SelectedText is null) return;
+
+        var menu = new ContextMenu();
+
+        var copyItem = new MenuItem { Header = "Copy", InputGesture = new KeyGesture(Key.C, KeyModifiers.Control) };
+        copyItem.Click += (_, _) => vm.CopySelectedText();
+        menu.Items.Add(copyItem);
+
+        var searchItem = new MenuItem { Header = "Search for Selection", InputGesture = new KeyGesture(Key.F, KeyModifiers.Control) };
+        searchItem.Click += (_, _) => vm.SearchForSelectedText();
+        menu.Items.Add(searchItem);
+
+        menu.Open(this);
     }
 
     private bool IsClick(Point pos)
