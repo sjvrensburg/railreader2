@@ -217,7 +217,7 @@ public partial class TabBarView : UserControl
         {
             int index = HitTestTabIndex(pos);
             if (index >= 0 && _vm is not null)
-                ShowTabContextMenu(index, pos);
+                ShowTabContextMenu(index);
             e.Handled = true;
             return;
         }
@@ -234,7 +234,7 @@ public partial class TabBarView : UserControl
         _isDragging = false;
     }
 
-    private void ShowTabContextMenu(int tabIndex, Point position)
+    private void ShowTabContextMenu(int tabIndex)
     {
         if (_vm is not { } vm) return;
 

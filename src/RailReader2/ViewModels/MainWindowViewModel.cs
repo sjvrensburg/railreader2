@@ -358,8 +358,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
         var tab = Tabs[index];
         var filePath = tab.FilePath;
 
-        // Create a new window with a fresh ViewModel and open the same document
-        var newVm = new MainWindowViewModel(AppConfig.Load());
+        // Create a new window with a cloned config so settings are current and independent
+        var newVm = new MainWindowViewModel(Config.Clone());
         var newWindow = new MainWindow { DataContext = newVm };
         newVm.SetWindow(newWindow);
         newWindow.Closing += (_, _) => newVm.SaveAllReadingPositions();

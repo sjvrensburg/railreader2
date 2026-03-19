@@ -30,7 +30,7 @@ public class ViewportPanel : Panel
 
     /// <summary>
     /// Update the cursor to reflect the active annotation tool.
-    /// Called by the animation frame or after tool changes.
+    /// Called when the ActiveTool property changes.
     /// </summary>
     public void UpdateAnnotationCursor()
     {
@@ -40,13 +40,12 @@ public class ViewportPanel : Panel
 
         Cursor = tool switch
         {
-            AnnotationTool.Highlight => new Cursor(StandardCursorType.Cross),
-            AnnotationTool.Pen => new Cursor(StandardCursorType.Cross),
-            AnnotationTool.Rectangle => new Cursor(StandardCursorType.Cross),
-            AnnotationTool.TextNote => new Cursor(StandardCursorType.Cross),
+            AnnotationTool.Highlight or AnnotationTool.Pen
+                or AnnotationTool.Rectangle or AnnotationTool.TextNote
+                => new Cursor(StandardCursorType.Cross),
             AnnotationTool.Eraser => new Cursor(StandardCursorType.No),
             AnnotationTool.TextSelect => new Cursor(StandardCursorType.Ibeam),
-            _ => Cursor.Default,
+            _ => null, // inherit default from parent
         };
     }
 

@@ -66,41 +66,12 @@ public partial class SettingsWindow : Window
         LineHighlightTintCombo.SelectedIndex = (int)c.LineHighlightTint;
         LineHighlightOpacitySlider.Value = c.LineHighlightOpacity;
 
-        _classItems.Clear();
-        for (int i = 0; i < LayoutConstants.LayoutClasses.Length; i++)
-        {
-            var item = new NavigableClassItem
-            {
-                Name = LayoutConstants.LayoutClasses[i],
-                ClassId = i,
-                IsChecked = c.NavigableClasses.Contains(i),
-            };
-            item.PropertyChanged += (_, args) =>
-            {
-                if (args.PropertyName == nameof(NavigableClassItem.IsChecked))
-                    OnNavigableClassChanged();
-            };
-            _classItems.Add(item);
-        }
-        NavigableClassesList.ItemsSource = _classItems;
-
-        _centeringClassItems.Clear();
-        for (int i = 0; i < LayoutConstants.LayoutClasses.Length; i++)
-        {
-            var item = new NavigableClassItem
-            {
-                Name = LayoutConstants.LayoutClasses[i],
-                ClassId = i,
-                IsChecked = c.CenteringClasses.Contains(i),
-            };
-            item.PropertyChanged += (_, args) =>
-            {
-                if (args.PropertyName == nameof(NavigableClassItem.IsChecked))
-                    OnCenteringClassChanged();
-            };
-            _centeringClassItems.Add(item);
-        }
-        CenteringClassesList.ItemsSource = _centeringClassItems;
+        BuildClassCheckboxes(_classItems, c.NavigableClasses,
+            set => { vm.Config.NavigableClasses = set; vm.OnConfigChanged(); },
+            NavigableClassesList);
+        BuildClassCheckboxes(_centeringClassItems, c.CenteringClasses,
+            set => { vm.Config.CenteringClasses = set; vm.OnConfigChanged(); },
+            CenteringClassesList);
     }
 
     private void SaveToConfig()
@@ -121,24 +92,27 @@ public partial class SettingsWindow : Window
         vm.OnConfigChanged();
     }
 
-    private void OnNavigableClassChanged()
+    private void BuildClassCheckboxes(
+        ObservableCollection<NavigableClassItem> items, HashSet<int> activeSet,
+        Action<HashSet<int>> onChanged, ItemsControl target)
     {
-        if (Vm is not { } vm || _loading) return;
-        vm.Config.NavigableClasses = _classItems
-            .Where(item => item.IsChecked)
-            .Select(item => item.ClassId)
-            .ToHashSet();
-        vm.OnConfigChanged();
-    }
-
-    private void OnCenteringClassChanged()
-    {
-        if (Vm is not { } vm || _loading) return;
-        vm.Config.CenteringClasses = _centeringClassItems
-            .Where(item => item.IsChecked)
-            .Select(item => item.ClassId)
-            .ToHashSet();
-        vm.OnConfigChanged();
+        items.Clear();
+        for (int i = 0; i < LayoutConstants.LayoutClasses.Length; i++)
+        {
+            var item = new NavigableClassItem
+            {
+                Name = LayoutConstants.LayoutClasses[i],
+                ClassId = i,
+                IsChecked = activeSet.Contains(i),
+            };
+            item.PropertyChanged += (_, args) =>
+            {
+                if (args.PropertyName == nameof(NavigableClassItem.IsChecked) && !_loading && Vm is not null)
+                    onChanged(items.Where(x => x.IsChecked).Select(x => x.ClassId).ToHashSet());
+            };
+            items.Add(item);
+        }
+        target.ItemsSource = items;
     }
 
     private void OnDarkModeChanged(object? sender, RoutedEventArgs e)
