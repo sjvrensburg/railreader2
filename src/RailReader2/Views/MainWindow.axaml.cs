@@ -142,6 +142,9 @@ public partial class MainWindow : Window
                         vm.ShowSettings = false;
                         await new SettingsWindow { DataContext = vm, FontSize = vm.CurrentFontSize }.ShowDialog(this);
                         break;
+                    case nameof(MainWindowViewModel.ActiveTool):
+                        Viewport.UpdateAnnotationCursor();
+                        break;
                     case nameof(MainWindowViewModel.IsFullScreen):
                         WindowState = vm.IsFullScreen ? WindowState.FullScreen : WindowState.Normal;
                         SystemDecorations = vm.IsFullScreen ? SystemDecorations.None : SystemDecorations.Full;

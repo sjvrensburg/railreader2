@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
+using RailReader.Core.Models;
 using RailReader2.ViewModels;
 
 namespace RailReader2.Views;
@@ -17,11 +18,35 @@ public class ViewportPanel : Panel
     private bool _browseAnnotationDrag;
     private int _pressClickCount;
 
+    // Track the last tool so we only update cursor when it changes
+    private AnnotationTool _lastCursorTool = AnnotationTool.None;
+
     public ViewportPanel()
     {
         ClipToBounds = true;
         Focusable = true;
         Background = new SolidColorBrush(Color.FromRgb(128, 128, 128));
+    }
+
+    /// <summary>
+    /// Update the cursor to reflect the active annotation tool.
+    /// Called when the ActiveTool property changes.
+    /// </summary>
+    public void UpdateAnnotationCursor()
+    {
+        var tool = ViewModel?.ActiveTool ?? AnnotationTool.None;
+        if (tool == _lastCursorTool) return;
+        _lastCursorTool = tool;
+
+        Cursor = tool switch
+        {
+            AnnotationTool.Highlight or AnnotationTool.Pen
+                or AnnotationTool.Rectangle or AnnotationTool.TextNote
+                => new Cursor(StandardCursorType.Cross),
+            AnnotationTool.Eraser => new Cursor(StandardCursorType.No),
+            AnnotationTool.TextSelect => new Cursor(StandardCursorType.Ibeam),
+            _ => null, // inherit default from parent
+        };
     }
 
     protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
@@ -43,10 +68,14 @@ public class ViewportPanel : Panel
 
         var point = e.GetCurrentPoint(this);
 
-        // Right-click: open radial menu or cancel tool
+        // Right-click: context menu for text selection, radial menu, or cancel tool
         if (point.Properties.IsRightButtonPressed && ViewModel is { } vm)
         {
-            if (vm.IsAnnotating)
+            if (vm.ActiveTool == AnnotationTool.TextSelect && vm.SelectedText is not null)
+            {
+                ShowTextSelectionContextMenu();
+            }
+            else if (vm.IsAnnotating)
             {
                 vm.CancelAnnotationTool();
             }
@@ -148,6 +177,23 @@ public class ViewportPanel : Panel
         _dragging = false;
         _browseAnnotationDrag = false;
         e.Handled = true;
+    }
+
+    private void ShowTextSelectionContextMenu()
+    {
+        if (ViewModel is not { } vm || vm.SelectedText is null) return;
+
+        var menu = new ContextMenu();
+
+        var copyItem = new MenuItem { Header = "Copy", InputGesture = new KeyGesture(Key.C, KeyModifiers.Control) };
+        copyItem.Click += (_, _) => vm.CopySelectedText();
+        menu.Items.Add(copyItem);
+
+        var searchItem = new MenuItem { Header = "Search for Selection" };
+        searchItem.Click += (_, _) => vm.SearchForSelectedText();
+        menu.Items.Add(searchItem);
+
+        menu.Open(this);
     }
 
     private bool IsClick(Point pos)

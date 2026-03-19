@@ -210,17 +210,55 @@ public partial class TabBarView : UserControl
 
     private void OnPanelPointerPressed(object? sender, PointerPressedEventArgs e)
     {
-        if (!e.GetCurrentPoint(TabPanel).Properties.IsLeftButtonPressed) return;
-
+        var point = e.GetCurrentPoint(TabPanel);
         var pos = e.GetPosition(TabPanel);
-        int index = HitTestTabIndex(pos);
-        if (index < 0) return;
+
+        if (point.Properties.IsRightButtonPressed)
+        {
+            int index = HitTestTabIndex(pos);
+            if (index >= 0 && _vm is not null)
+                ShowTabContextMenu(index);
+            e.Handled = true;
+            return;
+        }
+
+        if (!point.Properties.IsLeftButtonPressed) return;
+
+        int idx = HitTestTabIndex(pos);
+        if (idx < 0) return;
 
         if (e.Source is Button { Content: "\u00d7" }) return;
 
-        _dragIndex = index;
+        _dragIndex = idx;
         _dragStartPoint = pos;
         _isDragging = false;
+    }
+
+    private void ShowTabContextMenu(int tabIndex)
+    {
+        if (_vm is not { } vm) return;
+
+        var menu = new ContextMenu();
+
+        var duplicateItem = new MenuItem { Header = "Duplicate Tab" };
+        duplicateItem.Click += (_, _) =>
+        {
+            vm.SelectTab(tabIndex);
+            vm.DuplicateTab();
+        };
+        menu.Items.Add(duplicateItem);
+
+        var detachItem = new MenuItem { Header = "Detach Tab" };
+        detachItem.Click += (_, _) => vm.DetachTab(tabIndex);
+        menu.Items.Add(detachItem);
+
+        menu.Items.Add(new Separator());
+
+        var closeItem = new MenuItem { Header = "Close Tab" };
+        closeItem.Click += (_, _) => vm.CloseTab(tabIndex);
+        menu.Items.Add(closeItem);
+
+        menu.Open(TabPanel);
     }
 
     private void OnPanelPointerMoved(object? sender, PointerEventArgs e)

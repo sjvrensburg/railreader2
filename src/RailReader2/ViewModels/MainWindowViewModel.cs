@@ -315,6 +315,10 @@ public sealed partial class MainWindowViewModel : ObservableObject
             if (ActiveTab is { } oldTab)
                 SaveSidebarState(oldTab);
 
+            // Drop out of any annotation mode when switching tabs
+            if (IsAnnotating)
+                CancelAnnotationTool();
+
             ActiveTabIndex = index;
             _controller.SelectDocument(index);
             RestoreSidebarState(Tabs[index]);
@@ -346,6 +350,24 @@ public sealed partial class MainWindowViewModel : ObservableObject
     {
         if (ActiveTab is { } tab)
             OpenDocument(tab.FilePath);
+    }
+
+    public void DetachTab(int index)
+    {
+        if (index < 0 || index >= Tabs.Count) return;
+        var tab = Tabs[index];
+        var filePath = tab.FilePath;
+
+        // Create a new window with a cloned config so settings are current and independent
+        var newVm = new MainWindowViewModel(Config.Clone());
+        var newWindow = new MainWindow { DataContext = newVm };
+        newVm.SetWindow(newWindow);
+        newWindow.Closing += (_, _) => newVm.SaveAllReadingPositions();
+        newWindow.Show();
+        newVm.OpenDocument(filePath);
+
+        // Close the tab in this window
+        CloseTab(index);
     }
 
     // --- Navigation ---
@@ -780,12 +802,20 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     // --- Search ---
 
-    public event Action? SearchRequested;
+    public event Action<string?>? SearchRequested;
 
-    public void OpenSearch()
+    public void OpenSearch() => RequestSearch(null);
+
+    public void SearchForSelectedText()
+    {
+        if (SelectedText?.Trim() is not { Length: > 0 } text) return;
+        RequestSearch(text);
+    }
+
+    private void RequestSearch(string? prefill)
     {
         ShowOutline = true;
-        SearchRequested?.Invoke();
+        SearchRequested?.Invoke(prefill);
     }
 
     public void CloseSearch()

@@ -50,6 +50,19 @@ public static class LayoutConstants
         22, // text
     ];
 
+    /// <summary>
+    /// Block types that are horizontally centered when narrower than the viewport.
+    /// Excludes heading types (paragraph_title, doc_title) which look better left-aligned.
+    /// </summary>
+    public static HashSet<int> DefaultCenteringClasses() =>
+    [
+        0,  // abstract
+        1,  // algorithm
+        5,  // display_formula
+        10, // footnote
+        22, // text
+    ];
+
     public static int? ClassNameToIndex(string name) =>
         Array.IndexOf(LayoutClasses, name) is var idx and >= 0 ? idx : null;
 }

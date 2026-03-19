@@ -31,7 +31,7 @@
         "description": "Complete user guide for railreader2 — a desktop PDF viewer with AI-guided rail reading. Covers rail mode, auto-scroll, jump mode, colour effects, annotations, search, bookmarks, and all keyboard shortcuts.",
         "url": "https://sjvrensburg.github.io/railreader2/guide.html",
         "datePublished": "2026-02-26",
-        "dateModified": "2026-03-13",
+        "dateModified": "2026-03-19",
         "author": {
           "@type": "Person",
           "name": "Stéfan Janse van Rensburg"
@@ -193,6 +193,18 @@
       <p>
         Open multiple PDFs in tabs with <code>Ctrl+O</code>. Each tab has independent zoom, position,
         and analysis state. Switch tabs with <code>Ctrl+Tab</code> or by clicking. Drag tabs to reorder.
+      </p>
+      <p>
+        <strong>Right-click any tab</strong> to open a context menu with:
+      </p>
+      <ul>
+        <li><strong>Duplicate Tab</strong> &mdash; opens the same PDF in a new tab</li>
+        <li><strong>Detach Tab</strong> &mdash; moves the tab to a new window</li>
+        <li><strong>Close Tab</strong> &mdash; closes the tab</li>
+      </ul>
+      <p>
+        Switching tabs automatically exits any active annotation mode to prevent accidental edits
+        on the wrong document.
       </p>
     </section>
 
@@ -435,6 +447,17 @@
         <li><strong>Eraser</strong> (<code>5</code>) &mdash; Click on an annotation to remove it.</li>
       </ul>
 
+      <h3>Tool cursors</h3>
+      <p>
+        Each annotation tool shows a distinct mouse cursor so you always know the active mode:
+      </p>
+      <ul>
+        <li><strong>Highlight, Pen, Rectangle, Text Note</strong> &mdash; crosshair cursor</li>
+        <li><strong>Eraser</strong> &mdash; no-entry cursor</li>
+        <li><strong>Text Select</strong> &mdash; I-beam cursor</li>
+        <li><strong>Browse (no tool)</strong> &mdash; default arrow cursor</li>
+      </ul>
+
       <h3>Colour picker</h3>
       <p>
         The <strong>Highlight</strong> and <strong>Pen</strong> segments on the radial menu have colour options.
@@ -572,6 +595,10 @@
       <ul>
         <li><strong>Navigable Block Types:</strong> Choose which PP-DocLayoutV3 block types are navigable
           in rail mode. Toggling classes doesn't require re-running analysis.</li>
+        <li><strong>Centered Block Types:</strong> Choose which block types are horizontally centered
+          when they are narrower than the viewport. By default, headings (paragraph_title, doc_title)
+          are excluded so they stay left-aligned with surrounding text, while formulae and body text
+          are centered.</li>
         <li><strong>Analysis Lookahead:</strong> Number of pages to pre-analyze ahead (0 to disable).</li>
       </ul>
 

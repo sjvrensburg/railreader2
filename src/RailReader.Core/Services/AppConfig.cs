@@ -38,6 +38,14 @@ public sealed class AppConfig
     [JsonConverter(typeof(NavigableClassesConverter))]
     public HashSet<int> NavigableClasses { get; set; } = LayoutConstants.DefaultNavigableClasses();
 
+    [JsonConverter(typeof(NavigableClassesConverter))]
+    public HashSet<int> CenteringClasses { get; set; } = LayoutConstants.DefaultCenteringClasses();
+
+    /// <summary>Creates an independent deep copy via JSON round-trip.</summary>
+    public AppConfig Clone() =>
+        JsonSerializer.Deserialize<AppConfig>(JsonSerializer.Serialize(this, s_options), s_options)
+        ?? new AppConfig();
+
     private static readonly JsonSerializerOptions s_options = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
