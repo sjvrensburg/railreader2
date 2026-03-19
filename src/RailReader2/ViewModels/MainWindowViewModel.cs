@@ -446,14 +446,20 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public void HandleArrowRight(bool shortJump = false)
     {
         _controller.HandleArrowRight(shortJump);
-        InvalidateCameraAndTab();
+        // In rail mode, the animation loop drives all camera updates via Tick().
+        // Key repeats only keep StartScroll alive (a no-op when direction unchanged).
+        // Calling InvalidateCamera here would redundantly update the MatrixTransform
+        // at key-repeat rate (~30-40 Hz) on top of the animation frame updates.
+        if (ActiveTab?.Rail.Active != true)
+            InvalidateCamera();
         RequestAnimationFrame();
     }
 
     public void HandleArrowLeft(bool shortJump = false)
     {
         _controller.HandleArrowLeft(shortJump);
-        InvalidateCameraAndTab();
+        if (ActiveTab?.Rail.Active != true)
+            InvalidateCamera();
         RequestAnimationFrame();
     }
 

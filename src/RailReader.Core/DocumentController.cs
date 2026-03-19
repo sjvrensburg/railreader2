@@ -715,7 +715,10 @@ public sealed class DocumentController
         {
             doc.Camera.DecayZoomSpeed(dt);
             animating = true;
-            cameraChanged = true;
+            // Only mark camera changed if zoom speed is still perceptible
+            // (drives motion blur updates without forcing full compositor work)
+            if (doc.Camera.ZoomSpeed > 0)
+                cameraChanged = true;
         }
 
         // Poll analysis results
@@ -733,7 +736,11 @@ public sealed class DocumentController
             pageChanged = true;
         }
 
-        if (animating) cameraChanged = true;
+        // Only force camera invalidation if no tick method already set it.
+        // During rail scroll, TickRailSnap/TickAutoScroll set cameraChanged
+        // when camera actually moves — no need to redundantly force it here.
+        // This avoids unnecessary compositor MatrixTransform updates on frames
+        // where the camera position hasn't changed (e.g. auto-scroll pause).
 
         return new TickResult(cameraChanged, pageChanged, overlayChanged, false, false, animating);
     }

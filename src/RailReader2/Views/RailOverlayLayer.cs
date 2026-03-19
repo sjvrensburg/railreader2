@@ -59,6 +59,11 @@ public class RailOverlayLayer : Control
         [ThreadStatic] private static SKPaint? s_debugTextPaint;
         [ThreadStatic] private static SKFont? s_debugFont;
 
+        // Snapshot of dynamic state for Equals — during horizontal scroll
+        // block/line indices don't change, so the overlay output is identical.
+        private readonly int _currentBlock, _currentLine;
+        private readonly bool _railActive, _debugOverlay;
+
         public OverlayDrawOperation(Rect bounds, TabViewModel? tab, ColourEffect effect, bool lineFocusBlur,
             LineHighlightTint tint, double tintOpacity)
         {
@@ -68,11 +73,26 @@ public class RailOverlayLayer : Control
             _lineFocusBlur = lineFocusBlur;
             _tint = tint;
             _tintOpacity = tintOpacity;
+            _railActive = tab?.Rail.Active == true;
+            _currentBlock = tab?.Rail.CurrentBlock ?? 0;
+            _currentLine = tab?.Rail.CurrentLine ?? 0;
+            _debugOverlay = tab?.DebugOverlay ?? false;
         }
 
         public Rect Bounds => _bounds;
         public void Dispose() { }
-        public bool Equals(ICustomDrawOperation? other) => false;
+
+        public bool Equals(ICustomDrawOperation? other)
+            => other is OverlayDrawOperation op
+            && _bounds == op._bounds
+            && _effect == op._effect
+            && _lineFocusBlur == op._lineFocusBlur
+            && _tint == op._tint
+            && _tintOpacity == op._tintOpacity
+            && _railActive == op._railActive
+            && _currentBlock == op._currentBlock
+            && _currentLine == op._currentLine
+            && _debugOverlay == op._debugOverlay;
         public bool HitTest(Point p) => false;
 
         public void Render(ImmediateDrawingContext context)
