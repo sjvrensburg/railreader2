@@ -189,7 +189,7 @@ public class ViewportPanel : Panel
         copyItem.Click += (_, _) => vm.CopySelectedText();
         menu.Items.Add(copyItem);
 
-        var searchItem = new MenuItem { Header = "Search for Selection", InputGesture = new KeyGesture(Key.F, KeyModifiers.Control) };
+        var searchItem = new MenuItem { Header = "Search for Selection" };
         searchItem.Click += (_, _) => vm.SearchForSelectedText();
         menu.Items.Add(searchItem);
 

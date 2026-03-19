@@ -804,17 +804,18 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public event Action<string?>? SearchRequested;
 
-    public void OpenSearch()
-    {
-        ShowOutline = true;
-        SearchRequested?.Invoke(null);
-    }
+    public void OpenSearch() => RequestSearch(null);
 
     public void SearchForSelectedText()
     {
         if (SelectedText?.Trim() is not { Length: > 0 } text) return;
+        RequestSearch(text);
+    }
+
+    private void RequestSearch(string? prefill)
+    {
         ShowOutline = true;
-        SearchRequested?.Invoke(text);
+        SearchRequested?.Invoke(prefill);
     }
 
     public void CloseSearch()
