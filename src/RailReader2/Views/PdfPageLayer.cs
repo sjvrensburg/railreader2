@@ -66,6 +66,7 @@ public class PdfPageLayer : Control
 
         // Cached paint objects to avoid per-frame allocation
         [ThreadStatic] private static SKPaint? s_layerPaint;
+        [ThreadStatic] private static SKPaint? s_imagePaint;
 
         // Cached colour effect filter — reused when effect/intensity unchanged
         [ThreadStatic] private static SKColorFilter? s_cachedEffectFilter;
@@ -193,17 +194,6 @@ public class PdfPageLayer : Control
                 blurFilter = s_cachedBlurFilter;
             }
 
-            // Outer layer: colour effect + motion blur. Everything drawn inside
-            // this layer gets the colour filter applied uniformly (once).
-            bool needsLayer = effectFilter is not null || blurFilter is not null;
-            if (needsLayer)
-            {
-                s_layerPaint ??= new SKPaint();
-                s_layerPaint.ColorFilter = effectFilter;
-                s_layerPaint.ImageFilter = blurFilter;
-                canvas.SaveLayer(s_layerPaint);
-            }
-
             var destRect = SKRect.Create(0, 0, (float)tab.PageWidth, (float)tab.PageHeight);
 
             // Build bionic clip path + paint once for use in all draw calls
@@ -219,8 +209,45 @@ public class PdfPageLayer : Control
             using var bionicPath = bp;
             using var bionicPaint = bionicFilter is not null ? new SKPaint { ColorFilter = bionicFilter } : null;
 
+            // SaveLayer creates a viewport-sized offscreen buffer — expensive on large
+            // screens. Only use it when motion blur is active (image filter must operate
+            // on the composite). For colour-filter-only mode, apply the filter directly
+            // to each draw paint instead, avoiding the offscreen buffer entirely.
+            bool needsBlurLayer = blurFilter is not null;
+            bool hasBionic = bionicPath is not null;
+            // Per-paint colour filter: used when no blur layer and no bionic
+            // (bionic uses clip regions that need uniform filter application).
+            bool perPaintFilter = effectFilter is not null && !needsBlurLayer && !hasBionic;
+
+            if (needsBlurLayer)
+            {
+                s_layerPaint ??= new SKPaint();
+                s_layerPaint.ColorFilter = effectFilter;
+                s_layerPaint.ImageFilter = blurFilter;
+                canvas.SaveLayer(s_layerPaint);
+            }
+            else if (effectFilter is not null && hasBionic)
+            {
+                // Bionic + colour filter but no blur: need SaveLayer for uniform filter
+                s_layerPaint ??= new SKPaint();
+                s_layerPaint.ColorFilter = effectFilter;
+                s_layerPaint.ImageFilter = null;
+                canvas.SaveLayer(s_layerPaint);
+            }
+
             // Draw page image (with bionic if active)
-            DrawPageImage(canvas, image, destRect, bionicPath, bionicPaint);
+            if (perPaintFilter)
+            {
+                // Apply colour filter directly to image paint — no SaveLayer needed
+                s_imagePaint ??= new SKPaint();
+                s_imagePaint.ColorFilter = effectFilter;
+                var srcRect = SKRect.Create(image.Width, image.Height);
+                canvas.DrawImage(image, srcRect, destRect, s_sampling, s_imagePaint);
+            }
+            else
+            {
+                DrawPageImage(canvas, image, destRect, bionicPath, bionicPaint);
+            }
 
             // Line focus dim: draw a feathered white overlay that dims
             // everything except the active line, with smooth transitions.
@@ -272,10 +299,19 @@ public class PdfPageLayer : Control
                     s_cachedDimPadding = _opts.LineFocusPadding;
                 }
 
+                // When using per-paint filter (no SaveLayer), apply colour filter
+                // to the dim paint so it matches the effect (e.g. white→black for Invert).
+                if (perPaintFilter)
+                    s_cachedDimPaint!.ColorFilter = effectFilter;
+
                 canvas.DrawRect(destRect, s_cachedDimPaint);
+
+                if (perPaintFilter)
+                    s_cachedDimPaint!.ColorFilter = null;
             }
 
-            if (needsLayer)
+            bool usedLayer = needsBlurLayer || (effectFilter is not null && hasBionic);
+            if (usedLayer)
             {
                 canvas.Restore();
                 s_layerPaint!.ColorFilter = null;
