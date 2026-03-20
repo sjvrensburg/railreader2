@@ -67,7 +67,7 @@ public static class ScreenshotCompositor
             && doc.Rail is { Active: true, NavigableCount: > 0 })
         {
             var line = doc.Rail.CurrentLineInfo;
-            float pad = line.Height * 0.25f;
+            float pad = line.Height * (float)options.LinePadding;
             // Line rect in page-point space
             float lineTop = line.Y - line.Height / 2f - pad;
             float lineHeight = line.Height + pad * 2;

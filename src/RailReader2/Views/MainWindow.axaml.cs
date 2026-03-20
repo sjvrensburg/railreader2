@@ -252,6 +252,7 @@ public partial class MainWindow : Window
         OverlayLayer.ActiveEffect = ctrl?.ActiveColourEffect ?? ColourEffect.None;
         OverlayLayer.LineFocusBlurActive = tab?.LineFocusBlur ?? false;
         OverlayLayer.LineHighlightEnabled = tab?.LineHighlightEnabled ?? true;
+        OverlayLayer.LinePadding = config?.LinePadding ?? 0.2;
         OverlayLayer.Tint = config?.LineHighlightTint ?? LineHighlightTint.Auto;
         OverlayLayer.TintOpacity = config?.LineHighlightOpacity ?? 0.25;
 

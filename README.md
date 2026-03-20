@@ -89,9 +89,10 @@ At high zoom levels, navigation switches to "rail mode" — the viewer locks ont
 - **Auto-scroll** — toggle continuous horizontal scrolling in rail mode (P key), hold D/Right to boost speed, with configurable pauses at line and block boundaries
 - **Jump mode** — saccade-style reading (J key) that advances by a configurable percentage of the visible width; Shift+Right/Left for half-distance short jumps
 - **Line focus dim** — smooth feathered dimming of non-active lines to reduce peripheral distraction, with configurable intensity and padding
-- **Bionic reading** — shader-based text fading that de-emphasises the trailing portion of each word, guiding the eye to fixation points. Configurable fixation percentage and fade intensity
+- **Line highlight toggle** — independently toggle line highlight tint (H key); works with or without line focus blur
+- **Bionic reading** — *(Removed in 3.2)* shader-based text fading that de-emphasised the trailing portion of each word, guiding the eye to fixation points
 - **Pixel snapping** — quantises camera positions to the pixel grid to eliminate sub-pixel text shimmer at high zoom
-- **Rail toolbar** — docked vertical toolbar with toggle buttons (P/J/F/R) for auto-scroll, jump mode, line focus dim, and bionic reading, plus sliders for scroll speed (or jump distance) and motion blur intensity; auto-scroll and jump mode are mutually exclusive
+- **Rail toolbar** — docked vertical toolbar with toggle buttons (P/J/F/H) for auto-scroll, jump mode, line focus dim, and line highlight, plus sliders for scroll speed (or jump distance) and motion blur intensity; auto-scroll and jump mode are mutually exclusive
 - **Vertical position preservation** — maintains your panned vertical offset when navigating lines in rail mode
 - **Line snap shortcuts** — Home/End keys snap to the start/end of the current line in rail mode
 - **Named bookmarks** — bookmark any page with a custom name (B key or + button in the bookmarks pane). Navigate to bookmarks with a single click. Rename and delete inline. "Back to previous location" button for quick return after jumping. Bookmarks persist in the annotation sidecar file
@@ -168,7 +169,8 @@ Use **File → Open** (Ctrl+O) to open a PDF from within the app.
 | ` (backtick) | Navigate back to previous location |
 | C | Cycle colour effect on active tab |
 | F | Toggle line focus dim (rail mode) |
-| R | Toggle bionic reading (rail mode) |
+| H | Toggle line highlight tint (rail mode) |
+| R | Toggle bionic reading (rail mode) *(Removed in 3.2)* |
 | Shift+Right / Shift+Left | Short jump — half distance (jump mode) |
 | [ / ] | Adjust scroll speed or jump distance (rail mode) |
 | Shift+[ / Shift+] | Adjust blur intensity (rail mode) |
@@ -204,10 +206,8 @@ Rail reading parameters are editable via the Settings panel (gear icon in menu b
   "pixel_snapping": true,
   "line_focus_blur": false,
   "line_focus_blur_intensity": 0.5,
-  "line_focus_padding": 0.2,
-  "bionic_reading": false,
-  "bionic_fixation_percent": 0.4,
-  "bionic_fade_intensity": 0.6,
+  "line_padding": 0.2,
+  "line_highlight_enabled": true,
   "line_highlight_tint": "Auto",
   "line_highlight_opacity": 0.25,
   "auto_scroll_line_pause_ms": 400.0,
@@ -241,10 +241,8 @@ Rail reading parameters are editable via the Settings panel (gear icon in menu b
 | `pixel_snapping` | Quantise camera positions to pixel grid to reduce text shimmer (`true`/`false`) |
 | `line_focus_blur` | Dim non-active lines in rail mode (`true`/`false`) |
 | `line_focus_blur_intensity` | Line focus dim strength from 0.0 (off) to 1.0 (maximum) |
-| `line_focus_padding` | Padding around active line as fraction of line height (0.0–0.5) |
-| `bionic_reading` | Enable bionic reading text fading (`true`/`false`) |
-| `bionic_fixation_percent` | Fraction of each word kept at full contrast (0.0–1.0, default 0.4) |
-| `bionic_fade_intensity` | Bionic fade strength from 0.0 (off) to 1.0 (maximum) |
+| `line_padding` | Padding around active line as fraction of line height (0.0–0.5) |
+| `line_highlight_enabled` | Enable line highlight tint independently of line focus blur (`true`/`false`) |
 | `line_highlight_tint` | Colour tint on active line in rail mode: `Auto`, `Yellow`, `Cyan`, `Green`, `None` |
 | `line_highlight_opacity` | Line highlight tint opacity from 0.0 (off) to 1.0 (full) |
 | `auto_scroll_line_pause_ms` | Pause duration at line boundaries during auto-scroll (ms, 0 to disable) |
@@ -254,97 +252,28 @@ Rail reading parameters are editable via the Settings panel (gear icon in menu b
 | `navigable_classes` | Which block types rail mode navigates (array of class names). Configurable via Settings → Advanced. |
 | `centering_classes` | Which block types are horizontally centered when narrower than the viewport (array of class names). Excludes headings by default. Configurable via Settings → Advanced. |
 
+## Removed features
+
+Version 3.2 simplified the application to reduce complexity and make it less intimidating for new users. Bionic reading was removed because it was counterproductive with maths-heavy documents (the primary use case). The CLI and AI Agent were developer-only tools never shipped in binary releases, so they were removed from the solution to reduce maintenance burden.
+
 ## Architecture
 
-The codebase is split into a UI-free core library, a thin Avalonia UI shell, a CLI, and headless tests. An experimental AI agent CLI is available separately for developers:
+The codebase is split into a UI-free core library, a thin Avalonia UI shell, and headless tests:
 
 ```
-RailReader2.slnx              # Default solution (app + core + CLI + tests)
+RailReader2.slnx              # Default solution (app + core + tests)
 ├── src/RailReader.Core/        # All business logic (zero Avalonia dependencies)
 ├── src/RailReader2/            # Thin Avalonia UI shell
-├── src/RailReader.Cli/         # Command-line interface
 └── tests/RailReader.Core.Tests/  # xUnit headless tests
-
-RailReader2-full.slnx         # Full solution (adds AI agent CLI)
-└── src/RailReader.Agent/       # AI agent CLI (Microsoft.Extensions.AI)
 ```
 
-**RailReader.Core** contains `DocumentController` (the headless orchestration facade), `DocumentState` (per-document state), all Models and Services. It can be driven programmatically without any UI — the CLI, agent, and test project all use it directly.
+*(Removed in 3.2)* Previous versions included `src/RailReader.Cli/` (command-line interface) and `src/RailReader.Agent/` (AI agent CLI). These were removed in 3.2.
 
-**RailReader.Cli** is a command-line interface built on `System.CommandLine` that provides full headless access to RailReader's capabilities. See the [CLI section](#command-line-interface) below.
-
-**RailReader.Agent** *(experimental)* exposes RailReader's capabilities as AI tool functions via `Microsoft.Extensions.AI`. It can open PDFs, navigate, extract text, search, annotate, and export — all driven by an LLM agent loop. This component is not included in the binary releases (AppImage or Windows installer) and is only available when building from source. Configure via environment variables (`OPENAI_API_KEY`, `RAILREADER_MODEL`, `RAILREADER_BASE_URL`).
+**RailReader.Core** contains `DocumentController` (the headless orchestration facade), `DocumentState` (per-document state), all Models and Services. It can be driven programmatically without any UI — the test project uses it directly.
 
 ## Command-line interface
 
-RailReader includes a CLI (`RailReader.Cli`) for headless PDF operations — text extraction, search, layout analysis, annotations, bookmarks, page export, and configuration management. It references `RailReader.Core` directly with no subprocess overhead.
-
-### Quick start
-
-```bash
-# Run from source
-dotnet run -c Release --project src/RailReader.Cli -- document open paper.pdf
-
-# Interactive REPL mode
-dotnet run -c Release --project src/RailReader.Cli -- repl
-```
-
-### Command groups
-
-| Group | Commands | Description |
-|-------|----------|-------------|
-| `document` | `open`, `info`, `list`, `close`, `pages`, `outline` | Open, inspect, and manage PDF documents |
-| `text` | `extract`, `search` | Extract page text and search with regex/case-sensitivity |
-| `nav` | `goto`, `next`, `prev`, `status` | Navigate pages |
-| `analysis` | `run`, `status`, `list-blocks` | Run ONNX layout analysis and inspect detected blocks |
-| `annotation` | `list`, `add-highlight`, `add-note`, `remove`, `export-pdf`, `save`, `undo`, `redo` | Manage annotations on PDF pages |
-| `bookmark` | `list`, `add`, `remove` | Manage named bookmarks |
-| `config` | `show`, `set`, `reset`, `path` | View and modify application settings |
-| `export` | `page-image`, `page-range` | Export pages as PNG images |
-
-### JSON output
-
-All commands support a `--json` flag for machine-readable output:
-
-```bash
-dotnet run -c Release --project src/RailReader.Cli -- --json document open paper.pdf
-```
-
-```json
-{
-  "ok": true,
-  "data": {
-    "file_path": "/path/to/paper.pdf",
-    "title": "paper.pdf",
-    "page_count": 12,
-    "current_page": 1,
-    "analysis_available": true
-  }
-}
-```
-
-### REPL mode
-
-The `repl` command enters an interactive session where the open document persists across commands:
-
-```
-railreader> document open paper.pdf
-Opened paper.pdf (12 pages)
-
-railreader> text search "regression"
-Found 8 matches across 4 pages
-
-railreader> analysis run --page 3
-Analysis complete: 6 blocks detected on page 3
-
-railreader> bookmark add "Key result" --page 5
-Added bookmark "Key result" at page 5
-
-railreader> export page-image screenshot.png --page 3 --dpi 300 --annotations
-Exported page 3 to screenshot.png (1275x1649, 412,301 bytes)
-
-railreader> exit
-```
+*(Removed in 3.2)* The CLI (`RailReader.Cli`) provided headless PDF operations (text extraction, search, layout analysis, annotations, bookmarks, page export, and configuration management). It was removed in 3.2 as it was a developer tool never included in binary releases.
 
 ## Building
 
@@ -366,11 +295,7 @@ The model is placed in `models/PP-DocLayoutV3.onnx`. Without it, a simple fallba
 ### Build
 
 ```bash
-# Build app + tests (default, no AI agent dependencies)
 dotnet build RailReader2.slnx
-
-# Build everything including the AI agent CLI
-dotnet build RailReader2-full.slnx
 ```
 
 ### Test
@@ -387,32 +312,6 @@ dotnet run -c Release --project src/RailReader2 -- <path-to-pdf>
 
 # Launch without arguments and use File → Open (Ctrl+O)
 dotnet run -c Release --project src/RailReader2 --
-```
-
-### Run the CLI
-
-```bash
-# One-shot command
-dotnet run -c Release --project src/RailReader.Cli -- document open paper.pdf
-
-# Interactive REPL
-dotnet run -c Release --project src/RailReader.Cli -- repl
-
-# JSON output for scripting
-dotnet run -c Release --project src/RailReader.Cli -- --json text extract --page 1
-```
-
-### Run the AI agent (experimental, source builds only)
-
-The AI agent CLI is not included in the default solution or binary releases. Build it via the full solution or directly:
-
-```bash
-# Set your API key and optional model/base URL
-export OPENAI_API_KEY="your-key"
-export RAILREADER_MODEL="gpt-4o"           # optional, default gpt-4o
-export RAILREADER_BASE_URL="https://..."   # optional, for OpenAI-compatible APIs
-
-dotnet run --project src/RailReader.Agent -- "Open paper.pdf and summarise page 1"
 ```
 
 ### Publish self-contained

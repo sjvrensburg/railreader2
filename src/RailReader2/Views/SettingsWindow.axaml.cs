@@ -214,6 +214,7 @@ public partial class SettingsWindow : Window
         if (vm.ActiveTab is { } resetTab)
         {
             resetTab.LineFocusBlur = defaults.LineFocusBlur;
+            resetTab.LineHighlightEnabled = defaults.LineHighlightEnabled;
         }
         vm.Config.AutoScrollLinePauseMs = defaults.AutoScrollLinePauseMs;
         vm.Config.AutoScrollBlockPauseMs = defaults.AutoScrollBlockPauseMs;
