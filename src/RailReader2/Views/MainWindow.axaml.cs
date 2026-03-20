@@ -46,15 +46,9 @@ public partial class MainWindow : Window
                     PageLayer.MotionBlurIntensity = vm.Config.MotionBlurIntensity;
                     var tab = vm.ActiveTab;
                     bool blur = tab?.LineFocusBlur ?? false;
-                    bool bionic = tab?.BionicReading ?? false;
                     PageLayer.LineFocusBlurEnabled = blur;
                     PageLayer.LineFocusBlurIntensity = vm.Config.LineFocusBlurIntensity;
-                    PageLayer.LineFocusPadding = vm.Config.LineFocusPadding;
-                    PageLayer.BionicReadingEnabled = bionic;
-                    PageLayer.BionicFadeIntensity = vm.Config.BionicFadeIntensity;
-                    PageLayer.BionicFadeRects = bionic && tab is not null
-                        ? tab.State.GetOrComputeBionicOverlay(tab.CurrentPage, vm.Config.BionicFixationPercent)
-                        : null;
+                    PageLayer.LinePadding = vm.Config.LinePadding;
                     PageLayer.InvalidateVisual();
                     Minimap.InvalidateVisual();
                 },
@@ -62,6 +56,8 @@ public partial class MainWindow : Window
                 {
                     OverlayLayer.ActiveEffect = vm.Controller.ActiveColourEffect;
                     OverlayLayer.LineFocusBlurActive = vm.ActiveTab?.LineFocusBlur ?? false;
+                    OverlayLayer.LineHighlightEnabled = vm.ActiveTab?.LineHighlightEnabled ?? true;
+                    OverlayLayer.LinePadding = vm.Config.LinePadding;
                     OverlayLayer.Tint = vm.Config.LineHighlightTint;
                     OverlayLayer.TintOpacity = vm.Config.LineHighlightOpacity;
                     OverlayLayer.InvalidateVisual();
@@ -245,15 +241,9 @@ public partial class MainWindow : Window
         PageLayer.MotionBlurEnabled = config?.MotionBlur ?? true;
         PageLayer.MotionBlurIntensity = config?.MotionBlurIntensity ?? 0.5;
         bool blur = tab?.LineFocusBlur ?? false;
-        bool bionic = tab?.BionicReading ?? false;
         PageLayer.LineFocusBlurEnabled = blur;
         PageLayer.LineFocusBlurIntensity = config?.LineFocusBlurIntensity ?? 0.5;
-        PageLayer.LineFocusPadding = config?.LineFocusPadding ?? 0.2;
-        PageLayer.BionicReadingEnabled = bionic;
-        PageLayer.BionicFadeIntensity = config?.BionicFadeIntensity ?? 0.6;
-        PageLayer.BionicFadeRects = bionic && tab is not null
-            ? tab.State.GetOrComputeBionicOverlay(tab.CurrentPage, config?.BionicFixationPercent ?? 0.4)
-            : null;
+        PageLayer.LinePadding = config?.LinePadding ?? 0.2;
         SearchLayer.Tab = tab;
         SearchLayer.ViewModel = Vm;
         AnnotationLayer.Tab = tab;
@@ -261,6 +251,7 @@ public partial class MainWindow : Window
         OverlayLayer.Tab = tab;
         OverlayLayer.ActiveEffect = ctrl?.ActiveColourEffect ?? ColourEffect.None;
         OverlayLayer.LineFocusBlurActive = tab?.LineFocusBlur ?? false;
+        OverlayLayer.LineHighlightEnabled = tab?.LineHighlightEnabled ?? true;
         OverlayLayer.Tint = config?.LineHighlightTint ?? LineHighlightTint.Auto;
         OverlayLayer.TintOpacity = config?.LineHighlightOpacity ?? 0.25;
 
@@ -447,8 +438,8 @@ public partial class MainWindow : Window
                 e.Handled = true; return true;
             case Key.F:
                 vm.ToggleLineFocusBlur(); e.Handled = true; return true;
-            case Key.R:
-                vm.ToggleBionicReading(); e.Handled = true; return true;
+            case Key.H:
+                vm.ToggleLineHighlight(); RailToolBar.UpdateToggleStates(); e.Handled = true; return true;
             case Key.OemOpenBrackets when e.KeyModifiers.HasFlag(KeyModifiers.Shift):
                 RailToolBar.AdjustBlur(-0.05); e.Handled = true; return true;
             case Key.OemCloseBrackets when e.KeyModifiers.HasFlag(KeyModifiers.Shift):

@@ -29,6 +29,8 @@ public static class OverlayRenderer
         float pageHeight,
         OverlayPalette palette,
         bool lineFocusBlur,
+        bool lineHighlightEnabled,
+        double linePadding,
         LineHighlightTint tint,
         double tintOpacity,
         SKPaint dimPaint,
@@ -80,9 +82,19 @@ public static class OverlayRenderer
         outlinePaint.StrokeWidth = palette.BlockOutlineWidth;
         canvas.DrawRect(bboxRect, outlinePaint);
 
-        // Line highlight
-        if (lineFocusBlur)
+        // Line highlight — full-width coloured bar, independent of line focus blur.
+        // Padding matches the line focus dim clear zone so both features align.
+        if (lineHighlightEnabled)
         {
+            float hlPad = line.Height * (float)linePadding;
+            linePaint.Color = palette.ResolveLineHighlight(tint, tintOpacity);
+            canvas.DrawRect(SKRect.Create(
+                block.BBox.X, line.Y - line.Height / 2 - hlPad,
+                block.BBox.W, line.Height + hlPad * 2), linePaint);
+        }
+        else if (lineFocusBlur)
+        {
+            // Thin vertical bar indicator when highlight is off but blur is on
             const float barWidth = 3f;
             float pad = line.Height * 0.15f;
             linePaint.Color = palette.BlockOutline.WithAlpha(200);
@@ -91,11 +103,6 @@ public static class OverlayRenderer
                 line.Y - line.Height / 2 - pad,
                 barWidth,
                 line.Height + pad * 2), linePaint);
-        }
-        else
-        {
-            linePaint.Color = palette.ResolveLineHighlight(tint, tintOpacity);
-            canvas.DrawRect(SKRect.Create(block.BBox.X, line.Y - line.Height / 2, block.BBox.W, line.Height), linePaint);
         }
     }
 

@@ -21,8 +21,7 @@ public sealed class DocumentState : IDisposable
     private bool _pendingRailSetup;
     private ColourEffect _colourEffect;
     private bool _lineFocusBlur;
-    private bool _bionicReading;
-
+    private bool _lineHighlightEnabled = true;
     /// <summary>Fires when a property changes. Parameter is the property name.</summary>
     public Action<string>? StateChanged;
 
@@ -83,10 +82,10 @@ public sealed class DocumentState : IDisposable
         set => SetField(ref _lineFocusBlur, value, nameof(LineFocusBlur));
     }
 
-    public bool BionicReading
+    public bool LineHighlightEnabled
     {
-        get => _bionicReading;
-        set => SetField(ref _bionicReading, value, nameof(BionicReading));
+        get => _lineHighlightEnabled;
+        set => SetField(ref _lineHighlightEnabled, value, nameof(LineHighlightEnabled));
     }
 
     public string FilePath { get; }
@@ -96,7 +95,6 @@ public sealed class DocumentState : IDisposable
     public RailNav Rail { get; }
     public Dictionary<int, PageAnalysis> AnalysisCache { get; } = [];
     public Dictionary<int, PageText> TextCache { get; } = [];
-    public Dictionary<int, (double FixationPercent, List<SKRect> Rects)> BionicCache { get; } = [];
     public Queue<int> PendingAnalysis { get; } = new();
 
     /// <summary>
@@ -137,7 +135,7 @@ public sealed class DocumentState : IDisposable
         _title = Path.GetFileName(filePath);
         _colourEffect = config.ColourEffect;
         _lineFocusBlur = config.LineFocusBlur;
-        _bionicReading = config.BionicReading;
+        _lineHighlightEnabled = config.LineHighlightEnabled;
         Rail = new RailNav(config);
         Outline = _pdf.Outline;
     }
@@ -541,18 +539,6 @@ public sealed class DocumentState : IDisposable
         TextCache[pageIndex] = text;
         return text;
     }
-
-    public List<SKRect> GetOrComputeBionicOverlay(int pageIndex, double fixationPercent)
-    {
-        if (BionicCache.TryGetValue(pageIndex, out var cached) && cached.FixationPercent == fixationPercent)
-            return cached.Rects;
-        var text = GetOrExtractText(pageIndex);
-        var rects = Services.BionicReadingService.ComputeFadeRects(text, fixationPercent);
-        BionicCache[pageIndex] = (fixationPercent, rects);
-        return rects;
-    }
-
-    public void InvalidateBionicCache() => BionicCache.Clear();
 
     public void Dispose()
     {

@@ -49,19 +49,17 @@ public partial class SettingsWindow : Window
         ScrollMax.Value = (decimal)c.ScrollSpeedMax;
         RampTime.Value = (decimal)c.ScrollRampTime;
         Lookahead.Value = c.AnalysisLookaheadPages;
-        BionicReadingCheck.IsChecked = c.BionicReading;
-        BionicFixationSlider.Value = c.BionicFixationPercent;
-        BionicFadeSlider.Value = c.BionicFadeIntensity;
         EffectCombo.SelectedIndex = (int)c.ColourEffect;
         IntensitySlider.Value = c.ColourEffectIntensity;
         PixelSnappingCheck.IsChecked = c.PixelSnapping;
         LineFocusBlurCheck.IsChecked = c.LineFocusBlur;
         LineFocusBlurSlider.Value = c.LineFocusBlurIntensity;
-        LineFocusPaddingSlider.Value = c.LineFocusPadding;
+        LinePaddingSlider.Value = c.LinePadding;
         AutoScrollLinePause.Value = (decimal)c.AutoScrollLinePauseMs;
         AutoScrollBlockPause.Value = (decimal)c.AutoScrollBlockPauseMs;
         JumpPercentage.Value = (decimal)c.JumpPercentage;
 
+        LineHighlightCheck.IsChecked = c.LineHighlightEnabled;
         LineHighlightTintCombo.ItemsSource = Enum.GetNames<LineHighlightTint>();
         LineHighlightTintCombo.SelectedIndex = (int)c.LineHighlightTint;
         LineHighlightOpacitySlider.Value = c.LineHighlightOpacity;
@@ -157,8 +155,17 @@ public partial class SettingsWindow : Window
     private void OnLineFocusBlurIntensityChanged(object? sender, Avalonia.AvaloniaPropertyChangedEventArgs e)
         => OnSliderChanged(e, c => c.LineFocusBlurIntensity = LineFocusBlurSlider.Value);
 
-    private void OnLineFocusPaddingChanged(object? sender, Avalonia.AvaloniaPropertyChangedEventArgs e)
-        => OnSliderChanged(e, c => c.LineFocusPadding = LineFocusPaddingSlider.Value);
+    private void OnLinePaddingChanged(object? sender, Avalonia.AvaloniaPropertyChangedEventArgs e)
+        => OnSliderChanged(e, c => c.LinePadding = LinePaddingSlider.Value);
+
+    private void OnLineHighlightEnabledChanged(object? sender, RoutedEventArgs e)
+    {
+        if (Vm is not { } vm || _loading) return;
+        bool value = LineHighlightCheck.IsChecked == true;
+        vm.Config.LineHighlightEnabled = value;
+        if (vm.ActiveTab is { } tab) tab.LineHighlightEnabled = value;
+        vm.OnConfigChanged();
+    }
 
     private void OnLineHighlightTintChanged(object? sender, SelectionChangedEventArgs e)
     {
@@ -169,21 +176,6 @@ public partial class SettingsWindow : Window
 
     private void OnLineHighlightOpacityChanged(object? sender, Avalonia.AvaloniaPropertyChangedEventArgs e)
         => OnSliderChanged(e, c => c.LineHighlightOpacity = LineHighlightOpacitySlider.Value);
-
-    private void OnBionicReadingChanged(object? sender, RoutedEventArgs e)
-    {
-        if (Vm is not { } vm || _loading) return;
-        bool value = BionicReadingCheck.IsChecked == true;
-        vm.Config.BionicReading = value; // update default for new documents
-        if (vm.ActiveTab is { } tab) tab.BionicReading = value;
-        vm.OnConfigChanged();
-    }
-
-    private void OnBionicFixationChanged(object? sender, Avalonia.AvaloniaPropertyChangedEventArgs e)
-        => OnSliderChanged(e, c => c.BionicFixationPercent = BionicFixationSlider.Value);
-
-    private void OnBionicFadeChanged(object? sender, Avalonia.AvaloniaPropertyChangedEventArgs e)
-        => OnSliderChanged(e, c => c.BionicFadeIntensity = BionicFadeSlider.Value);
 
     private void OnSettingChanged(object? sender, NumericUpDownValueChangedEventArgs e) => SaveToConfig();
     private void OnEffectChanged(object? sender, SelectionChangedEventArgs e)
@@ -222,16 +214,13 @@ public partial class SettingsWindow : Window
         if (vm.ActiveTab is { } resetTab)
         {
             resetTab.LineFocusBlur = defaults.LineFocusBlur;
-            resetTab.BionicReading = defaults.BionicReading;
         }
         vm.Config.AutoScrollLinePauseMs = defaults.AutoScrollLinePauseMs;
         vm.Config.AutoScrollBlockPauseMs = defaults.AutoScrollBlockPauseMs;
         vm.Config.JumpPercentage = defaults.JumpPercentage;
+        vm.Config.LineHighlightEnabled = defaults.LineHighlightEnabled;
         vm.Config.LineHighlightTint = defaults.LineHighlightTint;
         vm.Config.LineHighlightOpacity = defaults.LineHighlightOpacity;
-        vm.Config.BionicReading = defaults.BionicReading;
-        vm.Config.BionicFixationPercent = defaults.BionicFixationPercent;
-        vm.Config.BionicFadeIntensity = defaults.BionicFadeIntensity;
         _loading = true;
         LoadFromConfig();
         _loading = false;

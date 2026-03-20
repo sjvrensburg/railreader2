@@ -43,23 +43,6 @@
                                     PropertyChanged="OnBlurIntensityChanged" />
                         </Grid>
 
-                        <TextBlock Text="Bionic Reading" FontWeight="Bold" FontSize="14" Margin="0,12,0,0" />
-                        <Separator />
-                        <TextBlock Text="Fades trailing characters in each word to create fixation points. Toggle with R key."
-                                   TextWrapping="Wrap" Opacity="0.7" FontSize="12" />
-                        <CheckBox Name="BionicReadingCheck" Content="Enable bionic reading"
-                                  IsCheckedChanged="OnBionicReadingChanged" />
-                        <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto,8,Auto">
-                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Fixation %:" VerticalAlignment="Center" />
-                            <Slider Grid.Row="0" Grid.Column="2" Name="BionicFixationSlider"
-                                    Minimum="0.1" Maximum="0.8" Value="0.4" MinWidth="120"
-                                    PropertyChanged="OnBionicFixationChanged" />
-                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Fade intensity:" VerticalAlignment="Center" />
-                            <Slider Grid.Row="2" Grid.Column="2" Name="BionicFadeSlider"
-                                    Minimum="0.1" Maximum="1.0" Value="0.6" MinWidth="120"
-                                    PropertyChanged="OnBionicFadeChanged" />
-                        </Grid>
-
                         <TextBlock Text="Colour Effects" FontWeight="Bold" FontSize="14" Margin="0,12,0,0" />
                         <Separator />
                         <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto,8,Auto">
@@ -127,14 +110,16 @@
                             <Slider Grid.Row="0" Grid.Column="2" Name="LineFocusBlurSlider" Minimum="0" Maximum="1"
                                     Value="0.5" MinWidth="120"
                                     PropertyChanged="OnLineFocusBlurIntensityChanged" />
-                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Focus padding:" VerticalAlignment="Center" />
-                            <Slider Grid.Row="2" Grid.Column="2" Name="LineFocusPaddingSlider" Minimum="0" Maximum="0.5"
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Line padding:" VerticalAlignment="Center" />
+                            <Slider Grid.Row="2" Grid.Column="2" Name="LinePaddingSlider" Minimum="0" Maximum="0.5"
                                     Value="0.2" MinWidth="120"
-                                    PropertyChanged="OnLineFocusPaddingChanged" />
+                                    PropertyChanged="OnLinePaddingChanged" />
                         </Grid>
 
                         <TextBlock Text="Line Highlight" FontWeight="Bold" FontSize="14" Margin="0,12,0,0" />
                         <Separator />
+                        <CheckBox Name="LineHighlightCheck" Content="Show line highlight in rail mode"
+                                  IsCheckedChanged="OnLineHighlightEnabledChanged" />
                         <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto,8,Auto">
                             <TextBlock Grid.Row="0" Grid.Column="0" Text="Colour:" VerticalAlignment="Center" />
                             <ComboBox Grid.Row="0" Grid.Column="2" Name="LineHighlightTintCombo"
