@@ -369,7 +369,7 @@ public class PdfPageLayer : Control
                     float pad = line.Height * (float)_opts.LineFocusPadding;
                     float lineTop = line.Y - line.Height / 2f - pad;
                     float lineBottom = line.Y + line.Height / 2f + pad;
-                    float feather = line.Height * 0.5f;
+                    float feather = line.Height * 0.08f;
 
                     float featherTop = Math.Max(0, lineTop - feather) / h;
                     float featherBottom = Math.Min(h, lineBottom + feather) / h;
