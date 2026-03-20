@@ -20,10 +20,7 @@ public class PdfPageLayer : Control
     public double MotionBlurIntensity { get; set; } = 0.5;
     public bool LineFocusBlurEnabled { get; set; }
     public double LineFocusBlurIntensity { get; set; } = 0.5;
-    public double LineFocusPadding { get; set; } = 0.2;
-    public bool BionicReadingEnabled { get; set; }
-    public double BionicFadeIntensity { get; set; } = 0.6;
-    public List<SKRect>? BionicFadeRects { get; set; }
+    public double LinePadding { get; set; } = 0.2;
 
     protected override void OnSizeChanged(SizeChangedEventArgs e)
     {
@@ -34,24 +31,19 @@ public class PdfPageLayer : Control
     public override void Render(DrawingContext context)
     {
         base.Render(context);
-        // Use tab page dimensions for the draw-op bounds so the compositor
-        // does not clip the operation away when PageLayer.Bounds is still
-        // zero (before the first layout pass after a tab is added).
         var tab = Tab;
         double w = tab?.PageWidth > 0 ? tab.PageWidth : Bounds.Width;
         double h = tab?.PageHeight > 0 ? tab.PageHeight : Bounds.Height;
         var opts = new RenderOptions(
             MotionBlurEnabled, MotionBlurIntensity,
-            LineFocusBlurEnabled, LineFocusBlurIntensity, LineFocusPadding,
-            BionicReadingEnabled, BionicFadeIntensity, BionicFadeRects,
+            LineFocusBlurEnabled, LineFocusBlurIntensity, LinePadding,
             ActiveEffect, ActiveIntensity);
         context.Custom(new PageDrawOperation(new Rect(0, 0, w, h), tab, ColourEffects, opts));
     }
 
     public record struct RenderOptions(
         bool MotionBlur, double BlurIntensity,
-        bool LineFocusBlur, double LineFocusIntensity, double LineFocusPadding,
-        bool BionicEnabled, double BionicIntensity, List<SKRect>? BionicRects,
+        bool LineFocusBlur, double LineFocusIntensity, double LinePadding,
         ColourEffect ActiveEffect, float ActiveIntensity);
 
     private sealed class PageDrawOperation : ICustomDrawOperation
@@ -75,15 +67,6 @@ public class PdfPageLayer : Control
         [ThreadStatic] private static SKColorFilter? s_cachedEffectFilter;
         [ThreadStatic] private static ColourEffect s_cachedEffectType;
         [ThreadStatic] private static float s_cachedEffectIntensity;
-
-        // Cached bionic reading objects — reused when rects/intensity unchanged.
-        // The rects list reference is stable (from GetOrComputeBionicOverlay cache),
-        // so reference equality detects page/config changes without comparing contents.
-        [ThreadStatic] private static SKColorFilter? s_cachedBionicFilter;
-        [ThreadStatic] private static float s_cachedBionicIntensity;
-        [ThreadStatic] private static SKPath? s_cachedBionicPath;
-        [ThreadStatic] private static SKPaint? s_cachedBionicPaint;
-        [ThreadStatic] private static List<SKRect>? s_cachedBionicRects;
 
         // Cached line focus dim paint — reused when line position unchanged
         private record struct DimCacheKey(
@@ -165,36 +148,6 @@ public class PdfPageLayer : Control
             };
         }
 
-        /// <summary>
-        /// Draws the page image with optional bionic fade integrated into the draw.
-        /// Fixation regions draw at full contrast; fade regions draw with the bionic
-        /// color filter. This must be called INSIDE any blur layers so blur applies
-        /// uniformly on top.
-        /// </summary>
-        private void DrawPageImage(SKCanvas canvas, SKImage image, SKRect destRect,
-            SKPath? bionicPath, SKPaint? bionicPaint, SKSamplingOptions sampling)
-        {
-            if (bionicPath is null || bionicPaint is null)
-            {
-                canvas.DrawImage(image, destRect, sampling);
-                return;
-            }
-
-            // Fixation regions: full contrast (everything outside fade rects)
-            canvas.Save();
-            canvas.ClipPath(bionicPath, SKClipOperation.Difference);
-            canvas.DrawImage(image, destRect, sampling);
-            canvas.Restore();
-
-            // Fade regions: bionic color filter applied
-            canvas.Save();
-            canvas.ClipPath(bionicPath);
-            canvas.SaveLayer(bionicPaint);
-            canvas.DrawImage(image, destRect, sampling);
-            canvas.Restore(); // layer
-            canvas.Restore(); // clip
-        }
-
         public void Render(ImmediateDrawingContext context)
         {
             if (context.TryGetFeature(typeof(ISkiaSharpApiLeaseFeature)) is not ISkiaSharpApiLeaseFeature leaseFeature)
@@ -266,53 +219,16 @@ public class PdfPageLayer : Control
 
             var destRect = SKRect.Create(0, 0, (float)tab.PageWidth, (float)tab.PageHeight);
 
-            // Get or update cached bionic reading objects
-            SKPath? bionicPath = null;
-            SKPaint? bionicPaint = null;
-            if (_opts.BionicEnabled && _opts.BionicRects is { Count: > 0 } bionicRects && _effects is not null)
-            {
-                float bionicIntensity = (float)_opts.BionicIntensity;
-
-                // Rebuild filter when intensity changes
-                if (s_cachedBionicFilter is null || s_cachedBionicIntensity != bionicIntensity)
-                {
-                    s_cachedBionicFilter?.Dispose();
-                    s_cachedBionicFilter = _effects.CreateBionicColorFilter(bionicIntensity);
-                    s_cachedBionicIntensity = bionicIntensity;
-
-                    // Filter changed — update paint
-                    s_cachedBionicPaint?.Dispose();
-                    s_cachedBionicPaint = new SKPaint { ColorFilter = s_cachedBionicFilter };
-                }
-
-                // Rebuild path when rect list instance changes (page change or config change)
-                if (!ReferenceEquals(s_cachedBionicRects, bionicRects))
-                {
-                    s_cachedBionicPath?.Dispose();
-                    var path = new SKPath();
-                    foreach (var rect in bionicRects)
-                        path.AddRect(rect);
-                    s_cachedBionicPath = path;
-                    s_cachedBionicRects = bionicRects;
-                }
-
-                bionicPath = s_cachedBionicPath;
-                bionicPaint = s_cachedBionicPaint;
-            }
-
             // SaveLayer creates a viewport-sized offscreen buffer — expensive on large
             // screens. Only use it when motion blur is active (image filter must operate
             // on the composite). For colour-filter-only mode, apply the filter directly
-            // to each draw paint instead, avoiding the offscreen buffer entirely.
+            // to the image paint instead, avoiding the offscreen buffer entirely.
             // Line focus dim is always drawn OUTSIDE the SaveLayer (after Restore) to
             // prevent the blur filter from bleeding gradient edges into a visible halo.
             // The dim colour has the colour effect baked in via ComputeDimColor().
             bool needsBlurLayer = blurFilter is not null;
-            bool hasBionic = bionicPath is not null;
-            // Per-paint colour filter: apply directly when no blur and no bionic clip regions.
-            bool perPaintFilter = effectFilter is not null && !needsBlurLayer && !hasBionic;
-            // SaveLayer when blur is active, or when bionic clips need a uniform colour filter.
-            bool useLayer = needsBlurLayer || (effectFilter is not null && hasBionic);
+            bool perPaintFilter = effectFilter is not null && !needsBlurLayer;
+            bool useLayer = needsBlurLayer;
             if (useLayer)
             {
                 s_layerPaint ??= new SKPaint();
@@ -321,7 +237,7 @@ public class PdfPageLayer : Control
                 canvas.SaveLayer(s_layerPaint);
             }
 
-            // Draw page image (with bionic if active)
+            // Draw page image
             if (perPaintFilter)
             {
                 // Apply colour filter directly to image paint — no SaveLayer needed
@@ -332,7 +248,7 @@ public class PdfPageLayer : Control
             }
             else
             {
-                DrawPageImage(canvas, image, destRect, bionicPath, bionicPaint, sampling);
+                canvas.DrawImage(image, destRect, sampling);
             }
 
             if (useLayer)
@@ -362,14 +278,14 @@ public class PdfPageLayer : Control
 
                 // Reuse cached dim paint when line position, settings, and effect are unchanged
                 var dimKey = new DimCacheKey(line.Y, line.Height, h,
-                    _opts.LineFocusIntensity, _opts.LineFocusPadding,
+                    _opts.LineFocusIntensity, _opts.LinePadding,
                     activeEffect, activeIntensity);
                 if (s_cachedDimPaint is null || s_cachedDimKey != dimKey)
                 {
                     s_cachedDimGradient?.Dispose();
                     s_cachedDimPaint?.Dispose();
 
-                    float pad = line.Height * (float)_opts.LineFocusPadding;
+                    float pad = line.Height * (float)_opts.LinePadding;
                     float lineTop = line.Y - line.Height / 2f - pad;
                     float lineBottom = line.Y + line.Height / 2f + pad;
                     float feather = line.Height * DimFeatherFraction;

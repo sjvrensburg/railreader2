@@ -58,12 +58,10 @@
                                             Margin="2,1" Padding="6,4">
                                         <DockPanel>
                                             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="4">
-                                                <Button Content="Rename" FontSize="11"
-                                                        Padding="6,3"
+                                                <Button Content="Rename"                                                        Padding="6,3"
                                                         ToolTip.Tip="Rename bookmark"
                                                         Click="OnRenameBookmarkClick" />
-                                                <Button Content="Delete" FontSize="11"
-                                                        Padding="6,3"
+                                                <Button Content="Delete"                                                        Padding="6,3"
                                                         ToolTip.Tip="Delete bookmark"
                                                         Click="OnDeleteBookmarkClick" />
                                             </StackPanel>

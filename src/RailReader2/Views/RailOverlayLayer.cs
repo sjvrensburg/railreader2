@@ -15,6 +15,8 @@ public class RailOverlayLayer : Control
     public TabViewModel? Tab { get; set; }
     public ColourEffect ActiveEffect { get; set; }
     public bool LineFocusBlurActive { get; set; }
+    public bool LineHighlightEnabled { get; set; } = true;
+    public double LinePadding { get; set; } = 0.2;
     public LineHighlightTint Tint { get; set; }
     public double TintOpacity { get; set; } = 0.25;
 
@@ -35,7 +37,7 @@ public class RailOverlayLayer : Control
         var tab = Tab;
         double w = tab?.PageWidth > 0 ? tab.PageWidth : Bounds.Width;
         double h = tab?.PageHeight > 0 ? tab.PageHeight : Bounds.Height;
-        context.Custom(new OverlayDrawOperation(new Rect(0, 0, w, h), tab, ActiveEffect, LineFocusBlurActive, Tint, TintOpacity));
+        context.Custom(new OverlayDrawOperation(new Rect(0, 0, w, h), tab, ActiveEffect, LineFocusBlurActive, LineHighlightEnabled, LinePadding, Tint, TintOpacity));
     }
 
     private sealed class OverlayDrawOperation : ICustomDrawOperation
@@ -44,6 +46,8 @@ public class RailOverlayLayer : Control
         private readonly TabViewModel? _tab;
         private readonly ColourEffect _effect;
         private readonly bool _lineFocusBlur;
+        private readonly bool _lineHighlightEnabled;
+        private readonly double _linePadding;
         private readonly LineHighlightTint _tint;
         private readonly double _tintOpacity;
 
@@ -65,12 +69,14 @@ public class RailOverlayLayer : Control
         private readonly bool _railActive, _debugOverlay;
 
         public OverlayDrawOperation(Rect bounds, TabViewModel? tab, ColourEffect effect, bool lineFocusBlur,
-            LineHighlightTint tint, double tintOpacity)
+            bool lineHighlightEnabled, double linePadding, LineHighlightTint tint, double tintOpacity)
         {
             _bounds = bounds;
             _tab = tab;
             _effect = effect;
             _lineFocusBlur = lineFocusBlur;
+            _lineHighlightEnabled = lineHighlightEnabled;
+            _linePadding = linePadding;
             _tint = tint;
             _tintOpacity = tintOpacity;
             _railActive = tab?.Rail.Active == true;
@@ -87,6 +93,8 @@ public class RailOverlayLayer : Control
             && _bounds == op._bounds
             && _effect == op._effect
             && _lineFocusBlur == op._lineFocusBlur
+            && _lineHighlightEnabled == op._lineHighlightEnabled
+            && _linePadding == op._linePadding
             && _tint == op._tint
             && _tintOpacity == op._tintOpacity
             && _railActive == op._railActive
@@ -114,8 +122,8 @@ public class RailOverlayLayer : Control
                 var outlinePaint = s_outlinePaint ??= new SKPaint { Style = SKPaintStyle.Stroke, IsAntialias = true };
                 var linePaint = s_linePaint ??= new SKPaint();
                 OverlayRenderer.DrawRailOverlays(canvas, tab.Rail.CurrentNavigableBlock, tab.Rail.CurrentLineInfo,
-                    (float)tab.PageWidth, (float)tab.PageHeight, palette, _lineFocusBlur, _tint, _tintOpacity,
-                    dimPaint, revealPaint, outlinePaint, linePaint);
+                    (float)tab.PageWidth, (float)tab.PageHeight, palette, _lineFocusBlur, _lineHighlightEnabled,
+                    _linePadding, _tint, _tintOpacity, dimPaint, revealPaint, outlinePaint, linePaint);
             }
 
             if (tab.DebugOverlay && tab.AnalysisCache.TryGetValue(tab.CurrentPage, out var debugAnalysis))

@@ -20,7 +20,7 @@
                 <ScrollViewer VerticalScrollBarVisibility="Auto"
                               HorizontalScrollBarVisibility="Disabled">
                     <StackPanel Spacing="8" Margin="16">
-                        <TextBlock Text="General" FontWeight="Bold" FontSize="14" />
+                        <TextBlock Text="General" FontWeight="Bold" />
                         <Separator />
                         <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto">
                             <TextBlock Grid.Column="0" Text="UI Font Scale:" VerticalAlignment="Center" />
@@ -32,7 +32,7 @@
                         <CheckBox Name="DarkModeCheck" Content="Dark mode"
                                   IsCheckedChanged="OnDarkModeChanged" />
 
-                        <TextBlock Text="Motion Blur" FontWeight="Bold" FontSize="14" Margin="0,12,0,0" />
+                        <TextBlock Text="Motion Blur" FontWeight="Bold" Margin="0,12,0,0" />
                         <Separator />
                         <CheckBox Name="MotionBlurCheck" Content="Motion blur during scroll and zoom"
                                   IsCheckedChanged="OnMotionBlurChanged" />
@@ -43,24 +43,7 @@
                                     PropertyChanged="OnBlurIntensityChanged" />
                         </Grid>
 
-                        <TextBlock Text="Bionic Reading" FontWeight="Bold" FontSize="14" Margin="0,12,0,0" />
-                        <Separator />
-                        <TextBlock Text="Fades trailing characters in each word to create fixation points. Toggle with R key."
-                                   TextWrapping="Wrap" Opacity="0.7" FontSize="12" />
-                        <CheckBox Name="BionicReadingCheck" Content="Enable bionic reading"
-                                  IsCheckedChanged="OnBionicReadingChanged" />
-                        <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto,8,Auto">
-                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Fixation %:" VerticalAlignment="Center" />
-                            <Slider Grid.Row="0" Grid.Column="2" Name="BionicFixationSlider"
-                                    Minimum="0.1" Maximum="0.8" Value="0.4" MinWidth="120"
-                                    PropertyChanged="OnBionicFixationChanged" />
-                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Fade intensity:" VerticalAlignment="Center" />
-                            <Slider Grid.Row="2" Grid.Column="2" Name="BionicFadeSlider"
-                                    Minimum="0.1" Maximum="1.0" Value="0.6" MinWidth="120"
-                                    PropertyChanged="OnBionicFadeChanged" />
-                        </Grid>
-
-                        <TextBlock Text="Colour Effects" FontWeight="Bold" FontSize="14" Margin="0,12,0,0" />
+                        <TextBlock Text="Colour Effects" FontWeight="Bold" Margin="0,12,0,0" />
                         <Separator />
                         <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto,8,Auto">
                             <TextBlock Grid.Row="0" Grid.Column="0" Text="Effect:" VerticalAlignment="Center" />
@@ -86,7 +69,7 @@
                 <ScrollViewer VerticalScrollBarVisibility="Auto"
                               HorizontalScrollBarVisibility="Disabled">
                     <StackPanel Spacing="8" Margin="16">
-                        <TextBlock Text="Navigation" FontWeight="Bold" FontSize="14" />
+                        <TextBlock Text="Navigation" FontWeight="Bold" />
                         <Separator />
                         <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto,4,Auto,4,Auto,4,Auto,4,Auto">
                             <TextBlock Grid.Row="0" Grid.Column="0" Text="Zoom threshold:" VerticalAlignment="Center" />
@@ -116,7 +99,7 @@
                                            ValueChanged="OnSettingChanged" />
                         </Grid>
 
-                        <TextBlock Text="Visual" FontWeight="Bold" FontSize="14" Margin="0,12,0,0" />
+                        <TextBlock Text="Visual" FontWeight="Bold" Margin="0,12,0,0" />
                         <Separator />
                         <CheckBox Name="PixelSnappingCheck" Content="Pixel snapping (reduces text shimmer)"
                                   IsCheckedChanged="OnPixelSnappingChanged" />
@@ -127,14 +110,16 @@
                             <Slider Grid.Row="0" Grid.Column="2" Name="LineFocusBlurSlider" Minimum="0" Maximum="1"
                                     Value="0.5" MinWidth="120"
                                     PropertyChanged="OnLineFocusBlurIntensityChanged" />
-                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Focus padding:" VerticalAlignment="Center" />
-                            <Slider Grid.Row="2" Grid.Column="2" Name="LineFocusPaddingSlider" Minimum="0" Maximum="0.5"
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Line padding:" VerticalAlignment="Center" />
+                            <Slider Grid.Row="2" Grid.Column="2" Name="LinePaddingSlider" Minimum="0" Maximum="0.5"
                                     Value="0.2" MinWidth="120"
-                                    PropertyChanged="OnLineFocusPaddingChanged" />
+                                    PropertyChanged="OnLinePaddingChanged" />
                         </Grid>
 
-                        <TextBlock Text="Line Highlight" FontWeight="Bold" FontSize="14" Margin="0,12,0,0" />
+                        <TextBlock Text="Line Highlight" FontWeight="Bold" Margin="0,12,0,0" />
                         <Separator />
+                        <CheckBox Name="LineHighlightCheck" Content="Show line highlight in rail mode"
+                                  IsCheckedChanged="OnLineHighlightEnabledChanged" />
                         <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto,8,Auto">
                             <TextBlock Grid.Row="0" Grid.Column="0" Text="Colour:" VerticalAlignment="Center" />
                             <ComboBox Grid.Row="0" Grid.Column="2" Name="LineHighlightTintCombo"
@@ -146,7 +131,7 @@
                                     PropertyChanged="OnLineHighlightOpacityChanged" />
                         </Grid>
 
-                        <TextBlock Text="Jump Mode" FontWeight="Bold" FontSize="14" Margin="0,12,0,0" />
+                        <TextBlock Text="Jump Mode" FontWeight="Bold" Margin="0,12,0,0" />
                         <Separator />
                         <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto">
                             <TextBlock Grid.Column="0" Text="Jump distance (%):" VerticalAlignment="Center" />
@@ -164,10 +149,10 @@
                 <ScrollViewer VerticalScrollBarVisibility="Auto"
                               HorizontalScrollBarVisibility="Disabled">
                     <StackPanel Spacing="8" Margin="16">
-                        <TextBlock Text="Pause Durations" FontWeight="Bold" FontSize="14" />
+                        <TextBlock Text="Pause Durations" FontWeight="Bold" />
                         <Separator />
                         <TextBlock Text="Brief pause at line and block boundaries during auto-scroll, giving your eyes time to settle."
-                                   TextWrapping="Wrap" Opacity="0.7" FontSize="12" />
+                                   TextWrapping="Wrap" Opacity="0.7" />
                         <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto,4,Auto">
                             <TextBlock Grid.Row="0" Grid.Column="0" Text="Line pause (ms):" VerticalAlignment="Center" />
                             <NumericUpDown Grid.Row="0" Grid.Column="2" Name="AutoScrollLinePause" Value="400"
@@ -181,7 +166,7 @@
                                            ValueChanged="OnSettingChanged" />
                         </Grid>
                         <TextBlock Text="Set to 0 to disable pauses. Speed is controlled via the rail toolbar sliders."
-                                   TextWrapping="Wrap" Opacity="0.5" FontSize="11" Margin="0,8,0,0" />
+                                   TextWrapping="Wrap" Opacity="0.5" Margin="0,8,0,0" />
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>
@@ -191,7 +176,7 @@
                 <ScrollViewer VerticalScrollBarVisibility="Auto"
                               HorizontalScrollBarVisibility="Disabled">
                     <StackPanel Spacing="8" Margin="16">
-                        <TextBlock Text="Document Analysis" FontWeight="Bold" FontSize="14" />
+                        <TextBlock Text="Document Analysis" FontWeight="Bold" />
                         <Separator />
                         <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto">
                             <TextBlock Grid.Column="0" Text="Lookahead pages:" VerticalAlignment="Center" />
@@ -201,12 +186,12 @@
                                            ValueChanged="OnSettingChanged" />
                         </Grid>
                         <TextBlock Text="Number of pages to pre-analyse ahead of the current page."
-                                   TextWrapping="Wrap" Opacity="0.5" FontSize="11" />
+                                   TextWrapping="Wrap" Opacity="0.5" />
 
-                        <TextBlock Text="Navigable Block Types" FontWeight="Bold" FontSize="14" Margin="0,12,0,0" />
+                        <TextBlock Text="Navigable Block Types" FontWeight="Bold" Margin="0,12,0,0" />
                         <Separator />
                         <TextBlock Text="Select which layout block types are navigable in rail mode:"
-                                   TextWrapping="Wrap" Opacity="0.7" FontSize="12" />
+                                   TextWrapping="Wrap" Opacity="0.7" />
                         <ItemsControl Name="NavigableClassesList">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="v:NavigableClassItem">
@@ -217,10 +202,10 @@
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
 
-                        <TextBlock Text="Centered Block Types" FontWeight="Bold" FontSize="14" Margin="0,12,0,0" />
+                        <TextBlock Text="Centered Block Types" FontWeight="Bold" Margin="0,12,0,0" />
                         <Separator />
                         <TextBlock Text="Select which block types are horizontally centered when narrower than the viewport:"
-                                   TextWrapping="Wrap" Opacity="0.7" FontSize="12" />
+                                   TextWrapping="Wrap" Opacity="0.7" />
                         <ItemsControl Name="CenteringClassesList">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="v:NavigableClassItem">

@@ -21,17 +21,14 @@ public sealed class AppConfig
     public bool PixelSnapping { get; set; } = true;
     public bool LineFocusBlur { get; set; }
     public double LineFocusBlurIntensity { get; set; } = 0.5;
-    public double LineFocusPadding { get; set; } = 0.2;
+    public double LinePadding { get; set; } = 0.2;
     public double AutoScrollLinePauseMs { get; set; } = 400.0;
     public double AutoScrollBlockPauseMs { get; set; } = 600.0;
     public double JumpPercentage { get; set; } = 25.0;
     public bool DarkMode { get; set; }
+    public bool LineHighlightEnabled { get; set; } = true;
     public LineHighlightTint LineHighlightTint { get; set; } = LineHighlightTint.Auto;
     public double LineHighlightOpacity { get; set; } = 0.25;
-    public bool BionicReading { get; set; }
-    public double BionicFixationPercent { get; set; } = 0.4;
-    public double BionicFadeIntensity { get; set; } = 0.6;
-
     [JsonConverter(typeof(RecentFilesConverter))]
     public List<RecentFileEntry> RecentFiles { get; set; } = [];
 

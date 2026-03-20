@@ -527,13 +527,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
     }
 
-    public void ToggleBionicReading()
+    public void ToggleLineHighlight()
     {
         if (_controller.ActiveDocument is { } doc)
         {
-            doc.BionicReading = !doc.BionicReading;
-            ShowStatusToast(doc.BionicReading ? "Bionic reading ON" : "Bionic reading OFF");
-            InvalidatePage();
+            doc.LineHighlightEnabled = !doc.LineHighlightEnabled;
+            InvalidateOverlay();
         }
     }
 

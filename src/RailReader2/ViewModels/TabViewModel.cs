@@ -23,8 +23,7 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
     [ObservableProperty] private bool _pendingRailSetup;
     [ObservableProperty] private ColourEffect _colourEffect;
     [ObservableProperty] private bool _lineFocusBlur;
-    [ObservableProperty] private bool _bionicReading;
-
+    [ObservableProperty] private bool _lineHighlightEnabled = true;
     /// <summary>Whether the side panel (outline/bookmarks/search) is visible for this tab.</summary>
     public bool ShowSidePanel { get; set; }
 
@@ -62,8 +61,7 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
         _pendingRailSetup = state.PendingRailSetup;
         _colourEffect = state.ColourEffect;
         _lineFocusBlur = state.LineFocusBlur;
-        _bionicReading = state.BionicReading;
-
+        _lineHighlightEnabled = state.LineHighlightEnabled;
         state.StateChanged += OnStateChanged;
     }
 
@@ -79,7 +77,7 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
             case nameof(PendingRailSetup): PendingRailSetup = State.PendingRailSetup; break;
             case nameof(ColourEffect): ColourEffect = State.ColourEffect; break;
             case nameof(LineFocusBlur): LineFocusBlur = State.LineFocusBlur; break;
-            case nameof(BionicReading): BionicReading = State.BionicReading; break;
+            case nameof(LineHighlightEnabled): LineHighlightEnabled = State.LineHighlightEnabled; break;
         }
     }
 
@@ -92,8 +90,7 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
     partial void OnPendingRailSetupChanged(bool value) => State.PendingRailSetup = value;
     partial void OnColourEffectChanged(ColourEffect value) => State.ColourEffect = value;
     partial void OnLineFocusBlurChanged(bool value) => State.LineFocusBlur = value;
-    partial void OnBionicReadingChanged(bool value) => State.BionicReading = value;
-
+    partial void OnLineHighlightEnabledChanged(bool value) => State.LineHighlightEnabled = value;
     // Methods used by Views (MinimapControl, MainWindow)
     public void CenterPage(double ww, double wh) => State.CenterPage(ww, wh);
     public void ClampCamera(double ww, double wh) => State.ClampCamera(ww, wh);

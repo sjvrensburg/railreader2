@@ -49,25 +49,12 @@ public sealed class ColourEffectShaders : IDisposable
         }
         """;
 
-    private const string BionicFadeSksl = """
-        uniform float intensity;
-        half4 main(half4 color) {
-            half lum = dot(color.rgb, half3(0.299, 0.587, 0.114));
-            half factor = smoothstep(0.85, 0.5, lum);
-            half3 faded = mix(color.rgb, half3(1.0), intensity * factor);
-            return half4(faded, color.a);
-        }
-        """;
-
-    private SKRuntimeEffect? _bionicEffect;
-
     public ColourEffectShaders()
     {
         CompileAndStore(ColourEffect.HighContrast, HighContrastSksl);
         CompileAndStore(ColourEffect.HighVisibility, HighVisibilitySksl);
         CompileAndStore(ColourEffect.Amber, AmberSksl);
         CompileAndStore(ColourEffect.Invert, InvertSksl);
-        _bionicEffect = CompileColorFilter("BionicFade", BionicFadeSksl);
     }
 
     private static SKRuntimeEffect? CompileColorFilter(string name, string sksl)
@@ -102,9 +89,6 @@ public sealed class ColourEffectShaders : IDisposable
         return new SKPaint { ColorFilter = filter };
     }
 
-    public SKColorFilter? CreateBionicColorFilter(float intensity)
-        => BuildColorFilter(_bionicEffect, intensity);
-
     private static SKColorFilter? BuildColorFilter(SKRuntimeEffect? effect, float intensity)
     {
         if (effect is null) return null;
@@ -118,7 +102,5 @@ public sealed class ColourEffectShaders : IDisposable
         foreach (var effect in _effects.Values)
             effect.Dispose();
         _effects.Clear();
-        _bionicEffect?.Dispose();
-        _bionicEffect = null;
     }
 }

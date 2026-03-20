@@ -18,7 +18,7 @@ public partial class RailToolBar : UserControl
     private Button? _autoScrollBtn;
     private Button? _jumpBtn;
     private Button? _focusBlurBtn;
-    private Button? _bionicBtn;
+    private Button? _highlightBtn;
 
     // Matching search overlay / toolbar button style
     private static readonly IBrush ActiveBg = new SolidColorBrush(Color.Parse("#0078D4"));
@@ -97,15 +97,15 @@ public partial class RailToolBar : UserControl
         });
         ButtonPanel.Children.Add(_focusBlurBtn);
 
-        _bionicBtn = MakeToggleButton("R", "Toggle bionic reading (R)", (_, _) =>
+        _highlightBtn = MakeToggleButton("H", "Toggle line highlight (H)", (_, _) =>
         {
             if (ViewModel is { } vm)
             {
-                vm.ToggleBionicReading();
+                vm.ToggleLineHighlight();
                 UpdateToggleStates();
             }
         });
-        ButtonPanel.Children.Add(_bionicBtn);
+        ButtonPanel.Children.Add(_highlightBtn);
     }
 
     public void UpdateToggleStates()
@@ -114,7 +114,7 @@ public partial class RailToolBar : UserControl
         ApplyToggleStyle(_autoScrollBtn, vm.AutoScrollActive);
         ApplyToggleStyle(_jumpBtn, vm.JumpMode);
         ApplyToggleStyle(_focusBlurBtn, vm.ActiveTab?.LineFocusBlur ?? false);
-        ApplyToggleStyle(_bionicBtn, vm.ActiveTab?.BionicReading ?? false);
+        ApplyToggleStyle(_highlightBtn, vm.ActiveTab?.LineHighlightEnabled ?? true);
     }
 
     private static void ApplyToggleStyle(Button? btn, bool active)

@@ -9,11 +9,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Build and Development Commands
 
 ```bash
-# Build app + CLI + tests (default solution, excludes AI agent)
+# Build app + tests (default solution)
 dotnet build RailReader2.slnx
-
-# Build everything including the AI agent CLI
-dotnet build RailReader2-full.slnx
 
 # Run the application (-- separates dotnet args from app args)
 dotnet run -c Release --project src/RailReader2 -- <path-to-pdf>
@@ -30,14 +27,6 @@ dotnet test tests/RailReader.Core.Tests --filter "ClassName=RailReader.Core.Test
 # Run specific test method
 dotnet test tests/RailReader.Core.Tests --filter "FullyQualifiedName~TestMethodName"
 
-# Run the CLI (one-shot or REPL)
-dotnet run -c Release --project src/RailReader.Cli -- document open test.pdf
-dotnet run -c Release --project src/RailReader.Cli -- repl
-dotnet run -c Release --project src/RailReader.Cli -- --json text extract --page 1
-
-# Run the AI agent CLI (requires RailReader2-full.slnx or direct project build)
-dotnet run --project src/RailReader.Agent -- "Open test.pdf and tell me how many pages it has"
-
 # Publish self-contained release
 dotnet publish src/RailReader2 -c Release -r linux-x64 --self-contained   # Linux
 dotnet publish src/RailReader2 -c Release -r win-x64 --self-contained     # Windows
@@ -51,14 +40,10 @@ dotnet publish src/RailReader2 -c Release -r win-x64 --self-contained     # Wind
 ## Architecture
 
 ```
-RailReader2.slnx              # Default: app + core + CLI + tests (no agent)
+RailReader2.slnx              # Default: app + core + tests
 ├── src/RailReader.Core/        # UI-free library: all business logic, models, services
 ├── src/RailReader2/            # Thin Avalonia UI shell (references Core)
-├── src/RailReader.Cli/         # Command-line interface (System.CommandLine, references Core)
 └── tests/RailReader.Core.Tests/# xUnit headless tests against Core
-
-RailReader2-full.slnx         # Full: includes experimental AI agent CLI
-└── src/RailReader.Agent/       # AI agent CLI via Microsoft.Extensions.AI (references Core)
 ```
 
 ### RailReader.Core (UI-free library)
@@ -86,27 +71,9 @@ Thin wrapper delegating all logic to `DocumentController`/`DocumentState` in Cor
 - `Views/` — layers (PdfPageLayer, RailOverlayLayer, AnnotationLayer, SearchHighlightLayer), dialogs, panels
 - `Controls/RadialMenu.cs` — Skia-rendered radial context menu with Font Awesome icons
 
-### RailReader.Cli (command-line interface)
-
-Native C# CLI built on `System.CommandLine` (v2.0.5). References `RailReader.Core` directly — no subprocess overhead. Included in the default solution.
-
-- `Program.cs` — entry point, root command setup, global `--json` option
-- `CliSession.cs` — shared session state (`DocumentController`, `AppConfig`, ONNX worker)
-- `Commands/` — one file per command group: `DocumentCommands`, `TextCommands`, `NavCommands`, `AnalysisCommands`, `AnnotationCommands`, `BookmarkCommands`, `ConfigCommands`, `ExportCommands`, `ReplCommand`
-- `Output/` — `IOutputFormatter` with `HumanFormatter` (tables/text) and `JsonFormatter` (JSON envelope with `ok`/`data`/`error`)
-- `SessionBinder.cs` — static context providing session and formatter to command handlers
-
-Command groups: `document`, `text`, `nav`, `analysis`, `annotation`, `bookmark`, `config`, `export`, `repl`. All commands support `--json` for machine-readable output. Page numbers are 1-based in CLI, converted to 0-based internally.
-
-### RailReader.Agent (AI agent CLI)
-
-- `RailReaderTools.cs` — `[Description]`-annotated tool methods wrapping `DocumentController`
-- Configured via env vars: `OPENAI_API_KEY` (required), `RAILREADER_MODEL` (optional, default `gpt-4o`), `RAILREADER_BASE_URL` (optional, for OpenAI-compatible APIs)
-- **Not included in binary releases** — build from source via `RailReader2-full.slnx` or direct project build
-
 ### Tests
 
-37 xUnit tests in `tests/RailReader.Core.Tests/` — DocumentController, Camera, Annotations, AppConfig. `TestFixtures.cs` generates test PDFs via SkiaSharp.
+29 xUnit tests in `tests/RailReader.Core.Tests/` — DocumentController, Camera, Annotations, AppConfig. `TestFixtures.cs` generates test PDFs via SkiaSharp.
 
 ## Key Concepts
 
@@ -122,7 +89,7 @@ Page bitmap → BGRA-to-RGB → 800x800 rescale → CHW float tensor → PP-DocL
 
 ### Rail Mode
 
-Activates above `rail_zoom_threshold` when analysis is available. Locks to detected text blocks, advances line-by-line with cubic ease-out snap. Key mechanics: hold-to-scroll with quadratic speed ramping, soft asymptotic block edge clamping (`SoftEase`), `VerticalBias` for preserving vertical offset, pixel snapping for text shimmer reduction. Sub-features: auto-scroll (`P`), jump mode (`J`), line focus blur (`F`), line highlight tint, named bookmarks (`B`).
+Activates above `rail_zoom_threshold` when analysis is available. Locks to detected text blocks, advances line-by-line with cubic ease-out snap. Key mechanics: hold-to-scroll with quadratic speed ramping, soft asymptotic block edge clamping (`SoftEase`), `VerticalBias` for preserving vertical offset, pixel snapping for text shimmer reduction. Sub-features: auto-scroll (`P`), jump mode (`J`), line focus blur (`F`), line highlight (`H`), named bookmarks (`B`).
 
 ### Controller/ViewModel Pattern
 
@@ -148,7 +115,7 @@ Key fields: `rail_zoom_threshold`, `snap_duration_ms`, `scroll_speed_start/max`,
 
 - ONNX model outputs `[N, 7]` tensors with reading order as the 7th column (Global Pointer Mechanism)
 - `PdfOutlineExtractor` uses direct PDFium P/Invoke (`FPDF_*`/`FPDFBookmark_*`) since PDFtoImage doesn't expose bookmarks
-- `PdfiumResolver.Initialize()` must be called before any PDFium P/Invoke — registers a `DllImportResolver` that maps "pdfium" to the correct platform-specific native library (pdfium.dll / libpdfium.so / libpdfium.dylib). Called in all entry points (GUI, CLI, Agent)
+- `PdfiumResolver.Initialize()` must be called before any PDFium P/Invoke — registers a `DllImportResolver` that maps "pdfium" to the correct platform-specific native library (pdfium.dll / libpdfium.so / libpdfium.dylib). Called in the GUI entry point
 - ONNX runtime pre-loading in `LayoutAnalyzer` static constructor handles Linux (.so) and macOS (.dylib); Windows uses OnnxRuntime's own resolver
 - SkiaSharp 3.x explicitly overrides Avalonia 11's bundled 2.88 — required for `SKRuntimeEffect.CreateColorFilter()`
 - TODO.md is a legacy Rust file — disregard it

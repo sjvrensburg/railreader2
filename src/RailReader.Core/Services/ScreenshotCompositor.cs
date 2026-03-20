@@ -67,7 +67,7 @@ public static class ScreenshotCompositor
             && doc.Rail is { Active: true, NavigableCount: > 0 })
         {
             var line = doc.Rail.CurrentLineInfo;
-            float pad = line.Height * 0.25f;
+            float pad = line.Height * (float)options.LinePadding;
             // Line rect in page-point space
             float lineTop = line.Y - line.Height / 2f - pad;
             float lineHeight = line.Height + pad * 2;
@@ -111,7 +111,7 @@ public static class ScreenshotCompositor
         if (options.RailOverlay && doc.Rail.Active && doc.Rail.HasAnalysis)
         {
             DrawRailOverlay(canvas, doc, activeEffect.GetOverlayPalette(), options.LineFocusBlur,
-                options.LineHighlightTint, options.LineHighlightOpacity);
+                options.LineHighlightEnabled, options.LinePadding, options.LineHighlightTint, options.LineHighlightOpacity);
         }
 
         // --- Layer 3: Search highlights ---
@@ -201,7 +201,7 @@ public static class ScreenshotCompositor
     }
 
     private static void DrawRailOverlay(SKCanvas canvas, DocumentState doc, OverlayPalette palette, bool lineFocusBlur,
-        LineHighlightTint tint = LineHighlightTint.Auto, double tintOpacity = 0.25)
+        bool lineHighlightEnabled = true, double linePadding = 0.2, LineHighlightTint tint = LineHighlightTint.Auto, double tintOpacity = 0.25)
     {
         if (doc.Rail.NavigableCount == 0) return;
         using var dimPaint = new SKPaint();
@@ -209,8 +209,8 @@ public static class ScreenshotCompositor
         using var outlinePaint = new SKPaint { Style = SKPaintStyle.Stroke, IsAntialias = true };
         using var linePaint = new SKPaint();
         OverlayRenderer.DrawRailOverlays(canvas, doc.Rail.CurrentNavigableBlock, doc.Rail.CurrentLineInfo,
-            (float)doc.PageWidth, (float)doc.PageHeight, palette, lineFocusBlur, tint, tintOpacity,
-            dimPaint, revealPaint, outlinePaint, linePaint);
+            (float)doc.PageWidth, (float)doc.PageHeight, palette, lineFocusBlur, lineHighlightEnabled,
+            linePadding, tint, tintOpacity, dimPaint, revealPaint, outlinePaint, linePaint);
     }
 
     private static void DrawDebugOverlay(SKCanvas canvas, PageAnalysis analysis)

@@ -36,9 +36,9 @@
       "price": "0",
       "priceCurrency": "USD"
     },
-    "softwareVersion": "3.1.5",
+    "softwareVersion": "3.2.0",
     "datePublished": "2026-02-18",
-    "dateModified": "2026-03-19",
+    "dateModified": "2026-03-20",
     "license": "https://opensource.org/licenses/MIT",
     "author": {
       "@type": "Person",
@@ -236,12 +236,13 @@
           Press J or the toolbar button to toggle saccade-style jump navigation
           &mdash; advance by a configurable percentage of the visible width.
           Enable line focus dim (F button) to smoothly fade non-active lines,
-          reducing peripheral distraction. All modes have quick-toggle
+          reducing peripheral distraction. Toggle the line highlight
+          independently with the H key. All modes have quick-toggle
           buttons on the rail toolbar.
         </p>
       </div>
       <div class="feature">
-        <h3>Bionic Reading</h3>
+        <h3>Bionic Reading <small>(Removed in 3.2)</small></h3>
         <p>
           Shader-based text fading de-emphasises the trailing portion of each
           word, guiding the eye to fixation points. Toggle with <code>R</code>
@@ -344,7 +345,7 @@
         </p>
       </div>
       <div class="feature">
-        <h3>AI Agent CLI</h3>
+        <h3>AI Agent CLI <small>(Removed in 3.2)</small></h3>
         <p>
           A headless agent CLI powered by
           <a href="https://learn.microsoft.com/en-us/dotnet/ai/ai-extensions">Microsoft.Extensions.AI</a>
@@ -358,7 +359,7 @@
         <p>
           All business logic lives in a UI-free core library
           (<code>RailReader.Core</code>) with zero Avalonia dependencies.
-          The desktop app is a thin UI shell. Fully testable &mdash; 37
+          The desktop app is a thin UI shell. Fully testable &mdash; 29
           xUnit tests run without a display server.
         </p>
       </div>
@@ -453,7 +454,8 @@
         <tr><td>` (backtick)</td><td>Navigate back to previous location</td></tr>
         <tr><td>C</td><td>Cycle colour effect on active tab</td></tr>
         <tr><td>F</td><td>Toggle line focus dim</td></tr>
-        <tr><td>R</td><td>Toggle bionic reading</td></tr>
+        <tr><td>R</td><td><em>(Removed in 3.2)</em></td></tr>
+        <tr><td>H</td><td>Toggle line highlight</td></tr>
         <tr><td>Escape</td><td>Stop auto-scroll</td></tr>
         <tr><td>[ / ]</td><td>Adjust scroll speed or jump distance</td></tr>
         <tr><td>Shift+[ / ]</td><td>Adjust blur intensity</td></tr>
