@@ -59,6 +59,9 @@ public class PdfPageLayer : Control
         // Max sigma at full intensity; scaled by user's intensity setting
         private const float MaxBlurSigma = 0.35f;
         private const double MinSpeedThreshold = 0.1;
+        // Feather zone as a fraction of line height — kept narrow to avoid
+        // a visible halo on dark colour effect backgrounds.
+        private const float DimFeatherFraction = 0.08f;
 
         // Cached blur filter — reused when sigma values haven't changed
         [ThreadStatic] private static SKImageFilter? s_cachedBlurFilter;
@@ -369,7 +372,7 @@ public class PdfPageLayer : Control
                     float pad = line.Height * (float)_opts.LineFocusPadding;
                     float lineTop = line.Y - line.Height / 2f - pad;
                     float lineBottom = line.Y + line.Height / 2f + pad;
-                    float feather = line.Height * 0.08f;
+                    float feather = line.Height * DimFeatherFraction;
 
                     float featherTop = Math.Max(0, lineTop - feather) / h;
                     float featherBottom = Math.Min(h, lineBottom + feather) / h;
