@@ -42,22 +42,29 @@ public static class OverlayRenderer
 
         var pageRect = SKRect.Create(0, 0, pageWidth, pageHeight);
 
-        // Dim
-        dimPaint.Color = palette.Dim;
-        if (palette.DimExcludesBlock)
+        // Dim — skip when line focus blur is active because the PdfPageLayer's
+        // line focus dim gradient handles all per-line dimming. Drawing both
+        // creates a brightness step at the block boundary (DimExcludesBlock)
+        // or double-dims non-active lines, producing a visible halo around the
+        // active line with dark colour effects.
+        if (!lineFocusBlur)
         {
-            canvas.Save();
-            canvas.ClipRect(blockRect, SKClipOperation.Difference);
-            canvas.DrawRect(pageRect, dimPaint);
-            canvas.Restore();
-        }
-        else
-        {
-            canvas.DrawRect(pageRect, dimPaint);
+            dimPaint.Color = palette.Dim;
+            if (palette.DimExcludesBlock)
+            {
+                canvas.Save();
+                canvas.ClipRect(blockRect, SKClipOperation.Difference);
+                canvas.DrawRect(pageRect, dimPaint);
+                canvas.Restore();
+            }
+            else
+            {
+                canvas.DrawRect(pageRect, dimPaint);
+            }
         }
 
-        // Block reveal
-        if (!palette.DimExcludesBlock && palette.BlockReveal is var (revealColor, blendMode))
+        // Block reveal (also skipped when line focus blur is active — same rationale as dim)
+        if (!lineFocusBlur && !palette.DimExcludesBlock && palette.BlockReveal is var (revealColor, blendMode))
         {
             canvas.Save();
             canvas.ClipRect(blockRect);

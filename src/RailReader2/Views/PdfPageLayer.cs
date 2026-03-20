@@ -301,12 +301,9 @@ public class PdfPageLayer : Control
             // screens. Only use it when motion blur is active (image filter must operate
             // on the composite). For colour-filter-only mode, apply the filter directly
             // to each draw paint instead, avoiding the offscreen buffer entirely.
-            // Line focus dim: applying the colour filter per-paint gives
-            // blend(filter(page), filter(dim)) instead of filter(blend(page, dim)).
-            // These are equivalent for Invert (proven algebraically) and visually
-            // indistinguishable for other effects because all SkSL shaders preserve
-            // alpha (return half4(result, color.a)), so the gradient transparency
-            // is maintained and the dim colour is correctly filtered.
+            // Line focus dim is always drawn OUTSIDE the SaveLayer (after Restore) to
+            // prevent the blur filter from bleeding gradient edges into a visible halo.
+            // The dim colour has the colour effect baked in via ComputeDimColor().
             bool needsBlurLayer = blurFilter is not null;
             bool hasBionic = bionicPath is not null;
             // Per-paint colour filter: apply directly when no blur and no bionic clip regions.
@@ -335,25 +332,30 @@ public class PdfPageLayer : Control
                 DrawPageImage(canvas, image, destRect, bionicPath, bionicPaint, sampling);
             }
 
-            // Line focus dim: draw a feathered white overlay that dims
-            // everything except the active line, with smooth transitions.
-            // Uses a vertical linear gradient with 6 stops to create a
-            // transparent window at the active line that feathers to full
-            // dim on both sides. Drawn inside the colour effect layer so
-            // the white adapts to colour effects (e.g. becomes black for Invert).
+            if (useLayer)
+            {
+                canvas.Restore();
+                s_layerPaint!.ColorFilter = null;
+                s_layerPaint.ImageFilter = null;
+            }
+
+            // Line focus dim: draw a feathered overlay that dims everything
+            // except the active line. Drawn OUTSIDE any blur SaveLayer to
+            // avoid halo artifacts from the blur filter bleeding the gradient
+            // edges. The dim colour always has the colour effect baked in
+            // (via ComputeDimColor) since no colour-filter layer wraps it.
             if (_opts.LineFocusBlur && _opts.LineFocusIntensity > 0
                 && tab.Rail is { Active: true, NavigableCount: > 0 } rail)
             {
                 var line = rail.CurrentLineInfo;
                 float h = (float)tab.PageHeight;
 
-                // When using per-paint filter, bake the filtered dim colour into the
-                // gradient instead of applying the colour filter to the paint. Applying
-                // a colour filter to the gradient paint corrupts transparent pixels:
-                // e.g. Invert transforms (0,0,0,0) → (255,255,255,0), violating
-                // premultiplied alpha and causing bright white artifacts.
-                var activeEffect = perPaintFilter ? _opts.ActiveEffect : ColourEffect.None;
-                float activeIntensity = perPaintFilter ? _opts.ActiveIntensity : 0f;
+                // Always bake the colour effect into the dim colour directly.
+                // Applying a colour filter to gradient paint corrupts transparent
+                // pixels (premultiplied alpha violation), so we pre-compute the
+                // filtered dim colour instead.
+                var activeEffect = effectFilter is not null ? _opts.ActiveEffect : ColourEffect.None;
+                float activeIntensity = effectFilter is not null ? _opts.ActiveIntensity : 0f;
 
                 // Reuse cached dim paint when line position, settings, and effect are unchanged
                 var dimKey = new DimCacheKey(line.Y, line.Height, h,
@@ -388,13 +390,6 @@ public class PdfPageLayer : Control
                 }
 
                 canvas.DrawRect(destRect, s_cachedDimPaint);
-            }
-
-            if (useLayer)
-            {
-                canvas.Restore();
-                s_layerPaint!.ColorFilter = null;
-                s_layerPaint.ImageFilter = null;
             }
 
             // effectFilter is cached (s_cachedEffectFilter) — do not dispose here
