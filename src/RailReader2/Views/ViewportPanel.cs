@@ -141,7 +141,8 @@ public class ViewportPanel : Panel
         {
             double dx = pos.X - _lastPos.X;
             double dy = pos.Y - _lastPos.Y;
-            ViewModel.HandlePan(dx, dy);
+            bool ctrl = e.KeyModifiers.HasFlag(KeyModifiers.Control);
+            ViewModel.HandlePan(dx, dy, ctrl);
         }
 
         _lastPos = pos;

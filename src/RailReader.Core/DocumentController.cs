@@ -46,6 +46,9 @@ public sealed class DocumentController
         public double CursorPageX, CursorPageY;
         public Stopwatch Timer = Stopwatch.StartNew();
         public const double DurationMs = 180;
+        // Rail position preservation: captured when zoom starts in rail mode
+        public double HorizontalFraction = -1; // 0=line start, 1=line end; <0 means not in rail
+        public double LineScreenY;              // Y position of active line on screen
     }
     private ZoomAnimation? _zoomAnim;
 
@@ -119,6 +122,18 @@ public sealed class DocumentController
     // Auto-scroll state
     public bool AutoScrollActive { get; private set; }
     public bool JumpMode { get; set; }
+
+    // Rail pause (Ctrl+drag free pan) state
+    public bool RailPaused { get; private set; }
+    private int _pausedBlock;
+    private int _pausedLine;
+    private double _pausedVerticalBias;
+    private double _pausedZoom;
+
+    // Non-rail edge-hold page advance
+    private Stopwatch? _nonRailEdgeHoldTimer;
+    private bool _nonRailEdgeForward;
+    private const double NonRailEdgeHoldMs = 400.0;
 
     /// <summary>
     /// Fired when a property changes. UI can subscribe to update bindings.
@@ -197,9 +212,15 @@ public sealed class DocumentController
         var doc = Documents[index];
         _config.SaveReadingPosition(doc.FilePath, doc.CurrentPage,
             doc.Camera.Zoom, doc.Camera.OffsetX, doc.Camera.OffsetY, doc.ColourEffect);
+
+        // Unlink before removing so the group cleanup can find remaining members
+        if (doc.LinkGroupId.HasValue)
+            UnlinkDocument(doc);
+
         Documents.RemoveAt(index);
         doc.Dispose();
         ActiveDocumentIndex = Math.Clamp(ActiveDocumentIndex, 0, Math.Max(Documents.Count - 1, 0));
+        RailPaused = false;
         CloseSearch();
     }
 
@@ -207,6 +228,7 @@ public sealed class DocumentController
     {
         if (index >= 0 && index < Documents.Count)
         {
+            RailPaused = false;
             ActiveDocumentIndex = index;
         }
     }
@@ -232,6 +254,57 @@ public sealed class DocumentController
         foreach (var doc in Documents)
             _config.SaveReadingPosition(doc.FilePath, doc.CurrentPage,
                 doc.Camera.Zoom, doc.Camera.OffsetX, doc.Camera.OffsetY, doc.ColourEffect);
+    }
+
+    // --- Tab linking ---
+
+    /// <summary>Link two documents so they stay on the same page.</summary>
+    public void LinkDocuments(DocumentState a, DocumentState b)
+    {
+        var groupId = a.LinkGroupId ?? b.LinkGroupId ?? Guid.NewGuid();
+        a.LinkGroupId = groupId;
+        b.LinkGroupId = groupId;
+        // Sync b to a's page
+        if (b.CurrentPage != a.CurrentPage)
+        {
+            var (ww, wh) = GetViewportSize();
+            b.GoToPage(a.CurrentPage, _worker, _config.NavigableClasses, ww, wh);
+        }
+    }
+
+    /// <summary>Remove a document from its link group.</summary>
+    public void UnlinkDocument(DocumentState doc)
+    {
+        if (doc.LinkGroupId is not { } groupId) return;
+        doc.LinkGroupId = null;
+
+        // If only one document remains in the group, unlink it too
+        DocumentState? lastInGroup = null;
+        int count = 0;
+        foreach (var d in Documents)
+        {
+            if (d.LinkGroupId == groupId) { lastInGroup = d; count++; }
+            if (count > 1) break;
+        }
+        if (count == 1 && lastInGroup is not null)
+            lastInGroup.LinkGroupId = null;
+    }
+
+    /// <summary>
+    /// Returns a list of documents that could be linked with the given document
+    /// (same file, different document, not already in the same group).
+    /// </summary>
+    public List<DocumentState> GetLinkCandidates(DocumentState doc)
+    {
+        var result = new List<DocumentState>();
+        foreach (var d in Documents)
+        {
+            if (d == doc) continue;
+            if (d.FilePath != doc.FilePath) continue;
+            if (doc.LinkGroupId.HasValue && d.LinkGroupId == doc.LinkGroupId) continue;
+            result.Add(d);
+        }
+        return result;
     }
 
     // --- Bookmarks ---
@@ -290,6 +363,8 @@ public sealed class DocumentController
 
     // --- Navigation ---
 
+    private bool _syncingLinks;
+
     public void GoToPage(int page)
     {
         _zoomAnim = null;
@@ -298,6 +373,31 @@ public sealed class DocumentController
         doc.GoToPage(page, _worker, _config.NavigableClasses, ww, wh);
         doc.QueueLookahead(_config.AnalysisLookaheadPages);
         UpdateCurrentPageMatches();
+        SyncLinkedTabs(doc, page);
+    }
+
+    /// <summary>
+    /// Sync all documents in the same link group to the given page.
+    /// </summary>
+    private void SyncLinkedTabs(DocumentState source, int page)
+    {
+        if (_syncingLinks || source.LinkGroupId is not { } groupId) return;
+        _syncingLinks = true;
+        try
+        {
+            var (ww, wh) = GetViewportSize();
+            foreach (var doc in Documents)
+            {
+                if (doc == source || doc.LinkGroupId != groupId) continue;
+                if (doc.CurrentPage == page) continue;
+                doc.GoToPage(page, _worker, _config.NavigableClasses, ww, wh);
+                doc.QueueLookahead(_config.AnalysisLookaheadPages);
+            }
+        }
+        finally
+        {
+            _syncingLinks = false;
+        }
     }
 
     public void FitPage()
@@ -326,7 +426,7 @@ public sealed class DocumentController
         if (ActiveDocument is not { } doc) return;
         var (ww, wh) = GetViewportSize();
 
-        if (ctrlHeld && doc.Rail.Active)
+        if (ctrlHeld && doc.Rail.Active && !RailPaused)
         {
             double step = scrollDelta * 2.0 * doc.Camera.Zoom;
             doc.Camera.OffsetX += step;
@@ -341,17 +441,59 @@ public sealed class DocumentController
         }
     }
 
-    public void HandlePan(double dx, double dy)
+    public void HandlePan(double dx, double dy, bool ctrlHeld = false)
     {
         _zoomAnim = null;
         if (ActiveDocument is not { } doc) return;
         if (AutoScrollActive) StopAutoScroll();
         var (ww, wh) = GetViewportSize();
+
+        if (ctrlHeld && doc.Rail.Active && !RailPaused)
+        {
+            RailPaused = true;
+            _pausedBlock = doc.Rail.CurrentBlock;
+            _pausedLine = doc.Rail.CurrentLine;
+            _pausedVerticalBias = doc.Rail.VerticalBias;
+            _pausedZoom = doc.Camera.Zoom;
+            StatusMessage?.Invoke("Free pan — release Ctrl to return");
+        }
+
         doc.Camera.OffsetX += dx;
         doc.Camera.OffsetY += dy;
         doc.ClampCamera(ww, wh);
-        if (doc.Rail.Active)
+        if (doc.Rail.Active && !RailPaused)
             doc.Rail.CaptureVerticalBias(doc.Camera.OffsetY, doc.Camera.Zoom, wh);
+    }
+
+    /// <summary>
+    /// End rail pause: restore block/line/bias/zoom from before the free pan and snap back.
+    /// </summary>
+    public void ResumeRailFromPause()
+    {
+        if (!RailPaused) return;
+        RailPaused = false;
+
+        if (ActiveDocument is not { } doc) return;
+        var (ww, wh) = GetViewportSize();
+
+        // Restore zoom if it changed during free pan (may re-enter rail mode)
+        if (Math.Abs(doc.Camera.Zoom - _pausedZoom) > 0.001)
+        {
+            doc.Camera.Zoom = _pausedZoom;
+            doc.Camera.NotifyZoomChange();
+            doc.UpdateRailZoom(ww, wh);
+            doc.UpdateRenderDpiIfNeeded();
+        }
+
+        if (!doc.Rail.Active) return;
+
+        // Clamp indices in case analysis changed while paused
+        doc.Rail.CurrentBlock = Math.Clamp(_pausedBlock, 0, Math.Max(doc.Rail.NavigableCount - 1, 0));
+        doc.Rail.CurrentLine = Math.Clamp(_pausedLine, 0, Math.Max(doc.Rail.CurrentLineCount - 1, 0));
+        doc.Rail.VerticalBias = _pausedVerticalBias;
+
+        doc.StartSnap(ww, wh);
+        StatusMessage?.Invoke("");
     }
 
     public void HandleZoomKey(bool zoomIn)
@@ -381,6 +523,15 @@ public sealed class DocumentController
         double targetOx = focusX - (focusX - baseOx) * (newZoom / baseZoom);
         double targetOy = focusY - (focusY - baseOy) * (newZoom / baseZoom);
 
+        // Capture rail reading position before zoom so we can restore it on completion
+        double hFraction = -1;
+        double lineScreenY = 0;
+        if (doc.Rail.Active && doc.Rail.HasAnalysis)
+        {
+            hFraction = doc.Rail.ComputeHorizontalFraction(doc.Camera.OffsetX, doc.Camera.Zoom, _vpWidth);
+            lineScreenY = doc.Rail.CurrentLineInfo.Y * doc.Camera.Zoom + doc.Camera.OffsetY;
+        }
+
         _zoomAnim = new ZoomAnimation
         {
             StartZoom = doc.Camera.Zoom,
@@ -391,6 +542,8 @@ public sealed class DocumentController
             TargetOffsetY = targetOy,
             CursorPageX = (focusX - targetOx) / newZoom,
             CursorPageY = (focusY - targetOy) / newZoom,
+            HorizontalFraction = hFraction,
+            LineScreenY = lineScreenY,
         };
     }
 
@@ -440,6 +593,7 @@ public sealed class DocumentController
 
             // Either has navigable blocks (land on it) or needs async analysis
             doc.GoToPage(targetPage, _worker, _config.NavigableClasses, ww, wh);
+            SyncLinkedTabs(doc, targetPage);
             doc.UpdateRailZoom(ww, wh);
 
             if (doc.Rail.Active)
@@ -514,9 +668,40 @@ public sealed class DocumentController
         }
         else
         {
+            double prevY = doc.Camera.OffsetY;
             doc.Camera.OffsetY += forward ? -PanStep : PanStep;
             doc.ClampCamera(ww, wh);
+
+            // Check if we're at the page edge (camera didn't move after clamping)
+            bool atEdge = Math.Abs(doc.Camera.OffsetY - prevY) < 1.0;
+            if (atEdge)
+            {
+                if (_nonRailEdgeHoldTimer is null || _nonRailEdgeForward != forward)
+                {
+                    _nonRailEdgeHoldTimer = Stopwatch.StartNew();
+                    _nonRailEdgeForward = forward;
+                }
+                else if (_nonRailEdgeHoldTimer.Elapsed.TotalMilliseconds >= NonRailEdgeHoldMs)
+                {
+                    int targetPage = doc.CurrentPage + (forward ? 1 : -1);
+                    if (targetPage >= 0 && targetPage < doc.PageCount)
+                    {
+                        GoToPage(targetPage);
+                        _nonRailEdgeHoldTimer = null;
+                    }
+                }
+            }
+            else
+            {
+                _nonRailEdgeHoldTimer = null;
+            }
         }
+    }
+
+    /// <summary>Clear non-rail edge-hold state (call on key release).</summary>
+    public void ClearNonRailEdgeHold()
+    {
+        _nonRailEdgeHoldTimer = null;
     }
 
     public void HandleArrowRight(bool shortJump = false)
@@ -694,7 +879,9 @@ public sealed class DocumentController
         bool animating = false;
 
         TickZoomAnimation(doc, ww, wh, ref cameraChanged, ref animating);
-        TickRailSnap(doc, dt, ww, wh, ref cameraChanged, ref pageChanged, ref overlayChanged, ref animating);
+
+        if (!RailPaused)
+            TickRailSnap(doc, dt, ww, wh, ref cameraChanged, ref pageChanged, ref overlayChanged, ref animating);
 
         // Snap Y to integer pixel when rail mode is stable
         if (_config.PixelSnapping && doc.Rail.Active && !animating)
@@ -707,7 +894,8 @@ public sealed class DocumentController
             }
         }
 
-        TickAutoScroll(doc, dt, ww, wh, ref cameraChanged, ref pageChanged, ref overlayChanged, ref animating);
+        if (!RailPaused)
+            TickAutoScroll(doc, dt, ww, wh, ref cameraChanged, ref pageChanged, ref overlayChanged, ref animating);
 
         // Decay zoom blur speed
         if (doc.Camera.ZoomSpeed > 0)
@@ -755,19 +943,28 @@ public sealed class DocumentController
             // Cubic ease-out: 1 - (1-t)^3
             double ease = 1.0 - (1.0 - t) * (1.0 - t) * (1.0 - t);
 
+            double prevZoom = doc.Camera.Zoom;
             doc.Camera.Zoom = za.StartZoom + (za.TargetZoom - za.StartZoom) * ease;
             doc.Camera.OffsetX = za.StartOffsetX + (za.TargetOffsetX - za.StartOffsetX) * ease;
             doc.Camera.OffsetY = za.StartOffsetY + (za.TargetOffsetY - za.StartOffsetY) * ease;
             doc.Camera.NotifyZoomChange();
+            doc.Rail.ScaleVerticalBias(prevZoom, doc.Camera.Zoom);
             doc.UpdateRailZoom(ww, wh, za.CursorPageX, za.CursorPageY);
             cameraChanged = true;
 
             if (t >= 1.0)
             {
+                double hFrac = za.HorizontalFraction;
+                double lineY = za.LineScreenY;
                 _zoomAnim = null;
                 doc.ClampCamera(ww, wh);
                 if (doc.Rail.Active)
-                    doc.StartSnap(ww, wh);
+                {
+                    if (hFrac >= 0)
+                        doc.StartSnapPreservingPosition(ww, wh, hFrac, lineY);
+                    else
+                        doc.StartSnap(ww, wh);
+                }
                 doc.UpdateRenderDpiIfNeeded();
             }
             else
@@ -792,6 +989,14 @@ public sealed class DocumentController
                 cameraChanged = true;
             }
             animating |= railAnimating;
+
+            if (doc.Rail.AutoScrollTriggered)
+            {
+                doc.Rail.AutoScrollTriggered = false;
+                AutoScrollActive = true;
+                StateChanged?.Invoke(nameof(AutoScrollActive));
+                StatusMessage?.Invoke("Auto-scroll activated");
+            }
 
             // Edge-hold advance: D/Right held at line end → NextLine; A/Left held at line start → PrevLine
             if (!doc.Rail.AutoScrolling && doc.Rail.ConsumePendingEdgeAdvance() is { } edgeDir)

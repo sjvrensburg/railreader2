@@ -122,6 +122,14 @@ public sealed partial class MainWindowViewModel : ObservableObject
     }
 
     public bool AutoScrollActive => _controller.AutoScrollActive;
+    public bool RailPaused => _controller.RailPaused;
+
+    public void ResumeRailFromPause()
+    {
+        _controller.ResumeRailFromPause();
+        InvalidateCameraAndTab();
+        RequestAnimationFrame();
+    }
 
     [ObservableProperty] private bool _jumpMode;
     partial void OnJumpModeChanged(bool value) => _controller.JumpMode = value;
@@ -129,6 +137,22 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public AppConfig Config => _controller.Config;
     public ColourEffectShaders ColourEffects => _controller.ColourEffects;
     public DocumentController Controller => _controller;
+
+    // Link group color assignment
+    public const int LinkColorCount = 4;
+    private readonly Dictionary<Guid, int> _linkColorMap = [];
+    private int _nextLinkColorIndex;
+
+    /// <summary>Returns the color index (0..3) assigned to a link group, assigning one if needed.</summary>
+    public int GetLinkGroupColorIndex(Guid groupId)
+    {
+        if (!_linkColorMap.TryGetValue(groupId, out int idx))
+        {
+            idx = _nextLinkColorIndex++ % LinkColorCount;
+            _linkColorMap[groupId] = idx;
+        }
+        return idx;
+    }
 
     public TabViewModel? ActiveTab =>
         ActiveTabIndex >= 0 && ActiveTabIndex < Tabs.Count ? Tabs[ActiveTabIndex] : null;
@@ -242,6 +266,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
             if (ActiveTab is { } oldTab)
                 SaveSidebarState(oldTab);
 
+            // Apply pending link group (from DuplicateTabLinked)
+            if (_pendingLinkGroupId is { } linkId)
+            {
+                tab.State.LinkGroupId = linkId;
+                _pendingLinkGroupId = null;
+            }
+
             _controller.AddDocument(tab.State);
             Tabs.Add(tab);
 
@@ -261,6 +292,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
         catch (Exception ex)
         {
+            _pendingLinkGroupId = null;
             Console.Error.WriteLine($"Failed to open {path}: {ex.Message}\n{ex.StackTrace}");
         }
     }
@@ -352,6 +384,47 @@ public sealed partial class MainWindowViewModel : ObservableObject
             OpenDocument(tab.FilePath);
     }
 
+    [RelayCommand]
+    public void DuplicateTabLinked()
+    {
+        if (ActiveTab is not { } sourceTab) return;
+        var groupId = sourceTab.State.LinkGroupId ?? Guid.NewGuid();
+        sourceTab.State.LinkGroupId = groupId;
+        _pendingLinkGroupId = groupId;
+        DuplicateTab();
+    }
+
+    private Guid? _pendingLinkGroupId;
+
+    public void LinkTabTo(int sourceIndex, int targetIndex)
+    {
+        if (sourceIndex < 0 || sourceIndex >= Tabs.Count) return;
+        if (targetIndex < 0 || targetIndex >= Tabs.Count) return;
+        _controller.LinkDocuments(Tabs[sourceIndex].State, Tabs[targetIndex].State);
+        InvalidateAll();
+    }
+
+    public void UnlinkTab(int index)
+    {
+        if (index < 0 || index >= Tabs.Count) return;
+        _controller.UnlinkDocument(Tabs[index].State);
+        InvalidateAll();
+    }
+
+    /// <summary>Returns indices of tabs that can be linked with the tab at the given index.</summary>
+    public List<(int Index, string Title)> GetLinkCandidates(int index)
+    {
+        if (index < 0 || index >= Tabs.Count) return [];
+        var candidates = _controller.GetLinkCandidates(Tabs[index].State);
+        var result = new List<(int, string)>();
+        for (int i = 0; i < Tabs.Count; i++)
+        {
+            if (candidates.Contains(Tabs[i].State))
+                result.Add((i, Tabs[i].Title));
+        }
+        return result;
+    }
+
     public void DetachTab(int index)
     {
         if (index < 0 || index >= Tabs.Count) return;
@@ -414,9 +487,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
         RequestAnimationFrame();
     }
 
-    public void HandlePan(double dx, double dy)
+    public void HandlePan(double dx, double dy, bool ctrlHeld = false)
     {
-        _controller.HandlePan(dx, dy);
+        _controller.HandlePan(dx, dy, ctrlHeld);
         InvalidateCameraAndTab();
     }
 

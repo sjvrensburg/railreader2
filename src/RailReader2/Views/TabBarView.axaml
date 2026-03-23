@@ -6,6 +6,20 @@
              IsVisible="{Binding Tabs.Count}">
     <Border Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}"
             Padding="4,2">
-        <StackPanel Name="TabPanel" Orientation="Horizontal" Spacing="2" />
+        <DockPanel>
+            <!-- Overflow dropdown (visible when tabs overflow) -->
+            <Button Name="OverflowButton" DockPanel.Dock="Right"
+                    Content="&#x25BC;" FontSize="10"
+                    Padding="6,4" MinWidth="24" MinHeight="24"
+                    VerticalAlignment="Center" Margin="2,0,0,0"
+                    CornerRadius="3" IsVisible="False"
+                    ToolTip.Tip="All tabs"
+                    Click="OnOverflowClick" />
+            <ScrollViewer Name="TabScroller"
+                          HorizontalScrollBarVisibility="Hidden"
+                          VerticalScrollBarVisibility="Disabled">
+                <StackPanel Name="TabPanel" Orientation="Horizontal" Spacing="2" />
+            </ScrollViewer>
+        </DockPanel>
     </Border>
 </UserControl>

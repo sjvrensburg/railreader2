@@ -13,6 +13,13 @@ namespace RailReader2.Views;
 public partial class TabBarView : UserControl
 {
     private static readonly IBrush AccentBrush = new SolidColorBrush(Color.FromRgb(66, 133, 244));
+    private static readonly IBrush[] LinkBrushes =
+    [
+        new SolidColorBrush(Color.Parse("#4A9EFF")),
+        new SolidColorBrush(Color.Parse("#4ADE80")),
+        new SolidColorBrush(Color.Parse("#FB923C")),
+        new SolidColorBrush(Color.Parse("#C084FC")),
+    ];
     private static readonly IBrush ActiveTabFg = Brushes.White;
     private static readonly IBrush InactiveTabBg = new SolidColorBrush(Color.FromArgb(30, 0, 0, 0));
     private static readonly IBrush InactiveTabFgLight = new SolidColorBrush(Color.FromRgb(80, 80, 80));
@@ -26,6 +33,8 @@ public partial class TabBarView : UserControl
     private Point _dragStartPoint;
     private Border? _dropIndicator;
 
+    private const double MaxTabWidth = 200;
+
     public TabBarView()
     {
         InitializeComponent();
@@ -37,33 +46,109 @@ public partial class TabBarView : UserControl
         TabPanel.AddHandler(PointerMovedEvent, OnPanelPointerMoved, RoutingStrategies.Tunnel);
         TabPanel.AddHandler(PointerReleasedEvent, OnPanelPointerReleased, RoutingStrategies.Tunnel);
         TabPanel.AddHandler(PointerCaptureLostEvent, OnPanelPointerCaptureLost, RoutingStrategies.Tunnel | RoutingStrategies.Bubble);
+
+        // Horizontal scroll on mouse wheel over tab bar
+        TabScroller.AddHandler(PointerWheelChangedEvent, OnTabScrollerWheel, RoutingStrategies.Tunnel);
+
+        // Update overflow button visibility when size changes
+        TabScroller.SizeChanged += (_, _) => UpdateOverflowButton();
+        TabPanel.SizeChanged += (_, _) => UpdateOverflowButton();
     }
 
     private MainWindowViewModel? _vm;
+    private System.Collections.Specialized.NotifyCollectionChangedEventHandler? _collectionHandler;
+    private readonly List<(TabViewModel Tab, PropertyChangedEventHandler Handler)> _tabSubscriptions = [];
 
     private void WireViewModel()
     {
+        // Unsubscribe from old VM
         if (_vm is not null)
+        {
             _vm.PropertyChanged -= OnVmPropertyChanged;
+            if (_collectionHandler is not null)
+                _vm.Tabs.CollectionChanged -= _collectionHandler;
+        }
+        ClearTabSubscriptions();
 
         _vm = DataContext as MainWindowViewModel;
 
         if (_vm is not null)
         {
             _vm.PropertyChanged += OnVmPropertyChanged;
-            _vm.Tabs.CollectionChanged += (_, _) => RebuildTabs();
+            _collectionHandler = (_, _) => RebuildTabs();
+            _vm.Tabs.CollectionChanged += _collectionHandler;
             RebuildTabs();
         }
+    }
+
+    private void ClearTabSubscriptions()
+    {
+        foreach (var (tab, handler) in _tabSubscriptions)
+            tab.PropertyChanged -= handler;
+        _tabSubscriptions.Clear();
     }
 
     private void OnVmPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName is nameof(MainWindowViewModel.ActiveTabIndex))
+        {
             UpdateTabStyles();
+            ScrollActiveTabIntoView();
+        }
+    }
+
+    private void OnTabScrollerWheel(object? sender, PointerWheelEventArgs e)
+    {
+        // Convert vertical wheel to horizontal scroll
+        double delta = e.Delta.Y * 60;
+        TabScroller.Offset = TabScroller.Offset.WithX(TabScroller.Offset.X - delta);
+        e.Handled = true;
+    }
+
+    private void UpdateOverflowButton()
+    {
+        bool overflow = TabPanel.Bounds.Width > TabScroller.Bounds.Width + 1;
+        OverflowButton.IsVisible = overflow;
+    }
+
+    private void OnOverflowClick(object? sender, RoutedEventArgs e)
+    {
+        if (_vm is null) return;
+        var menu = new ContextMenu();
+        for (int i = 0; i < _vm.Tabs.Count; i++)
+        {
+            int idx = i;
+            var tab = _vm.Tabs[i];
+            var item = new MenuItem
+            {
+                Header = tab.Title,
+                FontWeight = i == _vm.ActiveTabIndex ? FontWeight.Bold : FontWeight.Normal,
+            };
+            item.Click += (_, _) => _vm.SelectTab(idx);
+            menu.Items.Add(item);
+        }
+        menu.Open(OverflowButton);
+    }
+
+    private void ScrollActiveTabIntoView()
+    {
+        if (_vm is null) return;
+        var container = GetContainerByIndex(_vm.ActiveTabIndex);
+        if (container is null) return;
+        // Scroll so the active tab is visible
+        double left = container.Bounds.X;
+        double right = left + container.Bounds.Width;
+        double viewLeft = TabScroller.Offset.X;
+        double viewRight = viewLeft + TabScroller.Bounds.Width;
+        if (left < viewLeft)
+            TabScroller.Offset = TabScroller.Offset.WithX(left);
+        else if (right > viewRight)
+            TabScroller.Offset = TabScroller.Offset.WithX(right - TabScroller.Bounds.Width);
     }
 
     private void RebuildTabs()
     {
+        ClearTabSubscriptions();
         TabPanel.Children.Clear();
         if (_vm is null) return;
 
@@ -81,18 +166,70 @@ public partial class TabBarView : UserControl
                 [DockPanel.DockProperty] = Dock.Bottom,
             };
 
+            // Build tab button content: optional link indicator + title
+            var tabContentPanel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4 };
+
+            // Link indicator (chain icon + colored dot) — hidden when not linked
+            var linkDot = new Border
+            {
+                Name = "LinkDot",
+                Width = 8, Height = 8,
+                CornerRadius = new CornerRadius(4),
+                VerticalAlignment = VerticalAlignment.Center,
+            };
+            var linkIcon = new TextBlock
+            {
+                Text = "\U0001F517", // chain link emoji
+                FontSize = 10,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, -1, 0, 0),
+            };
+            var linkPanel = new StackPanel
+            {
+                Name = "LinkPanel",
+                Orientation = Orientation.Horizontal,
+                Spacing = 2,
+                IsVisible = tab.IsLinked,
+            };
+            linkPanel.Children.Add(linkIcon);
+            linkPanel.Children.Add(linkDot);
+
+            var titleText = new TextBlock
+            {
+                Text = tab.Title,
+                VerticalAlignment = VerticalAlignment.Center,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+            };
+
+            tabContentPanel.Children.Add(linkPanel);
+            tabContentPanel.Children.Add(titleText);
+
             var tabBtn = new Button
             {
-                Content = tab.Title,
+                Content = tabContentPanel,
                 Tag = tab,
                 Padding = new Thickness(12, 4),
                 Margin = new Thickness(0),
                 CornerRadius = new CornerRadius(4, 4, 0, 0),
                 MinHeight = 28,
+                MaxWidth = MaxTabWidth,
                 Cursor = new Cursor(StandardCursorType.Hand),
             };
             ToolTip.SetTip(tabBtn, tab.FilePath);
             tabBtn.Click += OnTabClick;
+
+            // Subscribe to link changes to update the visual
+            PropertyChangedEventHandler linkHandler = (_, args) =>
+            {
+                if (args.PropertyName is nameof(TabViewModel.LinkGroupId) or nameof(TabViewModel.IsLinked))
+                {
+                    linkPanel.IsVisible = tab.IsLinked;
+                    UpdateLinkDotColor(linkDot, tab);
+                }
+            };
+            tab.PropertyChanged += linkHandler;
+            _tabSubscriptions.Add((tab, linkHandler));
+            UpdateLinkDotColor(linkDot, tab);
 
             var closeBtn = new Button
             {
@@ -234,6 +371,14 @@ public partial class TabBarView : UserControl
         _isDragging = false;
     }
 
+    private void UpdateLinkDotColor(Border dot, TabViewModel tab)
+    {
+        if (_vm is not null && tab.LinkGroupId is { } gid)
+            dot.Background = LinkBrushes[_vm.GetLinkGroupColorIndex(gid)];
+        else
+            dot.Background = Brushes.Transparent;
+    }
+
     private void ShowTabContextMenu(int tabIndex)
     {
         if (_vm is not { } vm) return;
@@ -247,6 +392,39 @@ public partial class TabBarView : UserControl
             vm.DuplicateTab();
         };
         menu.Items.Add(duplicateItem);
+
+        var duplicateLinkedItem = new MenuItem { Header = "Duplicate Tab (Linked)" };
+        duplicateLinkedItem.Click += (_, _) =>
+        {
+            vm.SelectTab(tabIndex);
+            vm.DuplicateTabLinked();
+        };
+        menu.Items.Add(duplicateLinkedItem);
+
+        // "Link to..." submenu with candidates
+        var candidates = vm.GetLinkCandidates(tabIndex);
+        if (candidates.Count > 0)
+        {
+            var linkToItem = new MenuItem { Header = "Link to..." };
+            foreach (var (idx, title) in candidates)
+            {
+                int targetIdx = idx;
+                var candidate = new MenuItem { Header = title };
+                candidate.Click += (_, _) => vm.LinkTabTo(tabIndex, targetIdx);
+                linkToItem.Items.Add(candidate);
+            }
+            menu.Items.Add(linkToItem);
+        }
+
+        // Unlink option (only if linked)
+        if (tabIndex < vm.Tabs.Count && vm.Tabs[tabIndex].IsLinked)
+        {
+            var unlinkItem = new MenuItem { Header = "Unlink Tab" };
+            unlinkItem.Click += (_, _) => vm.UnlinkTab(tabIndex);
+            menu.Items.Add(unlinkItem);
+        }
+
+        menu.Items.Add(new Separator());
 
         var detachItem = new MenuItem { Header = "Detach Tab" };
         detachItem.Click += (_, _) => vm.DetachTab(tabIndex);

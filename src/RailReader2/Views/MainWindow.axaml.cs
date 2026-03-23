@@ -537,6 +537,20 @@ public partial class MainWindow : Window
             e.Handled = true;
         }
 
+        // Clear non-rail edge-hold on vertical key release
+        if (Vm is { } vm3 && e.Key is Key.Down or Key.Up or Key.S or Key.W or Key.Space)
+        {
+            vm3.Controller.ClearNonRailEdgeHold();
+            e.Handled = true;
+        }
+
+        // Resume rail mode when Ctrl is released after free pan
+        if (Vm is { RailPaused: true } vm2 && e.Key is Key.LeftCtrl or Key.RightCtrl)
+        {
+            vm2.ResumeRailFromPause();
+            e.Handled = true;
+        }
+
         if (!e.Handled)
             base.OnKeyUp(e);
     }

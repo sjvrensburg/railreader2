@@ -24,6 +24,8 @@ public sealed class AppConfig
     public double LinePadding { get; set; } = 0.2;
     public double AutoScrollLinePauseMs { get; set; } = 400.0;
     public double AutoScrollBlockPauseMs { get; set; } = 600.0;
+    public bool AutoScrollTriggerEnabled { get; set; }
+    public double AutoScrollTriggerDelayMs { get; set; } = 2000.0;
     public double JumpPercentage { get; set; } = 25.0;
     public bool DarkMode { get; set; }
     public bool LineHighlightEnabled { get; set; } = true;

@@ -22,6 +22,7 @@ public sealed class DocumentState : IDisposable
     private ColourEffect _colourEffect;
     private bool _lineFocusBlur;
     private bool _lineHighlightEnabled = true;
+    private Guid? _linkGroupId;
     /// <summary>Fires when a property changes. Parameter is the property name.</summary>
     public Action<string>? StateChanged;
 
@@ -86,6 +87,12 @@ public sealed class DocumentState : IDisposable
     {
         get => _lineHighlightEnabled;
         set => SetField(ref _lineHighlightEnabled, value, nameof(LineHighlightEnabled));
+    }
+
+    public Guid? LinkGroupId
+    {
+        get => _linkGroupId;
+        set => SetField(ref _linkGroupId, value, nameof(LinkGroupId));
     }
 
     public string FilePath { get; }
@@ -404,6 +411,13 @@ public sealed class DocumentState : IDisposable
     public void StartSnap(double windowWidth, double windowHeight)
     {
         Rail.StartSnapToCurrent(Camera.OffsetX, Camera.OffsetY, Camera.Zoom, windowWidth, windowHeight);
+    }
+
+    public void StartSnapPreservingPosition(double windowWidth, double windowHeight,
+        double horizontalFraction, double lineScreenY)
+    {
+        Rail.StartSnapPreservingPosition(Camera.OffsetX, Camera.OffsetY, Camera.Zoom,
+            windowWidth, windowHeight, horizontalFraction, lineScreenY);
     }
 
     public void StartSnapToEnd(double windowWidth, double windowHeight)

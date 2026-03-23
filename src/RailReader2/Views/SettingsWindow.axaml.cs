@@ -57,6 +57,8 @@ public partial class SettingsWindow : Window
         LinePaddingSlider.Value = c.LinePadding;
         AutoScrollLinePause.Value = (decimal)c.AutoScrollLinePauseMs;
         AutoScrollBlockPause.Value = (decimal)c.AutoScrollBlockPauseMs;
+        AutoScrollTriggerCheck.IsChecked = c.AutoScrollTriggerEnabled;
+        AutoScrollTriggerDelay.Value = (decimal)c.AutoScrollTriggerDelayMs;
         JumpPercentage.Value = (decimal)c.JumpPercentage;
 
         LineHighlightCheck.IsChecked = c.LineHighlightEnabled;
@@ -86,6 +88,7 @@ public partial class SettingsWindow : Window
         c.ColourEffectIntensity = IntensitySlider.Value;
         c.AutoScrollLinePauseMs = (double)(AutoScrollLinePause.Value ?? 400m);
         c.AutoScrollBlockPauseMs = (double)(AutoScrollBlockPause.Value ?? 600m);
+        c.AutoScrollTriggerDelayMs = (double)(AutoScrollTriggerDelay.Value ?? 2000m);
         c.JumpPercentage = (double)(JumpPercentage.Value ?? 25m);
         vm.OnConfigChanged();
     }
@@ -177,6 +180,13 @@ public partial class SettingsWindow : Window
     private void OnLineHighlightOpacityChanged(object? sender, Avalonia.AvaloniaPropertyChangedEventArgs e)
         => OnSliderChanged(e, c => c.LineHighlightOpacity = LineHighlightOpacitySlider.Value);
 
+    private void OnAutoScrollTriggerChanged(object? sender, RoutedEventArgs e)
+    {
+        if (Vm is not { } vm || _loading) return;
+        vm.Config.AutoScrollTriggerEnabled = AutoScrollTriggerCheck.IsChecked == true;
+        vm.OnConfigChanged();
+    }
+
     private void OnSettingChanged(object? sender, NumericUpDownValueChangedEventArgs e) => SaveToConfig();
     private void OnEffectChanged(object? sender, SelectionChangedEventArgs e)
     {
@@ -218,6 +228,8 @@ public partial class SettingsWindow : Window
         }
         vm.Config.AutoScrollLinePauseMs = defaults.AutoScrollLinePauseMs;
         vm.Config.AutoScrollBlockPauseMs = defaults.AutoScrollBlockPauseMs;
+        vm.Config.AutoScrollTriggerEnabled = defaults.AutoScrollTriggerEnabled;
+        vm.Config.AutoScrollTriggerDelayMs = defaults.AutoScrollTriggerDelayMs;
         vm.Config.JumpPercentage = defaults.JumpPercentage;
         vm.Config.LineHighlightEnabled = defaults.LineHighlightEnabled;
         vm.Config.LineHighlightTint = defaults.LineHighlightTint;
