@@ -50,7 +50,7 @@ RailReader2.slnx              # Default: app + core + tests
 
 All business logic with zero Avalonia dependencies. Key files:
 
-- `DocumentController.cs` — headless controller facade (orchestration, animation tick loop, viewport, search, annotation tool state)
+- `DocumentController.cs` — headless controller facade (orchestration, animation tick loop, viewport). Annotation interaction delegated to `AnnotationInteractionHandler.cs`; search delegated to `Services/SearchService.cs`
 - `DocumentState.cs` — per-document state (PDF, camera, rail nav, analysis cache, annotations, bookmarks)
 - `Models/` — data models (Annotations, BookmarkEntry, Camera, LayoutBlock, etc.)
 - `Services/AnalysisWorker.cs` — background ONNX inference thread (`Channel<T>` queue)
@@ -60,6 +60,8 @@ All business logic with zero Avalonia dependencies. Key files:
 - `Services/AppConfig.cs` — config persistence (`~/.config/railreader2/config.json`)
 - `Services/ColourEffectShaders.cs` — SkSL shaders (HighContrast, HighVisibility, Amber, Invert)
 - `Services/AnnotationService.cs` — JSON sidecar persistence for annotations and bookmarks
+- `AnnotationInteractionHandler.cs` — annotation tool input handling (hit testing, drag, resize, text notes)
+- `Services/SearchService.cs` — full-text search with regex/case sensitivity, result grouping by page
 
 ### RailReader2 (Avalonia UI shell)
 
@@ -89,7 +91,7 @@ Page bitmap → BGRA-to-RGB → 800x800 rescale → CHW float tensor → PP-DocL
 
 ### Rail Mode
 
-Activates above `rail_zoom_threshold` when analysis is available. Locks to detected text blocks, advances line-by-line with cubic ease-out snap. Key mechanics: hold-to-scroll with quadratic speed ramping, soft asymptotic block edge clamping (`SoftEase`), `VerticalBias` for preserving vertical offset, pixel snapping for text shimmer reduction. Sub-features: auto-scroll (`P`), jump mode (`J`), line focus blur (`F`), line highlight (`H`), named bookmarks (`B`).
+Activates above `rail_zoom_threshold` when analysis is available. Locks to detected text blocks, advances line-by-line with cubic ease-out snap. Key mechanics: hold-to-scroll with quadratic speed ramping, soft asymptotic block edge clamping (`SoftEase`), `VerticalBias` for preserving vertical offset, pixel snapping for text shimmer reduction. Sub-features: auto-scroll (`P`), jump mode (`J`), line focus blur (`F`), line highlight (`H`), named bookmarks (`B`). Free pan (Ctrl+drag) temporarily exits rail mode for unrestricted pan/zoom to inspect images or equations, snapping back on Ctrl release. Zooming in rail mode preserves horizontal scroll position and line screen position rather than snapping to line start.
 
 ### Controller/ViewModel Pattern
 
@@ -107,7 +109,7 @@ Four SkSL shaders compiled at startup via `SKRuntimeEffect.CreateColorFilter()`.
 
 Config: `~/.config/railreader2/config.json` (Linux), `%APPDATA%\railreader2\config.json` (Windows), or `~/Library/Application Support/railreader2/config.json` (macOS). Auto-created with defaults. Editable live via Settings panel. See `Services/AppConfig.cs` for all fields and defaults.
 
-Key fields: `rail_zoom_threshold`, `snap_duration_ms`, `scroll_speed_start/max`, `scroll_ramp_time`, `analysis_lookahead_pages`, `ui_font_scale`, `colour_effect/intensity`, `motion_blur/intensity`, `pixel_snapping`, `line_focus_blur/intensity`, `line_highlight_tint/opacity`, `auto_scroll_line_pause_ms/block_pause_ms`, `jump_percentage`, `dark_mode`, `navigable_classes[]`, `centering_classes[]`, `recent_files[]`.
+Key fields: `rail_zoom_threshold`, `snap_duration_ms`, `scroll_speed_start/max`, `scroll_ramp_time`, `analysis_lookahead_pages`, `ui_font_scale`, `colour_effect/intensity`, `motion_blur/intensity`, `pixel_snapping`, `line_focus_blur/intensity`, `line_highlight_tint/opacity`, `auto_scroll_line_pause_ms/block_pause_ms`, `auto_scroll_trigger_enabled`, `auto_scroll_trigger_delay_ms`, `jump_percentage`, `dark_mode`, `navigable_classes[]`, `centering_classes[]`, `recent_files[]`.
 
 `navigable_classes` controls which block types are navigable in rail mode. `centering_classes` controls which block types are horizontally centered when narrower than the viewport (excludes headings by default). Line detection runs for all blocks regardless, so toggling classes doesn't require ONNX re-inference.
 

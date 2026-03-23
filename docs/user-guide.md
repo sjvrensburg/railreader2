@@ -61,6 +61,8 @@ Once a PDF is open, scroll through pages with `PgDn`/`PgUp`, zoom with `+`/`-` o
 | `Ctrl+G` | Go to a specific page number |
 | `Space` | Next line (in rail mode) or next page |
 
+> **Edge-hold page navigation:** When not in rail mode, holding `Down` or `S` at the bottom of the page for 400ms automatically advances to the next page. Similarly, holding `Up` or `W` at the top of the page goes to the previous page.
+
 ### Minimap and outline
 
 Press `Ctrl+M` to toggle the **minimap** — a small page thumbnail in the corner. Click or drag on it to navigate.
@@ -73,8 +75,15 @@ Open multiple PDFs in tabs with `Ctrl+O`. Each tab has independent zoom, positio
 
 **Right-click any tab** to open a context menu with:
 - **Duplicate Tab** — opens the same PDF in a new tab
+- **Duplicate Tab (Linked)** — opens same PDF linked to this tab (always on same page)
+- **Link to...** — link to another tab showing the same document
+- **Unlink Tab** — remove from link group
 - **Detach Tab** — moves the tab to a new window
 - **Close Tab** — closes the tab
+
+**Linked tabs** always show the same page — navigating to a new page in one tab automatically updates the other. Each linked tab has independent zoom and scroll position, so you can view the same page at different magnifications simultaneously. Linked tabs are indicated by a chain icon and a colored dot on the tab header, and they always stay adjacent in the tab bar.
+
+**Tab bar overflow:** When many tabs are open, they shrink with ellipsis text. Use the mouse wheel to scroll the tab bar horizontally, or click the **▼** dropdown to see all tabs and jump to one.
 
 Switching tabs automatically exits any active annotation mode to prevent accidental edits on the wrong document.
 
@@ -86,6 +95,14 @@ Rail mode is the core feature of railreader2. When you zoom past the threshold (
 
 ![Rail mode](img/rail_mode.png)
 *Rail mode — line-by-line reading at high magnification with the current line highlighted*
+
+### Free pan
+
+Hold `Ctrl` and drag to temporarily pan freely, even zooming out below the rail threshold. This lets you quickly check a figure, equation, or footnote elsewhere on the same page without losing your place. Release `Ctrl` to snap back to your original reading position and zoom level.
+
+### Zoom position preservation
+
+Zooming while reading a line now preserves your horizontal scroll position, so you can adjust magnification without losing your place in the text.
 
 ### Line-by-line navigation
 
@@ -121,6 +138,7 @@ Press `P` in rail mode to toggle **auto-scroll**. The view continuously scrolls 
 
 - **Speed boost:** Hold `D` or `Right` during auto-scroll to double the speed.
 - **Pauses:** Auto-scroll pauses briefly at line boundaries (default 400ms) and block/page transitions (default 600ms) to let your eyes settle. Configurable in Settings > Auto-Scroll.
+- **Auto-scroll trigger:** Optionally, auto-scroll can start automatically after holding `D` or `Right` for a configurable delay. Enable this in Settings > Auto-Scroll > **Enable auto-scroll trigger** and set the desired hold duration.
 - **Stop:** Press `Escape`, `P`, or any opposing navigation key (`Up`, `Left`).
 
 The status bar shows a green **"Auto-Scroll"** indicator when active. Adjust speed with the rail toolbar slider or the `[` / `]` keys.
@@ -273,6 +291,8 @@ Annotations are saved automatically as JSON sidecar files alongside the PDF (e.g
 
 Use **File > Export with Annotations** to create a new PDF with annotations rendered into the pages. The original PDF is not modified.
 
+Use **File > Export Annotations as JSON** to save all annotations and bookmarks for the current document to a JSON file. This is useful for backup, scripting, or interoperability with other tools.
+
 ---
 
 ## Text Selection
@@ -393,6 +413,7 @@ Configuration is stored at `~/.config/railreader2/config.json` (Linux) or `%APPD
 | `F` | Toggle line focus dim |
 | `R` | *(Removed in 3.2)* |
 | `H` | Toggle line highlight |
+| `Ctrl+Drag` | Free pan (release Ctrl to snap back) |
 | `[` / `]` | Adjust speed or jump distance |
 | `Shift+[` / `Shift+]` | Adjust blur intensity |
 | Click | Jump to block |

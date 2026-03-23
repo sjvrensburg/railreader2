@@ -70,7 +70,7 @@
             </Grid>
 
             <TextBlock Text="Rail Mode (active above zoom threshold)" FontWeight="Bold" />
-            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" Margin="8,0">
+            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" Margin="8,0">
                 <TextBlock Grid.Row="0" Grid.Column="0" Text="Down / S" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
                 <TextBlock Grid.Row="0" Grid.Column="1" Text="Next line" Margin="0,2" />
                 <TextBlock Grid.Row="1" Grid.Column="0" Text="Up / W" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
@@ -101,6 +101,8 @@
                 <TextBlock Grid.Row="13" Grid.Column="1" Text="Adjust blur intensity" Margin="0,2" />
                 <TextBlock Grid.Row="14" Grid.Column="0" Text="Click" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
                 <TextBlock Grid.Row="14" Grid.Column="1" Text="Jump to block" Margin="0,2" />
+                <TextBlock Grid.Row="15" Grid.Column="0" Text="Ctrl+Drag" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="15" Grid.Column="1" Text="Free pan (release Ctrl to snap back)" Margin="0,2" />
             </Grid>
 
             <TextBlock Text="Pan (below zoom threshold)" FontWeight="Bold" />

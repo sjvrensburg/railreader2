@@ -57,7 +57,9 @@ At high zoom levels, navigation switches to "rail mode" — the viewer locks ont
 
 ### Features
 
-- **Multi-tab support** — open multiple PDFs with independent per-tab state. Right-click a tab for a context menu (Duplicate, Detach to new window, Close)
+- **Multi-tab support** — open multiple PDFs with independent per-tab state. Right-click a tab for a context menu (Duplicate, Duplicate Linked, Link To, Unlink, Detach to new window, Close)
+- **Linked tabs** — duplicate tabs can be linked to always stay on the same page. Chain icon and colored dot indicator on linked tabs. Linked tabs are kept adjacent and move as a group
+- **Tab bar overflow** — tabs shrink with ellipsis when many are open. Horizontal mouse wheel scrolls the tab bar. Overflow dropdown button lists all tabs
 - **Menu bar** — File, View, Navigation, Help menus with keyboard shortcuts
 - **Interactive minimap** — click or drag to navigate the page
 - **Outline and bookmarks panel** — tabbed pane with table of contents and named bookmarks (Ctrl+Shift+O for outline, Ctrl+Shift+B for bookmarks)
@@ -82,11 +84,16 @@ At high zoom levels, navigation switches to "rail mode" — the viewer locks ont
 - **Text selection** — select and copy text from PDF pages via the toolbar
 - **Toolbar** — floating Browse/Text Select/Copy toolbar for quick mode switching
 - **Annotation export** — export PDFs with embedded annotations (File → Export with Annotations)
+- **Annotation JSON export** — export annotation data as JSON (File → Export Annotations as JSON)
 - **Undo/redo** — annotation history with Ctrl+Z / Ctrl+Y
 - **Annotation mode indicator** — status bar shows active tool name in amber with a clickable exit button
 - **Annotation tool cursors** — each annotation tool shows a distinct mouse cursor (crosshair for drawing tools, I-beam for text select, no-entry for eraser) so you always know the active mode
 - **Tab-switch tool reset** — switching tabs automatically exits any active annotation mode to prevent accidental edits
+- **Free pan in rail mode** — hold Ctrl while dragging to pan and zoom freely (even below rail threshold) to inspect images or equations. Release Ctrl to snap back to your original reading position and zoom level
+- **Zoom position preservation** — zooming in rail mode no longer snaps to line start; horizontal scroll position and line screen position are preserved
+- **Edge-hold page navigation** — in non-rail mode, hold Down/S at the page bottom for 400ms to advance to the next page. Same for Up/W at the top edge
 - **Auto-scroll** — toggle continuous horizontal scrolling in rail mode (P key), hold D/Right to boost speed, with configurable pauses at line and block boundaries
+- **Auto-scroll trigger** — optionally auto-start auto-scroll after holding D/Right for a configurable delay (default 2s). Off by default, configurable in Settings > Auto-Scroll
 - **Jump mode** — saccade-style reading (J key) that advances by a configurable percentage of the visible width; Shift+Right/Left for half-distance short jumps
 - **Line focus dim** — smooth feathered dimming of non-active lines to reduce peripheral distraction, with configurable intensity and padding
 - **Line highlight toggle** — independently toggle line highlight tint (H key); works with or without line focus blur
@@ -99,6 +106,7 @@ At high zoom levels, navigation switches to "rail mode" — the viewer locks ont
 - **Line highlight tint** — configurable colour tint on the active line in rail mode (Auto, Yellow, Cyan, Green, or None) with adjustable opacity. Auto adapts to the active colour effect
 - **Fullscreen mode** — F11 hides all chrome for distraction-free reading; Escape exits
 - **Tabbed settings** — organised settings panel with Appearance, Rail Reading, Auto-Scroll, and Advanced tabs
+- **Colorblind-safe colors** — status bar, link indicators, debug overlay, and annotation highlights use a colorblind-safe palette
 - **Tooltips** — all interactive controls have descriptive tooltips
 
 ## Installation
@@ -156,9 +164,10 @@ Use **File → Open** (Ctrl+O) to open a PDF from within the app.
 | Space | Next line (rail mode) or next page |
 | +/- | Zoom in / out |
 | 0 | Reset zoom and position |
-| Arrow Down / Up (S / W) | Next / previous line (rail mode) or pan |
+| Arrow Down / Up (S / W) | Next / previous line (rail mode) or pan; hold at page edge for 400ms to advance page (non-rail) |
 | Arrow Right / Left (D / A) | Hold to scroll along line (rail mode) or pan |
 | Ctrl + Mouse wheel | Horizontal scroll along line (rail mode) |
+| Ctrl+Drag | Free pan in rail mode (release Ctrl to snap back) |
 | Mouse drag | Pan |
 | Mouse wheel | Zoom towards cursor |
 | Click on block | Jump to block (rail mode) |
@@ -221,7 +230,9 @@ Rail reading parameters are editable via the Settings panel (gear icon in menu b
   "centering_classes": [
     "abstract", "algorithm", "display_formula",
     "footnote", "text"
-  ]
+  ],
+  "auto_scroll_trigger_enabled": false,
+  "auto_scroll_trigger_delay_ms": 2000.0
 }
 ```
 
@@ -251,6 +262,8 @@ Rail reading parameters are editable via the Settings panel (gear icon in menu b
 | `dark_mode` | Enable dark UI theme (`true`/`false`) |
 | `navigable_classes` | Which block types rail mode navigates (array of class names). Configurable via Settings → Advanced. |
 | `centering_classes` | Which block types are horizontally centered when narrower than the viewport (array of class names). Excludes headings by default. Configurable via Settings → Advanced. |
+| `auto_scroll_trigger_enabled` | Auto-start auto-scroll after holding D/Right for the trigger delay (`true`/`false`, default `false`) |
+| `auto_scroll_trigger_delay_ms` | Delay before auto-scroll triggers from hold (ms, default 2000) |
 
 ## Removed features
 
