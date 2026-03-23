@@ -81,46 +81,46 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public ObservableCollection<TabViewModel> Tabs { get; } = [];
 
-    // Delegated state from controller
-    public List<SearchMatch> SearchMatches => _controller.SearchMatches;
-    public List<SearchMatch>? CurrentPageSearchMatches => _controller.CurrentPageSearchMatches;
+    // Delegated state from controller subsystems
+    public List<SearchMatch> SearchMatches => _controller.Search.SearchMatches;
+    public List<SearchMatch>? CurrentPageSearchMatches => _controller.Search.CurrentPageSearchMatches;
     public int ActiveMatchIndex
     {
-        get => _controller.ActiveMatchIndex;
-        set => _controller.ActiveMatchIndex = value;
+        get => _controller.Search.ActiveMatchIndex;
+        set => _controller.Search.ActiveMatchIndex = value;
     }
 
-    public AnnotationTool ActiveTool => _controller.ActiveTool;
-    public bool IsAnnotating => _controller.IsAnnotating;
+    public AnnotationTool ActiveTool => _controller.Annotations.ActiveTool;
+    public bool IsAnnotating => _controller.Annotations.IsAnnotating;
     public Annotation? SelectedAnnotation
     {
-        get => _controller.SelectedAnnotation;
-        set => _controller.SelectedAnnotation = value;
+        get => _controller.Annotations.SelectedAnnotation;
+        set => _controller.Annotations.SelectedAnnotation = value;
     }
-    public Annotation? PreviewAnnotation => _controller.PreviewAnnotation;
+    public Annotation? PreviewAnnotation => _controller.Annotations.PreviewAnnotation;
     public string ActiveAnnotationColor
     {
-        get => _controller.ActiveAnnotationColor;
-        set => _controller.ActiveAnnotationColor = value;
+        get => _controller.Annotations.ActiveAnnotationColor;
+        set => _controller.Annotations.ActiveAnnotationColor = value;
     }
     public float ActiveAnnotationOpacity
     {
-        get => _controller.ActiveAnnotationOpacity;
-        set => _controller.ActiveAnnotationOpacity = value;
+        get => _controller.Annotations.ActiveAnnotationOpacity;
+        set => _controller.Annotations.ActiveAnnotationOpacity = value;
     }
     public float ActiveStrokeWidth
     {
-        get => _controller.ActiveStrokeWidth;
-        set => _controller.ActiveStrokeWidth = value;
+        get => _controller.Annotations.ActiveStrokeWidth;
+        set => _controller.Annotations.ActiveStrokeWidth = value;
     }
 
-    public string? SelectedText => _controller.SelectedText;
-    public List<HighlightRect>? TextSelectionRects => _controller.TextSelectionRects;
+    public string? SelectedText => _controller.Annotations.SelectedText;
+    public List<HighlightRect>? TextSelectionRects => _controller.Annotations.TextSelectionRects;
 
     public Action<string>? CopyToClipboard
     {
-        get => _controller.CopyToClipboard;
-        set => _controller.CopyToClipboard = value;
+        get => _controller.Annotations.CopyToClipboard;
+        set => _controller.Annotations.CopyToClipboard = value;
     }
 
     public bool AutoScrollActive => _controller.AutoScrollActive;
@@ -857,7 +857,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public void SetAnnotationTool(AnnotationTool tool)
     {
-        _controller.SetAnnotationTool(tool);
+        _controller.Annotations.SetAnnotationTool(tool);
 
         if (tool != AnnotationTool.TextSelect)
         {
@@ -872,7 +872,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public void CancelAnnotationTool()
     {
-        _controller.CancelAnnotationTool();
+        _controller.Annotations.CancelAnnotationTool();
         OnPropertyChanged(nameof(SelectedText));
         OnPropertyChanged(nameof(IsAnnotating));
         OnPropertyChanged(nameof(ActiveTool));
@@ -881,7 +881,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public void HandleAnnotationPointerDown(double pageX, double pageY)
     {
-        var (needsDialog, isEdit, existingNote, px, py) = _controller.HandleAnnotationPointerDown(pageX, pageY);
+        var (needsDialog, isEdit, existingNote, px, py) = _controller.Annotations.HandleAnnotationPointerDown(_controller.ActiveDocument, pageX, pageY);
 
         if (needsDialog)
         {
@@ -899,7 +899,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public void HandleAnnotationPointerMove(double pageX, double pageY)
     {
-        if (_controller.HandleAnnotationPointerMove(pageX, pageY))
+        if (_controller.Annotations.HandleAnnotationPointerMove(_controller.ActiveDocument, pageX, pageY))
         {
             OnPropertyChanged(nameof(SelectedText));
             InvalidateAnnotations();
@@ -908,7 +908,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public void HandleAnnotationPointerUp(double pageX, double pageY)
     {
-        if (_controller.HandleAnnotationPointerUp(pageX, pageY))
+        if (_controller.Annotations.HandleAnnotationPointerUp(_controller.ActiveDocument, pageX, pageY))
             InvalidateAnnotations();
     }
 
@@ -919,7 +919,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         var result = await dialog.ShowDialog<string?>(_window);
         if (string.IsNullOrEmpty(result)) return;
 
-        _controller.CompleteTextNote(pageX, pageY, result);
+        _controller.Annotations.CompleteTextNote(_controller.ActiveDocument, pageX, pageY, result);
         InvalidateAnnotations();
     }
 
@@ -930,7 +930,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         var result = await dialog.ShowDialog<string?>(_window);
         if (result is null) return;
 
-        _controller.CompleteTextNoteEdit(note, result);
+        _controller.Annotations.CompleteTextNoteEdit(_controller.ActiveDocument, note, result);
         InvalidateAnnotations();
     }
 
@@ -942,7 +942,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     /// </summary>
     public bool HandleBrowsePointerDown(float pageX, float pageY)
     {
-        bool hit = _controller.HandleBrowsePointerDown(pageX, pageY);
+        bool hit = _controller.Annotations.HandleBrowsePointerDown(_controller.ActiveDocument, pageX, pageY);
         OnPropertyChanged(nameof(SelectedAnnotation));
         InvalidateAnnotations();
         return hit;
@@ -950,7 +950,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public bool HandleBrowsePointerMove(float pageX, float pageY)
     {
-        if (_controller.HandleBrowsePointerMove(pageX, pageY))
+        if (_controller.Annotations.HandleBrowsePointerMove(pageX, pageY))
         {
             InvalidateAnnotations();
             return true;
@@ -960,7 +960,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public bool HandleBrowsePointerUp(float pageX, float pageY)
     {
-        if (_controller.HandleBrowsePointerUp(pageX, pageY))
+        if (_controller.Annotations.HandleBrowsePointerUp(_controller.ActiveDocument, pageX, pageY))
         {
             InvalidateAnnotations();
             return true;
@@ -970,7 +970,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public (bool Handled, TextNoteAnnotation? EditNote) HandleBrowseClick(float pageX, float pageY, bool isDoubleClick = false)
     {
-        var result = _controller.HandleBrowseClick(pageX, pageY, isDoubleClick);
+        var result = _controller.Annotations.HandleBrowseClick(_controller.ActiveDocument, pageX, pageY, isDoubleClick);
         if (result.Handled)
         {
             OnPropertyChanged(nameof(SelectedAnnotation));
@@ -983,13 +983,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public void CopySelectedText()
     {
-        _controller.CopySelectedText();
+        _controller.Annotations.CopySelectedText();
         CloseRadialMenu();
     }
 
     public void DeleteSelectedAnnotation()
     {
-        if (_controller.DeleteSelectedAnnotation())
+        if (_controller.Annotations.DeleteSelectedAnnotation(_controller.ActiveDocument))
         {
             OnPropertyChanged(nameof(SelectedAnnotation));
             InvalidateAnnotations();
@@ -998,13 +998,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public void UndoAnnotation()
     {
-        _controller.UndoAnnotation();
+        _controller.Annotations.UndoAnnotation(_controller.ActiveDocument);
         InvalidateAnnotations();
     }
 
     public void RedoAnnotation()
     {
-        _controller.RedoAnnotation();
+        _controller.Annotations.RedoAnnotation(_controller.ActiveDocument);
         InvalidateAnnotations();
     }
 
@@ -1089,13 +1089,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public void CloseSearch()
     {
-        _controller.CloseSearch();
+        _controller.Search.CloseSearch();
         InvalidateSearch();
     }
 
     public void ExecuteSearch(string query, bool caseSensitive, bool useRegex)
     {
-        _controller.ExecuteSearch(query, caseSensitive, useRegex);
+        _controller.Search.ExecuteSearch(query, caseSensitive, useRegex);
         InvalidateSearch();
     }
 
@@ -1103,23 +1103,23 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public void NextMatch()
     {
-        _controller.NextMatch();
+        _controller.Search.NextMatch();
         InvalidateAfterNavigation();
     }
 
     public void PreviousMatch()
     {
-        _controller.PreviousMatch();
+        _controller.Search.PreviousMatch();
         InvalidateAfterNavigation();
     }
 
     public void GoToMatch(int matchIndex)
     {
-        _controller.GoToMatch(matchIndex);
+        _controller.Search.GoToMatch(matchIndex);
         InvalidateAfterNavigation();
     }
 
-    public void UpdateCurrentPageMatches() => _controller.UpdateCurrentPageMatches();
+    public void UpdateCurrentPageMatches() => _controller.Search.UpdateCurrentPageMatches();
 
     // --- Invalidation helpers ---
 
