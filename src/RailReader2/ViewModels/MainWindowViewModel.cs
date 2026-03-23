@@ -1036,6 +1036,34 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
     }
 
+    [RelayCommand]
+    public async Task ExportAnnotationsJson()
+    {
+        if (_window is null || ActiveTab is not { } tab) return;
+
+        var file = await _window.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "Export Annotations as JSON",
+            DefaultExtension = "json",
+            FileTypeChoices = [new FilePickerFileType("JSON Files") { Patterns = ["*.json"] }],
+            SuggestedFileName = Path.GetFileNameWithoutExtension(tab.FilePath) + "_annotations.json",
+        });
+        if (file is null) return;
+
+        var outputPath = file.TryGetLocalPath() ?? file.Path.LocalPath;
+        if (outputPath is null) return;
+
+        try
+        {
+            AnnotationService.ExportJson(tab.Annotations, outputPath);
+            ShowStatusToast($"Annotations exported to {Path.GetFileName(outputPath)}");
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[Export JSON] Failed: {ex.Message}");
+        }
+    }
+
     // --- Search ---
 
     public event Action<string?>? SearchRequested;

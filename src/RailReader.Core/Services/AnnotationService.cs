@@ -85,6 +85,10 @@ public static class AnnotationService
         SaveToFile(GetInternalPath(pdfPath), annotations);
     }
 
+    /// <summary>Export annotations to a JSON file at a user-chosen path.</summary>
+    public static void ExportJson(AnnotationFile annotations, string outputPath)
+        => SaveToFile(outputPath, annotations);
+
     /// <summary>Delete internal annotation file for a PDF.</summary>
     public static bool Delete(string pdfPath)
     {

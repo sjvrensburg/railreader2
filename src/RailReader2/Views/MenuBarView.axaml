@@ -11,6 +11,7 @@
             <MenuItem Header="_Recent Files" x:Name="RecentFilesMenu" />
             <Separator />
             <MenuItem Header="_Export with Annotations..." Command="{Binding ExportAnnotatedCommand}" />
+            <MenuItem Header="Export Annotations as _JSON..." Command="{Binding ExportAnnotationsJsonCommand}" />
             <Separator />
             <MenuItem Header="_Close Tab" InputGesture="Ctrl+W" Click="OnCloseTab" />
             <Separator />
