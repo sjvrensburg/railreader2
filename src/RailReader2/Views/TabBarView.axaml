@@ -17,7 +17,9 @@
                     Click="OnOverflowClick" />
             <ScrollViewer Name="TabScroller"
                           HorizontalScrollBarVisibility="Hidden"
-                          VerticalScrollBarVisibility="Disabled">
+                          VerticalScrollBarVisibility="Disabled"
+                          Focusable="False"
+                          KeyboardNavigation.TabNavigation="None">
                 <StackPanel Name="TabPanel" Orientation="Horizontal" Spacing="2" />
             </ScrollViewer>
         </DockPanel>

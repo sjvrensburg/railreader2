@@ -156,7 +156,7 @@
                                                     <TextBlock TextWrapping="Wrap">
                                                         <Run Text="{Binding PreText}" />
                                                         <Run Text="{Binding MatchText}" FontWeight="Bold"
-                                                             Foreground="#F0A030" />
+                                                             Foreground="#C07800" />
                                                         <Run Text="{Binding PostText}" />
                                                     </TextBlock>
                                                 </Button>

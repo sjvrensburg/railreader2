@@ -274,14 +274,32 @@ public sealed partial class MainWindowViewModel : ObservableObject
             }
 
             _controller.AddDocument(tab.State);
-            Tabs.Add(tab);
+
+            // Insert linked tabs adjacent to their group; unlinked tabs append at end
+            int insertIndex = Tabs.Count;
+            if (tab.State.LinkGroupId is { } gid)
+            {
+                for (int i = Tabs.Count - 1; i >= 0; i--)
+                {
+                    if (Tabs[i].State.LinkGroupId == gid)
+                    { insertIndex = i + 1; break; }
+                }
+                // Also fix the Documents list to match
+                if (insertIndex < Tabs.Count)
+                {
+                    _controller.Documents.Remove(tab.State);
+                    _controller.Documents.Insert(insertIndex, tab.State);
+                    _controller.ActiveDocumentIndex = _controller.Documents.IndexOf(tab.State);
+                }
+            }
+            Tabs.Insert(insertIndex, tab);
 
             // New tab inherits the current sidebar state
             tab.ShowSidePanel = ShowOutline;
             if (ReadSidePanelWidth is { } getWidth)
                 tab.SidePanelWidth = getWidth();
 
-            ActiveTabIndex = Tabs.Count - 1;
+            ActiveTabIndex = insertIndex;
             OnPropertyChanged(nameof(ActiveTab));
             InvalidateAll();
 
@@ -367,14 +385,143 @@ public sealed partial class MainWindowViewModel : ObservableObject
         if (toIndex < 0 || toIndex >= Tabs.Count) return;
 
         var selectedTab = ActiveTab;
-        Tabs.Move(fromIndex, toIndex);
-        _controller.MoveDocument(fromIndex, toIndex);
+        var draggedTab = Tabs[fromIndex];
+
+        if (draggedTab.State.LinkGroupId is { } groupId)
+            MoveLinkedGroup(fromIndex, toIndex, groupId);
+        else
+            MoveSingleTab(fromIndex, toIndex);
+
+        // Re-consolidate any link group that was split by this move
+        ConsolidateLinkGroups();
 
         if (selectedTab is not null)
             ActiveTabIndex = Tabs.IndexOf(selectedTab);
 
         OnPropertyChanged(nameof(ActiveTab));
         InvalidateAll();
+    }
+
+    private void MoveSingleTab(int fromIndex, int toIndex)
+    {
+        Tabs.Move(fromIndex, toIndex);
+        _controller.MoveDocument(fromIndex, toIndex);
+    }
+
+    private void MoveLinkedGroup(int draggedFrom, int dropTarget, Guid groupId)
+    {
+        // Collect group members in their current order
+        var groupIndices = new List<int>();
+        for (int i = 0; i < Tabs.Count; i++)
+            if (Tabs[i].State.LinkGroupId == groupId)
+                groupIndices.Add(i);
+
+        if (groupIndices.Count <= 1)
+        {
+            MoveSingleTab(draggedFrom, dropTarget);
+            return;
+        }
+
+        // Determine the insertion point: where the first group member should land
+        bool movingForward = dropTarget > draggedFrom;
+        int insertAt = movingForward
+            ? dropTarget - (groupIndices.Count - 1)  // account for group members being removed before insertion
+            : dropTarget;
+        insertAt = Math.Clamp(insertAt, 0, Tabs.Count - groupIndices.Count);
+
+        // Extract group tabs (in order), then reinsert at the target position
+        var groupTabs = groupIndices.Select(i => Tabs[i]).ToList();
+        var groupDocs = groupIndices.Select(i => _controller.Documents[i]).ToList();
+
+        // Remove from end to preserve indices
+        for (int i = groupIndices.Count - 1; i >= 0; i--)
+        {
+            Tabs.RemoveAt(groupIndices[i]);
+            _controller.Documents.RemoveAt(groupIndices[i]);
+        }
+
+        // Clamp insertion point after removal
+        insertAt = Math.Clamp(insertAt, 0, Tabs.Count);
+
+        // Reinsert group in order
+        for (int i = 0; i < groupTabs.Count; i++)
+        {
+            Tabs.Insert(insertAt + i, groupTabs[i]);
+            _controller.Documents.Insert(insertAt + i, groupDocs[i]);
+        }
+
+        // Fix active document index
+        if (_controller.ActiveDocument is { } active)
+            _controller.ActiveDocumentIndex = _controller.Documents.IndexOf(active);
+    }
+
+    /// <summary>
+    /// Ensures all tabs in the same link group are adjacent. Call after linking.
+    /// Moves the tab at <paramref name="moveIndex"/> next to its group members.
+    /// </summary>
+    private void EnsureGroupAdjacent(Guid groupId, int moveIndex)
+    {
+        // Find the first group member that isn't the one we're moving
+        int anchorIndex = -1;
+        for (int i = 0; i < Tabs.Count; i++)
+        {
+            if (i != moveIndex && Tabs[i].State.LinkGroupId == groupId)
+            { anchorIndex = i; break; }
+        }
+        if (anchorIndex < 0) return;
+
+        // Find the end of the contiguous group block starting at anchorIndex
+        int groupEnd = anchorIndex;
+        while (groupEnd + 1 < Tabs.Count && Tabs[groupEnd + 1].State.LinkGroupId == groupId)
+            groupEnd++;
+
+        // If the tab to move is already adjacent to the group, nothing to do
+        if (moveIndex == groupEnd + 1 || moveIndex == anchorIndex - 1) return;
+        if (moveIndex >= anchorIndex && moveIndex <= groupEnd) return;
+
+        // Move it to right after the group block
+        int targetIndex = moveIndex < anchorIndex ? groupEnd : groupEnd; // after last group member
+        if (moveIndex > groupEnd) targetIndex = groupEnd + 1;
+        if (targetIndex > moveIndex) targetIndex--; // account for removal shifting
+
+        targetIndex = Math.Clamp(targetIndex, 0, Tabs.Count - 1);
+        if (targetIndex != moveIndex)
+            MoveSingleTab(moveIndex, targetIndex);
+    }
+
+    /// <summary>
+    /// Scans for link groups whose members are not contiguous and moves
+    /// stray members next to the first occurrence of their group.
+    /// </summary>
+    private void ConsolidateLinkGroups()
+    {
+        var seen = new Dictionary<Guid, int>(); // groupId → end of contiguous block
+        int i = 0;
+        while (i < Tabs.Count)
+        {
+            var gid = Tabs[i].State.LinkGroupId;
+            if (gid is null) { i++; continue; }
+
+            if (!seen.TryGetValue(gid.Value, out int groupEnd))
+            {
+                // First time seeing this group — mark position
+                seen[gid.Value] = i;
+                i++;
+            }
+            else if (groupEnd == i - 1)
+            {
+                // Still contiguous — extend the block
+                seen[gid.Value] = i;
+                i++;
+            }
+            else
+            {
+                // Gap detected: this tab should be right after groupEnd
+                MoveSingleTab(i, groupEnd + 1);
+                seen[gid.Value] = groupEnd + 1;
+                // Don't increment i — the next tab shifted into this slot
+            }
+        }
     }
 
     [RelayCommand]
@@ -401,6 +548,17 @@ public sealed partial class MainWindowViewModel : ObservableObject
         if (sourceIndex < 0 || sourceIndex >= Tabs.Count) return;
         if (targetIndex < 0 || targetIndex >= Tabs.Count) return;
         _controller.LinkDocuments(Tabs[sourceIndex].State, Tabs[targetIndex].State);
+
+        // Move the target tab adjacent to the source (or vice versa)
+        var groupId = Tabs[sourceIndex].State.LinkGroupId;
+        if (groupId.HasValue)
+        {
+            // Re-lookup target index since it may not have moved yet
+            int newTargetIdx = Tabs.IndexOf(Tabs[targetIndex]);
+            EnsureGroupAdjacent(groupId.Value, newTargetIdx);
+        }
+
+        OnPropertyChanged(nameof(ActiveTab));
         InvalidateAll();
     }
 

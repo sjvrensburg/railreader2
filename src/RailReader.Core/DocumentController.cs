@@ -84,8 +84,8 @@ public sealed class DocumentController
     public static readonly (string Color, float Opacity)[] HighlightColors =
     [
         ("#FFFF00", 0.35f),  // Yellow
-        ("#90EE90", 0.35f),  // Green
-        ("#FFB6C1", 0.35f),  // Pink
+        ("#66CC66", 0.35f),  // Green
+        ("#FF8FA0", 0.35f),  // Pink
     ];
 
     public static readonly (string Color, float Opacity)[] PenColors =

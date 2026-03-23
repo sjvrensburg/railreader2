@@ -16,9 +16,9 @@ public partial class TabBarView : UserControl
     private static readonly IBrush[] LinkBrushes =
     [
         new SolidColorBrush(Color.Parse("#4A9EFF")),
-        new SolidColorBrush(Color.Parse("#4ADE80")),
         new SolidColorBrush(Color.Parse("#FB923C")),
-        new SolidColorBrush(Color.Parse("#C084FC")),
+        new SolidColorBrush(Color.Parse("#00B4C5")),
+        new SolidColorBrush(Color.Parse("#E879A8")),
     ];
     private static readonly IBrush ActiveTabFg = Brushes.White;
     private static readonly IBrush InactiveTabBg = new SolidColorBrush(Color.FromArgb(30, 0, 0, 0));
@@ -323,6 +323,20 @@ public partial class TabBarView : UserControl
         }
     }
 
+    /// <summary>Returns all tab indices in the same link group as the given index, or just the index itself if unlinked.</summary>
+    private List<int> GetGroupIndices(int index)
+    {
+        if (_vm is null || index < 0 || index >= _vm.Tabs.Count)
+            return [index];
+        var gid = _vm.Tabs[index].State.LinkGroupId;
+        if (!gid.HasValue) return [index];
+        var indices = new List<int>();
+        for (int i = 0; i < _vm.Tabs.Count; i++)
+            if (_vm.Tabs[i].State.LinkGroupId == gid)
+                indices.Add(i);
+        return indices;
+    }
+
     private int HitTestTabIndex(Point posInPanel)
     {
         foreach (var child in TabPanel.Children)
@@ -453,9 +467,13 @@ public partial class TabBarView : UserControl
             _isDragging = true;
             e.Pointer.Capture(TabPanel);
 
-            var dragContainer = GetContainerByIndex(_dragIndex);
-            if (dragContainer is not null)
-                dragContainer.Opacity = 0.5;
+            // Dim all group members when dragging a linked tab
+            foreach (int idx in GetGroupIndices(_dragIndex))
+            {
+                var container = GetContainerByIndex(idx);
+                if (container is not null)
+                    container.Opacity = 0.5;
+            }
         }
 
         e.Handled = true;
@@ -500,9 +518,16 @@ public partial class TabBarView : UserControl
 
     private void ResetDragState(IPointer? pointer)
     {
-        var dragContainer = _dragIndex >= 0 ? GetContainerByIndex(_dragIndex) : null;
-        if (dragContainer is not null)
-            dragContainer.Opacity = 1.0;
+        // Restore opacity on all group members
+        if (_dragIndex >= 0)
+        {
+            foreach (int idx in GetGroupIndices(_dragIndex))
+            {
+                var container = GetContainerByIndex(idx);
+                if (container is not null)
+                    container.Opacity = 1.0;
+            }
+        }
 
         pointer?.Capture(null);
         RemoveDropIndicator();
