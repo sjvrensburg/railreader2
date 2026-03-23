@@ -35,6 +35,12 @@ public sealed class RailNav
     private bool _autoScrollPauseAdvances; // true = end-of-line pause that triggers advance
     private double _autoScrollPendingPauseMs; // deferred pause that starts after snap completes
 
+    /// <summary>
+    /// Set to true when sustained horizontal scroll triggers auto-scroll.
+    /// The controller reads and clears this flag to transition state.
+    /// </summary>
+    public bool AutoScrollTriggered { get; set; }
+
     // Edge-hold advance: when the user holds D/Right (or A/Left) against the line boundary
     // for EdgeAdvanceHoldMs, trigger a NextLine/PrevLine as if they had pressed Down/Up.
     private Stopwatch? _edgeHoldTimer;
@@ -131,6 +137,16 @@ public sealed class RailNav
             _snap = null;
             _scrollDir = null;
         }
+    }
+
+    /// <summary>
+    /// Scale VerticalBias proportionally so the active line stays at the
+    /// same screen position when zoom changes incrementally.
+    /// </summary>
+    public void ScaleVerticalBias(double previousZoom, double newZoom)
+    {
+        if (Active && previousZoom > 0 && Math.Abs(previousZoom - newZoom) > 0.001)
+            VerticalBias *= newZoom / previousZoom;
     }
 
     public void FindNearestBlock(double cameraX, double cameraY, double zoom, double windowWidth, double windowHeight)
@@ -413,6 +429,61 @@ public sealed class RailNav
         BeginSnap(cameraX, cameraY, SnapX(targetX), SnapY(targetY));
     }
 
+    /// <summary>
+    /// Computes horizontal scroll fraction (0=line start, 1=line end) for the current
+    /// camera position. Used to preserve reading position across zoom changes.
+    /// </summary>
+    public double ComputeHorizontalFraction(double cameraX, double zoom, double windowWidth)
+    {
+        if (!CanNavigate) return 0;
+        var (blockLeft, blockRight, blockWidthPx) = GetBlockBounds(zoom);
+        if (blockWidthPx <= windowWidth) return 0; // block fits in viewport, no scrolling
+
+        double maxX = -blockLeft * zoom;           // camera X at line start (left edge visible)
+        double minX = windowWidth - blockRight * zoom; // camera X at line end (right edge visible)
+        if (Math.Abs(maxX - minX) < 1) return 0;
+
+        return Math.Clamp((maxX - cameraX) / (maxX - minX), 0, 1);
+    }
+
+    /// <summary>
+    /// Snap to the current line, preserving horizontal fraction and vertical screen position.
+    /// Used after zoom changes to maintain the user's reading position.
+    /// </summary>
+    public void StartSnapPreservingPosition(double cameraX, double cameraY, double zoom,
+        double windowWidth, double windowHeight, double horizontalFraction, double lineScreenY)
+    {
+        if (!CanNavigate) return;
+
+        var line = CurrentLineInfo;
+
+        // Compute target Y so the line stays at lineScreenY on screen
+        // lineScreenY = line.Y * zoom + targetY  →  targetY = lineScreenY - line.Y * zoom
+        double targetY = lineScreenY - line.Y * zoom;
+        // Update VerticalBias to match this position (so future snaps preserve it)
+        double centeredY = windowHeight / 2.0 - line.Y * zoom;
+        VerticalBias = targetY - centeredY;
+
+        // Compute target X from horizontal fraction
+        var (blockLeft, blockRight, blockWidthPx) = GetBlockBounds(zoom);
+        double targetX;
+        if (blockWidthPx <= windowWidth)
+        {
+            // Block fits — use standard positioning
+            var (stdX, _) = ComputeTargetCamera(zoom, windowWidth, windowHeight);
+            targetX = stdX;
+        }
+        else
+        {
+            double maxX = -blockLeft * zoom;
+            double minX = windowWidth - blockRight * zoom;
+            targetX = maxX - horizontalFraction * (maxX - minX);
+        }
+
+        targetX = ClampX(targetX, zoom, windowWidth);
+        BeginSnap(cameraX, cameraY, SnapX(targetX), SnapY(targetY));
+    }
+
     private void BeginSnap(double startX, double startY, double targetX, double targetY)
     {
         _snap = new SnapAnimation
@@ -607,6 +678,18 @@ public sealed class RailNav
         double sign = dir == ScrollDirection.Forward ? -1.0 : 1.0;
         cameraX = ClampX(_scrollStartX + sign * totalDisplacement * zoom, zoom, windowWidth);
 
+        // Auto-scroll trigger: if holding forward scroll for longer than the
+        // configured delay, transition to auto-scroll mode.
+        if (_config.AutoScrollTriggerEnabled
+            && dir == ScrollDirection.Forward
+            && _scrollHoldTimer.Elapsed.TotalMilliseconds >= _config.AutoScrollTriggerDelayMs)
+        {
+            StopScrollAndEdgeHold();
+            StartAutoScroll(_config.DefaultAutoScrollSpeed);
+            AutoScrollTriggered = true;
+            return true;
+        }
+
         // Edge-hold advance: if the camera is pinned against the line boundary,
         // accumulate hold time and trigger a line advance when the threshold is reached.
         if (CheckEdgeHoldAdvance(cameraX, zoom, windowWidth, dir))
@@ -624,11 +707,23 @@ public sealed class RailNav
         CurrentLine = CurrentNavigableBlock.Lines.Count - 1;
     }
 
-    public LayoutBlock CurrentNavigableBlock =>
-        _analysis!.Blocks[_navigableIndices[CurrentBlock]];
+    public LayoutBlock CurrentNavigableBlock
+    {
+        get
+        {
+            int idx = Math.Min(CurrentBlock, _navigableIndices.Count - 1);
+            return _analysis!.Blocks[_navigableIndices[idx]];
+        }
+    }
 
-    public LineInfo CurrentLineInfo =>
-        CurrentNavigableBlock.Lines[Math.Min(CurrentLine, CurrentNavigableBlock.Lines.Count - 1)];
+    public LineInfo CurrentLineInfo
+    {
+        get
+        {
+            var block = CurrentNavigableBlock;
+            return block.Lines[Math.Min(CurrentLine, block.Lines.Count - 1)];
+        }
+    }
 
     public int? FindBlockAtPoint(double pageX, double pageY)
     {

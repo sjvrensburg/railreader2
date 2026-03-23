@@ -189,17 +189,17 @@ public partial class MainWindow : Window
 
         ToolBar.ViewModel = vm;
 
-        var highlightColors = BuildColorOptions(vm, AnnotationTool.Highlight, DocumentController.HighlightColors, 0);
-        var penColors = BuildColorOptions(vm, AnnotationTool.Pen, DocumentController.PenColors, 1);
+        var highlightColors = BuildColorOptions(vm, AnnotationTool.Highlight, AnnotationInteractionHandler.HighlightColors, 0);
+        var penColors = BuildColorOptions(vm, AnnotationTool.Pen, AnnotationInteractionHandler.PenColors, 1);
 
         var segments = new List<RadialMenu.Segment>
         {
             new("Highlight", RadialMenu.IconChars.Highlighter,
                 () => vm.SetAnnotationTool(AnnotationTool.Highlight),
-                highlightColors, vm.Controller.GetAnnotationColorIndex(AnnotationTool.Highlight)),
+                highlightColors, vm.Controller.Annotations.GetAnnotationColorIndex(AnnotationTool.Highlight)),
             new("Pen", RadialMenu.IconChars.Pen,
                 () => vm.SetAnnotationTool(AnnotationTool.Pen),
-                penColors, vm.Controller.GetAnnotationColorIndex(AnnotationTool.Pen)),
+                penColors, vm.Controller.Annotations.GetAnnotationColorIndex(AnnotationTool.Pen)),
             new("Text", RadialMenu.IconChars.TextHeight,
                 () => vm.SetAnnotationTool(AnnotationTool.TextNote)),
             new("Rect", RadialMenu.IconChars.Square,
@@ -221,7 +221,7 @@ public partial class MainWindow : Window
             var (color, opacity) = palette[i];
             options.Add(new RadialMenu.ColorOption(color, opacity, () =>
             {
-                vm.Controller.SetAnnotationColorIndex(tool, idx);
+                vm.Controller.Annotations.SetAnnotationColorIndex(tool, idx);
                 vm.SetAnnotationTool(tool);
                 RadialMenuControl.UpdateSegmentColorIndex(segmentIndex, idx);
             }));
@@ -534,6 +534,20 @@ public partial class MainWindow : Window
         if (Vm is { } vm && e.Key is Key.Left or Key.Right or Key.A or Key.D)
         {
             vm.HandleArrowRelease(true);
+            e.Handled = true;
+        }
+
+        // Clear non-rail edge-hold on vertical key release
+        if (Vm is { } vm3 && e.Key is Key.Down or Key.Up or Key.S or Key.W or Key.Space)
+        {
+            vm3.Controller.ClearNonRailEdgeHold();
+            e.Handled = true;
+        }
+
+        // Resume rail mode when Ctrl is released after free pan
+        if (Vm is { RailPaused: true } vm2 && e.Key is Key.LeftCtrl or Key.RightCtrl)
+        {
+            vm2.ResumeRailFromPause();
             e.Handled = true;
         }
 

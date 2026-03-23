@@ -70,7 +70,9 @@ public static class AnnotationService
                 annotations.SourcePdfPath = Path.GetFullPath(pdfPath);
                 // Migrate to internal storage
                 SaveToFile(GetInternalPath(pdfPath), annotations);
+#if DEBUG
                 Console.Error.WriteLine($"[Annotations] Migrated sidecar to internal storage: {Path.GetFileName(pdfPath)}");
+#endif
             }
             return annotations;
         }
@@ -83,6 +85,13 @@ public static class AnnotationService
     {
         annotations.SourcePdfPath = Path.GetFullPath(pdfPath);
         SaveToFile(GetInternalPath(pdfPath), annotations);
+    }
+
+    /// <summary>Export annotations to a JSON file at a user-chosen path. Throws on failure.</summary>
+    public static void ExportJson(AnnotationFile annotations, string outputPath)
+    {
+        var json = JsonSerializer.Serialize(annotations, s_options);
+        File.WriteAllText(outputPath, json);
     }
 
     /// <summary>Delete internal annotation file for a PDF.</summary>

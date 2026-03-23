@@ -13,7 +13,7 @@ public static class OverlayRenderer
 
     private static readonly SKColor[] DebugColors =
     [
-        new(244, 67, 54), new(33, 150, 243), new(76, 175, 80),
+        new(220, 70, 180), new(33, 150, 243), new(76, 175, 80),
         new(255, 152, 0), new(156, 39, 176), new(0, 188, 212),
     ];
 

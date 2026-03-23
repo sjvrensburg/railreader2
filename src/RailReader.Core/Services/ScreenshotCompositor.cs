@@ -225,7 +225,7 @@ public static class ScreenshotCompositor
 
     private static void DrawSearchHighlights(SKCanvas canvas, DocumentController controller)
     {
-        var matches = controller.CurrentPageSearchMatches;
+        var matches = controller.Search.CurrentPageSearchMatches;
         if (matches is null || matches.Count == 0) return;
 
         var doc = controller.ActiveDocument;
@@ -235,7 +235,7 @@ public static class ScreenshotCompositor
         using var activePaint = new SKPaint { Color = new SKColor(255, 165, 0, 160), IsAntialias = true };
 
         int activeLocalIndex = OverlayRenderer.ComputeActiveLocalIndex(
-            controller.SearchMatches, matches, controller.ActiveMatchIndex, doc.CurrentPage);
+            controller.Search.SearchMatches, matches, controller.Search.ActiveMatchIndex, doc.CurrentPage);
         OverlayRenderer.DrawSearchHighlights(canvas, matches, activeLocalIndex, highlightPaint, activePaint);
     }
 }

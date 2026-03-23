@@ -5,6 +5,7 @@ using Avalonia.Threading;
 using Avalonia.VisualTree;
 using RailReader.Core;
 using RailReader.Core.Models;
+using RailReader.Core.Services;
 using RailReader2.ViewModels;
 
 namespace RailReader2.Views;
@@ -297,8 +298,9 @@ public partial class OutlinePanel : UserControl
         if (_vm is null) return;
         string query = SearchInput.Text ?? "";
 
-        // Cancel any in-progress search
+        // Cancel and dispose any in-progress search
         _searchCts?.Cancel();
+        _searchCts?.Dispose();
         _searchCts = new CancellationTokenSource();
         var token = _searchCts.Token;
 
@@ -316,11 +318,11 @@ public partial class OutlinePanel : UserControl
         var doc = _vm.Controller.ActiveDocument;
         if (doc is null) return;
 
-        var (regex, comparison) = DocumentController.PrepareSearchParams(query, caseSensitive, useRegex);
+        var (regex, comparison) = SearchService.PrepareSearchParams(query, caseSensitive, useRegex);
         if (useRegex && regex is null) return;
 
         // Clear previous results
-        _vm.Controller.CloseSearch();
+        _vm.Controller.Search.CloseSearch();
         _vm.InvalidateSearchLayer();
         SearchMatchCount.Text = "Searching...";
 
@@ -331,7 +333,7 @@ public partial class OutlinePanel : UserControl
         {
             if (token.IsCancellationRequested) return;
 
-            DocumentController.SearchPage(doc, page, query, regex, comparison, allMatches);
+            SearchService.SearchPage(doc, page, query, regex, comparison, allMatches);
 
             // Yield to UI every batch to stay responsive
             if (page % batchSize == batchSize - 1)
@@ -340,7 +342,7 @@ public partial class OutlinePanel : UserControl
 
         if (token.IsCancellationRequested) return;
 
-        _vm.Controller.FinalizeSearch(doc, allMatches);
+        _vm.Controller.Search.FinalizeSearch(doc, allMatches);
         _vm.InvalidateSearchLayer();
         BuildResultGroups();
         UpdateMatchDisplay();
@@ -374,7 +376,7 @@ public partial class OutlinePanel : UserControl
                 groups.Add(currentGroup);
             }
 
-            var (pre, match, post) = _vm.Controller.GetMatchSnippet(m);
+            var (pre, match, post) = _vm.Controller.Search.GetMatchSnippet(m);
             currentGroup.Items.Add(new SearchResultItem
             {
                 MatchIndex = i,

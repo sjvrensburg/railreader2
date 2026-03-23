@@ -202,6 +202,21 @@
         <li><strong>Detach Tab</strong> &mdash; moves the tab to a new window</li>
         <li><strong>Close Tab</strong> &mdash; closes the tab</li>
       </ul>
+
+      <h4>Linked tabs</h4>
+      <p>
+        Click the <strong>chain icon</strong> on a tab to link it. Linked tabs stay synchronised on the
+        same page &mdash; navigating to a new page in one linked tab automatically updates all other
+        linked tabs. This is useful when comparing the same document at different zoom levels or with
+        different colour effects. Linked tabs are always placed adjacent to each other in the tab bar.
+      </p>
+
+      <h4>Tab bar overflow</h4>
+      <p>
+        When many tabs are open, the tab bar scrolls horizontally. A dropdown button appears at the
+        end of the tab bar, listing all open tabs for quick switching.
+      </p>
+
       <p>
         Switching tabs automatically exits any active annotation mode to prevent accidental edits
         on the wrong document.
@@ -232,7 +247,9 @@
       </ul>
       <p>
         When you reach the last line of a block, pressing <code>Down</code> advances to the next
-        navigable block. At the last block on a page, it advances to the next page.
+        navigable block. At the last block on a page, it advances to the next page. You can also
+        <strong>hold</strong> <code>Down</code>/<code>S</code> at the last line of a page to
+        advance to the next page automatically, without needing to release and re-press the key.
       </p>
 
       <h3>Click to jump</h3>
@@ -246,6 +263,21 @@
         Holding <code>Right</code>/<code>D</code> scrolls horizontally along the current line with
         speed ramping &mdash; it starts slow and accelerates. <code>Ctrl + mouse wheel</code> also
         scrolls horizontally. The speed ramp time and max speed are configurable in Settings.
+      </p>
+
+      <h3>Free pan (Ctrl+Drag)</h3>
+      <p>
+        Hold <code>Ctrl</code> in rail mode to temporarily break out of rail constraints. While
+        <code>Ctrl</code> is held, you can pan and zoom freely as if rail mode were inactive. When
+        you release <code>Ctrl</code>, the view snaps back to the nearest rail position. This is
+        useful for quickly checking a figure, footnote, or other element outside the current
+        reading flow without losing your place.
+      </p>
+
+      <h3>Zoom position preservation</h3>
+      <p>
+        Zooming in and out preserves your reading position within the current line. The camera
+        adjusts so the text you were reading stays in view rather than jumping to the block origin.
       </p>
 
       <div class="tip">
@@ -272,6 +304,11 @@
       <p>
         The status bar shows a green <strong>"Auto-Scroll"</strong> indicator when active. Adjust
         speed with the rail toolbar slider or the <code>[</code> / <code>]</code> keys.
+      </p>
+      <p>
+        <strong>Auto-scroll trigger:</strong> Auto-scroll can also start automatically after sustained
+        horizontal scrolling. If you hold <code>Right</code>/<code>D</code> continuously for long enough,
+        auto-scroll engages and continues on its own when you release the key.
       </p>
     </section>
 
@@ -504,6 +541,11 @@
         Use <strong>File &rarr; Export with Annotations</strong> to create a new PDF with annotations
         rendered into the pages. The original PDF is not modified.
       </p>
+      <p>
+        Use <strong>File &rarr; Export Annotations as JSON</strong> to save all annotations for the
+        current document as a standalone JSON file. This is useful for programmatic access to
+        annotation data or for backup purposes.
+      </p>
     </section>
 
     <!-- 10. Text Selection -->
@@ -663,6 +705,7 @@
           <tr><td>H</td><td>Toggle line highlight</td></tr>
           <tr><td>[ / ]</td><td>Adjust speed or jump distance</td></tr>
           <tr><td>Shift+[ / Shift+]</td><td>Adjust blur intensity</td></tr>
+          <tr><td>Ctrl+Drag</td><td>Free pan/zoom in rail mode (release to snap back)</td></tr>
           <tr><td>Click</td><td>Jump to block</td></tr>
         </tbody>
         <tbody>

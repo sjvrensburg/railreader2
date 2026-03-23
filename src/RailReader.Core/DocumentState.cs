@@ -22,6 +22,7 @@ public sealed class DocumentState : IDisposable
     private ColourEffect _colourEffect;
     private bool _lineFocusBlur;
     private bool _lineHighlightEnabled = true;
+    private Guid? _linkGroupId;
     /// <summary>Fires when a property changes. Parameter is the property name.</summary>
     public Action<string>? StateChanged;
 
@@ -88,6 +89,12 @@ public sealed class DocumentState : IDisposable
         set => SetField(ref _lineHighlightEnabled, value, nameof(LineHighlightEnabled));
     }
 
+    public Guid? LinkGroupId
+    {
+        get => _linkGroupId;
+        set => SetField(ref _linkGroupId, value, nameof(LinkGroupId));
+    }
+
     public string FilePath { get; }
     public int PageCount { get; }
     public PdfService Pdf => _pdf;
@@ -146,27 +153,19 @@ public sealed class DocumentState : IDisposable
     /// </summary>
     public void LoadPageBitmap()
     {
-        try
-        {
-            CachedImage = null;
-            CachedBitmap = null;
-            MinimapBitmap = null;
+        CachedImage = null;
+        CachedBitmap = null;
+        MinimapBitmap = null;
 
-            var (w, h) = _pdf.GetPageSize(CurrentPage);
-            PageWidth = w;
-            PageHeight = h;
+        var (w, h) = _pdf.GetPageSize(CurrentPage);
+        PageWidth = w;
+        PageHeight = h;
 
-            int dpi = PdfService.CalculateRenderDpi(Camera.Zoom);
-            CachedBitmap = _pdf.RenderPage(CurrentPage, dpi);
-            CachedImage = SKImage.FromBitmap(CachedBitmap);
-            CachedDpi = dpi;
-            MinimapBitmap = _pdf.RenderThumbnail(CurrentPage);
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"Failed to render page {CurrentPage}: {ex.Message}");
-            CachedBitmap = null;
-        }
+        int dpi = PdfService.CalculateRenderDpi(Camera.Zoom);
+        CachedBitmap = _pdf.RenderPage(CurrentPage, dpi);
+        CachedImage = SKImage.FromBitmap(CachedBitmap);
+        CachedDpi = dpi;
+        MinimapBitmap = _pdf.RenderThumbnail(CurrentPage);
     }
 
     private bool _dpiRenderPending;
@@ -239,7 +238,9 @@ public sealed class DocumentState : IDisposable
     {
         if (AnalysisCache.TryGetValue(CurrentPage, out var cached))
         {
+#if DEBUG
             Console.Error.WriteLine($"[SubmitAnalysis] Page {CurrentPage}: cache hit, {cached.Blocks.Count} blocks");
+#endif
             ApplyAnalysis(cached, navigableClasses);
             return;
         }
@@ -248,7 +249,9 @@ public sealed class DocumentState : IDisposable
 
         if (worker.IsInFlight(FilePath, CurrentPage))
         {
+#if DEBUG
             Console.Error.WriteLine($"[SubmitAnalysis] Page {CurrentPage}: already in flight");
+#endif
             PendingRailSetup = true;
             return;
         }
@@ -258,13 +261,17 @@ public sealed class DocumentState : IDisposable
         string filePath = FilePath;
         PendingRailSetup = true;
 
+#if DEBUG
         Console.Error.WriteLine($"[SubmitAnalysis] Page {page}: scheduling pixmap on background thread...");
+#endif
         Task.Run(() =>
         {
             try
             {
                 var (rgb, pxW, pxH) = _pdf.RenderPagePixmap(page, LayoutConstants.InputSize);
+#if DEBUG
                 Console.Error.WriteLine($"[SubmitAnalysis] Page {page}: pixmap ready {pxW}x{pxH}, submitting...");
+#endif
                 _marshaller.Post(() =>
                 {
                     if (CurrentPage != page) return;
@@ -404,6 +411,13 @@ public sealed class DocumentState : IDisposable
     public void StartSnap(double windowWidth, double windowHeight)
     {
         Rail.StartSnapToCurrent(Camera.OffsetX, Camera.OffsetY, Camera.Zoom, windowWidth, windowHeight);
+    }
+
+    public void StartSnapPreservingPosition(double windowWidth, double windowHeight,
+        double horizontalFraction, double lineScreenY)
+    {
+        Rail.StartSnapPreservingPosition(Camera.OffsetX, Camera.OffsetY, Camera.Zoom,
+            windowWidth, windowHeight, horizontalFraction, lineScreenY);
     }
 
     public void StartSnapToEnd(double windowWidth, double windowHeight)

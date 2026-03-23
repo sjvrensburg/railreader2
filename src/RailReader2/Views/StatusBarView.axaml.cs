@@ -9,7 +9,7 @@ namespace RailReader2.Views;
 public partial class StatusBarView : UserControl
 {
     private static readonly IBrush RailModeBrush = new SolidColorBrush(Color.FromRgb(66, 133, 244));
-    private static readonly IBrush AutoScrollBrush = new SolidColorBrush(Color.FromRgb(76, 175, 80));
+    private static readonly IBrush AutoScrollBrush = new SolidColorBrush(Color.FromRgb(0, 180, 190));
     private static readonly IBrush AmberBrush = new SolidColorBrush(Color.FromRgb(255, 170, 0));
     private static readonly IBrush DangerBrush = new SolidColorBrush(Color.FromRgb(255, 100, 100));
 

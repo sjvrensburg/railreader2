@@ -167,6 +167,20 @@
                         </Grid>
                         <TextBlock Text="Set to 0 to disable pauses. Speed is controlled via the rail toolbar sliders."
                                    TextWrapping="Wrap" Opacity="0.5" Margin="0,8,0,0" />
+
+                        <TextBlock Text="Auto-Scroll Trigger" FontWeight="Bold" Margin="0,12,0,0" />
+                        <Separator />
+                        <TextBlock Text="Automatically start auto-scroll after holding the scroll key (D / Right Arrow) for a set duration."
+                                   TextWrapping="Wrap" Opacity="0.7" />
+                        <CheckBox Name="AutoScrollTriggerCheck" Content="Enable auto-scroll trigger"
+                                  IsCheckedChanged="OnAutoScrollTriggerChanged" />
+                        <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto">
+                            <TextBlock Grid.Column="0" Text="Trigger delay (ms):" VerticalAlignment="Center" />
+                            <NumericUpDown Grid.Column="2" Name="AutoScrollTriggerDelay" Value="2000"
+                                           Minimum="500" Maximum="10000" Increment="250"
+                                           FormatString="F0" Width="130" HorizontalAlignment="Left"
+                                           ValueChanged="OnSettingChanged" />
+                        </Grid>
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>

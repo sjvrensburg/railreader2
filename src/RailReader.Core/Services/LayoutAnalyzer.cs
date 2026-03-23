@@ -8,7 +8,9 @@ namespace RailReader.Core.Services;
 public sealed class LayoutAnalyzer : IDisposable
 {
     private readonly InferenceSession _session;
+#if DEBUG
     private bool _loggedOutputShapes;
+#endif
     private float[]? _chwBuffer;
 
     static LayoutAnalyzer()
@@ -56,8 +58,10 @@ public sealed class LayoutAnalyzer : IDisposable
         opts.GraphOptimizationLevel = GraphOptimizationLevel.ORT_ENABLE_ALL;
         _session = new InferenceSession(modelPath, opts);
 
+#if DEBUG
         Console.Error.WriteLine($"[ONNX] Input names: {string.Join(", ", _session.InputNames)}");
         Console.Error.WriteLine($"[ONNX] Output names: {string.Join(", ", _session.OutputNames)}");
+#endif
     }
 
     public PageAnalysis RunAnalysis(byte[] rgbBytes, int pxW, int pxH, double pageW, double pageH)
@@ -120,6 +124,7 @@ public sealed class LayoutAnalyzer : IDisposable
                 detectionData = t.ToArray();
             }
 
+#if DEBUG
             if (!_loggedOutputShapes)
             {
                 Console.Error.WriteLine($"[ONNX] Output '{r.Name}': dims=[{string.Join(",", t.Dimensions.ToArray())}]");
@@ -128,8 +133,11 @@ public sealed class LayoutAnalyzer : IDisposable
                 var preview = string.Join(", ", flat.Take(Math.Min(14, flat.Length)).Select(v => v.ToString("F2")));
                 Console.Error.WriteLine($"[ONNX]   First values: [{preview}]");
             }
+#endif
         }
+#if DEBUG
         _loggedOutputShapes = true;
+#endif
 
         if (detectionData is null)
             return null;

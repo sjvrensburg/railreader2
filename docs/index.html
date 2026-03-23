@@ -218,7 +218,9 @@
         <p>
           Zoom in past the threshold and navigation locks to detected text blocks.
           Advance line by line with arrow keys or WASD. Hold left/right to scroll
-          continuously with speed ramping.
+          continuously with speed ramping. Hold <code>Ctrl</code> to temporarily
+          free-pan and zoom without rail constraints &mdash; release to snap back.
+          Zooming preserves your reading position within the current line.
         </p>
       </div>
       <div class="feature">
@@ -227,7 +229,8 @@
           Toggle continuous horizontal scrolling with the P key or the toolbar
           button. Hold D or Right to boost speed. Pauses briefly at line and block
           boundaries for eye settling. Adjust speed via the docked slider toolbar
-          or [ ] keys. Auto-scroll and jump mode are mutually exclusive.
+          or [ ] keys. Auto-scroll can also trigger automatically after sustained
+          horizontal scrolling. Auto-scroll and jump mode are mutually exclusive.
         </p>
       </div>
       <div class="feature">
@@ -278,8 +281,10 @@
         <h3>Multi-Tab &amp; Outline</h3>
         <p>
           Open multiple PDFs in tabs with independent state. Right-click a tab
-          to duplicate, detach to a new window, or close it. Navigate via the
-          table of contents panel or the interactive minimap.
+          to duplicate, detach to a new window, or close it. Link tabs together
+          with the chain icon so they stay on the same page. The tab bar scrolls
+          horizontally and provides a dropdown when many tabs are open.
+          Navigate via the table of contents panel or the interactive minimap.
         </p>
       </div>
       <div class="feature">
@@ -311,7 +316,9 @@
         <p>
           Choose which block types are navigable in rail mode and which are
           horizontally centered when narrow. Adjust zoom thresholds, scroll
-          speeds, and snap animation timing. Settings persist across sessions.
+          speeds, and snap animation timing. Hold <code>Down</code>/<code>S</code>
+          at the last line of a page to advance to the next page automatically.
+          Settings persist across sessions.
         </p>
       </div>
       <div class="feature">
@@ -333,7 +340,8 @@
           Colour picker for highlight and pen tools. Collapsible popup notes.
           Select, move, and resize annotations in browse mode. Delete with
           the Delete key. Undo/redo for all actions. Persist as sidecar files
-          and export into a new PDF.
+          and export into a new PDF or as JSON via <strong>File &rarr; Export
+          Annotations as JSON</strong>.
         </p>
       </div>
       <div class="feature">
@@ -456,6 +464,7 @@
         <tr><td>F</td><td>Toggle line focus dim</td></tr>
         <tr><td>R</td><td><em>(Removed in 3.2)</em></td></tr>
         <tr><td>H</td><td>Toggle line highlight</td></tr>
+        <tr><td>Ctrl+Drag</td><td>Free pan/zoom in rail mode (release to snap back)</td></tr>
         <tr><td>Escape</td><td>Stop auto-scroll</td></tr>
         <tr><td>[ / ]</td><td>Adjust scroll speed or jump distance</td></tr>
         <tr><td>Shift+[ / ]</td><td>Adjust blur intensity</td></tr>

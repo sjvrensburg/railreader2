@@ -12,6 +12,8 @@ using RailReader2.Views;
 
 namespace RailReader2.ViewModels;
 
+// TODO: Many methods are single-line passthroughs (controller call + invalidation).
+//       Consider a helper like Dispatch(Action<DocumentController>, InvalidationFlags) to reduce boilerplate.
 public sealed partial class MainWindowViewModel : ObservableObject
 {
     private readonly DocumentController _controller;
@@ -79,49 +81,57 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public ObservableCollection<TabViewModel> Tabs { get; } = [];
 
-    // Delegated state from controller
-    public List<SearchMatch> SearchMatches => _controller.SearchMatches;
-    public List<SearchMatch>? CurrentPageSearchMatches => _controller.CurrentPageSearchMatches;
+    // Delegated state from controller subsystems
+    public List<SearchMatch> SearchMatches => _controller.Search.SearchMatches;
+    public List<SearchMatch>? CurrentPageSearchMatches => _controller.Search.CurrentPageSearchMatches;
     public int ActiveMatchIndex
     {
-        get => _controller.ActiveMatchIndex;
-        set => _controller.ActiveMatchIndex = value;
+        get => _controller.Search.ActiveMatchIndex;
+        set => _controller.Search.ActiveMatchIndex = value;
     }
 
-    public AnnotationTool ActiveTool => _controller.ActiveTool;
-    public bool IsAnnotating => _controller.IsAnnotating;
+    public AnnotationTool ActiveTool => _controller.Annotations.ActiveTool;
+    public bool IsAnnotating => _controller.Annotations.IsAnnotating;
     public Annotation? SelectedAnnotation
     {
-        get => _controller.SelectedAnnotation;
-        set => _controller.SelectedAnnotation = value;
+        get => _controller.Annotations.SelectedAnnotation;
+        set => _controller.Annotations.SelectedAnnotation = value;
     }
-    public Annotation? PreviewAnnotation => _controller.PreviewAnnotation;
+    public Annotation? PreviewAnnotation => _controller.Annotations.PreviewAnnotation;
     public string ActiveAnnotationColor
     {
-        get => _controller.ActiveAnnotationColor;
-        set => _controller.ActiveAnnotationColor = value;
+        get => _controller.Annotations.ActiveAnnotationColor;
+        set => _controller.Annotations.ActiveAnnotationColor = value;
     }
     public float ActiveAnnotationOpacity
     {
-        get => _controller.ActiveAnnotationOpacity;
-        set => _controller.ActiveAnnotationOpacity = value;
+        get => _controller.Annotations.ActiveAnnotationOpacity;
+        set => _controller.Annotations.ActiveAnnotationOpacity = value;
     }
     public float ActiveStrokeWidth
     {
-        get => _controller.ActiveStrokeWidth;
-        set => _controller.ActiveStrokeWidth = value;
+        get => _controller.Annotations.ActiveStrokeWidth;
+        set => _controller.Annotations.ActiveStrokeWidth = value;
     }
 
-    public string? SelectedText => _controller.SelectedText;
-    public List<HighlightRect>? TextSelectionRects => _controller.TextSelectionRects;
+    public string? SelectedText => _controller.Annotations.SelectedText;
+    public List<HighlightRect>? TextSelectionRects => _controller.Annotations.TextSelectionRects;
 
     public Action<string>? CopyToClipboard
     {
-        get => _controller.CopyToClipboard;
-        set => _controller.CopyToClipboard = value;
+        get => _controller.Annotations.CopyToClipboard;
+        set => _controller.Annotations.CopyToClipboard = value;
     }
 
     public bool AutoScrollActive => _controller.AutoScrollActive;
+    public bool RailPaused => _controller.RailPaused;
+
+    public void ResumeRailFromPause()
+    {
+        _controller.ResumeRailFromPause();
+        InvalidateCameraAndTab();
+        RequestAnimationFrame();
+    }
 
     [ObservableProperty] private bool _jumpMode;
     partial void OnJumpModeChanged(bool value) => _controller.JumpMode = value;
@@ -129,6 +139,22 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public AppConfig Config => _controller.Config;
     public ColourEffectShaders ColourEffects => _controller.ColourEffects;
     public DocumentController Controller => _controller;
+
+    // Link group color assignment
+    public const int LinkColorCount = 4;
+    private readonly Dictionary<Guid, int> _linkColorMap = [];
+    private int _nextLinkColorIndex;
+
+    /// <summary>Returns the color index (0..3) assigned to a link group, assigning one if needed.</summary>
+    public int GetLinkGroupColorIndex(Guid groupId)
+    {
+        if (!_linkColorMap.TryGetValue(groupId, out int idx))
+        {
+            idx = _nextLinkColorIndex++ % LinkColorCount;
+            _linkColorMap[groupId] = idx;
+        }
+        return idx;
+    }
 
     public TabViewModel? ActiveTab =>
         ActiveTabIndex >= 0 && ActiveTabIndex < Tabs.Count ? Tabs[ActiveTabIndex] : null;
@@ -242,26 +268,55 @@ public sealed partial class MainWindowViewModel : ObservableObject
             if (ActiveTab is { } oldTab)
                 SaveSidebarState(oldTab);
 
+            // Apply pending link group (from DuplicateTabLinked)
+            if (_pendingLinkGroupId is { } linkId)
+            {
+                tab.State.LinkGroupId = linkId;
+                _pendingLinkGroupId = null;
+            }
+
             _controller.AddDocument(tab.State);
-            Tabs.Add(tab);
+
+            // Insert linked tabs adjacent to their group; unlinked tabs append at end
+            int insertIndex = Tabs.Count;
+            if (tab.State.LinkGroupId is { } gid)
+            {
+                for (int i = Tabs.Count - 1; i >= 0; i--)
+                {
+                    if (Tabs[i].State.LinkGroupId == gid)
+                    { insertIndex = i + 1; break; }
+                }
+                // Also fix the Documents list to match
+                if (insertIndex < Tabs.Count)
+                {
+                    _controller.Documents.Remove(tab.State);
+                    _controller.Documents.Insert(insertIndex, tab.State);
+                    _controller.ActiveDocumentIndex = _controller.Documents.IndexOf(tab.State);
+                }
+            }
+            Tabs.Insert(insertIndex, tab);
 
             // New tab inherits the current sidebar state
             tab.ShowSidePanel = ShowOutline;
             if (ReadSidePanelWidth is { } getWidth)
                 tab.SidePanelWidth = getWidth();
 
-            ActiveTabIndex = Tabs.Count - 1;
+            ActiveTabIndex = insertIndex;
             OnPropertyChanged(nameof(ActiveTab));
             InvalidateAll();
 
             Dispatcher.UIThread.Post(() => InvalidatePage(), DispatcherPriority.Background);
             RequestAnimationFrame();
 
+#if DEBUG
             Console.Error.WriteLine("[OpenDocument] Tab added successfully");
+#endif
         }
         catch (Exception ex)
         {
+            _pendingLinkGroupId = null;
             Console.Error.WriteLine($"Failed to open {path}: {ex.Message}\n{ex.StackTrace}");
+            ShowStatusToast($"Failed to open: {Path.GetFileName(path)}");
         }
     }
 
@@ -335,8 +390,15 @@ public sealed partial class MainWindowViewModel : ObservableObject
         if (toIndex < 0 || toIndex >= Tabs.Count) return;
 
         var selectedTab = ActiveTab;
-        Tabs.Move(fromIndex, toIndex);
-        _controller.MoveDocument(fromIndex, toIndex);
+        var draggedTab = Tabs[fromIndex];
+
+        if (draggedTab.State.LinkGroupId is { } groupId)
+            MoveLinkedGroup(fromIndex, toIndex, groupId);
+        else
+            MoveSingleTab(fromIndex, toIndex);
+
+        // Re-consolidate any link group that was split by this move
+        ConsolidateLinkGroups();
 
         if (selectedTab is not null)
             ActiveTabIndex = Tabs.IndexOf(selectedTab);
@@ -345,11 +407,185 @@ public sealed partial class MainWindowViewModel : ObservableObject
         InvalidateAll();
     }
 
+    private void MoveSingleTab(int fromIndex, int toIndex)
+    {
+        Tabs.Move(fromIndex, toIndex);
+        _controller.MoveDocument(fromIndex, toIndex);
+    }
+
+    private void MoveLinkedGroup(int draggedFrom, int dropTarget, Guid groupId)
+    {
+        // Collect group members in their current order
+        var groupIndices = new List<int>();
+        for (int i = 0; i < Tabs.Count; i++)
+            if (Tabs[i].State.LinkGroupId == groupId)
+                groupIndices.Add(i);
+
+        if (groupIndices.Count <= 1)
+        {
+            MoveSingleTab(draggedFrom, dropTarget);
+            return;
+        }
+
+        // Determine the insertion point: where the first group member should land
+        bool movingForward = dropTarget > draggedFrom;
+        int insertAt = movingForward
+            ? dropTarget - (groupIndices.Count - 1)  // account for group members being removed before insertion
+            : dropTarget;
+        insertAt = Math.Clamp(insertAt, 0, Tabs.Count - groupIndices.Count);
+
+        // Extract group tabs (in order), then reinsert at the target position
+        var groupTabs = groupIndices.Select(i => Tabs[i]).ToList();
+        var groupDocs = groupIndices.Select(i => _controller.Documents[i]).ToList();
+
+        // Remove from end to preserve indices
+        for (int i = groupIndices.Count - 1; i >= 0; i--)
+        {
+            Tabs.RemoveAt(groupIndices[i]);
+            _controller.Documents.RemoveAt(groupIndices[i]);
+        }
+
+        // Clamp insertion point after removal
+        insertAt = Math.Clamp(insertAt, 0, Tabs.Count);
+
+        // Reinsert group in order
+        for (int i = 0; i < groupTabs.Count; i++)
+        {
+            Tabs.Insert(insertAt + i, groupTabs[i]);
+            _controller.Documents.Insert(insertAt + i, groupDocs[i]);
+        }
+
+        // Fix active document index
+        if (_controller.ActiveDocument is { } active)
+            _controller.ActiveDocumentIndex = _controller.Documents.IndexOf(active);
+    }
+
+    /// <summary>
+    /// Ensures all tabs in the same link group are adjacent. Call after linking.
+    /// Moves the tab at <paramref name="moveIndex"/> next to its group members.
+    /// </summary>
+    private void EnsureGroupAdjacent(Guid groupId, int moveIndex)
+    {
+        // Find the first group member that isn't the one we're moving
+        int anchorIndex = -1;
+        for (int i = 0; i < Tabs.Count; i++)
+        {
+            if (i != moveIndex && Tabs[i].State.LinkGroupId == groupId)
+            { anchorIndex = i; break; }
+        }
+        if (anchorIndex < 0) return;
+
+        // Find the end of the contiguous group block starting at anchorIndex
+        int groupEnd = anchorIndex;
+        while (groupEnd + 1 < Tabs.Count && Tabs[groupEnd + 1].State.LinkGroupId == groupId)
+            groupEnd++;
+
+        // If the tab to move is already adjacent to the group, nothing to do
+        if (moveIndex == groupEnd + 1 || moveIndex == anchorIndex - 1) return;
+        if (moveIndex >= anchorIndex && moveIndex <= groupEnd) return;
+
+        // Move it to right after the group block
+        int targetIndex = moveIndex < anchorIndex ? groupEnd : groupEnd; // after last group member
+        if (moveIndex > groupEnd) targetIndex = groupEnd + 1;
+        if (targetIndex > moveIndex) targetIndex--; // account for removal shifting
+
+        targetIndex = Math.Clamp(targetIndex, 0, Tabs.Count - 1);
+        if (targetIndex != moveIndex)
+            MoveSingleTab(moveIndex, targetIndex);
+    }
+
+    /// <summary>
+    /// Scans for link groups whose members are not contiguous and moves
+    /// stray members next to the first occurrence of their group.
+    /// </summary>
+    private void ConsolidateLinkGroups()
+    {
+        var seen = new Dictionary<Guid, int>(); // groupId → end of contiguous block
+        int i = 0;
+        while (i < Tabs.Count)
+        {
+            var gid = Tabs[i].State.LinkGroupId;
+            if (gid is null) { i++; continue; }
+
+            if (!seen.TryGetValue(gid.Value, out int groupEnd))
+            {
+                // First time seeing this group — mark position
+                seen[gid.Value] = i;
+                i++;
+            }
+            else if (groupEnd == i - 1)
+            {
+                // Still contiguous — extend the block
+                seen[gid.Value] = i;
+                i++;
+            }
+            else
+            {
+                // Gap detected: this tab should be right after groupEnd
+                MoveSingleTab(i, groupEnd + 1);
+                seen[gid.Value] = groupEnd + 1;
+                // Don't increment i — the next tab shifted into this slot
+            }
+        }
+    }
+
     [RelayCommand]
     public void DuplicateTab()
     {
         if (ActiveTab is { } tab)
             OpenDocument(tab.FilePath);
+    }
+
+    [RelayCommand]
+    public void DuplicateTabLinked()
+    {
+        if (ActiveTab is not { } sourceTab) return;
+        var groupId = sourceTab.State.LinkGroupId ?? Guid.NewGuid();
+        sourceTab.State.LinkGroupId = groupId;
+        _pendingLinkGroupId = groupId;
+        DuplicateTab();
+    }
+
+    private Guid? _pendingLinkGroupId;
+
+    public void LinkTabTo(int sourceIndex, int targetIndex)
+    {
+        if (sourceIndex < 0 || sourceIndex >= Tabs.Count) return;
+        if (targetIndex < 0 || targetIndex >= Tabs.Count) return;
+        _controller.LinkDocuments(Tabs[sourceIndex].State, Tabs[targetIndex].State);
+
+        // Move the target tab adjacent to the source (or vice versa)
+        var groupId = Tabs[sourceIndex].State.LinkGroupId;
+        if (groupId.HasValue)
+        {
+            // Re-lookup target index since it may not have moved yet
+            int newTargetIdx = Tabs.IndexOf(Tabs[targetIndex]);
+            EnsureGroupAdjacent(groupId.Value, newTargetIdx);
+        }
+
+        OnPropertyChanged(nameof(ActiveTab));
+        InvalidateAll();
+    }
+
+    public void UnlinkTab(int index)
+    {
+        if (index < 0 || index >= Tabs.Count) return;
+        _controller.UnlinkDocument(Tabs[index].State);
+        InvalidateAll();
+    }
+
+    /// <summary>Returns indices of tabs that can be linked with the tab at the given index.</summary>
+    public List<(int Index, string Title)> GetLinkCandidates(int index)
+    {
+        if (index < 0 || index >= Tabs.Count) return [];
+        var candidates = _controller.GetLinkCandidates(Tabs[index].State);
+        var result = new List<(int, string)>();
+        for (int i = 0; i < Tabs.Count; i++)
+        {
+            if (candidates.Contains(Tabs[i].State))
+                result.Add((i, Tabs[i].Title));
+        }
+        return result;
     }
 
     public void DetachTab(int index)
@@ -414,9 +650,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
         RequestAnimationFrame();
     }
 
-    public void HandlePan(double dx, double dy)
+    public void HandlePan(double dx, double dy, bool ctrlHeld = false)
     {
-        _controller.HandlePan(dx, dy);
+        _controller.HandlePan(dx, dy, ctrlHeld);
         InvalidateCameraAndTab();
     }
 
@@ -621,7 +857,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public void SetAnnotationTool(AnnotationTool tool)
     {
-        _controller.SetAnnotationTool(tool);
+        _controller.Annotations.SetAnnotationTool(tool);
 
         if (tool != AnnotationTool.TextSelect)
         {
@@ -636,7 +872,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public void CancelAnnotationTool()
     {
-        _controller.CancelAnnotationTool();
+        _controller.Annotations.CancelAnnotationTool();
         OnPropertyChanged(nameof(SelectedText));
         OnPropertyChanged(nameof(IsAnnotating));
         OnPropertyChanged(nameof(ActiveTool));
@@ -645,7 +881,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public void HandleAnnotationPointerDown(double pageX, double pageY)
     {
-        var (needsDialog, isEdit, existingNote, px, py) = _controller.HandleAnnotationPointerDown(pageX, pageY);
+        var (needsDialog, isEdit, existingNote, px, py) = _controller.Annotations.HandleAnnotationPointerDown(_controller.ActiveDocument, pageX, pageY);
 
         if (needsDialog)
         {
@@ -663,7 +899,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public void HandleAnnotationPointerMove(double pageX, double pageY)
     {
-        if (_controller.HandleAnnotationPointerMove(pageX, pageY))
+        if (_controller.Annotations.HandleAnnotationPointerMove(_controller.ActiveDocument, pageX, pageY))
         {
             OnPropertyChanged(nameof(SelectedText));
             InvalidateAnnotations();
@@ -672,7 +908,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public void HandleAnnotationPointerUp(double pageX, double pageY)
     {
-        if (_controller.HandleAnnotationPointerUp(pageX, pageY))
+        if (_controller.Annotations.HandleAnnotationPointerUp(_controller.ActiveDocument, pageX, pageY))
             InvalidateAnnotations();
     }
 
@@ -683,7 +919,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         var result = await dialog.ShowDialog<string?>(_window);
         if (string.IsNullOrEmpty(result)) return;
 
-        _controller.CompleteTextNote(pageX, pageY, result);
+        _controller.Annotations.CompleteTextNote(_controller.ActiveDocument, pageX, pageY, result);
         InvalidateAnnotations();
     }
 
@@ -694,7 +930,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         var result = await dialog.ShowDialog<string?>(_window);
         if (result is null) return;
 
-        _controller.CompleteTextNoteEdit(note, result);
+        _controller.Annotations.CompleteTextNoteEdit(_controller.ActiveDocument, note, result);
         InvalidateAnnotations();
     }
 
@@ -706,7 +942,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     /// </summary>
     public bool HandleBrowsePointerDown(float pageX, float pageY)
     {
-        bool hit = _controller.HandleBrowsePointerDown(pageX, pageY);
+        bool hit = _controller.Annotations.HandleBrowsePointerDown(_controller.ActiveDocument, pageX, pageY);
         OnPropertyChanged(nameof(SelectedAnnotation));
         InvalidateAnnotations();
         return hit;
@@ -714,7 +950,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public bool HandleBrowsePointerMove(float pageX, float pageY)
     {
-        if (_controller.HandleBrowsePointerMove(pageX, pageY))
+        if (_controller.Annotations.HandleBrowsePointerMove(pageX, pageY))
         {
             InvalidateAnnotations();
             return true;
@@ -724,7 +960,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public bool HandleBrowsePointerUp(float pageX, float pageY)
     {
-        if (_controller.HandleBrowsePointerUp(pageX, pageY))
+        if (_controller.Annotations.HandleBrowsePointerUp(_controller.ActiveDocument, pageX, pageY))
         {
             InvalidateAnnotations();
             return true;
@@ -734,7 +970,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public (bool Handled, TextNoteAnnotation? EditNote) HandleBrowseClick(float pageX, float pageY, bool isDoubleClick = false)
     {
-        var result = _controller.HandleBrowseClick(pageX, pageY, isDoubleClick);
+        var result = _controller.Annotations.HandleBrowseClick(_controller.ActiveDocument, pageX, pageY, isDoubleClick);
         if (result.Handled)
         {
             OnPropertyChanged(nameof(SelectedAnnotation));
@@ -747,13 +983,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public void CopySelectedText()
     {
-        _controller.CopySelectedText();
+        _controller.Annotations.CopySelectedText();
         CloseRadialMenu();
     }
 
     public void DeleteSelectedAnnotation()
     {
-        if (_controller.DeleteSelectedAnnotation())
+        if (_controller.Annotations.DeleteSelectedAnnotation(_controller.ActiveDocument))
         {
             OnPropertyChanged(nameof(SelectedAnnotation));
             InvalidateAnnotations();
@@ -762,13 +998,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public void UndoAnnotation()
     {
-        _controller.UndoAnnotation();
+        _controller.Annotations.UndoAnnotation(_controller.ActiveDocument);
         InvalidateAnnotations();
     }
 
     public void RedoAnnotation()
     {
-        _controller.RedoAnnotation();
+        _controller.Annotations.RedoAnnotation(_controller.ActiveDocument);
         InvalidateAnnotations();
     }
 
@@ -805,6 +1041,34 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
     }
 
+    [RelayCommand]
+    public async Task ExportAnnotationsJson()
+    {
+        if (_window is null || ActiveTab is not { } tab) return;
+
+        var file = await _window.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "Export Annotations as JSON",
+            DefaultExtension = "json",
+            FileTypeChoices = [new FilePickerFileType("JSON Files") { Patterns = ["*.json"] }],
+            SuggestedFileName = Path.GetFileNameWithoutExtension(tab.FilePath) + "_annotations.json",
+        });
+        if (file is null) return;
+
+        var outputPath = file.TryGetLocalPath() ?? file.Path.LocalPath;
+        if (outputPath is null) return;
+
+        try
+        {
+            AnnotationService.ExportJson(tab.Annotations, outputPath);
+            ShowStatusToast($"Annotations exported to {Path.GetFileName(outputPath)}");
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[Export JSON] Failed: {ex.Message}");
+        }
+    }
+
     // --- Search ---
 
     public event Action<string?>? SearchRequested;
@@ -825,13 +1089,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public void CloseSearch()
     {
-        _controller.CloseSearch();
+        _controller.Search.CloseSearch();
         InvalidateSearch();
     }
 
     public void ExecuteSearch(string query, bool caseSensitive, bool useRegex)
     {
-        _controller.ExecuteSearch(query, caseSensitive, useRegex);
+        _controller.Search.ExecuteSearch(query, caseSensitive, useRegex);
         InvalidateSearch();
     }
 
@@ -839,23 +1103,23 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public void NextMatch()
     {
-        _controller.NextMatch();
+        _controller.Search.NextMatch();
         InvalidateAfterNavigation();
     }
 
     public void PreviousMatch()
     {
-        _controller.PreviousMatch();
+        _controller.Search.PreviousMatch();
         InvalidateAfterNavigation();
     }
 
     public void GoToMatch(int matchIndex)
     {
-        _controller.GoToMatch(matchIndex);
+        _controller.Search.GoToMatch(matchIndex);
         InvalidateAfterNavigation();
     }
 
-    public void UpdateCurrentPageMatches() => _controller.UpdateCurrentPageMatches();
+    public void UpdateCurrentPageMatches() => _controller.Search.UpdateCurrentPageMatches();
 
     // --- Invalidation helpers ---
 
