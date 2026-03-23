@@ -304,16 +304,7 @@ public static class AnnotationRenderer
         switch (annotation)
         {
             case HighlightAnnotation h when h.Rects.Count > 0:
-                float minX = float.MaxValue, minY = float.MaxValue;
-                float maxX = float.MinValue, maxY = float.MinValue;
-                foreach (var r in h.Rects)
-                {
-                    if (r.X < minX) minX = r.X;
-                    if (r.Y < minY) minY = r.Y;
-                    if (r.X + r.W > maxX) maxX = r.X + r.W;
-                    if (r.Y + r.H > maxY) maxY = r.Y + r.H;
-                }
-                return new SKRect(minX, minY, maxX, maxY);
+                return ComputeRectsBounds(h.Rects);
             case FreehandAnnotation f when f.Points.Count > 0:
                 return ComputePointsBounds(f.Points);
             case TextNoteAnnotation t:
@@ -324,6 +315,20 @@ public static class AnnotationRenderer
             default:
                 return null;
         }
+    }
+
+    private static SKRect ComputeRectsBounds(List<HighlightRect> rects)
+    {
+        float minX = float.MaxValue, minY = float.MaxValue;
+        float maxX = float.MinValue, maxY = float.MinValue;
+        foreach (var r in rects)
+        {
+            if (r.X < minX) minX = r.X;
+            if (r.Y < minY) minY = r.Y;
+            if (r.X + r.W > maxX) maxX = r.X + r.W;
+            if (r.Y + r.H > maxY) maxY = r.Y + r.H;
+        }
+        return new SKRect(minX, minY, maxX, maxY);
     }
 
     private static SKRect ComputePointsBounds(List<PointF> points)

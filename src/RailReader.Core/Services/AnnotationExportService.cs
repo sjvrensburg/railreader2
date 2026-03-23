@@ -52,14 +52,18 @@ public static class AnnotationExportService
                     }
                 }
 
-                canvas.Save();
-                canvas.Scale(scaleX, scaleY);
-                AnnotationRenderer.DrawAnnotations(canvas, pageAnnotations, null);
-                canvas.Restore();
-
-                // Restore original collapsed state
-                foreach (var tn in collapsed)
-                    tn.IsExpanded = false;
+                try
+                {
+                    canvas.Save();
+                    canvas.Scale(scaleX, scaleY);
+                    AnnotationRenderer.DrawAnnotations(canvas, pageAnnotations, null);
+                    canvas.Restore();
+                }
+                finally
+                {
+                    foreach (var tn in collapsed)
+                        tn.IsExpanded = false;
+                }
             }
 
             document.EndPage();

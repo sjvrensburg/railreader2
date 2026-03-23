@@ -197,11 +197,13 @@ public class ViewportPanel : Panel
         menu.Open(this);
     }
 
+    private const double ClickThresholdSq = 25.0; // 5px squared
+
     private bool IsClick(Point pos)
     {
         double dx = pos.X - _pressPos.X;
         double dy = pos.Y - _pressPos.Y;
-        return dx * dx + dy * dy < 25.0; // 5px threshold squared
+        return dx * dx + dy * dy < ClickThresholdSq;
     }
 
     private (double PageX, double PageY) ScreenToPage(Point screenPos)

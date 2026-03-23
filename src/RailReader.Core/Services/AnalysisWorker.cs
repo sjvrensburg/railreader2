@@ -45,7 +45,9 @@ public sealed class AnalysisWorker : IDisposable
         {
             analyzer = new LayoutAnalyzer(modelPath);
             IsReady = true;
+#if DEBUG
             Console.Error.WriteLine("[Worker] ONNX session ready, waiting for requests...");
+#endif
         }
         catch (Exception ex)
         {
@@ -66,10 +68,14 @@ public sealed class AnalysisWorker : IDisposable
         {
             await foreach (var request in _requestChannel.Reader.ReadAllAsync(ct))
             {
+#if DEBUG
                 Console.Error.WriteLine($"[Worker] Running ONNX for {Path.GetFileName(request.FilePath)} page {request.Page}...");
+#endif
                 var analysis = analyzer.RunAnalysis(
                     request.RgbBytes, request.PxW, request.PxH, request.PageW, request.PageH);
+#if DEBUG
                 Console.Error.WriteLine($"[Worker] Page {request.Page}: {analysis.Blocks.Count} blocks detected");
+#endif
 
                 await _resultChannel.Writer.WriteAsync(
                     new AnalysisResult(request.FilePath, request.Page, analysis), ct);

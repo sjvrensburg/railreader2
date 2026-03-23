@@ -15,8 +15,10 @@ public sealed class PdfService
         PdfBytes = File.ReadAllBytes(filePath);
         PageCount = Conversion.GetPageCount(PdfBytes);
         Outline = PdfOutlineExtractor.Extract(PdfBytes);
+#if DEBUG
         if (Outline.Count > 0)
             Console.Error.WriteLine($"[PDF] Extracted {Outline.Count} outline entries");
+#endif
     }
 
     public (double Width, double Height) GetPageSize(int pageIndex)

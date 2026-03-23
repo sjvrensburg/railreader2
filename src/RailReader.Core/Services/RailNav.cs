@@ -707,11 +707,23 @@ public sealed class RailNav
         CurrentLine = CurrentNavigableBlock.Lines.Count - 1;
     }
 
-    public LayoutBlock CurrentNavigableBlock =>
-        _analysis!.Blocks[_navigableIndices[CurrentBlock]];
+    public LayoutBlock CurrentNavigableBlock
+    {
+        get
+        {
+            int idx = Math.Min(CurrentBlock, _navigableIndices.Count - 1);
+            return _analysis!.Blocks[_navigableIndices[idx]];
+        }
+    }
 
-    public LineInfo CurrentLineInfo =>
-        CurrentNavigableBlock.Lines[Math.Min(CurrentLine, CurrentNavigableBlock.Lines.Count - 1)];
+    public LineInfo CurrentLineInfo
+    {
+        get
+        {
+            var block = CurrentNavigableBlock;
+            return block.Lines[Math.Min(CurrentLine, block.Lines.Count - 1)];
+        }
+    }
 
     public int? FindBlockAtPoint(double pageX, double pageY)
     {

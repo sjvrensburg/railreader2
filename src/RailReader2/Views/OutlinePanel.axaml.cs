@@ -297,8 +297,9 @@ public partial class OutlinePanel : UserControl
         if (_vm is null) return;
         string query = SearchInput.Text ?? "";
 
-        // Cancel any in-progress search
+        // Cancel and dispose any in-progress search
         _searchCts?.Cancel();
+        _searchCts?.Dispose();
         _searchCts = new CancellationTokenSource();
         var token = _searchCts.Token;
 

@@ -25,8 +25,10 @@ public static class CleanupService
         filesRemoved += orphansRemoved;
         bytesFreed += orphanBytes;
 
+#if DEBUG
         if (filesRemoved > 0)
             Console.Error.WriteLine($"Cleanup: removed {filesRemoved} files, freed {bytesFreed} bytes");
+#endif
 
         return (filesRemoved, bytesFreed);
     }

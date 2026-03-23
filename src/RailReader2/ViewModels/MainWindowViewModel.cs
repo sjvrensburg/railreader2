@@ -12,6 +12,8 @@ using RailReader2.Views;
 
 namespace RailReader2.ViewModels;
 
+// TODO: Many methods are single-line passthroughs (controller call + invalidation).
+//       Consider a helper like Dispatch(Action<DocumentController>, InvalidationFlags) to reduce boilerplate.
 public sealed partial class MainWindowViewModel : ObservableObject
 {
     private readonly DocumentController _controller;
@@ -306,12 +308,15 @@ public sealed partial class MainWindowViewModel : ObservableObject
             Dispatcher.UIThread.Post(() => InvalidatePage(), DispatcherPriority.Background);
             RequestAnimationFrame();
 
+#if DEBUG
             Console.Error.WriteLine("[OpenDocument] Tab added successfully");
+#endif
         }
         catch (Exception ex)
         {
             _pendingLinkGroupId = null;
             Console.Error.WriteLine($"Failed to open {path}: {ex.Message}\n{ex.StackTrace}");
+            ShowStatusToast($"Failed to open: {Path.GetFileName(path)}");
         }
     }
 

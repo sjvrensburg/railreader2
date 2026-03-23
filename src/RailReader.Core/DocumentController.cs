@@ -22,6 +22,10 @@ public record struct TickResult(
 /// Headless controller that owns all document business logic.
 /// No Avalonia dependency — can be driven by AI agent, tests, or UI.
 /// </summary>
+// TODO: Extract annotation interaction handling (~480 lines: HandleAnnotationPointerDown/Move/Up,
+//       browse-mode drag, resize, erase) into a dedicated AnnotationInteractionHandler class.
+// TODO: Extract search logic (~380 lines: ExecuteSearch, SearchPage, FinalizeSearch,
+//       NavigateToActiveMatch, FindAllOccurrences, etc.) into a dedicated SearchService class.
 public sealed class DocumentController
 {
     private const double ZoomStep = 1.25;
@@ -160,9 +164,13 @@ public sealed class DocumentController
             ?? throw new FileNotFoundException(
                 "ONNX model not found (PP-DocLayoutV3.onnx). Run ./scripts/download-model.sh");
 
+#if DEBUG
         Console.Error.WriteLine($"[ONNX] Starting worker with model: {modelPath}");
+#endif
         _worker = new AnalysisWorker(modelPath);
+#if DEBUG
         Console.Error.WriteLine("[ONNX] Worker started (ONNX session loading in background)");
+#endif
     }
 
     public void SetViewportSize(double w, double h)
@@ -1073,7 +1081,9 @@ public sealed class DocumentController
         while (_worker.Poll() is { } result)
         {
             got = true;
+#if DEBUG
             Console.Error.WriteLine($"[Analysis] Got result for {Path.GetFileName(result.FilePath)} page {result.Page}: {result.Analysis.Blocks.Count} blocks");
+#endif
             foreach (var doc in Documents)
             {
                 if (doc.FilePath != result.FilePath) continue;
@@ -1084,7 +1094,9 @@ public sealed class DocumentController
                     doc.Rail.SetAnalysis(result.Analysis, _config.NavigableClasses);
                     doc.PendingRailSetup = false;
                     doc.UpdateRailZoom(ww, wh);
+#if DEBUG
                     Console.Error.WriteLine($"[Analysis] Rail has {doc.Rail.NavigableCount} navigable blocks, Active={doc.Rail.Active}");
+#endif
                     if (doc.Rail.Active)
                     {
                         doc.PendingSkipDirection = 0;
