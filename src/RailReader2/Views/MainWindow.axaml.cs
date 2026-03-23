@@ -189,17 +189,17 @@ public partial class MainWindow : Window
 
         ToolBar.ViewModel = vm;
 
-        var highlightColors = BuildColorOptions(vm, AnnotationTool.Highlight, DocumentController.HighlightColors, 0);
-        var penColors = BuildColorOptions(vm, AnnotationTool.Pen, DocumentController.PenColors, 1);
+        var highlightColors = BuildColorOptions(vm, AnnotationTool.Highlight, AnnotationInteractionHandler.HighlightColors, 0);
+        var penColors = BuildColorOptions(vm, AnnotationTool.Pen, AnnotationInteractionHandler.PenColors, 1);
 
         var segments = new List<RadialMenu.Segment>
         {
             new("Highlight", RadialMenu.IconChars.Highlighter,
                 () => vm.SetAnnotationTool(AnnotationTool.Highlight),
-                highlightColors, vm.Controller.GetAnnotationColorIndex(AnnotationTool.Highlight)),
+                highlightColors, vm.Controller.Annotations.GetAnnotationColorIndex(AnnotationTool.Highlight)),
             new("Pen", RadialMenu.IconChars.Pen,
                 () => vm.SetAnnotationTool(AnnotationTool.Pen),
-                penColors, vm.Controller.GetAnnotationColorIndex(AnnotationTool.Pen)),
+                penColors, vm.Controller.Annotations.GetAnnotationColorIndex(AnnotationTool.Pen)),
             new("Text", RadialMenu.IconChars.TextHeight,
                 () => vm.SetAnnotationTool(AnnotationTool.TextNote)),
             new("Rect", RadialMenu.IconChars.Square,
@@ -221,7 +221,7 @@ public partial class MainWindow : Window
             var (color, opacity) = palette[i];
             options.Add(new RadialMenu.ColorOption(color, opacity, () =>
             {
-                vm.Controller.SetAnnotationColorIndex(tool, idx);
+                vm.Controller.Annotations.SetAnnotationColorIndex(tool, idx);
                 vm.SetAnnotationTool(tool);
                 RadialMenuControl.UpdateSegmentColorIndex(segmentIndex, idx);
             }));
