@@ -104,4 +104,25 @@ public class AnnotationTests : IDisposable
         bool miss = AnnotationGeometry.HitTest(highlight, 500, 500);
         Assert.False(miss);
     }
+
+    [Fact]
+    public void MergeInto_AppendsAnnotationsAndBookmarks()
+    {
+        var target = new AnnotationFile();
+        target.Pages[0] = [new HighlightAnnotation { Rects = [new HighlightRect(0, 0, 10, 10)] }];
+        target.Bookmarks.Add(new BookmarkEntry { Name = "Intro", Page = 0 });
+
+        var imported = new AnnotationFile();
+        imported.Pages[0] = [new HighlightAnnotation { Rects = [new HighlightRect(20, 20, 30, 30)] }];
+        imported.Pages[1] = [new FreehandAnnotation { Points = [new PointF(5, 5)] }];
+        imported.Bookmarks.Add(new BookmarkEntry { Name = "Intro", Page = 0 }); // duplicate
+        imported.Bookmarks.Add(new BookmarkEntry { Name = "Ch 2", Page = 1 }); // new
+
+        int added = AnnotationService.MergeInto(target, imported);
+
+        Assert.Equal(2, target.Pages[0].Count); // original + imported
+        Assert.Single(target.Pages[1]);          // new page
+        Assert.Equal(2, target.Bookmarks.Count); // "Intro" not duplicated, "Ch 2" added
+        Assert.Equal(3, added);                  // 2 annotations + 1 bookmark
+    }
 }

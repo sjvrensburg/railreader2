@@ -291,7 +291,9 @@ Annotations are saved automatically as JSON sidecar files alongside the PDF (e.g
 
 Use **File > Export with Annotations** to create a new PDF with annotations rendered into the pages. The original PDF is not modified.
 
-Use **File > Export Annotations as JSON** to save all annotations and bookmarks for the current document to a JSON file. This is useful for backup, scripting, or interoperability with other tools.
+Use **File > Export Annotations as JSON** to save all annotations and bookmarks for the current document to a JSON file. This is useful for backup, scripting, or sharing with other RailReader2 users.
+
+Use **File > Import Annotations...** to import annotations from a JSON file. Imported annotations are merged with any existing annotations on the active document — your annotations are preserved, and the imported ones are added alongside them. Duplicate bookmarks (same name and page) are skipped.
 
 ---
 

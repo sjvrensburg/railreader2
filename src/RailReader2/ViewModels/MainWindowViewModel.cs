@@ -1075,6 +1075,45 @@ public sealed partial class MainWindowViewModel : ObservableObject
     }
 
     [RelayCommand]
+    public async Task ImportAnnotationsJson()
+    {
+        if (_window is null || ActiveTab is not { } tab) return;
+
+        var files = await _window.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Import Annotations",
+            AllowMultiple = false,
+            FileTypeFilter = [new FilePickerFileType("JSON Files") { Patterns = ["*.json"] }],
+        });
+        if (files.Count == 0) return;
+
+        var inputPath = files[0].TryGetLocalPath() ?? files[0].Path.LocalPath;
+        if (inputPath is null) return;
+
+        try
+        {
+            var imported = AnnotationService.ImportJson(inputPath);
+            if (imported is null)
+            {
+                ShowStatusToast("Failed to read annotation file");
+                return;
+            }
+
+            int added = AnnotationService.MergeInto(tab.State.Annotations, imported);
+            tab.State.MarkAnnotationsDirty();
+            InvalidateAnnotations();
+            ShowStatusToast(added > 0
+                ? $"Imported {added} annotation(s) from {Path.GetFileName(inputPath)}"
+                : "No new annotations found in file");
+        }
+        catch (Exception ex)
+        {
+            _logger.Error("[Import JSON] Failed", ex);
+            ShowStatusToast("Failed to import annotations");
+        }
+    }
+
+    [RelayCommand]
     public async Task ExportDiagnosticLog()
     {
         if (_window is null || LogFilePath is null || !File.Exists(LogFilePath)) return;

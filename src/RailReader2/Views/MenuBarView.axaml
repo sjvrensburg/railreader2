@@ -12,6 +12,7 @@
             <Separator />
             <MenuItem Header="_Export with Annotations..." Command="{Binding ExportAnnotatedCommand}" />
             <MenuItem Header="Export Annotations as _JSON..." Command="{Binding ExportAnnotationsJsonCommand}" />
+            <MenuItem Header="_Import Annotations..." Command="{Binding ImportAnnotationsJsonCommand}" />
             <Separator />
             <MenuItem Header="_Close Tab" InputGesture="Ctrl+W" Click="OnCloseTab" />
             <Separator />

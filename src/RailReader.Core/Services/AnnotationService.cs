@@ -95,6 +95,44 @@ public static class AnnotationService
         File.WriteAllText(outputPath, json);
     }
 
+    /// <summary>Import annotations from a JSON file. Returns null if deserialization fails.</summary>
+    public static AnnotationFile? ImportJson(string inputPath)
+        => LoadFromFile(inputPath);
+
+    /// <summary>
+    /// Merges imported annotations into an existing annotation file.
+    /// Appends annotations per page and adds bookmarks that don't already exist.
+    /// </summary>
+    public static int MergeInto(AnnotationFile target, AnnotationFile imported)
+    {
+        int added = 0;
+
+        foreach (var (page, annotations) in imported.Pages)
+        {
+            if (!target.Pages.TryGetValue(page, out var existing))
+            {
+                existing = [];
+                target.Pages[page] = existing;
+            }
+            existing.AddRange(annotations);
+            added += annotations.Count;
+        }
+
+        // Add bookmarks that don't already exist (by name + page)
+        var existingBookmarks = new HashSet<(string, int)>(
+            target.Bookmarks.Select(b => (b.Name, b.Page)));
+        foreach (var bm in imported.Bookmarks)
+        {
+            if (existingBookmarks.Add((bm.Name, bm.Page)))
+            {
+                target.Bookmarks.Add(bm);
+                added++;
+            }
+        }
+
+        return added;
+    }
+
     /// <summary>Delete internal annotation file for a PDF.</summary>
     public static bool Delete(string pdfPath)
     {

@@ -86,6 +86,7 @@ At high zoom levels, navigation switches to "rail mode" — the viewer locks ont
 - **Toolbar** — floating Browse/Text Select/Copy toolbar for quick mode switching
 - **Annotation export** — export PDFs with embedded annotations (File → Export with Annotations)
 - **Annotation JSON export** — export annotation data as JSON (File → Export Annotations as JSON)
+- **Annotation import** — import annotations from a JSON file and merge with existing (File → Import Annotations). Share annotations with other RailReader2 users
 - **Undo/redo** — annotation history with Ctrl+Z / Ctrl+Y
 - **Annotation mode indicator** — status bar shows active tool name in amber with a clickable exit button
 - **Annotation tool cursors** — each annotation tool shows a distinct mouse cursor (crosshair for drawing tools, I-beam for text select, no-entry for eraser) so you always know the active mode
