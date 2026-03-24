@@ -11,6 +11,9 @@ public interface ILogger
     void Info(string message);
     void Warn(string message);
     void Error(string message, Exception? ex = null);
+
+    /// <summary>Path to the log file, or null if this logger doesn't write to a file.</summary>
+    string? LogFilePath => null;
 }
 
 /// <summary>

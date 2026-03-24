@@ -5,9 +5,6 @@
         Width="420" Height="280"
         WindowStartupLocation="CenterOwner"
         CanResize="False">
-    <Window.Resources>
-        <FontFamily x:Key="FaFont">avares://RailReader2/Assets/fa-solid-900.ttf#Font Awesome 6 Free Solid</FontFamily>
-    </Window.Resources>
     <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8" Margin="20,0">
         <TextBlock Text="railreader2" FontWeight="Bold" HorizontalAlignment="Center" />
         <TextBlock x:Name="VersionText" HorizontalAlignment="Center" Opacity="0.7" />
@@ -27,7 +24,7 @@
                     Background="Transparent" BorderThickness="0"
                     Cursor="Hand">
                 <TextBlock Text="&#xf0c5;" FontFamily="{StaticResource FaFont}" FontSize="12"
-                           Opacity="0.5" ToolTip.Tip="Copy log file path to clipboard" />
+                           Opacity="0.5" />
             </Button>
         </StackPanel>
     </StackPanel>

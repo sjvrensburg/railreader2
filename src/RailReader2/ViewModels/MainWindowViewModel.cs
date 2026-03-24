@@ -161,7 +161,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         ActiveTabIndex >= 0 && ActiveTabIndex < Tabs.Count ? Tabs[ActiveTabIndex] : null;
 
     /// <summary>Path to the current session log file, or null if file logging unavailable.</summary>
-    public string? LogFilePath => (_logger as ConsoleLogger)?.LogFilePath;
+    public string? LogFilePath => _logger.LogFilePath;
 
     public MainWindowViewModel(AppConfig config)
     {
