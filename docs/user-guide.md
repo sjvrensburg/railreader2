@@ -366,6 +366,24 @@ Configuration is stored at `~/.config/railreader2/config.json` (Linux) or `%APPD
 
 ---
 
+## Troubleshooting
+
+RailReader2 writes a diagnostic log during each session. If you encounter a problem, the log helps developers understand what happened.
+
+### Exporting the log
+
+- **Help → Export Diagnostic Log...** opens a save dialog to export a copy of the current session log.
+- **Help → About** shows the log file path at the bottom of the dialog. Click the copy icon next to the path to copy it to the clipboard, then attach the file to a bug report.
+
+The log file is located at:
+- **Linux:** `~/.config/railreader2/session.log`
+- **Windows:** `%APPDATA%\railreader2\session.log`
+- **macOS:** `~/Library/Application Support/railreader2/session.log`
+
+The log is overwritten at the start of each session. Old `.log` files are automatically removed after 7 days by the cleanup service.
+
+---
+
 ## Keyboard Shortcuts
 
 ### General
