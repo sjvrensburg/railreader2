@@ -11,7 +11,9 @@ public sealed class LayoutAnalyzer : IDisposable
     internal static ILogger Logger { get; set; } = NullLogger.Instance;
 
     private readonly InferenceSession _session;
+#if DEBUG
     private bool _loggedOutputShapes;
+#endif
     private float[]? _chwBuffer;
 
     static LayoutAnalyzer()
@@ -134,7 +136,9 @@ public sealed class LayoutAnalyzer : IDisposable
             }
 #endif
         }
+#if DEBUG
         _loggedOutputShapes = true;
+#endif
 
         if (detectionData is null)
             return null;
