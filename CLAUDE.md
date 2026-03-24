@@ -40,28 +40,32 @@ dotnet publish src/RailReader2 -c Release -r win-x64 --self-contained     # Wind
 ## Architecture
 
 ```
-RailReader2.slnx              # Default: app + core + tests
-├── src/RailReader.Core/        # UI-free library: all business logic, models, services
-├── src/RailReader2/            # Thin Avalonia UI shell (references Core)
+RailReader2.slnx              # Default: app + core + renderer + UI + tests
+├── src/RailReader.Core/        # UI-free library: all business logic, models, services (zero rendering deps)
+├── src/RailReader.Renderer.Skia/ # SkiaSharp rendering, PDFium PDF services (implements Core interfaces)
+├── src/RailReader2/            # Thin Avalonia UI shell (references Core + Renderer.Skia)
 └── tests/RailReader.Core.Tests/# xUnit headless tests against Core
 ```
 
 ### RailReader.Core (UI-free library)
 
-All business logic with zero Avalonia dependencies. Key files:
+All business logic with zero Avalonia and zero SkiaSharp dependencies. Key files:
 
-- `DocumentController.cs` — headless controller facade (orchestration, animation tick loop, viewport). Annotation interaction delegated to `AnnotationInteractionHandler.cs`; search delegated to `Services/SearchService.cs`
-- `DocumentState.cs` — per-document state (PDF, camera, rail nav, analysis cache, annotations, bookmarks)
-- `Models/` — data models (Annotations, BookmarkEntry, Camera, LayoutBlock, etc.)
+- `DocumentController.cs` — headless controller facade (orchestration, animation tick loop, viewport). Delegates zoom animation to `ZoomAnimationController.cs`, auto-scroll to `AutoScrollController.cs`, annotation interaction to `AnnotationInteractionHandler.cs`, search to `Services/SearchService.cs`
+- `DocumentState.cs` — per-document state (PDF via `IPdfService`, camera, rail nav, analysis cache, annotations, bookmarks)
+- `ZoomAnimationController.cs` — smooth zoom animation with easing, focus point preservation, rail position restoration
+- `AutoScrollController.cs` — auto-scroll toggle/stop, jump mode exclusivity, speed management
+- `Models/` — data models (Annotations, BookmarkEntry, Camera, LayoutBlock, RectF, ColorRGBA, etc.)
 - `Services/AnalysisWorker.cs` — background ONNX inference thread (`Channel<T>` queue)
 - `Services/RailNav.cs` — rail navigation state machine (snap, scroll, clamp, auto-scroll, jump mode)
-- `Services/PdfService.cs` — PDF rendering, DPI scaling, page info
-- `Services/PdfTextService.cs` — text extraction with per-character bounding boxes
+- `Services/IPdfService.cs` — rendering-agnostic PDF service interfaces (`IPdfService`, `IRenderedPage`, `IPdfServiceFactory`)
+- `Services/PdfTextService.cs` — text extraction with per-character bounding boxes (PDFium P/Invoke)
 - `Services/AppConfig.cs` — config persistence (`~/.config/railreader2/config.json`)
-- `Services/ColourEffectShaders.cs` — SkSL shaders (HighContrast, HighVisibility, Amber, Invert)
 - `Services/AnnotationService.cs` — JSON sidecar persistence for annotations and bookmarks
-- `AnnotationInteractionHandler.cs` — annotation tool input handling (hit testing, drag, resize, text notes)
+- `Services/AnnotationGeometry.cs` — pure-geometry annotation hit testing, bounds computation
+- `AnnotationInteractionHandler.cs` — annotation tool input handling (drag, resize, text notes)
 - `Services/SearchService.cs` — full-text search with regex/case sensitivity, result grouping by page
+- `ILogger.cs` — logging abstraction (`ILogger`, `NullLogger`, `ConsoleLogger`)
 
 ### RailReader2 (Avalonia UI shell)
 
@@ -73,9 +77,22 @@ Thin wrapper delegating all logic to `DocumentController`/`DocumentState` in Cor
 - `Views/` — layers (PdfPageLayer, RailOverlayLayer, AnnotationLayer, SearchHighlightLayer), dialogs, panels
 - `Controls/RadialMenu.cs` — Skia-rendered radial context menu with Font Awesome icons
 
+### RailReader.Renderer.Skia (SkiaSharp rendering)
+
+Implements Core's `IPdfService`/`IPdfTextService` interfaces using PDFium + SkiaSharp. Also contains all Skia drawing code:
+
+- `SkiaPdfService.cs` / `SkiaPdfTextService.cs` / `SkiaPdfServiceFactory.cs` — PDFium-backed PDF services
+- `SkiaRenderedPage.cs` — `IRenderedPage` wrapping `SKBitmap`
+- `AnnotationRenderer.cs` — Skia annotation drawing (highlight, freehand, text note, rectangle)
+- `OverlayRenderer.cs` — rail overlay drawing (dim, block outline, line highlight)
+- `ScreenshotCompositor.cs` — multi-layer composition to `SKBitmap`
+- `ColourEffectShaders.cs` — SkSL shader compilation (HighContrast, HighVisibility, Amber, Invert)
+- `AnnotationExportService.cs` — annotation export to PDF via `SKDocument`
+- `SkiaConversions.cs` — `ColorRGBA`↔`SKColor`, `RectF`↔`SKRect` conversion helpers
+
 ### Tests
 
-29 xUnit tests in `tests/RailReader.Core.Tests/` — DocumentController, Camera, Annotations, AppConfig. `TestFixtures.cs` generates test PDFs via SkiaSharp.
+100 xUnit tests in `tests/RailReader.Core.Tests/` — DocumentController, Camera, Annotations, AppConfig, RailNav, SearchService, AnnotationGeometry, ZoomAnimation, AutoScroll. `TestFixtures.cs` generates test PDFs via SkiaSharp.
 
 ## Key Concepts
 

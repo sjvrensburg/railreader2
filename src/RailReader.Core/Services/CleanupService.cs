@@ -68,10 +68,10 @@ public static class CleanupService
                         filesRemoved++;
                     }
                 }
-                catch { /* skip */ }
+                catch (Exception ex) { Logger.Debug($"[Cleanup] Skip: {ex.Message}"); }
             }
         }
-        catch { /* skip */ }
+        catch (Exception ex) { Logger.Debug($"[Cleanup] Skip: {ex.Message}"); }
     }
 
     private static void RemoveMatchingFiles(
@@ -93,9 +93,9 @@ public static class CleanupService
                     info.Delete();
                     filesRemoved++;
                 }
-                catch { /* skip */ }
+                catch (Exception ex) { Logger.Debug($"[Cleanup] Skip: {ex.Message}"); }
             }
         }
-        catch { /* skip */ }
+        catch (Exception ex) { Logger.Debug($"[Cleanup] Skip: {ex.Message}"); }
     }
 }

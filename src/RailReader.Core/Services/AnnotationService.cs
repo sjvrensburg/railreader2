@@ -101,7 +101,7 @@ public static class AnnotationService
         var path = GetInternalPath(pdfPath);
         if (!File.Exists(path)) return false;
         try { File.Delete(path); return true; }
-        catch { return false; }
+        catch (Exception ex) { Logger.Debug($"[Annotations] Failed to delete {path}: {ex.Message}"); return false; }
     }
 
     /// <summary>List all internally stored annotation files with metadata.</summary>
@@ -125,7 +125,7 @@ public static class AnnotationService
                     af.Pages.Values.Sum(p => p.Count), af.Bookmarks.Count,
                     !string.IsNullOrEmpty(af.SourcePdfPath) && File.Exists(af.SourcePdfPath)));
             }
-            catch { /* skip corrupt files */ }
+            catch (Exception ex) { Logger.Debug($"[Annotations] Skip corrupt file {file}: {ex.Message}"); }
         }
         return result;
     }
@@ -147,7 +147,7 @@ public static class AnnotationService
                 File.Delete(info.InternalPath);
                 removed++;
             }
-            catch { /* skip */ }
+            catch (Exception ex) { Logger.Debug($"[Annotations] Failed to clean orphan: {ex.Message}"); }
         }
 
         return (removed, bytesFreed);
