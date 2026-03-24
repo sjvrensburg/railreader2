@@ -1,11 +1,14 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using RailReader.Core;
 using RailReader.Core.Models;
 
 namespace RailReader.Core.Services;
 
 public sealed class AppConfig
 {
+    internal static ILogger Logger { get; set; } = NullLogger.Instance;
+
     public double RailZoomThreshold { get; set; } = 3.0;
     public double SnapDurationMs { get; set; } = 300.0;
     public double ScrollSpeedStart { get; set; } = 10.0;
@@ -90,7 +93,7 @@ public sealed class AppConfig
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"Failed to load config: {ex.Message}");
+            Logger.Error("Failed to load config", ex);
         }
 
         var config = new AppConfig();
@@ -149,7 +152,7 @@ public sealed class AppConfig
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"Failed to save config: {ex.Message}");
+            Logger.Error("Failed to save config", ex);
         }
     }
 }

@@ -1,6 +1,8 @@
 using System.Runtime.InteropServices;
 using Avalonia;
+using RailReader.Core;
 using RailReader.Core.Services;
+using RailReader.Renderer.Skia;
 
 namespace RailReader2;
 
@@ -20,6 +22,16 @@ internal sealed class Program
             signal(15 /* SIGTERM */, new IntPtr(1) /* SIG_IGN */);
 
         PdfiumResolver.Initialize();
+
+        var logger = new ConsoleLogger();
+        AppConfig.Logger = logger;
+        AnnotationService.Logger = logger;
+        CleanupService.Logger = logger;
+        PdfTextService.Logger = logger;
+        PdfOutlineExtractor.Logger = logger;
+        LayoutAnalyzer.Logger = logger;
+        SkiaPdfService.Logger = logger;
+
         BuildAvaloniaApp()
             .StartWithClassicDesktopLifetime(args);
     }

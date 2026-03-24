@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using RailReader.Core;
 using RailReader.Core.Models;
 using static RailReader.Core.Services.PdfiumNative;
 
@@ -10,6 +11,8 @@ namespace RailReader.Core.Services;
 /// </summary>
 public static class PdfTextService
 {
+    internal static ILogger Logger { get; set; } = NullLogger.Instance;
+
     private static readonly PageText s_empty = new("", []);
 
     /// <summary>
@@ -133,7 +136,7 @@ public static class PdfTextService
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"[PdfText] Failed to {operationName} for page {pageIndex}: {ex.Message}");
+            Logger.Error($"[PdfText] Failed to {operationName} for page {pageIndex}", ex);
             return defaultValue;
         }
         finally

@@ -1,9 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="RailReader2.Views.ToolBarView">
-    <UserControl.Resources>
-        <FontFamily x:Key="FaFont">avares://RailReader2/Assets/fa-solid-900.ttf#Font Awesome 6 Free Solid</FontFamily>
-    </UserControl.Resources>
     <UserControl.Styles>
         <Style Selector="ToggleButton.toolBtn">
             <Setter Property="Background" Value="#404040" />

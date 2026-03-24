@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using RailReader.Core;
 using RailReader.Core.Models;
 
 namespace RailReader.Core.Services;
@@ -14,6 +15,8 @@ namespace RailReader.Core.Services;
 /// </summary>
 public static class AnnotationService
 {
+    internal static ILogger Logger { get; set; } = NullLogger.Instance;
+
     private static readonly JsonSerializerOptions s_options = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
@@ -70,9 +73,7 @@ public static class AnnotationService
                 annotations.SourcePdfPath = Path.GetFullPath(pdfPath);
                 // Migrate to internal storage
                 SaveToFile(GetInternalPath(pdfPath), annotations);
-#if DEBUG
-                Console.Error.WriteLine($"[Annotations] Migrated sidecar to internal storage: {Path.GetFileName(pdfPath)}");
-#endif
+                Logger.Debug($"[Annotations] Migrated sidecar to internal storage: {Path.GetFileName(pdfPath)}");
             }
             return annotations;
         }
@@ -94,13 +95,51 @@ public static class AnnotationService
         File.WriteAllText(outputPath, json);
     }
 
+    /// <summary>Import annotations from a JSON file. Returns null if deserialization fails.</summary>
+    public static AnnotationFile? ImportJson(string inputPath)
+        => LoadFromFile(inputPath);
+
+    /// <summary>
+    /// Merges imported annotations into an existing annotation file.
+    /// Appends annotations per page and adds bookmarks that don't already exist.
+    /// </summary>
+    public static int MergeInto(AnnotationFile target, AnnotationFile imported)
+    {
+        int added = 0;
+
+        foreach (var (page, annotations) in imported.Pages)
+        {
+            if (!target.Pages.TryGetValue(page, out var existing))
+            {
+                existing = [];
+                target.Pages[page] = existing;
+            }
+            existing.AddRange(annotations);
+            added += annotations.Count;
+        }
+
+        // Add bookmarks that don't already exist (by name + page)
+        var existingBookmarks = new HashSet<(string, int)>(
+            target.Bookmarks.Select(b => (b.Name, b.Page)));
+        foreach (var bm in imported.Bookmarks)
+        {
+            if (existingBookmarks.Add((bm.Name, bm.Page)))
+            {
+                target.Bookmarks.Add(bm);
+                added++;
+            }
+        }
+
+        return added;
+    }
+
     /// <summary>Delete internal annotation file for a PDF.</summary>
     public static bool Delete(string pdfPath)
     {
         var path = GetInternalPath(pdfPath);
         if (!File.Exists(path)) return false;
         try { File.Delete(path); return true; }
-        catch { return false; }
+        catch (Exception ex) { Logger.Debug($"[Annotations] Failed to delete {path}: {ex.Message}"); return false; }
     }
 
     /// <summary>List all internally stored annotation files with metadata.</summary>
@@ -124,7 +163,7 @@ public static class AnnotationService
                     af.Pages.Values.Sum(p => p.Count), af.Bookmarks.Count,
                     !string.IsNullOrEmpty(af.SourcePdfPath) && File.Exists(af.SourcePdfPath)));
             }
-            catch { /* skip corrupt files */ }
+            catch (Exception ex) { Logger.Debug($"[Annotations] Skip corrupt file {file}: {ex.Message}"); }
         }
         return result;
     }
@@ -146,7 +185,7 @@ public static class AnnotationService
                 File.Delete(info.InternalPath);
                 removed++;
             }
-            catch { /* skip */ }
+            catch (Exception ex) { Logger.Debug($"[Annotations] Failed to clean orphan: {ex.Message}"); }
         }
 
         return (removed, bytesFreed);
@@ -161,7 +200,7 @@ public static class AnnotationService
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"[Annotations] Failed to load {path}: {ex.Message}");
+            Logger.Error($"[Annotations] Failed to load {path}", ex);
             return null;
         }
     }
@@ -175,7 +214,7 @@ public static class AnnotationService
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"[Annotations] Failed to save {path}: {ex.Message}");
+            Logger.Error($"[Annotations] Failed to save {path}", ex);
         }
     }
 

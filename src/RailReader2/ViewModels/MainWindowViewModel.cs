@@ -17,6 +17,7 @@ namespace RailReader2.ViewModels;
 public sealed partial class MainWindowViewModel : ObservableObject
 {
     private readonly DocumentController _controller;
+    private readonly ILogger _logger;
     private Window? _window;
     private DispatcherTimer? _pollTimer;
     private readonly Stopwatch _frameTimer = Stopwatch.StartNew();
@@ -137,7 +138,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     partial void OnJumpModeChanged(bool value) => _controller.JumpMode = value;
 
     public AppConfig Config => _controller.Config;
-    public ColourEffectShaders ColourEffects { get; } = new();
+    public ColourEffectShaders ColourEffects { get; }
     public DocumentController Controller => _controller;
 
     // Link group color assignment
@@ -159,10 +160,15 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public TabViewModel? ActiveTab =>
         ActiveTabIndex >= 0 && ActiveTabIndex < Tabs.Count ? Tabs[ActiveTabIndex] : null;
 
+    /// <summary>Path to the current session log file, or null if file logging unavailable.</summary>
+    public string? LogFilePath => _logger.LogFilePath;
+
     public MainWindowViewModel(AppConfig config)
     {
+        _logger = new ConsoleLogger();
+        ColourEffects = new ColourEffectShaders(_logger);
         _controller = new DocumentController(config, new AvaloniaThreadMarshaller(),
-            new RailReader.Renderer.Skia.SkiaPdfServiceFactory());
+            new RailReader.Renderer.Skia.SkiaPdfServiceFactory(), _logger);
         try { _controller.InitializeWorker(); }
         catch (FileNotFoundException) { /* ONNX model not found — layout analysis disabled */ }
         _controller.StateChanged += OnControllerStateChanged;
@@ -250,7 +256,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     {
         try
         {
-            Console.Error.WriteLine($"[OpenDocument] Opening: {path}");
+            _logger.Debug($"[OpenDocument] Opening: {path}");
 
             TabViewModel? tab = null;
             await Task.Run(() =>
@@ -262,7 +268,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
             if (tab is null) return;
 
-            Console.Error.WriteLine($"[OpenDocument] Loaded: {tab.PageCount} pages, {tab.PageWidth}x{tab.PageHeight}");
+            _logger.Debug($"[OpenDocument] Loaded: {tab.PageCount} pages, {tab.PageWidth}x{tab.PageHeight}");
             tab.LoadAnnotations();
 
             // Save sidebar state from outgoing tab before switching
@@ -309,14 +315,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
             Dispatcher.UIThread.Post(() => InvalidatePage(), DispatcherPriority.Background);
             RequestAnimationFrame();
 
-#if DEBUG
-            Console.Error.WriteLine("[OpenDocument] Tab added successfully");
-#endif
+            _logger.Debug("[OpenDocument] Tab added successfully");
         }
         catch (Exception ex)
         {
             _pendingLinkGroupId = null;
-            Console.Error.WriteLine($"Failed to open {path}: {ex.Message}\n{ex.StackTrace}");
+            _logger.Error($"Failed to open {path}", ex);
             ShowStatusToast($"Failed to open: {Path.GetFileName(path)}");
         }
     }
@@ -335,7 +339,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         {
             var path = files[0].TryGetLocalPath()
                        ?? files[0].Path.LocalPath;
-            Console.Error.WriteLine($"[OpenFile] Selected: {path}");
+            _logger.Debug($"[OpenFile] Selected: {path}");
             if (path is not null) OpenDocument(path);
         }
     }
@@ -1032,13 +1036,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
             {
                 AnnotationExportService.Export(tab.Pdf, tab.Annotations, outputPath,
                     onProgress: (page, total) =>
-                        Console.Error.WriteLine($"[Export] Page {page + 1} of {total}..."));
+                        _logger.Debug($"[Export] Page {page + 1} of {total}..."));
             });
-            Console.Error.WriteLine($"[Export] Saved to {outputPath}");
+            _logger.Info($"[Export] Saved to {outputPath}");
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"[Export] Failed: {ex.Message}");
+            _logger.Error("[Export] Failed", ex);
         }
     }
 
@@ -1066,7 +1070,74 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"[Export JSON] Failed: {ex.Message}");
+            _logger.Error("[Export JSON] Failed", ex);
+        }
+    }
+
+    [RelayCommand]
+    public async Task ImportAnnotationsJson()
+    {
+        if (_window is null || ActiveTab is not { } tab) return;
+
+        var files = await _window.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Import Annotations",
+            AllowMultiple = false,
+            FileTypeFilter = [new FilePickerFileType("JSON Files") { Patterns = ["*.json"] }],
+        });
+        if (files.Count == 0) return;
+
+        var inputPath = files[0].TryGetLocalPath() ?? files[0].Path.LocalPath;
+        if (inputPath is null) return;
+
+        try
+        {
+            var imported = AnnotationService.ImportJson(inputPath);
+            if (imported is null)
+            {
+                ShowStatusToast("Failed to read annotation file");
+                return;
+            }
+
+            int added = AnnotationService.MergeInto(tab.State.Annotations, imported);
+            tab.State.MarkAnnotationsDirty();
+            InvalidateAnnotations();
+            ShowStatusToast(added > 0
+                ? $"Imported {added} annotation(s) from {Path.GetFileName(inputPath)}"
+                : "No new annotations found in file");
+        }
+        catch (Exception ex)
+        {
+            _logger.Error("[Import JSON] Failed", ex);
+            ShowStatusToast("Failed to import annotations");
+        }
+    }
+
+    [RelayCommand]
+    public async Task ExportDiagnosticLog()
+    {
+        if (_window is null || LogFilePath is null || !File.Exists(LogFilePath)) return;
+
+        var file = await _window.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "Export Diagnostic Log",
+            DefaultExtension = "log",
+            FileTypeChoices = [new FilePickerFileType("Log Files") { Patterns = ["*.log", "*.txt"] }],
+            SuggestedFileName = $"railreader2-log-{DateTime.Now:yyyyMMdd-HHmmss}.log",
+        });
+        if (file is null) return;
+
+        var outputPath = file.TryGetLocalPath() ?? file.Path.LocalPath;
+        if (outputPath is null) return;
+
+        try
+        {
+            File.Copy(LogFilePath, outputPath, overwrite: true);
+            ShowStatusToast($"Log exported to {Path.GetFileName(outputPath)}");
+        }
+        catch (Exception ex)
+        {
+            _logger.Error("[Export Log] Failed", ex);
         }
     }
 

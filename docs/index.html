@@ -36,7 +36,7 @@
       "price": "0",
       "priceCurrency": "USD"
     },
-    "softwareVersion": "3.2.0",
+    "softwareVersion": "3.3.2",
     "datePublished": "2026-02-18",
     "dateModified": "2026-03-20",
     "license": "https://opensource.org/licenses/MIT",
@@ -339,9 +339,10 @@
           Each tool shows a distinct cursor so you always know the active mode.
           Colour picker for highlight and pen tools. Collapsible popup notes.
           Select, move, and resize annotations in browse mode. Delete with
-          the Delete key. Undo/redo for all actions. Persist as sidecar files
-          and export into a new PDF or as JSON via <strong>File &rarr; Export
-          Annotations as JSON</strong>.
+          the Delete key. Undo/redo for all actions. Export into a new PDF
+          or as JSON. Import annotations from other users via
+          <strong>File &rarr; Import Annotations</strong> &mdash; annotations
+          merge with your existing ones.
         </p>
       </div>
       <div class="feature">
@@ -363,12 +364,22 @@
         </p>
       </div>
       <div class="feature">
+        <h3>Diagnostic Logging</h3>
+        <p>
+          A session log file captures all activity for troubleshooting.
+          Export via <strong>Help &rarr; Export Diagnostic Log</strong>,
+          or copy the log file path from the About dialog to attach to
+          bug reports.
+        </p>
+      </div>
+      <div class="feature">
         <h3>Headless Core Library</h3>
         <p>
-          All business logic lives in a UI-free core library
-          (<code>RailReader.Core</code>) with zero Avalonia dependencies.
-          The desktop app is a thin UI shell. Fully testable &mdash; 29
-          xUnit tests run without a display server.
+          All business logic lives in a rendering-agnostic core library
+          (<code>RailReader.Core</code>) with zero Avalonia or SkiaSharp
+          dependencies. A separate <code>RailReader.Renderer.Skia</code>
+          project implements rendering interfaces. Fully testable &mdash;
+          100 xUnit tests run without a display server.
         </p>
       </div>
     </div>

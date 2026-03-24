@@ -9,6 +9,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="RailReader2" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="../RailReader.Core/RailReader.Core.csproj" />
   </ItemGroup>
 

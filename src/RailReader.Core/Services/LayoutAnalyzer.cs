@@ -1,12 +1,15 @@
 using System.Runtime.InteropServices;
 using Microsoft.ML.OnnxRuntime;
 using Microsoft.ML.OnnxRuntime.Tensors;
+using RailReader.Core;
 using RailReader.Core.Models;
 
 namespace RailReader.Core.Services;
 
 public sealed class LayoutAnalyzer : IDisposable
 {
+    internal static ILogger Logger { get; set; } = NullLogger.Instance;
+
     private readonly InferenceSession _session;
 #if DEBUG
     private bool _loggedOutputShapes;
@@ -58,10 +61,8 @@ public sealed class LayoutAnalyzer : IDisposable
         opts.GraphOptimizationLevel = GraphOptimizationLevel.ORT_ENABLE_ALL;
         _session = new InferenceSession(modelPath, opts);
 
-#if DEBUG
-        Console.Error.WriteLine($"[ONNX] Input names: {string.Join(", ", _session.InputNames)}");
-        Console.Error.WriteLine($"[ONNX] Output names: {string.Join(", ", _session.OutputNames)}");
-#endif
+        Logger.Debug($"[ONNX] Input names: {string.Join(", ", _session.InputNames)}");
+        Logger.Debug($"[ONNX] Output names: {string.Join(", ", _session.OutputNames)}");
     }
 
     public PageAnalysis RunAnalysis(byte[] rgbBytes, int pxW, int pxH, double pageW, double pageH)
@@ -127,11 +128,11 @@ public sealed class LayoutAnalyzer : IDisposable
 #if DEBUG
             if (!_loggedOutputShapes)
             {
-                Console.Error.WriteLine($"[ONNX] Output '{r.Name}': dims=[{string.Join(",", t.Dimensions.ToArray())}]");
+                Logger.Debug($"[ONNX] Output '{r.Name}': dims=[{string.Join(",", t.Dimensions.ToArray())}]");
                 // Reuse detectionData if already copied, otherwise take a snapshot for preview
                 var flat = isDetection ? detectionData! : t.ToArray();
                 var preview = string.Join(", ", flat.Take(Math.Min(14, flat.Length)).Select(v => v.ToString("F2")));
-                Console.Error.WriteLine($"[ONNX]   First values: [{preview}]");
+                Logger.Debug($"[ONNX]   First values: [{preview}]");
             }
 #endif
         }

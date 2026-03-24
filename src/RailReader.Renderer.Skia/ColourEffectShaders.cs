@@ -1,3 +1,4 @@
+using RailReader.Core;
 using RailReader.Core.Models;
 using SkiaSharp;
 
@@ -5,6 +6,7 @@ namespace RailReader.Core.Services;
 
 public sealed class ColourEffectShaders : IDisposable
 {
+    private readonly ILogger _logger;
     private readonly Dictionary<ColourEffect, SKRuntimeEffect> _effects = [];
 
     private const string HighContrastSksl = """
@@ -49,19 +51,20 @@ public sealed class ColourEffectShaders : IDisposable
         }
         """;
 
-    public ColourEffectShaders()
+    public ColourEffectShaders(ILogger? logger = null)
     {
+        _logger = logger ?? NullLogger.Instance;
         CompileAndStore(ColourEffect.HighContrast, HighContrastSksl);
         CompileAndStore(ColourEffect.HighVisibility, HighVisibilitySksl);
         CompileAndStore(ColourEffect.Amber, AmberSksl);
         CompileAndStore(ColourEffect.Invert, InvertSksl);
     }
 
-    private static SKRuntimeEffect? CompileColorFilter(string name, string sksl)
+    private SKRuntimeEffect? CompileColorFilter(string name, string sksl)
     {
         var compiled = SKRuntimeEffect.CreateColorFilter(sksl, out var error);
         if (compiled is null)
-            Console.Error.WriteLine($"Failed to compile {name} shader: {error}");
+            _logger.Error($"Failed to compile {name} shader: {error}");
         return compiled;
     }
 

@@ -291,7 +291,9 @@ Annotations are saved automatically as JSON sidecar files alongside the PDF (e.g
 
 Use **File > Export with Annotations** to create a new PDF with annotations rendered into the pages. The original PDF is not modified.
 
-Use **File > Export Annotations as JSON** to save all annotations and bookmarks for the current document to a JSON file. This is useful for backup, scripting, or interoperability with other tools.
+Use **File > Export Annotations as JSON** to save all annotations and bookmarks for the current document to a JSON file. This is useful for backup, scripting, or sharing with other RailReader2 users.
+
+Use **File > Import Annotations...** to import annotations from a JSON file. Imported annotations are merged with any existing annotations on the active document — your annotations are preserved, and the imported ones are added alongside them. Duplicate bookmarks (same name and page) are skipped.
 
 ---
 
@@ -363,6 +365,24 @@ Press `Ctrl+,` or use the menu to open Settings. Changes take effect immediately
 ### Config file
 
 Configuration is stored at `~/.config/railreader2/config.json` (Linux) or `%APPDATA%\railreader2\config.json` (Windows). You can edit it directly; restart the app to apply changes.
+
+---
+
+## Troubleshooting
+
+RailReader2 writes a diagnostic log during each session. If you encounter a problem, the log helps developers understand what happened.
+
+### Exporting the log
+
+- **Help → Export Diagnostic Log...** opens a save dialog to export a copy of the current session log.
+- **Help → About** shows the log file path at the bottom of the dialog. Click the copy icon next to the path to copy it to the clipboard, then attach the file to a bug report.
+
+The log file is located at:
+- **Linux:** `~/.config/railreader2/session.log`
+- **Windows:** `%APPDATA%\railreader2\session.log`
+- **macOS:** `~/Library/Application Support/railreader2/session.log`
+
+The log is overwritten at the start of each session. Old `.log` files are automatically removed after 7 days by the cleanup service.
 
 ---
 

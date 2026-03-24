@@ -10,6 +10,7 @@
   <ItemGroup>
     <InternalsVisibleTo Include="RailReader.Core.Tests" />
     <InternalsVisibleTo Include="RailReader.Renderer.Skia" />
+    <InternalsVisibleTo Include="RailReader2" />
   </ItemGroup>
 
   <ItemGroup>

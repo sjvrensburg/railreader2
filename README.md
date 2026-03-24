@@ -69,6 +69,7 @@ At high zoom levels, navigation switches to "rail mode" — the viewer locks ont
 - **UI font scaling** — adjustable font size via Settings for high-DPI or accessibility use
 - **Click-to-select block** — click on any detected block in rail mode to jump to it
 - **About dialog** — version info and credits (Help → About)
+- **Diagnostic logging** — session log file written to the config directory; export via Help → Export Diagnostic Log, or copy the path from Help → About for bug reports
 - **Disk cleanup** — removes cache, old logs, temp files (Help → Clean Up Temp Files)
 - **Analysis lookahead** — pre-analyzes upcoming pages in the background for instant navigation
 - **Colour effects** — GPU-accelerated accessibility filters (High Contrast, High Visibility, Amber, Invert) with adjustable intensity. Per-document: each tab keeps its own effect, persisted across sessions
@@ -85,6 +86,7 @@ At high zoom levels, navigation switches to "rail mode" — the viewer locks ont
 - **Toolbar** — floating Browse/Text Select/Copy toolbar for quick mode switching
 - **Annotation export** — export PDFs with embedded annotations (File → Export with Annotations)
 - **Annotation JSON export** — export annotation data as JSON (File → Export Annotations as JSON)
+- **Annotation import** — import annotations from a JSON file and merge with existing (File → Import Annotations). Share annotations with other RailReader2 users
 - **Undo/redo** — annotation history with Ctrl+Z / Ctrl+Y
 - **Annotation mode indicator** — status bar shows active tool name in amber with a clickable exit button
 - **Annotation tool cursors** — each annotation tool shows a distinct mouse cursor (crosshair for drawing tools, I-beam for text select, no-entry for eraser) so you always know the active mode
@@ -271,18 +273,21 @@ Version 3.2 simplified the application to reduce complexity and make it less int
 
 ## Architecture
 
-The codebase is split into a UI-free core library, a thin Avalonia UI shell, and headless tests:
+The codebase is split into a rendering-agnostic core library, a shared SkiaSharp renderer, a thin Avalonia UI shell, and headless tests:
 
 ```
-RailReader2.slnx              # Default solution (app + core + tests)
-├── src/RailReader.Core/        # All business logic (zero Avalonia dependencies)
+RailReader2.slnx              # Default solution
+├── src/RailReader.Core/        # Business logic (zero Avalonia, zero SkiaSharp)
+├── src/RailReader.Renderer.Skia/ # SkiaSharp rendering (implements Core interfaces)
 ├── src/RailReader2/            # Thin Avalonia UI shell
-└── tests/RailReader.Core.Tests/  # xUnit headless tests
+└── tests/RailReader.Core.Tests/  # 100 xUnit headless tests
 ```
 
 *(Removed in 3.2)* Previous versions included `src/RailReader.Cli/` (command-line interface) and `src/RailReader.Agent/` (AI agent CLI). These were removed in 3.2.
 
-**RailReader.Core** contains `DocumentController` (the headless orchestration facade), `DocumentState` (per-document state), all Models and Services. It can be driven programmatically without any UI — the test project uses it directly.
+**RailReader.Core** contains `DocumentController` (the headless orchestration facade), `DocumentState` (per-document state), all Models and Services. It has no rendering-library dependency — PDF rendering is abstracted behind `IPdfService`/`IPdfTextService` interfaces. The test project uses it directly.
+
+**RailReader.Renderer.Skia** implements Core's rendering interfaces using PDFium and SkiaSharp. It also contains all Skia drawing code (annotations, overlays, shaders, screenshot compositing).
 
 ## Command-line interface
 
