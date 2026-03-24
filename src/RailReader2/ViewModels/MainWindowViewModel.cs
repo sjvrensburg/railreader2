@@ -17,6 +17,7 @@ namespace RailReader2.ViewModels;
 public sealed partial class MainWindowViewModel : ObservableObject
 {
     private readonly DocumentController _controller;
+    private readonly ILogger _logger;
     private Window? _window;
     private DispatcherTimer? _pollTimer;
     private readonly Stopwatch _frameTimer = Stopwatch.StartNew();
@@ -137,7 +138,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     partial void OnJumpModeChanged(bool value) => _controller.JumpMode = value;
 
     public AppConfig Config => _controller.Config;
-    public ColourEffectShaders ColourEffects { get; } = new();
+    public ColourEffectShaders ColourEffects { get; }
     public DocumentController Controller => _controller;
 
     // Link group color assignment
@@ -161,8 +162,10 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public MainWindowViewModel(AppConfig config)
     {
+        _logger = new ConsoleLogger();
+        ColourEffects = new ColourEffectShaders(_logger);
         _controller = new DocumentController(config, new AvaloniaThreadMarshaller(),
-            new RailReader.Renderer.Skia.SkiaPdfServiceFactory());
+            new RailReader.Renderer.Skia.SkiaPdfServiceFactory(), _logger);
         try { _controller.InitializeWorker(); }
         catch (FileNotFoundException) { /* ONNX model not found — layout analysis disabled */ }
         _controller.StateChanged += OnControllerStateChanged;
@@ -250,7 +253,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     {
         try
         {
-            Console.Error.WriteLine($"[OpenDocument] Opening: {path}");
+            _logger.Debug($"[OpenDocument] Opening: {path}");
 
             TabViewModel? tab = null;
             await Task.Run(() =>
@@ -262,7 +265,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
             if (tab is null) return;
 
-            Console.Error.WriteLine($"[OpenDocument] Loaded: {tab.PageCount} pages, {tab.PageWidth}x{tab.PageHeight}");
+            _logger.Debug($"[OpenDocument] Loaded: {tab.PageCount} pages, {tab.PageWidth}x{tab.PageHeight}");
             tab.LoadAnnotations();
 
             // Save sidebar state from outgoing tab before switching
@@ -309,14 +312,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
             Dispatcher.UIThread.Post(() => InvalidatePage(), DispatcherPriority.Background);
             RequestAnimationFrame();
 
-#if DEBUG
-            Console.Error.WriteLine("[OpenDocument] Tab added successfully");
-#endif
+            _logger.Debug("[OpenDocument] Tab added successfully");
         }
         catch (Exception ex)
         {
             _pendingLinkGroupId = null;
-            Console.Error.WriteLine($"Failed to open {path}: {ex.Message}\n{ex.StackTrace}");
+            _logger.Error($"Failed to open {path}", ex);
             ShowStatusToast($"Failed to open: {Path.GetFileName(path)}");
         }
     }
@@ -335,7 +336,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         {
             var path = files[0].TryGetLocalPath()
                        ?? files[0].Path.LocalPath;
-            Console.Error.WriteLine($"[OpenFile] Selected: {path}");
+            _logger.Debug($"[OpenFile] Selected: {path}");
             if (path is not null) OpenDocument(path);
         }
     }
@@ -1032,13 +1033,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
             {
                 AnnotationExportService.Export(tab.Pdf, tab.Annotations, outputPath,
                     onProgress: (page, total) =>
-                        Console.Error.WriteLine($"[Export] Page {page + 1} of {total}..."));
+                        _logger.Debug($"[Export] Page {page + 1} of {total}..."));
             });
-            Console.Error.WriteLine($"[Export] Saved to {outputPath}");
+            _logger.Info($"[Export] Saved to {outputPath}");
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"[Export] Failed: {ex.Message}");
+            _logger.Error("[Export] Failed", ex);
         }
     }
 
@@ -1066,7 +1067,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"[Export JSON] Failed: {ex.Message}");
+            _logger.Error("[Export JSON] Failed", ex);
         }
     }
 

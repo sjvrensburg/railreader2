@@ -29,6 +29,7 @@ public sealed class DocumentController
     private readonly AppConfig _config;
     private readonly IThreadMarshaller _marshaller;
     private readonly IPdfServiceFactory _pdfFactory;
+    private readonly ILogger _logger;
     private AnalysisWorker? _worker;
     public bool HasWorker => _worker is not null;
 
@@ -92,11 +93,13 @@ public sealed class DocumentController
     /// </summary>
     public Action<string>? StatusMessage;
 
-    public DocumentController(AppConfig config, IThreadMarshaller marshaller, IPdfServiceFactory pdfFactory)
+    public DocumentController(AppConfig config, IThreadMarshaller marshaller, IPdfServiceFactory pdfFactory,
+        ILogger? logger = null)
     {
         _config = config;
         _marshaller = marshaller;
         _pdfFactory = pdfFactory;
+        _logger = logger ?? NullLogger.Instance;
         Annotations = new AnnotationInteractionHandler();
         Search = new SearchService(
             () => ActiveDocument,
@@ -113,13 +116,9 @@ public sealed class DocumentController
             ?? throw new FileNotFoundException(
                 "ONNX model not found (PP-DocLayoutV3.onnx). Run ./scripts/download-model.sh");
 
-#if DEBUG
-        Console.Error.WriteLine($"[ONNX] Starting worker with model: {modelPath}");
-#endif
-        _worker = new AnalysisWorker(modelPath);
-#if DEBUG
-        Console.Error.WriteLine("[ONNX] Worker started (ONNX session loading in background)");
-#endif
+        _logger.Debug($"[ONNX] Starting worker with model: {modelPath}");
+        _worker = new AnalysisWorker(modelPath, logger: _logger);
+        _logger.Debug("[ONNX] Worker started (ONNX session loading in background)");
     }
 
     public void SetViewportSize(double w, double h)
@@ -137,7 +136,7 @@ public sealed class DocumentController
     /// </summary>
     public DocumentState CreateDocument(string path)
         => new(path, _pdfFactory.CreatePdfService(path), _pdfFactory.CreatePdfTextService(),
-            _config, _marshaller);
+            _config, _marshaller, _logger);
 
     /// <summary>
     /// Adds a document to the tab list, restores reading position, and submits analysis.
@@ -1031,9 +1030,7 @@ public sealed class DocumentController
         while (_worker.Poll() is { } result)
         {
             got = true;
-#if DEBUG
-            Console.Error.WriteLine($"[Analysis] Got result for {Path.GetFileName(result.FilePath)} page {result.Page}: {result.Analysis.Blocks.Count} blocks");
-#endif
+            _logger.Debug($"[Analysis] Got result for {Path.GetFileName(result.FilePath)} page {result.Page}: {result.Analysis.Blocks.Count} blocks");
             foreach (var doc in Documents)
             {
                 if (doc.FilePath != result.FilePath) continue;
@@ -1044,9 +1041,7 @@ public sealed class DocumentController
                     doc.Rail.SetAnalysis(result.Analysis, _config.NavigableClasses);
                     doc.PendingRailSetup = false;
                     doc.UpdateRailZoom(ww, wh);
-#if DEBUG
-                    Console.Error.WriteLine($"[Analysis] Rail has {doc.Rail.NavigableCount} navigable blocks, Active={doc.Rail.Active}");
-#endif
+                    _logger.Debug($"[Analysis] Rail has {doc.Rail.NavigableCount} navigable blocks, Active={doc.Rail.Active}");
                     if (doc.Rail.Active)
                     {
                         doc.PendingSkipDirection = 0;

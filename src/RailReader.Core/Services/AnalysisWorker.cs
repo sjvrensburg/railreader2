@@ -1,4 +1,5 @@
 using System.Threading.Channels;
+using RailReader.Core;
 using RailReader.Core.Models;
 
 namespace RailReader.Core.Services;
@@ -17,6 +18,7 @@ public sealed class AnalysisWorker : IDisposable
     private readonly HashSet<(string FilePath, int Page)> _inFlight = [];
     private readonly CancellationTokenSource _cts = new();
     private readonly Task _workerTask;
+    private readonly ILogger _logger;
 
     /// <summary>Set to true once the worker loop has initialized the ONNX session.</summary>
     public bool IsReady { get; private set; }
@@ -24,8 +26,9 @@ public sealed class AnalysisWorker : IDisposable
     /// <summary>Set if the worker loop failed to start (e.g. ONNX model load failure).</summary>
     public string? StartupError { get; private set; }
 
-    public AnalysisWorker(string modelPath)
+    public AnalysisWorker(string modelPath, ILogger? logger = null)
     {
+        _logger = logger ?? NullLogger.Instance;
         _requestChannel = Channel.CreateUnbounded<AnalysisRequest>();
         _resultChannel = Channel.CreateUnbounded<AnalysisResult>();
 
@@ -34,7 +37,7 @@ public sealed class AnalysisWorker : IDisposable
         _workerTask.ContinueWith(t =>
         {
             if (t.IsFaulted)
-                Console.Error.WriteLine($"[Worker] Task faulted: {t.Exception?.InnerException?.Message}");
+                _logger.Error("[Worker] Task faulted", t.Exception?.InnerException);
         }, TaskContinuationOptions.OnlyOnFaulted);
     }
 
@@ -45,21 +48,12 @@ public sealed class AnalysisWorker : IDisposable
         {
             analyzer = new LayoutAnalyzer(modelPath);
             IsReady = true;
-#if DEBUG
-            Console.Error.WriteLine("[Worker] ONNX session ready, waiting for requests...");
-#endif
+            _logger.Debug("[Worker] ONNX session ready, waiting for requests...");
         }
         catch (Exception ex)
         {
             StartupError = ex.Message;
-            Console.Error.WriteLine($"[Worker] FATAL: Failed to create ONNX session: {ex.Message}");
-            var inner = ex.InnerException;
-            while (inner is not null)
-            {
-                Console.Error.WriteLine($"[Worker]   Inner: {inner.GetType().Name}: {inner.Message}");
-                inner = inner.InnerException;
-            }
-            Console.Error.WriteLine($"[Worker] Stack: {ex.StackTrace}");
+            _logger.Error("[Worker] FATAL: Failed to create ONNX session", ex);
             _resultChannel.Writer.TryComplete();
             return;
         }
@@ -68,14 +62,10 @@ public sealed class AnalysisWorker : IDisposable
         {
             await foreach (var request in _requestChannel.Reader.ReadAllAsync(ct))
             {
-#if DEBUG
-                Console.Error.WriteLine($"[Worker] Running ONNX for {Path.GetFileName(request.FilePath)} page {request.Page}...");
-#endif
+                _logger.Debug($"[Worker] Running ONNX for {Path.GetFileName(request.FilePath)} page {request.Page}...");
                 var analysis = analyzer.RunAnalysis(
                     request.RgbBytes, request.PxW, request.PxH, request.PageW, request.PageH);
-#if DEBUG
-                Console.Error.WriteLine($"[Worker] Page {request.Page}: {analysis.Blocks.Count} blocks detected");
-#endif
+                _logger.Debug($"[Worker] Page {request.Page}: {analysis.Blocks.Count} blocks detected");
 
                 await _resultChannel.Writer.WriteAsync(
                     new AnalysisResult(request.FilePath, request.Page, analysis), ct);

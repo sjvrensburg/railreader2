@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using RailReader.Core;
 using RailReader.Core.Models;
 using static RailReader.Core.Services.PdfiumNative;
 
@@ -10,6 +11,8 @@ namespace RailReader.Core.Services;
 /// </summary>
 public static class PdfOutlineExtractor
 {
+    internal static ILogger Logger { get; set; } = NullLogger.Instance;
+
     public static List<OutlineEntry> Extract(byte[] pdfBytes)
     {
         var result = new List<OutlineEntry>();
@@ -28,7 +31,7 @@ public static class PdfOutlineExtractor
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"[Outline] Failed to extract: {ex.Message}");
+            Logger.Error("[Outline] Failed to extract", ex);
         }
         finally
         {

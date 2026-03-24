@@ -1,4 +1,5 @@
 using PDFtoImage;
+using RailReader.Core;
 using RailReader.Core.Models;
 using RailReader.Core.Services;
 
@@ -9,6 +10,8 @@ namespace RailReader.Renderer.Skia;
 /// </summary>
 public sealed class SkiaPdfService : IPdfService
 {
+    internal static ILogger Logger { get; set; } = NullLogger.Instance;
+
     public byte[] PdfBytes { get; }
     public int PageCount { get; }
     public List<OutlineEntry> Outline { get; }
@@ -18,10 +21,8 @@ public sealed class SkiaPdfService : IPdfService
         PdfBytes = File.ReadAllBytes(filePath);
         PageCount = Conversion.GetPageCount(PdfBytes);
         Outline = PdfOutlineExtractor.Extract(PdfBytes);
-#if DEBUG
         if (Outline.Count > 0)
-            Console.Error.WriteLine($"[PDF] Extracted {Outline.Count} outline entries");
-#endif
+            Logger.Debug($"[PDF] Extracted {Outline.Count} outline entries");
     }
 
     public (double Width, double Height) GetPageSize(int pageIndex)

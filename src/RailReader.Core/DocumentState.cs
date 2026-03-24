@@ -12,6 +12,7 @@ public sealed class DocumentState : IDisposable
     private readonly IPdfService _pdf;
     private readonly IPdfTextService _pdfText;
     private readonly IThreadMarshaller _marshaller;
+    private readonly ILogger _logger;
 
     private string _title;
     private int _currentPage;
@@ -134,9 +135,10 @@ public sealed class DocumentState : IDisposable
     public IRenderedPage? MinimapPage { get; private set; }
 
     public DocumentState(string filePath, IPdfService pdf, IPdfTextService pdfText,
-        AppConfig config, IThreadMarshaller marshaller)
+        AppConfig config, IThreadMarshaller marshaller, ILogger? logger = null)
     {
         _marshaller = marshaller;
+        _logger = logger ?? NullLogger.Instance;
         FilePath = filePath;
         _pdf = pdf;
         _pdfText = pdfText;
@@ -225,7 +227,7 @@ public sealed class DocumentState : IDisposable
                 }
                 catch (Exception ex)
                 {
-                    Console.Error.WriteLine($"Failed to re-render page at {neededDpi} DPI: {ex.Message}");
+                    _logger.Error($"Failed to re-render page at {neededDpi} DPI: {ex.Message}", ex);
                     _marshaller.Post(() => _dpiRenderPending = false);
                 }
             });
@@ -238,9 +240,7 @@ public sealed class DocumentState : IDisposable
     {
         if (AnalysisCache.TryGetValue(CurrentPage, out var cached))
         {
-#if DEBUG
-            Console.Error.WriteLine($"[SubmitAnalysis] Page {CurrentPage}: cache hit, {cached.Blocks.Count} blocks");
-#endif
+            _logger.Debug($"[SubmitAnalysis] Page {CurrentPage}: cache hit, {cached.Blocks.Count} blocks");
             ApplyAnalysis(cached, navigableClasses);
             return;
         }
@@ -249,9 +249,7 @@ public sealed class DocumentState : IDisposable
 
         if (worker.IsInFlight(FilePath, CurrentPage))
         {
-#if DEBUG
-            Console.Error.WriteLine($"[SubmitAnalysis] Page {CurrentPage}: already in flight");
-#endif
+            _logger.Debug($"[SubmitAnalysis] Page {CurrentPage}: already in flight");
             PendingRailSetup = true;
             return;
         }
@@ -261,17 +259,13 @@ public sealed class DocumentState : IDisposable
         string filePath = FilePath;
         PendingRailSetup = true;
 
-#if DEBUG
-        Console.Error.WriteLine($"[SubmitAnalysis] Page {page}: scheduling pixmap on background thread...");
-#endif
+        _logger.Debug($"[SubmitAnalysis] Page {page}: scheduling pixmap on background thread...");
         Task.Run(() =>
         {
             try
             {
                 var (rgb, pxW, pxH) = _pdf.RenderPagePixmap(page, LayoutConstants.InputSize);
-#if DEBUG
-                Console.Error.WriteLine($"[SubmitAnalysis] Page {page}: pixmap ready {pxW}x{pxH}, submitting...");
-#endif
+                _logger.Debug($"[SubmitAnalysis] Page {page}: pixmap ready {pxW}x{pxH}, submitting...");
                 _marshaller.Post(() =>
                 {
                     if (CurrentPage != page) return;
@@ -280,7 +274,7 @@ public sealed class DocumentState : IDisposable
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"Failed to prepare analysis input: {ex.Message}");
+                _logger.Error($"Failed to prepare analysis input: {ex.Message}", ex);
                 _marshaller.Post(() => PendingRailSetup = false);
             }
         });
@@ -333,7 +327,7 @@ public sealed class DocumentState : IDisposable
                 }
                 catch (Exception ex)
                 {
-                    Console.Error.WriteLine($"Lookahead prepare failed for page {page + 1}: {ex.Message}");
+                    _logger.Error($"Lookahead prepare failed for page {page + 1}: {ex.Message}", ex);
                 }
             });
             return true;

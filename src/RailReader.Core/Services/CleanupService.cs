@@ -1,7 +1,11 @@
+using RailReader.Core;
+
 namespace RailReader.Core.Services;
 
 public static class CleanupService
 {
+    internal static ILogger Logger { get; set; } = NullLogger.Instance;
+
     public static (int FilesRemoved, long BytesFreed) RunCleanup()
     {
         int filesRemoved = 0;
@@ -25,10 +29,8 @@ public static class CleanupService
         filesRemoved += orphansRemoved;
         bytesFreed += orphanBytes;
 
-#if DEBUG
         if (filesRemoved > 0)
-            Console.Error.WriteLine($"Cleanup: removed {filesRemoved} files, freed {bytesFreed} bytes");
-#endif
+            Logger.Debug($"Cleanup: removed {filesRemoved} files, freed {bytesFreed} bytes");
 
         return (filesRemoved, bytesFreed);
     }

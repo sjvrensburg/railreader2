@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using RailReader.Core;
 using RailReader.Core.Models;
 
 namespace RailReader.Core.Services;
@@ -14,6 +15,8 @@ namespace RailReader.Core.Services;
 /// </summary>
 public static class AnnotationService
 {
+    internal static ILogger Logger { get; set; } = NullLogger.Instance;
+
     private static readonly JsonSerializerOptions s_options = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
@@ -70,9 +73,7 @@ public static class AnnotationService
                 annotations.SourcePdfPath = Path.GetFullPath(pdfPath);
                 // Migrate to internal storage
                 SaveToFile(GetInternalPath(pdfPath), annotations);
-#if DEBUG
-                Console.Error.WriteLine($"[Annotations] Migrated sidecar to internal storage: {Path.GetFileName(pdfPath)}");
-#endif
+                Logger.Debug($"[Annotations] Migrated sidecar to internal storage: {Path.GetFileName(pdfPath)}");
             }
             return annotations;
         }
@@ -161,7 +162,7 @@ public static class AnnotationService
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"[Annotations] Failed to load {path}: {ex.Message}");
+            Logger.Error($"[Annotations] Failed to load {path}", ex);
             return null;
         }
     }
@@ -175,7 +176,7 @@ public static class AnnotationService
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"[Annotations] Failed to save {path}: {ex.Message}");
+            Logger.Error($"[Annotations] Failed to save {path}", ex);
         }
     }
 
