@@ -22,34 +22,19 @@ public record struct TickResult(
 /// </summary>
 public sealed class DocumentController
 {
-    private const double ZoomStep = 1.25;
-    private const double ZoomScrollSensitivity = 0.003;
     private const double PanStep = 50.0;
 
     private readonly AppConfig _config;
     private readonly IThreadMarshaller _marshaller;
     private readonly IPdfServiceFactory _pdfFactory;
     private readonly ILogger _logger;
+    private readonly ZoomAnimationController _zoom;
+    private readonly AutoScrollController _autoScroll;
     private AnalysisWorker? _worker;
     public bool HasWorker => _worker is not null;
 
     private double _vpWidth = 1200;
     private double _vpHeight = 900;
-
-    // Smooth zoom animation
-    private sealed class ZoomAnimation
-    {
-        public double StartZoom, TargetZoom;
-        public double StartOffsetX, StartOffsetY;
-        public double TargetOffsetX, TargetOffsetY;
-        public double CursorPageX, CursorPageY;
-        public Stopwatch Timer = Stopwatch.StartNew();
-        public const double DurationMs = 180;
-        // Rail position preservation: captured when zoom starts in rail mode
-        public double HorizontalFraction = -1; // 0=line start, 1=line end; <0 means not in rail
-        public double LineScreenY;              // Y position of active line on screen
-    }
-    private ZoomAnimation? _zoomAnim;
 
     public List<DocumentState> Documents { get; } = [];
     public int ActiveDocumentIndex { get; set; }
@@ -67,9 +52,9 @@ public sealed class DocumentController
     public AnnotationInteractionHandler Annotations { get; }
     public SearchService Search { get; }
 
-    // Auto-scroll state
-    public bool AutoScrollActive { get; private set; }
-    public bool JumpMode { get; set; }
+    // Auto-scroll state (delegated to AutoScrollController)
+    public bool AutoScrollActive => _autoScroll.AutoScrollActive;
+    public bool JumpMode { get => _autoScroll.JumpMode; set => _autoScroll.JumpMode = value; }
 
     // Rail pause (Ctrl+drag free pan) state
     public bool RailPaused { get; private set; }
@@ -100,6 +85,9 @@ public sealed class DocumentController
         _marshaller = marshaller;
         _pdfFactory = pdfFactory;
         _logger = logger ?? NullLogger.Instance;
+        _zoom = new ZoomAnimationController(config);
+        _autoScroll = new AutoScrollController(config);
+        _autoScroll.StateChanged = name => StateChanged?.Invoke(name);
         Annotations = new AnnotationInteractionHandler();
         Search = new SearchService(
             () => ActiveDocument,
@@ -324,7 +312,7 @@ public sealed class DocumentController
 
     public void GoToPage(int page)
     {
-        _zoomAnim = null;
+        _zoom.Cancel();
         if (ActiveDocument is not { } doc) return;
         var (ww, wh) = GetViewportSize();
         doc.GoToPage(page, _worker, _config.NavigableClasses, ww, wh);
@@ -359,7 +347,7 @@ public sealed class DocumentController
 
     public void FitPage()
     {
-        _zoomAnim = null;
+        _zoom.Cancel();
         if (ActiveDocument is not { } doc) return;
         var (ww, wh) = GetViewportSize();
         doc.CenterPage(ww, wh);
@@ -368,7 +356,7 @@ public sealed class DocumentController
 
     public void FitWidth()
     {
-        _zoomAnim = null;
+        _zoom.Cancel();
         if (ActiveDocument is not { } doc) return;
         var (ww, wh) = GetViewportSize();
         doc.FitWidth(ww, wh);
@@ -391,16 +379,16 @@ public sealed class DocumentController
         }
         else
         {
-            double factor = 1.0 + scrollDelta * ZoomScrollSensitivity;
-            double baseZoom = _zoomAnim?.TargetZoom ?? doc.Camera.Zoom;
+            double factor = 1.0 + scrollDelta * ZoomAnimationController.ZoomScrollSensitivity;
+            double baseZoom = _zoom.PendingTargetZoom ?? doc.Camera.Zoom;
             double newZoom = Math.Clamp(baseZoom * factor, Camera.ZoomMin, Camera.ZoomMax);
-            StartZoomAnimation(doc, newZoom, cursorX, cursorY);
+            _zoom.Start(doc, newZoom, cursorX, cursorY, _vpWidth);
         }
     }
 
     public void HandlePan(double dx, double dy, bool ctrlHeld = false)
     {
-        _zoomAnim = null;
+        _zoom.Cancel();
         if (ActiveDocument is not { } doc) return;
         if (AutoScrollActive) StopAutoScroll();
         var (ww, wh) = GetViewportSize();
@@ -458,50 +446,13 @@ public sealed class DocumentController
         if (ActiveDocument is not { } doc) return;
         var (ww, wh) = GetViewportSize();
 
-        double baseZoom = _zoomAnim?.TargetZoom ?? doc.Camera.Zoom;
+        double baseZoom = _zoom.PendingTargetZoom ?? doc.Camera.Zoom;
         double newZoom = Math.Clamp(
-            zoomIn ? baseZoom * ZoomStep : baseZoom / ZoomStep,
+            zoomIn ? baseZoom * ZoomAnimationController.ZoomStep : baseZoom / ZoomAnimationController.ZoomStep,
             Camera.ZoomMin, Camera.ZoomMax);
 
-        StartZoomAnimation(doc, newZoom, ww / 2.0, wh / 2.0);
+        _zoom.Start(doc, newZoom, ww / 2.0, wh / 2.0, _vpWidth);
         if (!doc.Rail.Active && AutoScrollActive) StopAutoScroll();
-    }
-
-    /// <summary>
-    /// Starts a smooth zoom animation toward <paramref name="focusX"/>,<paramref name="focusY"/>
-    /// (screen coordinates). Accumulates from any in-progress animation.
-    /// </summary>
-    private void StartZoomAnimation(DocumentState doc, double newZoom, double focusX, double focusY)
-    {
-        double baseOx = _zoomAnim?.TargetOffsetX ?? doc.Camera.OffsetX;
-        double baseOy = _zoomAnim?.TargetOffsetY ?? doc.Camera.OffsetY;
-        double baseZoom = _zoomAnim?.TargetZoom ?? doc.Camera.Zoom;
-
-        double targetOx = focusX - (focusX - baseOx) * (newZoom / baseZoom);
-        double targetOy = focusY - (focusY - baseOy) * (newZoom / baseZoom);
-
-        // Capture rail reading position before zoom so we can restore it on completion
-        double hFraction = -1;
-        double lineScreenY = 0;
-        if (doc.Rail.Active && doc.Rail.HasAnalysis)
-        {
-            hFraction = doc.Rail.ComputeHorizontalFraction(doc.Camera.OffsetX, doc.Camera.Zoom, _vpWidth);
-            lineScreenY = doc.Rail.CurrentLineInfo.Y * doc.Camera.Zoom + doc.Camera.OffsetY;
-        }
-
-        _zoomAnim = new ZoomAnimation
-        {
-            StartZoom = doc.Camera.Zoom,
-            TargetZoom = newZoom,
-            StartOffsetX = doc.Camera.OffsetX,
-            StartOffsetY = doc.Camera.OffsetY,
-            TargetOffsetX = targetOx,
-            TargetOffsetY = targetOy,
-            CursorPageX = (focusX - targetOx) / newZoom,
-            CursorPageY = (focusY - targetOy) / newZoom,
-            HorizontalFraction = hFraction,
-            LineScreenY = lineScreenY,
-        };
     }
 
     // --- Rail navigation ---
@@ -737,42 +688,15 @@ public sealed class DocumentController
         return true;
     }
 
-    // --- Auto-scroll ---
+    // --- Auto-scroll (delegated to AutoScrollController) ---
 
-    public void ToggleAutoScroll()
-    {
-        if (AutoScrollActive)
-        {
-            StopAutoScroll();
-            return;
-        }
-        if (ActiveDocument is not { } doc || !doc.Rail.Active) return;
+    public void ToggleAutoScroll() => _autoScroll.ToggleAutoScroll(ActiveDocument);
 
-        doc.Rail.StartAutoScroll(AutoScrollSpeed);
-        AutoScrollActive = true;
-        StateChanged?.Invoke(nameof(AutoScrollActive));
-    }
+    public void StopAutoScroll() => _autoScroll.StopAutoScroll(ActiveDocument);
 
-    public void StopAutoScroll()
-    {
-        ActiveDocument?.Rail.StopAutoScroll();
-        AutoScrollActive = false;
-        StateChanged?.Invoke(nameof(AutoScrollActive));
-    }
+    public void ToggleAutoScrollExclusive() => _autoScroll.ToggleAutoScrollExclusive(ActiveDocument);
 
-    public void ToggleAutoScrollExclusive()
-    {
-        if (JumpMode) JumpMode = false;
-        ToggleAutoScroll();
-    }
-
-    public void ToggleJumpModeExclusive()
-    {
-        if (AutoScrollActive) StopAutoScroll();
-        JumpMode = !JumpMode;
-    }
-
-    private double AutoScrollSpeed => _config.DefaultAutoScrollSpeed;
+    public void ToggleJumpModeExclusive() => _autoScroll.ToggleJumpModeExclusive(ActiveDocument);
 
     // --- Colour effects ---
 
@@ -889,53 +813,18 @@ public sealed class DocumentController
         return new TickResult(cameraChanged, pageChanged, overlayChanged, false, false, animating);
     }
 
-    /// <summary>Smooth zoom animation step.</summary>
+    /// <summary>Smooth zoom animation step (delegated to ZoomAnimationController).</summary>
     private void TickZoomAnimation(DocumentState doc, double ww, double wh,
         ref bool cameraChanged, ref bool animating)
     {
-        if (_zoomAnim is { } za)
-        {
-            double elapsed = za.Timer.Elapsed.TotalMilliseconds;
-            double t = Math.Clamp(elapsed / ZoomAnimation.DurationMs, 0, 1);
-            // Cubic ease-out: 1 - (1-t)^3
-            double ease = 1.0 - (1.0 - t) * (1.0 - t) * (1.0 - t);
-
-            double prevZoom = doc.Camera.Zoom;
-            doc.Camera.Zoom = za.StartZoom + (za.TargetZoom - za.StartZoom) * ease;
-            doc.Camera.OffsetX = za.StartOffsetX + (za.TargetOffsetX - za.StartOffsetX) * ease;
-            doc.Camera.OffsetY = za.StartOffsetY + (za.TargetOffsetY - za.StartOffsetY) * ease;
-            doc.Camera.NotifyZoomChange();
-            doc.Rail.ScaleVerticalBias(prevZoom, doc.Camera.Zoom);
-            doc.UpdateRailZoom(ww, wh, za.CursorPageX, za.CursorPageY);
-            cameraChanged = true;
-
-            if (t >= 1.0)
-            {
-                double hFrac = za.HorizontalFraction;
-                double lineY = za.LineScreenY;
-                _zoomAnim = null;
-                doc.ClampCamera(ww, wh);
-                if (doc.Rail.Active)
-                {
-                    if (hFrac >= 0)
-                        doc.StartSnapPreservingPosition(ww, wh, hFrac, lineY);
-                    else
-                        doc.StartSnap(ww, wh);
-                }
-                doc.UpdateRenderDpiIfNeeded();
-            }
-            else
-            {
-                animating = true;
-            }
-        }
+        _zoom.Tick(doc, ww, wh, ref cameraChanged, ref animating);
     }
 
     /// <summary>Rail snap animation and edge-hold line advance (skipped while zoom is animating).</summary>
     private void TickRailSnap(DocumentState doc, double dt, double ww, double wh,
         ref bool cameraChanged, ref bool pageChanged, ref bool overlayChanged, ref bool animating)
     {
-        if (_zoomAnim is null)
+        if (!_zoom.IsAnimating)
         {
             double cx = doc.Camera.OffsetX, cy = doc.Camera.OffsetY;
             bool railAnimating = doc.Rail.Tick(ref cx, ref cy, dt, doc.Camera.Zoom, ww);
@@ -950,8 +839,7 @@ public sealed class DocumentController
             if (doc.Rail.AutoScrollTriggered)
             {
                 doc.Rail.AutoScrollTriggered = false;
-                AutoScrollActive = true;
-                StateChanged?.Invoke(nameof(AutoScrollActive));
+                _autoScroll.ActivateAutoScroll();
                 StatusMessage?.Invoke("Auto-scroll activated");
             }
 
@@ -1000,7 +888,7 @@ public sealed class DocumentController
                 {
                     case LineAdvanceResult.PageChanged:
                         pageChanged = true;
-                        doc.Rail.StartAutoScroll(AutoScrollSpeed);
+                        doc.Rail.StartAutoScroll(_autoScroll.AutoScrollSpeed);
                         doc.Rail.PauseAutoScroll(_config.AutoScrollBlockPauseMs);
                         break;
                     case LineAdvanceResult.PageChangedRailLost:
