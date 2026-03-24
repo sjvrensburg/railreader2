@@ -124,4 +124,138 @@ public class DocumentControllerTests : IDisposable
         Assert.Same(s1, _controller.Documents[1]);
         Assert.Same(s2, _controller.Documents[0]);
     }
+
+    // --- Helper for rail mode tests ---
+
+    private void SetupRailMode(DocumentState doc)
+    {
+        var analysis = new PageAnalysis();
+        var block = new LayoutBlock
+        {
+            ClassId = 22, BBox = new BBox(72, 72, 468, 200),
+            Confidence = 0.9f, Order = 0,
+        };
+        for (int i = 0; i < 5; i++)
+            block.Lines.Add(new LineInfo(72 + i * 20, 16));
+        analysis.Blocks.Add(block);
+        doc.AnalysisCache[doc.CurrentPage] = analysis;
+        doc.Rail.SetAnalysis(analysis, _controller.Config.NavigableClasses);
+        doc.Camera.Zoom = _controller.Config.RailZoomThreshold + 1;
+        var (ww, wh) = _controller.GetViewportSize();
+        doc.Rail.UpdateZoom(doc.Camera.Zoom, doc.Camera.OffsetX, doc.Camera.OffsetY, ww, wh);
+    }
+
+    // --- New tests ---
+
+    [Fact]
+    public void Tick_NoDocument_ReturnsDefault()
+    {
+        var result = _controller.Tick(0.016);
+        Assert.False(result.CameraChanged);
+        Assert.False(result.PageChanged);
+        Assert.False(result.OverlayChanged);
+        Assert.False(result.SearchChanged);
+        Assert.False(result.AnnotationsChanged);
+        Assert.False(result.StillAnimating);
+    }
+
+    [Fact]
+    public void GoToPage_UpdatesCurrentPage()
+    {
+        var state = _controller.CreateDocument(_pdfPath);
+        state.LoadPageBitmap();
+        _controller.AddDocument(state);
+        _controller.SetViewportSize(800, 600);
+
+        _controller.GoToPage(1);
+        Assert.Equal(1, _controller.ActiveDocument!.CurrentPage);
+    }
+
+    [Fact]
+    public void ToggleAutoScroll_ActivatesAndDeactivates()
+    {
+        var state = _controller.CreateDocument(_pdfPath);
+        state.LoadPageBitmap();
+        _controller.AddDocument(state);
+        _controller.SetViewportSize(800, 600);
+        SetupRailMode(state);
+
+        _controller.ToggleAutoScroll();
+        Assert.True(_controller.AutoScrollActive);
+
+        _controller.ToggleAutoScroll();
+        Assert.False(_controller.AutoScrollActive);
+    }
+
+    [Fact]
+    public void ToggleJumpModeExclusive_StopsAutoScroll()
+    {
+        var state = _controller.CreateDocument(_pdfPath);
+        state.LoadPageBitmap();
+        _controller.AddDocument(state);
+        _controller.SetViewportSize(800, 600);
+        SetupRailMode(state);
+
+        _controller.ToggleAutoScroll();
+        Assert.True(_controller.AutoScrollActive);
+
+        _controller.ToggleJumpModeExclusive();
+        Assert.False(_controller.AutoScrollActive);
+        Assert.True(_controller.JumpMode);
+    }
+
+    [Fact]
+    public void CycleColourEffect_Cycles()
+    {
+        var state = _controller.CreateDocument(_pdfPath);
+        state.LoadPageBitmap();
+        _controller.AddDocument(state);
+
+        var next = _controller.CycleColourEffect();
+        Assert.NotEqual(ColourEffect.None, next);
+    }
+
+    [Fact]
+    public void HandleVerticalNav_AdvancesLine()
+    {
+        var state = _controller.CreateDocument(_pdfPath);
+        state.LoadPageBitmap();
+        _controller.AddDocument(state);
+        _controller.SetViewportSize(800, 600);
+        SetupRailMode(state);
+
+        int lineBefore = state.Rail.CurrentLine;
+        _controller.HandleArrowDown();
+        Assert.Equal(lineBefore + 1, state.Rail.CurrentLine);
+    }
+
+    [Fact]
+    public void Tick_WithDocument_DoesNotCrash()
+    {
+        var state = _controller.CreateDocument(_pdfPath);
+        state.LoadPageBitmap();
+        _controller.AddDocument(state);
+        _controller.SetViewportSize(800, 600);
+
+        var ex = Record.Exception(() =>
+        {
+            for (int i = 0; i < 10; i++)
+                _controller.Tick(0.016);
+        });
+        Assert.Null(ex);
+    }
+
+    [Fact]
+    public void FitPage_UpdatesZoom()
+    {
+        var state = _controller.CreateDocument(_pdfPath);
+        state.LoadPageBitmap();
+        _controller.AddDocument(state);
+        _controller.SetViewportSize(800, 600);
+
+        double zoomBefore = state.Camera.Zoom;
+        _controller.FitPage();
+        Assert.True(state.Camera.Zoom > 0);
+        Assert.NotEqual(zoomBefore, state.Camera.Zoom);
+    }
 }
