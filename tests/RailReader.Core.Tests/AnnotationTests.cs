@@ -98,10 +98,10 @@ public class AnnotationTests : IDisposable
             Opacity = 0.4f,
         };
 
-        bool hit = AnnotationRenderer.HitTest(highlight, 50, 20);
+        bool hit = AnnotationGeometry.HitTest(highlight, 50, 20);
         Assert.True(hit);
 
-        bool miss = AnnotationRenderer.HitTest(highlight, 500, 500);
+        bool miss = AnnotationGeometry.HitTest(highlight, 500, 500);
         Assert.False(miss);
     }
 }

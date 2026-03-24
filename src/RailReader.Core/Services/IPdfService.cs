@@ -10,13 +10,6 @@ public interface IRenderedPage : IDisposable
 {
     int Width { get; }
     int Height { get; }
-
-    /// <summary>
-    /// Returns the underlying platform-specific bitmap object.
-    /// Typed as object to avoid coupling Core to a rendering library.
-    /// Callers that know the concrete type can cast (e.g. to SKBitmap).
-    /// </summary>
-    object NativeBitmap { get; }
 }
 
 

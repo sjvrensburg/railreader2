@@ -1,4 +1,5 @@
 using RailReader.Core.Models;
+using RailReader.Renderer.Skia;
 using SkiaSharp;
 
 namespace RailReader.Core.Services;
@@ -51,7 +52,7 @@ public static class OverlayRenderer
         // active line with dark colour effects.
         if (!lineFocusBlur)
         {
-            dimPaint.Color = ToSKColor(palette.Dim);
+            dimPaint.Color = palette.Dim.ToSKColor();
             if (palette.DimExcludesBlock)
             {
                 canvas.Save();
@@ -70,15 +71,15 @@ public static class OverlayRenderer
         {
             canvas.Save();
             canvas.ClipRect(blockRect);
-            revealPaint.Color = ToSKColor(revealColor);
-            revealPaint.BlendMode = ToSKBlendMode(blendMode);
+            revealPaint.Color = revealColor.ToSKColor();
+            revealPaint.BlendMode = blendMode.ToSKBlendMode();
             canvas.DrawRect(blockRect, revealPaint);
             canvas.Restore();
         }
 
         // Block outline
         var bboxRect = SKRect.Create(block.BBox.X, block.BBox.Y, block.BBox.W, block.BBox.H);
-        outlinePaint.Color = ToSKColor(palette.BlockOutline);
+        outlinePaint.Color = palette.BlockOutline.ToSKColor();
         outlinePaint.StrokeWidth = palette.BlockOutlineWidth;
         canvas.DrawRect(bboxRect, outlinePaint);
 
@@ -87,7 +88,7 @@ public static class OverlayRenderer
         if (lineHighlightEnabled)
         {
             float hlPad = line.Height * (float)linePadding;
-            linePaint.Color = ToSKColor(palette.ResolveLineHighlight(tint, tintOpacity));
+            linePaint.Color = palette.ResolveLineHighlight(tint, tintOpacity).ToSKColor();
             canvas.DrawRect(SKRect.Create(
                 block.BBox.X, line.Y - line.Height / 2 - hlPad,
                 block.BBox.W, line.Height + hlPad * 2), linePaint);
@@ -97,7 +98,7 @@ public static class OverlayRenderer
             // Thin vertical bar indicator when highlight is off but blur is on
             const float barWidth = 3f;
             float pad = line.Height * 0.15f;
-            linePaint.Color = ToSKColor(palette.BlockOutline.WithAlpha(200));
+            linePaint.Color = palette.BlockOutline.WithAlpha(200).ToSKColor();
             canvas.DrawRect(SKRect.Create(
                 block.BBox.X - BlockMargin - barWidth,
                 line.Y - line.Height / 2 - pad,
@@ -181,11 +182,4 @@ public static class OverlayRenderer
         return -1;
     }
 
-    internal static SKColor ToSKColor(ColorRGBA c) => new(c.R, c.G, c.B, c.A);
-
-    internal static SKBlendMode ToSKBlendMode(BlendMode m) => m switch
-    {
-        BlendMode.Plus => SKBlendMode.Plus,
-        _ => SKBlendMode.SrcOver,
-    };
 }

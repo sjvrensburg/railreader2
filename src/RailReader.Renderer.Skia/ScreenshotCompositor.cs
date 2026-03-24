@@ -30,8 +30,8 @@ public static class ScreenshotCompositor
     {
         // Render PDF page at requested DPI
         int dpi = Math.Clamp(options.Dpi, 72, 600);
-        using var rendered = (SkiaRenderedPage)doc.Pdf.RenderPage(doc.CurrentPage, dpi);
-        var pageBitmap = rendered.Bitmap;
+        using var renderedPage = doc.Pdf.RenderPage(doc.CurrentPage, dpi);
+        var pageBitmap = ((SkiaRenderedPage)renderedPage).Bitmap;
 
         int bitmapW = pageBitmap.Width;
         int bitmapH = pageBitmap.Height;

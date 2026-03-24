@@ -1,4 +1,5 @@
 using RailReader.Core.Models;
+using RailReader.Renderer.Skia;
 using SkiaSharp;
 
 namespace RailReader.Core.Services;
@@ -280,22 +281,13 @@ public static class AnnotationRenderer
         ];
     }
 
-    public static ResizeHandle HitTestResizeHandle(FreehandAnnotation annotation, float pageX, float pageY, float tolerance = 8f)
-        => AnnotationGeometry.HitTestResizeHandle(annotation, pageX, pageY, tolerance);
-
-    public static SKRect? GetAnnotationBounds(Annotation annotation)
+    private static SKRect? GetAnnotationBounds(Annotation annotation)
     {
         var bounds = AnnotationGeometry.GetAnnotationBounds(annotation);
         if (bounds is not { } r) return null;
         return new SKRect(r.Left, r.Top, r.Right, r.Bottom);
     }
 
-    public static bool HitTest(Annotation annotation, float pageX, float pageY, float tolerance = 4f)
-        => AnnotationGeometry.HitTest(annotation, pageX, pageY, tolerance);
-
     private static SKColor ParseColor(string hex, float opacity)
-    {
-        var c = ColorUtils.ParseHexColor(hex, (byte)(opacity * 255));
-        return new SKColor(c.R, c.G, c.B, c.A);
-    }
+        => ColorUtils.ParseHexColor(hex, (byte)(opacity * 255)).ToSKColor();
 }

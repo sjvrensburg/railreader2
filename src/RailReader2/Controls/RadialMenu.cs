@@ -6,6 +6,7 @@ using Avalonia.Media;
 using SkiaSharp;
 using Avalonia.Rendering.SceneGraph;
 using Avalonia.Skia;
+using RailReader.Renderer.Skia;
 
 namespace RailReader2.Controls;
 
@@ -517,9 +518,6 @@ public class RadialMenu : Control
         }
 
         private static SKColor ParseHexColor(string hex, byte alpha)
-        {
-            var c = RailReader.Core.Services.ColorUtils.ParseHexColor(hex, alpha);
-            return new SKColor(c.R, c.G, c.B, c.A);
-        }
+            => RailReader.Core.Services.ColorUtils.ParseHexColor(hex, alpha).ToSKColor();
     }
 }

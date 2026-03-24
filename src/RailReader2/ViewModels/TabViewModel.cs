@@ -77,17 +77,6 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
         set => State.OnDpiRenderComplete = value;
     }
 
-    /// <summary>
-    /// Invalidates the cached SKImage so CachedImage re-creates it from the
-    /// updated IRenderedPage. Call after DPI re-render completes.
-    /// </summary>
-    public void InvalidateCachedImage()
-    {
-        _cachedImage?.Dispose();
-        _cachedImage = null;
-        _cachedImagePage = null;
-    }
-
     public TabViewModel(DocumentState state)
     {
         State = state;

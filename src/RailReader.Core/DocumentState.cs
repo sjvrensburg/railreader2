@@ -155,8 +155,12 @@ public sealed class DocumentState : IDisposable
     /// </summary>
     public void LoadPageBitmap()
     {
+        var oldPage = CachedPage;
+        var oldMinimap = MinimapPage;
         CachedPage = null;
         MinimapPage = null;
+        oldPage?.Dispose();
+        oldMinimap?.Dispose();
 
         var (w, h) = _pdf.GetPageSize(CurrentPage);
         PageWidth = w;

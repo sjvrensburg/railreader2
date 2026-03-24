@@ -60,8 +60,7 @@ public static class AnnotationGeometry
     {
         var bounds = GetAnnotationBounds(annotation);
         if (bounds is not { } rect) return false;
-        rect.Inflate(tolerance, tolerance);
-        return rect.Contains(pageX, pageY);
+        return rect.Inflated(tolerance, tolerance).Contains(pageX, pageY);
     }
 
     public static ResizeHandle HitTestResizeHandle(FreehandAnnotation annotation, float pageX, float pageY, float tolerance = 8f)

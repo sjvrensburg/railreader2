@@ -8,15 +8,9 @@ namespace RailReader.Renderer.Skia;
 /// </summary>
 public sealed class SkiaPdfServiceFactory : IPdfServiceFactory
 {
-    private static bool s_resolverInitialized;
-
     public SkiaPdfServiceFactory()
     {
-        if (!s_resolverInitialized)
-        {
-            PdfiumResolver.Initialize();
-            s_resolverInitialized = true;
-        }
+        PdfiumResolver.Initialize();
     }
 
     public IPdfService CreatePdfService(string filePath)

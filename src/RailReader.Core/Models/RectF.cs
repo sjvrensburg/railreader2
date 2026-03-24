@@ -13,13 +13,8 @@ public record struct RectF(float Left, float Top, float Right, float Bottom)
     public readonly bool Contains(float x, float y)
         => x >= Left && x <= Right && y >= Top && y <= Bottom;
 
-    public void Inflate(float dx, float dy)
-    {
-        Left -= dx;
-        Top -= dy;
-        Right += dx;
-        Bottom += dy;
-    }
+    public readonly RectF Inflated(float dx, float dy)
+        => new(Left - dx, Top - dy, Right + dx, Bottom + dy);
 
     public static RectF Create(float x, float y, float w, float h)
         => new(x, y, x + w, y + h);

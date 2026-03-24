@@ -75,14 +75,4 @@ public sealed class SkiaPdfService : IPdfService
         return (Math.Max(1, (int)(pageW * scale)), Math.Max(1, (int)(pageH * scale)));
     }
 
-    /// <summary>
-    /// Calculates the appropriate render DPI for the current zoom level.
-    /// Higher zoom → higher DPI for sharp text.
-    /// </summary>
-    public static int CalculateRenderDpi(double zoom)
-    {
-        int raw = (int)(zoom * 150);
-        int rounded = ((raw + 37) / 75) * 75;
-        return Math.Clamp(rounded, 150, 600);
-    }
 }

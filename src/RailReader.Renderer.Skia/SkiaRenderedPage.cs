@@ -12,7 +12,6 @@ public sealed class SkiaRenderedPage : IRenderedPage
     public SKBitmap Bitmap { get; }
     public int Width => Bitmap.Width;
     public int Height => Bitmap.Height;
-    public object NativeBitmap => Bitmap;
 
     public SkiaRenderedPage(SKBitmap bitmap) => Bitmap = bitmap;
 
