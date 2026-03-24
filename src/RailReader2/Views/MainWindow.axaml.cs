@@ -132,7 +132,9 @@ public partial class MainWindow : Window
                         break;
                     case nameof(MainWindowViewModel.ShowAbout) when vm.ShowAbout:
                         vm.ShowAbout = false;
-                        await new AboutDialog { FontSize = vm.CurrentFontSize }.ShowDialog(this);
+                        var aboutDlg = new AboutDialog { FontSize = vm.CurrentFontSize };
+                        aboutDlg.SetLogFilePath(vm.LogFilePath);
+                        await aboutDlg.ShowDialog(this);
                         break;
                     case nameof(MainWindowViewModel.ShowSettings) when vm.ShowSettings:
                         vm.ShowSettings = false;

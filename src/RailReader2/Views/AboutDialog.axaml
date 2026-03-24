@@ -2,15 +2,33 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="RailReader2.Views.AboutDialog"
         Title="About railreader2"
-        Width="320" Height="220"
+        Width="420" Height="280"
         WindowStartupLocation="CenterOwner"
         CanResize="False">
-    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8">
+    <Window.Resources>
+        <FontFamily x:Key="FaFont">avares://RailReader2/Assets/fa-solid-900.ttf#Font Awesome 6 Free Solid</FontFamily>
+    </Window.Resources>
+    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8" Margin="20,0">
         <TextBlock Text="railreader2" FontWeight="Bold" HorizontalAlignment="Center" />
         <TextBlock x:Name="VersionText" HorizontalAlignment="Center" Opacity="0.7" />
         <TextBlock Text="AI-guided rail reading PDF viewer" HorizontalAlignment="Center" Margin="0,8,0,0" />
         <Separator Margin="0,8" />
         <TextBlock Text="Built with Avalonia, SkiaSharp, ONNX Runtime" HorizontalAlignment="Center" Opacity="0.6" />
         <TextBlock Text="Layout detection: PP-DocLayoutV3 by PaddlePaddle" HorizontalAlignment="Center" Opacity="0.6" />
+        <Separator Margin="0,8" />
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="6"
+                    x:Name="LogPathPanel" IsVisible="False">
+            <TextBlock Text="Log:" Opacity="0.6" VerticalAlignment="Center" />
+            <TextBlock x:Name="LogPathText" Opacity="0.5" VerticalAlignment="Center" FontSize="11" />
+            <Button x:Name="CopyLogPathButton"
+                    ToolTip.Tip="Copy log file path to clipboard"
+                    Click="OnCopyLogPath"
+                    Padding="4,2" VerticalAlignment="Center"
+                    Background="Transparent" BorderThickness="0"
+                    Cursor="Hand">
+                <TextBlock Text="&#xf0c5;" FontFamily="{StaticResource FaFont}" FontSize="12"
+                           Opacity="0.5" ToolTip.Tip="Copy log file path to clipboard" />
+            </Button>
+        </StackPanel>
     </StackPanel>
 </Window>

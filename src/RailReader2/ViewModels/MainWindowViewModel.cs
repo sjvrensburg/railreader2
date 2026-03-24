@@ -160,6 +160,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public TabViewModel? ActiveTab =>
         ActiveTabIndex >= 0 && ActiveTabIndex < Tabs.Count ? Tabs[ActiveTabIndex] : null;
 
+    /// <summary>Path to the current session log file, or null if file logging unavailable.</summary>
+    public string? LogFilePath => (_logger as ConsoleLogger)?.LogFilePath;
+
     public MainWindowViewModel(AppConfig config)
     {
         _logger = new ConsoleLogger();
@@ -1068,6 +1071,34 @@ public sealed partial class MainWindowViewModel : ObservableObject
         catch (Exception ex)
         {
             _logger.Error("[Export JSON] Failed", ex);
+        }
+    }
+
+    [RelayCommand]
+    public async Task ExportDiagnosticLog()
+    {
+        if (_window is null || LogFilePath is null || !File.Exists(LogFilePath)) return;
+
+        var file = await _window.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "Export Diagnostic Log",
+            DefaultExtension = "log",
+            FileTypeChoices = [new FilePickerFileType("Log Files") { Patterns = ["*.log", "*.txt"] }],
+            SuggestedFileName = $"railreader2-log-{DateTime.Now:yyyyMMdd-HHmmss}.log",
+        });
+        if (file is null) return;
+
+        var outputPath = file.TryGetLocalPath() ?? file.Path.LocalPath;
+        if (outputPath is null) return;
+
+        try
+        {
+            File.Copy(LogFilePath, outputPath, overwrite: true);
+            ShowStatusToast($"Log exported to {Path.GetFileName(outputPath)}");
+        }
+        catch (Exception ex)
+        {
+            _logger.Error("[Export Log] Failed", ex);
         }
     }
 

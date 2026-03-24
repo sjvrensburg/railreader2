@@ -61,6 +61,7 @@
             <MenuItem Header="_Keyboard Shortcuts" InputGesture="F1" Click="OnShowShortcuts" />
             <MenuItem Header="_About" Click="OnShowAbout" />
             <Separator />
+            <MenuItem Header="Export _Diagnostic Log..." Command="{Binding ExportDiagnosticLogCommand}" />
             <MenuItem Header="Clean Up Temp Files..." Command="{Binding RunCleanupCommand}" />
         </MenuItem>
     </Menu>
