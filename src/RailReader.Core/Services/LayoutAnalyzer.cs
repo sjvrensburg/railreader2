@@ -123,6 +123,7 @@ public sealed class LayoutAnalyzer : IDisposable
                 detectionData = t.ToArray();
             }
 
+#if DEBUG
             if (!_loggedOutputShapes)
             {
                 Logger.Debug($"[ONNX] Output '{r.Name}': dims=[{string.Join(",", t.Dimensions.ToArray())}]");
@@ -131,6 +132,7 @@ public sealed class LayoutAnalyzer : IDisposable
                 var preview = string.Join(", ", flat.Take(Math.Min(14, flat.Length)).Select(v => v.ToString("F2")));
                 Logger.Debug($"[ONNX]   First values: [{preview}]");
             }
+#endif
         }
         _loggedOutputShapes = true;
 

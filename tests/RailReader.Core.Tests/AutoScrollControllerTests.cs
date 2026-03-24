@@ -31,22 +31,7 @@ public class AutoScrollControllerTests : IDisposable
         _doc.Dispose();
     }
 
-    private void SetupRailMode()
-    {
-        var analysis = new PageAnalysis();
-        var block = new LayoutBlock
-        {
-            ClassId = 22, BBox = new BBox(72, 72, 468, 200),
-            Confidence = 0.9f, Order = 0,
-        };
-        for (int i = 0; i < 5; i++)
-            block.Lines.Add(new LineInfo(72 + i * 20, 16));
-        analysis.Blocks.Add(block);
-        _doc.AnalysisCache[_doc.CurrentPage] = analysis;
-        _doc.Rail.SetAnalysis(analysis, _config.NavigableClasses);
-        _doc.Camera.Zoom = _config.RailZoomThreshold + 1;
-        _doc.Rail.UpdateZoom(_doc.Camera.Zoom, _doc.Camera.OffsetX, _doc.Camera.OffsetY, 800, 600);
-    }
+    private void SetupRailMode() => TestFixtures.SetupRailMode(_doc, _config);
 
     [Fact]
     public void ToggleAutoScroll_Activates()

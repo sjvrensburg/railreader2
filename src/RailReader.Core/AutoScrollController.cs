@@ -19,7 +19,17 @@ internal sealed class AutoScrollController
     public bool AutoScrollActive { get; private set; }
 
     /// <summary>Whether jump mode is currently active.</summary>
-    public bool JumpMode { get; set; }
+    public bool JumpMode
+    {
+        get => _jumpMode;
+        set
+        {
+            if (_jumpMode == value) return;
+            _jumpMode = value;
+            StateChanged?.Invoke(nameof(JumpMode));
+        }
+    }
+    private bool _jumpMode;
 
     /// <summary>
     /// Fired when a property changes. UI can subscribe to update bindings.

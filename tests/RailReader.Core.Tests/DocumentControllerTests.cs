@@ -125,24 +125,10 @@ public class DocumentControllerTests : IDisposable
         Assert.Same(s2, _controller.Documents[0]);
     }
 
-    // --- Helper for rail mode tests ---
-
     private void SetupRailMode(DocumentState doc)
     {
-        var analysis = new PageAnalysis();
-        var block = new LayoutBlock
-        {
-            ClassId = 22, BBox = new BBox(72, 72, 468, 200),
-            Confidence = 0.9f, Order = 0,
-        };
-        for (int i = 0; i < 5; i++)
-            block.Lines.Add(new LineInfo(72 + i * 20, 16));
-        analysis.Blocks.Add(block);
-        doc.AnalysisCache[doc.CurrentPage] = analysis;
-        doc.Rail.SetAnalysis(analysis, _controller.Config.NavigableClasses);
-        doc.Camera.Zoom = _controller.Config.RailZoomThreshold + 1;
         var (ww, wh) = _controller.GetViewportSize();
-        doc.Rail.UpdateZoom(doc.Camera.Zoom, doc.Camera.OffsetX, doc.Camera.OffsetY, ww, wh);
+        TestFixtures.SetupRailMode(doc, _controller.Config, ww, wh);
     }
 
     // --- New tests ---
