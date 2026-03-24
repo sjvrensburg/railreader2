@@ -11,7 +11,10 @@ public class AnnotationTests : IDisposable
     public AnnotationTests()
     {
         var config = new AppConfig();
-        _state = new DocumentState(TestFixtures.GetTestPdfPath(), config, new SynchronousThreadMarshaller());
+        var factory = TestFixtures.CreatePdfFactory();
+        var pdfPath = TestFixtures.GetTestPdfPath();
+        _state = new DocumentState(pdfPath, factory.CreatePdfService(pdfPath),
+            factory.CreatePdfTextService(), config, new SynchronousThreadMarshaller());
         _state.LoadPageBitmap();
         _state.LoadAnnotations();
     }

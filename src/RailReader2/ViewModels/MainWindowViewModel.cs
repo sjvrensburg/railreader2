@@ -137,7 +137,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     partial void OnJumpModeChanged(bool value) => _controller.JumpMode = value;
 
     public AppConfig Config => _controller.Config;
-    public ColourEffectShaders ColourEffects => _controller.ColourEffects;
+    public ColourEffectShaders ColourEffects { get; } = new();
     public DocumentController Controller => _controller;
 
     // Link group color assignment
@@ -161,7 +161,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public MainWindowViewModel(AppConfig config)
     {
-        _controller = new DocumentController(config, new AvaloniaThreadMarshaller());
+        _controller = new DocumentController(config, new AvaloniaThreadMarshaller(),
+            new RailReader.Renderer.Skia.SkiaPdfServiceFactory());
         try { _controller.InitializeWorker(); }
         catch (FileNotFoundException) { /* ONNX model not found — layout analysis disabled */ }
         _controller.StateChanged += OnControllerStateChanged;

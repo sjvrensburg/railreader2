@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using RailReader.Core;
 using RailReader.Core.Models;
 using RailReader.Core.Services;
+using RailReader.Renderer.Skia;
 using SkiaSharp;
 
 namespace RailReader2.ViewModels;
@@ -35,20 +36,56 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
     // Read-only properties used by Views
     public string FilePath => State.FilePath;
     public int PageCount => State.PageCount;
-    public PdfService Pdf => State.Pdf;
+    public IPdfService Pdf => State.Pdf;
     public Camera Camera => State.Camera;
     public RailNav Rail => State.Rail;
     public Dictionary<int, PageAnalysis> AnalysisCache => State.AnalysisCache;
     public List<OutlineEntry> Outline => State.Outline;
     public AnnotationFile Annotations => State.Annotations;
-    public SKImage? CachedImage => State.CachedImage;
     public int CachedDpi => State.CachedDpi;
-    public SKBitmap? MinimapBitmap => State.MinimapBitmap;
+
+    /// <summary>
+    /// Returns the cached SKImage for GPU rendering. Created on demand from the
+    /// IRenderedPage; the UI layer owns this because SKImage.FromBitmap must be
+    /// called on the UI thread and is SkiaSharp-specific.
+    /// </summary>
+    public SKImage? CachedImage
+    {
+        get
+        {
+            if (State.CachedPage is SkiaRenderedPage sp)
+            {
+                if (_cachedImage is null || _cachedImagePage != sp)
+                {
+                    _cachedImage?.Dispose();
+                    _cachedImage = SKImage.FromBitmap(sp.Bitmap);
+                    _cachedImagePage = sp;
+                }
+                return _cachedImage;
+            }
+            return null;
+        }
+    }
+    private SKImage? _cachedImage;
+    private SkiaRenderedPage? _cachedImagePage;
+
+    public SKBitmap? MinimapBitmap => (State.MinimapPage as SkiaRenderedPage)?.Bitmap;
 
     public Action? OnDpiRenderComplete
     {
         get => State.OnDpiRenderComplete;
         set => State.OnDpiRenderComplete = value;
+    }
+
+    /// <summary>
+    /// Invalidates the cached SKImage so CachedImage re-creates it from the
+    /// updated IRenderedPage. Call after DPI re-render completes.
+    /// </summary>
+    public void InvalidateCachedImage()
+    {
+        _cachedImage?.Dispose();
+        _cachedImage = null;
+        _cachedImagePage = null;
     }
 
     public TabViewModel(DocumentState state)
@@ -113,6 +150,9 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
     public void Dispose()
     {
         State.StateChanged -= OnStateChanged;
+        _cachedImage?.Dispose();
+        _cachedImage = null;
+        _cachedImagePage = null;
         State.Dispose();
     }
 }

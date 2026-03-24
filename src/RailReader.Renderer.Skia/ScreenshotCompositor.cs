@@ -1,5 +1,8 @@
+using RailReader.Core;
 using RailReader.Core.Commands;
 using RailReader.Core.Models;
+using RailReader.Core.Services;
+using RailReader.Renderer.Skia;
 using SkiaSharp;
 
 namespace RailReader.Core.Services;
@@ -22,11 +25,13 @@ public static class ScreenshotCompositor
     public static SKBitmap RenderPage(
         DocumentState doc,
         DocumentController controller,
+        ColourEffectShaders colourEffects,
         ScreenshotOptions options)
     {
         // Render PDF page at requested DPI
         int dpi = Math.Clamp(options.Dpi, 72, 600);
-        using var pageBitmap = doc.Pdf.RenderPage(doc.CurrentPage, dpi);
+        using var rendered = (SkiaRenderedPage)doc.Pdf.RenderPage(doc.CurrentPage, dpi);
+        var pageBitmap = rendered.Bitmap;
 
         int bitmapW = pageBitmap.Width;
         int bitmapH = pageBitmap.Height;
@@ -48,7 +53,6 @@ public static class ScreenshotCompositor
 
         using var pageImage = SKImage.FromBitmap(pageBitmap);
         var destRect = SKRect.Create(0, 0, bitmapW, bitmapH);
-        var colourEffects = controller.ColourEffects;
         var activeEffect = controller.ActiveColourEffect;
         var activeIntensity = controller.ActiveColourIntensity;
 

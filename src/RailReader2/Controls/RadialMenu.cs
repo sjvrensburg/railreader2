@@ -517,6 +517,9 @@ public class RadialMenu : Control
         }
 
         private static SKColor ParseHexColor(string hex, byte alpha)
-            => RailReader.Core.Services.ColorUtils.ParseHexColor(hex, alpha);
+        {
+            var c = RailReader.Core.Services.ColorUtils.ParseHexColor(hex, alpha);
+            return new SKColor(c.R, c.G, c.B, c.A);
+        }
     }
 }

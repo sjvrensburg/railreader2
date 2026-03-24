@@ -1,16 +1,19 @@
 using RailReader.Core.Models;
+using RailReader.Core.Services;
+using RailReader.Renderer.Skia;
 using SkiaSharp;
 
 namespace RailReader.Core.Services;
 
+/// <summary>
+/// Exports a PDF with annotations rasterised onto each page.
+/// Uses SKDocument.CreatePdf() to produce a multi-page raster PDF.
+/// Will move to RailReader.Renderer.Skia in a future step.
+/// </summary>
 public static class AnnotationExportService
 {
-    /// <summary>
-    /// Exports a PDF with annotations rasterised onto each page.
-    /// Uses SKDocument.CreatePdf() to produce a multi-page raster PDF.
-    /// </summary>
     public static void Export(
-        PdfService pdf,
+        IPdfService pdf,
         AnnotationFile annotations,
         string outputPath,
         int dpi = 300,
@@ -28,7 +31,8 @@ public static class AnnotationExportService
             var (pageW, pageH) = pdf.GetPageSize(page);
 
             // Render page bitmap at export DPI
-            using var bitmap = pdf.RenderPage(page, dpi);
+            using var rendered = (SkiaRenderedPage)pdf.RenderPage(page, dpi);
+            var bitmap = rendered.Bitmap;
             float scaleX = (float)bitmap.Width / (float)pageW;
             float scaleY = (float)bitmap.Height / (float)pageH;
 

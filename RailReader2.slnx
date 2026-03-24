@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/RailReader.Core/RailReader.Core.csproj" />
+    <Project Path="src/RailReader.Renderer.Skia/RailReader.Renderer.Skia.csproj" />
     <Project Path="src/RailReader2/RailReader2.csproj" />
   </Folder>
   <Folder Name="/tests/">

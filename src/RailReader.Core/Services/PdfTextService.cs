@@ -1,6 +1,5 @@
 using System.Runtime.InteropServices;
 using RailReader.Core.Models;
-using SkiaSharp;
 using static RailReader.Core.Services.PdfiumNative;
 
 namespace RailReader.Core.Services;
@@ -64,10 +63,10 @@ public static class PdfTextService
     /// for character ranges on a page. Returns rects in page-point space (origin top-left, Y-down),
     /// adjusted for CropBox offset so highlights align with the rendered page.
     /// </summary>
-    public static List<List<SKRect>> GetTextRangeRects(byte[] pdfBytes, int pageIndex,
+    public static List<List<RectF>> GetTextRangeRects(byte[] pdfBytes, int pageIndex,
         List<(int CharStart, int CharLength)> ranges)
     {
-        var result = new List<List<SKRect>>(ranges.Count);
+        var result = new List<List<RectF>>(ranges.Count);
         for (int i = 0; i < ranges.Count; i++)
             result.Add([]);
 
@@ -89,7 +88,7 @@ public static class PdfTextService
                             float adjRight = (float)(right - offsetX);
                             float tlY = (float)(visibleHeight - (top - offsetY));
                             float brY = (float)(visibleHeight - (bottom - offsetY));
-                            result[i].Add(new SKRect(adjLeft, tlY, adjRight, brY));
+                            result[i].Add(new RectF(adjLeft, tlY, adjRight, brY));
                         }
                     }
                 }

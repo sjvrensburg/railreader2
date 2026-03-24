@@ -30,6 +30,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../RailReader.Core/RailReader.Core.csproj" />
+    <ProjectReference Include="../RailReader.Renderer.Skia/RailReader.Renderer.Skia.csproj" />
   </ItemGroup>
 
 </Project>

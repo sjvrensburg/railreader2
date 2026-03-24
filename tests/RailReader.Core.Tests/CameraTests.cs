@@ -30,7 +30,9 @@ public class CameraTests
     {
         var config = new RailReader.Core.Services.AppConfig();
         var pdfPath = TestFixtures.GetTestPdfPath();
-        var state = new DocumentState(pdfPath, config, new SynchronousThreadMarshaller());
+        var factory = TestFixtures.CreatePdfFactory();
+        var state = new DocumentState(pdfPath, factory.CreatePdfService(pdfPath),
+            factory.CreatePdfTextService(), config, new SynchronousThreadMarshaller());
         state.LoadPageBitmap();
 
         // Set viewport much larger than page
@@ -51,7 +53,9 @@ public class CameraTests
     {
         var config = new RailReader.Core.Services.AppConfig();
         var pdfPath = TestFixtures.GetTestPdfPath();
-        var state = new DocumentState(pdfPath, config, new SynchronousThreadMarshaller());
+        var factory = TestFixtures.CreatePdfFactory();
+        var state = new DocumentState(pdfPath, factory.CreatePdfService(pdfPath),
+            factory.CreatePdfTextService(), config, new SynchronousThreadMarshaller());
         state.LoadPageBitmap();
 
         state.CenterPage(800, 600);
