@@ -1,4 +1,5 @@
 using RailReader.Core.Models;
+using RailReader.Renderer.Skia;
 using SkiaSharp;
 
 namespace RailReader.Core.Services;
@@ -280,79 +281,13 @@ public static class AnnotationRenderer
         ];
     }
 
-    public static ResizeHandle HitTestResizeHandle(FreehandAnnotation annotation, float pageX, float pageY, float tolerance = 8f)
+    private static SKRect? GetAnnotationBounds(Annotation annotation)
     {
-        var bounds = GetAnnotationBounds(annotation);
-        if (bounds is not { } rect) return ResizeHandle.None;
-
-        var selRect = SKRect.Create(rect.Left - 3, rect.Top - 3, rect.Width + 6, rect.Height + 6);
-        var positions = GetHandlePositions(selRect);
-
-        // ResizeHandle enum: None=0, TopLeft=1..Left=8
-        for (int i = 0; i < positions.Length; i++)
-        {
-            float dx = pageX - positions[i].X;
-            float dy = pageY - positions[i].Y;
-            if (dx * dx + dy * dy <= tolerance * tolerance)
-                return (ResizeHandle)(i + 1);
-        }
-        return ResizeHandle.None;
-    }
-
-    public static SKRect? GetAnnotationBounds(Annotation annotation)
-    {
-        switch (annotation)
-        {
-            case HighlightAnnotation h when h.Rects.Count > 0:
-                return ComputeRectsBounds(h.Rects);
-            case FreehandAnnotation f when f.Points.Count > 0:
-                return ComputePointsBounds(f.Points);
-            case TextNoteAnnotation t:
-                float half = NoteIconSize / 2;
-                return new SKRect(t.X - half, t.Y - half, t.X + half, t.Y + half);
-            case RectAnnotation r:
-                return new SKRect(r.X, r.Y, r.X + r.W, r.Y + r.H);
-            default:
-                return null;
-        }
-    }
-
-    private static SKRect ComputeRectsBounds(List<HighlightRect> rects)
-    {
-        float minX = float.MaxValue, minY = float.MaxValue;
-        float maxX = float.MinValue, maxY = float.MinValue;
-        foreach (var r in rects)
-        {
-            if (r.X < minX) minX = r.X;
-            if (r.Y < minY) minY = r.Y;
-            if (r.X + r.W > maxX) maxX = r.X + r.W;
-            if (r.Y + r.H > maxY) maxY = r.Y + r.H;
-        }
-        return new SKRect(minX, minY, maxX, maxY);
-    }
-
-    private static SKRect ComputePointsBounds(List<PointF> points)
-    {
-        float minX = float.MaxValue, minY = float.MaxValue;
-        float maxX = float.MinValue, maxY = float.MinValue;
-        foreach (var p in points)
-        {
-            if (p.X < minX) minX = p.X;
-            if (p.Y < minY) minY = p.Y;
-            if (p.X > maxX) maxX = p.X;
-            if (p.Y > maxY) maxY = p.Y;
-        }
-        return new SKRect(minX, minY, maxX, maxY);
-    }
-
-    public static bool HitTest(Annotation annotation, float pageX, float pageY, float tolerance = 4f)
-    {
-        var bounds = GetAnnotationBounds(annotation);
-        if (bounds is not { } rect) return false;
-        rect.Inflate(tolerance, tolerance);
-        return rect.Contains(pageX, pageY);
+        var bounds = AnnotationGeometry.GetAnnotationBounds(annotation);
+        if (bounds is not { } r) return null;
+        return new SKRect(r.Left, r.Top, r.Right, r.Bottom);
     }
 
     private static SKColor ParseColor(string hex, float opacity)
-        => ColorUtils.ParseHexColor(hex, (byte)(opacity * 255));
+        => ColorUtils.ParseHexColor(hex, (byte)(opacity * 255)).ToSKColor();
 }

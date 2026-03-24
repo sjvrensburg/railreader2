@@ -11,7 +11,10 @@ public class AnnotationTests : IDisposable
     public AnnotationTests()
     {
         var config = new AppConfig();
-        _state = new DocumentState(TestFixtures.GetTestPdfPath(), config, new SynchronousThreadMarshaller());
+        var factory = TestFixtures.CreatePdfFactory();
+        var pdfPath = TestFixtures.GetTestPdfPath();
+        _state = new DocumentState(pdfPath, factory.CreatePdfService(pdfPath),
+            factory.CreatePdfTextService(), config, new SynchronousThreadMarshaller());
         _state.LoadPageBitmap();
         _state.LoadAnnotations();
     }
@@ -95,10 +98,10 @@ public class AnnotationTests : IDisposable
             Opacity = 0.4f,
         };
 
-        bool hit = AnnotationRenderer.HitTest(highlight, 50, 20);
+        bool hit = AnnotationGeometry.HitTest(highlight, 50, 20);
         Assert.True(hit);
 
-        bool miss = AnnotationRenderer.HitTest(highlight, 500, 500);
+        bool miss = AnnotationGeometry.HitTest(highlight, 500, 500);
         Assert.False(miss);
     }
 }

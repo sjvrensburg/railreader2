@@ -18,6 +18,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../../src/RailReader.Core/RailReader.Core.csproj" />
+    <ProjectReference Include="../../src/RailReader.Renderer.Skia/RailReader.Renderer.Skia.csproj" />
   </ItemGroup>
 
 </Project>

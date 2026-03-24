@@ -4,23 +4,16 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <!-- PDFtoImage marks APIs as platform-specific; we only target desktop (Win/Linux/macOS) -->
     <NoWarn>CA1416</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
     <InternalsVisibleTo Include="RailReader.Core.Tests" />
+    <InternalsVisibleTo Include="RailReader.Renderer.Skia" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="PDFtoImage" Version="5.*" />
     <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.*" />
-
-    <!-- SkiaSharp 3.x: needed by PdfService, ColourEffectShaders, SearchMatch, etc. -->
-    <PackageReference Include="SkiaSharp" Version="3.*" />
-    <PackageReference Include="SkiaSharp.NativeAssets.Linux" Version="3.*" />
-    <PackageReference Include="SkiaSharp.NativeAssets.Win32" Version="3.*" />
-    <PackageReference Include="SkiaSharp.NativeAssets.macOS" Version="3.*" />
   </ItemGroup>
 
 </Project>

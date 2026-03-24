@@ -1,5 +1,3 @@
-using SkiaSharp;
-
 namespace RailReader.Core.Models;
 
 public enum ColourEffect
@@ -13,27 +11,27 @@ public enum ColourEffect
 
 public sealed class OverlayPalette
 {
-    public SKColor Dim { get; init; }
+    public ColorRGBA Dim { get; init; }
     public bool DimExcludesBlock { get; init; }
-    public (SKColor Color, SKBlendMode BlendMode)? BlockReveal { get; init; }
-    public SKColor BlockOutline { get; init; }
+    public (ColorRGBA Color, BlendMode BlendMode)? BlockReveal { get; init; }
+    public ColorRGBA BlockOutline { get; init; }
     public float BlockOutlineWidth { get; init; }
-    public SKColor LineHighlight { get; init; }
+    public ColorRGBA LineHighlight { get; init; }
 
-    public SKColor ResolveLineHighlight(LineHighlightTint tint, double opacity)
+    public ColorRGBA ResolveLineHighlight(LineHighlightTint tint, double opacity)
     {
         byte a = (byte)(Math.Clamp(opacity, 0, 1) * 255);
         if (tint == LineHighlightTint.Auto)
             return LineHighlight.WithAlpha(a);
-        SKColor baseColor = tint switch
+        ColorRGBA baseColor = tint switch
         {
-            LineHighlightTint.Yellow => new(255, 220, 50),
-            LineHighlightTint.Cyan   => new(0,   255, 255),
-            LineHighlightTint.Green  => new(0,   220, 120),
-            LineHighlightTint.Pink   => new(255, 130, 180),
-            LineHighlightTint.Orange => new(255, 180, 60),
-            LineHighlightTint.Blue   => new(100, 160, 255),
-            _                        => new(255, 220, 50),
+            LineHighlightTint.Yellow => new(255, 220, 50, 255),
+            LineHighlightTint.Cyan   => new(0,   255, 255, 255),
+            LineHighlightTint.Green  => new(0,   220, 120, 255),
+            LineHighlightTint.Pink   => new(255, 130, 180, 255),
+            LineHighlightTint.Orange => new(255, 180, 60, 255),
+            LineHighlightTint.Blue   => new(100, 160, 255, 255),
+            _                        => new(255, 220, 50, 255),
         };
         return baseColor.WithAlpha(a);
     }
@@ -64,48 +62,48 @@ public static class ColourEffectExtensions
     {
         ColourEffect.HighContrast => new OverlayPalette
         {
-            Dim = new SKColor(0, 0, 0, 140),
+            Dim = new ColorRGBA(0, 0, 0, 140),
             DimExcludesBlock = true,
             BlockReveal = null,
-            BlockOutline = new SKColor(0, 255, 255, 200),
+            BlockOutline = new ColorRGBA(0, 255, 255, 200),
             BlockOutlineWidth = 2.5f,
-            LineHighlight = new SKColor(0, 255, 255, 25),
+            LineHighlight = new ColorRGBA(0, 255, 255, 25),
         },
         ColourEffect.HighVisibility => new OverlayPalette
         {
-            Dim = new SKColor(0, 0, 0, 120),
+            Dim = new ColorRGBA(0, 0, 0, 120),
             DimExcludesBlock = true,
             BlockReveal = null,
-            BlockOutline = new SKColor(255, 230, 0, 200),
+            BlockOutline = new ColorRGBA(255, 230, 0, 200),
             BlockOutlineWidth = 2.5f,
-            LineHighlight = new SKColor(255, 230, 0, 30),
+            LineHighlight = new ColorRGBA(255, 230, 0, 30),
         },
         ColourEffect.Amber => new OverlayPalette
         {
-            Dim = new SKColor(20, 10, 0, 110),
+            Dim = new ColorRGBA(20, 10, 0, 110),
             DimExcludesBlock = false,
-            BlockReveal = (new SKColor(255, 220, 160, 100), SKBlendMode.Plus),
-            BlockOutline = new SKColor(255, 180, 60, 120),
+            BlockReveal = (new ColorRGBA(255, 220, 160, 100), BlendMode.Plus),
+            BlockOutline = new ColorRGBA(255, 180, 60, 120),
             BlockOutlineWidth = 1.5f,
-            LineHighlight = new SKColor(255, 180, 60, 35),
+            LineHighlight = new ColorRGBA(255, 180, 60, 35),
         },
         ColourEffect.Invert => new OverlayPalette
         {
-            Dim = new SKColor(60, 60, 60, 100),
+            Dim = new ColorRGBA(60, 60, 60, 100),
             DimExcludesBlock = false,
             BlockReveal = null,
-            BlockOutline = new SKColor(0, 220, 120, 180),
+            BlockOutline = new ColorRGBA(0, 220, 120, 180),
             BlockOutlineWidth = 2.0f,
-            LineHighlight = new SKColor(0, 220, 120, 40),
+            LineHighlight = new ColorRGBA(0, 220, 120, 40),
         },
         _ => new OverlayPalette // None
         {
-            Dim = new SKColor(0, 0, 0, 90),
+            Dim = new ColorRGBA(0, 0, 0, 90),
             DimExcludesBlock = true,
             BlockReveal = null,
-            BlockOutline = new SKColor(66, 133, 244, 160),
+            BlockOutline = new ColorRGBA(66, 133, 244, 160),
             BlockOutlineWidth = 1.5f,
-            LineHighlight = new SKColor(255, 220, 50, 60),
+            LineHighlight = new ColorRGBA(255, 220, 50, 60),
         },
     };
 }

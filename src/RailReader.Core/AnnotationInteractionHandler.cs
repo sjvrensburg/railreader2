@@ -1,6 +1,5 @@
 using RailReader.Core.Models;
 using RailReader.Core.Services;
-using SkiaSharp;
 
 namespace RailReader.Core;
 
@@ -47,7 +46,7 @@ public sealed class AnnotationInteractionHandler
     private float _dragStartPageX, _dragStartPageY;
     private PositionSnapshot? _dragOriginalPosition;
     private ResizeHandle _resizeHandle = ResizeHandle.None;
-    private SKRect _resizeStartBounds;
+    private RectF _resizeStartBounds;
     private List<PointF>? _resizeOriginalPoints;
 
     // Text selection state
@@ -294,7 +293,7 @@ public sealed class AnnotationInteractionHandler
         if (list is null) return;
         for (int i = list.Count - 1; i >= 0; i--)
         {
-            if (AnnotationRenderer.HitTest(list[i], pageX, pageY))
+            if (AnnotationGeometry.HitTest(list[i], pageX, pageY))
             {
                 doc.RemoveAnnotation(doc.CurrentPage, list[i]);
                 return;
@@ -338,14 +337,14 @@ public sealed class AnnotationInteractionHandler
         // First check resize handles on selected freehand
         if (SelectedAnnotation is FreehandAnnotation selectedFreehand && list is not null)
         {
-            var handle = AnnotationRenderer.HitTestResizeHandle(selectedFreehand, pageX, pageY);
+            var handle = AnnotationGeometry.HitTestResizeHandle(selectedFreehand, pageX, pageY);
             if (handle != ResizeHandle.None)
             {
                 _resizeHandle = handle;
                 _dragStartPageX = pageX;
                 _dragStartPageY = pageY;
-                var bounds = AnnotationRenderer.GetAnnotationBounds(selectedFreehand);
-                _resizeStartBounds = bounds ?? SKRect.Empty;
+                var bounds = AnnotationGeometry.GetAnnotationBounds(selectedFreehand);
+                _resizeStartBounds = bounds ?? RectF.Empty;
                 _resizeOriginalPoints = [.. selectedFreehand.Points];
                 return true;
             }
@@ -356,7 +355,7 @@ public sealed class AnnotationInteractionHandler
         {
             for (int i = list.Count - 1; i >= 0; i--)
             {
-                if (AnnotationRenderer.HitTest(list[i], pageX, pageY))
+                if (AnnotationGeometry.HitTest(list[i], pageX, pageY))
                 {
                     SelectedAnnotation = list[i];
                     _dragAnnotation = list[i];
@@ -444,7 +443,7 @@ public sealed class AnnotationInteractionHandler
 
         for (int i = list.Count - 1; i >= 0; i--)
         {
-            if (list[i] is TextNoteAnnotation tn && AnnotationRenderer.HitTest(tn, pageX, pageY))
+            if (list[i] is TextNoteAnnotation tn && AnnotationGeometry.HitTest(tn, pageX, pageY))
             {
                 SelectedAnnotation = tn;
                 if (isDoubleClick)
@@ -491,7 +490,7 @@ public sealed class AnnotationInteractionHandler
         var oldBounds = _resizeStartBounds;
         if (oldBounds.Width < 1 || oldBounds.Height < 1) return;
 
-        var newBounds = ComputeNewBounds(oldBounds, _resizeHandle, pageX, pageY, _dragStartPageX, _dragStartPageY);
+        var newBounds = AnnotationGeometry.ComputeNewBounds(oldBounds, _resizeHandle, pageX, pageY, _dragStartPageX, _dragStartPageY);
 
         // Minimum size constraint
         if (newBounds.Width < 10 || newBounds.Height < 10) return;
@@ -504,27 +503,6 @@ public sealed class AnnotationInteractionHandler
             float ny = (op.Y - oldBounds.Top) / oldBounds.Height;
             freehand.Points[i] = new PointF(newBounds.Left + nx * newBounds.Width, newBounds.Top + ny * newBounds.Height);
         }
-    }
-
-    private static SKRect ComputeNewBounds(SKRect old, ResizeHandle handle, float px, float py, float startX, float startY)
-    {
-        float dx = px - startX;
-        float dy = py - startY;
-        float l = old.Left, t = old.Top, r = old.Right, b = old.Bottom;
-
-        switch (handle)
-        {
-            case ResizeHandle.TopLeft:     l += dx; t += dy; break;
-            case ResizeHandle.Top:         t += dy; break;
-            case ResizeHandle.TopRight:    r += dx; t += dy; break;
-            case ResizeHandle.Right:       r += dx; break;
-            case ResizeHandle.BottomRight: r += dx; b += dy; break;
-            case ResizeHandle.Bottom:      b += dy; break;
-            case ResizeHandle.BottomLeft:  l += dx; b += dy; break;
-            case ResizeHandle.Left:        l += dx; break;
-        }
-
-        return new SKRect(Math.Min(l, r), Math.Min(t, b), Math.Max(l, r), Math.Max(t, b));
     }
 
     private static bool PointsEqual(List<PointF> a, List<PointF> b)
@@ -546,7 +524,7 @@ public sealed class AnnotationInteractionHandler
         if (GetCurrentPageAnnotations(doc) is not { } list) return null;
         for (int i = list.Count - 1; i >= 0; i--)
         {
-            if (list[i] is TextNoteAnnotation tn && AnnotationRenderer.HitTest(tn, pageX, pageY))
+            if (list[i] is TextNoteAnnotation tn && AnnotationGeometry.HitTest(tn, pageX, pageY))
                 return tn;
         }
         return null;

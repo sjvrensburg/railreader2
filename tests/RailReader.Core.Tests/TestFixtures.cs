@@ -1,3 +1,5 @@
+using RailReader.Core.Services;
+using RailReader.Renderer.Skia;
 using SkiaSharp;
 
 namespace RailReader.Core.Tests;
@@ -29,6 +31,11 @@ public static class TestFixtures
         s_tempFiles.Add(path);
         return path;
     }
+
+    /// <summary>
+    /// Creates the standard SkiaPdfServiceFactory for tests.
+    /// </summary>
+    public static IPdfServiceFactory CreatePdfFactory() => new SkiaPdfServiceFactory();
 
     public static void CreateTestPdf(string path, int pageCount = 3)
     {

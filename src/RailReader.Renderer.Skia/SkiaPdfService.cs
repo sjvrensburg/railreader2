@@ -1,16 +1,19 @@
 using PDFtoImage;
 using RailReader.Core.Models;
-using SkiaSharp;
+using RailReader.Core.Services;
 
-namespace RailReader.Core.Services;
+namespace RailReader.Renderer.Skia;
 
-public sealed class PdfService
+/// <summary>
+/// PDFium/SkiaSharp implementation of IPdfService.
+/// </summary>
+public sealed class SkiaPdfService : IPdfService
 {
     public byte[] PdfBytes { get; }
     public int PageCount { get; }
     public List<OutlineEntry> Outline { get; }
 
-    public PdfService(string filePath)
+    public SkiaPdfService(string filePath)
     {
         PdfBytes = File.ReadAllBytes(filePath);
         PageCount = Conversion.GetPageCount(PdfBytes);
@@ -27,19 +30,21 @@ public sealed class PdfService
         return (size.Width, size.Height);
     }
 
-    /// <summary>
-    /// Renders a page to an SKBitmap at the given DPI.
-    /// Caller owns the returned bitmap.
-    /// </summary>
-    public SKBitmap RenderPage(int pageIndex, int dpi = 200)
+    public IRenderedPage RenderPage(int pageIndex, int dpi = 200)
     {
-        return Conversion.ToImage(PdfBytes, page: pageIndex,
+        var bitmap = Conversion.ToImage(PdfBytes, page: pageIndex,
             options: new RenderOptions(Dpi: dpi));
+        return new SkiaRenderedPage(bitmap);
     }
 
-    /// <summary>
-    /// Renders a page to RGB bytes at the given target pixel size (for ONNX analysis).
-    /// </summary>
+    public IRenderedPage RenderThumbnail(int pageIndex)
+    {
+        var (pixW, pixH) = FitPageToTarget(pageIndex, 200);
+        var bitmap = Conversion.ToImage(PdfBytes, page: pageIndex,
+            options: new RenderOptions(Width: pixW, Height: pixH));
+        return new SkiaRenderedPage(bitmap);
+    }
+
     public (byte[] RgbBytes, int Width, int Height) RenderPagePixmap(int pageIndex, int targetSize)
     {
         var (pixW, pixH) = FitPageToTarget(pageIndex, targetSize);
@@ -63,33 +68,11 @@ public sealed class PdfService
         return (rgb, bitmap.Width, bitmap.Height);
     }
 
-    /// <summary>
-    /// Renders a small thumbnail of a page suitable for the minimap (≤200×280 px).
-    /// Caller owns the returned bitmap.
-    /// </summary>
-    public SKBitmap RenderThumbnail(int pageIndex)
-    {
-        var (pixW, pixH) = FitPageToTarget(pageIndex, 200);
-        return Conversion.ToImage(PdfBytes, page: pageIndex,
-            options: new RenderOptions(Width: pixW, Height: pixH));
-    }
-
     private (int Width, int Height) FitPageToTarget(int pageIndex, int targetSize)
     {
         var (pageW, pageH) = GetPageSize(pageIndex);
         double scale = Math.Min(targetSize / pageW, targetSize / pageH);
         return (Math.Max(1, (int)(pageW * scale)), Math.Max(1, (int)(pageH * scale)));
-    }
-
-    /// <summary>
-    /// Calculates the appropriate render DPI for the current zoom level.
-    /// Higher zoom → higher DPI for sharp text.
-    /// </summary>
-    public static int CalculateRenderDpi(double zoom)
-    {
-        int raw = (int)(zoom * 150);
-        int rounded = ((raw + 37) / 75) * 75; // snap to nearest 75 DPI step
-        return Math.Clamp(rounded, 150, 600);
     }
 
 }

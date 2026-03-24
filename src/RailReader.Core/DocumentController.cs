@@ -28,9 +28,9 @@ public sealed class DocumentController
 
     private readonly AppConfig _config;
     private readonly IThreadMarshaller _marshaller;
+    private readonly IPdfServiceFactory _pdfFactory;
     private AnalysisWorker? _worker;
     public bool HasWorker => _worker is not null;
-    private readonly ColourEffectShaders _colourEffects = new();
 
     private double _vpWidth = 1200;
     private double _vpHeight = 900;
@@ -53,7 +53,6 @@ public sealed class DocumentController
     public List<DocumentState> Documents { get; } = [];
     public int ActiveDocumentIndex { get; set; }
     public AppConfig Config => _config;
-    public ColourEffectShaders ColourEffects => _colourEffects;
     public ColourEffect ActiveColourEffect => ActiveDocument?.ColourEffect ?? _config.ColourEffect;
     public float ActiveColourIntensity => (float)_config.ColourEffectIntensity;
     public AnalysisWorker? Worker => _worker;
@@ -93,10 +92,11 @@ public sealed class DocumentController
     /// </summary>
     public Action<string>? StatusMessage;
 
-    public DocumentController(AppConfig config, IThreadMarshaller marshaller)
+    public DocumentController(AppConfig config, IThreadMarshaller marshaller, IPdfServiceFactory pdfFactory)
     {
         _config = config;
         _marshaller = marshaller;
+        _pdfFactory = pdfFactory;
         Annotations = new AnnotationInteractionHandler();
         Search = new SearchService(
             () => ActiveDocument,
@@ -136,7 +136,8 @@ public sealed class DocumentController
     /// Creates a DocumentState for the given path (synchronous). Call LoadDocumentAsync for bitmap loading.
     /// </summary>
     public DocumentState CreateDocument(string path)
-        => new(path, _config, _marshaller);
+        => new(path, _pdfFactory.CreatePdfService(path), _pdfFactory.CreatePdfTextService(),
+            _config, _marshaller);
 
     /// <summary>
     /// Adds a document to the tab list, restores reading position, and submits analysis.

@@ -1,6 +1,5 @@
 using RailReader.Core.Models;
 using RailReader.Core.Services;
-using SkiaSharp;
 
 namespace RailReader.Core;
 
@@ -10,7 +9,8 @@ namespace RailReader.Core;
 /// </summary>
 public sealed class DocumentState : IDisposable
 {
-    private readonly PdfService _pdf;
+    private readonly IPdfService _pdf;
+    private readonly IPdfTextService _pdfText;
     private readonly IThreadMarshaller _marshaller;
 
     private string _title;
@@ -97,7 +97,8 @@ public sealed class DocumentState : IDisposable
 
     public string FilePath { get; }
     public int PageCount { get; }
-    public PdfService Pdf => _pdf;
+    public IPdfService Pdf => _pdf;
+    public IPdfTextService PdfText => _pdfText;
     public Camera Camera { get; } = new();
     public RailNav Rail { get; }
     public Dictionary<int, PageAnalysis> AnalysisCache { get; } = [];
@@ -125,19 +126,20 @@ public sealed class DocumentState : IDisposable
     public Stack<IUndoAction> RedoStack { get; } = new();
     private Timer? _autoSaveTimer;
 
-    // Cached page bitmap, GPU-ready image, and the DPI it was rendered at
-    public SKBitmap? CachedBitmap { get; private set; }
-    public SKImage? CachedImage { get; private set; }
+    // Cached rendered page and the DPI it was rendered at
+    public IRenderedPage? CachedPage { get; private set; }
     public int CachedDpi { get; private set; }
 
     // Small pre-scaled thumbnail used by the minimap (≤200×280 px).
-    public SKBitmap? MinimapBitmap { get; private set; }
+    public IRenderedPage? MinimapPage { get; private set; }
 
-    public DocumentState(string filePath, AppConfig config, IThreadMarshaller marshaller)
+    public DocumentState(string filePath, IPdfService pdf, IPdfTextService pdfText,
+        AppConfig config, IThreadMarshaller marshaller)
     {
         _marshaller = marshaller;
         FilePath = filePath;
-        _pdf = new PdfService(filePath);
+        _pdf = pdf;
+        _pdfText = pdfText;
         PageCount = _pdf.PageCount;
         _title = Path.GetFileName(filePath);
         _colourEffect = config.ColourEffect;
@@ -153,19 +155,21 @@ public sealed class DocumentState : IDisposable
     /// </summary>
     public void LoadPageBitmap()
     {
-        CachedImage = null;
-        CachedBitmap = null;
-        MinimapBitmap = null;
+        var oldPage = CachedPage;
+        var oldMinimap = MinimapPage;
+        CachedPage = null;
+        MinimapPage = null;
+        oldPage?.Dispose();
+        oldMinimap?.Dispose();
 
         var (w, h) = _pdf.GetPageSize(CurrentPage);
         PageWidth = w;
         PageHeight = h;
 
-        int dpi = PdfService.CalculateRenderDpi(Camera.Zoom);
-        CachedBitmap = _pdf.RenderPage(CurrentPage, dpi);
-        CachedImage = SKImage.FromBitmap(CachedBitmap);
+        int dpi = CalculateRenderDpi(Camera.Zoom);
+        CachedPage = _pdf.RenderPage(CurrentPage, dpi);
         CachedDpi = dpi;
-        MinimapBitmap = _pdf.RenderThumbnail(CurrentPage);
+        MinimapPage = _pdf.RenderThumbnail(CurrentPage);
     }
 
     private bool _dpiRenderPending;
@@ -191,7 +195,7 @@ public sealed class DocumentState : IDisposable
     {
         if (_dpiRenderPending) return false;
 
-        int neededDpi = PdfService.CalculateRenderDpi(Camera.Zoom);
+        int neededDpi = CalculateRenderDpi(Camera.Zoom);
         if (neededDpi > CachedDpi * 1.5 || (neededDpi < CachedDpi * 0.5 && CachedDpi > 150))
         {
             _dpiRenderPending = true;
@@ -200,25 +204,21 @@ public sealed class DocumentState : IDisposable
             {
                 try
                 {
-                    var newBitmap = _pdf.RenderPage(page, neededDpi);
+                    var newPage = _pdf.RenderPage(page, neededDpi);
                     _marshaller.Post(() =>
                     {
                         if (CurrentPage == page)
                         {
-                            var newImage = SKImage.FromBitmap(newBitmap);
-                            var oldImage = CachedImage;
-                            var oldBitmap = CachedBitmap;
-                            CachedBitmap = newBitmap;
-                            CachedImage = newImage;
+                            var oldPage = CachedPage;
+                            CachedPage = newPage;
                             CachedDpi = neededDpi;
                             DpiRenderReady = true;
-                            oldImage?.Dispose();
-                            oldBitmap?.Dispose();
+                            oldPage?.Dispose();
                             OnDpiRenderComplete?.Invoke();
                         }
                         else
                         {
-                            newBitmap.Dispose();
+                            newPage.Dispose();
                         }
                         _dpiRenderPending = false;
                     });
@@ -549,23 +549,31 @@ public sealed class DocumentState : IDisposable
     {
         if (TextCache.TryGetValue(pageIndex, out var cached))
             return cached;
-        var text = PdfTextService.ExtractPageText(_pdf.PdfBytes, pageIndex);
+        var text = _pdfText.ExtractPageText(_pdf.PdfBytes, pageIndex);
         TextCache[pageIndex] = text;
         return text;
+    }
+
+    /// <summary>
+    /// Calculates the appropriate render DPI for a zoom level.
+    /// Pure math — no rendering-library dependency.
+    /// </summary>
+    public static int CalculateRenderDpi(double zoom)
+    {
+        int raw = (int)(zoom * 150);
+        int rounded = ((raw + 37) / 75) * 75;
+        return Math.Clamp(rounded, 150, 600);
     }
 
     public void Dispose()
     {
         _autoSaveTimer?.Dispose();
         SaveAnnotations();
-        var img = CachedImage;
-        CachedImage = null;
-        img?.Dispose();
-        var bmp = CachedBitmap;
-        CachedBitmap = null;
-        bmp?.Dispose();
-        var mmBmp = MinimapBitmap;
-        MinimapBitmap = null;
-        mmBmp?.Dispose();
+        var page = CachedPage;
+        CachedPage = null;
+        page?.Dispose();
+        var mm = MinimapPage;
+        MinimapPage = null;
+        mm?.Dispose();
     }
 }
