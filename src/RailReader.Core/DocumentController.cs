@@ -606,7 +606,6 @@ public sealed class DocumentController
                     if (targetPage >= 0 && targetPage < doc.PageCount)
                     {
                         GoToPage(targetPage);
-                        // Jump to top of new page when going forward, bottom when going backward
                         double scaledH = doc.PageHeight * doc.Camera.Zoom;
                         doc.Camera.OffsetY = forward ? 0 : Math.Min(wh - scaledH, 0);
                         doc.ClampCamera(ww, wh);
@@ -900,13 +899,14 @@ public sealed class DocumentController
 
             if (reachedEnd)
             {
+                int prevBlock = doc.Rail.CurrentBlock;
                 var adv = AdvanceLine(doc, forward: true, ww, wh);
                 switch (adv)
                 {
                     case LineAdvanceResult.PageChanged:
                         pageChanged = true;
                         doc.Rail.StartAutoScroll(_autoScroll.AutoScrollSpeed);
-                        doc.Rail.PauseAutoScroll(_config.AutoScrollBlockPauseMs);
+                        doc.Rail.PauseAutoScroll(GetBlockEntryPause(doc));
                         break;
                     case LineAdvanceResult.PageChangedRailLost:
                         pageChanged = true;
@@ -914,13 +914,28 @@ public sealed class DocumentController
                         break;
                     case LineAdvanceResult.LineAdvanced:
                         doc.StartSnap(ww, wh);
-                        doc.Rail.PauseAutoScroll(_config.AutoScrollLinePauseMs);
+                        bool enteredNewBlock = doc.Rail.CurrentBlock != prevBlock;
+                        doc.Rail.PauseAutoScroll(enteredNewBlock
+                            ? GetBlockEntryPause(doc)
+                            : _config.AutoScrollLinePauseMs);
                         break;
                 }
                 overlayChanged = true;
             }
         }
     }
+
+    /// <summary>
+    /// Returns the auto-scroll pause duration for entering the current block,
+    /// based on its class (equation, header, or default).
+    /// </summary>
+    private double GetBlockEntryPause(DocumentState doc) =>
+        doc.Rail.CurrentNavigableBlock.ClassId switch
+        {
+            LayoutConstants.ClassDisplayFormula => _config.AutoScrollEquationPauseMs,
+            LayoutConstants.ClassDocTitle or LayoutConstants.ClassParagraphTitle => _config.AutoScrollHeaderPauseMs,
+            _ => _config.AutoScrollLinePauseMs,
+        };
 
     /// <summary>
     /// Poll the analysis worker for completed results. Can also be called

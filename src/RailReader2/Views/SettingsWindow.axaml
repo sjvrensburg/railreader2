@@ -153,7 +153,7 @@
                         <Separator />
                         <TextBlock Text="Brief pause at line and block boundaries during auto-scroll, giving your eyes time to settle."
                                    TextWrapping="Wrap" Opacity="0.7" />
-                        <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto,4,Auto">
+                        <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto,4,Auto,4,Auto,4,Auto">
                             <TextBlock Grid.Row="0" Grid.Column="0" Text="Line pause (ms):" VerticalAlignment="Center" />
                             <NumericUpDown Grid.Row="0" Grid.Column="2" Name="AutoScrollLinePause" Value="400"
                                            Minimum="0" Maximum="2000" Increment="50"
@@ -162,6 +162,16 @@
                             <TextBlock Grid.Row="2" Grid.Column="0" Text="Block pause (ms):" VerticalAlignment="Center" />
                             <NumericUpDown Grid.Row="2" Grid.Column="2" Name="AutoScrollBlockPause" Value="600"
                                            Minimum="0" Maximum="2000" Increment="50"
+                                           FormatString="F0" Width="130" HorizontalAlignment="Left"
+                                           ValueChanged="OnSettingChanged" />
+                            <TextBlock Grid.Row="4" Grid.Column="0" Text="Equation pause (ms):" VerticalAlignment="Center" />
+                            <NumericUpDown Grid.Row="4" Grid.Column="2" Name="AutoScrollEquationPause" Value="600"
+                                           Minimum="0" Maximum="5000" Increment="50"
+                                           FormatString="F0" Width="130" HorizontalAlignment="Left"
+                                           ValueChanged="OnSettingChanged" />
+                            <TextBlock Grid.Row="6" Grid.Column="0" Text="Header pause (ms):" VerticalAlignment="Center" />
+                            <NumericUpDown Grid.Row="6" Grid.Column="2" Name="AutoScrollHeaderPause" Value="600"
+                                           Minimum="0" Maximum="5000" Increment="50"
                                            FormatString="F0" Width="130" HorizontalAlignment="Left"
                                            ValueChanged="OnSettingChanged" />
                         </Grid>

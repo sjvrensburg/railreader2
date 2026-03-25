@@ -64,6 +64,7 @@ public partial class OutlinePanel : UserControl
             _vm.SearchRequested += OnSearchRequested;
             WatchActiveTabPage();
             UpdateOutlineSource();
+            SyncOutlineToPage();
             UpdateBookmarkSource();
         }
     }
@@ -83,6 +84,7 @@ public partial class OutlinePanel : UserControl
         {
             WatchActiveTabPage();
             UpdateOutlineSource();
+            SyncOutlineToPage();
             UpdateBookmarkSource();
         }
     }
@@ -115,6 +117,8 @@ public partial class OutlinePanel : UserControl
         int currentPage = tab.CurrentPage;
         var best = FindEntryForPage(outline, currentPage);
 
+        if (OutlineTree.SelectedItem == best) return;
+
         _suppressOutlineSelection = true;
         try
         {
@@ -143,7 +147,7 @@ public partial class OutlinePanel : UserControl
         {
             if (entry.Page is { } p && p <= currentPage)
             {
-                if (best is null || !best.Page.HasValue || p >= best.Page.Value)
+                if (best is null || p >= best.Page!.Value)
                     best = entry;
             }
             if (entry.Children.Count > 0)

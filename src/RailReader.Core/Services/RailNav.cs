@@ -813,7 +813,6 @@ public sealed class RailNav
 
         if (visibleRight >= blockRight)
         {
-            // Determine pause: longer for block/page boundaries
             bool isBlockEnd = CurrentLine + 1 >= CurrentNavigableBlock.Lines.Count;
             double pauseMs = isBlockEnd ? _config.AutoScrollBlockPauseMs : _config.AutoScrollLinePauseMs;
 
