@@ -67,6 +67,8 @@ public sealed class DocumentController
     private Stopwatch? _nonRailEdgeHoldTimer;
     private bool _nonRailEdgeForward;
     private const double NonRailEdgeHoldMs = 400.0;
+    private Stopwatch? _nonRailEdgeCooldown;
+    private const double NonRailEdgeCooldownMs = 300.0;
 
     /// <summary>
     /// Fired when a property changes. UI can subscribe to update bindings.
@@ -576,6 +578,15 @@ public sealed class DocumentController
         }
         else
         {
+            // After an edge-hold page jump, ignore input briefly so key-repeat
+            // doesn't immediately pan away from the landing position.
+            if (_nonRailEdgeCooldown is not null)
+            {
+                if (_nonRailEdgeCooldown.Elapsed.TotalMilliseconds < NonRailEdgeCooldownMs)
+                    return;
+                _nonRailEdgeCooldown = null;
+            }
+
             double prevY = doc.Camera.OffsetY;
             doc.Camera.OffsetY += forward ? -PanStep : PanStep;
             doc.ClampCamera(ww, wh);
@@ -595,7 +606,11 @@ public sealed class DocumentController
                     if (targetPage >= 0 && targetPage < doc.PageCount)
                     {
                         GoToPage(targetPage);
+                        double scaledH = doc.PageHeight * doc.Camera.Zoom;
+                        doc.Camera.OffsetY = forward ? 0 : Math.Min(wh - scaledH, 0);
+                        doc.ClampCamera(ww, wh);
                         _nonRailEdgeHoldTimer = null;
+                        _nonRailEdgeCooldown = Stopwatch.StartNew();
                     }
                 }
             }
@@ -610,6 +625,7 @@ public sealed class DocumentController
     public void ClearNonRailEdgeHold()
     {
         _nonRailEdgeHoldTimer = null;
+        _nonRailEdgeCooldown = null;
     }
 
     public void HandleArrowRight(bool shortJump = false)
@@ -883,13 +899,14 @@ public sealed class DocumentController
 
             if (reachedEnd)
             {
+                int prevBlock = doc.Rail.CurrentBlock;
                 var adv = AdvanceLine(doc, forward: true, ww, wh);
                 switch (adv)
                 {
                     case LineAdvanceResult.PageChanged:
                         pageChanged = true;
                         doc.Rail.StartAutoScroll(_autoScroll.AutoScrollSpeed);
-                        doc.Rail.PauseAutoScroll(_config.AutoScrollBlockPauseMs);
+                        doc.Rail.PauseAutoScroll(GetBlockEntryPause(doc));
                         break;
                     case LineAdvanceResult.PageChangedRailLost:
                         pageChanged = true;
@@ -897,13 +914,28 @@ public sealed class DocumentController
                         break;
                     case LineAdvanceResult.LineAdvanced:
                         doc.StartSnap(ww, wh);
-                        doc.Rail.PauseAutoScroll(_config.AutoScrollLinePauseMs);
+                        bool enteredNewBlock = doc.Rail.CurrentBlock != prevBlock;
+                        doc.Rail.PauseAutoScroll(enteredNewBlock
+                            ? GetBlockEntryPause(doc)
+                            : _config.AutoScrollLinePauseMs);
                         break;
                 }
                 overlayChanged = true;
             }
         }
     }
+
+    /// <summary>
+    /// Returns the auto-scroll pause duration for entering the current block,
+    /// based on its class (equation, header, or default).
+    /// </summary>
+    private double GetBlockEntryPause(DocumentState doc) =>
+        doc.Rail.CurrentNavigableBlock.ClassId switch
+        {
+            LayoutConstants.ClassDisplayFormula => _config.AutoScrollEquationPauseMs,
+            LayoutConstants.ClassDocTitle or LayoutConstants.ClassParagraphTitle => _config.AutoScrollHeaderPauseMs,
+            _ => _config.AutoScrollLinePauseMs,
+        };
 
     /// <summary>
     /// Poll the analysis worker for completed results. Can also be called

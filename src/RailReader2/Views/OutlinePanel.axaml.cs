@@ -30,6 +30,7 @@ public partial class OutlinePanel : UserControl
     private MainWindowViewModel? _vm;
     private DispatcherTimer? _debounceTimer;
     private CancellationTokenSource? _searchCts;
+    private bool _suppressOutlineSelection;
 
     public OutlinePanel()
     {
@@ -48,6 +49,11 @@ public partial class OutlinePanel : UserControl
         {
             _vm.PropertyChanged -= OnVmPropertyChanged;
             _vm.SearchRequested -= OnSearchRequested;
+            if (_watchedTab is not null)
+            {
+                _watchedTab.PropertyChanged -= OnTabPropertyChanged;
+                _watchedTab = null;
+            }
         }
 
         _vm = DataContext as MainWindowViewModel;
@@ -56,7 +62,9 @@ public partial class OutlinePanel : UserControl
         {
             _vm.PropertyChanged += OnVmPropertyChanged;
             _vm.SearchRequested += OnSearchRequested;
+            WatchActiveTabPage();
             UpdateOutlineSource();
+            SyncOutlineToPage();
             UpdateBookmarkSource();
         }
     }
@@ -74,8 +82,76 @@ public partial class OutlinePanel : UserControl
     {
         if (args.PropertyName == nameof(MainWindowViewModel.ActiveTab))
         {
+            WatchActiveTabPage();
             UpdateOutlineSource();
+            SyncOutlineToPage();
             UpdateBookmarkSource();
+        }
+    }
+
+    private TabViewModel? _watchedTab;
+
+    private void WatchActiveTabPage()
+    {
+        if (_watchedTab is not null)
+            _watchedTab.PropertyChanged -= OnTabPropertyChanged;
+
+        _watchedTab = _vm?.ActiveTab;
+
+        if (_watchedTab is not null)
+            _watchedTab.PropertyChanged += OnTabPropertyChanged;
+    }
+
+    private void OnTabPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs args)
+    {
+        if (args.PropertyName == nameof(TabViewModel.CurrentPage))
+            SyncOutlineToPage();
+    }
+
+    private void SyncOutlineToPage()
+    {
+        if (_vm?.ActiveTab is not { } tab) return;
+        var outline = tab.Outline;
+        if (outline is null || outline.Count == 0) return;
+
+        int currentPage = tab.CurrentPage;
+        var best = FindEntryForPage(outline, currentPage);
+
+        if (OutlineTree.SelectedItem == best) return;
+
+        _suppressOutlineSelection = true;
+        try
+        {
+            OutlineTree.SelectedItem = best;
+        }
+        finally
+        {
+            _suppressOutlineSelection = false;
+        }
+    }
+
+    /// <summary>
+    /// Find the outline entry whose page is closest to but not past the current page.
+    /// Walks the tree depth-first, returning the last entry with Page &lt;= currentPage.
+    /// </summary>
+    private static OutlineEntry? FindEntryForPage(List<OutlineEntry> entries, int currentPage)
+    {
+        OutlineEntry? best = null;
+        FindEntryForPageRecursive(entries, currentPage, ref best);
+        return best;
+    }
+
+    private static void FindEntryForPageRecursive(List<OutlineEntry> entries, int currentPage, ref OutlineEntry? best)
+    {
+        foreach (var entry in entries)
+        {
+            if (entry.Page is { } p && p <= currentPage)
+            {
+                if (best is null || p >= best.Page!.Value)
+                    best = entry;
+            }
+            if (entry.Children.Count > 0)
+                FindEntryForPageRecursive(entry.Children, currentPage, ref best);
         }
     }
 
@@ -129,6 +205,7 @@ public partial class OutlinePanel : UserControl
 
     private void OnOutlineSelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
+        if (_suppressOutlineSelection) return;
         if (_vm is { } vm && OutlineTree.SelectedItem is OutlineEntry { Page: { } page })
             vm.GoToPage(page);
     }

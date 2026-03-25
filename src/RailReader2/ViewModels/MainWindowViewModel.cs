@@ -310,6 +310,14 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
             ActiveTabIndex = insertIndex;
             OnPropertyChanged(nameof(ActiveTab));
+
+            // Navigate duplicate tab to the source tab's page
+            if (_pendingDuplicatePage is { } dupPage)
+            {
+                _pendingDuplicatePage = null;
+                _controller.GoToPage(dupPage);
+            }
+
             InvalidateAll();
 
             Dispatcher.UIThread.Post(() => InvalidatePage(), DispatcherPriority.Background);
@@ -320,6 +328,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         catch (Exception ex)
         {
             _pendingLinkGroupId = null;
+            _pendingDuplicatePage = null;
             _logger.Error($"Failed to open {path}", ex);
             ShowStatusToast($"Failed to open: {Path.GetFileName(path)}");
         }
@@ -538,7 +547,10 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public void DuplicateTab()
     {
         if (ActiveTab is { } tab)
+        {
+            _pendingDuplicatePage = tab.CurrentPage;
             OpenDocument(tab.FilePath);
+        }
     }
 
     [RelayCommand]
@@ -552,6 +564,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     }
 
     private Guid? _pendingLinkGroupId;
+    private int? _pendingDuplicatePage;
 
     public void LinkTabTo(int sourceIndex, int targetIndex)
     {

@@ -57,6 +57,8 @@ public partial class SettingsWindow : Window
         LinePaddingSlider.Value = c.LinePadding;
         AutoScrollLinePause.Value = (decimal)c.AutoScrollLinePauseMs;
         AutoScrollBlockPause.Value = (decimal)c.AutoScrollBlockPauseMs;
+        AutoScrollEquationPause.Value = (decimal)c.AutoScrollEquationPauseMs;
+        AutoScrollHeaderPause.Value = (decimal)c.AutoScrollHeaderPauseMs;
         AutoScrollTriggerCheck.IsChecked = c.AutoScrollTriggerEnabled;
         AutoScrollTriggerDelay.Value = (decimal)c.AutoScrollTriggerDelayMs;
         JumpPercentage.Value = (decimal)c.JumpPercentage;
@@ -88,6 +90,8 @@ public partial class SettingsWindow : Window
         c.ColourEffectIntensity = IntensitySlider.Value;
         c.AutoScrollLinePauseMs = (double)(AutoScrollLinePause.Value ?? 400m);
         c.AutoScrollBlockPauseMs = (double)(AutoScrollBlockPause.Value ?? 600m);
+        c.AutoScrollEquationPauseMs = (double)(AutoScrollEquationPause.Value ?? 600m);
+        c.AutoScrollHeaderPauseMs = (double)(AutoScrollHeaderPause.Value ?? 600m);
         c.AutoScrollTriggerDelayMs = (double)(AutoScrollTriggerDelay.Value ?? 2000m);
         c.JumpPercentage = (double)(JumpPercentage.Value ?? 25m);
         vm.OnConfigChanged();
@@ -228,6 +232,8 @@ public partial class SettingsWindow : Window
         }
         vm.Config.AutoScrollLinePauseMs = defaults.AutoScrollLinePauseMs;
         vm.Config.AutoScrollBlockPauseMs = defaults.AutoScrollBlockPauseMs;
+        vm.Config.AutoScrollEquationPauseMs = defaults.AutoScrollEquationPauseMs;
+        vm.Config.AutoScrollHeaderPauseMs = defaults.AutoScrollHeaderPauseMs;
         vm.Config.AutoScrollTriggerEnabled = defaults.AutoScrollTriggerEnabled;
         vm.Config.AutoScrollTriggerDelayMs = defaults.AutoScrollTriggerDelayMs;
         vm.Config.JumpPercentage = defaults.JumpPercentage;

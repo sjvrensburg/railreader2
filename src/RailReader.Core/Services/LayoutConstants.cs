@@ -9,6 +9,11 @@ public static class LayoutConstants
     public const float DensityThresholdFraction = 0.15f;
     public const int MinLineHeightPx = 3;
 
+    // Frequently referenced class indices (must match LayoutClasses order below)
+    public const int ClassDisplayFormula = 5;
+    public const int ClassDocTitle = 6;
+    public const int ClassParagraphTitle = 17;
+
     // PP-DocLayoutV3 official label list (25 classes, alphabetical order)
     // Source: https://huggingface.co/PaddlePaddle/PP-DocLayoutV3 inference.yml
     public static readonly string[] LayoutClasses =
