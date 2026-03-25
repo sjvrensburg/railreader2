@@ -67,6 +67,8 @@ public sealed class DocumentController
     private Stopwatch? _nonRailEdgeHoldTimer;
     private bool _nonRailEdgeForward;
     private const double NonRailEdgeHoldMs = 400.0;
+    private Stopwatch? _nonRailEdgeCooldown;
+    private const double NonRailEdgeCooldownMs = 300.0;
 
     /// <summary>
     /// Fired when a property changes. UI can subscribe to update bindings.
@@ -576,6 +578,15 @@ public sealed class DocumentController
         }
         else
         {
+            // After an edge-hold page jump, ignore input briefly so key-repeat
+            // doesn't immediately pan away from the landing position.
+            if (_nonRailEdgeCooldown is not null)
+            {
+                if (_nonRailEdgeCooldown.Elapsed.TotalMilliseconds < NonRailEdgeCooldownMs)
+                    return;
+                _nonRailEdgeCooldown = null;
+            }
+
             double prevY = doc.Camera.OffsetY;
             doc.Camera.OffsetY += forward ? -PanStep : PanStep;
             doc.ClampCamera(ww, wh);
@@ -600,6 +611,7 @@ public sealed class DocumentController
                         doc.Camera.OffsetY = forward ? 0 : Math.Min(wh - scaledH, 0);
                         doc.ClampCamera(ww, wh);
                         _nonRailEdgeHoldTimer = null;
+                        _nonRailEdgeCooldown = Stopwatch.StartNew();
                     }
                 }
             }
@@ -614,6 +626,7 @@ public sealed class DocumentController
     public void ClearNonRailEdgeHold()
     {
         _nonRailEdgeHoldTimer = null;
+        _nonRailEdgeCooldown = null;
     }
 
     public void HandleArrowRight(bool shortJump = false)
