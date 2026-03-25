@@ -595,6 +595,10 @@ public sealed class DocumentController
                     if (targetPage >= 0 && targetPage < doc.PageCount)
                     {
                         GoToPage(targetPage);
+                        // Jump to top of new page when going forward, bottom when going backward
+                        double scaledH = doc.PageHeight * doc.Camera.Zoom;
+                        doc.Camera.OffsetY = forward ? 0 : Math.Min(wh - scaledH, 0);
+                        doc.ClampCamera(ww, wh);
                         _nonRailEdgeHoldTimer = null;
                     }
                 }
