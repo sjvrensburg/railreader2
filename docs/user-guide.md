@@ -11,16 +11,16 @@ Everything you need to know to get the most out of railreader2.
 3. [Rail Mode](#rail-mode)
 4. [Auto-Scroll](#auto-scroll)
 5. [Jump Mode](#jump-mode)
-6. [Line Focus Dim](#line-focus-dim)
-7. [Bionic Reading](#bionic-reading) (Removed in 3.2)
-8. [Colour Effects](#colour-effects)
-9. [Search](#search)
-10. [Annotations](#annotations)
-11. [Text Selection](#text-selection)
-12. [Bookmarks](#bookmarks)
-13. [Settings](#settings)
+6. [Line Focus & Highlight](#line-focus--highlight)
+7. [Colour Effects](#colour-effects)
+8. [Search](#search)
+9. [Annotations](#annotations)
+10. [Text Selection](#text-selection)
+11. [Bookmarks](#bookmarks)
+12. [Settings](#settings)
+13. [Troubleshooting](#troubleshooting)
 14. [Keyboard Shortcuts](#keyboard-shortcuts)
-15. [AI Agent CLI (Experimental)](#ai-agent-cli-experimental) (Removed in 3.2)
+15. [Removed Features](#removed-features)
 
 ---
 
@@ -157,7 +157,9 @@ This mimics natural reading eye movements and is useful for scanning text quickl
 
 ---
 
-## Line Focus Dim
+## Line Focus & Highlight
+
+### Line focus dim
 
 When enabled, line focus dim applies a smooth feathered dimming overlay to the entire page except the active line in rail mode. Non-active lines fade toward the background colour, reducing peripheral distraction while maintaining a clean visual transition.
 
@@ -165,21 +167,6 @@ When enabled, line focus dim applies a smooth feathered dimming overlay to the e
 *Line focus dim — non-active lines are dimmed to reduce distraction*
 
 Toggle with the `F` key, the **F** button on the rail toolbar, or in Settings > Rail Reading. Dim intensity is adjustable from 0 (off) to 1 (maximum). The line padding (how much extra space stays fully visible around the active line) is also configurable.
-
----
-
-## Bionic Reading
-
-> **Removed in version 3.2.** Bionic reading was removed because it was counterproductive with mathematically complex documents.
-
-Bionic reading is a reading aid that de-emphasises the trailing portion of each word, guiding your eye to fixation points at the start of words. The effect is applied as a GPU shader that fades non-fixation characters toward the background.
-
-Toggle with the `R` key, the **R** button on the rail toolbar, or in Settings > Rail Reading. Two parameters are configurable:
-
-- **Fixation percent** — the fraction of each word kept at full contrast (default 40%). Higher values keep more of each word sharp.
-- **Fade intensity** — how much the non-fixation characters are faded (default 0.6). Higher values produce a stronger effect.
-
-Bionic reading composes correctly with line focus dim and colour effects.
 
 ### Line highlight tint
 
@@ -349,7 +336,6 @@ Press `Ctrl+,` or use the menu to open Settings. Changes take effect immediately
 - **Ramp Time:** Seconds to reach max scroll speed from start.
 - **Pixel Snapping:** Quantise camera to pixel grid to reduce text shimmer.
 - **Line Focus Dim:** Toggle and set intensity and padding.
-- **Bionic Reading:** *(Removed in 3.2.)*
 - **Line Highlight:** Toggle the active-line highlight independently (works with or without line focus dim). Choose a colour tint (Auto, Yellow, Cyan, Green, None) and set opacity.
 - **Jump Distance:** Percentage of visible width for jump mode (5–80%).
 
@@ -431,7 +417,6 @@ The log is overwritten at the start of each session. Old `.log` files are automa
 | `` ` `` (backtick) | Navigate back to previous location |
 | `C` | Cycle colour effect on active tab |
 | `F` | Toggle line focus dim |
-| `R` | *(Removed in 3.2)* |
 | `H` | Toggle line highlight |
 | `Ctrl+Drag` | Free pan (release Ctrl to snap back) |
 | `[` / `]` | Adjust speed or jump distance |
@@ -454,53 +439,12 @@ The log is overwritten at the start of each session. Old `.log` files are automa
 
 ---
 
-## AI Agent CLI (Experimental)
+## Removed Features
 
-> **Removed in version 3.2.** The CLI and Agent projects were developer tools not included in binary releases and have been removed to simplify the codebase.
+### Bionic Reading (Removed in 3.2)
 
-> **Note:** The AI Agent CLI is not included in the binary releases (AppImage or Windows installer). It is only available when building from source with the .NET SDK installed.
+Bionic reading was a GPU shader-based reading aid that de-emphasised the trailing portion of each word, guiding the eye to fixation points at the start of words. It was removed because it was counterproductive with mathematically complex documents.
 
-RailReader includes a headless agent CLI that lets an LLM open PDFs, navigate, extract text, search, annotate, and export — all via structured tool calls. This feature is experimental and may change in future releases.
+### AI Agent CLI (Removed in 3.2)
 
-### Setup
-
-```bash
-# Set your API key
-export OPENAI_API_KEY="your-key"
-
-# Optional: specify model and base URL
-export RAILREADER_MODEL="gpt-4o"
-export RAILREADER_BASE_URL="https://api.example.com/v1"
-```
-
-### Usage
-
-```bash
-# Run with a task description
-dotnet run --project src/RailReader.Agent -- "Open paper.pdf and summarise page 1"
-
-# Interactive mode (prompts for task)
-dotnet run --project src/RailReader.Agent
-
-# Capture screenshots deterministically
-dotnet run --project src/RailReader.Agent -- --capture-screenshots docs/img/
-```
-
-### Available tools
-
-| Tool | Description |
-|------|-------------|
-| `OpenDocument` | Open a PDF file |
-| `CloseDocument` | Close the active document |
-| `ListDocuments` | List all open documents |
-| `GoToPage`, `NextPage`, `PrevPage` | Page navigation |
-| `SetZoom` | Set zoom level |
-| `SetRailPosition` | Position rail at specific block/line |
-| `GetPageText` | Extract text from a page |
-| `GetLayoutInfo` | Get layout analysis results |
-| `Search` | Full-text search with regex support |
-| `AddHighlight`, `AddTextAnnotation` | Add annotations |
-| `ExportPdf` | Export with annotations |
-| `ExportPageImage` | Screenshot export (PNG) |
-| `WaitForAnalysis` | Wait for layout analysis |
-| `SetColourEffect` | Set colour filter |
+The CLI and Agent projects were developer tools not included in binary releases and have been removed to simplify the codebase.

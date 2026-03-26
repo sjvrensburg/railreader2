@@ -57,30 +57,50 @@ At high zoom levels, navigation switches to "rail mode" — the viewer locks ont
 
 ### Features
 
+#### Rail reading
+
+- **Rail toolbar** — docked vertical toolbar with toggle buttons (P/J/F/H) for auto-scroll, jump mode, line focus dim, and line highlight, plus sliders for scroll speed (or jump distance) and motion blur intensity; auto-scroll and jump mode are mutually exclusive
+- **Auto-scroll** — toggle continuous horizontal scrolling in rail mode (P key), hold D/Right to boost speed, with configurable pauses at line and block boundaries
+- **Auto-scroll trigger** — optionally auto-start auto-scroll after holding D/Right for a configurable delay (default 2s). Off by default, configurable in Settings > Auto-Scroll
+- **Jump mode** — saccade-style reading (J key) that advances by a configurable percentage of the visible width; Shift+Right/Left for half-distance short jumps
+- **Line focus dim** — smooth feathered dimming of non-active lines to reduce peripheral distraction, with configurable intensity and padding
+- **Line highlight toggle** — independently toggle line highlight tint (H key); works with or without line focus blur
+- **Line highlight tint** — configurable colour tint on the active line in rail mode (Auto, Yellow, Cyan, Green, or None) with adjustable opacity. Auto adapts to the active colour effect
+- **Click-to-select block** — click on any detected block in rail mode to jump to it
+- **Free pan in rail mode** — hold Ctrl while dragging to pan and zoom freely (even below rail threshold) to inspect images or equations. Release Ctrl to snap back to your original reading position and zoom level
+- **Zoom position preservation** — zooming in rail mode no longer snaps to line start; horizontal scroll position and line screen position are preserved
+- **Vertical position preservation** — maintains your panned vertical offset when navigating lines in rail mode
+- **Line snap shortcuts** — Home/End keys snap to the start/end of the current line in rail mode
+- **Pixel snapping** — quantises camera positions to the pixel grid to eliminate sub-pixel text shimmer at high zoom
+- **Edge-hold page navigation** — in non-rail mode, hold Down/S at the page bottom for 400ms to advance to the next page. Same for Up/W at the top edge
+- **Analysis lookahead** — pre-analyzes upcoming pages in the background for instant navigation
+- **Analysis indicator** — status bar shows "Analyzing..." during layout inference
+- **Configurable navigation** — choose which block types are navigable in rail mode via Settings → Advanced
+
+#### Visual comfort
+
+- **Colour effects** — GPU-accelerated accessibility filters (High Contrast, High Visibility, Amber, Invert) with adjustable intensity. Per-document: each tab keeps its own effect, persisted across sessions
+- **Colour effect cycling** — press `C` to cycle through colour effects on the active tab, with a brief status bar toast showing the current effect
+- **Dark mode** — toggle via Settings → Appearance; switches the Avalonia Fluent theme to dark variant
+- **UI font scaling** — adjustable font size via Settings for high-DPI or accessibility use
+- **Smooth zoom** — scroll wheel and +/- key zooms animate over 180ms with cubic ease-out; rapid scrolling accumulates smoothly
+- **Motion blur** — subtle directional blur during horizontal scroll and zoom for perceptual smoothness, with configurable intensity
+- **Fullscreen mode** — F11 hides all chrome for distraction-free reading; Escape exits
+- **Colorblind-safe colors** — status bar, link indicators, debug overlay, and annotation highlights use a colorblind-safe palette
+
+#### Navigation & document management
+
 - **Multi-tab support** — open multiple PDFs with independent per-tab state. Right-click a tab for a context menu (Duplicate, Duplicate Linked, Link To, Unlink, Detach to new window, Close)
 - **Linked tabs** — duplicate tabs can be linked to always stay on the same page. Chain icon and colored dot indicator on linked tabs. Linked tabs are kept adjacent and move as a group
 - **Tab bar overflow** — tabs shrink with ellipsis when many are open. Horizontal mouse wheel scrolls the tab bar. Overflow dropdown button lists all tabs
-- **Menu bar** — File, View, Navigation, Help menus with keyboard shortcuts
-- **Interactive minimap** — click or drag to navigate the page
 - **Outline and bookmarks panel** — tabbed pane with table of contents and named bookmarks (Ctrl+Shift+O for outline, Ctrl+Shift+B for bookmarks)
-- **Settings panel** — live-editable rail reading parameters with persistence
-- **Keyboard shortcuts dialog** — press F1 or Help → Keyboard Shortcuts for a complete reference
+- **Named bookmarks** — bookmark any page with a custom name (B key or + button in the bookmarks pane). Navigate to bookmarks with a single click. Rename and delete inline. "Back to previous location" button for quick return after jumping. Bookmarks persist in the annotation sidecar file
+- **Interactive minimap** — click or drag to navigate the page
 - **On-screen nav buttons** — ◀/▶ buttons in the status bar for mouse-only page navigation
-- **UI font scaling** — adjustable font size via Settings for high-DPI or accessibility use
-- **Click-to-select block** — click on any detected block in rail mode to jump to it
-- **About dialog** — version info and credits (Help → About)
-- **Diagnostic logging** — session log file written to the config directory; export via Help → Export Diagnostic Log, or copy the path from Help → About for bug reports
-- **Disk cleanup** — removes cache, old logs, temp files (Help → Clean Up Temp Files)
-- **Analysis lookahead** — pre-analyzes upcoming pages in the background for instant navigation
-- **Colour effects** — GPU-accelerated accessibility filters (High Contrast, High Visibility, Amber, Invert) with adjustable intensity. Per-document: each tab keeps its own effect, persisted across sessions
-- **Colour effect cycling** — press `C` to cycle through colour effects on the active tab, with a brief status bar toast showing the current effect
-- **Smooth zoom** — scroll wheel and +/- key zooms animate over 180ms with cubic ease-out; rapid scrolling accumulates smoothly
-- **Dark mode** — toggle via Settings → Appearance; switches the Avalonia Fluent theme to dark variant
-- **Motion blur** — subtle directional blur during horizontal scroll and zoom for perceptual smoothness, with configurable intensity
-- **Splash screen** — startup splash while ONNX model loads
-- **Analysis indicator** — status bar shows "Analyzing..." during layout inference
-- **Debug overlay** — visualise detected layout blocks with class labels and confidence
 - **Search** — full-text search in a sidebar panel with results grouped by page, text snippets with highlighted match terms, regex and case sensitivity toggles, and match highlighting on the page (Ctrl+F)
+
+#### Annotations & text
+
 - **Annotations** — highlight, freehand pen, rectangles, text notes, and eraser via radial menu (right-click). Colour picker for highlight (yellow/green/pink) and pen (red/blue/black). Collapsible popup notes with folded-corner icon. Select, move, and resize annotations in browse mode. Delete selected annotations with the Delete key.
 - **Text selection** — select and copy text from PDF pages via the toolbar
 - **Toolbar** — floating Browse/Text Select/Copy toolbar for quick mode switching
@@ -91,25 +111,20 @@ At high zoom levels, navigation switches to "rail mode" — the viewer locks ont
 - **Annotation mode indicator** — status bar shows active tool name in amber with a clickable exit button
 - **Annotation tool cursors** — each annotation tool shows a distinct mouse cursor (crosshair for drawing tools, I-beam for text select, no-entry for eraser) so you always know the active mode
 - **Tab-switch tool reset** — switching tabs automatically exits any active annotation mode to prevent accidental edits
-- **Free pan in rail mode** — hold Ctrl while dragging to pan and zoom freely (even below rail threshold) to inspect images or equations. Release Ctrl to snap back to your original reading position and zoom level
-- **Zoom position preservation** — zooming in rail mode no longer snaps to line start; horizontal scroll position and line screen position are preserved
-- **Edge-hold page navigation** — in non-rail mode, hold Down/S at the page bottom for 400ms to advance to the next page. Same for Up/W at the top edge
-- **Auto-scroll** — toggle continuous horizontal scrolling in rail mode (P key), hold D/Right to boost speed, with configurable pauses at line and block boundaries
-- **Auto-scroll trigger** — optionally auto-start auto-scroll after holding D/Right for a configurable delay (default 2s). Off by default, configurable in Settings > Auto-Scroll
-- **Jump mode** — saccade-style reading (J key) that advances by a configurable percentage of the visible width; Shift+Right/Left for half-distance short jumps
-- **Line focus dim** — smooth feathered dimming of non-active lines to reduce peripheral distraction, with configurable intensity and padding
-- **Line highlight toggle** — independently toggle line highlight tint (H key); works with or without line focus blur
-- **Bionic reading** — *(Removed in 3.2)* shader-based text fading that de-emphasised the trailing portion of each word, guiding the eye to fixation points
-- **Pixel snapping** — quantises camera positions to the pixel grid to eliminate sub-pixel text shimmer at high zoom
-- **Rail toolbar** — docked vertical toolbar with toggle buttons (P/J/F/H) for auto-scroll, jump mode, line focus dim, and line highlight, plus sliders for scroll speed (or jump distance) and motion blur intensity; auto-scroll and jump mode are mutually exclusive
-- **Vertical position preservation** — maintains your panned vertical offset when navigating lines in rail mode
-- **Line snap shortcuts** — Home/End keys snap to the start/end of the current line in rail mode
-- **Named bookmarks** — bookmark any page with a custom name (B key or + button in the bookmarks pane). Navigate to bookmarks with a single click. Rename and delete inline. "Back to previous location" button for quick return after jumping. Bookmarks persist in the annotation sidecar file
-- **Line highlight tint** — configurable colour tint on the active line in rail mode (Auto, Yellow, Cyan, Green, or None) with adjustable opacity. Auto adapts to the active colour effect
-- **Fullscreen mode** — F11 hides all chrome for distraction-free reading; Escape exits
+
+#### General
+
+- **Menu bar** — File, View, Navigation, Help menus with keyboard shortcuts
+- **Settings panel** — live-editable rail reading parameters with persistence
 - **Tabbed settings** — organised settings panel with Appearance, Rail Reading, Auto-Scroll, and Advanced tabs
-- **Colorblind-safe colors** — status bar, link indicators, debug overlay, and annotation highlights use a colorblind-safe palette
+- **Keyboard shortcuts dialog** — press F1 or Help → Keyboard Shortcuts for a complete reference
 - **Tooltips** — all interactive controls have descriptive tooltips
+- **Splash screen** — startup splash while ONNX model loads
+- **About dialog** — version info and credits (Help → About)
+- **Diagnostic logging** — session log file written to the config directory; export via Help → Export Diagnostic Log, or copy the path from Help → About for bug reports
+- **Disk cleanup** — removes cache, old logs, temp files (Help → Clean Up Temp Files)
+- **Debug overlay** — visualise detected layout blocks with class labels and confidence
+- **Bionic reading** — *(Removed in 3.2)* shader-based text fading that de-emphasised the trailing portion of each word, guiding the eye to fixation points
 
 ## Installation
 
@@ -181,7 +196,6 @@ Use **File → Open** (Ctrl+O) to open a PDF from within the app.
 | C | Cycle colour effect on active tab |
 | F | Toggle line focus dim (rail mode) |
 | H | Toggle line highlight tint (rail mode) |
-| R | Toggle bionic reading (rail mode) *(Removed in 3.2)* |
 | Shift+Right / Shift+Left | Short jump — half distance (jump mode) |
 | [ / ] | Adjust scroll speed or jump distance (rail mode) |
 | Shift+[ / Shift+] | Adjust blur intensity (rail mode) |
