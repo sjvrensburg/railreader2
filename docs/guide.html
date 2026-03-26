@@ -104,8 +104,7 @@
         <li><a href="#rail-mode">Rail Mode</a></li>
         <li><a href="#auto-scroll">Auto-Scroll</a></li>
         <li><a href="#jump-mode">Jump Mode</a></li>
-        <li><a href="#line-focus-blur">Line Focus Dim</a></li>
-        <li><a href="#bionic-reading">Bionic Reading <small>(Removed in 3.2)</small></a></li>
+        <li><a href="#line-focus-highlight">Line Focus &amp; Highlight</a></li>
         <li><a href="#colour-effects">Colour Effects</a></li>
         <li><a href="#search">Search</a></li>
         <li><a href="#annotations">Annotations</a></li>
@@ -114,7 +113,7 @@
         <li><a href="#settings">Settings</a></li>
         <li><a href="#troubleshooting">Troubleshooting</a></li>
         <li><a href="#shortcuts">Keyboard Shortcuts</a></li>
-        <li><a href="#agent-cli">AI Agent CLI <small>(Removed in 3.2)</small></a></li>
+        <li><a href="#removed-features">Removed Features</a></li>
       </ol>
     </nav>
 
@@ -338,8 +337,10 @@
     </section>
 
     <!-- 6. Line Focus Blur -->
-    <section class="guide-section" id="line-focus-blur">
-      <h2>Line Focus Dim</h2>
+    <section class="guide-section" id="line-focus-highlight">
+      <h2>Line Focus &amp; Highlight</h2>
+
+      <h3>Line focus dim</h3>
       <p>
         When enabled, line focus dim applies a smooth feathered dimming overlay to the entire page
         except the active line in rail mode. Non-active lines fade toward the background colour,
@@ -373,30 +374,6 @@
       </ul>
       <p>
         Opacity is adjustable from 0.0 (invisible) to 1.0 (fully opaque). The default is Auto at 25% opacity.
-      </p>
-    </section>
-
-    <!-- Bionic Reading -->
-    <section class="guide-section" id="bionic-reading">
-      <h2>Bionic Reading</h2>
-      <div class="note"><strong>Removed in version 3.2.</strong> Bionic reading was removed because it was counterproductive with mathematically complex documents.</div>
-      <p>
-        Bionic reading is a reading aid that de-emphasises the trailing portion of each word,
-        guiding your eye to fixation points at the start of words. The effect is applied as a GPU
-        shader that fades non-fixation characters toward the background.
-      </p>
-      <p>
-        Toggle with the <code>R</code> key, the <strong>R</strong> button on the rail toolbar, or in
-        Settings &rarr; Rail Reading. Two parameters are configurable:
-      </p>
-      <ul>
-        <li><strong>Fixation percent</strong> &mdash; the fraction of each word kept at full contrast (default 40%).
-          Higher values keep more of each word sharp.</li>
-        <li><strong>Fade intensity</strong> &mdash; how much the non-fixation characters are faded (default 0.6).
-          Higher values produce a stronger effect.</li>
-      </ul>
-      <p>
-        Bionic reading composes correctly with line focus dim and colour effects.
       </p>
     </section>
 
@@ -632,7 +609,6 @@
         <li><strong>Pixel Snapping:</strong> Quantise camera to pixel grid to reduce text shimmer.</li>
         <li><strong>Line Focus Dim:</strong> Toggle and set intensity. Adjust the focus padding (extra space around the active line that stays fully visible, 0&ndash;0.5).</li>
         <li><strong>Line Highlight Tint:</strong> Choose a colour tint for the active line (Auto, Yellow, Cyan, Green, None) and set opacity.</li>
-        <li><strong>Bionic Reading:</strong> <em>(Removed in 3.2)</em> Toggle bionic reading and configure fixation percent (fraction of each word at full contrast) and fade intensity.</li>
         <li><strong>Jump Distance:</strong> Percentage of visible width for jump mode (5&ndash;80%).</li>
       </ul>
 
@@ -732,7 +708,6 @@
           <tr><td>` (backtick)</td><td>Navigate back to previous location</td></tr>
           <tr><td>C</td><td>Cycle colour effect on active tab</td></tr>
           <tr><td>F</td><td>Toggle line focus dim</td></tr>
-          <tr><td>R</td><td><em>(Removed in 3.2)</em></td></tr>
           <tr><td>H</td><td>Toggle line highlight</td></tr>
           <tr><td>[ / ]</td><td>Adjust speed or jump distance</td></tr>
           <tr><td>Shift+[ / Shift+]</td><td>Adjust blur intensity</td></tr>
@@ -754,53 +729,22 @@
       </table>
     </section>
 
-    <!-- 13. AI Agent CLI (Experimental) -->
-    <section class="guide-section" id="agent-cli">
-      <h2>AI Agent CLI (Experimental)</h2>
-      <div class="note"><strong>Removed in version 3.2.</strong> The CLI and Agent projects were developer tools not included in binary releases and have been removed to simplify the codebase.</div>
+    <!-- Removed Features -->
+    <section class="guide-section" id="removed-features">
+      <h2>Removed Features</h2>
 
-      <div class="tip">
-        <strong>Note:</strong> The AI Agent CLI is not included in the binary releases (AppImage or
-        Windows installer). It is only available when building from source with the .NET SDK installed.
-        This feature is experimental and may change in future releases.
-      </div>
-
+      <h3>Bionic Reading (Removed in 3.2)</h3>
       <p>
-        RailReader includes a headless agent CLI that lets an LLM open PDFs, navigate, extract text,
-        search, annotate, and export &mdash; all via structured tool calls.
+        Bionic reading was a GPU shader-based reading aid that de-emphasised the trailing portion of each word,
+        guiding the eye to fixation points at the start of words. It was removed because it was counterproductive
+        with mathematically complex documents.
       </p>
 
-      <h3>Setup</h3>
-      <pre><code># Set your API key
-export OPENAI_API_KEY="your-key"
-
-# Optional: specify model and base URL
-export RAILREADER_MODEL="gpt-4o"
-export RAILREADER_BASE_URL="https://api.example.com/v1"</code></pre>
-
-      <h3>Usage</h3>
-      <pre><code># Run with a task description
-dotnet run --project src/RailReader.Agent -- "Open paper.pdf and summarise page 1"
-
-# Interactive mode (prompts for task)
-dotnet run --project src/RailReader.Agent
-
-# Capture screenshots deterministically
-dotnet run --project src/RailReader.Agent -- --capture-screenshots docs/img/</code></pre>
-
-      <h3>Available tools</h3>
-      <p>The agent has access to these tools:</p>
-      <ul>
-        <li><code>OpenDocument</code>, <code>CloseDocument</code>, <code>ListDocuments</code> &mdash; Document management</li>
-        <li><code>GoToPage</code>, <code>NextPage</code>, <code>PrevPage</code> &mdash; Navigation</li>
-        <li><code>SetZoom</code>, <code>SetRailPosition</code> &mdash; View control</li>
-        <li><code>GetPageText</code>, <code>GetLayoutInfo</code> &mdash; Content extraction</li>
-        <li><code>Search</code> &mdash; Full-text search</li>
-        <li><code>AddHighlight</code>, <code>AddTextAnnotation</code> &mdash; Annotations</li>
-        <li><code>ExportPdf</code>, <code>ExportPageImage</code> &mdash; Export</li>
-        <li><code>WaitForAnalysis</code> &mdash; Wait for layout analysis to complete</li>
-        <li><code>SetColourEffect</code> &mdash; Colour filter control</li>
-      </ul>
+      <h3>AI Agent CLI (Removed in 3.2)</h3>
+      <p>
+        The CLI and Agent projects were developer tools not included in binary releases and have been removed
+        to simplify the codebase.
+      </p>
     </section>
 
   </main>

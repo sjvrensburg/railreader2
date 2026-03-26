@@ -204,6 +204,16 @@
     <h2>Features</h2>
     <div class="features">
       <div class="feature">
+        <h3>Rail Mode</h3>
+        <p>
+          Zoom in past the threshold and navigation locks to detected text blocks.
+          Advance line by line with arrow keys or WASD. Hold left/right to scroll
+          continuously with speed ramping. Hold <code>Ctrl</code> to temporarily
+          free-pan and zoom without rail constraints &mdash; release to snap back.
+          Zooming preserves your reading position within the current line.
+        </p>
+      </div>
+      <div class="feature">
         <h3>AI Layout Detection</h3>
         <p>
           <a href="https://huggingface.co/PaddlePaddle/PP-DocLayoutV3">PP-DocLayoutV3</a>
@@ -214,13 +224,11 @@
         </p>
       </div>
       <div class="feature">
-        <h3>Rail Mode</h3>
+        <h3>Line Highlight Tint</h3>
         <p>
-          Zoom in past the threshold and navigation locks to detected text blocks.
-          Advance line by line with arrow keys or WASD. Hold left/right to scroll
-          continuously with speed ramping. Hold <code>Ctrl</code> to temporarily
-          free-pan and zoom without rail constraints &mdash; release to snap back.
-          Zooming preserves your reading position within the current line.
+          Configurable colour tint on the active line in rail mode &mdash; Auto,
+          Yellow, Cyan, Green, or None. Auto adapts to the active colour effect.
+          Adjustable opacity for subtle or prominent highlighting.
         </p>
       </div>
       <div class="feature">
@@ -245,28 +253,12 @@
         </p>
       </div>
       <div class="feature">
-        <h3>Bionic Reading <small>(Removed in 3.2)</small></h3>
-        <p>
-          Shader-based text fading de-emphasises the trailing portion of each
-          word, guiding the eye to fixation points. Toggle with <code>R</code>
-          or the toolbar button. Configurable fixation percentage and fade
-          intensity. Composes with line focus dim and colour effects.
-        </p>
-      </div>
-      <div class="feature">
         <h3>Colour Effects</h3>
         <p>
-          GPU-accelerated colour filters &mdash; amber, greyscale, inverted, high
-          contrast &mdash; with adjustable intensity. Per-document: each tab keeps
-          its own effect. Press <code>C</code> to cycle through effects quickly.
-        </p>
-      </div>
-      <div class="feature">
-        <h3>Smooth Zoom &amp; Dark Mode</h3>
-        <p>
-          All zoom actions animate smoothly over 180ms with cubic ease-out.
-          Rapid scroll inputs accumulate fluidly. Toggle a dark UI theme in
-          Settings for comfortable use in low-light environments.
+          GPU-accelerated colour filters &mdash; amber, high contrast, high
+          visibility, inverted &mdash; with adjustable intensity. Per-document:
+          each tab keeps its own effect. Press <code>C</code> to cycle through
+          effects quickly.
         </p>
       </div>
       <div class="feature">
@@ -275,40 +267,6 @@
           PDF pages are rasterised by PDFium at a DPI proportional to zoom
           (up to 600&nbsp;DPI). Pan and zoom are compositor-level transforms
           &mdash; sharp and smooth at any magnification.
-        </p>
-      </div>
-      <div class="feature">
-        <h3>Multi-Tab &amp; Outline</h3>
-        <p>
-          Open multiple PDFs in tabs with independent state. Right-click a tab
-          to duplicate, detach to a new window, or close it. Link tabs together
-          with the chain icon so they stay on the same page. The tab bar scrolls
-          horizontally and provides a dropdown when many tabs are open.
-          Navigate via the table of contents panel or the interactive minimap.
-        </p>
-      </div>
-      <div class="feature">
-        <h3>Named Bookmarks</h3>
-        <p>
-          Bookmark any page with a custom name. Navigate to bookmarks from a
-          dedicated panel tab alongside the outline. "Back to previous location"
-          for quick return after jumping. Bookmarks persist across sessions.
-        </p>
-      </div>
-      <div class="feature">
-        <h3>Line Highlight Tint</h3>
-        <p>
-          Configurable colour tint on the active line in rail mode &mdash; Auto,
-          Yellow, Cyan, Green, or None. Auto adapts to the active colour effect.
-          Adjustable opacity for subtle or prominent highlighting.
-        </p>
-      </div>
-      <div class="feature">
-        <h3>Motion Blur</h3>
-        <p>
-          Subtle directional blur during horizontal scroll and uniform blur
-          during zoom for perceptual smoothness. Configurable intensity via
-          Settings, or disable entirely.
         </p>
       </div>
       <div class="feature">
@@ -322,6 +280,14 @@
         </p>
       </div>
       <div class="feature">
+        <h3>Named Bookmarks</h3>
+        <p>
+          Bookmark any page with a custom name. Navigate to bookmarks from a
+          dedicated panel tab alongside the outline. "Back to previous location"
+          for quick return after jumping. Bookmarks persist across sessions.
+        </p>
+      </div>
+      <div class="feature">
         <h3>Search</h3>
         <p>
           Full-text search across all pages in a sidebar panel. Results are
@@ -329,6 +295,24 @@
           Click any result to jump to that match. Regex and case-sensitivity
           toggles. Matches highlighted on the page &mdash; navigate with
           F3 / Shift+F3 or Enter / Shift+Enter.
+        </p>
+      </div>
+      <div class="feature">
+        <h3>Multi-Tab &amp; Outline</h3>
+        <p>
+          Open multiple PDFs in tabs with independent state. Right-click a tab
+          to duplicate, detach to a new window, or close it. Link tabs together
+          with the chain icon so they stay on the same page. The tab bar scrolls
+          horizontally and provides a dropdown when many tabs are open.
+          Navigate via the table of contents panel or the interactive minimap.
+        </p>
+      </div>
+      <div class="feature">
+        <h3>Smooth Zoom &amp; Dark Mode</h3>
+        <p>
+          All zoom actions animate smoothly over 180ms with cubic ease-out.
+          Rapid scroll inputs accumulate fluidly. Toggle a dark UI theme in
+          Settings for comfortable use in low-light environments.
         </p>
       </div>
       <div class="feature">
@@ -354,13 +338,11 @@
         </p>
       </div>
       <div class="feature">
-        <h3>AI Agent CLI <small>(Removed in 3.2)</small></h3>
+        <h3>Motion Blur</h3>
         <p>
-          A headless agent CLI powered by
-          <a href="https://learn.microsoft.com/en-us/dotnet/ai/ai-extensions">Microsoft.Extensions.AI</a>
-          lets an LLM open PDFs, navigate, extract text, search, annotate,
-          and export &mdash; all via structured tool calls. Works with any
-          OpenAI-compatible API.
+          Subtle directional blur during horizontal scroll and uniform blur
+          during zoom for perceptual smoothness. Configurable intensity via
+          Settings, or disable entirely.
         </p>
       </div>
       <div class="feature">
@@ -473,7 +455,6 @@
         <tr><td>` (backtick)</td><td>Navigate back to previous location</td></tr>
         <tr><td>C</td><td>Cycle colour effect on active tab</td></tr>
         <tr><td>F</td><td>Toggle line focus dim</td></tr>
-        <tr><td>R</td><td><em>(Removed in 3.2)</em></td></tr>
         <tr><td>H</td><td>Toggle line highlight</td></tr>
         <tr><td>Ctrl+Drag</td><td>Free pan/zoom in rail mode (release to snap back)</td></tr>
         <tr><td>Escape</td><td>Stop auto-scroll</td></tr>
