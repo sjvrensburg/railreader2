@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Build and Development Commands
 
 ```bash
-# Build app + tests (default solution)
+# Build app + CLI + tests (default solution)
 dotnet build RailReader2.slnx
 
 # Run the application (-- separates dotnet args from app args)
@@ -17,6 +17,11 @@ dotnet run -c Release --project src/RailReader2 -- <path-to-pdf>
 
 # Run without arguments (shows welcome screen)
 dotnet run -c Release --project src/RailReader2
+
+# Run the CLI headless tool
+dotnet run -c Release --project src/RailReader2.Cli -- render <pdf> --output-dir ./out
+dotnet run -c Release --project src/RailReader2.Cli -- structure <pdf> --output out.json
+dotnet run -c Release --project src/RailReader2.Cli -- annotations <pdf> --include-text --output ann.json
 
 # Run tests (all)
 dotnet test tests/RailReader.Core.Tests
@@ -40,10 +45,11 @@ dotnet publish src/RailReader2 -c Release -r win-x64 --self-contained     # Wind
 ## Architecture
 
 ```
-RailReader2.slnx              # Default: app + core + renderer + UI + tests
+RailReader2.slnx              # Default: app + core + renderer + CLI + tests
 ├── src/RailReader.Core/        # UI-free library: all business logic, models, services (zero rendering deps)
 ├── src/RailReader.Renderer.Skia/ # SkiaSharp rendering, PDFium PDF services (implements Core interfaces)
 ├── src/RailReader2/            # Thin Avalonia UI shell (references Core + Renderer.Skia)
+├── src/RailReader2.Cli/        # Headless CLI tool (references Core + Renderer.Skia, zero Avalonia)
 └── tests/RailReader.Core.Tests/# xUnit headless tests against Core
 ```
 
@@ -77,6 +83,8 @@ Thin wrapper delegating all logic to `DocumentController`/`DocumentState` in Cor
 - `Views/` — layers (PdfPageLayer, RailOverlayLayer, AnnotationLayer, SearchHighlightLayer), dialogs, panels
 - `Controls/RadialMenu.cs` — Skia-rendered radial context menu with Font Awesome icons
 
+**AXAML bindings**: `AvaloniaUseCompiledBindingsByDefault` is enabled — all bindings are compiled by default. Use `{x:Bind}`-style compiled bindings in AXAML files.
+
 ### RailReader.Renderer.Skia (SkiaSharp rendering)
 
 Implements Core's `IPdfService`/`IPdfTextService` interfaces using PDFium + SkiaSharp. Also contains all Skia drawing code:
@@ -92,7 +100,21 @@ Implements Core's `IPdfService`/`IPdfTextService` interfaces using PDFium + Skia
 
 ### Tests
 
-101 xUnit tests in `tests/RailReader.Core.Tests/` — DocumentController, Camera, Annotations (including merge), AppConfig, RailNav, SearchService, AnnotationGeometry, ZoomAnimation, AutoScroll. `TestFixtures.cs` generates test PDFs via SkiaSharp.
+xUnit tests in `tests/RailReader.Core.Tests/` — DocumentController, Camera, Annotations (including merge), AppConfig, RailNav, SearchService, AnnotationGeometry, ZoomAnimation, AutoScroll. `TestFixtures.cs` generates test PDFs via SkiaSharp (test project references both Core and Renderer.Skia for this reason).
+
+### RailReader2.Cli (Headless CLI)
+
+Separate console binary (`RailReader2.Cli`) for automated extraction. Zero Avalonia deps — references Core + Renderer.Skia only. Three commands:
+
+- `render <pdf>` — Render pages as PNG with optional colour effects (`--effect highcontrast|highvisibility|amber|invert`) and annotation overlay. Uses `IPdfService.RenderPage()` → `SkiaRenderedPage.Bitmap` → `ColourEffectShaders` + `AnnotationRenderer` directly (no `DocumentState`/`DocumentController`).
+- `structure <pdf>` — Extract outline + ONNX layout blocks + per-block text as JSON. Uses `LayoutAnalyzer` directly (no `AnalysisWorker`), `IPdfTextService` for text extraction, `CharBox`↔`BBox` centre-point matching for block text.
+- `annotations <pdf>` — Export annotations as JSON or annotated PDF. Rich mode (`--include-text` + `--include-blocks`): correlates annotations with layout blocks via `AnnotationGeometry.GetAnnotationBounds()` → `RectF`↔`BBox` overlap, extracts text under each annotation, finds nearest heading from outline + `paragraph_title`/`doc_title` blocks.
+
+Shipped as additional artifacts on GitHub Releases (Linux + Windows). ONNX model NOT bundled — uses shared model cache from GUI install.
+
+### Cross-Project Internals
+
+Core uses `InternalsVisibleTo` to expose internals to `RailReader.Core.Tests`, `RailReader.Renderer.Skia`, `RailReader2`, and `RailReader2.Cli`. Renderer.Skia also exposes internals to `RailReader2` and `RailReader2.Cli`. This allows the thin UI shell and CLI to access internal types without making them public.
 
 ## Key Concepts
 
