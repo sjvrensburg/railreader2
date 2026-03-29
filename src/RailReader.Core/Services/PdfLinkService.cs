@@ -38,12 +38,14 @@ internal static class PdfLinkService
                 if (!FPDFLink_GetAnnotRect(linkAnnot, out FsRectF fsRect))
                     continue;
 
-                // Convert from PDF user space (Y-up, MediaBox) to page-point space (Y-down, CropBox)
+                // Convert from PDF user space (Y-up, MediaBox) to page-point space (Y-down, CropBox).
+                // Normalize with Min/Max because FsRectF top/bottom can be swapped.
                 float left = fsRect.Left - offsetX;
                 float right = fsRect.Right - offsetX;
-                float top = (float)(visibleHeight - (fsRect.Top - offsetY));
-                float bottom = (float)(visibleHeight - (fsRect.Bottom - offsetY));
-                var rect = new RectF(left, top, right, bottom);
+                float y1 = (float)(visibleHeight - (fsRect.Top - offsetY));
+                float y2 = (float)(visibleHeight - (fsRect.Bottom - offsetY));
+                var rect = new RectF(Math.Min(left, right), Math.Min(y1, y2),
+                                     Math.Max(left, right), Math.Max(y1, y2));
 
                 var dest = ResolveDestination(doc, linkAnnot);
                 if (dest is null) continue;
@@ -95,13 +97,18 @@ internal static class PdfLinkService
 
             float left = fsRect.Left - offsetX;
             float right = fsRect.Right - offsetX;
-            float top = (float)(visibleHeight - (fsRect.Top - offsetY));
-            float bottom = (float)(visibleHeight - (fsRect.Bottom - offsetY));
+            float y1 = (float)(visibleHeight - (fsRect.Top - offsetY));
+            float y2 = (float)(visibleHeight - (fsRect.Bottom - offsetY));
 
             var dest = ResolveDestination(doc, link);
             if (dest is null) return null;
 
-            return new PdfLink { Rect = new RectF(left, top, right, bottom), Destination = dest };
+            return new PdfLink
+            {
+                Rect = new RectF(Math.Min(left, right), Math.Min(y1, y2),
+                                 Math.Max(left, right), Math.Max(y1, y2)),
+                Destination = dest,
+            };
         }
         catch (Exception ex)
         {
