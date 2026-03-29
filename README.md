@@ -332,7 +332,7 @@ RailReader2.slnx              # Default solution
 
 ## Command-line interface
 
-A standalone headless CLI (`railreader2-cli`) for automated PDF extraction. Ships as separate binaries on [GitHub Releases](https://github.com/sjvrensburg/railreader2/releases/latest).
+A standalone headless CLI for automated PDF extraction. Download `railreader2-cli-linux-x64.tar.gz` (Linux) or `railreader2-cli-win-x64.zip` (Windows) from [GitHub Releases](https://github.com/sjvrensburg/railreader2/releases/latest), extract the archive, and run.
 
 ```bash
 # Render pages as PNG

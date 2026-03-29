@@ -322,7 +322,7 @@ Bookmarks are stored in the same annotation sidecar file as highlights, notes, a
 
 ## CLI Tool
 
-RailReader2 ships a standalone headless CLI for automated PDF extraction. Download `railreader2-cli-linux-x64` (Linux) or `RailReader2.Cli.exe` (Windows) from [GitHub Releases](https://github.com/sjvrensburg/railreader2/releases/latest). No installation needed — it's a standalone binary. On Linux, make it executable with `chmod +x railreader2-cli-linux-x64`.
+RailReader2 ships a standalone headless CLI for automated PDF extraction. Download `railreader2-cli-linux-x64.tar.gz` (Linux) or `railreader2-cli-win-x64.zip` (Windows) from [GitHub Releases](https://github.com/sjvrensburg/railreader2/releases/latest), then extract the archive. On Linux, make the binary executable with `chmod +x RailReader2.Cli`.
 
 ### ONNX model
 
