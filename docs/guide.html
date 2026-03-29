@@ -83,6 +83,7 @@
         <a href="#colour-effects">Colour Effects</a>
         <a href="#search">Search</a>
         <a href="#annotations">Annotations</a>
+        <a href="#cli-tool">CLI</a>
         <a href="#shortcuts">Shortcuts</a>
         <a href="https://github.com/sjvrensburg/railreader2">GitHub</a>
       </nav>
@@ -110,6 +111,7 @@
         <li><a href="#annotations">Annotations</a></li>
         <li><a href="#text-selection">Text Selection</a></li>
         <li><a href="#bookmarks">Bookmarks</a></li>
+        <li><a href="#cli-tool">CLI Tool</a></li>
         <li><a href="#settings">Settings</a></li>
         <li><a href="#troubleshooting">Troubleshooting</a></li>
         <li><a href="#shortcuts">Keyboard Shortcuts</a></li>
@@ -584,6 +586,96 @@
       </p>
     </section>
 
+    <!-- CLI Tool -->
+    <section class="guide-section" id="cli-tool">
+      <h2>CLI Tool</h2>
+      <p>
+        RailReader2 ships a standalone headless CLI for automated PDF extraction.
+        Download <code>railreader2-cli-linux-x64</code> (Linux) or
+        <code>RailReader2.Cli.exe</code> (Windows) from
+        <a href="https://github.com/sjvrensburg/railreader2/releases/latest">GitHub Releases</a>.
+        No installation needed &mdash; it's a standalone binary. On Linux, make it executable
+        with <code>chmod +x railreader2-cli-linux-x64</code>.
+      </p>
+
+      <h3>ONNX model</h3>
+      <p>
+        The CLI uses the PP-DocLayoutV3 ONNX layout model. If the GUI is installed, the CLI
+        finds the model automatically from the shared cache. If the GUI isn't installed,
+        download the model by running <code>./scripts/download-model.sh</code> from source.
+        The <code>structure</code> command works without the model but skips layout analysis.
+      </p>
+
+      <h3>render &mdash; export pages as PNG</h3>
+      <p>
+        Renders PDF pages as PNG images, with optional colour effects and annotation overlay.
+      </p>
+      <pre><code>railreader2-cli render &lt;pdf&gt; [options]</code></pre>
+      <table class="shortcuts-table">
+        <thead class="sr-only">
+          <tr><th>Option</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>--pages &lt;range&gt;</code></td><td>Page range, e.g. <code>"1,3,5-10"</code> (default: all)</td></tr>
+          <tr><td><code>--dpi &lt;int&gt;</code></td><td>Render DPI (default: 300)</td></tr>
+          <tr><td><code>--effect &lt;name&gt;</code></td><td>Colour effect: <code>none</code>, <code>highcontrast</code>, <code>highvisibility</code>, <code>amber</code>, <code>invert</code></td></tr>
+          <tr><td><code>--intensity &lt;float&gt;</code></td><td>Effect intensity 0.0&ndash;1.0 (default: 1.0)</td></tr>
+          <tr><td><code>--annotations</code></td><td>Burn annotations into rendered pages</td></tr>
+          <tr><td><code>--output-dir &lt;path&gt;</code></td><td>Output directory (default: <code>./screenshots</code>)</td></tr>
+        </tbody>
+      </table>
+      <pre><code># Render first 5 pages with amber filter
+railreader2-cli render paper.pdf --pages 1-5 --effect amber --output-dir ./out
+
+# Render all pages with annotations baked in
+railreader2-cli render paper.pdf --annotations --dpi 150</code></pre>
+
+      <h3>structure &mdash; extract document structure</h3>
+      <p>
+        Extracts the PDF outline (table of contents), ONNX layout blocks, and per-block text as JSON.
+      </p>
+      <pre><code>railreader2-cli structure &lt;pdf&gt; [options]</code></pre>
+      <table class="shortcuts-table">
+        <thead class="sr-only">
+          <tr><th>Option</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>--output &lt;path&gt;</code></td><td>Output JSON file path (default: stdout)</td></tr>
+          <tr><td><code>--include-text</code></td><td>Include extracted text per layout block</td></tr>
+          <tr><td><code>--analyze</code></td><td>Run ONNX layout analysis to detect blocks</td></tr>
+          <tr><td><code>--pages &lt;range&gt;</code></td><td>Page range for analysis (default: all)</td></tr>
+        </tbody>
+      </table>
+      <pre><code># Full structure with layout analysis and text
+railreader2-cli structure paper.pdf --analyze --include-text --output structure.json
+
+# Just the outline (no model needed)
+railreader2-cli structure paper.pdf</code></pre>
+
+      <h3>annotations &mdash; export annotations</h3>
+      <p>
+        Exports annotations as rich JSON (with extracted text, layout block correlations, and
+        nearest section headings) or as an annotated PDF.
+      </p>
+      <pre><code>railreader2-cli annotations &lt;pdf&gt; [options]</code></pre>
+      <table class="shortcuts-table">
+        <thead class="sr-only">
+          <tr><th>Option</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>--output &lt;path&gt;</code></td><td>Output file path (default: stdout for JSON)</td></tr>
+          <tr><td><code>--format &lt;json|pdf&gt;</code></td><td>Export format (default: json)</td></tr>
+          <tr><td><code>--include-text</code></td><td>Extract text under each annotation</td></tr>
+          <tr><td><code>--include-blocks</code></td><td>Correlate annotations with layout blocks (implies ONNX analysis)</td></tr>
+        </tbody>
+      </table>
+      <pre><code># Rich JSON export with text and layout context
+railreader2-cli annotations paper.pdf --include-text --include-blocks --output annotations.json
+
+# Export as annotated PDF
+railreader2-cli annotations paper.pdf --format pdf --output paper.annotated.pdf</code></pre>
+    </section>
+
     <!-- 12. Settings -->
     <section class="guide-section" id="settings">
       <h2>Settings</h2>
@@ -742,8 +834,9 @@
 
       <h3>AI Agent CLI (Removed in 3.2)</h3>
       <p>
-        The CLI and Agent projects were developer tools not included in binary releases and have been removed
-        to simplify the codebase.
+        The original CLI and AI Agent projects were developer tools not included in binary releases
+        and were removed in 3.2. A new headless CLI has since been reintroduced as a shipped binary
+        &mdash; see <a href="#cli-tool">CLI Tool</a>.
       </p>
     </section>
 

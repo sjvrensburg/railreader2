@@ -17,10 +17,11 @@ Everything you need to know to get the most out of railreader2.
 9. [Annotations](#annotations)
 10. [Text Selection](#text-selection)
 11. [Bookmarks](#bookmarks)
-12. [Settings](#settings)
-13. [Troubleshooting](#troubleshooting)
-14. [Keyboard Shortcuts](#keyboard-shortcuts)
-15. [Removed Features](#removed-features)
+12. [CLI Tool](#cli-tool)
+13. [Settings](#settings)
+14. [Troubleshooting](#troubleshooting)
+15. [Keyboard Shortcuts](#keyboard-shortcuts)
+16. [Removed Features](#removed-features)
 
 ---
 
@@ -319,6 +320,87 @@ Bookmarks are stored in the same annotation sidecar file as highlights, notes, a
 
 ---
 
+## CLI Tool
+
+RailReader2 ships a standalone headless CLI for automated PDF extraction. Download `railreader2-cli-linux-x64` (Linux) or `RailReader2.Cli.exe` (Windows) from [GitHub Releases](https://github.com/sjvrensburg/railreader2/releases/latest). No installation needed — it's a standalone binary. On Linux, make it executable with `chmod +x railreader2-cli-linux-x64`.
+
+### ONNX model
+
+The CLI uses the PP-DocLayoutV3 ONNX layout model. If the GUI is installed, the CLI finds the model automatically from the shared cache. If the GUI isn't installed, download the model by running `./scripts/download-model.sh` from source. The `structure` command works without the model but skips layout analysis.
+
+### render — export pages as PNG
+
+Renders PDF pages as PNG images, with optional colour effects and annotation overlay.
+
+```
+railreader2-cli render <pdf> [options]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--pages <range>` | Page range, e.g. `"1,3,5-10"` (default: all) |
+| `--dpi <int>` | Render DPI (default: 300) |
+| `--effect <name>` | Colour effect: `none`, `highcontrast`, `highvisibility`, `amber`, `invert` |
+| `--intensity <float>` | Effect intensity 0.0–1.0 (default: 1.0) |
+| `--annotations` | Burn annotations into rendered pages |
+| `--output-dir <path>` | Output directory (default: `./screenshots`) |
+
+```bash
+# Render first 5 pages with amber filter
+railreader2-cli render paper.pdf --pages 1-5 --effect amber --output-dir ./out
+
+# Render all pages with annotations baked in
+railreader2-cli render paper.pdf --annotations --dpi 150
+```
+
+### structure — extract document structure
+
+Extracts the PDF outline, ONNX layout blocks, and per-block text as JSON.
+
+```
+railreader2-cli structure <pdf> [options]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--output <path>` | Output JSON file path (default: stdout) |
+| `--include-text` | Include extracted text per layout block |
+| `--analyze` | Run ONNX layout analysis to detect blocks |
+| `--pages <range>` | Page range for analysis (default: all) |
+
+```bash
+# Full structure with layout analysis and text
+railreader2-cli structure paper.pdf --analyze --include-text --output structure.json
+
+# Just the outline (no model needed)
+railreader2-cli structure paper.pdf
+```
+
+### annotations — export annotations
+
+Exports annotations as rich JSON (with extracted text, layout block correlations, and nearest section headings) or as an annotated PDF.
+
+```
+railreader2-cli annotations <pdf> [options]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--output <path>` | Output file path (default: stdout for JSON) |
+| `--format <json\|pdf>` | Export format (default: json) |
+| `--include-text` | Extract text under each annotation |
+| `--include-blocks` | Correlate annotations with layout blocks (implies ONNX analysis) |
+
+```bash
+# Rich JSON export with text and layout context
+railreader2-cli annotations paper.pdf --include-text --include-blocks --output annotations.json
+
+# Export as annotated PDF
+railreader2-cli annotations paper.pdf --format pdf --output paper.annotated.pdf
+```
+
+---
+
 ## Settings
 
 Press `Ctrl+,` or use the menu to open Settings. Changes take effect immediately and are saved automatically.
@@ -447,4 +529,4 @@ Bionic reading was a GPU shader-based reading aid that de-emphasised the trailin
 
 ### AI Agent CLI (Removed in 3.2)
 
-The CLI and Agent projects were developer tools not included in binary releases and have been removed to simplify the codebase.
+The original CLI and AI Agent projects were developer tools not included in binary releases and were removed in 3.2. A new headless CLI has since been reintroduced as a shipped binary — see [CLI Tool](#cli-tool).
