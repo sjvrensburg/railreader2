@@ -344,9 +344,10 @@ public partial class MainWindow : Window
 
         // When the search TextBox has focus, let text input keys through.
         // Only intercept non-text keys (F-keys, Escape, PgUp/PgDn, etc.).
-        bool searchFocused = vm.ShowOutline && OutlinePanel.IsSearchInputFocused;
+        bool textInputFocused = (vm.ShowOutline && OutlinePanel.IsSearchInputFocused)
+            || StatusBar.IsEditing;
 
-        if (!searchFocused && HandleNavigationKey(vm, e))
+        if (!textInputFocused && HandleNavigationKey(vm, e))
             { RailToolBar.SyncState(); return; }
 
         if (HandleGlobalKey(vm, e))

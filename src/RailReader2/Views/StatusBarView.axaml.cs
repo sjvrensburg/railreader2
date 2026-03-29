@@ -75,6 +75,8 @@ public partial class StatusBarView : UserControl
         return btn;
     }
 
+    public bool IsEditing { get; private set; }
+
     private void BeginPageEdit(MainWindowViewModel vm, TabViewModel tab)
     {
         // Find and replace the page label with an editable TextBox
@@ -95,8 +97,12 @@ public partial class StatusBarView : UserControl
             VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
         };
 
+        IsEditing = true;
+
         void Commit()
         {
+            if (!IsEditing) return;
+            IsEditing = false;
             if (int.TryParse(input.Text?.Trim(), out int page))
                 vm.GoToPage(page - 1); // 1-based input → 0-based
             UpdateStatus();
@@ -105,7 +111,7 @@ public partial class StatusBarView : UserControl
         input.KeyDown += (_, e) =>
         {
             if (e.Key == Key.Enter) { Commit(); e.Handled = true; }
-            else if (e.Key == Key.Escape) { UpdateStatus(); e.Handled = true; }
+            else if (e.Key == Key.Escape) { IsEditing = false; UpdateStatus(); e.Handled = true; }
         };
         input.LostFocus += (_, _) => Commit();
 

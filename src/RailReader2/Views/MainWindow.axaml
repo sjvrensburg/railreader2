@@ -23,7 +23,7 @@
                       IsVisible="{Binding IsTabBarVisible}" />
 
         <!-- Status Bar -->
-        <v:StatusBarView DockPanel.Dock="Bottom" DataContext="{Binding}"
+        <v:StatusBarView x:Name="StatusBar" DockPanel.Dock="Bottom" DataContext="{Binding}"
                          IsVisible="{Binding !IsFullScreen}" />
 
         <!-- Main Content: resizable sidebar + viewport -->
