@@ -273,7 +273,7 @@ Press `Delete` or `Backspace` in browse mode to remove the selected annotation. 
 
 ### Persistence
 
-Annotations are saved automatically as JSON sidecar files alongside the PDF (e.g. `paper.pdf.annotations.json`). They load automatically when you reopen the file.
+Annotations are saved automatically to internal storage (`~/.config/railreader2/annotations/` on Linux, `%APPDATA%\railreader2\annotations\` on Windows). They load automatically when you reopen the file. When the same PDF is open in multiple tabs, all tabs share the same annotation data — edits in one tab are immediately visible in the other, with independent undo/redo stacks per tab.
 
 ### Export
 
@@ -316,7 +316,7 @@ If you bookmark a page that already has a bookmark, the existing bookmark's name
 
 ### Persistence
 
-Bookmarks are stored in the same annotation sidecar file as highlights, notes, and other annotations (`<pdf>.railreader2.json`). They persist across sessions automatically.
+Bookmarks are stored in the same annotation file as highlights, notes, and other annotations. They persist across sessions automatically.
 
 ---
 

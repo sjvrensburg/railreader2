@@ -133,7 +133,7 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
     public void ClampCamera(double ww, double wh) => State.ClampCamera(ww, wh);
     public void UpdateRailZoom(double ww, double wh) => State.UpdateRailZoom(ww, wh);
     public void StartSnap(double ww, double wh) => State.StartSnap(ww, wh);
-    public void LoadAnnotations() => State.LoadAnnotations();
+    public void LoadAnnotations(AnnotationFileManager manager) => State.LoadAnnotations(manager);
     public bool SubmitPendingLookahead(AnalysisWorker? worker) => State.SubmitPendingLookahead(worker);
 
     public void Dispose()

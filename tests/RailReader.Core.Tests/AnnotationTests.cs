@@ -7,19 +7,26 @@ namespace RailReader.Core.Tests;
 public class AnnotationTests : IDisposable
 {
     private readonly DocumentState _state;
+    private readonly AnnotationFileManager _manager;
 
     public AnnotationTests()
     {
         var config = new AppConfig();
+        var marshaller = new SynchronousThreadMarshaller();
         var factory = TestFixtures.CreatePdfFactory();
         var pdfPath = TestFixtures.GetTestPdfPath();
         _state = new DocumentState(pdfPath, factory.CreatePdfService(pdfPath),
-            factory.CreatePdfTextService(), config, new SynchronousThreadMarshaller());
+            factory.CreatePdfTextService(), config, marshaller);
         _state.LoadPageBitmap();
-        _state.LoadAnnotations();
+        _manager = new AnnotationFileManager(marshaller);
+        _state.LoadAnnotations(_manager);
     }
 
-    public void Dispose() => _state.Dispose();
+    public void Dispose()
+    {
+        _state.Dispose();
+        _manager.Dispose();
+    }
 
     [Fact]
     public void AddAnnotation_AddsToPage()
@@ -103,6 +110,52 @@ public class AnnotationTests : IDisposable
 
         bool miss = AnnotationGeometry.HitTest(highlight, 500, 500);
         Assert.False(miss);
+    }
+
+    [Fact]
+    public void SharedAnnotationFile_TwoTabsSameFile()
+    {
+        var config = new AppConfig();
+        var marshaller = new SynchronousThreadMarshaller();
+        var factory = TestFixtures.CreatePdfFactory();
+        var pdfPath = TestFixtures.GetTestPdfPath();
+
+        using var manager = new AnnotationFileManager(marshaller);
+
+        var stateA = new DocumentState(pdfPath, factory.CreatePdfService(pdfPath),
+            factory.CreatePdfTextService(), config, marshaller);
+        stateA.LoadPageBitmap();
+        stateA.LoadAnnotations(manager);
+
+        var stateB = new DocumentState(pdfPath, factory.CreatePdfService(pdfPath),
+            factory.CreatePdfTextService(), config, marshaller);
+        stateB.LoadPageBitmap();
+        stateB.LoadAnnotations(manager);
+
+        // Both tabs share the same AnnotationFile instance
+        Assert.Same(stateA.Annotations, stateB.Annotations);
+
+        // Annotation added via tab A is visible in tab B
+        stateA.AddAnnotation(0, new HighlightAnnotation
+        {
+            Rects = [new HighlightRect(10, 10, 100, 20)],
+        });
+        Assert.Single(stateB.Annotations.Pages[0]);
+
+        // Annotation added via tab B is visible in tab A
+        stateB.AddAnnotation(1, new HighlightAnnotation
+        {
+            Rects = [new HighlightRect(50, 50, 80, 15)],
+        });
+        Assert.Single(stateA.Annotations.Pages[1]);
+
+        // Undo in tab A only affects tab A's action (page 0), not tab B's (page 1)
+        stateA.Undo();
+        Assert.Empty(stateA.Annotations.Pages[0]);
+        Assert.Single(stateB.Annotations.Pages[1]); // tab B's annotation intact
+
+        stateA.Dispose();
+        stateB.Dispose();
     }
 
     [Fact]

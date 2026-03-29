@@ -70,6 +70,7 @@ All business logic with zero Avalonia and zero SkiaSharp dependencies. Key files
 - `Services/PdfTextService.cs` — text extraction with per-character bounding boxes (PDFium P/Invoke)
 - `Services/AppConfig.cs` — config persistence (`~/.config/railreader2/config.json`)
 - `Services/AnnotationService.cs` — JSON persistence for annotations and bookmarks, import/export with merge support
+- `Services/AnnotationFileManager.cs` — reference-counted shared `AnnotationFile` instances per PDF path (multiple tabs share one object, one auto-save timer per file)
 - `Services/AnnotationGeometry.cs` — pure-geometry annotation hit testing, bounds computation
 - `AnnotationInteractionHandler.cs` — annotation tool input handling (drag, resize, text notes)
 - `Services/SearchService.cs` — full-text search with regex/case sensitivity, result grouping by page
@@ -140,7 +141,7 @@ Activates above `rail_zoom_threshold` when analysis is available. Locks to detec
 
 ### Annotations
 
-Five tools (Highlight, Pen, Rectangle, TextNote, Eraser) via right-click radial menu with colour pickers. Select/move/resize in browse mode. Undo/redo stack. Stored internally in `ConfigDir/annotations/<hash>.json`, keyed by SHA256 hash of the PDF's full path. Legacy sidecar files (alongside the PDF) are loaded as a migration fallback but never written to. Export to PDF via `AnnotationExportService`. Export/import as JSON for sharing between users — `AnnotationService.MergeInto()` appends imported annotations per page and deduplicates bookmarks. Named bookmarks also stored in the annotation file. `AnnotationService` handles all persistence; `AnnotationService.CleanOrphaned()` removes annotation files whose source PDFs no longer exist.
+Five tools (Highlight, Pen, Rectangle, TextNote, Eraser) via right-click radial menu with colour pickers. Select/move/resize in browse mode. Per-tab undo/redo stacks. Stored internally in `ConfigDir/annotations/<hash>.json`, keyed by SHA256 hash of the PDF's full path. Legacy sidecar files (alongside the PDF) are loaded as a migration fallback but never written to. `AnnotationFileManager` provides reference-counted shared `AnnotationFile` instances — multiple tabs opening the same PDF share a single in-memory object, eliminating last-writer-wins data loss. Auto-save is per-file (one debounced timer per unique PDF, not per tab). Export to PDF via `AnnotationExportService`. Export/import as JSON for sharing between users — `AnnotationService.MergeInto()` appends imported annotations per page and deduplicates bookmarks. Named bookmarks also stored in the annotation file. `AnnotationService` handles file-level persistence; `AnnotationFileManager` manages shared lifetimes; `AnnotationService.CleanOrphaned()` removes annotation files whose source PDFs no longer exist.
 
 ### Colour Effects
 
