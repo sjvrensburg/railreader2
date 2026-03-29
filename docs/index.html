@@ -36,7 +36,7 @@
       "price": "0",
       "priceCurrency": "USD"
     },
-    "softwareVersion": "3.3.2",
+    "softwareVersion": "3.3.4",
     "datePublished": "2026-02-18",
     "dateModified": "2026-03-20",
     "license": "https://opensource.org/licenses/MIT",
@@ -361,7 +361,9 @@
           (<code>RailReader.Core</code>) with zero Avalonia or SkiaSharp
           dependencies. A separate <code>RailReader.Renderer.Skia</code>
           project implements rendering interfaces. Fully testable &mdash;
-          100 xUnit tests run without a display server.
+          101 xUnit tests run without a display server. A standalone
+          <strong>CLI tool</strong> leverages the same core for headless
+          rendering, structure extraction, and annotation export.
         </p>
       </div>
     </div>
@@ -402,6 +404,13 @@
       <li>
         Open a PDF with <code>Ctrl+O</code> or pass it as a command-line argument.
         Zoom in to activate rail mode and start reading.
+      </li>
+      <li>
+        <strong>Headless CLI:</strong> Standalone binaries for automated extraction
+        (<code>railreader2-cli</code> on Linux, <code>RailReader2.Cli.exe</code> on Windows)
+        are available from the same
+        <a href="https://github.com/sjvrensburg/railreader2/releases/latest">GitHub Releases</a>
+        page. See the <a href="guide.html#cli-tool">User Guide</a> for details.
       </li>
     </ol>
   </section>

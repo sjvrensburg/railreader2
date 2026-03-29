@@ -16,15 +16,17 @@ git tag vX.Y.Z
 git push && git push origin vX.Y.Z
 ```
 
-The release workflow (`.github/workflows/release.yml`) runs three jobs:
+The release workflow (`.github/workflows/release.yml`) runs five jobs:
 
 | Job | Runner | Output | Destination |
 |-----|--------|--------|-------------|
 | `build-linux` | ubuntu-24.04 | `railreader2-linux-x86_64.AppImage` | GitHub Release |
 | `build-windows` | windows-latest | `railreader2-setup-x64.exe` | GitHub Release |
 | `build-msix` | windows-latest | `railreader2-win-x64.msix` | CI artifact only (not in release) |
+| `build-cli-linux` | ubuntu-24.04 | `railreader2-cli-linux-x64` | GitHub Release |
+| `build-cli-windows` | windows-latest | `RailReader2.Cli.exe` | GitHub Release |
 
-The GitHub Release is created automatically with the AppImage and Inno Setup installer. The MSIX artifact is available in the Actions run for manual Store submission.
+The GitHub Release is created automatically with the AppImage, Inno Setup installer, and CLI binaries. The MSIX artifact is available in the Actions run for manual Store submission.
 
 ## GitHub Release (Linux + Windows)
 

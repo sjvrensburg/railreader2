@@ -112,6 +112,13 @@ At high zoom levels, navigation switches to "rail mode" — the viewer locks ont
 - **Annotation tool cursors** — each annotation tool shows a distinct mouse cursor (crosshair for drawing tools, I-beam for text select, no-entry for eraser) so you always know the active mode
 - **Tab-switch tool reset** — switching tabs automatically exits any active annotation mode to prevent accidental edits
 
+#### Headless CLI
+
+- **Render pages as PNG** — export PDF pages as images with optional colour effects (high contrast, high visibility, amber, invert) and annotation overlay baked in
+- **Extract document structure** — output outline, ONNX layout blocks, and per-block text as JSON
+- **Export annotations** — export annotations as rich JSON (with extracted text, layout block correlations, and nearest section headings) or as an annotated PDF
+- Ships as separate standalone binaries for Linux and Windows on [GitHub Releases](https://github.com/sjvrensburg/railreader2/releases/latest)
+
 #### General
 
 - **Menu bar** — File, View, Navigation, Help menus with keyboard shortcuts
@@ -128,7 +135,7 @@ At high zoom levels, navigation switches to "rail mode" — the viewer locks ont
 
 ## Installation
 
-Download the latest release from [GitHub Releases](https://github.com/sjvrensburg/railreader2/releases/latest). The AI layout model is bundled in all packages.
+Download the latest release from [GitHub Releases](https://github.com/sjvrensburg/railreader2/releases/latest). The AI layout model is bundled in all packages. Standalone CLI binaries (`railreader2-cli-linux-x64` and `RailReader2.Cli.exe`) are also available from the same release page.
 
 ### Linux
 
@@ -166,6 +173,23 @@ railreader2 <path-to-pdf>
 ```
 
 Use **File → Open** (Ctrl+O) to open a PDF from within the app.
+
+### CLI usage
+
+The headless CLI (`railreader2-cli`) provides three commands for automated PDF extraction:
+
+```bash
+# Render pages as PNG with amber colour effect
+railreader2-cli render paper.pdf --pages 1-5 --effect amber --output-dir ./out
+
+# Extract document structure with layout analysis
+railreader2-cli structure paper.pdf --analyze --include-text --output structure.json
+
+# Export annotations with extracted text and block context
+railreader2-cli annotations paper.pdf --include-text --output annotations.json
+```
+
+Run `railreader2-cli --help` or `railreader2-cli <command> --help` for all options.
 
 ### Controls
 
@@ -283,7 +307,7 @@ Rail reading parameters are editable via the Settings panel (gear icon in menu b
 
 ## Removed features
 
-Version 3.2 simplified the application to reduce complexity and make it less intimidating for new users. Bionic reading was removed because it was counterproductive with maths-heavy documents (the primary use case). The CLI and AI Agent were developer-only tools never shipped in binary releases, so they were removed from the solution to reduce maintenance burden.
+Version 3.2 simplified the application to reduce complexity and make it less intimidating for new users. Bionic reading was removed because it was counterproductive with maths-heavy documents (the primary use case). The original CLI and AI Agent were developer-only tools that were never shipped in binary releases, so they were removed. A new headless CLI has since been reintroduced as a shipped product — see the [Headless CLI](#headless-cli) section above.
 
 ## Architecture
 
@@ -294,6 +318,7 @@ RailReader2.slnx              # Default solution
 ├── src/RailReader.Core/        # Business logic (zero Avalonia, zero SkiaSharp)
 ├── src/RailReader.Renderer.Skia/ # SkiaSharp rendering (implements Core interfaces)
 ├── src/RailReader2/            # Thin Avalonia UI shell
+├── src/RailReader2.Cli/        # Headless CLI (references Core + Renderer.Skia, zero Avalonia)
 └── tests/RailReader.Core.Tests/  # 100 xUnit headless tests
 ```
 
@@ -305,7 +330,20 @@ RailReader2.slnx              # Default solution
 
 ## Command-line interface
 
-*(Removed in 3.2)* The CLI (`RailReader.Cli`) provided headless PDF operations (text extraction, search, layout analysis, annotations, bookmarks, page export, and configuration management). It was removed in 3.2 as it was a developer tool never included in binary releases.
+A standalone headless CLI (`railreader2-cli`) for automated PDF extraction. Ships as separate binaries on [GitHub Releases](https://github.com/sjvrensburg/railreader2/releases/latest).
+
+```bash
+# Render pages as PNG
+railreader2-cli render paper.pdf --pages 1-5 --dpi 300 --effect amber --output-dir ./out
+
+# Extract structure (outline + layout blocks + text)
+railreader2-cli structure paper.pdf --analyze --include-text --output structure.json
+
+# Export annotations with text and layout context
+railreader2-cli annotations paper.pdf --include-text --include-blocks --output annotations.json
+```
+
+The CLI uses the ONNX layout model from the GUI installation. If the GUI isn't installed, download the model with `./scripts/download-model.sh`.
 
 ## Building
 
@@ -344,6 +382,9 @@ dotnet run -c Release --project src/RailReader2 -- <path-to-pdf>
 
 # Launch without arguments and use File → Open (Ctrl+O)
 dotnet run -c Release --project src/RailReader2 --
+
+# Run the CLI
+dotnet run -c Release --project src/RailReader2.Cli -- render <pdf> --output-dir ./out
 ```
 
 ### Publish self-contained
