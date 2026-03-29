@@ -321,7 +321,7 @@ RailReader2.slnx              # Default solution
 ├── src/RailReader.Renderer.Skia/ # SkiaSharp rendering (implements Core interfaces)
 ├── src/RailReader2/            # Thin Avalonia UI shell
 ├── src/RailReader2.Cli/        # Headless CLI (references Core + Renderer.Skia, zero Avalonia)
-└── tests/RailReader.Core.Tests/  # 100 xUnit headless tests
+└── tests/RailReader.Core.Tests/  # 102 xUnit headless tests
 ```
 
 *(Removed in 3.2)* Previous versions included `src/RailReader.Cli/` (command-line interface) and `src/RailReader.Agent/` (AI agent CLI). These were removed in 3.2.

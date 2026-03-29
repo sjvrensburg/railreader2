@@ -512,8 +512,10 @@
 
       <h3>Persistence</h3>
       <p>
-        Annotations are saved automatically as JSON sidecar files alongside the PDF
-        (e.g. <code>paper.pdf.annotations.json</code>). They load automatically when you reopen the file.
+        Annotations are saved automatically to internal storage. They load automatically when you
+        reopen the file. When the same PDF is open in multiple tabs, all tabs share the same
+        annotation data &mdash; edits in one tab are immediately visible in the other, with
+        independent undo/redo stacks per tab.
       </p>
 
       <h3>Export</h3>
@@ -581,7 +583,7 @@
 
       <h3>Persistence</h3>
       <p>
-        Bookmarks are stored in the same annotation sidecar file as highlights, notes, and other
+        Bookmarks are stored in the same annotation file as highlights, notes, and other
         annotations. They persist across sessions automatically.
       </p>
     </section>
