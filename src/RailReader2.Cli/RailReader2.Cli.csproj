@@ -7,6 +7,7 @@
     <NoWarn>CA1416</NoWarn>
     <AssemblyName>RailReader2.Cli</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <PublishSingleFile>true</PublishSingleFile>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../RailReader.Core/RailReader.Core.csproj" />
