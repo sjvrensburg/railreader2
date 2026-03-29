@@ -30,7 +30,6 @@ public static class AnnotationsCommand
             return 0;
         }
 
-        // PDF export
         if (format == "pdf")
         {
             var outPath = outputPath ?? Path.ChangeExtension(Path.GetFileName(pdfPath), ".annotated.pdf");
@@ -40,7 +39,6 @@ public static class AnnotationsCommand
             return 0;
         }
 
-        // Rich JSON export
         var pdf2 = factory.CreatePdfService(pdfPath);
 
         LayoutAnalyzer? analyzer = null;
@@ -68,7 +66,7 @@ public static class AnnotationsCommand
             Source = Path.GetFileName(pdfPath),
             ExportedAt = DateTime.UtcNow.ToString("O"),
             PageCount = pdf2.PageCount,
-            Outline = pdf2.Outline.Select(StructureCommand.SerializeOutlineEntry).ToList()
+            Outline = pdf2.Outline.Select(Shared.SerializeOutlineEntry).ToList()
         };
 
         foreach (var (pageIdx, pageAnnotations) in annotations.Pages.OrderBy(p => p.Key))
@@ -95,43 +93,36 @@ public static class AnnotationsCommand
             foreach (var ann in pageAnnotations)
             {
                 var annOutput = SerializeAnnotation(ann);
+                var annBounds = AnnotationGeometry.GetAnnotationBounds(ann);
 
-                if (includeText && pageText != null)
-                {
-                    var bounds = AnnotationGeometry.GetAnnotationBounds(ann);
-                    if (bounds is { } rect)
-                        annOutput.Text = ExtractTextInRect(pageText, rect);
-                }
+                if (includeText && pageText != null && annBounds is { } textRect)
+                    annOutput.Text = Shared.ExtractTextInRect(pageText, textRect.Left, textRect.Top, textRect.Right, textRect.Bottom);
 
-                if (includeBlocks && analysis != null)
+                if (includeBlocks && analysis != null && annBounds is { } blockRect)
                 {
-                    var annBounds = AnnotationGeometry.GetAnnotationBounds(ann);
-                    if (annBounds is { } rect)
+                    foreach (var block in analysis.Blocks)
                     {
-                        foreach (var block in analysis.Blocks)
+                        if (Overlaps(blockRect, block.BBox))
                         {
-                            if (Overlaps(rect, block.BBox))
+                            var blockOutput = new AnnotationBlockOutput
                             {
-                                var blockOutput = new AnnotationBlockOutput
-                                {
-                                    Class = block.ClassId < LayoutConstants.LayoutClasses.Length
-                                        ? LayoutConstants.LayoutClasses[block.ClassId]
-                                        : $"class_{block.ClassId}",
-                                    ClassId = block.ClassId,
-                                    BBox = new BBoxOutput(block.BBox.X, block.BBox.Y, block.BBox.W, block.BBox.H),
-                                    Confidence = block.Confidence
-                                };
+                                Class = block.ClassId < LayoutConstants.LayoutClasses.Length
+                                    ? LayoutConstants.LayoutClasses[block.ClassId]
+                                    : $"class_{block.ClassId}",
+                                ClassId = block.ClassId,
+                                BBox = new BBoxOutput(block.BBox.X, block.BBox.Y, block.BBox.W, block.BBox.H),
+                                Confidence = block.Confidence
+                            };
 
-                                if (includeText && pageText != null)
-                                    blockOutput.Text = StructureCommand.ExtractBlockText(pageText, block);
+                            if (includeText && pageText != null)
+                                blockOutput.Text = Shared.ExtractBlockText(pageText, block);
 
-                                annOutput.OverlappingBlocks.Add(blockOutput);
-                            }
+                            annOutput.OverlappingBlocks.Add(blockOutput);
                         }
                     }
                 }
 
-                annOutput.NearestHeading = FindNearestHeading(ann, pageIdx, pdf2.Outline, analysis);
+                annOutput.NearestHeading = FindNearestHeading(annBounds, pageIdx, pdf2.Outline, analysis);
                 pageOutput.Annotations.Add(annOutput);
             }
 
@@ -146,7 +137,7 @@ public static class AnnotationsCommand
             Page = b.Page
         }).ToList();
 
-        var json = JsonSerializer.Serialize(result, s_jsonOptions);
+        var json = JsonSerializer.Serialize(result, Shared.JsonOptions);
 
         if (outputPath != null)
         {
@@ -209,33 +200,15 @@ public static class AnnotationsCommand
         return new AnnotationOutput { Type = "unknown", Color = ann.Color, Opacity = ann.Opacity };
     }
 
-    static string? ExtractTextInRect(PageText pageText, RectF rect)
-    {
-        var chars = new List<(int Index, char Ch)>();
-        foreach (var cb in pageText.CharBoxes)
-        {
-            float midX = (cb.Left + cb.Right) / 2f;
-            float midY = (cb.Top + cb.Bottom) / 2f;
-            if (rect.Contains(midX, midY) && cb.Index >= 0 && cb.Index < pageText.Text.Length)
-                chars.Add((cb.Index, pageText.Text[cb.Index]));
-        }
-        if (chars.Count == 0) return null;
-        chars.Sort((a, b) => a.Index.CompareTo(b.Index));
-        return new string(chars.Select(c => c.Ch).ToArray()).Trim();
-    }
-
-    static HeadingOutput? FindNearestHeading(Annotation ann, int pageIdx,
+    static HeadingOutput? FindNearestHeading(RectF? annBounds, int pageIdx,
         List<OutlineEntry> outline, PageAnalysis? analysis)
     {
-        var bounds = AnnotationGeometry.GetAnnotationBounds(ann);
-        if (bounds is not { } annRect) return null;
+        if (annBounds is not { } annRect) return null;
 
-        // Try outline entries first
-        var bestOutline = FindNearestOutlineHeading(outline, pageIdx, annRect.Top);
+        var bestOutline = FindNearestOutlineHeading(outline, pageIdx);
         if (bestOutline != null)
             return bestOutline;
 
-        // Fall back to paragraph_title / doc_title blocks
         if (analysis == null) return null;
 
         LayoutBlock? bestBlock = null;
@@ -272,20 +245,16 @@ public static class AnnotationsCommand
         return null;
     }
 
-    static HeadingOutput? FindNearestOutlineHeading(
-        List<OutlineEntry> outline, int pageIdx, float annTop, string? inheritedTitle = null)
+    static HeadingOutput? FindNearestOutlineHeading(List<OutlineEntry> outline, int pageIdx)
     {
         HeadingOutput? best = null;
 
         foreach (var entry in outline)
         {
-            if (entry.Page.HasValue)
-            {
-                if (entry.Page.Value <= pageIdx)
-                    best = new HeadingOutput { Title = entry.Title, Source = "outline", Page = entry.Page.Value };
-            }
+            if (entry.Page.HasValue && entry.Page.Value <= pageIdx)
+                best = new HeadingOutput { Title = entry.Title, Source = "outline", Page = entry.Page.Value };
 
-            var childBest = FindNearestOutlineHeading(entry.Children, pageIdx, annTop, entry.Title);
+            var childBest = FindNearestOutlineHeading(entry.Children, pageIdx);
             if (childBest != null)
                 best = childBest;
         }
@@ -305,16 +274,8 @@ public static class AnnotationsCommand
         Console.WriteLine("  --include-text        Extract text under each annotation");
         Console.WriteLine("  --include-blocks      Correlate annotations with layout blocks (implies ONNX analysis)");
     }
-
-    static readonly JsonSerializerOptions s_jsonOptions = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
-        WriteIndented = true,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-    };
 }
 
-// Output DTOs
 public class AnnotationExportOutput
 {
     public string Source { get; set; } = "";

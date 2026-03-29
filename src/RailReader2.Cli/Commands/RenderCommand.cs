@@ -48,10 +48,23 @@ public static class RenderCommand
             using var renderedPage = pdf.RenderPage(pageIdx, dpi);
             var srcBitmap = ((SkiaRenderedPage)renderedPage).Bitmap;
 
+            var pageAnnotations = withAnnotations && annotations != null
+                && annotations.Pages.TryGetValue(pageIdx, out var pa) && pa.Count > 0 ? pa : null;
+
+            bool needsCompositing = paint != null || pageAnnotations != null;
+
+            if (!needsCompositing)
+            {
+                var outputPath = Path.Combine(outputDir, $"page_{pageIdx + 1:D3}.png");
+                ScreenshotCompositor.SavePng(srcBitmap, outputPath);
+                rendered++;
+                Console.Error.WriteLine($"  Rendered page {pageIdx + 1}/{pdf.PageCount} -> {outputPath}");
+                continue;
+            }
+
             using var surface = SKSurface.Create(new SKImageInfo(srcBitmap.Width, srcBitmap.Height));
             var canvas = surface.Canvas;
 
-            // Draw page with optional colour effect
             if (paint != null)
             {
                 canvas.SaveLayer(paint);
@@ -63,10 +76,7 @@ public static class RenderCommand
                 canvas.DrawBitmap(srcBitmap, 0, 0);
             }
 
-            // Draw annotations
-            if (withAnnotations && annotations != null
-                && annotations.Pages.TryGetValue(pageIdx, out var pageAnnotations)
-                && pageAnnotations.Count > 0)
+            if (pageAnnotations != null)
             {
                 var (pw, ph) = pdf.GetPageSize(pageIdx);
                 float scaleX = srcBitmap.Width / (float)pw;
@@ -75,7 +85,6 @@ public static class RenderCommand
                 canvas.Save();
                 canvas.Scale(scaleX, scaleY);
 
-                // Expand text notes for rendering (same pattern as AnnotationExportService)
                 var expandedNotes = new List<TextNoteAnnotation>();
                 foreach (var ann in pageAnnotations)
                 {
@@ -94,14 +103,13 @@ public static class RenderCommand
                 canvas.Restore();
             }
 
-            var fileName = $"page_{pageIdx + 1:D3}.png";
-            var outputPath = Path.Combine(outputDir, fileName);
+            var outPath = Path.Combine(outputDir, $"page_{pageIdx + 1:D3}.png");
             using var image = surface.Snapshot();
             using var outBitmap = SKBitmap.FromImage(image);
-            ScreenshotCompositor.SavePng(outBitmap, outputPath);
+            ScreenshotCompositor.SavePng(outBitmap, outPath);
 
             rendered++;
-            Console.Error.WriteLine($"  Rendered page {pageIdx + 1}/{pdf.PageCount} -> {outputPath}");
+            Console.Error.WriteLine($"  Rendered page {pageIdx + 1}/{pdf.PageCount} -> {outPath}");
         }
 
         Console.Error.WriteLine($"Done: {rendered} page(s) rendered to {Path.GetFullPath(outputDir)}");
@@ -117,6 +125,7 @@ public static class RenderCommand
         null or "none" => ColourEffect.None,
         _ => ColourEffect.None
     };
+
     static void PrintHelp()
     {
         Console.WriteLine("railreader2-cli render — Render PDF pages as PNG images");
