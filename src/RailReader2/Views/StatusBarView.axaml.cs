@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media;
 using RailReader.Core.Models;
@@ -74,6 +75,45 @@ public partial class StatusBarView : UserControl
         return btn;
     }
 
+    private void BeginPageEdit(MainWindowViewModel vm, TabViewModel tab)
+    {
+        // Find and replace the page label with an editable TextBox
+        int idx = -1;
+        for (int i = 0; i < StatusPanel.Children.Count; i++)
+        {
+            if (StatusPanel.Children[i] is TextBlock tb && tb.Text?.StartsWith("Page ") == true)
+            { idx = i; break; }
+        }
+        if (idx < 0) return;
+
+        var input = new TextBox
+        {
+            Text = (tab.CurrentPage + 1).ToString(),
+            Width = 50,
+            MinHeight = 0,
+            Padding = new Avalonia.Thickness(4, 0),
+            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+        };
+
+        void Commit()
+        {
+            if (int.TryParse(input.Text?.Trim(), out int page))
+                vm.GoToPage(page - 1); // 1-based input → 0-based
+            UpdateStatus();
+        }
+
+        input.KeyDown += (_, e) =>
+        {
+            if (e.Key == Key.Enter) { Commit(); e.Handled = true; }
+            else if (e.Key == Key.Escape) { UpdateStatus(); e.Handled = true; }
+        };
+        input.LostFocus += (_, _) => Commit();
+
+        StatusPanel.Children[idx] = input;
+        input.Focus();
+        input.SelectAll();
+    }
+
     private void AddSeparator() =>
         StatusPanel.Children.Add(new TextBlock { Text = "|", Opacity = 0.5 });
 
@@ -98,11 +138,15 @@ public partial class StatusBarView : UserControl
         int zoomPct = (int)Math.Round(tab.Camera.Zoom * 100);
         StatusPanel.Children.Add(MakeNavButton("\u25c0", (_, _) =>
         { if (vm?.ActiveTab is { } t) vm.GoToPage(t.CurrentPage - 1); }, "Previous page (PgUp)"));
-        StatusPanel.Children.Add(new TextBlock
+        var pageLabel = new TextBlock
         {
             Text = $"Page {tab.CurrentPage + 1}/{tab.PageCount}",
             VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
-        });
+            Cursor = new Cursor(StandardCursorType.Hand),
+        };
+        ToolTip.SetTip(pageLabel, "Double-click to go to page");
+        pageLabel.DoubleTapped += (_, _) => BeginPageEdit(vm!, tab);
+        StatusPanel.Children.Add(pageLabel);
         StatusPanel.Children.Add(MakeNavButton("\u25b6", (_, _) =>
         { if (vm?.ActiveTab is { } t) vm.GoToPage(t.CurrentPage + 1); }, "Next page (PgDn)"));
         AddSeparator();
