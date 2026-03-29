@@ -352,6 +352,7 @@ public sealed class DocumentController
         }
 
         doc.ClampCamera(ww, wh);
+        doc.UpdateRailZoom(ww, wh);
     }
 
     // --- Navigation ---
