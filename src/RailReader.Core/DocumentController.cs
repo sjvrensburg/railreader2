@@ -23,6 +23,8 @@ public record struct TickResult(
 public sealed class DocumentController
 {
     private const double PanStep = 50.0;
+    private const double DestMarginTop = 0.1;   // 10% from top when scrolling to link target
+    private const double DestMarginLeft = 0.05;  // 5% from left
 
     private readonly AppConfig _config;
     private readonly IThreadMarshaller _marshaller;
@@ -343,12 +345,12 @@ public sealed class DocumentController
         if (dest.PdfY is { } pdfY)
         {
             double pageY = doc.PageHeight - pdfY;
-            doc.Camera.OffsetY = -pageY * doc.Camera.Zoom + wh * 0.1;
+            doc.Camera.OffsetY = -pageY * doc.Camera.Zoom + wh * DestMarginTop;
         }
 
         if (dest.PdfX is { } pdfX)
         {
-            doc.Camera.OffsetX = -pdfX * doc.Camera.Zoom + ww * 0.05;
+            doc.Camera.OffsetX = -pdfX * doc.Camera.Zoom + ww * DestMarginLeft;
         }
 
         doc.ClampCamera(ww, wh);

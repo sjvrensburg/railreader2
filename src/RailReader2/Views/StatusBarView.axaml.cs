@@ -76,16 +76,12 @@ public partial class StatusBarView : UserControl
     }
 
     public bool IsEditing { get; private set; }
+    private TextBlock? _pageLabel;
 
     private void BeginPageEdit(MainWindowViewModel vm, TabViewModel tab)
     {
-        // Find and replace the page label with an editable TextBox
-        int idx = -1;
-        for (int i = 0; i < StatusPanel.Children.Count; i++)
-        {
-            if (StatusPanel.Children[i] is TextBlock tb && tb.Text?.StartsWith("Page ") == true)
-            { idx = i; break; }
-        }
+        if (_pageLabel is null) return;
+        int idx = StatusPanel.Children.IndexOf(_pageLabel);
         if (idx < 0) return;
 
         var input = new TextBox
@@ -132,6 +128,7 @@ public partial class StatusBarView : UserControl
 
     private void UpdateStatus()
     {
+        if (IsEditing) return;
         StatusPanel.Children.Clear();
         var vm = DataContext as MainWindowViewModel;
         var tab = vm?.ActiveTab;
@@ -144,15 +141,15 @@ public partial class StatusBarView : UserControl
         int zoomPct = (int)Math.Round(tab.Camera.Zoom * 100);
         StatusPanel.Children.Add(MakeNavButton("\u25c0", (_, _) =>
         { if (vm?.ActiveTab is { } t) vm.GoToPage(t.CurrentPage - 1); }, "Previous page (PgUp)"));
-        var pageLabel = new TextBlock
+        _pageLabel = new TextBlock
         {
             Text = $"Page {tab.CurrentPage + 1}/{tab.PageCount}",
             VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
             Cursor = new Cursor(StandardCursorType.Hand),
         };
-        ToolTip.SetTip(pageLabel, "Double-click to go to page");
-        pageLabel.DoubleTapped += (_, _) => BeginPageEdit(vm!, tab);
-        StatusPanel.Children.Add(pageLabel);
+        ToolTip.SetTip(_pageLabel, "Double-click to go to page");
+        _pageLabel.DoubleTapped += (_, _) => BeginPageEdit(vm!, tab);
+        StatusPanel.Children.Add(_pageLabel);
         StatusPanel.Children.Add(MakeNavButton("\u25b6", (_, _) =>
         { if (vm?.ActiveTab is { } t) vm.GoToPage(t.CurrentPage + 1); }, "Next page (PgDn)"));
         AddSeparator();
