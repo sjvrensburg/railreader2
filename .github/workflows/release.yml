@@ -187,6 +187,7 @@ jobs:
           path: railreader2-win-x64.msix
 
   build-cli-linux:
+    needs: download-model
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -196,14 +197,22 @@ jobs:
         with:
           dotnet-version: "10.0.x"
 
+      - name: Download model artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: onnx-model
+          path: models
+
       - name: Publish CLI
         run: dotnet publish src/RailReader2.Cli/RailReader2.Cli.csproj -c Release -r linux-x64 --self-contained -o publish-cli/
 
       - name: Package
         run: |
+          mkdir -p publish-cli/models
+          cp models/$MODEL_NAME publish-cli/models/
           cd publish-cli
           chmod +x RailReader2.Cli
-          tar czf ../railreader2-cli-linux-x64.tar.gz RailReader2.Cli *.so
+          tar czf ../railreader2-cli-linux-x64.tar.gz RailReader2.Cli *.so models/
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -212,6 +221,7 @@ jobs:
           path: railreader2-cli-linux-x64.tar.gz
 
   build-cli-windows:
+    needs: download-model
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -221,12 +231,20 @@ jobs:
         with:
           dotnet-version: "10.0.x"
 
+      - name: Download model artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: onnx-model
+          path: models
+
       - name: Publish CLI
         run: dotnet publish src/RailReader2.Cli/RailReader2.Cli.csproj -c Release -r win-x64 --self-contained -o publish-cli/
 
       - name: Package
         run: |
-          Compress-Archive -Path publish-cli\RailReader2.Cli.exe, publish-cli\*.dll -DestinationPath railreader2-cli-win-x64.zip
+          New-Item -ItemType Directory -Force -Path publish-cli\models
+          Copy-Item "models\$env:MODEL_NAME" -Destination "publish-cli\models\"
+          Compress-Archive -Path publish-cli\RailReader2.Cli.exe, publish-cli\*.dll, publish-cli\models -DestinationPath railreader2-cli-win-x64.zip
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
