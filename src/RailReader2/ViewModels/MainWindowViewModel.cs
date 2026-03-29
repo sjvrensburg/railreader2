@@ -269,7 +269,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             if (tab is null) return;
 
             _logger.Debug($"[OpenDocument] Loaded: {tab.PageCount} pages, {tab.PageWidth}x{tab.PageHeight}");
-            tab.LoadAnnotations();
+            tab.LoadAnnotations(_controller.AnnotationManager);
 
             // Save sidebar state from outgoing tab before switching
             if (ActiveTab is { } oldTab)

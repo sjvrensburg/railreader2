@@ -30,6 +30,7 @@ public sealed class DocumentController
     private readonly ILogger _logger;
     private readonly ZoomAnimationController _zoom;
     private readonly AutoScrollController _autoScroll;
+    private readonly AnnotationFileManager _annotationManager;
     private AnalysisWorker? _worker;
     public bool HasWorker => _worker is not null;
 
@@ -42,6 +43,7 @@ public sealed class DocumentController
     public ColourEffect ActiveColourEffect => ActiveDocument?.ColourEffect ?? _config.ColourEffect;
     public float ActiveColourIntensity => (float)_config.ColourEffectIntensity;
     public AnalysisWorker? Worker => _worker;
+    public AnnotationFileManager AnnotationManager => _annotationManager;
 
     public DocumentState? ActiveDocument =>
         ActiveDocumentIndex >= 0 && ActiveDocumentIndex < Documents.Count
@@ -90,6 +92,7 @@ public sealed class DocumentController
         _zoom = new ZoomAnimationController(config);
         _autoScroll = new AutoScrollController(config);
         _autoScroll.StateChanged = name => StateChanged?.Invoke(name);
+        _annotationManager = new AnnotationFileManager(marshaller);
         Annotations = new AnnotationInteractionHandler();
         Search = new SearchService(
             () => ActiveDocument,
@@ -201,6 +204,7 @@ public sealed class DocumentController
         foreach (var doc in Documents)
             _config.SaveReadingPosition(doc.FilePath, doc.CurrentPage,
                 doc.Camera.Zoom, doc.Camera.OffsetX, doc.Camera.OffsetY, doc.ColourEffect);
+        _annotationManager.FlushAll();
     }
 
     // --- Tab linking ---

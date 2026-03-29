@@ -120,12 +120,11 @@ public sealed class DocumentState : IDisposable
     public int PendingSkipCount { get; set; }
     public List<OutlineEntry> Outline { get; }
 
-    // Annotations
+    // Annotations (shared via AnnotationFileManager when set)
     public AnnotationFile Annotations { get; set; } = new();
-    public bool AnnotationsDirty { get; set; }
     public Stack<IUndoAction> UndoStack { get; } = new();
     public Stack<IUndoAction> RedoStack { get; } = new();
-    private Timer? _autoSaveTimer;
+    private AnnotationFileManager? _annotationManager;
 
     // Cached rendered page and the DPI it was rendered at
     public IRenderedPage? CachedPage { get; private set; }
@@ -419,43 +418,15 @@ public sealed class DocumentState : IDisposable
         Rail.StartSnapToCurrentEnd(Camera.OffsetX, Camera.OffsetY, Camera.Zoom, windowWidth, windowHeight);
     }
 
-    public void LoadAnnotations()
+    public void LoadAnnotations(AnnotationFileManager manager)
     {
-        Annotations = AnnotationService.Load(FilePath) ?? new AnnotationFile
-        {
-            SourcePdf = Path.GetFileName(FilePath),
-            SourcePdfPath = Path.GetFullPath(FilePath),
-        };
-    }
-
-
-    public void SaveAnnotations()
-    {
-        if (AnnotationsDirty)
-        {
-            bool hasAnnotations = Annotations.Pages.Values.Any(list => list.Count > 0)
-                || Annotations.Bookmarks.Count > 0;
-            if (hasAnnotations)
-            {
-                AnnotationService.Save(FilePath, Annotations);
-            }
-            else
-            {
-                // No annotations left — remove internal storage file
-                AnnotationService.Delete(FilePath);
-            }
-            AnnotationsDirty = false;
-        }
+        _annotationManager = manager;
+        Annotations = manager.Checkout(FilePath);
     }
 
     public void MarkAnnotationsDirty()
     {
-        AnnotationsDirty = true;
-        // Debounced auto-save: restart the timer on each modification
-        if (_autoSaveTimer is not null)
-            _autoSaveTimer.Change(1000, Timeout.Infinite);
-        else
-            _autoSaveTimer = new Timer(_ => _marshaller.Post(SaveAnnotations), null, 1000, Timeout.Infinite);
+        _annotationManager?.MarkDirty(FilePath);
     }
 
     // --- Bookmarks ---
@@ -561,8 +532,7 @@ public sealed class DocumentState : IDisposable
 
     public void Dispose()
     {
-        _autoSaveTimer?.Dispose();
-        SaveAnnotations();
+        _annotationManager?.Release(FilePath);
         var page = CachedPage;
         CachedPage = null;
         page?.Dispose();
