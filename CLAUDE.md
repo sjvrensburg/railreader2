@@ -8,6 +8,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Build and Development Commands
 
+**Prerequisites**: .NET 10 SDK (all projects target `net10.0`).
+
 ```bash
 # Build app + CLI + tests (default solution)
 dotnet build RailReader2.slnx
