@@ -15,13 +15,14 @@ Everything you need to know to get the most out of railreader2.
 7. [Colour Effects](#colour-effects)
 8. [Search](#search)
 9. [Annotations](#annotations)
-10. [Text Selection](#text-selection)
-11. [Bookmarks](#bookmarks)
-12. [CLI Tool](#cli-tool)
-13. [Settings](#settings)
-14. [Troubleshooting](#troubleshooting)
-15. [Keyboard Shortcuts](#keyboard-shortcuts)
-16. [Removed Features](#removed-features)
+10. [PDF Links](#pdf-links)
+11. [Text Selection](#text-selection)
+12. [Bookmarks](#bookmarks)
+13. [CLI Tool](#cli-tool)
+14. [Settings](#settings)
+15. [Troubleshooting](#troubleshooting)
+16. [Keyboard Shortcuts](#keyboard-shortcuts)
+17. [Removed Features](#removed-features)
 
 ---
 
@@ -282,6 +283,24 @@ Use **File > Export with Annotations** to create a new PDF with annotations rend
 Use **File > Export Annotations as JSON** to save all annotations and bookmarks for the current document to a JSON file. This is useful for backup, scripting, or sharing with other RailReader2 users.
 
 Use **File > Import Annotations...** to import annotations from a JSON file. Imported annotations are merged with any existing annotations on the active document — your annotations are preserved, and the imported ones are added alongside them. Duplicate bookmarks (same name and page) are skipped.
+
+---
+
+## PDF Links
+
+Clickable links embedded in PDF documents are fully supported.
+
+### Internal links (cross-references)
+
+Clicking an internal link — such as a citation reference, figure number, table of contents entry, or equation reference — navigates directly to the target page. This works in both browse mode and rail mode. In rail mode, links take priority over block-snapping.
+
+### External links (URLs)
+
+Clicking an external link (a URL) opens a confirmation dialog showing the full URL. Click **Open** to launch it in your default browser, or **Cancel** to dismiss. Only `http://` and `https://` URLs are allowed; other schemes are blocked for security.
+
+### Hover feedback
+
+When the mouse hovers over a clickable link, the cursor changes to a hand pointer. This works in browse mode (when no annotation tool is active).
 
 ---
 
