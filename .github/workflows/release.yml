@@ -15,7 +15,24 @@ env:
   MODEL_NAME: "PP-DocLayoutV3.onnx"
 
 jobs:
+  download-model:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download ONNX model
+        run: |
+          mkdir -p models
+          curl -fL --retry 3 --retry-delay 5 \
+            -H "Authorization: Bearer ${{ secrets.HF_TOKEN }}" \
+            -o "models/$MODEL_NAME" "$MODEL_URL"
+
+      - name: Upload model artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: onnx-model
+          path: models/${{ env.MODEL_NAME }}
+
   build-linux:
+    needs: download-model
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -28,13 +45,14 @@ jobs:
       - name: Install AppImage dependencies
         run: sudo apt-get update && sudo apt-get install -y fuse libfuse2
 
+      - name: Download model artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: onnx-model
+          path: models/
+
       - name: Publish
         run: dotnet publish src/RailReader2/RailReader2.csproj -c Release -r linux-x64 --self-contained -o publish/
-
-      - name: Download ONNX model
-        run: |
-          mkdir -p models
-          curl -fL --retry 3 --retry-delay 5 -o "models/$MODEL_NAME" "$MODEL_URL"
 
       - name: Download appimagetool
         run: |
@@ -73,6 +91,7 @@ jobs:
           path: railreader2-linux-x86_64.AppImage
 
   build-windows:
+    needs: download-model
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -85,13 +104,19 @@ jobs:
       - name: Install Inno Setup
         run: choco install innosetup -y
 
+      - name: Download model artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: onnx-model
+          path: models/
+
       - name: Publish
         run: dotnet publish src/RailReader2/RailReader2.csproj -c Release -r win-x64 --self-contained -o publish/
 
-      - name: Download ONNX model
+      - name: Copy model into publish directory
         run: |
           New-Item -ItemType Directory -Force -Path publish\models
-          Invoke-WebRequest -Uri "$env:MODEL_URL" -OutFile "publish\models\$env:MODEL_NAME"
+          Copy-Item "models\$env:MODEL_NAME" -Destination "publish\models\"
 
       - name: Convert PNG to ICO
         run: magick assets/railreader2.png -define icon:auto-resize=256,128,64,48,32,16 installer/icon.ico
@@ -108,6 +133,7 @@ jobs:
           path: installer/output/railreader2-setup-x64.exe
 
   build-msix:
+    needs: download-model
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -117,13 +143,19 @@ jobs:
         with:
           dotnet-version: "10.0.x"
 
+      - name: Download model artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: onnx-model
+          path: models/
+
       - name: Publish
         run: dotnet publish src/RailReader2/RailReader2.csproj -c Release -r win-x64 --self-contained -o publish/msix/
 
-      - name: Download ONNX model
+      - name: Copy model into publish directory
         run: |
           New-Item -ItemType Directory -Force -Path publish\msix\models
-          Invoke-WebRequest -Uri "$env:MODEL_URL" -OutFile "publish\msix\models\$env:MODEL_NAME"
+          Copy-Item "models\$env:MODEL_NAME" -Destination "publish\msix\models\"
 
       - name: Copy MSIX manifest and assets
         run: |
