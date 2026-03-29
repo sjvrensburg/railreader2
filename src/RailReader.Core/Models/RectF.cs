@@ -19,5 +19,13 @@ public record struct RectF(float Left, float Top, float Right, float Bottom)
     public static RectF Create(float x, float y, float w, float h)
         => new(x, y, x + w, y + h);
 
+    /// <summary>
+    /// Returns a normalized rect where Left &lt;= Right and Top &lt;= Bottom.
+    /// Useful when coordinates may be swapped (e.g. PDF coordinate conversions).
+    /// </summary>
+    public readonly RectF Normalized()
+        => new(Math.Min(Left, Right), Math.Min(Top, Bottom),
+               Math.Max(Left, Right), Math.Max(Top, Bottom));
+
     public static readonly RectF Empty = new(0, 0, 0, 0);
 }

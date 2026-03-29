@@ -23,6 +23,8 @@ public record struct TickResult(
 public sealed class DocumentController
 {
     private const double PanStep = 50.0;
+    private const double DestMarginTop = 0.1;   // 10% from top when scrolling to link target
+    private const double DestMarginLeft = 0.05;  // 5% from left
 
     private readonly AppConfig _config;
     private readonly IThreadMarshaller _marshaller;
@@ -290,14 +292,25 @@ public sealed class DocumentController
         ActiveDocument?.RenameBookmark(index, newName);
     }
 
-    /// <summary>Page the user was on before the last bookmark navigation. -1 = none.</summary>
-    public int LastPositionPage { get; private set; } = -1;
+    // --- Navigation history (back/forward) ---
+    // Stacks live on DocumentState so each tab has independent history.
+
+    public bool CanGoBack => ActiveDocument is { } d && d.BackStack.Count > 0;
+    public bool CanGoForward => ActiveDocument is { } d && d.ForwardStack.Count > 0;
+
+    /// <summary>Pushes the current page onto the back stack and clears forward history.</summary>
+    private void PushHistory()
+    {
+        if (ActiveDocument is not { } doc) return;
+        doc.BackStack.Push(doc.CurrentPage);
+        doc.ForwardStack.Clear();
+    }
 
     public void NavigateToBookmark(int index)
     {
         if (ActiveDocument is not { Annotations: { } annotations } doc) return;
         if ((uint)index >= (uint)annotations.Bookmarks.Count) return;
-        LastPositionPage = doc.CurrentPage;
+        PushHistory();
         GoToPage(annotations.Bookmarks[index].Page);
         FitPage();
     }
@@ -305,11 +318,43 @@ public sealed class DocumentController
     public void NavigateBack()
     {
         if (ActiveDocument is not { } doc) return;
-        if (LastPositionPage < 0) return;
-        int backPage = LastPositionPage;
-        LastPositionPage = doc.CurrentPage;
-        GoToPage(backPage);
-        FitPage();
+        if (doc.BackStack.Count == 0) return;
+        doc.ForwardStack.Push(doc.CurrentPage);
+        GoToPage(doc.BackStack.Pop());
+    }
+
+    public void NavigateForward()
+    {
+        if (ActiveDocument is not { } doc) return;
+        if (doc.ForwardStack.Count == 0) return;
+        doc.BackStack.Push(doc.CurrentPage);
+        GoToPage(doc.ForwardStack.Pop());
+    }
+
+    /// <summary>
+    /// Scrolls the camera so the destination position is visible.
+    /// Coordinates are in PDF user space; converted using the target page dimensions.
+    /// </summary>
+    private void ScrollToDestination(PageDestination dest)
+    {
+        if (ActiveDocument is not { } doc) return;
+        if (dest.PdfX is null && dest.PdfY is null) return;
+
+        var (ww, wh) = GetViewportSize();
+
+        if (dest.PdfY is { } pdfY)
+        {
+            double pageY = doc.PageHeight - pdfY;
+            doc.Camera.OffsetY = -pageY * doc.Camera.Zoom + wh * DestMarginTop;
+        }
+
+        if (dest.PdfX is { } pdfX)
+        {
+            doc.Camera.OffsetX = -pdfX * doc.Camera.Zoom + ww * DestMarginLeft;
+        }
+
+        doc.ClampCamera(ww, wh);
+        doc.UpdateRailZoom(ww, wh);
     }
 
     // --- Navigation ---
@@ -712,7 +757,9 @@ public sealed class DocumentController
         {
             if (link.Destination is PageDestination pageDest)
             {
+                PushHistory();
                 GoToPage(pageDest.PageIndex);
+                ScrollToDestination(pageDest);
                 return (true, link.Destination);
             }
             return (true, link.Destination);

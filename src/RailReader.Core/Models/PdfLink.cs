@@ -16,6 +16,10 @@ public abstract class PdfLinkDestination;
 public sealed class PageDestination : PdfLinkDestination
 {
     public required int PageIndex { get; init; }
+    /// <summary>Target X in PDF user space. Null if not specified.</summary>
+    public float? PdfX { get; init; }
+    /// <summary>Target Y in PDF user space (Y-up from page bottom). Null if not specified.</summary>
+    public float? PdfY { get; init; }
 }
 
 /// <summary>External link to a URL.</summary>

@@ -37,6 +37,9 @@ internal static class PdfiumNative
     [DllImport(Lib)] internal static extern uint FPDFAction_GetType(IntPtr action);
     [DllImport(Lib)] internal static extern uint FPDFAction_GetURIPath(IntPtr document, IntPtr action, IntPtr buffer, uint buflen);
     [DllImport(Lib)] internal static extern IntPtr FPDFLink_GetLinkAtPoint(IntPtr page, double x, double y);
+    [DllImport(Lib)] internal static extern bool FPDFDest_GetLocationInPage(IntPtr dest,
+        out int hasXVal, out int hasYVal, out int hasZoomVal,
+        out float x, out float y, out float zoom);
 
     // PDFium action types
     internal const uint PDFACTION_GOTO = 1;      // Internal "go to destination"
@@ -51,6 +54,22 @@ internal static class PdfiumNative
         public float Bottom;
         public float Right;
         public float Top;
+    }
+
+    /// <summary>
+    /// Computes the CropBox-to-page-point-space transform for a loaded page.
+    /// PDFium APIs return coordinates in MediaBox space; if the page has a
+    /// CropBox offset from the MediaBox origin, we subtract it so coordinates
+    /// align with the rendered (CropBox) area.
+    /// </summary>
+    internal static (float OffsetX, float OffsetY, double VisibleHeight) GetCropBoxTransform(IntPtr page)
+    {
+        float cropLeft = 0, cropBottom = 0, cropRight = 0, cropTop = 0;
+        bool hasCropBox = FPDFPage_GetCropBox(page, ref cropLeft, ref cropBottom, ref cropRight, ref cropTop);
+        float offsetX = hasCropBox ? cropLeft : 0;
+        float offsetY = hasCropBox ? cropBottom : 0;
+        double visibleHeight = hasCropBox ? cropTop - cropBottom : FPDF_GetPageHeight(page);
+        return (offsetX, offsetY, visibleHeight);
     }
 
     // Text

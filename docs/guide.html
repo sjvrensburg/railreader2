@@ -180,6 +180,10 @@
         <li><code>Ctrl+G</code> &mdash; Go to a specific page number</li>
         <li><code>Space</code> &mdash; Next line (in rail mode) or next page</li>
       </ul>
+      <p>
+        <strong>Quick go-to:</strong> Double-click the page number in the status bar to type a page
+        number directly and press Enter to navigate.
+      </p>
 
       <h3>Minimap and outline</h3>
       <p>
@@ -545,7 +549,8 @@
       <h3>Internal links (cross-references)</h3>
       <p>
         Clicking an internal link &mdash; such as a citation reference, figure number, table of contents
-        entry, or equation reference &mdash; navigates directly to the target page. This works in both
+        entry, or equation reference &mdash; navigates directly to the target location. The view scrolls
+        to the exact position specified by the link destination, not just the page. This works in both
         browse mode and rail mode. In rail mode, links take priority over block-snapping.
       </p>
 
@@ -555,6 +560,14 @@
         <strong>Open</strong> to launch it in your default browser, or <strong>Cancel</strong> to dismiss.
         Only <code>http://</code> and <code>https://</code> URLs are allowed; other schemes are blocked
         for security.
+      </p>
+
+      <h3>Back and forward</h3>
+      <p>
+        After following a link or jumping to a bookmark, press <code>Alt+Left</code> or
+        <code>`</code> (backtick) to go back. Press <code>Alt+Right</code> to go forward.
+        Each tab maintains its own independent navigation history. The back button in the
+        bookmarks panel also works.
       </p>
 
       <h3>Hover feedback</h3>
@@ -827,7 +840,8 @@ railreader2-cli annotations paper.pdf --format pdf --output paper.annotated.pdf<
           <tr><td>P</td><td>Toggle auto-scroll</td></tr>
           <tr><td>J</td><td>Toggle jump mode</td></tr>
           <tr><td>B</td><td>Add bookmark for current page</td></tr>
-          <tr><td>` (backtick)</td><td>Navigate back to previous location</td></tr>
+          <tr><td>Alt+Left / ` (backtick)</td><td>Navigate back</td></tr>
+          <tr><td>Alt+Right</td><td>Navigate forward</td></tr>
           <tr><td>C</td><td>Cycle colour effect on active tab</td></tr>
           <tr><td>F</td><td>Toggle line focus dim</td></tr>
           <tr><td>H</td><td>Toggle line highlight</td></tr>

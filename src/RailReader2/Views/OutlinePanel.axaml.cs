@@ -169,7 +169,7 @@ public partial class OutlinePanel : UserControl
 
     private void UpdateBackButton()
     {
-        BackButton.IsVisible = _vm?.Controller.LastPositionPage >= 0;
+        BackButton.IsVisible = _vm?.Controller.CanGoBack == true;
     }
 
     public bool IsBookmarksTabActive => PaneTabs.SelectedIndex == 1;

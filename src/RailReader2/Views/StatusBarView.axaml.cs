@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media;
 using RailReader.Core.Models;
@@ -74,6 +75,47 @@ public partial class StatusBarView : UserControl
         return btn;
     }
 
+    public bool IsEditing { get; private set; }
+    private TextBlock? _pageLabel;
+
+    private void BeginPageEdit(MainWindowViewModel vm, TabViewModel tab)
+    {
+        if (_pageLabel is null) return;
+        int idx = StatusPanel.Children.IndexOf(_pageLabel);
+        if (idx < 0) return;
+
+        var input = new TextBox
+        {
+            Text = (tab.CurrentPage + 1).ToString(),
+            Width = 50,
+            MinHeight = 0,
+            Padding = new Avalonia.Thickness(4, 0),
+            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+        };
+
+        IsEditing = true;
+
+        void Commit()
+        {
+            if (!IsEditing) return;
+            IsEditing = false;
+            if (int.TryParse(input.Text?.Trim(), out int page))
+                vm.GoToPage(page - 1); // 1-based input → 0-based
+            UpdateStatus();
+        }
+
+        input.KeyDown += (_, e) =>
+        {
+            if (e.Key == Key.Enter) { Commit(); e.Handled = true; }
+            else if (e.Key == Key.Escape) { IsEditing = false; UpdateStatus(); e.Handled = true; }
+        };
+        input.LostFocus += (_, _) => Commit();
+
+        StatusPanel.Children[idx] = input;
+        input.Focus();
+        input.SelectAll();
+    }
+
     private void AddSeparator() =>
         StatusPanel.Children.Add(new TextBlock { Text = "|", Opacity = 0.5 });
 
@@ -86,6 +128,7 @@ public partial class StatusBarView : UserControl
 
     private void UpdateStatus()
     {
+        if (IsEditing) return;
         StatusPanel.Children.Clear();
         var vm = DataContext as MainWindowViewModel;
         var tab = vm?.ActiveTab;
@@ -98,11 +141,15 @@ public partial class StatusBarView : UserControl
         int zoomPct = (int)Math.Round(tab.Camera.Zoom * 100);
         StatusPanel.Children.Add(MakeNavButton("\u25c0", (_, _) =>
         { if (vm?.ActiveTab is { } t) vm.GoToPage(t.CurrentPage - 1); }, "Previous page (PgUp)"));
-        StatusPanel.Children.Add(new TextBlock
+        _pageLabel = new TextBlock
         {
             Text = $"Page {tab.CurrentPage + 1}/{tab.PageCount}",
             VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
-        });
+            Cursor = new Cursor(StandardCursorType.Hand),
+        };
+        ToolTip.SetTip(_pageLabel, "Double-click to go to page");
+        _pageLabel.DoubleTapped += (_, _) => BeginPageEdit(vm!, tab);
+        StatusPanel.Children.Add(_pageLabel);
         StatusPanel.Children.Add(MakeNavButton("\u25b6", (_, _) =>
         { if (vm?.ActiveTab is { } t) vm.GoToPage(t.CurrentPage + 1); }, "Next page (PgDn)"));
         AddSeparator();

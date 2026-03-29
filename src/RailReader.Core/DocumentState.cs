@@ -121,6 +121,10 @@ public sealed class DocumentState : IDisposable
     public int PendingSkipCount { get; set; }
     public List<OutlineEntry> Outline { get; }
 
+    // Navigation history (back/forward) — per-document so tab switching doesn't cross-pollinate
+    public Stack<int> BackStack { get; } = new();
+    public Stack<int> ForwardStack { get; } = new();
+
     // Annotations (shared via AnnotationFileManager when set)
     public AnnotationFile Annotations { get; set; } = new();
     public Stack<IUndoAction> UndoStack { get; } = new();

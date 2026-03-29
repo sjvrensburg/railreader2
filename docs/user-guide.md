@@ -63,6 +63,8 @@ Once a PDF is open, scroll through pages with `PgDn`/`PgUp`, zoom with `+`/`-` o
 | `Ctrl+G` | Go to a specific page number |
 | `Space` | Next line (in rail mode) or next page |
 
+> **Quick go-to:** Double-click the page number in the status bar to type a page number directly and press Enter to navigate.
+
 > **Edge-hold page navigation:** When not in rail mode, holding `Down` or `S` at the bottom of the page for 400ms automatically advances to the next page. Similarly, holding `Up` or `W` at the top of the page goes to the previous page.
 
 ### Minimap and outline
@@ -292,11 +294,15 @@ Clickable links embedded in PDF documents are fully supported.
 
 ### Internal links (cross-references)
 
-Clicking an internal link — such as a citation reference, figure number, table of contents entry, or equation reference — navigates directly to the target page. This works in both browse mode and rail mode. In rail mode, links take priority over block-snapping.
+Clicking an internal link — such as a citation reference, figure number, table of contents entry, or equation reference — navigates directly to the target location. The view scrolls to the exact position specified by the link destination, not just the page. This works in both browse mode and rail mode. In rail mode, links take priority over block-snapping.
 
 ### External links (URLs)
 
 Clicking an external link (a URL) opens a confirmation dialog showing the full URL. Click **Open** to launch it in your default browser, or **Cancel** to dismiss. Only `http://` and `https://` URLs are allowed; other schemes are blocked for security.
+
+### Back and forward
+
+After following a link or jumping to a bookmark, press `Alt+Left` or `` ` `` (backtick) to go back. Press `Alt+Right` to go forward. Each tab maintains its own independent navigation history. The back button in the bookmarks panel also works.
 
 ### Hover feedback
 
@@ -515,7 +521,8 @@ The log is overwritten at the start of each session. Old `.log` files are automa
 | `P` | Toggle auto-scroll |
 | `J` | Toggle jump mode |
 | `B` | Add bookmark for current page |
-| `` ` `` (backtick) | Navigate back to previous location |
+| `Alt+Left` / `` ` `` | Navigate back |
+| `Alt+Right` | Navigate forward |
 | `C` | Cycle colour effect on active tab |
 | `F` | Toggle line focus dim |
 | `H` | Toggle line highlight |
