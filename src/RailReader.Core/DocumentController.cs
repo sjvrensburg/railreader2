@@ -330,18 +330,27 @@ public sealed class DocumentController
     }
 
     /// <summary>
-    /// Scrolls the camera so that the destination's Y position is near the top of the viewport.
-    /// The destination Y is in PDF user space (Y-up); we convert using the target page's height.
+    /// Scrolls the camera so the destination position is visible.
+    /// Coordinates are in PDF user space; converted using the target page dimensions.
     /// </summary>
     private void ScrollToDestination(PageDestination dest)
     {
-        if (dest.PdfY is not { } pdfY || ActiveDocument is not { } doc) return;
-
-        // Convert PDF Y (Y-up from bottom) to page-point Y (Y-down from top)
-        double pageY = doc.PageHeight - pdfY;
+        if (ActiveDocument is not { } doc) return;
+        if (dest.PdfX is null && dest.PdfY is null) return;
 
         var (ww, wh) = GetViewportSize();
-        doc.Camera.OffsetY = -pageY * doc.Camera.Zoom + wh * 0.1; // 10% margin from top
+
+        if (dest.PdfY is { } pdfY)
+        {
+            double pageY = doc.PageHeight - pdfY;
+            doc.Camera.OffsetY = -pageY * doc.Camera.Zoom + wh * 0.1;
+        }
+
+        if (dest.PdfX is { } pdfX)
+        {
+            doc.Camera.OffsetX = -pdfX * doc.Camera.Zoom + ww * 0.05;
+        }
+
         doc.ClampCamera(ww, wh);
     }
 

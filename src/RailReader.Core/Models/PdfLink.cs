@@ -16,11 +16,9 @@ public abstract class PdfLinkDestination;
 public sealed class PageDestination : PdfLinkDestination
 {
     public required int PageIndex { get; init; }
-    /// <summary>
-    /// Target Y position in PDF user space (Y-up from page bottom).
-    /// Null if the destination has no explicit Y coordinate.
-    /// Stored in raw PDF space — convert at navigation time using the target page's height.
-    /// </summary>
+    /// <summary>Target X in PDF user space. Null if not specified.</summary>
+    public float? PdfX { get; init; }
+    /// <summary>Target Y in PDF user space (Y-up from page bottom). Null if not specified.</summary>
     public float? PdfY { get; init; }
 }
 

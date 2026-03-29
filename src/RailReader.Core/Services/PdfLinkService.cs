@@ -114,13 +114,14 @@ internal static class PdfLinkService
 
     private static PageDestination MakePageDestination(IntPtr dest, int pageIdx)
     {
-        float? pdfY = null;
-        if (FPDFDest_GetLocationInPage(dest, out _, out int hasY, out _, out _, out float y, out _)
-            && hasY != 0)
+        float? pdfX = null, pdfY = null;
+        if (FPDFDest_GetLocationInPage(dest, out int hasX, out int hasY, out _,
+                out float x, out float y, out _))
         {
-            pdfY = y;
+            if (hasX != 0) pdfX = x;
+            if (hasY != 0) pdfY = y;
         }
-        return new PageDestination { PageIndex = pageIdx, PdfY = pdfY };
+        return new PageDestination { PageIndex = pageIdx, PdfX = pdfX, PdfY = pdfY };
     }
 
     /// <summary>
