@@ -115,6 +115,6 @@ public static class AnnotationGeometry
             case ResizeHandle.Left:        l += dx; break;
         }
 
-        return new RectF(Math.Min(l, r), Math.Min(t, b), Math.Max(l, r), Math.Max(t, b));
+        return new RectF(l, t, r, b).Normalized();
     }
 }

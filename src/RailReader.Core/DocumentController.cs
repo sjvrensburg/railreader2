@@ -291,19 +291,17 @@ public sealed class DocumentController
     }
 
     // --- Navigation history (back/forward) ---
+    // Stacks live on DocumentState so each tab has independent history.
 
-    private readonly Stack<int> _backStack = new();
-    private readonly Stack<int> _forwardStack = new();
-
-    public bool CanGoBack => _backStack.Count > 0;
-    public bool CanGoForward => _forwardStack.Count > 0;
+    public bool CanGoBack => ActiveDocument is { } d && d.BackStack.Count > 0;
+    public bool CanGoForward => ActiveDocument is { } d && d.ForwardStack.Count > 0;
 
     /// <summary>Pushes the current page onto the back stack and clears forward history.</summary>
     private void PushHistory()
     {
         if (ActiveDocument is not { } doc) return;
-        _backStack.Push(doc.CurrentPage);
-        _forwardStack.Clear();
+        doc.BackStack.Push(doc.CurrentPage);
+        doc.ForwardStack.Clear();
     }
 
     public void NavigateToBookmark(int index)
@@ -318,17 +316,17 @@ public sealed class DocumentController
     public void NavigateBack()
     {
         if (ActiveDocument is not { } doc) return;
-        if (_backStack.Count == 0) return;
-        _forwardStack.Push(doc.CurrentPage);
-        GoToPage(_backStack.Pop());
+        if (doc.BackStack.Count == 0) return;
+        doc.ForwardStack.Push(doc.CurrentPage);
+        GoToPage(doc.BackStack.Pop());
     }
 
     public void NavigateForward()
     {
         if (ActiveDocument is not { } doc) return;
-        if (_forwardStack.Count == 0) return;
-        _backStack.Push(doc.CurrentPage);
-        GoToPage(_forwardStack.Pop());
+        if (doc.ForwardStack.Count == 0) return;
+        doc.BackStack.Push(doc.CurrentPage);
+        GoToPage(doc.ForwardStack.Pop());
     }
 
     // --- Navigation ---

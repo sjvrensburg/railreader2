@@ -38,14 +38,7 @@ internal static class PdfLinkService
                 if (!FPDFLink_GetAnnotRect(linkAnnot, out FsRectF fsRect))
                     continue;
 
-                // Convert from PDF user space (Y-up, MediaBox) to page-point space (Y-down, CropBox).
-                // Normalize with Min/Max because FsRectF top/bottom can be swapped.
-                float left = fsRect.Left - offsetX;
-                float right = fsRect.Right - offsetX;
-                float y1 = (float)(visibleHeight - (fsRect.Top - offsetY));
-                float y2 = (float)(visibleHeight - (fsRect.Bottom - offsetY));
-                var rect = new RectF(Math.Min(left, right), Math.Min(y1, y2),
-                                     Math.Max(left, right), Math.Max(y1, y2));
+                var rect = ToPageRect(fsRect, offsetX, offsetY, visibleHeight);
 
                 var dest = ResolveDestination(doc, linkAnnot);
                 if (dest is null) continue;
@@ -59,61 +52,6 @@ internal static class PdfLinkService
         {
             Logger.Error($"[PdfLink] Failed to extract links for page {pageIndex}", ex);
             return s_empty;
-        }
-        finally
-        {
-            if (page != IntPtr.Zero) FPDF_ClosePage(page);
-            if (doc != IntPtr.Zero) FPDF_CloseDocument(doc);
-            if (pinned.IsAllocated) pinned.Free();
-        }
-    }
-
-    public static PdfLink? HitTestLink(byte[] pdfBytes, int pageIndex, double pageX, double pageY)
-    {
-        IntPtr doc = IntPtr.Zero;
-        IntPtr page = IntPtr.Zero;
-        GCHandle pinned = default;
-
-        try
-        {
-            pinned = GCHandle.Alloc(pdfBytes, GCHandleType.Pinned);
-            doc = FPDF_LoadMemDocument(pinned.AddrOfPinnedObject(), pdfBytes.Length, null);
-            if (doc == IntPtr.Zero) return null;
-
-            page = FPDF_LoadPage(doc, pageIndex);
-            if (page == IntPtr.Zero) return null;
-
-            var (offsetX, offsetY, visibleHeight) = GetCropBoxTransform(page);
-
-            // Convert page-point space (Y-down) back to PDF user space (Y-up) for PDFium
-            double pdfX = pageX + offsetX;
-            double pdfY = visibleHeight - pageY + offsetY;
-
-            IntPtr link = FPDFLink_GetLinkAtPoint(page, pdfX, pdfY);
-            if (link == IntPtr.Zero) return null;
-
-            if (!FPDFLink_GetAnnotRect(link, out FsRectF fsRect))
-                return null;
-
-            float left = fsRect.Left - offsetX;
-            float right = fsRect.Right - offsetX;
-            float y1 = (float)(visibleHeight - (fsRect.Top - offsetY));
-            float y2 = (float)(visibleHeight - (fsRect.Bottom - offsetY));
-
-            var dest = ResolveDestination(doc, link);
-            if (dest is null) return null;
-
-            return new PdfLink
-            {
-                Rect = new RectF(Math.Min(left, right), Math.Min(y1, y2),
-                                 Math.Max(left, right), Math.Max(y1, y2)),
-                Destination = dest,
-            };
-        }
-        catch (Exception ex)
-        {
-            Logger.Error($"[PdfLink] Failed to hit-test link on page {pageIndex}", ex);
-            return null;
         }
         finally
         {
@@ -174,13 +112,16 @@ internal static class PdfLinkService
         return null;
     }
 
-    private static (float OffsetX, float OffsetY, double VisibleHeight) GetCropBoxTransform(IntPtr page)
+    /// <summary>
+    /// Converts an FsRectF from PDF user space (Y-up, MediaBox) to a normalized
+    /// RectF in page-point space (Y-down, CropBox-adjusted).
+    /// </summary>
+    private static RectF ToPageRect(FsRectF fsRect, float offsetX, float offsetY, double visibleHeight)
     {
-        float cropLeft = 0, cropBottom = 0, cropRight = 0, cropTop = 0;
-        bool hasCropBox = FPDFPage_GetCropBox(page, ref cropLeft, ref cropBottom, ref cropRight, ref cropTop);
-        float offsetX = hasCropBox ? cropLeft : 0;
-        float offsetY = hasCropBox ? cropBottom : 0;
-        double visibleHeight = hasCropBox ? cropTop - cropBottom : FPDF_GetPageHeight(page);
-        return (offsetX, offsetY, visibleHeight);
+        float left = fsRect.Left - offsetX;
+        float right = fsRect.Right - offsetX;
+        float y1 = (float)(visibleHeight - (fsRect.Top - offsetY));
+        float y2 = (float)(visibleHeight - (fsRect.Bottom - offsetY));
+        return new RectF(left, y1, right, y2).Normalized();
     }
 }

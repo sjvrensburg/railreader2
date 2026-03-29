@@ -147,20 +147,4 @@ public static class PdfTextService
             if (pinned.IsAllocated) pinned.Free();
         }
     }
-
-    /// <summary>
-    /// Computes the CropBox-to-page-point-space transform for a loaded page.
-    /// PDFium text APIs return coordinates in MediaBox space; if the page has a
-    /// CropBox offset from the MediaBox origin, we subtract it so coordinates
-    /// align with the rendered (CropBox) area.
-    /// </summary>
-    private static (float OffsetX, float OffsetY, double VisibleHeight) GetCropBoxTransform(IntPtr page)
-    {
-        float cropLeft = 0, cropBottom = 0, cropRight = 0, cropTop = 0;
-        bool hasCropBox = FPDFPage_GetCropBox(page, ref cropLeft, ref cropBottom, ref cropRight, ref cropTop);
-        float offsetX = hasCropBox ? cropLeft : 0;
-        float offsetY = hasCropBox ? cropBottom : 0;
-        double visibleHeight = hasCropBox ? cropTop - cropBottom : FPDF_GetPageHeight(page);
-        return (offsetX, offsetY, visibleHeight);
-    }
 }
