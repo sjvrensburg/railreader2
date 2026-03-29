@@ -37,6 +37,7 @@ public class ViewportPanel : Panel
         var tool = ViewModel?.ActiveTool ?? AnnotationTool.None;
         if (tool == _lastCursorTool) return;
         _lastCursorTool = tool;
+        _showingLinkCursor = false;
 
         Cursor = tool switch
         {
@@ -113,7 +114,20 @@ public class ViewportPanel : Panel
     protected override void OnPointerMoved(PointerEventArgs e)
     {
         base.OnPointerMoved(e);
-        if (!_dragging || ViewModel is null) return;
+        if (ViewModel is null) return;
+
+        if (!_dragging)
+        {
+            // Not dragging — update cursor for link hover (only in browse mode)
+            if (!ViewModel.IsAnnotating)
+            {
+                var pos = e.GetPosition(this);
+                var (pageX, pageY) = ScreenToPage(pos);
+                bool overLink = ViewModel.IsOverLink(pageX, pageY);
+                UpdateLinkCursor(overLink);
+            }
+            return;
+        }
 
         // If left button was released outside the viewport (e.g. on toolbar),
         // we never got OnPointerReleased — cancel the drag now.
@@ -125,28 +139,41 @@ public class ViewportPanel : Panel
             return;
         }
 
-        var pos = e.GetPosition(this);
+        var dragPos = e.GetPosition(this);
 
         if (ViewModel.IsAnnotating)
         {
-            var (pageX, pageY) = ScreenToPage(pos);
+            var (pageX, pageY) = ScreenToPage(dragPos);
             ViewModel.HandleAnnotationPointerMove(pageX, pageY);
         }
         else if (_browseAnnotationDrag)
         {
-            var (pageX, pageY) = ScreenToPage(pos);
+            var (pageX, pageY) = ScreenToPage(dragPos);
             ViewModel.HandleBrowsePointerMove((float)pageX, (float)pageY);
         }
         else
         {
-            double dx = pos.X - _lastPos.X;
-            double dy = pos.Y - _lastPos.Y;
+            double dx = dragPos.X - _lastPos.X;
+            double dy = dragPos.Y - _lastPos.Y;
             bool ctrl = e.KeyModifiers.HasFlag(KeyModifiers.Control);
             ViewModel.HandlePan(dx, dy, ctrl);
         }
 
-        _lastPos = pos;
+        _lastPos = dragPos;
         e.Handled = true;
+    }
+
+    private bool _showingLinkCursor;
+
+    private void UpdateLinkCursor(bool overLink)
+    {
+        if (overLink == _showingLinkCursor) return;
+        _showingLinkCursor = overLink;
+
+        // Only override cursor when no annotation tool is active
+        if (_lastCursorTool != AnnotationTool.None) return;
+
+        Cursor = overLink ? new Cursor(StandardCursorType.Hand) : null;
     }
 
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
