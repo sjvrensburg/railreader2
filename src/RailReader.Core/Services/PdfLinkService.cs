@@ -69,7 +69,7 @@ internal static class PdfLinkService
         {
             int pageIdx = FPDFDest_GetDestPageIndex(doc, dest);
             if (pageIdx >= 0)
-                return new PageDestination { PageIndex = pageIdx };
+                return MakePageDestination(dest, pageIdx);
         }
 
         // Fall back to action
@@ -85,7 +85,7 @@ internal static class PdfLinkService
                 {
                     int pageIdx = FPDFDest_GetDestPageIndex(doc, dest);
                     if (pageIdx >= 0)
-                        return new PageDestination { PageIndex = pageIdx };
+                        return MakePageDestination(dest, pageIdx);
                 }
                 break;
 
@@ -110,6 +110,17 @@ internal static class PdfLinkService
         }
 
         return null;
+    }
+
+    private static PageDestination MakePageDestination(IntPtr dest, int pageIdx)
+    {
+        float? pdfY = null;
+        if (FPDFDest_GetLocationInPage(dest, out _, out int hasY, out _, out _, out float y, out _)
+            && hasY != 0)
+        {
+            pdfY = y;
+        }
+        return new PageDestination { PageIndex = pageIdx, PdfY = pdfY };
     }
 
     /// <summary>

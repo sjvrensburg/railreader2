@@ -329,6 +329,22 @@ public sealed class DocumentController
         GoToPage(doc.ForwardStack.Pop());
     }
 
+    /// <summary>
+    /// Scrolls the camera so that the destination's Y position is near the top of the viewport.
+    /// The destination Y is in PDF user space (Y-up); we convert using the target page's height.
+    /// </summary>
+    private void ScrollToDestination(PageDestination dest)
+    {
+        if (dest.PdfY is not { } pdfY || ActiveDocument is not { } doc) return;
+
+        // Convert PDF Y (Y-up from bottom) to page-point Y (Y-down from top)
+        double pageY = doc.PageHeight - pdfY;
+
+        var (ww, wh) = GetViewportSize();
+        doc.Camera.OffsetY = -pageY * doc.Camera.Zoom + wh * 0.1; // 10% margin from top
+        doc.ClampCamera(ww, wh);
+    }
+
     // --- Navigation ---
 
     private bool _syncingLinks;
@@ -731,6 +747,7 @@ public sealed class DocumentController
             {
                 PushHistory();
                 GoToPage(pageDest.PageIndex);
+                ScrollToDestination(pageDest);
                 return (true, link.Destination);
             }
             return (true, link.Destination);

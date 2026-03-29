@@ -37,6 +37,9 @@ internal static class PdfiumNative
     [DllImport(Lib)] internal static extern uint FPDFAction_GetType(IntPtr action);
     [DllImport(Lib)] internal static extern uint FPDFAction_GetURIPath(IntPtr document, IntPtr action, IntPtr buffer, uint buflen);
     [DllImport(Lib)] internal static extern IntPtr FPDFLink_GetLinkAtPoint(IntPtr page, double x, double y);
+    [DllImport(Lib)] internal static extern bool FPDFDest_GetLocationInPage(IntPtr dest,
+        out int hasXVal, out int hasYVal, out int hasZoomVal,
+        out float x, out float y, out float zoom);
 
     // PDFium action types
     internal const uint PDFACTION_GOTO = 1;      // Internal "go to destination"
