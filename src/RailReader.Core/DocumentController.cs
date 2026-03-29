@@ -290,14 +290,27 @@ public sealed class DocumentController
         ActiveDocument?.RenameBookmark(index, newName);
     }
 
-    /// <summary>Page the user was on before the last bookmark navigation. -1 = none.</summary>
-    public int LastPositionPage { get; private set; } = -1;
+    // --- Navigation history (back/forward) ---
+
+    private readonly Stack<int> _backStack = new();
+    private readonly Stack<int> _forwardStack = new();
+
+    public bool CanGoBack => _backStack.Count > 0;
+    public bool CanGoForward => _forwardStack.Count > 0;
+
+    /// <summary>Pushes the current page onto the back stack and clears forward history.</summary>
+    private void PushHistory()
+    {
+        if (ActiveDocument is not { } doc) return;
+        _backStack.Push(doc.CurrentPage);
+        _forwardStack.Clear();
+    }
 
     public void NavigateToBookmark(int index)
     {
         if (ActiveDocument is not { Annotations: { } annotations } doc) return;
         if ((uint)index >= (uint)annotations.Bookmarks.Count) return;
-        LastPositionPage = doc.CurrentPage;
+        PushHistory();
         GoToPage(annotations.Bookmarks[index].Page);
         FitPage();
     }
@@ -305,11 +318,17 @@ public sealed class DocumentController
     public void NavigateBack()
     {
         if (ActiveDocument is not { } doc) return;
-        if (LastPositionPage < 0) return;
-        int backPage = LastPositionPage;
-        LastPositionPage = doc.CurrentPage;
-        GoToPage(backPage);
-        FitPage();
+        if (_backStack.Count == 0) return;
+        _forwardStack.Push(doc.CurrentPage);
+        GoToPage(_backStack.Pop());
+    }
+
+    public void NavigateForward()
+    {
+        if (ActiveDocument is not { } doc) return;
+        if (_forwardStack.Count == 0) return;
+        _backStack.Push(doc.CurrentPage);
+        GoToPage(_forwardStack.Pop());
     }
 
     // --- Navigation ---
@@ -712,6 +731,7 @@ public sealed class DocumentController
         {
             if (link.Destination is PageDestination pageDest)
             {
+                PushHistory();
                 GoToPage(pageDest.PageIndex);
                 return (true, link.Destination);
             }

@@ -335,6 +335,13 @@ public partial class MainWindow : Window
         if (e.KeyModifiers.HasFlag(KeyModifiers.Control) && HandleCtrlShortcut(vm, e))
             { RailToolBar.SyncState(); return; }
 
+        // Alt+Arrow: navigation history (back/forward)
+        if (e.KeyModifiers.HasFlag(KeyModifiers.Alt))
+        {
+            if (e.Key == Key.Left) { vm.NavigateBack(); e.Handled = true; return; }
+            if (e.Key == Key.Right) { vm.NavigateForward(); e.Handled = true; return; }
+        }
+
         // When the search TextBox has focus, let text input keys through.
         // Only intercept non-text keys (F-keys, Escape, PgUp/PgDn, etc.).
         bool searchFocused = vm.ShowOutline && OutlinePanel.IsSearchInputFocused;

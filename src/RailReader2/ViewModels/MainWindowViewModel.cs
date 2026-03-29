@@ -638,6 +638,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
         InvalidateAfterNavigation();
     }
 
+    public void NavigateForward()
+    {
+        _controller.NavigateForward();
+        InvalidateAfterNavigation();
+    }
+
     [RelayCommand]
     public void GoToPage(int page)
     {
