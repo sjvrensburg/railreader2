@@ -135,7 +135,9 @@ At high zoom levels, navigation switches to "rail mode" — the viewer locks ont
 
 ## Installation
 
-Download the latest release from [GitHub Releases](https://github.com/sjvrensburg/railreader2/releases/latest). The AI layout model is bundled in all packages. Standalone CLI binaries (`railreader2-cli-linux-x64` and `RailReader2.Cli.exe`) are also available from the same release page.
+Download the latest release from [GitHub Releases](https://github.com/sjvrensburg/railreader2/releases/latest). The AI layout model is bundled in all packages.
+
+> **Advanced users:** A standalone CLI for automated PDF extraction is also available from the same release page — see [Command-line interface](#command-line-interface) below.
 
 ### Linux
 
