@@ -109,6 +109,7 @@
         <li><a href="#colour-effects">Colour Effects</a></li>
         <li><a href="#search">Search</a></li>
         <li><a href="#annotations">Annotations</a></li>
+        <li><a href="#pdf-links">PDF Links</a></li>
         <li><a href="#text-selection">Text Selection</a></li>
         <li><a href="#bookmarks">Bookmarks</a></li>
         <li><a href="#cli-tool">CLI Tool</a></li>
@@ -536,7 +537,34 @@
       </p>
     </section>
 
-    <!-- 10. Text Selection -->
+    <!-- 10. PDF Links -->
+    <section class="guide-section" id="pdf-links">
+      <h2>PDF Links</h2>
+      <p>Clickable links embedded in PDF documents are fully supported.</p>
+
+      <h3>Internal links (cross-references)</h3>
+      <p>
+        Clicking an internal link &mdash; such as a citation reference, figure number, table of contents
+        entry, or equation reference &mdash; navigates directly to the target page. This works in both
+        browse mode and rail mode. In rail mode, links take priority over block-snapping.
+      </p>
+
+      <h3>External links (URLs)</h3>
+      <p>
+        Clicking an external link (a URL) opens a confirmation dialog showing the full URL. Click
+        <strong>Open</strong> to launch it in your default browser, or <strong>Cancel</strong> to dismiss.
+        Only <code>http://</code> and <code>https://</code> URLs are allowed; other schemes are blocked
+        for security.
+      </p>
+
+      <h3>Hover feedback</h3>
+      <p>
+        When the mouse hovers over a clickable link, the cursor changes to a hand pointer. This works
+        in browse mode (when no annotation tool is active).
+      </p>
+    </section>
+
+    <!-- 11. Text Selection -->
     <section class="guide-section" id="text-selection">
       <h2>Text Selection</h2>
       <p>

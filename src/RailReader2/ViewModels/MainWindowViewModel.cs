@@ -737,9 +737,50 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public void HandleClick(double canvasX, double canvasY)
     {
-        if (_controller.HandleClick(canvasX, canvasY))
+        var (handled, link) = _controller.HandleClick(canvasX, canvasY);
+        if (link is UriDestination uriDest)
+        {
+            _ = PromptAndOpenUrl(uriDest.Uri);
+            return;
+        }
+        if (handled)
             InvalidateNavigation();
     }
+
+    private async Task PromptAndOpenUrl(string uri)
+    {
+        if (_window is null) return;
+
+        // Only allow http/https URLs
+        if (!uri.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
+            !uri.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        {
+            ShowStatusToast("Blocked non-HTTP link");
+            return;
+        }
+
+        var dialog = new Views.ConfirmUrlDialog(uri);
+        var result = await dialog.ShowDialog<bool?>(_window);
+        if (result == true)
+        {
+            try
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = uri,
+                    UseShellExecute = true,
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Failed to open URL: {uri}", ex);
+                ShowStatusToast("Failed to open link");
+            }
+        }
+    }
+
+    public bool IsOverLink(double pageX, double pageY)
+        => _controller.HitTestLink(pageX, pageY) is not null;
 
     // --- Auto-scroll ---
 

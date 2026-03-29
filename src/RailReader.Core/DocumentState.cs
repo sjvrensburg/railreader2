@@ -104,6 +104,7 @@ public sealed class DocumentState : IDisposable
     public RailNav Rail { get; }
     public Dictionary<int, PageAnalysis> AnalysisCache { get; } = [];
     public Dictionary<int, PageText> TextCache { get; } = [];
+    public Dictionary<int, List<PdfLink>> LinkCache { get; } = [];
     public Queue<int> PendingAnalysis { get; } = new();
 
     /// <summary>
@@ -517,6 +518,33 @@ public sealed class DocumentState : IDisposable
         var text = _pdfText.ExtractPageText(_pdf.PdfBytes, pageIndex);
         TextCache[pageIndex] = text;
         return text;
+    }
+
+    /// <summary>
+    /// Returns cached links for a page, extracting them on first access.
+    /// </summary>
+    public List<PdfLink> GetOrExtractLinks(int pageIndex)
+    {
+        if (LinkCache.TryGetValue(pageIndex, out var cached))
+            return cached;
+        var links = PdfLinkService.ExtractPageLinks(_pdf.PdfBytes, pageIndex);
+        LinkCache[pageIndex] = links;
+        return links;
+    }
+
+    /// <summary>
+    /// Hit-tests a point against PDF links on the current page.
+    /// Uses the cached link list for fast in-memory lookup.
+    /// </summary>
+    public PdfLink? HitTestLink(double pageX, double pageY)
+    {
+        var links = GetOrExtractLinks(CurrentPage);
+        foreach (var link in links)
+        {
+            if (link.Rect.Contains((float)pageX, (float)pageY))
+                return link;
+        }
+        return null;
     }
 
     /// <summary>

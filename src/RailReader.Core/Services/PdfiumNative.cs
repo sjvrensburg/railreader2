@@ -29,6 +29,30 @@ internal static class PdfiumNative
     [DllImport(Lib)] internal static extern IntPtr FPDFAction_GetDest(IntPtr document, IntPtr action);
     [DllImport(Lib)] internal static extern int FPDFDest_GetDestPageIndex(IntPtr document, IntPtr dest);
 
+    // Links
+    [DllImport(Lib)] internal static extern bool FPDFLink_Enumerate(IntPtr page, ref int startPos, out IntPtr linkAnnot);
+    [DllImport(Lib)] internal static extern bool FPDFLink_GetAnnotRect(IntPtr linkAnnot, out FsRectF rect);
+    [DllImport(Lib)] internal static extern IntPtr FPDFLink_GetDest(IntPtr document, IntPtr link);
+    [DllImport(Lib)] internal static extern IntPtr FPDFLink_GetAction(IntPtr link);
+    [DllImport(Lib)] internal static extern uint FPDFAction_GetType(IntPtr action);
+    [DllImport(Lib)] internal static extern uint FPDFAction_GetURIPath(IntPtr document, IntPtr action, IntPtr buffer, uint buflen);
+    [DllImport(Lib)] internal static extern IntPtr FPDFLink_GetLinkAtPoint(IntPtr page, double x, double y);
+
+    // PDFium action types
+    internal const uint PDFACTION_GOTO = 1;      // Internal "go to destination"
+    internal const uint PDFACTION_REMOTEGOTO = 2; // Remote "go to destination" (another PDF)
+    internal const uint PDFACTION_URI = 3;        // Open a URI
+    internal const uint PDFACTION_LAUNCH = 4;     // Launch an application
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct FsRectF
+    {
+        public float Left;
+        public float Bottom;
+        public float Right;
+        public float Top;
+    }
+
     // Text
     [DllImport(Lib)] internal static extern IntPtr FPDFText_LoadPage(IntPtr page);
     [DllImport(Lib)] internal static extern void FPDFText_ClosePage(IntPtr textPage);

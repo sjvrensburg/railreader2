@@ -695,18 +695,43 @@ public sealed class DocumentController
         }
     }
 
-    public bool HandleClick(double canvasX, double canvasY)
+    /// <summary>
+    /// Handles a click on the viewport. Returns link destination if a link was clicked,
+    /// otherwise falls through to rail-mode block snapping.
+    /// </summary>
+    public (bool Handled, PdfLinkDestination? Link) HandleClick(double canvasX, double canvasY)
     {
-        if (ActiveDocument is not { } doc || !doc.Rail.Active || !doc.Rail.HasAnalysis) return false;
+        if (ActiveDocument is not { } doc) return (false, null);
 
         double pageX = (canvasX - doc.Camera.OffsetX) / doc.Camera.Zoom;
         double pageY = (canvasY - doc.Camera.OffsetY) / doc.Camera.Zoom;
 
+        // Check for PDF links first (takes priority over rail-mode snap)
+        var link = doc.HitTestLink(pageX, pageY);
+        if (link is not null)
+        {
+            if (link.Destination is PageDestination pageDest)
+            {
+                GoToPage(pageDest.PageIndex);
+                return (true, link.Destination);
+            }
+            return (true, link.Destination);
+        }
+
+        // Fall through to rail-mode block snapping
+        if (!doc.Rail.Active || !doc.Rail.HasAnalysis) return (false, null);
+
         doc.Rail.FindBlockNearPoint(pageX, pageY);
         var (ww, wh) = GetViewportSize();
         doc.StartSnap(ww, wh);
-        return true;
+        return (true, null);
     }
+
+    /// <summary>
+    /// Hit-tests a point (in page-point space) against PDF links on the active document.
+    /// </summary>
+    public PdfLink? HitTestLink(double pageX, double pageY)
+        => ActiveDocument?.HitTestLink(pageX, pageY);
 
     // --- Auto-scroll (delegated to AutoScrollController) ---
 

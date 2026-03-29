@@ -63,11 +63,12 @@ All business logic with zero Avalonia and zero SkiaSharp dependencies. Key files
 - `DocumentState.cs` — per-document state (PDF via `IPdfService`, camera, rail nav, analysis cache, annotations, bookmarks)
 - `ZoomAnimationController.cs` — smooth zoom animation with easing, focus point preservation, rail position restoration
 - `AutoScrollController.cs` — auto-scroll toggle/stop, jump mode exclusivity, speed management
-- `Models/` — data models (Annotations, BookmarkEntry, Camera, LayoutBlock, RectF, ColorRGBA, etc.)
+- `Models/` — data models (Annotations, BookmarkEntry, Camera, LayoutBlock, RectF, ColorRGBA, PdfLink, etc.)
 - `Services/AnalysisWorker.cs` — background ONNX inference thread (`Channel<T>` queue)
 - `Services/RailNav.cs` — rail navigation state machine (snap, scroll, clamp, auto-scroll, jump mode)
 - `Services/IPdfService.cs` — rendering-agnostic PDF service interfaces (`IPdfService`, `IRenderedPage`, `IPdfServiceFactory`)
 - `Services/PdfTextService.cs` — text extraction with per-character bounding boxes (PDFium P/Invoke)
+- `Services/PdfLinkService.cs` — PDF hyperlink extraction and hit-testing (PDFium P/Invoke). Extracts link rects and destinations (internal page links, external URLs) per page with CropBox coordinate transform
 - `Services/AppConfig.cs` — config persistence (`~/.config/railreader2/config.json`)
 - `Services/AnnotationService.cs` — JSON persistence for annotations and bookmarks, import/export with merge support
 - `Services/AnnotationFileManager.cs` — reference-counted shared `AnnotationFile` instances per PDF path (multiple tabs share one object, one auto-save timer per file)
@@ -83,7 +84,7 @@ Thin wrapper delegating all logic to `DocumentController`/`DocumentState` in Cor
 - `ViewModels/MainWindowViewModel.cs` — thin wrapper handling Avalonia-specific concerns (file dialogs, clipboard, invalidation)
 - `ViewModels/TabViewModel.cs` — `[ObservableProperty]` wrapper for `DocumentState` binding
 - `Views/MainWindow.axaml.cs` — keyboard shortcuts, camera transform, animation frame scheduling
-- `Views/` — layers (PdfPageLayer, RailOverlayLayer, AnnotationLayer, SearchHighlightLayer), dialogs, panels
+- `Views/` — layers (PdfPageLayer, RailOverlayLayer, AnnotationLayer, SearchHighlightLayer), dialogs (ConfirmUrlDialog, BookmarkNameDialog, etc.), panels
 - `Controls/RadialMenu.cs` — Skia-rendered radial context menu with Font Awesome icons
 
 **AXAML bindings**: `AvaloniaUseCompiledBindingsByDefault` is enabled — all bindings are compiled by default. Use `{x:Bind}`-style compiled bindings in AXAML files.
