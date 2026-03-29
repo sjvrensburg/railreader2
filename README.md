@@ -101,7 +101,7 @@ At high zoom levels, navigation switches to "rail mode" — the viewer locks ont
 
 #### Annotations & text
 
-- **PDF links** — click internal cross-references (citations, figure refs, TOC entries) to navigate, or external URLs to open in the browser with a confirmation prompt. Hand cursor on hover
+- **PDF links** — click internal cross-references (citations, figure refs, TOC entries) to navigate to the exact target position, or external URLs to open in the browser with a confirmation prompt. Back/forward history with `Alt+Left`/`Alt+Right`. Hand cursor on hover
 - **Annotations** — highlight, freehand pen, rectangles, text notes, and eraser via radial menu (right-click). Colour picker for highlight (yellow/green/pink) and pen (red/blue/black). Collapsible popup notes with folded-corner icon. Select, move, and resize annotations in browse mode. Delete selected annotations with the Delete key.
 - **Text selection** — select and copy text from PDF pages via the toolbar
 - **Toolbar** — floating Browse/Text Select/Copy toolbar for quick mode switching
@@ -219,7 +219,8 @@ Run `railreader2-cli --help` or `railreader2-cli <command> --help` for all optio
 | P | Toggle auto-scroll (rail mode), D/Right to boost |
 | J | Toggle jump mode (saccade-style advance) |
 | B | Add bookmark for current page |
-| ` (backtick) | Navigate back to previous location |
+| Alt+Left / ` (backtick) | Navigate back |
+| Alt+Right | Navigate forward |
 | C | Cycle colour effect on active tab |
 | F | Toggle line focus dim (rail mode) |
 | H | Toggle line highlight tint (rail mode) |
@@ -322,7 +323,7 @@ RailReader2.slnx              # Default solution
 ├── src/RailReader.Renderer.Skia/ # SkiaSharp rendering (implements Core interfaces)
 ├── src/RailReader2/            # Thin Avalonia UI shell
 ├── src/RailReader2.Cli/        # Headless CLI (references Core + Renderer.Skia, zero Avalonia)
-└── tests/RailReader.Core.Tests/  # 105 xUnit headless tests
+└── tests/RailReader.Core.Tests/  # 105+ xUnit headless tests
 ```
 
 *(Removed in 3.2)* Previous versions included `src/RailReader.Cli/` (command-line interface) and `src/RailReader.Agent/` (AI agent CLI). These were removed in 3.2.
