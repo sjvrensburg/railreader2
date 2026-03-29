@@ -199,14 +199,17 @@ jobs:
       - name: Publish CLI
         run: dotnet publish src/RailReader2.Cli/RailReader2.Cli.csproj -c Release -r linux-x64 --self-contained -o publish-cli/
 
-      - name: Rename binary
-        run: mv publish-cli/RailReader2.Cli publish-cli/railreader2-cli-linux-x64
+      - name: Package
+        run: |
+          cd publish-cli
+          chmod +x RailReader2.Cli
+          tar czf ../railreader2-cli-linux-x64.tar.gz RailReader2.Cli *.so
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: linux-cli
-          path: publish-cli/railreader2-cli-linux-x64
+          path: railreader2-cli-linux-x64.tar.gz
 
   build-cli-windows:
     runs-on: windows-latest
@@ -221,11 +224,15 @@ jobs:
       - name: Publish CLI
         run: dotnet publish src/RailReader2.Cli/RailReader2.Cli.csproj -c Release -r win-x64 --self-contained -o publish-cli/
 
+      - name: Package
+        run: |
+          Compress-Archive -Path publish-cli\RailReader2.Cli.exe, publish-cli\*.dll -DestinationPath railreader2-cli-win-x64.zip
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: windows-cli
-          path: publish-cli/RailReader2.Cli.exe
+          path: railreader2-cli-win-x64.zip
 
   release:
     needs: [build-linux, build-windows, build-cli-linux, build-cli-windows]
@@ -244,5 +251,5 @@ jobs:
           files: |
             railreader2-linux-x86_64.AppImage
             railreader2-setup-x64.exe
-            railreader2-cli-linux-x64
-            RailReader2.Cli.exe
+            railreader2-cli-linux-x64.tar.gz
+            railreader2-cli-win-x64.zip
