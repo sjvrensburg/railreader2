@@ -539,14 +539,3 @@ The log is overwritten at the start of each session. Old `.log` files are automa
 | `Ctrl+C` | Copy selected text |
 | `Escape` | Cancel / close / stop / exit fullscreen |
 
----
-
-## Removed Features
-
-### Bionic Reading (Removed in 3.2)
-
-Bionic reading was a GPU shader-based reading aid that de-emphasised the trailing portion of each word, guiding the eye to fixation points at the start of words. It was removed because it was counterproductive with mathematically complex documents.
-
-### AI Agent CLI (Removed in 3.2)
-
-The original CLI and AI Agent projects were developer tools not included in binary releases and were removed in 3.2. A new headless CLI has since been reintroduced as a shipped binary — see [CLI Tool](#cli-tool).

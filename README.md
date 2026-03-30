@@ -131,7 +131,6 @@ At high zoom levels, navigation switches to "rail mode" — the viewer locks ont
 - **Diagnostic logging** — session log file written to the config directory; export via Help → Export Diagnostic Log, or copy the path from Help → About for bug reports
 - **Disk cleanup** — removes cache, old logs, temp files (Help → Clean Up Temp Files)
 - **Debug overlay** — visualise detected layout blocks with class labels and confidence
-- **Bionic reading** — *(Removed in 3.2)* shader-based text fading that de-emphasised the trailing portion of each word, guiding the eye to fixation points
 
 ## Installation
 
@@ -308,10 +307,6 @@ Rail reading parameters are editable via the Settings panel (gear icon in menu b
 | `auto_scroll_trigger_enabled` | Auto-start auto-scroll after holding D/Right for the trigger delay (`true`/`false`, default `false`) |
 | `auto_scroll_trigger_delay_ms` | Delay before auto-scroll triggers from hold (ms, default 2000) |
 
-## Removed features
-
-Version 3.2 simplified the application to reduce complexity and make it less intimidating for new users. Bionic reading was removed because it was counterproductive with maths-heavy documents (the primary use case). The original CLI and AI Agent were developer-only tools that were never shipped in binary releases, so they were removed. A new headless CLI has since been reintroduced as a shipped product — see the [Headless CLI](#headless-cli) section above.
-
 ## Architecture
 
 The codebase is split into a rendering-agnostic core library, a shared SkiaSharp renderer, a thin Avalonia UI shell, and headless tests:
@@ -324,8 +319,6 @@ RailReader2.slnx              # Default solution
 ├── src/RailReader2.Cli/        # Headless CLI (references Core + Renderer.Skia, zero Avalonia)
 └── tests/RailReader.Core.Tests/  # 105+ xUnit headless tests
 ```
-
-*(Removed in 3.2)* Previous versions included `src/RailReader.Cli/` (command-line interface) and `src/RailReader.Agent/` (AI agent CLI). These were removed in 3.2.
 
 **RailReader.Core** contains `DocumentController` (the headless orchestration facade), `DocumentState` (per-document state), all Models and Services. It has no rendering-library dependency — PDF rendering is abstracted behind `IPdfService`/`IPdfTextService` interfaces. The test project uses it directly.
 
