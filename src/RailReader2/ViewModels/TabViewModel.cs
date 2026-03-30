@@ -25,8 +25,6 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
     [ObservableProperty] private ColourEffect _colourEffect;
     [ObservableProperty] private bool _lineFocusBlur;
     [ObservableProperty] private bool _lineHighlightEnabled = true;
-    [ObservableProperty] private Guid? _linkGroupId;
-    public bool IsLinked => LinkGroupId.HasValue;
     /// <summary>Whether the side panel (outline/bookmarks/search) is visible for this tab.</summary>
     public bool ShowSidePanel { get; set; }
 
@@ -90,7 +88,6 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
         _colourEffect = state.ColourEffect;
         _lineFocusBlur = state.LineFocusBlur;
         _lineHighlightEnabled = state.LineHighlightEnabled;
-        _linkGroupId = state.LinkGroupId;
         state.StateChanged += OnStateChanged;
     }
 
@@ -107,9 +104,6 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
             case nameof(ColourEffect): ColourEffect = State.ColourEffect; break;
             case nameof(LineFocusBlur): LineFocusBlur = State.LineFocusBlur; break;
             case nameof(LineHighlightEnabled): LineHighlightEnabled = State.LineHighlightEnabled; break;
-            case nameof(LinkGroupId):
-                LinkGroupId = State.LinkGroupId;
-                break;
         }
     }
 
@@ -123,11 +117,6 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
     partial void OnColourEffectChanged(ColourEffect value) => State.ColourEffect = value;
     partial void OnLineFocusBlurChanged(bool value) => State.LineFocusBlur = value;
     partial void OnLineHighlightEnabledChanged(bool value) => State.LineHighlightEnabled = value;
-    partial void OnLinkGroupIdChanged(Guid? value)
-    {
-        State.LinkGroupId = value;
-        OnPropertyChanged(nameof(IsLinked));
-    }
     // Methods used by Views (MinimapControl, MainWindow)
     public void CenterPage(double ww, double wh) => State.CenterPage(ww, wh);
     public void ClampCamera(double ww, double wh) => State.ClampCamera(ww, wh);

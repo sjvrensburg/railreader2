@@ -169,10 +169,6 @@ public sealed class DocumentController
         _config.SaveReadingPosition(doc.FilePath, doc.CurrentPage,
             doc.Camera.Zoom, doc.Camera.OffsetX, doc.Camera.OffsetY, doc.ColourEffect);
 
-        // Unlink before removing so the group cleanup can find remaining members
-        if (doc.LinkGroupId.HasValue)
-            UnlinkDocument(doc);
-
         Documents.RemoveAt(index);
         doc.Dispose();
         ActiveDocumentIndex = Math.Clamp(ActiveDocumentIndex, 0, Math.Max(Documents.Count - 1, 0));
@@ -211,57 +207,6 @@ public sealed class DocumentController
             _config.SaveReadingPosition(doc.FilePath, doc.CurrentPage,
                 doc.Camera.Zoom, doc.Camera.OffsetX, doc.Camera.OffsetY, doc.ColourEffect);
         _annotationManager.FlushAll();
-    }
-
-    // --- Tab linking ---
-
-    /// <summary>Link two documents so they stay on the same page.</summary>
-    public void LinkDocuments(DocumentState a, DocumentState b)
-    {
-        var groupId = a.LinkGroupId ?? b.LinkGroupId ?? Guid.NewGuid();
-        a.LinkGroupId = groupId;
-        b.LinkGroupId = groupId;
-        // Sync b to a's page
-        if (b.CurrentPage != a.CurrentPage)
-        {
-            var (ww, wh) = GetViewportSize();
-            b.GoToPage(a.CurrentPage, _worker, _config.NavigableClasses, ww, wh);
-        }
-    }
-
-    /// <summary>Remove a document from its link group.</summary>
-    public void UnlinkDocument(DocumentState doc)
-    {
-        if (doc.LinkGroupId is not { } groupId) return;
-        doc.LinkGroupId = null;
-
-        // If only one document remains in the group, unlink it too
-        DocumentState? lastInGroup = null;
-        int count = 0;
-        foreach (var d in Documents)
-        {
-            if (d.LinkGroupId == groupId) { lastInGroup = d; count++; }
-            if (count > 1) break;
-        }
-        if (count == 1 && lastInGroup is not null)
-            lastInGroup.LinkGroupId = null;
-    }
-
-    /// <summary>
-    /// Returns a list of documents that could be linked with the given document
-    /// (same file, different document, not already in the same group).
-    /// </summary>
-    public List<DocumentState> GetLinkCandidates(DocumentState doc)
-    {
-        var result = new List<DocumentState>();
-        foreach (var d in Documents)
-        {
-            if (d == doc) continue;
-            if (d.FilePath != doc.FilePath) continue;
-            if (doc.LinkGroupId.HasValue && d.LinkGroupId == doc.LinkGroupId) continue;
-            result.Add(d);
-        }
-        return result;
     }
 
     // --- Bookmarks ---
@@ -363,8 +308,6 @@ public sealed class DocumentController
 
     // --- Navigation ---
 
-    private bool _syncingLinks;
-
     public void GoToPage(int page)
     {
         _zoom.Cancel();
@@ -373,31 +316,6 @@ public sealed class DocumentController
         doc.GoToPage(page, _worker, _config.NavigableClasses, ww, wh);
         doc.QueueLookahead(_config.AnalysisLookaheadPages);
         Search.UpdateCurrentPageMatches();
-        SyncLinkedTabs(doc, page);
-    }
-
-    /// <summary>
-    /// Sync all documents in the same link group to the given page.
-    /// </summary>
-    private void SyncLinkedTabs(DocumentState source, int page)
-    {
-        if (_syncingLinks || source.LinkGroupId is not { } groupId) return;
-        _syncingLinks = true;
-        try
-        {
-            var (ww, wh) = GetViewportSize();
-            foreach (var doc in Documents)
-            {
-                if (doc == source || doc.LinkGroupId != groupId) continue;
-                if (doc.CurrentPage == page) continue;
-                doc.GoToPage(page, _worker, _config.NavigableClasses, ww, wh);
-                doc.QueueLookahead(_config.AnalysisLookaheadPages);
-            }
-        }
-        finally
-        {
-            _syncingLinks = false;
-        }
     }
 
     public void FitPage()
@@ -556,7 +474,6 @@ public sealed class DocumentController
 
             // Either has navigable blocks (land on it) or needs async analysis
             doc.GoToPage(targetPage, _worker, _config.NavigableClasses, ww, wh);
-            SyncLinkedTabs(doc, targetPage);
             doc.UpdateRailZoom(ww, wh);
 
             if (doc.Rail.Active)
