@@ -466,6 +466,59 @@ public class RailNavTests
             $"Expected boosted position ({cx2}) < non-boosted ({cx1})");
     }
 
+    [Fact]
+    public void PendingPause_SuppressesScrollDuringSnap()
+    {
+        // Simulate entering a narrow block (like an equation) where the entire
+        // block fits on screen. A deferred pause is set, and the snap is running.
+        // Auto-scroll must NOT advance past the block while the snap is in progress.
+        ActivateWithAnalysis(2, 1);
+        _nav.StartAutoScroll(100.0);
+
+        // Start a snap (simulates entering a new block)
+        _nav.StartSnapToCurrent(0, 0, Zoom, WindowWidth, WindowHeight);
+
+        // Set a deferred pause (as the controller does on block entry)
+        _nav.PauseAutoScroll(600);
+
+        // Tick auto-scroll while snap is still running — should NOT scroll
+        double cx = 0;
+        bool reachedEnd = _nav.TickAutoScroll(ref cx, 0.1, Zoom, WindowWidth);
+        Assert.False(reachedEnd, "Should not advance while snap is running with pending pause");
+        Assert.Equal(0, cx); // camera X should not have moved
+    }
+
+    [Fact]
+    public void PendingPause_ActivatesAfterSnapCompletes()
+    {
+        ActivateWithAnalysis(2, 1);
+        _nav.StartAutoScroll(100.0);
+
+        // Start snap and deferred pause
+        _nav.StartSnapToCurrent(0, 0, Zoom, WindowWidth, WindowHeight);
+        _nav.PauseAutoScroll(50); // short pause for test speed
+
+        // Complete the snap
+        double cx = 0, cy = 0;
+        Thread.Sleep(10);
+        _nav.Tick(ref cx, ref cy, 1.0, Zoom, WindowWidth); // large dt to finish snap
+
+        // Now tick auto-scroll — pause should be active (not scrolling)
+        double cxBefore = cx;
+        bool reachedEnd = _nav.TickAutoScroll(ref cx, 0.1, Zoom, WindowWidth);
+        Assert.False(reachedEnd, "Should be pausing, not advancing");
+        Assert.Equal(cxBefore, cx); // camera X should not move during pause
+
+        // After pause expires, first tick clears the timer, second tick scrolls
+        Thread.Sleep(60);
+        _nav.TickAutoScroll(ref cx, 0.01, Zoom, WindowWidth); // clears pause timer
+        reachedEnd = _nav.TickAutoScroll(ref cx, 0.01, Zoom, WindowWidth); // actually scrolls
+        // For a narrow block that already fits on screen, reachedEnd may be
+        // immediately true — the key assertion is that the pause was applied.
+        Assert.True(reachedEnd || cx != cxBefore,
+            "After pause expires, auto-scroll should resume or reach block end");
+    }
+
     // ===== UpdateZoom (3 tests) =====
 
     [Fact]

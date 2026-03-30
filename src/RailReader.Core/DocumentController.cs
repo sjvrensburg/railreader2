@@ -991,9 +991,11 @@ public sealed class DocumentController
                     case LineAdvanceResult.LineAdvanced:
                         doc.StartSnap(ww, wh);
                         bool enteredNewBlock = doc.Rail.CurrentBlock != prevBlock;
-                        doc.Rail.PauseAutoScroll(enteredNewBlock
-                            ? GetBlockEntryPause(doc)
-                            : _config.AutoScrollLinePauseMs);
+                        // Block entry pause is deferred until after the snap animation
+                        // so the user sees the new block while paused, not the old one.
+                        // Mid-block line pauses are already handled inside RailNav.
+                        if (enteredNewBlock)
+                            doc.Rail.PauseAutoScroll(GetBlockEntryPause(doc));
                         break;
                 }
                 overlayChanged = true;

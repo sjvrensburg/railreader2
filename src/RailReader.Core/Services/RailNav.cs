@@ -782,12 +782,19 @@ public sealed class RailNav
         if (!AutoScrolling || _navigableIndices.Count == 0) return false;
 
         // Activate deferred pause once the snap animation has finished
-        if (_autoScrollPendingPauseMs > 0 && _snap is null)
+        if (_autoScrollPendingPauseMs > 0)
         {
-            _autoScrollPauseTimer = Stopwatch.StartNew();
-            _autoScrollPauseDurationMs = _autoScrollPendingPauseMs;
-            _autoScrollPauseAdvances = false;
-            _autoScrollPendingPauseMs = 0;
+            if (_snap is null)
+            {
+                _autoScrollPauseTimer = Stopwatch.StartNew();
+                _autoScrollPauseDurationMs = _autoScrollPendingPauseMs;
+                _autoScrollPauseAdvances = false;
+                _autoScrollPendingPauseMs = 0;
+            }
+            else
+            {
+                return false; // snap still running — don't scroll until pause activates
+            }
         }
 
         // Pause: hold position, count down
@@ -814,16 +821,16 @@ public sealed class RailNav
         if (visibleRight >= blockRight)
         {
             bool isBlockEnd = CurrentLine + 1 >= CurrentNavigableBlock.Lines.Count;
-            double pauseMs = isBlockEnd ? _config.AutoScrollBlockPauseMs : _config.AutoScrollLinePauseMs;
-
-            if (pauseMs > 0)
+            // Block-end pauses are handled by the controller (which knows the
+            // destination block type).  Only pause here for mid-block line ends.
+            if (!isBlockEnd && _config.AutoScrollLinePauseMs > 0)
             {
                 _autoScrollPauseTimer = Stopwatch.StartNew();
-                _autoScrollPauseDurationMs = pauseMs;
+                _autoScrollPauseDurationMs = _config.AutoScrollLinePauseMs;
                 _autoScrollPauseAdvances = true;
                 return false; // start pause
             }
-            return true; // no pause, advance immediately
+            return true; // advance immediately (block end or no pause)
         }
         return false;
     }
