@@ -32,8 +32,32 @@ internal sealed class Program
         LayoutAnalyzer.Logger = logger;
         SkiaPdfService.Logger = logger;
 
-        BuildAvaloniaApp()
-            .StartWithClassicDesktopLifetime(args);
+        // Log unhandled exceptions so crash info survives in session.log
+        AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+        {
+            logger.Error($"[FATAL] Unhandled exception (terminating={e.IsTerminating})",
+                e.ExceptionObject as Exception);
+        };
+        TaskScheduler.UnobservedTaskException += (_, e) =>
+        {
+            logger.Error("[WARN] Unobserved task exception", e.Exception);
+            e.SetObserved();
+        };
+
+        try
+        {
+            BuildAvaloniaApp()
+                .StartWithClassicDesktopLifetime(args);
+        }
+        catch (Exception ex)
+        {
+            logger.Error("[FATAL] Top-level exception", ex);
+            throw;
+        }
+        finally
+        {
+            logger.Dispose();
+        }
     }
 
     public static AppBuilder BuildAvaloniaApp()

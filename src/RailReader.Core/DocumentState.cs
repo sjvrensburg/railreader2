@@ -13,6 +13,8 @@ public sealed class DocumentState : IDisposable
     private readonly IPdfTextService _pdfText;
     private readonly IThreadMarshaller _marshaller;
     private readonly ILogger _logger;
+    private readonly CancellationTokenSource _cts = new();
+    internal bool IsDisposed { get; private set; }
 
     private string _title;
     private int _currentPage;
@@ -206,35 +208,37 @@ public sealed class DocumentState : IDisposable
         {
             _dpiRenderPending = true;
             int page = CurrentPage;
+            var ct = _cts.Token;
             Task.Run(() =>
             {
                 try
                 {
+                    ct.ThrowIfCancellationRequested();
                     var newPage = _pdf.RenderPage(page, neededDpi);
                     _marshaller.Post(() =>
                     {
-                        if (CurrentPage == page)
-                        {
-                            var oldPage = CachedPage;
-                            CachedPage = newPage;
-                            CachedDpi = neededDpi;
-                            DpiRenderReady = true;
-                            oldPage?.Dispose();
-                            OnDpiRenderComplete?.Invoke();
-                        }
-                        else
+                        if (IsDisposed || CurrentPage != page)
                         {
                             newPage.Dispose();
+                            _dpiRenderPending = false;
+                            return;
                         }
+                        var oldPage = CachedPage;
+                        CachedPage = newPage;
+                        CachedDpi = neededDpi;
+                        DpiRenderReady = true;
+                        oldPage?.Dispose();
+                        OnDpiRenderComplete?.Invoke();
                         _dpiRenderPending = false;
                     });
                 }
+                catch (OperationCanceledException) { }
                 catch (Exception ex)
                 {
                     _logger.Error($"Failed to re-render page at {neededDpi} DPI: {ex.Message}", ex);
                     _marshaller.Post(() => _dpiRenderPending = false);
                 }
-            });
+            }, ct);
             return true;
         }
         return false;
@@ -264,24 +268,27 @@ public sealed class DocumentState : IDisposable
         PendingRailSetup = true;
 
         _logger.Debug($"[SubmitAnalysis] Page {page}: scheduling pixmap on background thread...");
+        var ct = _cts.Token;
         Task.Run(() =>
         {
             try
             {
+                ct.ThrowIfCancellationRequested();
                 var (rgb, pxW, pxH) = _pdf.RenderPagePixmap(page, LayoutConstants.InputSize);
                 _logger.Debug($"[SubmitAnalysis] Page {page}: pixmap ready {pxW}x{pxH}, submitting...");
                 _marshaller.Post(() =>
                 {
-                    if (CurrentPage != page) return;
+                    if (IsDisposed || CurrentPage != page) return;
                     worker.Submit(new AnalysisRequest(filePath, page, rgb, pxW, pxH, pageW, pageH));
                 });
             }
+            catch (OperationCanceledException) { }
             catch (Exception ex)
             {
                 _logger.Error($"Failed to prepare analysis input: {ex.Message}", ex);
-                _marshaller.Post(() => PendingRailSetup = false);
+                _marshaller.Post(() => { if (!IsDisposed) PendingRailSetup = false; });
             }
-        });
+        }, ct);
     }
 
     public void ReapplyNavigableClasses(HashSet<int> navigableClasses)
@@ -319,21 +326,25 @@ public sealed class DocumentState : IDisposable
 
             string filePath = FilePath;
             double pageW = PageWidth, pageH = PageHeight;
+            var ct = _cts.Token;
             Task.Run(() =>
             {
                 try
                 {
+                    ct.ThrowIfCancellationRequested();
                     var (rgb, pxW, pxH) = _pdf.RenderPagePixmap(page, LayoutConstants.InputSize);
                     _marshaller.Post(() =>
                     {
-                        worker.Submit(new AnalysisRequest(filePath, page, rgb, pxW, pxH, pageW, pageH));
+                        if (!IsDisposed)
+                            worker.Submit(new AnalysisRequest(filePath, page, rgb, pxW, pxH, pageW, pageH));
                     });
                 }
+                catch (OperationCanceledException) { }
                 catch (Exception ex)
                 {
                     _logger.Error($"Lookahead prepare failed for page {page + 1}: {ex.Message}", ex);
                 }
-            });
+            }, ct);
             return true;
         }
         return false;
@@ -564,6 +575,8 @@ public sealed class DocumentState : IDisposable
 
     public void Dispose()
     {
+        IsDisposed = true;
+        _cts.Cancel();
         _annotationManager?.Release(FilePath);
         var page = CachedPage;
         CachedPage = null;
@@ -571,5 +584,6 @@ public sealed class DocumentState : IDisposable
         var mm = MinimapPage;
         MinimapPage = null;
         mm?.Dispose();
+        _cts.Dispose();
     }
 }

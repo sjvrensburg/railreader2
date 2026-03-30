@@ -17,7 +17,7 @@ namespace RailReader2.ViewModels;
 public sealed partial class MainWindowViewModel : ObservableObject
 {
     private readonly DocumentController _controller;
-    private readonly ILogger _logger;
+    private readonly ConsoleLogger _logger;
     private Window? _window;
     private DispatcherTimer? _pollTimer;
     private readonly Stopwatch _frameTimer = Stopwatch.StartNew();
@@ -163,9 +163,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
     /// <summary>Path to the current session log file, or null if file logging unavailable.</summary>
     public string? LogFilePath => _logger.LogFilePath;
 
-    public MainWindowViewModel(AppConfig config)
+    public MainWindowViewModel(AppConfig config, ConsoleLogger? logger = null)
     {
-        _logger = new ConsoleLogger();
+        _logger = logger ?? AppConfig.Logger as ConsoleLogger ?? new ConsoleLogger();
         ColourEffects = new ColourEffectShaders(_logger);
         _controller = new DocumentController(config, new AvaloniaThreadMarshaller(),
             new RailReader.Renderer.Skia.SkiaPdfServiceFactory(), _logger);
@@ -1192,7 +1192,18 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
         try
         {
-            File.Copy(LogFilePath, outputPath, overwrite: true);
+            using var writer = new StreamWriter(outputPath, append: false);
+
+            // Include previous session log if available (may contain crash info)
+            if (_logger.PreviousLogFilePath is { } prevPath && File.Exists(prevPath))
+            {
+                writer.WriteLine("=== Previous session ===");
+                writer.Write(File.ReadAllText(prevPath));
+                writer.WriteLine();
+                writer.WriteLine("=== Current session ===");
+            }
+
+            writer.Write(File.ReadAllText(LogFilePath));
             ShowStatusToast($"Log exported to {Path.GetFileName(outputPath)}");
         }
         catch (Exception ex)

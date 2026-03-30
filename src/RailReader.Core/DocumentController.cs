@@ -1029,7 +1029,7 @@ public sealed class DocumentController
             _logger.Debug($"[Analysis] Got result for {Path.GetFileName(result.FilePath)} page {result.Page}: {result.Analysis.Blocks.Count} blocks");
             foreach (var doc in Documents)
             {
-                if (doc.FilePath != result.FilePath) continue;
+                if (doc.IsDisposed || doc.FilePath != result.FilePath) continue;
 
                 doc.AnalysisCache[result.Page] = result.Analysis;
                 if (doc.CurrentPage == result.Page && doc.PendingRailSetup)
