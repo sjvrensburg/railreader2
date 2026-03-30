@@ -79,13 +79,7 @@ Open multiple PDFs in tabs with `Ctrl+O`. Each tab has independent zoom, positio
 
 **Right-click any tab** to open a context menu with:
 - **Duplicate Tab** — opens the same PDF in a new tab
-- **Duplicate Tab (Linked)** — opens same PDF linked to this tab (always on same page)
-- **Link to...** — link to another tab showing the same document
-- **Unlink Tab** — remove from link group
-- **Detach Tab** — moves the tab to a new window
 - **Close Tab** — closes the tab
-
-**Linked tabs** always show the same page — navigating to a new page in one tab automatically updates the other. Each linked tab has independent zoom and scroll position, so you can view the same page at different magnifications simultaneously. Linked tabs are indicated by a chain icon and a colored dot on the tab header, and they always stay adjacent in the tab bar.
 
 **Tab bar overflow:** When many tabs are open, they shrink with ellipsis text. Use the mouse wheel to scroll the tab bar horizontally, or click the **▼** dropdown to see all tabs and jump to one.
 

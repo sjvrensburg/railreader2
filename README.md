@@ -90,8 +90,7 @@ At high zoom levels, navigation switches to "rail mode" — the viewer locks ont
 
 #### Navigation & document management
 
-- **Multi-tab support** — open multiple PDFs with independent per-tab state. Right-click a tab for a context menu (Duplicate, Duplicate Linked, Link To, Unlink, Detach to new window, Close)
-- **Linked tabs** — duplicate tabs can be linked to always stay on the same page. Chain icon and colored dot indicator on linked tabs. Linked tabs are kept adjacent and move as a group
+- **Multi-tab support** — open multiple PDFs with independent per-tab state. Right-click a tab to duplicate or close
 - **Tab bar overflow** — tabs shrink with ellipsis when many are open. Horizontal mouse wheel scrolls the tab bar. Overflow dropdown button lists all tabs
 - **Outline and bookmarks panel** — tabbed pane with table of contents and named bookmarks (Ctrl+Shift+O for outline, Ctrl+Shift+B for bookmarks)
 - **Named bookmarks** — bookmark any page with a custom name (B key or + button in the bookmarks pane). Navigate to bookmarks with a single click. Rename and delete inline. "Back to previous location" button for quick return after jumping. Bookmarks persist in the annotation sidecar file

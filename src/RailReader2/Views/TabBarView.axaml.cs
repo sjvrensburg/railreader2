@@ -13,13 +13,6 @@ namespace RailReader2.Views;
 public partial class TabBarView : UserControl
 {
     private static readonly IBrush AccentBrush = new SolidColorBrush(Color.FromRgb(66, 133, 244));
-    private static readonly IBrush[] LinkBrushes =
-    [
-        new SolidColorBrush(Color.Parse("#4A9EFF")),
-        new SolidColorBrush(Color.Parse("#FB923C")),
-        new SolidColorBrush(Color.Parse("#00B4C5")),
-        new SolidColorBrush(Color.Parse("#E879A8")),
-    ];
     private static readonly IBrush ActiveTabFg = Brushes.White;
     private static readonly IBrush InactiveTabBg = new SolidColorBrush(Color.FromArgb(30, 0, 0, 0));
     private static readonly IBrush InactiveTabFgLight = new SolidColorBrush(Color.FromRgb(80, 80, 80));
@@ -57,8 +50,6 @@ public partial class TabBarView : UserControl
 
     private MainWindowViewModel? _vm;
     private System.Collections.Specialized.NotifyCollectionChangedEventHandler? _collectionHandler;
-    private readonly List<(TabViewModel Tab, PropertyChangedEventHandler Handler)> _tabSubscriptions = [];
-
     private void WireViewModel()
     {
         // Unsubscribe from old VM
@@ -68,7 +59,6 @@ public partial class TabBarView : UserControl
             if (_collectionHandler is not null)
                 _vm.Tabs.CollectionChanged -= _collectionHandler;
         }
-        ClearTabSubscriptions();
 
         _vm = DataContext as MainWindowViewModel;
 
@@ -79,13 +69,6 @@ public partial class TabBarView : UserControl
             _vm.Tabs.CollectionChanged += _collectionHandler;
             RebuildTabs();
         }
-    }
-
-    private void ClearTabSubscriptions()
-    {
-        foreach (var (tab, handler) in _tabSubscriptions)
-            tab.PropertyChanged -= handler;
-        _tabSubscriptions.Clear();
     }
 
     private void OnVmPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -148,7 +131,6 @@ public partial class TabBarView : UserControl
 
     private void RebuildTabs()
     {
-        ClearTabSubscriptions();
         TabPanel.Children.Clear();
         if (_vm is null) return;
 
@@ -166,34 +148,6 @@ public partial class TabBarView : UserControl
                 [DockPanel.DockProperty] = Dock.Bottom,
             };
 
-            // Build tab button content: optional link indicator + title
-            var tabContentPanel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4 };
-
-            // Link indicator (chain icon + colored dot) — hidden when not linked
-            var linkDot = new Border
-            {
-                Name = "LinkDot",
-                Width = 8, Height = 8,
-                CornerRadius = new CornerRadius(4),
-                VerticalAlignment = VerticalAlignment.Center,
-            };
-            var linkIcon = new TextBlock
-            {
-                Text = "\U0001F517", // chain link emoji
-                FontSize = 10,
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(0, -1, 0, 0),
-            };
-            var linkPanel = new StackPanel
-            {
-                Name = "LinkPanel",
-                Orientation = Orientation.Horizontal,
-                Spacing = 2,
-                IsVisible = tab.IsLinked,
-            };
-            linkPanel.Children.Add(linkIcon);
-            linkPanel.Children.Add(linkDot);
-
             var titleText = new TextBlock
             {
                 Text = tab.Title,
@@ -201,12 +155,9 @@ public partial class TabBarView : UserControl
                 TextTrimming = TextTrimming.CharacterEllipsis,
             };
 
-            tabContentPanel.Children.Add(linkPanel);
-            tabContentPanel.Children.Add(titleText);
-
             var tabBtn = new Button
             {
-                Content = tabContentPanel,
+                Content = titleText,
                 Tag = tab,
                 Padding = new Thickness(12, 4),
                 Margin = new Thickness(0),
@@ -217,19 +168,6 @@ public partial class TabBarView : UserControl
             };
             ToolTip.SetTip(tabBtn, tab.FilePath);
             tabBtn.Click += OnTabClick;
-
-            // Subscribe to link changes to update the visual
-            PropertyChangedEventHandler linkHandler = (_, args) =>
-            {
-                if (args.PropertyName is nameof(TabViewModel.LinkGroupId) or nameof(TabViewModel.IsLinked))
-                {
-                    linkPanel.IsVisible = tab.IsLinked;
-                    UpdateLinkDotColor(linkDot, tab);
-                }
-            };
-            tab.PropertyChanged += linkHandler;
-            _tabSubscriptions.Add((tab, linkHandler));
-            UpdateLinkDotColor(linkDot, tab);
 
             var closeBtn = new Button
             {
@@ -323,20 +261,6 @@ public partial class TabBarView : UserControl
         }
     }
 
-    /// <summary>Returns all tab indices in the same link group as the given index, or just the index itself if unlinked.</summary>
-    private List<int> GetGroupIndices(int index)
-    {
-        if (_vm is null || index < 0 || index >= _vm.Tabs.Count)
-            return [index];
-        var gid = _vm.Tabs[index].State.LinkGroupId;
-        if (!gid.HasValue) return [index];
-        var indices = new List<int>();
-        for (int i = 0; i < _vm.Tabs.Count; i++)
-            if (_vm.Tabs[i].State.LinkGroupId == gid)
-                indices.Add(i);
-        return indices;
-    }
-
     private int HitTestTabIndex(Point posInPanel)
     {
         foreach (var child in TabPanel.Children)
@@ -385,14 +309,6 @@ public partial class TabBarView : UserControl
         _isDragging = false;
     }
 
-    private void UpdateLinkDotColor(Border dot, TabViewModel tab)
-    {
-        if (_vm is not null && tab.LinkGroupId is { } gid)
-            dot.Background = LinkBrushes[_vm.GetLinkGroupColorIndex(gid)];
-        else
-            dot.Background = Brushes.Transparent;
-    }
-
     private void ShowTabContextMenu(int tabIndex)
     {
         if (_vm is not { } vm) return;
@@ -406,43 +322,6 @@ public partial class TabBarView : UserControl
             vm.DuplicateTab();
         };
         menu.Items.Add(duplicateItem);
-
-        var duplicateLinkedItem = new MenuItem { Header = "Duplicate Tab (Linked)" };
-        duplicateLinkedItem.Click += (_, _) =>
-        {
-            vm.SelectTab(tabIndex);
-            vm.DuplicateTabLinked();
-        };
-        menu.Items.Add(duplicateLinkedItem);
-
-        // "Link to..." submenu with candidates
-        var candidates = vm.GetLinkCandidates(tabIndex);
-        if (candidates.Count > 0)
-        {
-            var linkToItem = new MenuItem { Header = "Link to..." };
-            foreach (var (idx, title) in candidates)
-            {
-                int targetIdx = idx;
-                var candidate = new MenuItem { Header = title };
-                candidate.Click += (_, _) => vm.LinkTabTo(tabIndex, targetIdx);
-                linkToItem.Items.Add(candidate);
-            }
-            menu.Items.Add(linkToItem);
-        }
-
-        // Unlink option (only if linked)
-        if (tabIndex < vm.Tabs.Count && vm.Tabs[tabIndex].IsLinked)
-        {
-            var unlinkItem = new MenuItem { Header = "Unlink Tab" };
-            unlinkItem.Click += (_, _) => vm.UnlinkTab(tabIndex);
-            menu.Items.Add(unlinkItem);
-        }
-
-        menu.Items.Add(new Separator());
-
-        var detachItem = new MenuItem { Header = "Detach Tab" };
-        detachItem.Click += (_, _) => vm.DetachTab(tabIndex);
-        menu.Items.Add(detachItem);
 
         menu.Items.Add(new Separator());
 
@@ -467,13 +346,9 @@ public partial class TabBarView : UserControl
             _isDragging = true;
             e.Pointer.Capture(TabPanel);
 
-            // Dim all group members when dragging a linked tab
-            foreach (int idx in GetGroupIndices(_dragIndex))
-            {
-                var container = GetContainerByIndex(idx);
-                if (container is not null)
-                    container.Opacity = 0.5;
-            }
+            var container = GetContainerByIndex(_dragIndex);
+            if (container is not null)
+                container.Opacity = 0.5;
         }
 
         e.Handled = true;
@@ -518,15 +393,11 @@ public partial class TabBarView : UserControl
 
     private void ResetDragState(IPointer? pointer)
     {
-        // Restore opacity on all group members
         if (_dragIndex >= 0)
         {
-            foreach (int idx in GetGroupIndices(_dragIndex))
-            {
-                var container = GetContainerByIndex(idx);
-                if (container is not null)
-                    container.Opacity = 1.0;
-            }
+            var container = GetContainerByIndex(_dragIndex);
+            if (container is not null)
+                container.Opacity = 1.0;
         }
 
         pointer?.Capture(null);

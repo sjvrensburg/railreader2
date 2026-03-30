@@ -14,6 +14,9 @@ public sealed class ConsoleLogger : ILogger, IDisposable
     /// <summary>Path to the current session log file, or null if file logging failed.</summary>
     public string? LogFilePath { get; }
 
+    /// <summary>Path to the previous session's log file, or null if unavailable.</summary>
+    public string? PreviousLogFilePath { get; }
+
     public ConsoleLogger()
     {
         try
@@ -21,6 +24,19 @@ public sealed class ConsoleLogger : ILogger, IDisposable
             var logDir = AppConfig.ConfigDir;
             Directory.CreateDirectory(logDir);
             LogFilePath = Path.Combine(logDir, "session.log");
+            var prevPath = Path.Combine(logDir, "session-prev.log");
+
+            // Preserve previous session log (may contain crash info)
+            try
+            {
+                if (File.Exists(LogFilePath))
+                {
+                    File.Copy(LogFilePath, prevPath, overwrite: true);
+                    PreviousLogFilePath = prevPath;
+                }
+            }
+            catch { }
+
             _fileWriter = new StreamWriter(LogFilePath, append: false) { AutoFlush = true };
             _fileWriter.WriteLine($"--- Session started {DateTime.Now:yyyy-MM-dd HH:mm:ss} ---");
         }

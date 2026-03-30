@@ -142,8 +142,9 @@ public sealed class DocumentController
         var (ww, wh) = GetViewportSize();
 
         var saved = _config.GetReadingPosition(state.FilePath);
-        if (saved is not null && saved.Page > 0)
-            state.GoToPage(Math.Clamp(saved.Page, 0, state.PageCount - 1), _worker, _config.NavigableClasses, ww, wh);
+        bool restoredPage = saved is not null && saved.Page > 0;
+        if (restoredPage)
+            state.GoToPage(Math.Clamp(saved!.Page, 0, state.PageCount - 1), _worker, _config.NavigableClasses, ww, wh);
         if (saved?.ColourEffect is { } savedEffect)
             state.ColourEffect = savedEffect;
 
@@ -154,7 +155,10 @@ public sealed class DocumentController
         _config.AddRecentFile(state.FilePath);
         ActiveDocumentIndex = Documents.Count - 1;
 
-        state.SubmitAnalysis(_worker, _config.NavigableClasses);
+        // GoToPage already submitted analysis for the restored page;
+        // only submit here for new documents starting at page 0.
+        if (!restoredPage)
+            state.SubmitAnalysis(_worker, _config.NavigableClasses);
         state.QueueLookahead(_config.AnalysisLookaheadPages);
     }
 
@@ -164,10 +168,6 @@ public sealed class DocumentController
         var doc = Documents[index];
         _config.SaveReadingPosition(doc.FilePath, doc.CurrentPage,
             doc.Camera.Zoom, doc.Camera.OffsetX, doc.Camera.OffsetY, doc.ColourEffect);
-
-        // Unlink before removing so the group cleanup can find remaining members
-        if (doc.LinkGroupId.HasValue)
-            UnlinkDocument(doc);
 
         Documents.RemoveAt(index);
         doc.Dispose();
@@ -207,57 +207,6 @@ public sealed class DocumentController
             _config.SaveReadingPosition(doc.FilePath, doc.CurrentPage,
                 doc.Camera.Zoom, doc.Camera.OffsetX, doc.Camera.OffsetY, doc.ColourEffect);
         _annotationManager.FlushAll();
-    }
-
-    // --- Tab linking ---
-
-    /// <summary>Link two documents so they stay on the same page.</summary>
-    public void LinkDocuments(DocumentState a, DocumentState b)
-    {
-        var groupId = a.LinkGroupId ?? b.LinkGroupId ?? Guid.NewGuid();
-        a.LinkGroupId = groupId;
-        b.LinkGroupId = groupId;
-        // Sync b to a's page
-        if (b.CurrentPage != a.CurrentPage)
-        {
-            var (ww, wh) = GetViewportSize();
-            b.GoToPage(a.CurrentPage, _worker, _config.NavigableClasses, ww, wh);
-        }
-    }
-
-    /// <summary>Remove a document from its link group.</summary>
-    public void UnlinkDocument(DocumentState doc)
-    {
-        if (doc.LinkGroupId is not { } groupId) return;
-        doc.LinkGroupId = null;
-
-        // If only one document remains in the group, unlink it too
-        DocumentState? lastInGroup = null;
-        int count = 0;
-        foreach (var d in Documents)
-        {
-            if (d.LinkGroupId == groupId) { lastInGroup = d; count++; }
-            if (count > 1) break;
-        }
-        if (count == 1 && lastInGroup is not null)
-            lastInGroup.LinkGroupId = null;
-    }
-
-    /// <summary>
-    /// Returns a list of documents that could be linked with the given document
-    /// (same file, different document, not already in the same group).
-    /// </summary>
-    public List<DocumentState> GetLinkCandidates(DocumentState doc)
-    {
-        var result = new List<DocumentState>();
-        foreach (var d in Documents)
-        {
-            if (d == doc) continue;
-            if (d.FilePath != doc.FilePath) continue;
-            if (doc.LinkGroupId.HasValue && d.LinkGroupId == doc.LinkGroupId) continue;
-            result.Add(d);
-        }
-        return result;
     }
 
     // --- Bookmarks ---
@@ -359,8 +308,6 @@ public sealed class DocumentController
 
     // --- Navigation ---
 
-    private bool _syncingLinks;
-
     public void GoToPage(int page)
     {
         _zoom.Cancel();
@@ -369,31 +316,6 @@ public sealed class DocumentController
         doc.GoToPage(page, _worker, _config.NavigableClasses, ww, wh);
         doc.QueueLookahead(_config.AnalysisLookaheadPages);
         Search.UpdateCurrentPageMatches();
-        SyncLinkedTabs(doc, page);
-    }
-
-    /// <summary>
-    /// Sync all documents in the same link group to the given page.
-    /// </summary>
-    private void SyncLinkedTabs(DocumentState source, int page)
-    {
-        if (_syncingLinks || source.LinkGroupId is not { } groupId) return;
-        _syncingLinks = true;
-        try
-        {
-            var (ww, wh) = GetViewportSize();
-            foreach (var doc in Documents)
-            {
-                if (doc == source || doc.LinkGroupId != groupId) continue;
-                if (doc.CurrentPage == page) continue;
-                doc.GoToPage(page, _worker, _config.NavigableClasses, ww, wh);
-                doc.QueueLookahead(_config.AnalysisLookaheadPages);
-            }
-        }
-        finally
-        {
-            _syncingLinks = false;
-        }
     }
 
     public void FitPage()
@@ -552,7 +474,6 @@ public sealed class DocumentController
 
             // Either has navigable blocks (land on it) or needs async analysis
             doc.GoToPage(targetPage, _worker, _config.NavigableClasses, ww, wh);
-            SyncLinkedTabs(doc, targetPage);
             doc.UpdateRailZoom(ww, wh);
 
             if (doc.Rail.Active)
@@ -991,9 +912,11 @@ public sealed class DocumentController
                     case LineAdvanceResult.LineAdvanced:
                         doc.StartSnap(ww, wh);
                         bool enteredNewBlock = doc.Rail.CurrentBlock != prevBlock;
-                        doc.Rail.PauseAutoScroll(enteredNewBlock
-                            ? GetBlockEntryPause(doc)
-                            : _config.AutoScrollLinePauseMs);
+                        // Block entry pause is deferred until after the snap animation
+                        // so the user sees the new block while paused, not the old one.
+                        // Mid-block line pauses are already handled inside RailNav.
+                        if (enteredNewBlock)
+                            doc.Rail.PauseAutoScroll(GetBlockEntryPause(doc));
                         break;
                 }
                 overlayChanged = true;
@@ -1029,7 +952,7 @@ public sealed class DocumentController
             _logger.Debug($"[Analysis] Got result for {Path.GetFileName(result.FilePath)} page {result.Page}: {result.Analysis.Blocks.Count} blocks");
             foreach (var doc in Documents)
             {
-                if (doc.FilePath != result.FilePath) continue;
+                if (doc.IsDisposed || doc.FilePath != result.FilePath) continue;
 
                 doc.AnalysisCache[result.Page] = result.Analysis;
                 if (doc.CurrentPage == result.Page && doc.PendingRailSetup)
