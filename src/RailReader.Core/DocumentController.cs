@@ -142,8 +142,9 @@ public sealed class DocumentController
         var (ww, wh) = GetViewportSize();
 
         var saved = _config.GetReadingPosition(state.FilePath);
-        if (saved is not null && saved.Page > 0)
-            state.GoToPage(Math.Clamp(saved.Page, 0, state.PageCount - 1), _worker, _config.NavigableClasses, ww, wh);
+        bool restoredPage = saved is not null && saved.Page > 0;
+        if (restoredPage)
+            state.GoToPage(Math.Clamp(saved!.Page, 0, state.PageCount - 1), _worker, _config.NavigableClasses, ww, wh);
         if (saved?.ColourEffect is { } savedEffect)
             state.ColourEffect = savedEffect;
 
@@ -154,7 +155,10 @@ public sealed class DocumentController
         _config.AddRecentFile(state.FilePath);
         ActiveDocumentIndex = Documents.Count - 1;
 
-        state.SubmitAnalysis(_worker, _config.NavigableClasses);
+        // GoToPage already submitted analysis for the restored page;
+        // only submit here for new documents starting at page 0.
+        if (!restoredPage)
+            state.SubmitAnalysis(_worker, _config.NavigableClasses);
         state.QueueLookahead(_config.AnalysisLookaheadPages);
     }
 

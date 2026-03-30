@@ -17,7 +17,7 @@ namespace RailReader2.ViewModels;
 public sealed partial class MainWindowViewModel : ObservableObject
 {
     private readonly DocumentController _controller;
-    private readonly ConsoleLogger _logger;
+    private readonly ILogger _logger;
     private Window? _window;
     private DispatcherTimer? _pollTimer;
     private readonly Stopwatch _frameTimer = Stopwatch.StartNew();
@@ -163,9 +163,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
     /// <summary>Path to the current session log file, or null if file logging unavailable.</summary>
     public string? LogFilePath => _logger.LogFilePath;
 
-    public MainWindowViewModel(AppConfig config, ConsoleLogger? logger = null)
+    public MainWindowViewModel(AppConfig config, ILogger? logger = null)
     {
-        _logger = logger ?? AppConfig.Logger as ConsoleLogger ?? new ConsoleLogger();
+        _logger = logger ?? AppConfig.Logger;
         ColourEffects = new ColourEffectShaders(_logger);
         _controller = new DocumentController(config, new AvaloniaThreadMarshaller(),
             new RailReader.Renderer.Skia.SkiaPdfServiceFactory(), _logger);
@@ -1192,18 +1192,21 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
         try
         {
-            using var writer = new StreamWriter(outputPath, append: false);
+            using var output = File.Create(outputPath);
+            using var writer = new StreamWriter(output);
 
             // Include previous session log if available (may contain crash info)
             if (_logger.PreviousLogFilePath is { } prevPath && File.Exists(prevPath))
             {
                 writer.WriteLine("=== Previous session ===");
-                writer.Write(File.ReadAllText(prevPath));
+                writer.Flush();
+                using (var prev = File.OpenRead(prevPath)) prev.CopyTo(output);
                 writer.WriteLine();
                 writer.WriteLine("=== Current session ===");
+                writer.Flush();
             }
 
-            writer.Write(File.ReadAllText(LogFilePath));
+            using (var current = File.OpenRead(LogFilePath)) current.CopyTo(output);
             ShowStatusToast($"Log exported to {Path.GetFileName(outputPath)}");
         }
         catch (Exception ex)

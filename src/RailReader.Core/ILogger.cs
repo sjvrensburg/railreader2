@@ -14,6 +14,9 @@ public interface ILogger
 
     /// <summary>Path to the log file, or null if this logger doesn't write to a file.</summary>
     string? LogFilePath => null;
+
+    /// <summary>Path to the previous session's log file, or null if unavailable.</summary>
+    string? PreviousLogFilePath => null;
 }
 
 /// <summary>
