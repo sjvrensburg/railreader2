@@ -70,7 +70,12 @@ public sealed class RailNav : ICameraClamp
     /// snap animation is still in progress.
     /// </summary>
     private bool ShouldSuppressAfterEdgeAdvance()
-        => _edgeHold.ShouldSuppressAfterAdvance(snapInProgress: _snap is not null);
+    {
+        if (!_edgeHold.AdvanceJustFired) return false;
+        if (_snap is not null) return true; // snap still running
+        _edgeHold.ClearAdvanceFlag();
+        return false;
+    }
 
     public RailNav(AppConfig config)
     {

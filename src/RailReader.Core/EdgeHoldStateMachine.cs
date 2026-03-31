@@ -104,17 +104,13 @@ internal sealed class EdgeHoldStateMachine
     }
 
     /// <summary>
-    /// Returns true if input should be suppressed because an edge-hold
-    /// advance snap animation is still in progress. Clears the flag once
-    /// the snap completes. Used by rail-mode Jump/StartScroll.
+    /// True after an advance fires, until the caller clears it.
+    /// Used by rail-mode navigation to suppress input while a
+    /// post-advance snap animation completes.
     /// </summary>
-    public bool ShouldSuppressAfterAdvance(bool snapInProgress)
-    {
-        if (!_advanceJustFired) return false;
-        if (snapInProgress) return true;
-        _advanceJustFired = false;
-        return false;
-    }
+    public bool AdvanceJustFired => _advanceJustFired;
+
+    public void ClearAdvanceFlag() => _advanceJustFired = false;
 
     /// <summary>Resets all state including output signals.</summary>
     public void Reset()
