@@ -679,7 +679,8 @@ public sealed class RailNav
         double sign = dir == ScrollDirection.Forward ? -1.0 : 1.0;
         // Use rail zoom threshold as reference so screen-space speed is constant
         // regardless of current zoom (matches auto-scroll behaviour).
-        cameraX = ClampX(_scrollStartX + sign * totalDisplacement * _config.RailZoomThreshold * 1.5, zoom, windowWidth);
+        double refSpeed = _config.RailZoomThreshold * 2.0;
+        cameraX = ClampX(_scrollStartX + sign * totalDisplacement * refSpeed, zoom, windowWidth);
 
         // Auto-scroll trigger: if holding forward scroll for longer than the
         // configured delay, transition to auto-scroll mode.
@@ -819,13 +820,15 @@ public sealed class RailNav
         }
 
         double speed = _autoScrollBoost ? _autoScrollSpeed * 2.0 : _autoScrollSpeed;
-        // Expose normalized speed (0–1) so motion blur can react to auto-scroll.
-        double maxSpeed = _config.ScrollSpeedMax;
-        ScrollSpeed = maxSpeed > 0 ? Math.Clamp(speed / maxSpeed, 0.0, 1.0) : 0.0;
         // Move camera left (negative X) to scroll content right.
         // Use the rail zoom threshold as reference so screen-space speed is
         // constant regardless of current zoom (avoids text rushing at high mag).
-        cameraX -= speed * _config.RailZoomThreshold * 1.5 * dtSecs;
+        double refSpeed = _config.RailZoomThreshold * 2.0;
+        cameraX -= speed * refSpeed * dtSecs;
+        // Expose normalized speed (0–1) so motion blur matches perceived screen
+        // velocity, not the raw page-coordinate speed.
+        double maxSpeed = _config.ScrollSpeedMax;
+        ScrollSpeed = maxSpeed > 0 ? Math.Clamp(speed * refSpeed / (maxSpeed * zoom), 0.0, 1.0) : 0.0;
         cameraX = ClampX(cameraX, zoom, windowWidth);
 
         // Check if we've reached the right edge of the block
