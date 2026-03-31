@@ -692,7 +692,19 @@ public sealed class RailNav
             else
                 newSeedSecs = ramp * Math.Sqrt((clamped - sStart) / (sMax - sStart));
 
-            _scrollStartX = cameraX;
+            // Compute the displacement the new curve produces at the seed time
+            // and offset _scrollStartX so the camera stays at its current position.
+            double seedDisp;
+            if (newSeedSecs <= ramp)
+                seedDisp = sStart * newSeedSecs
+                    + (sMax - sStart) * newSeedSecs * newSeedSecs * newSeedSecs / (3.0 * ramp * ramp);
+            else
+            {
+                double rd = sStart * ramp + (sMax - sStart) * ramp / 3.0;
+                seedDisp = rd + sMax * (newSeedSecs - ramp);
+            }
+            double s = dir == ScrollDirection.Forward ? -1.0 : 1.0;
+            _scrollStartX = cameraX - s * seedDisp * ReferenceSpeed;
             _scrollHoldTimer = Stopwatch.StartNew();
             _scrollSeedSecs = newSeedSecs;
             holdSecs = newSeedSecs;
