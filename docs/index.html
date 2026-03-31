@@ -36,9 +36,9 @@
       "price": "0",
       "priceCurrency": "USD"
     },
-    "softwareVersion": "3.3.4",
+    "softwareVersion": "3.4.3",
     "datePublished": "2026-02-18",
-    "dateModified": "2026-03-20",
+    "dateModified": "2026-03-31",
     "license": "https://opensource.org/licenses/MIT",
     "author": {
       "@type": "Person",
@@ -236,9 +236,12 @@
         <p>
           Toggle continuous horizontal scrolling with the P key or the toolbar
           button. Hold D or Right to boost speed. Pauses briefly at line and block
-          boundaries for eye settling. Adjust speed via the docked slider toolbar
-          or [ ] keys. Auto-scroll can also trigger automatically after sustained
-          horizontal scrolling. Auto-scroll and jump mode are mutually exclusive.
+          boundaries for eye settling &mdash; narrow blocks like equations and
+          headings get proportional dwell time. Scroll speed is zoom-independent,
+          so reading pace stays consistent at any magnification. Adjust speed via
+          the docked slider toolbar, <code>[</code> / <code>]</code> keys
+          (&plusmn;5), or <code>Ctrl+[</code> / <code>]</code> for fine
+          adjustments (&plusmn;1). Auto-scroll and jump mode are mutually exclusive.
         </p>
       </div>
       <div class="feature">
@@ -300,11 +303,11 @@
       <div class="feature">
         <h3>Multi-Tab &amp; Outline</h3>
         <p>
-          Open multiple PDFs in tabs with independent state. Right-click a tab
-          to duplicate, detach to a new window, or close it. Link tabs together
-          with the chain icon so they stay on the same page. The tab bar scrolls
+          Open multiple PDFs in tabs with independent state. The tab bar scrolls
           horizontally and provides a dropdown when many tabs are open.
           Navigate via the table of contents panel or the interactive minimap.
+          In fullscreen, the tab bar and status bar auto-hide and reveal on
+          hover at the screen edges.
         </p>
       </div>
       <div class="feature">
@@ -340,9 +343,11 @@
       <div class="feature">
         <h3>Motion Blur</h3>
         <p>
-          Subtle directional blur during horizontal scroll and uniform blur
-          during zoom for perceptual smoothness. Configurable intensity via
-          Settings, or disable entirely.
+          Subtle directional blur during horizontal scroll (including
+          auto-scroll) and uniform blur during zoom for perceptual smoothness.
+          Adjustable via <code>Shift+[</code> / <code>]</code> or
+          <code>Ctrl+Shift+[</code> / <code>]</code> for fine control.
+          Configurable intensity via Settings, or disable entirely.
         </p>
       </div>
       <div class="feature">
@@ -466,8 +471,10 @@
         <tr><td>H</td><td>Toggle line highlight</td></tr>
         <tr><td>Ctrl+Drag</td><td>Free pan/zoom in rail mode (release to snap back)</td></tr>
         <tr><td>Escape</td><td>Stop auto-scroll</td></tr>
-        <tr><td>[ / ]</td><td>Adjust scroll speed or jump distance</td></tr>
-        <tr><td>Shift+[ / ]</td><td>Adjust blur intensity</td></tr>
+        <tr><td>[ / ]</td><td>Adjust scroll speed or jump distance (&plusmn;5)</td></tr>
+        <tr><td>Ctrl+[ / ]</td><td>Fine adjust speed or jump distance (&plusmn;1)</td></tr>
+        <tr><td>Shift+[ / ]</td><td>Adjust blur intensity (&plusmn;0.05)</td></tr>
+        <tr><td>Ctrl+Shift+[ / ]</td><td>Fine adjust blur intensity (&plusmn;0.01)</td></tr>
       </tbody>
       <tbody>
         <tr><th colspan="2" scope="rowgroup">Search &amp; Annotations</th></tr>

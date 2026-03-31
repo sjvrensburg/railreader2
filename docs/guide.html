@@ -300,7 +300,11 @@
       </ul>
       <p>
         The status bar shows a green <strong>"Auto-Scroll"</strong> indicator when active. Adjust
-        speed with the rail toolbar slider or the <code>[</code> / <code>]</code> keys.
+        speed with the rail toolbar slider, <code>[</code> / <code>]</code> keys (&plusmn;5), or
+        <code>Ctrl+[</code> / <code>Ctrl+]</code> for fine adjustments (&plusmn;1). Scroll speed
+        is zoom-independent &mdash; reading pace stays consistent at any magnification. Narrow blocks
+        (equations, headings) that fit in the viewport receive proportional dwell time so they are not
+        skipped.
       </p>
       <p>
         <strong>Auto-scroll trigger:</strong> Auto-scroll can also start automatically after sustained
@@ -835,8 +839,10 @@ railreader2-cli annotations paper.pdf --format pdf --output paper.annotated.pdf<
           <tr><td>C</td><td>Cycle colour effect on active tab</td></tr>
           <tr><td>F</td><td>Toggle line focus dim</td></tr>
           <tr><td>H</td><td>Toggle line highlight</td></tr>
-          <tr><td>[ / ]</td><td>Adjust speed or jump distance</td></tr>
-          <tr><td>Shift+[ / Shift+]</td><td>Adjust blur intensity</td></tr>
+          <tr><td>[ / ]</td><td>Adjust speed or jump distance (&plusmn;5)</td></tr>
+          <tr><td>Ctrl+[ / Ctrl+]</td><td>Fine adjust speed or jump distance (&plusmn;1)</td></tr>
+          <tr><td>Shift+[ / Shift+]</td><td>Adjust blur intensity (&plusmn;0.05)</td></tr>
+          <tr><td>Ctrl+Shift+[ / ]</td><td>Fine adjust blur intensity (&plusmn;0.01)</td></tr>
           <tr><td>Ctrl+Drag</td><td>Free pan/zoom in rail mode (release to snap back)</td></tr>
           <tr><td>Click</td><td>Jump to block</td></tr>
         </tbody>
