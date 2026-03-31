@@ -64,6 +64,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     [ObservableProperty] private bool _isFullScreen;
     [ObservableProperty] private bool _showFullScreenHeader;
+    [ObservableProperty] private bool _showFullScreenFooter;
     [ObservableProperty] private bool _isRadialMenuOpen;
     [ObservableProperty] private bool _showBookmarkDialog;
     [ObservableProperty] private double _radialMenuX;
@@ -72,13 +73,22 @@ public sealed partial class MainWindowViewModel : ObservableObject
     /// <summary>True when the tab bar should be visible (not fullscreen, or hovering at top edge).</summary>
     public bool IsTabBarVisible => !IsFullScreen || ShowFullScreenHeader;
 
+    /// <summary>True when the status bar should be visible (not fullscreen, or hovering at bottom edge).</summary>
+    public bool IsStatusBarVisible => !IsFullScreen || ShowFullScreenFooter;
+
     partial void OnIsFullScreenChanged(bool value)
     {
         OnPropertyChanged(nameof(IsTabBarVisible));
-        if (!value) ShowFullScreenHeader = false;
+        OnPropertyChanged(nameof(IsStatusBarVisible));
+        if (!value)
+        {
+            ShowFullScreenHeader = false;
+            ShowFullScreenFooter = false;
+        }
     }
 
     partial void OnShowFullScreenHeaderChanged(bool value) => OnPropertyChanged(nameof(IsTabBarVisible));
+    partial void OnShowFullScreenFooterChanged(bool value) => OnPropertyChanged(nameof(IsStatusBarVisible));
 
     public ObservableCollection<TabViewModel> Tabs { get; } = [];
 

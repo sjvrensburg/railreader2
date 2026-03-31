@@ -15,7 +15,7 @@ public partial class MainWindow : Window
     private double _lastMinimapOy;
     private double _lastMinimapZoom;
 
-    // Fullscreen tab reveal: show threshold < hide threshold for hysteresis
+    // Fullscreen hover reveal: show threshold < hide threshold for hysteresis
     private const double FullScreenShowThreshold = 5.0;
     private const double FullScreenHideThreshold = 60.0;
 
@@ -571,10 +571,19 @@ public partial class MainWindow : Window
         if (Vm is { IsFullScreen: true } vm)
         {
             var pos = e.GetPosition(this);
+
+            // Top edge: tab bar reveal
             if (!vm.ShowFullScreenHeader && pos.Y <= FullScreenShowThreshold)
                 vm.ShowFullScreenHeader = true;
             else if (vm.ShowFullScreenHeader && pos.Y > FullScreenHideThreshold)
                 vm.ShowFullScreenHeader = false;
+
+            // Bottom edge: status bar reveal
+            double distFromBottom = Bounds.Height - pos.Y;
+            if (!vm.ShowFullScreenFooter && distFromBottom <= FullScreenShowThreshold)
+                vm.ShowFullScreenFooter = true;
+            else if (vm.ShowFullScreenFooter && distFromBottom > FullScreenHideThreshold)
+                vm.ShowFullScreenFooter = false;
         }
     }
 }

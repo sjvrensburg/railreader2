@@ -34,6 +34,7 @@ public sealed class RailNav
     private double _autoScrollPauseDurationMs;
     private bool _autoScrollPauseAdvances; // true = end-of-line pause that triggers advance
     private double _autoScrollPendingPauseMs; // deferred pause that starts after snap completes
+    private bool _autoScrollDwelt; // true after dwell pause on a block that fits in viewport
 
     /// <summary>
     /// Set to true when sustained horizontal scroll triggers auto-scroll.
@@ -748,6 +749,7 @@ public sealed class RailNav
         _autoScrollBoost = false;
         _autoScrollPauseTimer = null;
         _autoScrollPendingPauseMs = 0;
+        _autoScrollDwelt = false;
         // Stop any manual scroll
         StopScrollAndEdgeHold();
     }
@@ -759,6 +761,8 @@ public sealed class RailNav
         _autoScrollBoost = false;
         _autoScrollPauseTimer = null;
         _autoScrollPendingPauseMs = 0;
+        _autoScrollDwelt = false;
+        ScrollSpeed = 0.0;
     }
 
     /// <summary>Inject a settling pause into auto-scroll (e.g. after advancing to a new line).
@@ -768,6 +772,7 @@ public sealed class RailNav
     {
         if (!AutoScrolling || durationMs <= 0) return;
         _autoScrollPendingPauseMs = durationMs;
+        _autoScrollDwelt = false; // reset for the new block
     }
 
     /// <summary>Set/clear the boost flag (user holding D/Right during auto-scroll).</summary>
@@ -790,6 +795,7 @@ public sealed class RailNav
                 _autoScrollPauseDurationMs = _autoScrollPendingPauseMs;
                 _autoScrollPauseAdvances = false;
                 _autoScrollPendingPauseMs = 0;
+                ScrollSpeed = 0.0;
             }
             else
             {
@@ -800,6 +806,7 @@ public sealed class RailNav
         // Pause: hold position, count down
         if (_autoScrollPauseTimer is not null)
         {
+            ScrollSpeed = 0.0;
             if (_autoScrollPauseTimer.Elapsed.TotalMilliseconds >= _autoScrollPauseDurationMs)
             {
                 bool advance = _autoScrollPauseAdvances;
@@ -810,21 +817,39 @@ public sealed class RailNav
         }
 
         double speed = _autoScrollBoost ? _autoScrollSpeed * 2.0 : _autoScrollSpeed;
+        // Expose normalized speed (0–1) so motion blur can react to auto-scroll.
+        double maxSpeed = _config.ScrollSpeedMax;
+        ScrollSpeed = maxSpeed > 0 ? Math.Clamp(speed / maxSpeed, 0.0, 1.0) : 0.0;
         // Move camera left (negative X) to scroll content right
         cameraX -= speed * zoom * dtSecs;
         cameraX = ClampX(cameraX, zoom, windowWidth);
 
         // Check if we've reached the right edge of the block
-        var (_, blockRight, _) = GetBlockBounds(zoom);
+        var (_, blockRight, blockWidthPx) = GetBlockBounds(zoom);
         double visibleRight = (-cameraX + windowWidth) / zoom;
 
         if (visibleRight >= blockRight)
         {
+            // When the block fits entirely in the viewport there is no scroll
+            // distance, so without a dwell pause the block would be skipped
+            // instantly after the entry pause. Add a per-line dwell pause so
+            // narrow blocks (equations, headings) get proportional viewing time.
+            bool fitsInViewport = blockWidthPx <= windowWidth;
+            if (fitsInViewport && !_autoScrollDwelt && _config.AutoScrollLinePauseMs > 0)
+            {
+                _autoScrollDwelt = true;
+                _autoScrollPauseTimer = Stopwatch.StartNew();
+                _autoScrollPauseDurationMs = _config.AutoScrollLinePauseMs * CurrentNavigableBlock.Lines.Count;
+                _autoScrollPauseAdvances = true;
+                return false; // dwell pause
+            }
+
             bool isBlockEnd = CurrentLine + 1 >= CurrentNavigableBlock.Lines.Count;
             // Block-end pauses are handled by the controller (which knows the
             // destination block type).  Only pause here for mid-block line ends.
             if (!isBlockEnd && _config.AutoScrollLinePauseMs > 0)
             {
+                _autoScrollDwelt = false; // reset for the next line
                 _autoScrollPauseTimer = Stopwatch.StartNew();
                 _autoScrollPauseDurationMs = _config.AutoScrollLinePauseMs;
                 _autoScrollPauseAdvances = true;
