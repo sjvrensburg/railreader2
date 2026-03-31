@@ -3,7 +3,7 @@ using RailReader.Core.Models;
 
 namespace RailReader.Core.Services;
 
-public sealed class RailNav
+public sealed class RailNav : ICameraClamp
 {
     private AppConfig _config;
     private PageAnalysis? _analysis;
@@ -29,15 +29,9 @@ public sealed class RailNav
     private double _scrollLastSpeedMax;
     private double _scrollDisplacementOffset; // absorbs displacement discontinuity on speed change
 
-    // Auto-scroll state: continuous forward scroll along the line then advance
-    public bool AutoScrolling { get; private set; }
-    private double _autoScrollSpeed; // pixels/sec in page coordinates
-    private bool _autoScrollBoost;   // true while user holds D/Right during auto-scroll
-    private Stopwatch? _autoScrollPauseTimer;
-    private double _autoScrollPauseDurationMs;
-    private bool _autoScrollPauseAdvances; // true = end-of-line pause that triggers advance
-    private double _autoScrollPendingPauseMs; // deferred pause that starts after snap completes
-    private bool _autoScrollDwelt; // true after dwell pause on a block that fits in viewport
+    // Auto-scroll state machine: explicit states replace the previous implicit flag combinations
+    private readonly AutoScrollStateMachine _autoScrollState;
+    public bool AutoScrolling => _autoScrollState.IsActive;
 
     /// <summary>
     /// Set to true when sustained horizontal scroll triggers auto-scroll.
@@ -87,7 +81,14 @@ public sealed class RailNav
         return false;
     }
 
-    public RailNav(AppConfig config) => _config = config;
+    public RailNav(AppConfig config)
+    {
+        _config = config;
+        _autoScrollState = new AutoScrollStateMachine(this);
+    }
+
+    double ICameraClamp.ClampX(double cameraX, double zoom, double windowWidth)
+        => ClampX(cameraX, zoom, windowWidth);
 
     public void SetAnalysis(PageAnalysis analysis, HashSet<int> navigable)
     {
@@ -776,49 +777,26 @@ public sealed class RailNav
     public void StartAutoScroll(double speed)
     {
         if (!CanNavigate) return;
-        AutoScrolling = true;
-        _autoScrollSpeed = speed;
-        _autoScrollBoost = false;
-        _autoScrollPauseTimer = null;
-        _autoScrollPendingPauseMs = 0;
-        _autoScrollDwelt = false;
-        // Stop any manual scroll
+        _autoScrollState.Start(speed);
         StopScrollAndEdgeHold();
     }
 
     public void StopAutoScroll()
     {
-        AutoScrolling = false;
-        _autoScrollSpeed = 0;
-        _autoScrollBoost = false;
-        _autoScrollPauseTimer = null;
-        _autoScrollPendingPauseMs = 0;
-        _autoScrollDwelt = false;
+        _autoScrollState.Stop();
         ScrollSpeed = 0.0;
     }
 
-    /// <summary>Inject a settling pause into auto-scroll (e.g. after advancing to a new line).
+    /// <summary>Inject a settling pause into auto-scroll (e.g. after advancing to a new block).
     /// The pause is deferred until any snap animation completes, so the full duration
     /// is perceived as stillness after the camera reaches its target.</summary>
     public void PauseAutoScroll(double durationMs)
     {
-        if (!AutoScrolling || durationMs <= 0) return;
-        _autoScrollPendingPauseMs = durationMs;
-        _autoScrollDwelt = false; // reset for the new block
+        _autoScrollState.RequestDeferredPause(durationMs);
     }
 
     /// <summary>Set/clear the boost flag (user holding D/Right during auto-scroll).</summary>
-    public void SetAutoScrollBoost(bool boost) => _autoScrollBoost = boost;
-
-    /// <summary>Begin an auto-scroll pause of <paramref name="durationMs"/> milliseconds.
-    /// When <paramref name="advances"/> is true, the pause triggers a line advance on completion.</summary>
-    private void BeginAutoScrollPause(double durationMs, bool advances)
-    {
-        _autoScrollPauseTimer = Stopwatch.StartNew();
-        _autoScrollPauseDurationMs = durationMs;
-        _autoScrollPauseAdvances = advances;
-        ScrollSpeed = 0.0;
-    }
+    public void SetAutoScrollBoost(bool boost) => _autoScrollState.SetBoost(boost);
 
     /// <summary>
     /// Returns true if auto-scroll has reached the right edge and should advance.
@@ -826,72 +804,28 @@ public sealed class RailNav
     /// </summary>
     public bool TickAutoScroll(ref double cameraX, double dtSecs, double zoom, double windowWidth)
     {
-        if (!AutoScrolling || _navigableIndices.Count == 0) return false;
+        if (!_autoScrollState.IsActive || _navigableIndices.Count == 0) return false;
 
-        // Activate deferred pause once the snap animation has finished
-        if (_autoScrollPendingPauseMs > 0)
+        var (_, blockRight, _) = GetBlockBounds(zoom);
+        var block = CurrentNavigableBlock;
+
+        var ctx = new AutoScrollContext
         {
-            if (_snap is null)
-            {
-                BeginAutoScrollPause(_autoScrollPendingPauseMs, advances: false);
-                _autoScrollPendingPauseMs = 0;
-            }
-            else
-            {
-                return false; // snap still running — don't scroll until pause activates
-            }
-        }
+            SnapInProgress = _snap is not null,
+            BlockRight = blockRight,
+            RawBlockWidthPx = block.BBox.W * zoom,
+            CurrentLine = CurrentLine,
+            BlockLineCount = block.Lines.Count,
+            LinePauseMs = _config.AutoScrollLinePauseMs,
+            WindowWidth = windowWidth,
+            Zoom = zoom,
+            ReferenceSpeed = ReferenceSpeed,
+            MaxSpeed = _config.ScrollSpeedMax,
+        };
 
-        // Pause: hold position, count down
-        if (_autoScrollPauseTimer is not null)
-        {
-            if (_autoScrollPauseTimer.Elapsed.TotalMilliseconds >= _autoScrollPauseDurationMs)
-            {
-                bool advance = _autoScrollPauseAdvances;
-                _autoScrollPauseTimer = null;
-                return advance;
-            }
-            return false; // still pausing
-        }
-
-        double speed = _autoScrollBoost ? _autoScrollSpeed * 2.0 : _autoScrollSpeed;
-        // Use rail zoom threshold as reference so screen-space speed is constant
-        // regardless of current zoom (avoids text rushing at high magnification).
-        cameraX -= speed * ReferenceSpeed * dtSecs;
-        double maxSpeed = _config.ScrollSpeedMax;
-        ScrollSpeed = maxSpeed > 0 ? Math.Clamp(speed / maxSpeed, 0.0, 1.0) : 0.0;
-        cameraX = ClampX(cameraX, zoom, windowWidth);
-
-        var (_, blockRight, blockWidthPx) = GetBlockBounds(zoom);
-        double visibleRight = (-cameraX + windowWidth) / zoom;
-
-        if (visibleRight >= blockRight)
-        {
-            // Use the raw block width (without GetBlockBounds margins) to decide
-            // whether a dwell pause is needed. The margins exist for scroll
-            // aesthetics but shouldn't prevent the dwell from firing on blocks
-            // that visually fit in the viewport.
-            double rawWidthPx = CurrentNavigableBlock.BBox.W * zoom;
-            bool fitsInViewport = rawWidthPx <= windowWidth;
-            if (fitsInViewport && !_autoScrollDwelt && _config.AutoScrollLinePauseMs > 0)
-            {
-                _autoScrollDwelt = true;
-                BeginAutoScrollPause(_config.AutoScrollLinePauseMs * CurrentNavigableBlock.Lines.Count, advances: true);
-                return false; // dwell pause
-            }
-
-            bool isBlockEnd = CurrentLine + 1 >= CurrentNavigableBlock.Lines.Count;
-            // Block-end pauses are handled by the controller (which knows the
-            // destination block type).  Only pause here for mid-block line ends.
-            if (!isBlockEnd && _config.AutoScrollLinePauseMs > 0)
-            {
-                _autoScrollDwelt = false; // reset for the next line
-                BeginAutoScrollPause(_config.AutoScrollLinePauseMs, advances: true);
-                return false; // start pause
-            }
-            return true; // advance immediately (block end or no pause)
-        }
-        return false;
+        bool reachedEnd = _autoScrollState.Tick(ref cameraX, dtSecs, in ctx);
+        ScrollSpeed = _autoScrollState.NormalizedSpeed;
+        return reachedEnd;
     }
 
     public void UpdateConfig(AppConfig config)
@@ -899,8 +833,7 @@ public sealed class RailNav
         _config = config;
         // If autoscroll is running, apply the updated speed immediately so
         // [ / ] key adjustments take effect without stopping and restarting.
-        if (AutoScrolling)
-            _autoScrollSpeed = config.DefaultAutoScrollSpeed;
+        _autoScrollState.UpdateSpeed(config.DefaultAutoScrollSpeed);
     }
 
     private sealed class SnapAnimation

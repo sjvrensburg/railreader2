@@ -103,17 +103,10 @@ public sealed class DocumentState : IDisposable
     public Queue<int> PendingAnalysis { get; } = new();
 
     /// <summary>
-    /// When non-zero, indicates that this page was reached via rail navigation
-    /// and should be skipped if analysis reveals no navigable blocks.
-    /// +1 = forward, -1 = backward.
+    /// When set, this page was reached via rail navigation and should be
+    /// skipped if analysis reveals no navigable blocks. Cleared on landing.
     /// </summary>
-    public int PendingSkipDirection { get; set; }
-
-    /// <summary>
-    /// Number of pages already skipped in the current skip sequence.
-    /// Used to show a cumulative count in the skip notification.
-    /// </summary>
-    public int PendingSkipCount { get; set; }
+    public PendingPageSkip? PendingSkip { get; set; }
     public List<OutlineEntry> Outline { get; }
 
     // Navigation history (back/forward) — per-document so tab switching doesn't cross-pollinate
