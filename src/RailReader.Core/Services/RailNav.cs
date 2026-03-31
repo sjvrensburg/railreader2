@@ -676,10 +676,26 @@ public sealed class RailNav
         // to avoid a position jump from recomputing the integral with new params.
         if (sStart != _scrollLastSpeedStart || sMax != _scrollLastSpeedMax)
         {
+            // Compute the instant speed we were at before the change so we can
+            // resume at the same velocity on the new curve instead of restarting
+            // from zero.  speed(t) = sStart + (sMax-sStart)*(t/ramp)²
+            double oldStart = _scrollLastSpeedStart;
+            double oldMax = _scrollLastSpeedMax;
+            double oldInstant = holdSecs <= ramp
+                ? oldStart + (oldMax - oldStart) * (holdSecs / ramp) * (holdSecs / ramp)
+                : oldMax;
+            // Clamp to new curve range and invert to find the equivalent time.
+            double clamped = Math.Clamp(oldInstant, sStart, sMax);
+            double newSeedSecs;
+            if (clamped >= sMax || Math.Abs(sMax - sStart) < 0.001)
+                newSeedSecs = ramp; // already at or beyond max — start fully ramped
+            else
+                newSeedSecs = ramp * Math.Sqrt((clamped - sStart) / (sMax - sStart));
+
             _scrollStartX = cameraX;
             _scrollHoldTimer = Stopwatch.StartNew();
-            _scrollSeedSecs = 0;
-            holdSecs = 0;
+            _scrollSeedSecs = newSeedSecs;
+            holdSecs = newSeedSecs;
             _scrollLastSpeedStart = sStart;
             _scrollLastSpeedMax = sMax;
         }
