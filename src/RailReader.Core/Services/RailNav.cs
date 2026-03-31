@@ -674,40 +674,14 @@ public sealed class RailNav
 
         // Re-anchor when speed params change mid-scroll (e.g. user pressed [ or ])
         // to avoid a position jump from recomputing the integral with new params.
+        // Simply restart the ramp from the current position — the existing smooth
+        // ramp-up handles the transition naturally.
         if (sStart != _scrollLastSpeedStart || sMax != _scrollLastSpeedMax)
         {
-            // Compute the instant speed we were at before the change so we can
-            // resume at the same velocity on the new curve instead of restarting
-            // from zero.  speed(t) = sStart + (sMax-sStart)*(t/ramp)²
-            double oldStart = _scrollLastSpeedStart;
-            double oldMax = _scrollLastSpeedMax;
-            double oldInstant = holdSecs <= ramp
-                ? oldStart + (oldMax - oldStart) * (holdSecs / ramp) * (holdSecs / ramp)
-                : oldMax;
-            // Clamp to new curve range and invert to find the equivalent time.
-            double clamped = Math.Clamp(oldInstant, sStart, sMax);
-            double newSeedSecs;
-            if (clamped >= sMax || Math.Abs(sMax - sStart) < 0.001)
-                newSeedSecs = ramp; // already at or beyond max — start fully ramped
-            else
-                newSeedSecs = ramp * Math.Sqrt((clamped - sStart) / (sMax - sStart));
-
-            // Compute the displacement the new curve produces at the seed time
-            // and offset _scrollStartX so the camera stays at its current position.
-            double seedDisp;
-            if (newSeedSecs <= ramp)
-                seedDisp = sStart * newSeedSecs
-                    + (sMax - sStart) * newSeedSecs * newSeedSecs * newSeedSecs / (3.0 * ramp * ramp);
-            else
-            {
-                double rd = sStart * ramp + (sMax - sStart) * ramp / 3.0;
-                seedDisp = rd + sMax * (newSeedSecs - ramp);
-            }
-            double s = dir == ScrollDirection.Forward ? -1.0 : 1.0;
-            _scrollStartX = cameraX - s * seedDisp * ReferenceSpeed;
+            _scrollStartX = cameraX;
             _scrollHoldTimer = Stopwatch.StartNew();
-            _scrollSeedSecs = newSeedSecs;
-            holdSecs = newSeedSecs;
+            _scrollSeedSecs = 1.0 / 60.0;
+            holdSecs = _scrollSeedSecs;
             _scrollLastSpeedStart = sStart;
             _scrollLastSpeedMax = sMax;
         }
