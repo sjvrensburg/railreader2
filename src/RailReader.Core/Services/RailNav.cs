@@ -27,6 +27,7 @@ public sealed class RailNav
     private double _scrollSeedSecs; // virtual time offset so first frame has visible displacement
     private double _scrollLastSpeedStart; // cached to detect mid-scroll speed changes
     private double _scrollLastSpeedMax;
+    private double _scrollDisplacementOffset; // absorbs displacement discontinuity on speed change
 
     // Auto-scroll state: continuous forward scroll along the line then advance
     public bool AutoScrolling { get; private set; }
@@ -278,6 +279,7 @@ public sealed class RailNav
             _scrollSeedSecs = 1.0 / 60.0;
             _scrollLastSpeedStart = _config.ScrollSpeedStart;
             _scrollLastSpeedMax = _config.ScrollSpeedMax;
+            _scrollDisplacementOffset = 0;
         }
     }
 
@@ -625,6 +627,18 @@ public sealed class RailNav
     private static double SoftEase(double overshoot, double limit)
         => overshoot * limit / (limit + overshoot);
 
+    /// <summary>
+    /// Integral of the quadratic speed ramp: speed(t) = start + (max-start)*(t/ramp)².
+    /// Returns total displacement in page-coordinate pixels.
+    /// </summary>
+    private static double ScrollDisplacement(double speedStart, double speedMax, double ramp, double t)
+    {
+        if (t <= ramp)
+            return speedStart * t + (speedMax - speedStart) * t * t * t / (3.0 * ramp * ramp);
+        double rampDisp = speedStart * ramp + (speedMax - speedStart) * ramp / 3.0;
+        return rampDisp + speedMax * (t - ramp);
+    }
+
     public bool Tick(ref double cameraX, ref double cameraY, double dtSecs, double zoom, double windowWidth)
     {
         bool animating = TickSnapAnimation(ref cameraX, ref cameraY);
@@ -672,32 +686,20 @@ public sealed class RailNav
         double sStart = _config.ScrollSpeedStart;
         double sMax = _config.ScrollSpeedMax;
 
-        // Re-anchor when speed params change mid-scroll (e.g. user pressed [ or ])
-        // to avoid a position jump from recomputing the integral with new params.
-        // Simply restart the ramp from the current position — the existing smooth
-        // ramp-up handles the transition naturally.
+        // When speed params change mid-scroll (e.g. user pressed [ or ]),
+        // absorb the displacement difference so the camera doesn't jump.
+        // The timer keeps running, so the velocity transitions naturally
+        // along the new ramp curve from the current elapsed time.
         if (sStart != _scrollLastSpeedStart || sMax != _scrollLastSpeedMax)
         {
-            _scrollStartX = cameraX;
-            _scrollHoldTimer = Stopwatch.StartNew();
-            _scrollSeedSecs = 1.0 / 60.0;
-            holdSecs = _scrollSeedSecs;
+            double oldDisp = ScrollDisplacement(_scrollLastSpeedStart, _scrollLastSpeedMax, ramp, holdSecs);
+            double newDisp = ScrollDisplacement(sStart, sMax, ramp, holdSecs);
+            _scrollDisplacementOffset += oldDisp - newDisp;
             _scrollLastSpeedStart = sStart;
             _scrollLastSpeedMax = sMax;
         }
 
-        double totalDisplacement;
-        if (holdSecs <= ramp)
-        {
-            totalDisplacement = sStart * holdSecs
-                + (sMax - sStart) * holdSecs * holdSecs * holdSecs / (3.0 * ramp * ramp);
-        }
-        else
-        {
-            // Integral up to ramp + constant max speed after ramp
-            double rampDisplacement = sStart * ramp + (sMax - sStart) * ramp / 3.0;
-            totalDisplacement = rampDisplacement + sMax * (holdSecs - ramp);
-        }
+        double totalDisplacement = ScrollDisplacement(sStart, sMax, ramp, holdSecs) + _scrollDisplacementOffset;
 
         double instantSpeed = holdSecs <= ramp
             ? sStart + (sMax - sStart) * (holdSecs / ramp) * (holdSecs / ramp)
