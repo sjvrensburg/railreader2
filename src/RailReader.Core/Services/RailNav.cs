@@ -867,11 +867,12 @@ public sealed class RailNav
 
         if (visibleRight >= blockRight)
         {
-            // When the block fits entirely in the viewport there is no scroll
-            // distance, so without a dwell pause the block would be skipped
-            // instantly after the entry pause. Add a per-line dwell pause so
-            // narrow blocks (equations, headings) get proportional viewing time.
-            bool fitsInViewport = blockWidthPx <= windowWidth;
+            // Use the raw block width (without GetBlockBounds margins) to decide
+            // whether a dwell pause is needed. The margins exist for scroll
+            // aesthetics but shouldn't prevent the dwell from firing on blocks
+            // that visually fit in the viewport.
+            double rawWidthPx = CurrentNavigableBlock.BBox.W * zoom;
+            bool fitsInViewport = rawWidthPx <= windowWidth;
             if (fitsInViewport && !_autoScrollDwelt && _config.AutoScrollLinePauseMs > 0)
             {
                 _autoScrollDwelt = true;
