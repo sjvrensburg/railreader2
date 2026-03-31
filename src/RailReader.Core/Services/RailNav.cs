@@ -39,13 +39,11 @@ public sealed class RailNav : ICameraClamp
     /// </summary>
     public bool AutoScrollTriggered { get; set; }
 
-    // Edge-hold advance: when the user holds D/Right (or A/Left) against the line boundary
-    // for EdgeAdvanceHoldMs, trigger a NextLine/PrevLine as if they had pressed Down/Up.
-    private Stopwatch? _edgeHoldTimer;
-    private ScrollDirection? _edgeHoldDir;
+    // Edge-hold advance: when the user holds D/Right (or A/Left) against the line boundary,
+    // trigger a NextLine/PrevLine as if they had pressed Down/Up.
+    private readonly EdgeHoldStateMachine _edgeHold = new();
     private ScrollDirection? _pendingEdgeAdvance;
     private bool _edgeAdvanceJustFired; // suppresses Jump()/StartScroll() so the snap-to-start/end isn't overwritten
-    private const double EdgeAdvanceHoldMs = 400.0;
 
     /// <summary>
     /// Multiplier applied to RailZoomThreshold to produce a zoom-independent
@@ -296,8 +294,7 @@ public sealed class RailNav : ICameraClamp
     public void StopScrollAndEdgeHold()
     {
         StopScroll();
-        _edgeHoldTimer = null;
-        _edgeHoldDir = null;
+        _edgeHold.Reset();
     }
 
     /// <summary>
@@ -322,13 +319,7 @@ public sealed class RailNav : ICameraClamp
     {
         if (IsAtHardEdge(cameraX, zoom, windowWidth, dir))
         {
-            if (_edgeHoldDir != dir)
-            {
-                _edgeHoldTimer = Stopwatch.StartNew();
-                _edgeHoldDir = dir;
-            }
-            else if (_edgeHoldTimer is not null
-                && _edgeHoldTimer.Elapsed.TotalMilliseconds >= EdgeAdvanceHoldMs)
+            if (_edgeHold.OnEdgeHit(dir == ScrollDirection.Forward))
             {
                 _pendingEdgeAdvance = dir;
                 _edgeAdvanceJustFired = true;
@@ -337,8 +328,7 @@ public sealed class RailNav : ICameraClamp
         }
         else
         {
-            _edgeHoldTimer = null;
-            _edgeHoldDir = null;
+            _edgeHold.OnMoved();
         }
         return false;
     }
@@ -386,8 +376,7 @@ public sealed class RailNav : ICameraClamp
         var dir = forward ? ScrollDirection.Forward : ScrollDirection.Backward;
         if (CheckEdgeHoldAdvance(newX, zoom, windowWidth, dir))
         {
-            _edgeHoldTimer = null;
-            _edgeHoldDir = null;
+            _edgeHold.Reset();
             return; // controller will advance line and snap
         }
 
