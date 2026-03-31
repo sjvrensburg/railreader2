@@ -22,9 +22,9 @@
         <v:TabBarView Name="TabBar" DockPanel.Dock="Top" DataContext="{Binding}"
                       IsVisible="{Binding IsTabBarVisible}" />
 
-        <!-- Status Bar -->
+        <!-- Status Bar (visible in windowed mode, or on hover at bottom edge in fullscreen) -->
         <v:StatusBarView x:Name="StatusBar" DockPanel.Dock="Bottom" DataContext="{Binding}"
-                         IsVisible="{Binding !IsFullScreen}" />
+                         IsVisible="{Binding IsStatusBarVisible}" />
 
         <!-- Main Content: resizable sidebar + viewport -->
         <Grid Name="MainGrid" ColumnDefinitions="220,Auto,*">

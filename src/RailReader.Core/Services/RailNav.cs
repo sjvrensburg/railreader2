@@ -25,6 +25,9 @@ public sealed class RailNav
     private Stopwatch? _scrollHoldTimer;
     private double _scrollStartX;
     private double _scrollSeedSecs; // virtual time offset so first frame has visible displacement
+    private double _scrollLastSpeedStart; // cached to detect mid-scroll speed changes
+    private double _scrollLastSpeedMax;
+    private double _scrollDisplacementOffset; // absorbs displacement discontinuity on speed change
 
     // Auto-scroll state: continuous forward scroll along the line then advance
     public bool AutoScrolling { get; private set; }
@@ -34,6 +37,7 @@ public sealed class RailNav
     private double _autoScrollPauseDurationMs;
     private bool _autoScrollPauseAdvances; // true = end-of-line pause that triggers advance
     private double _autoScrollPendingPauseMs; // deferred pause that starts after snap completes
+    private bool _autoScrollDwelt; // true after dwell pause on a block that fits in viewport
 
     /// <summary>
     /// Set to true when sustained horizontal scroll triggers auto-scroll.
@@ -48,6 +52,16 @@ public sealed class RailNav
     private ScrollDirection? _pendingEdgeAdvance;
     private bool _edgeAdvanceJustFired; // suppresses Jump()/StartScroll() so the snap-to-start/end isn't overwritten
     private const double EdgeAdvanceHoldMs = 400.0;
+
+    /// <summary>
+    /// Multiplier applied to RailZoomThreshold to produce a zoom-independent
+    /// reference speed. Calibrated so that at twice the threshold zoom the
+    /// screen-space speed matches the old zoom-proportional behaviour.
+    /// </summary>
+    private const double SpeedReferenceMultiplier = 2.0;
+
+    /// <summary>Zoom-independent speed factor: constant across all zoom levels.</summary>
+    private double ReferenceSpeed => _config.RailZoomThreshold * SpeedReferenceMultiplier;
 
     /// <summary>
     /// When a block's width is less than this fraction of the viewport,
@@ -263,6 +277,9 @@ public sealed class RailNav
             // Seed one frame ahead (~16ms) so the first Tick() produces
             // visible displacement instead of near-zero movement.
             _scrollSeedSecs = 1.0 / 60.0;
+            _scrollLastSpeedStart = _config.ScrollSpeedStart;
+            _scrollLastSpeedMax = _config.ScrollSpeedMax;
+            _scrollDisplacementOffset = 0;
         }
     }
 
@@ -610,6 +627,18 @@ public sealed class RailNav
     private static double SoftEase(double overshoot, double limit)
         => overshoot * limit / (limit + overshoot);
 
+    /// <summary>
+    /// Integral of the quadratic speed ramp: speed(t) = start + (max-start)*(t/ramp)².
+    /// Returns total displacement in page-coordinate pixels.
+    /// </summary>
+    private static double ScrollDisplacement(double speedStart, double speedMax, double ramp, double t)
+    {
+        if (t <= ramp)
+            return speedStart * t + (speedMax - speedStart) * t * t * t / (3.0 * ramp * ramp);
+        double rampDisp = speedStart * ramp + (speedMax - speedStart) * ramp / 3.0;
+        return rampDisp + speedMax * (t - ramp);
+    }
+
     public bool Tick(ref double cameraX, ref double cameraY, double dtSecs, double zoom, double windowWidth)
     {
         bool animating = TickSnapAnimation(ref cameraX, ref cameraY);
@@ -657,18 +686,20 @@ public sealed class RailNav
         double sStart = _config.ScrollSpeedStart;
         double sMax = _config.ScrollSpeedMax;
 
-        double totalDisplacement;
-        if (holdSecs <= ramp)
+        // When speed params change mid-scroll (e.g. user pressed [ or ]),
+        // absorb the displacement difference so the camera doesn't jump.
+        // The timer keeps running, so the velocity transitions naturally
+        // along the new ramp curve from the current elapsed time.
+        if (sStart != _scrollLastSpeedStart || sMax != _scrollLastSpeedMax)
         {
-            totalDisplacement = sStart * holdSecs
-                + (sMax - sStart) * holdSecs * holdSecs * holdSecs / (3.0 * ramp * ramp);
+            double oldDisp = ScrollDisplacement(_scrollLastSpeedStart, _scrollLastSpeedMax, ramp, holdSecs);
+            double newDisp = ScrollDisplacement(sStart, sMax, ramp, holdSecs);
+            _scrollDisplacementOffset += oldDisp - newDisp;
+            _scrollLastSpeedStart = sStart;
+            _scrollLastSpeedMax = sMax;
         }
-        else
-        {
-            // Integral up to ramp + constant max speed after ramp
-            double rampDisplacement = sStart * ramp + (sMax - sStart) * ramp / 3.0;
-            totalDisplacement = rampDisplacement + sMax * (holdSecs - ramp);
-        }
+
+        double totalDisplacement = ScrollDisplacement(sStart, sMax, ramp, holdSecs) + _scrollDisplacementOffset;
 
         double instantSpeed = holdSecs <= ramp
             ? sStart + (sMax - sStart) * (holdSecs / ramp) * (holdSecs / ramp)
@@ -676,7 +707,9 @@ public sealed class RailNav
         ScrollSpeed = sMax > 0 ? instantSpeed / sMax : 0.0;
 
         double sign = dir == ScrollDirection.Forward ? -1.0 : 1.0;
-        cameraX = ClampX(_scrollStartX + sign * totalDisplacement * zoom, zoom, windowWidth);
+        // Use rail zoom threshold as reference so screen-space speed is constant
+        // regardless of current zoom (matches auto-scroll behaviour).
+        cameraX = ClampX(_scrollStartX + sign * totalDisplacement * ReferenceSpeed, zoom, windowWidth);
 
         // Auto-scroll trigger: if holding forward scroll for longer than the
         // configured delay, transition to auto-scroll mode.
@@ -748,6 +781,7 @@ public sealed class RailNav
         _autoScrollBoost = false;
         _autoScrollPauseTimer = null;
         _autoScrollPendingPauseMs = 0;
+        _autoScrollDwelt = false;
         // Stop any manual scroll
         StopScrollAndEdgeHold();
     }
@@ -759,6 +793,8 @@ public sealed class RailNav
         _autoScrollBoost = false;
         _autoScrollPauseTimer = null;
         _autoScrollPendingPauseMs = 0;
+        _autoScrollDwelt = false;
+        ScrollSpeed = 0.0;
     }
 
     /// <summary>Inject a settling pause into auto-scroll (e.g. after advancing to a new line).
@@ -768,10 +804,21 @@ public sealed class RailNav
     {
         if (!AutoScrolling || durationMs <= 0) return;
         _autoScrollPendingPauseMs = durationMs;
+        _autoScrollDwelt = false; // reset for the new block
     }
 
     /// <summary>Set/clear the boost flag (user holding D/Right during auto-scroll).</summary>
     public void SetAutoScrollBoost(bool boost) => _autoScrollBoost = boost;
+
+    /// <summary>Begin an auto-scroll pause of <paramref name="durationMs"/> milliseconds.
+    /// When <paramref name="advances"/> is true, the pause triggers a line advance on completion.</summary>
+    private void BeginAutoScrollPause(double durationMs, bool advances)
+    {
+        _autoScrollPauseTimer = Stopwatch.StartNew();
+        _autoScrollPauseDurationMs = durationMs;
+        _autoScrollPauseAdvances = advances;
+        ScrollSpeed = 0.0;
+    }
 
     /// <summary>
     /// Returns true if auto-scroll has reached the right edge and should advance.
@@ -786,9 +833,7 @@ public sealed class RailNav
         {
             if (_snap is null)
             {
-                _autoScrollPauseTimer = Stopwatch.StartNew();
-                _autoScrollPauseDurationMs = _autoScrollPendingPauseMs;
-                _autoScrollPauseAdvances = false;
+                BeginAutoScrollPause(_autoScrollPendingPauseMs, advances: false);
                 _autoScrollPendingPauseMs = 0;
             }
             else
@@ -810,24 +855,38 @@ public sealed class RailNav
         }
 
         double speed = _autoScrollBoost ? _autoScrollSpeed * 2.0 : _autoScrollSpeed;
-        // Move camera left (negative X) to scroll content right
-        cameraX -= speed * zoom * dtSecs;
+        // Use rail zoom threshold as reference so screen-space speed is constant
+        // regardless of current zoom (avoids text rushing at high magnification).
+        cameraX -= speed * ReferenceSpeed * dtSecs;
+        double maxSpeed = _config.ScrollSpeedMax;
+        ScrollSpeed = maxSpeed > 0 ? Math.Clamp(speed / maxSpeed, 0.0, 1.0) : 0.0;
         cameraX = ClampX(cameraX, zoom, windowWidth);
 
-        // Check if we've reached the right edge of the block
-        var (_, blockRight, _) = GetBlockBounds(zoom);
+        var (_, blockRight, blockWidthPx) = GetBlockBounds(zoom);
         double visibleRight = (-cameraX + windowWidth) / zoom;
 
         if (visibleRight >= blockRight)
         {
+            // Use the raw block width (without GetBlockBounds margins) to decide
+            // whether a dwell pause is needed. The margins exist for scroll
+            // aesthetics but shouldn't prevent the dwell from firing on blocks
+            // that visually fit in the viewport.
+            double rawWidthPx = CurrentNavigableBlock.BBox.W * zoom;
+            bool fitsInViewport = rawWidthPx <= windowWidth;
+            if (fitsInViewport && !_autoScrollDwelt && _config.AutoScrollLinePauseMs > 0)
+            {
+                _autoScrollDwelt = true;
+                BeginAutoScrollPause(_config.AutoScrollLinePauseMs * CurrentNavigableBlock.Lines.Count, advances: true);
+                return false; // dwell pause
+            }
+
             bool isBlockEnd = CurrentLine + 1 >= CurrentNavigableBlock.Lines.Count;
             // Block-end pauses are handled by the controller (which knows the
             // destination block type).  Only pause here for mid-block line ends.
             if (!isBlockEnd && _config.AutoScrollLinePauseMs > 0)
             {
-                _autoScrollPauseTimer = Stopwatch.StartNew();
-                _autoScrollPauseDurationMs = _config.AutoScrollLinePauseMs;
-                _autoScrollPauseAdvances = true;
+                _autoScrollDwelt = false; // reset for the next line
+                BeginAutoScrollPause(_config.AutoScrollLinePauseMs, advances: true);
                 return false; // start pause
             }
             return true; // advance immediately (block end or no pause)

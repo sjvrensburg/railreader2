@@ -897,6 +897,7 @@ public sealed class DocumentController
             if (reachedEnd)
             {
                 int prevBlock = doc.Rail.CurrentBlock;
+                int prevLine = doc.Rail.CurrentLine;
                 var adv = AdvanceLine(doc, forward: true, ww, wh);
                 switch (adv)
                 {
@@ -910,6 +911,14 @@ public sealed class DocumentController
                         StopAutoScroll();
                         break;
                     case LineAdvanceResult.LineAdvanced:
+                        // Guard against NextLine() returning Ok without actually
+                        // advancing (e.g. CanNavigate became false). Without this,
+                        // autoscroll would loop infinitely on the same block.
+                        if (doc.Rail.CurrentBlock == prevBlock && doc.Rail.CurrentLine == prevLine)
+                        {
+                            StopAutoScroll();
+                            break;
+                        }
                         doc.StartSnap(ww, wh);
                         bool enteredNewBlock = doc.Rail.CurrentBlock != prevBlock;
                         // Block entry pause is deferred until after the snap animation

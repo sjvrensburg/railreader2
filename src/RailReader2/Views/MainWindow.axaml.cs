@@ -15,7 +15,7 @@ public partial class MainWindow : Window
     private double _lastMinimapOy;
     private double _lastMinimapZoom;
 
-    // Fullscreen tab reveal: show threshold < hide threshold for hysteresis
+    // Fullscreen hover reveal: show threshold < hide threshold for hysteresis
     private const double FullScreenShowThreshold = 5.0;
     private const double FullScreenHideThreshold = 60.0;
 
@@ -37,7 +37,7 @@ public partial class MainWindow : Window
             // Wire granular invalidation callbacks
             vm.SetInvalidation(new InvalidationCallbacks
             {
-                InvalidateCamera = UpdateCameraTransform,
+                InvalidateCamera = () => { UpdateCameraTransform(); StatusBar.UpdateZoom(); },
                 InvalidatePage = () =>
                 {
                     PageLayer.ActiveEffect = vm.Controller.ActiveColourEffect;
@@ -451,10 +451,18 @@ public partial class MainWindow : Window
                 vm.ToggleLineFocusBlur(); e.Handled = true; return true;
             case Key.H:
                 vm.ToggleLineHighlight(); RailToolBar.UpdateToggleStates(); e.Handled = true; return true;
+            case Key.OemOpenBrackets when e.KeyModifiers == (KeyModifiers.Control | KeyModifiers.Shift):
+                RailToolBar.AdjustBlur(-0.01); e.Handled = true; return true;
+            case Key.OemCloseBrackets when e.KeyModifiers == (KeyModifiers.Control | KeyModifiers.Shift):
+                RailToolBar.AdjustBlur(0.01); e.Handled = true; return true;
             case Key.OemOpenBrackets when e.KeyModifiers.HasFlag(KeyModifiers.Shift):
                 RailToolBar.AdjustBlur(-0.05); e.Handled = true; return true;
             case Key.OemCloseBrackets when e.KeyModifiers.HasFlag(KeyModifiers.Shift):
                 RailToolBar.AdjustBlur(0.05); e.Handled = true; return true;
+            case Key.OemOpenBrackets when e.KeyModifiers.HasFlag(KeyModifiers.Control):
+                RailToolBar.AdjustSpeed(-1); e.Handled = true; return true;
+            case Key.OemCloseBrackets when e.KeyModifiers.HasFlag(KeyModifiers.Control):
+                RailToolBar.AdjustSpeed(1); e.Handled = true; return true;
             case Key.OemOpenBrackets:
                 RailToolBar.AdjustSpeed(-5); e.Handled = true; return true;
             case Key.OemCloseBrackets:
@@ -571,10 +579,19 @@ public partial class MainWindow : Window
         if (Vm is { IsFullScreen: true } vm)
         {
             var pos = e.GetPosition(this);
+
+            // Top edge: tab bar reveal
             if (!vm.ShowFullScreenHeader && pos.Y <= FullScreenShowThreshold)
                 vm.ShowFullScreenHeader = true;
             else if (vm.ShowFullScreenHeader && pos.Y > FullScreenHideThreshold)
                 vm.ShowFullScreenHeader = false;
+
+            // Bottom edge: status bar reveal
+            double distFromBottom = Bounds.Height - pos.Y;
+            if (!vm.ShowFullScreenFooter && distFromBottom <= FullScreenShowThreshold)
+                vm.ShowFullScreenFooter = true;
+            else if (vm.ShowFullScreenFooter && distFromBottom > FullScreenHideThreshold)
+                vm.ShowFullScreenFooter = false;
         }
     }
 }
