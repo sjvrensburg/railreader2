@@ -575,6 +575,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public void ToggleAutoScrollExclusive()
     {
+        if (ActiveTab?.PendingRailSetup == true)
+        {
+            ShowStatusToast("Layout analysis in progress\u2026");
+            return;
+        }
         _controller.ToggleAutoScrollExclusive();
         JumpMode = _controller.JumpMode;
         OnPropertyChanged(nameof(AutoScrollActive));
@@ -583,6 +588,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public void ToggleJumpModeExclusive()
     {
+        if (ActiveTab?.PendingRailSetup == true)
+        {
+            ShowStatusToast("Layout analysis in progress\u2026");
+            return;
+        }
         _controller.ToggleJumpModeExclusive();
         JumpMode = _controller.JumpMode;
         OnPropertyChanged(nameof(AutoScrollActive));
