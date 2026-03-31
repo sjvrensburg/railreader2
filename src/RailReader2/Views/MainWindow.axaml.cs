@@ -451,10 +451,18 @@ public partial class MainWindow : Window
                 vm.ToggleLineFocusBlur(); e.Handled = true; return true;
             case Key.H:
                 vm.ToggleLineHighlight(); RailToolBar.UpdateToggleStates(); e.Handled = true; return true;
+            case Key.OemOpenBrackets when e.KeyModifiers == (KeyModifiers.Control | KeyModifiers.Shift):
+                RailToolBar.AdjustBlur(-0.01); e.Handled = true; return true;
+            case Key.OemCloseBrackets when e.KeyModifiers == (KeyModifiers.Control | KeyModifiers.Shift):
+                RailToolBar.AdjustBlur(0.01); e.Handled = true; return true;
             case Key.OemOpenBrackets when e.KeyModifiers.HasFlag(KeyModifiers.Shift):
                 RailToolBar.AdjustBlur(-0.05); e.Handled = true; return true;
             case Key.OemCloseBrackets when e.KeyModifiers.HasFlag(KeyModifiers.Shift):
                 RailToolBar.AdjustBlur(0.05); e.Handled = true; return true;
+            case Key.OemOpenBrackets when e.KeyModifiers.HasFlag(KeyModifiers.Control):
+                RailToolBar.AdjustSpeed(-1); e.Handled = true; return true;
+            case Key.OemCloseBrackets when e.KeyModifiers.HasFlag(KeyModifiers.Control):
+                RailToolBar.AdjustSpeed(1); e.Handled = true; return true;
             case Key.OemOpenBrackets:
                 RailToolBar.AdjustSpeed(-5); e.Handled = true; return true;
             case Key.OemCloseBrackets:
