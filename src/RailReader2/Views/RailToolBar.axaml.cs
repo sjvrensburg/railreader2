@@ -135,7 +135,7 @@ public partial class RailToolBar : UserControl
         {
             Orientation = Orientation.Vertical,
             Minimum = 5,
-            Maximum = 80,
+            Maximum = 160,
             Value = 30,
             Height = 120,
             Width = 28,
