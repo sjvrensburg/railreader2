@@ -860,10 +860,9 @@ public sealed class RailNav
         // Use the rail zoom threshold as reference so screen-space speed is
         // constant regardless of current zoom (avoids text rushing at high mag).
         cameraX -= speed * ReferenceSpeed * dtSecs;
-        // Expose normalized speed (0–1) so motion blur matches perceived screen
-        // velocity, not the raw page-coordinate speed.
+        // Normalize speed 0–1 for motion blur, matching hold-scroll's formula.
         double maxSpeed = _config.ScrollSpeedMax;
-        ScrollSpeed = maxSpeed > 0 ? Math.Clamp(speed * ReferenceSpeed / (maxSpeed * zoom), 0.0, 1.0) : 0.0;
+        ScrollSpeed = maxSpeed > 0 ? Math.Clamp(speed / maxSpeed, 0.0, 1.0) : 0.0;
         cameraX = ClampX(cameraX, zoom, windowWidth);
 
         // Check if we've reached the right edge of the block
