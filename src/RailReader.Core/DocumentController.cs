@@ -910,7 +910,10 @@ public sealed class DocumentController
                         StopAutoScroll();
                         break;
                     case LineAdvanceResult.LineAdvanced:
-                        doc.StartSnap(ww, wh);
+                        // Use forward-only snap to prevent backward camera jerk when
+                        // advancing from a narrow centered block (equation, heading)
+                        // to a wider left-aligned block.
+                        doc.StartSnapForward(ww, wh);
                         bool enteredNewBlock = doc.Rail.CurrentBlock != prevBlock;
                         // Block entry pause is deferred until after the snap animation
                         // so the user sees the new block while paused, not the old one.

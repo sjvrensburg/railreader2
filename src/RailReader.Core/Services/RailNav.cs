@@ -412,6 +412,18 @@ public sealed class RailNav
     }
 
     /// <summary>
+    /// Snap to the current line, but clamp target X so the camera never moves
+    /// backward (rightward). Used by autoscroll to avoid a visual jerk when
+    /// advancing from a narrow centered block to a wider left-aligned block.
+    /// </summary>
+    public void StartSnapToCurrentForward(double cameraX, double cameraY, double zoom, double windowWidth, double windowHeight)
+    {
+        if (!CanNavigate) return;
+        var (targetX, targetY) = ComputeTargetCamera(zoom, windowWidth, windowHeight);
+        BeginSnap(cameraX, cameraY, Math.Min(targetX, cameraX), targetY);
+    }
+
+    /// <summary>
     /// Snap to the right (end) edge of the current line. Used when navigating backward
     /// via edge-hold so the user lands at the end of the previous line and can continue scrolling.
     /// </summary>

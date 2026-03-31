@@ -415,6 +415,11 @@ public sealed class DocumentState : IDisposable
         Rail.StartSnapToCurrent(Camera.OffsetX, Camera.OffsetY, Camera.Zoom, windowWidth, windowHeight);
     }
 
+    public void StartSnapForward(double windowWidth, double windowHeight)
+    {
+        Rail.StartSnapToCurrentForward(Camera.OffsetX, Camera.OffsetY, Camera.Zoom, windowWidth, windowHeight);
+    }
+
     public void StartSnapPreservingPosition(double windowWidth, double windowHeight,
         double horizontalFraction, double lineScreenY)
     {
