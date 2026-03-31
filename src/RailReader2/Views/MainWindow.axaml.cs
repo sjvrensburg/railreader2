@@ -37,7 +37,7 @@ public partial class MainWindow : Window
             // Wire granular invalidation callbacks
             vm.SetInvalidation(new InvalidationCallbacks
             {
-                InvalidateCamera = UpdateCameraTransform,
+                InvalidateCamera = () => { UpdateCameraTransform(); StatusBar.UpdateZoom(); },
                 InvalidatePage = () =>
                 {
                     PageLayer.ActiveEffect = vm.Controller.ActiveColourEffect;

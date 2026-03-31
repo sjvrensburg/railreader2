@@ -15,6 +15,7 @@ public partial class StatusBarView : UserControl
     private static readonly IBrush DangerBrush = new SolidColorBrush(Color.FromRgb(255, 100, 100));
 
     private TabViewModel? _subscribedTab;
+    private TextBlock? _zoomLabel;
 
     public StatusBarView()
     {
@@ -77,6 +78,18 @@ public partial class StatusBarView : UserControl
 
     public bool IsEditing { get; private set; }
     private TextBlock? _pageLabel;
+
+    /// <summary>
+    /// Lightweight zoom-only update called from the camera invalidation path
+    /// so the displayed zoom stays current during animations.
+    /// </summary>
+    public void UpdateZoom()
+    {
+        if (_zoomLabel is null) return;
+        var tab = (DataContext as MainWindowViewModel)?.ActiveTab;
+        if (tab is null) return;
+        _zoomLabel.Text = $"Zoom: {(int)Math.Round(tab.Camera.Zoom * 100)}%";
+    }
 
     private void BeginPageEdit(MainWindowViewModel vm, TabViewModel tab)
     {
@@ -153,7 +166,8 @@ public partial class StatusBarView : UserControl
         StatusPanel.Children.Add(MakeNavButton("\u25b6", (_, _) =>
         { if (vm?.ActiveTab is { } t) vm.GoToPage(t.CurrentPage + 1); }, "Next page (PgDn)"));
         AddSeparator();
-        StatusPanel.Children.Add(new TextBlock { Text = $"Zoom: {zoomPct}%" });
+        _zoomLabel = new TextBlock { Text = $"Zoom: {zoomPct}%" };
+        StatusPanel.Children.Add(_zoomLabel);
 
         if (tab.PendingRailSetup)
         {
