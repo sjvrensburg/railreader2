@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using RailReader.Core.Commands;
 using RailReader.Core.Models;
 using RailReader.Core.Services;
@@ -68,11 +67,7 @@ public sealed class DocumentController
     private double _pausedZoom;
 
     // Non-rail edge-hold page advance
-    private Stopwatch? _nonRailEdgeHoldTimer;
-    private bool _nonRailEdgeForward;
-    private const double NonRailEdgeHoldMs = 400.0;
-    private Stopwatch? _nonRailEdgeCooldown;
-    private const double NonRailEdgeCooldownMs = 300.0;
+    private readonly EdgeHoldStateMachine _edgeHold = new();
 
     /// <summary>
     /// Fired when a property changes. UI can subscribe to update bindings.
@@ -478,8 +473,7 @@ public sealed class DocumentController
 
             if (doc.Rail.Active)
             {
-                doc.PendingSkipDirection = 0;
-                doc.PendingSkipCount = 0;
+                doc.PendingSkip = null;
                 doc.QueueLookahead(_config.AnalysisLookaheadPages);
                 if (!forward) doc.Rail.JumpToEnd();
                 doc.StartSnap(ww, wh);
@@ -489,8 +483,7 @@ public sealed class DocumentController
 
             if (doc.PendingRailSetup)
             {
-                doc.PendingSkipDirection = step;
-                doc.PendingSkipCount = skipped;
+                doc.PendingSkip = new(forward, skipped);
                 doc.QueueLookahead(_config.AnalysisLookaheadPages);
                 return SkipResult.Deferred;
             }
@@ -499,8 +492,7 @@ public sealed class DocumentController
             targetPage += step;
         }
 
-        doc.PendingSkipDirection = 0;
-        doc.PendingSkipCount = 0;
+        doc.PendingSkip = null;
         return SkipResult.Exhausted;
     }
 
@@ -525,10 +517,9 @@ public sealed class DocumentController
     /// </summary>
     private bool TryResumeSkip(DocumentState doc, double ww, double wh)
     {
+        var skip = doc.PendingSkip!;
         // The current page (whose analysis just arrived with no blocks) counts as skipped
-        int skipped = doc.PendingSkipCount + 1;
-        bool forward = doc.PendingSkipDirection > 0;
-        return SkipToNavigablePage(doc, forward, skipped, ww, wh) == SkipResult.FoundNavigable;
+        return SkipToNavigablePage(doc, skip.Forward, skip.Skipped + 1, ww, wh) == SkipResult.FoundNavigable;
     }
 
     public void HandleArrowDown() => HandleVerticalNav(forward: true);
@@ -548,29 +539,16 @@ public sealed class DocumentController
         }
         else
         {
-            // After an edge-hold page jump, ignore input briefly so key-repeat
-            // doesn't immediately pan away from the landing position.
-            if (_nonRailEdgeCooldown is not null)
-            {
-                if (_nonRailEdgeCooldown.Elapsed.TotalMilliseconds < NonRailEdgeCooldownMs)
-                    return;
-                _nonRailEdgeCooldown = null;
-            }
+            if (_edgeHold.ShouldSuppressInput) return;
 
             double prevY = doc.Camera.OffsetY;
             doc.Camera.OffsetY += forward ? -PanStep : PanStep;
             doc.ClampCamera(ww, wh);
 
-            // Check if we're at the page edge (camera didn't move after clamping)
             bool atEdge = Math.Abs(doc.Camera.OffsetY - prevY) < 1.0;
             if (atEdge)
             {
-                if (_nonRailEdgeHoldTimer is null || _nonRailEdgeForward != forward)
-                {
-                    _nonRailEdgeHoldTimer = Stopwatch.StartNew();
-                    _nonRailEdgeForward = forward;
-                }
-                else if (_nonRailEdgeHoldTimer.Elapsed.TotalMilliseconds >= NonRailEdgeHoldMs)
+                if (_edgeHold.OnEdgeHit(forward))
                 {
                     int targetPage = doc.CurrentPage + (forward ? 1 : -1);
                     if (targetPage >= 0 && targetPage < doc.PageCount)
@@ -579,24 +557,18 @@ public sealed class DocumentController
                         double scaledH = doc.PageHeight * doc.Camera.Zoom;
                         doc.Camera.OffsetY = forward ? 0 : Math.Min(wh - scaledH, 0);
                         doc.ClampCamera(ww, wh);
-                        _nonRailEdgeHoldTimer = null;
-                        _nonRailEdgeCooldown = Stopwatch.StartNew();
                     }
                 }
             }
             else
             {
-                _nonRailEdgeHoldTimer = null;
+                _edgeHold.OnMoved();
             }
         }
     }
 
     /// <summary>Clear non-rail edge-hold state (call on key release).</summary>
-    public void ClearNonRailEdgeHold()
-    {
-        _nonRailEdgeHoldTimer = null;
-        _nonRailEdgeCooldown = null;
-    }
+    public void ClearNonRailEdgeHold() => _edgeHold.Reset();
 
     public void HandleArrowRight(bool shortJump = false)
     {
@@ -972,21 +944,18 @@ public sealed class DocumentController
                     _logger.Debug($"[Analysis] Rail has {doc.Rail.NavigableCount} navigable blocks, Active={doc.Rail.Active}");
                     if (doc.Rail.Active)
                     {
-                        doc.PendingSkipDirection = 0;
+                        doc.PendingSkip = null;
                         doc.StartSnap(ww, wh);
                         needsAnim = true;
                     }
-                    else if (doc.PendingSkipDirection != 0)
+                    else if (doc.PendingSkip is not null)
                     {
                         // Analysis arrived but no navigable blocks — skip to next page.
                         // Only resume if this is the active document; clear stale state otherwise.
                         if (doc == ActiveDocument)
                             needsAnim |= TryResumeSkip(doc, ww, wh);
                         else
-                        {
-                            doc.PendingSkipDirection = 0;
-                            doc.PendingSkipCount = 0;
-                        }
+                            doc.PendingSkip = null;
                     }
                 }
             }
