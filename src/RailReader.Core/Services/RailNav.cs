@@ -817,6 +817,7 @@ public sealed class RailNav
         _autoScrollPauseTimer = Stopwatch.StartNew();
         _autoScrollPauseDurationMs = durationMs;
         _autoScrollPauseAdvances = advances;
+        ScrollSpeed = 0.0;
     }
 
     /// <summary>
@@ -834,7 +835,6 @@ public sealed class RailNav
             {
                 BeginAutoScrollPause(_autoScrollPendingPauseMs, advances: false);
                 _autoScrollPendingPauseMs = 0;
-                ScrollSpeed = 0.0;
             }
             else
             {
@@ -845,7 +845,6 @@ public sealed class RailNav
         // Pause: hold position, count down
         if (_autoScrollPauseTimer is not null)
         {
-            ScrollSpeed = 0.0;
             if (_autoScrollPauseTimer.Elapsed.TotalMilliseconds >= _autoScrollPauseDurationMs)
             {
                 bool advance = _autoScrollPauseAdvances;
@@ -856,16 +855,13 @@ public sealed class RailNav
         }
 
         double speed = _autoScrollBoost ? _autoScrollSpeed * 2.0 : _autoScrollSpeed;
-        // Move camera left (negative X) to scroll content right.
-        // Use the rail zoom threshold as reference so screen-space speed is
-        // constant regardless of current zoom (avoids text rushing at high mag).
+        // Use rail zoom threshold as reference so screen-space speed is constant
+        // regardless of current zoom (avoids text rushing at high magnification).
         cameraX -= speed * ReferenceSpeed * dtSecs;
-        // Normalize speed 0–1 for motion blur, matching hold-scroll's formula.
         double maxSpeed = _config.ScrollSpeedMax;
         ScrollSpeed = maxSpeed > 0 ? Math.Clamp(speed / maxSpeed, 0.0, 1.0) : 0.0;
         cameraX = ClampX(cameraX, zoom, windowWidth);
 
-        // Check if we've reached the right edge of the block
         var (_, blockRight, blockWidthPx) = GetBlockBounds(zoom);
         double visibleRight = (-cameraX + windowWidth) / zoom;
 
