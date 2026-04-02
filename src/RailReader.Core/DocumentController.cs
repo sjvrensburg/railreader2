@@ -60,11 +60,8 @@ public sealed class DocumentController
     public bool JumpMode { get => _autoScroll.JumpMode; set => _autoScroll.JumpMode = value; }
 
     // Rail pause (Ctrl+drag free pan) state
-    public bool RailPaused { get; private set; }
-    private int _pausedBlock;
-    private int _pausedLine;
-    private double _pausedVerticalBias;
-    private double _pausedZoom;
+    private RailPauseState? _railPause;
+    public bool RailPaused => _railPause is not null;
 
     // Non-rail edge-hold page advance
     private readonly EdgeHoldStateMachine _edgeHold = new();
@@ -167,7 +164,7 @@ public sealed class DocumentController
         Documents.RemoveAt(index);
         doc.Dispose();
         ActiveDocumentIndex = Math.Clamp(ActiveDocumentIndex, 0, Math.Max(Documents.Count - 1, 0));
-        RailPaused = false;
+        _railPause = null;
         Search.CloseSearch();
     }
 
@@ -175,7 +172,7 @@ public sealed class DocumentController
     {
         if (index >= 0 && index < Documents.Count)
         {
-            RailPaused = false;
+            _railPause = null;
             ActiveDocumentIndex = index;
         }
     }
@@ -369,14 +366,7 @@ public sealed class DocumentController
         var (ww, wh) = GetViewportSize();
 
         if (ctrlHeld && doc.Rail.Active && !RailPaused)
-        {
-            RailPaused = true;
-            _pausedBlock = doc.Rail.CurrentBlock;
-            _pausedLine = doc.Rail.CurrentLine;
-            _pausedVerticalBias = doc.Rail.VerticalBias;
-            _pausedZoom = doc.Camera.Zoom;
-            StatusMessage?.Invoke("Free pan — release Ctrl to return");
-        }
+            StartRailPause(doc);
 
         doc.Camera.OffsetX += dx;
         doc.Camera.OffsetY += dy;
@@ -385,21 +375,27 @@ public sealed class DocumentController
             doc.Rail.CaptureVerticalBias(doc.Camera.OffsetY, doc.Camera.Zoom, wh);
     }
 
+    private void StartRailPause(DocumentState doc)
+    {
+        _railPause = new(doc.Rail.CurrentBlock, doc.Rail.CurrentLine, doc.Rail.VerticalBias, doc.Camera.Zoom);
+        StatusMessage?.Invoke("Free pan — release Ctrl to return");
+    }
+
     /// <summary>
     /// End rail pause: restore block/line/bias/zoom from before the free pan and snap back.
     /// </summary>
     public void ResumeRailFromPause()
     {
-        if (!RailPaused) return;
-        RailPaused = false;
+        if (_railPause is not { } pause) return;
+        _railPause = null;
 
         if (ActiveDocument is not { } doc) return;
         var (ww, wh) = GetViewportSize();
 
         // Restore zoom if it changed during free pan (may re-enter rail mode)
-        if (Math.Abs(doc.Camera.Zoom - _pausedZoom) > 0.001)
+        if (Math.Abs(doc.Camera.Zoom - pause.Zoom) > 0.001)
         {
-            doc.Camera.Zoom = _pausedZoom;
+            doc.Camera.Zoom = pause.Zoom;
             doc.Camera.NotifyZoomChange();
             doc.UpdateRailZoom(ww, wh);
             doc.UpdateRenderDpiIfNeeded();
@@ -408,9 +404,9 @@ public sealed class DocumentController
         if (!doc.Rail.Active) return;
 
         // Clamp indices in case analysis changed while paused
-        doc.Rail.CurrentBlock = Math.Clamp(_pausedBlock, 0, Math.Max(doc.Rail.NavigableCount - 1, 0));
-        doc.Rail.CurrentLine = Math.Clamp(_pausedLine, 0, Math.Max(doc.Rail.CurrentLineCount - 1, 0));
-        doc.Rail.VerticalBias = _pausedVerticalBias;
+        doc.Rail.CurrentBlock = Math.Clamp(pause.Block, 0, Math.Max(doc.Rail.NavigableCount - 1, 0));
+        doc.Rail.CurrentLine = Math.Clamp(pause.Line, 0, Math.Max(doc.Rail.CurrentLineCount - 1, 0));
+        doc.Rail.VerticalBias = pause.VerticalBias;
 
         doc.StartSnap(ww, wh);
         StatusMessage?.Invoke("");
@@ -833,34 +829,42 @@ public sealed class DocumentController
             }
             animating |= railAnimating;
 
-            if (doc.Rail.AutoScrollTriggered)
+            if (doc.Rail.ConsumeAutoScrollTrigger())
             {
-                doc.Rail.AutoScrollTriggered = false;
                 _autoScroll.ActivateAutoScroll();
                 StatusMessage?.Invoke("Auto-scroll activated");
             }
 
-            // Edge-hold advance: D/Right held at line end → NextLine; A/Left held at line start → PrevLine
-            if (!doc.Rail.AutoScrolling && doc.Rail.ConsumePendingEdgeAdvance() is { } edgeDir)
-            {
-                bool forward = edgeDir == ScrollDirection.Forward;
-                var adv = AdvanceLine(doc, forward, ww, wh);
-                if (adv is LineAdvanceResult.PageChanged or LineAdvanceResult.PageChangedRailLost)
-                {
-                    pageChanged = true;
-                    // AdvanceLine already snaps to start; override with snap-to-end for backward
-                    if (!forward && adv == LineAdvanceResult.PageChanged)
-                        doc.StartSnapToEnd(ww, wh);
-                }
-                else if (adv == LineAdvanceResult.LineAdvanced)
-                {
-                    if (forward) doc.StartSnap(ww, wh);
-                    else doc.StartSnapToEnd(ww, wh);
-                }
-                overlayChanged = true;
-                cameraChanged = true;
-            }
+            HandleEdgeAdvance(doc, ww, wh, ref pageChanged, ref cameraChanged, ref overlayChanged);
         }
+    }
+
+    /// <summary>
+    /// Handles edge-hold line advances: D/Right held at line end → NextLine;
+    /// A/Left held at line start → PrevLine.
+    /// </summary>
+    private void HandleEdgeAdvance(DocumentState doc, double ww, double wh,
+        ref bool pageChanged, ref bool cameraChanged, ref bool overlayChanged)
+    {
+        if (doc.Rail.AutoScrolling) return;
+        if (doc.Rail.ConsumePendingEdgeAdvance() is not { } edgeDir) return;
+
+        bool forward = edgeDir == ScrollDirection.Forward;
+        var adv = AdvanceLine(doc, forward, ww, wh);
+        if (adv is LineAdvanceResult.PageChanged or LineAdvanceResult.PageChangedRailLost)
+        {
+            pageChanged = true;
+            // AdvanceLine already snaps to start; override with snap-to-end for backward
+            if (!forward && adv == LineAdvanceResult.PageChanged)
+                doc.StartSnapToEnd(ww, wh);
+        }
+        else if (adv == LineAdvanceResult.LineAdvanced)
+        {
+            if (forward) doc.StartSnap(ww, wh);
+            else doc.StartSnapToEnd(ww, wh);
+        }
+        overlayChanged = true;
+        cameraChanged = true;
     }
 
     /// <summary>Auto-scroll tick: advance along the current line, then advance to the next line/page.</summary>

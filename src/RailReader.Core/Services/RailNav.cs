@@ -21,13 +21,7 @@ public sealed class RailNav : ICameraClamp
     public double VerticalBias { get; set; }
 
     private SnapAnimation? _snap;
-    private ScrollDirection? _scrollDir;
-    private Stopwatch? _scrollHoldTimer;
-    private double _scrollStartX;
-    private double _scrollSeedSecs; // virtual time offset so first frame has visible displacement
-    private double _scrollLastSpeedStart; // cached to detect mid-scroll speed changes
-    private double _scrollLastSpeedMax;
-    private double _scrollDisplacementOffset; // absorbs displacement discontinuity on speed change
+    private readonly HorizontalScrollState _scroll = new();
 
     // Auto-scroll state machine: explicit states replace the previous implicit flag combinations
     private readonly AutoScrollStateMachine _autoScrollState;
@@ -35,9 +29,15 @@ public sealed class RailNav : ICameraClamp
 
     /// <summary>
     /// Set to true when sustained horizontal scroll triggers auto-scroll.
-    /// The controller reads and clears this flag to transition state.
+    /// The controller consumes this signal to transition state.
     /// </summary>
-    public bool AutoScrollTriggered { get; set; }
+    private bool _autoScrollTriggered;
+    public bool ConsumeAutoScrollTrigger()
+    {
+        if (!_autoScrollTriggered) return false;
+        _autoScrollTriggered = false;
+        return true;
+    }
 
     // Edge-hold advance: when the user holds D/Right (or A/Left) against the line boundary,
     // the state machine fires a line advance after a hold threshold.
@@ -106,8 +106,8 @@ public sealed class RailNav : ICameraClamp
             CurrentLine = 0;
             VerticalBias = 0;
             _snap = null;
-            _scrollDir = null;
-            _scrollHoldTimer = null;
+            _scroll.Stop();
+            ScrollSpeed = 0.0;
         }
         else
         {
@@ -146,7 +146,8 @@ public sealed class RailNav : ICameraClamp
         {
             Active = false;
             _snap = null;
-            _scrollDir = null;
+            _scroll.Stop();
+            ScrollSpeed = 0.0;
         }
     }
 
@@ -255,36 +256,18 @@ public sealed class RailNav : ICameraClamp
 
         if (ShouldSuppressAfterEdgeAdvance()) return;
 
-        if (_scrollDir != dir)
+        if (_scroll.Direction != dir)
         {
-            _scrollDir = dir;
-            _scrollHoldTimer = Stopwatch.StartNew();
             // If a snap is in progress, jump to its target and start scrolling from there.
-            // This avoids a stale _scrollStartX when key-repeat fires during a line-advance snap
-            // (e.g. edge-hold advance), which would otherwise produce a displaced starting position.
-            if (_snap is { } activeSnap)
-            {
-                _scrollStartX = activeSnap.TargetX;
-                _snap = null;
-            }
-            else
-            {
-                _scrollStartX = currentCameraX;
-            }
-            // Seed one frame ahead (~16ms) so the first Tick() produces
-            // visible displacement instead of near-zero movement.
-            _scrollSeedSecs = 1.0 / 60.0;
-            _scrollLastSpeedStart = _config.ScrollSpeedStart;
-            _scrollLastSpeedMax = _config.ScrollSpeedMax;
-            _scrollDisplacementOffset = 0;
+            double startX = _snap is { } activeSnap ? activeSnap.TargetX : currentCameraX;
+            _snap = null;
+            _scroll.Start(dir, startX, _config.ScrollSpeedStart, _config.ScrollSpeedMax);
         }
     }
 
     public void StopScroll()
     {
-        _scrollDir = null;
-        _scrollHoldTimer = null;
-        _scrollSeedSecs = 0;
+        _scroll.Stop();
         ScrollSpeed = 0.0;
     }
 
@@ -597,18 +580,6 @@ public sealed class RailNav : ICameraClamp
     private static double SoftEase(double overshoot, double limit)
         => overshoot * limit / (limit + overshoot);
 
-    /// <summary>
-    /// Integral of the quadratic speed ramp: speed(t) = start + (max-start)*(t/ramp)².
-    /// Returns total displacement in page-coordinate pixels.
-    /// </summary>
-    private static double ScrollDisplacement(double speedStart, double speedMax, double ramp, double t)
-    {
-        if (t <= ramp)
-            return speedStart * t + (speedMax - speedStart) * t * t * t / (3.0 * ramp * ramp);
-        double rampDisp = speedStart * ramp + (speedMax - speedStart) * ramp / 3.0;
-        return rampDisp + speedMax * (t - ramp);
-    }
-
     public bool Tick(ref double cameraX, ref double cameraY, double dtSecs, double zoom, double windowWidth)
     {
         bool animating = TickSnapAnimation(ref cameraX, ref cameraY);
@@ -641,35 +612,18 @@ public sealed class RailNav : ICameraClamp
 
     private bool TickScrollHold(ref double cameraX, double zoom, double windowWidth)
     {
-        if (_scrollDir is not { } dir || _scrollHoldTimer is null)
+        if (_scroll.Direction is not { } dir)
         {
             ScrollSpeed = 0.0;
             return false;
         }
 
-        // Compute total displacement from absolute elapsed time (integral of speed curve).
-        // This eliminates frame-rate dependent jitter from variable dt.
-        // speed(t) = start + (max - start) * (t/ramp)^2
-        // integral: start*T + (max-start) * T^3 / (3*ramp^2)  for T <= ramp
-        double holdSecs = _scrollHoldTimer.Elapsed.TotalSeconds + _scrollSeedSecs;
         double ramp = _config.ScrollRampTime;
         double sStart = _config.ScrollSpeedStart;
         double sMax = _config.ScrollSpeedMax;
 
-        // When speed params change mid-scroll (e.g. user pressed [ or ]),
-        // absorb the displacement difference so the camera doesn't jump.
-        // The timer keeps running, so the velocity transitions naturally
-        // along the new ramp curve from the current elapsed time.
-        if (sStart != _scrollLastSpeedStart || sMax != _scrollLastSpeedMax)
-        {
-            double oldDisp = ScrollDisplacement(_scrollLastSpeedStart, _scrollLastSpeedMax, ramp, holdSecs);
-            double newDisp = ScrollDisplacement(sStart, sMax, ramp, holdSecs);
-            _scrollDisplacementOffset += oldDisp - newDisp;
-            _scrollLastSpeedStart = sStart;
-            _scrollLastSpeedMax = sMax;
-        }
-
-        double totalDisplacement = ScrollDisplacement(sStart, sMax, ramp, holdSecs) + _scrollDisplacementOffset;
+        double totalDisplacement = _scroll.ComputeDisplacement(sStart, sMax, ramp);
+        double holdSecs = _scroll.ElapsedSecs;
 
         double instantSpeed = holdSecs <= ramp
             ? sStart + (sMax - sStart) * (holdSecs / ramp) * (holdSecs / ramp)
@@ -679,17 +633,17 @@ public sealed class RailNav : ICameraClamp
         double sign = dir == ScrollDirection.Forward ? -1.0 : 1.0;
         // Use rail zoom threshold as reference so screen-space speed is constant
         // regardless of current zoom (matches auto-scroll behaviour).
-        cameraX = ClampX(_scrollStartX + sign * totalDisplacement * ReferenceSpeed, zoom, windowWidth);
+        cameraX = ClampX(_scroll.StartX + sign * totalDisplacement * ReferenceSpeed, zoom, windowWidth);
 
         // Auto-scroll trigger: if holding forward scroll for longer than the
         // configured delay, transition to auto-scroll mode.
         if (_config.AutoScrollTriggerEnabled
             && dir == ScrollDirection.Forward
-            && _scrollHoldTimer.Elapsed.TotalMilliseconds >= _config.AutoScrollTriggerDelayMs)
+            && _scroll.ElapsedMs >= _config.AutoScrollTriggerDelayMs)
         {
             StopScrollAndEdgeHold();
             StartAutoScroll(_config.DefaultAutoScrollSpeed);
-            AutoScrollTriggered = true;
+            _autoScrollTriggered = true;
             return true;
         }
 

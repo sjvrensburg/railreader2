@@ -185,7 +185,7 @@ public sealed class DocumentState : IDisposable
     /// picks this up and invalidates the page layer atomically with the
     /// camera update, avoiding mid-frame bitmap swaps.
     /// </summary>
-    public bool DpiRenderReady { get; set; }
+    public bool DpiRenderReady { get; internal set; }
 
     /// <summary>
     /// Called on the UI thread when a DPI re-render completes, so the view can
