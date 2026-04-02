@@ -41,57 +41,66 @@ public static class StructureCommand
             Outline = pdf.Outline.Select(Shared.SerializeOutlineEntry).ToList()
         };
 
+        int failed = 0;
         foreach (var pageIdx in pages!)
         {
             if (!analyze && !includeText) continue;
 
-            Console.Error.WriteLine($"  Processing page {pageIdx + 1}/{pdf.PageCount}...");
-
-            var (pw, ph) = pdf.GetPageSize(pageIdx);
-            PageAnalysis? analysis = null;
-
-            if (analyze && analyzer != null)
+            try
             {
-                var (rgbBytes, pxW, pxH) = pdf.RenderPagePixmap(pageIdx, 800);
-                analysis = analyzer.RunAnalysis(rgbBytes, pxW, pxH, pw, ph);
-            }
+                Console.Error.WriteLine($"  Processing page {pageIdx + 1}/{pdf.PageCount}...");
 
-            PageText? pageText = null;
-            if (includeText && textService != null)
-                pageText = textService.ExtractPageText(pdf.PdfBytes, pageIdx);
+                var (pw, ph) = pdf.GetPageSize(pageIdx);
+                PageAnalysis? analysis = null;
 
-            if (analysis != null || pageText != null)
-            {
-                var pageOutput = new StructurePage
+                if (analyze && analyzer != null)
                 {
-                    Page = pageIdx,
-                    Width = (float)pw,
-                    Height = (float)ph
-                };
-
-                if (analysis != null)
-                {
-                    pageOutput.Blocks = analysis.Blocks.Select(b =>
-                    {
-                        var block = new StructureBlock
-                        {
-                            Class = b.ClassId < LayoutConstants.LayoutClasses.Length
-                                ? LayoutConstants.LayoutClasses[b.ClassId]
-                                : $"class_{b.ClassId}",
-                            ClassId = b.ClassId,
-                            BBox = new BBoxOutput(b.BBox.X, b.BBox.Y, b.BBox.W, b.BBox.H),
-                            Confidence = b.Confidence,
-                            ReadingOrder = b.Order,
-                        };
-
-                        if (includeText && pageText != null)
-                            block.Text = Shared.ExtractBlockText(pageText, b);
-
-                        return block;
-                    }).ToList();
+                    var (rgbBytes, pxW, pxH) = pdf.RenderPagePixmap(pageIdx, 800);
+                    analysis = analyzer.RunAnalysis(rgbBytes, pxW, pxH, pw, ph);
                 }
 
-                result.Pages.Add(pageOutput);
+                PageText? pageText = null;
+                if (includeText && textService != null)
+                    pageText = textService.ExtractPageText(pdf.PdfBytes, pageIdx);
+
+                if (analysis != null || pageText != null)
+                {
+                    var pageOutput = new StructurePage
+                    {
+                        Page = pageIdx,
+                        Width = (float)pw,
+                        Height = (float)ph
+                    };
+
+                    if (analysis != null)
+                    {
+                        pageOutput.Blocks = analysis.Blocks.Select(b =>
+                        {
+                            var block = new StructureBlock
+                            {
+                                Class = b.ClassId < LayoutConstants.LayoutClasses.Length
+                                    ? LayoutConstants.LayoutClasses[b.ClassId]
+                                    : $"class_{b.ClassId}",
+                                ClassId = b.ClassId,
+                                BBox = new BBoxOutput(b.BBox.X, b.BBox.Y, b.BBox.W, b.BBox.H),
+                                Confidence = b.Confidence,
+                                ReadingOrder = b.Order,
+                            };
+
+                            if (includeText && pageText != null)
+                                block.Text = Shared.ExtractBlockText(pageText, b);
+
+                            return block;
+                        }).ToList();
+                    }
+
+                    result.Pages.Add(pageOutput);
+                }
+            }
+            catch (Exception ex)
+            {
+                failed++;
+                Console.Error.WriteLine($"  Error on page {pageIdx + 1}: {ex.Message}");
             }
         }
 
@@ -109,7 +118,7 @@ public static class StructureCommand
             Console.WriteLine(json);
         }
 
-        return 0;
+        return failed > 0 ? 1 : 0;
     }
 
     static void PrintHelp()

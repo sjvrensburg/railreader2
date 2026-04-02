@@ -53,62 +53,72 @@ public static class RenderCommand
         var paint = colourEffects.CreatePaint(effect, intensity);
 
         int rendered = 0;
+        int failed = 0;
         foreach (var pageIdx in pages!)
         {
-            using var renderedPage = pdf.RenderPage(pageIdx, dpi);
-            var srcBitmap = ((SkiaRenderedPage)renderedPage).Bitmap;
-
-            var pageAnnotations = withAnnotations && annotations != null
-                && annotations.Pages.TryGetValue(pageIdx, out var pa) && pa.Count > 0 ? pa : null;
-
-            bool needsCompositing = paint != null || pageAnnotations != null;
-
-            if (!needsCompositing)
+            try
             {
-                var outputPath = Path.Combine(outputDir, $"page_{pageIdx + 1:D3}.png");
-                ScreenshotCompositor.SavePng(srcBitmap, outputPath);
+                using var renderedPage = pdf.RenderPage(pageIdx, dpi);
+                var srcBitmap = ((SkiaRenderedPage)renderedPage).Bitmap;
+
+                var pageAnnotations = withAnnotations && annotations != null
+                    && annotations.Pages.TryGetValue(pageIdx, out var pa) && pa.Count > 0 ? pa : null;
+
+                bool needsCompositing = paint != null || pageAnnotations != null;
+
+                if (!needsCompositing)
+                {
+                    var outputPath = Path.Combine(outputDir, $"page_{pageIdx + 1:D3}.png");
+                    ScreenshotCompositor.SavePng(srcBitmap, outputPath);
+                    rendered++;
+                    Console.Error.WriteLine($"  Rendered page {pageIdx + 1}/{pdf.PageCount} -> {outputPath}");
+                    continue;
+                }
+
+                using var surface = SKSurface.Create(new SKImageInfo(srcBitmap.Width, srcBitmap.Height));
+                var canvas = surface.Canvas;
+
+                if (paint != null)
+                {
+                    canvas.SaveLayer(paint);
+                    canvas.DrawBitmap(srcBitmap, 0, 0);
+                    canvas.Restore();
+                }
+                else
+                {
+                    canvas.DrawBitmap(srcBitmap, 0, 0);
+                }
+
+                if (pageAnnotations != null)
+                {
+                    var (pw, ph) = pdf.GetPageSize(pageIdx);
+                    float scaleX = srcBitmap.Width / (float)pw;
+                    float scaleY = srcBitmap.Height / (float)ph;
+
+                    canvas.Save();
+                    canvas.Scale(scaleX, scaleY);
+                    AnnotationRenderer.DrawAnnotations(canvas, pageAnnotations, null, expandAllNotes: true);
+                    canvas.Restore();
+                }
+
+                var outPath = Path.Combine(outputDir, $"page_{pageIdx + 1:D3}.png");
+                using var image = surface.Snapshot();
+                using var outBitmap = SKBitmap.FromImage(image);
+                ScreenshotCompositor.SavePng(outBitmap, outPath);
+
                 rendered++;
-                Console.Error.WriteLine($"  Rendered page {pageIdx + 1}/{pdf.PageCount} -> {outputPath}");
-                continue;
+                Console.Error.WriteLine($"  Rendered page {pageIdx + 1}/{pdf.PageCount} -> {outPath}");
             }
-
-            using var surface = SKSurface.Create(new SKImageInfo(srcBitmap.Width, srcBitmap.Height));
-            var canvas = surface.Canvas;
-
-            if (paint != null)
+            catch (Exception ex)
             {
-                canvas.SaveLayer(paint);
-                canvas.DrawBitmap(srcBitmap, 0, 0);
-                canvas.Restore();
+                failed++;
+                Console.Error.WriteLine($"  Error on page {pageIdx + 1}: {ex.Message}");
             }
-            else
-            {
-                canvas.DrawBitmap(srcBitmap, 0, 0);
-            }
-
-            if (pageAnnotations != null)
-            {
-                var (pw, ph) = pdf.GetPageSize(pageIdx);
-                float scaleX = srcBitmap.Width / (float)pw;
-                float scaleY = srcBitmap.Height / (float)ph;
-
-                canvas.Save();
-                canvas.Scale(scaleX, scaleY);
-                AnnotationRenderer.DrawAnnotations(canvas, pageAnnotations, null, expandAllNotes: true);
-                canvas.Restore();
-            }
-
-            var outPath = Path.Combine(outputDir, $"page_{pageIdx + 1:D3}.png");
-            using var image = surface.Snapshot();
-            using var outBitmap = SKBitmap.FromImage(image);
-            ScreenshotCompositor.SavePng(outBitmap, outPath);
-
-            rendered++;
-            Console.Error.WriteLine($"  Rendered page {pageIdx + 1}/{pdf.PageCount} -> {outPath}");
         }
 
-        Console.Error.WriteLine($"Done: {rendered} page(s) rendered to {Path.GetFullPath(outputDir)}");
-        return 0;
+        Console.Error.WriteLine($"Done: {rendered} page(s) rendered to {Path.GetFullPath(outputDir)}"
+            + (failed > 0 ? $" ({failed} failed)" : ""));
+        return failed > 0 ? 1 : 0;
     }
 
     static ColourEffect ParseEffect(string? name) => name?.ToLowerInvariant() switch

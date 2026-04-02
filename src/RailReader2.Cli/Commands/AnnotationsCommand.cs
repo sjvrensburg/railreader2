@@ -59,64 +59,73 @@ public static class AnnotationsCommand
             Outline = pdf2.Outline.Select(Shared.SerializeOutlineEntry).ToList()
         };
 
+        int failed = 0;
         foreach (var (pageIdx, pageAnnotations) in annotations.Pages.OrderBy(p => p.Key))
         {
-            var (pw, ph) = pdf2.GetPageSize(pageIdx);
-            var pageOutput = new AnnotationPageOutput
+            try
             {
-                Page = pageIdx,
-                Width = (float)pw,
-                Height = (float)ph
-            };
-
-            PageAnalysis? analysis = null;
-            if (includeBlocks && analyzer != null)
-            {
-                var (rgbBytes, pxW, pxH) = pdf2.RenderPagePixmap(pageIdx, 800);
-                analysis = analyzer.RunAnalysis(rgbBytes, pxW, pxH, pw, ph);
-            }
-
-            PageText? pageText = null;
-            if (includeText && textService != null)
-                pageText = textService.ExtractPageText(pdf2.PdfBytes, pageIdx);
-
-            foreach (var ann in pageAnnotations)
-            {
-                var annOutput = SerializeAnnotation(ann);
-                var annBounds = AnnotationGeometry.GetAnnotationBounds(ann);
-
-                if (includeText && pageText != null && annBounds is { } textRect)
-                    annOutput.Text = Shared.ExtractTextInRect(pageText, textRect.Left, textRect.Top, textRect.Right, textRect.Bottom);
-
-                if (includeBlocks && analysis != null && annBounds is { } blockRect)
+                var (pw, ph) = pdf2.GetPageSize(pageIdx);
+                var pageOutput = new AnnotationPageOutput
                 {
-                    foreach (var block in analysis.Blocks)
-                    {
-                        if (Overlaps(blockRect, block.BBox))
-                        {
-                            var blockOutput = new AnnotationBlockOutput
-                            {
-                                Class = block.ClassId < LayoutConstants.LayoutClasses.Length
-                                    ? LayoutConstants.LayoutClasses[block.ClassId]
-                                    : $"class_{block.ClassId}",
-                                ClassId = block.ClassId,
-                                BBox = new BBoxOutput(block.BBox.X, block.BBox.Y, block.BBox.W, block.BBox.H),
-                                Confidence = block.Confidence
-                            };
+                    Page = pageIdx,
+                    Width = (float)pw,
+                    Height = (float)ph
+                };
 
-                            if (includeText && pageText != null)
-                                blockOutput.Text = Shared.ExtractBlockText(pageText, block);
-
-                            annOutput.OverlappingBlocks.Add(blockOutput);
-                        }
-                    }
+                PageAnalysis? analysis = null;
+                if (includeBlocks && analyzer != null)
+                {
+                    var (rgbBytes, pxW, pxH) = pdf2.RenderPagePixmap(pageIdx, 800);
+                    analysis = analyzer.RunAnalysis(rgbBytes, pxW, pxH, pw, ph);
                 }
 
-                annOutput.NearestHeading = FindNearestHeading(annBounds, pageIdx, pdf2.Outline, analysis);
-                pageOutput.Annotations.Add(annOutput);
-            }
+                PageText? pageText = null;
+                if (includeText && textService != null)
+                    pageText = textService.ExtractPageText(pdf2.PdfBytes, pageIdx);
 
-            result.Pages.Add(pageOutput);
+                foreach (var ann in pageAnnotations)
+                {
+                    var annOutput = SerializeAnnotation(ann);
+                    var annBounds = AnnotationGeometry.GetAnnotationBounds(ann);
+
+                    if (includeText && pageText != null && annBounds is { } textRect)
+                        annOutput.Text = Shared.ExtractTextInRect(pageText, textRect.Left, textRect.Top, textRect.Right, textRect.Bottom);
+
+                    if (includeBlocks && analysis != null && annBounds is { } blockRect)
+                    {
+                        foreach (var block in analysis.Blocks)
+                        {
+                            if (Overlaps(blockRect, block.BBox))
+                            {
+                                var blockOutput = new AnnotationBlockOutput
+                                {
+                                    Class = block.ClassId < LayoutConstants.LayoutClasses.Length
+                                        ? LayoutConstants.LayoutClasses[block.ClassId]
+                                        : $"class_{block.ClassId}",
+                                    ClassId = block.ClassId,
+                                    BBox = new BBoxOutput(block.BBox.X, block.BBox.Y, block.BBox.W, block.BBox.H),
+                                    Confidence = block.Confidence
+                                };
+
+                                if (includeText && pageText != null)
+                                    blockOutput.Text = Shared.ExtractBlockText(pageText, block);
+
+                                annOutput.OverlappingBlocks.Add(blockOutput);
+                            }
+                        }
+                    }
+
+                    annOutput.NearestHeading = FindNearestHeading(annBounds, pageIdx, pdf2.Outline, analysis);
+                    pageOutput.Annotations.Add(annOutput);
+                }
+
+                result.Pages.Add(pageOutput);
+            }
+            catch (Exception ex)
+            {
+                failed++;
+                Console.Error.WriteLine($"  Error on page {pageIdx + 1}: {ex.Message}");
+            }
         }
 
         result.Bookmarks = annotations.Bookmarks.Select(b => new BookmarkOutput
@@ -139,7 +148,7 @@ public static class AnnotationsCommand
             Console.WriteLine(json);
         }
 
-        return 0;
+        return failed > 0 ? 1 : 0;
     }
 
     internal static bool Overlaps(RectF a, BBox b)
