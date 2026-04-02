@@ -256,7 +256,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
             await Task.Run(() =>
             {
                 var state = _controller.CreateDocument(path);
-                state.LoadPageBitmap();
+                if (!state.LoadPageBitmap())
+                    throw new InvalidOperationException($"Failed to render first page of {Path.GetFileName(path)}");
                 tab = new TabViewModel(state);
             });
 

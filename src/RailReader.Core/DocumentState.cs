@@ -146,24 +146,36 @@ public sealed class DocumentState : IDisposable
     /// <summary>
     /// Renders the current page bitmap. Safe to call from a background thread.
     /// Does NOT submit analysis (which requires UI-thread access to the worker).
+    /// Returns false if the page could not be rendered.
     /// </summary>
-    public void LoadPageBitmap()
+    public bool LoadPageBitmap()
     {
         var oldPage = CachedPage;
         var oldMinimap = MinimapPage;
-        CachedPage = null;
-        MinimapPage = null;
-        oldPage?.Dispose();
-        oldMinimap?.Dispose();
 
-        var (w, h) = _pdf.GetPageSize(CurrentPage);
-        PageWidth = w;
-        PageHeight = h;
+        try
+        {
+            var (w, h) = _pdf.GetPageSize(CurrentPage);
+            int dpi = CalculateRenderDpi(Camera.Zoom);
+            var newPage = _pdf.RenderPage(CurrentPage, dpi);
+            var newMinimap = _pdf.RenderThumbnail(CurrentPage);
 
-        int dpi = CalculateRenderDpi(Camera.Zoom);
-        CachedPage = _pdf.RenderPage(CurrentPage, dpi);
-        CachedDpi = dpi;
-        MinimapPage = _pdf.RenderThumbnail(CurrentPage);
+            // Commit: swap fields and dispose old bitmaps only after full success
+            CachedPage = newPage;
+            CachedDpi = dpi;
+            MinimapPage = newMinimap;
+            PageWidth = w;
+            PageHeight = h;
+            oldPage?.Dispose();
+            oldMinimap?.Dispose();
+            return true;
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex)
+        {
+            _logger.Error($"Failed to render page {CurrentPage + 1}: {ex.Message}", ex);
+            return false;
+        }
     }
 
     private bool _dpiRenderPending;
@@ -336,17 +348,23 @@ public sealed class DocumentState : IDisposable
         return false;
     }
 
-    public void GoToPage(int page, AnalysisWorker? worker, HashSet<int> navigableClasses, double windowWidth, double windowHeight)
+    public bool GoToPage(int page, AnalysisWorker? worker, HashSet<int> navigableClasses, double windowWidth, double windowHeight)
     {
         page = Math.Clamp(page, 0, PageCount - 1);
-        if (page == CurrentPage) return;
+        if (page == CurrentPage) return true;
 
+        int oldPage = CurrentPage;
         double oldZoom = Camera.Zoom;
         CurrentPage = page;
-        LoadPageBitmap();
+        if (!LoadPageBitmap())
+        {
+            CurrentPage = oldPage;
+            return false;
+        }
         SubmitAnalysis(worker, navigableClasses);
         Camera.Zoom = oldZoom;
         ClampCamera(windowWidth, windowHeight);
+        return true;
     }
 
     public void CenterPage(double windowWidth, double windowHeight)

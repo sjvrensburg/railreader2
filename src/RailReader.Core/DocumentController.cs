@@ -308,10 +308,17 @@ public sealed class DocumentController
         _zoom.Cancel();
         if (ActiveDocument is not { } doc) return;
         var (ww, wh) = GetViewportSize();
-        doc.GoToPage(page, _worker, _config.NavigableClasses, ww, wh);
+        if (!doc.GoToPage(page, _worker, _config.NavigableClasses, ww, wh))
+        {
+            NotifyRenderFailed(page);
+            return;
+        }
         doc.QueueLookahead(_config.AnalysisLookaheadPages);
         Search.UpdateCurrentPageMatches();
     }
+
+    private void NotifyRenderFailed(int page)
+        => StatusMessage?.Invoke($"Page {page + 1} could not be rendered (corrupted?)");
 
     public void FitPage()
     {
@@ -468,7 +475,12 @@ public sealed class DocumentController
             }
 
             // Either has navigable blocks (land on it) or needs async analysis
-            doc.GoToPage(targetPage, _worker, _config.NavigableClasses, ww, wh);
+            if (!doc.GoToPage(targetPage, _worker, _config.NavigableClasses, ww, wh))
+            {
+                NotifyRenderFailed(targetPage);
+                doc.PendingSkip = null;
+                return SkipResult.Exhausted;
+            }
             doc.UpdateRailZoom(ww, wh);
 
             if (doc.Rail.Active)
