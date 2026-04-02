@@ -1,8 +1,8 @@
 using RailReader.Core.Models;
-using RailReader.Renderer.Skia;
+using RailReader.Core.Services;
 using SkiaSharp;
 
-namespace RailReader.Core.Services;
+namespace RailReader.Renderer.Skia;
 
 /// <summary>
 /// Shared annotation drawing logic used by both the overlay layer and the export path.

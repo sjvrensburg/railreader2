@@ -24,8 +24,18 @@ public static class RenderCommand
         var withAnnotations = Program.HasFlag(args, "annotations");
         var outputDir = Program.GetOption(args, "output-dir") ?? "screenshots";
 
-        var dpi = dpiStr != null && int.TryParse(dpiStr, out var d) ? d : 300;
-        var intensity = intensityStr != null && float.TryParse(intensityStr, out var f) ? f : 1.0f;
+        int dpi = 300;
+        if (dpiStr != null && int.TryParse(dpiStr, out var d))
+        {
+            dpi = Math.Clamp(d, 72, 1200);
+            if (d != dpi) Console.Error.WriteLine($"Warning: DPI clamped to {dpi} (valid range: 72-1200)");
+        }
+        float intensity = 1.0f;
+        if (intensityStr != null && float.TryParse(intensityStr, out var f))
+        {
+            intensity = Math.Clamp(f, 0f, 2f);
+            if (f != intensity) Console.Error.WriteLine($"Warning: Intensity clamped to {intensity:F1} (valid range: 0-2)");
+        }
         var effect = ParseEffect(effectName);
 
         var pdf = factory.CreatePdfService(pdfPath);
@@ -84,22 +94,7 @@ public static class RenderCommand
 
                 canvas.Save();
                 canvas.Scale(scaleX, scaleY);
-
-                var expandedNotes = new List<TextNoteAnnotation>();
-                foreach (var ann in pageAnnotations)
-                {
-                    if (ann is TextNoteAnnotation tn)
-                    {
-                        tn.IsExpanded = true;
-                        expandedNotes.Add(tn);
-                    }
-                }
-
-                AnnotationRenderer.DrawAnnotations(canvas, pageAnnotations, null);
-
-                foreach (var tn in expandedNotes)
-                    tn.IsExpanded = false;
-
+                AnnotationRenderer.DrawAnnotations(canvas, pageAnnotations, null, expandAllNotes: true);
                 canvas.Restore();
             }
 

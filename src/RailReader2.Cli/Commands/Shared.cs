@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using RailReader.Core;
 using RailReader.Core.Models;
 using RailReader.Core.Services;
 
@@ -43,6 +44,24 @@ internal static class Shared
     {
         var bbox = block.BBox;
         return ExtractTextInRect(pageText, bbox.X, bbox.Y, bbox.X + bbox.W, bbox.Y + bbox.H) ?? "";
+    }
+
+    /// <summary>
+    /// Creates a LayoutAnalyzer if the ONNX model is available.
+    /// Returns null and prints a warning if the model is not found.
+    /// </summary>
+    internal static LayoutAnalyzer? CreateAnalyzer(bool requested)
+    {
+        if (!requested) return null;
+
+        var modelPath = DocumentController.FindModelPath();
+        if (modelPath == null)
+        {
+            Console.Error.WriteLine("Warning: ONNX model not found. Skipping layout analysis.");
+            Console.Error.WriteLine("  Download the model with: ./scripts/download-model.sh");
+            return null;
+        }
+        return new LayoutAnalyzer(modelPath);
     }
 }
 

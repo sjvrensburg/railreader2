@@ -139,11 +139,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     public bool RailPaused => _controller.RailPaused;
 
     public void ResumeRailFromPause()
-    {
-        _controller.ResumeRailFromPause();
-        InvalidateCameraAndTab();
-        RequestAnimationFrame();
-    }
+        => Dispatch(_controller.ResumeRailFromPause, InvalidateCameraAndTab, animate: true);
 
     [ObservableProperty] private bool _jumpMode;
     partial void OnJumpModeChanged(bool value) => _controller.JumpMode = value;
@@ -420,62 +416,36 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
     [RelayCommand]
     public void GoToPage(int page)
-    {
-        _controller.GoToPage(page);
-        InvalidateAfterNavigation();
-    }
+        => Dispatch(() => _controller.GoToPage(page), InvalidateAfterNavigation);
 
     [RelayCommand]
     public void FitPage()
-    {
-        _controller.FitPage();
-        InvalidateCameraAndTab();
-    }
+        => Dispatch(_controller.FitPage, InvalidateCameraAndTab);
 
     [RelayCommand]
     public void FitWidth()
-    {
-        _controller.FitWidth();
-        InvalidateCameraAndTab();
-    }
+        => Dispatch(_controller.FitWidth, InvalidateCameraAndTab);
 
     // --- Camera ---
 
     public void HandleZoom(double scrollDelta, double cursorX, double cursorY, bool ctrlHeld)
-    {
-        _controller.HandleZoom(scrollDelta, cursorX, cursorY, ctrlHeld);
-        InvalidateCameraAndTab();
-        RequestAnimationFrame();
-    }
+        => Dispatch(() => _controller.HandleZoom(scrollDelta, cursorX, cursorY, ctrlHeld), InvalidateCameraAndTab, animate: true);
 
     public void HandlePan(double dx, double dy, bool ctrlHeld = false)
-    {
-        _controller.HandlePan(dx, dy, ctrlHeld);
-        InvalidateCameraAndTab();
-    }
+        => Dispatch(() => _controller.HandlePan(dx, dy, ctrlHeld), InvalidateCameraAndTab);
 
     public void HandleZoomKey(bool zoomIn)
-    {
-        _controller.HandleZoomKey(zoomIn);
-        InvalidateCameraAndTab();
-        RequestAnimationFrame();
-    }
+        => Dispatch(() => _controller.HandleZoomKey(zoomIn), InvalidateCameraAndTab, animate: true);
 
     public void HandleResetZoom() => FitPage();
 
     // --- Rail navigation ---
 
     public void HandleArrowDown()
-    {
-        _controller.HandleArrowDown();
-        InvalidateNavigation();
-    }
+        => Dispatch(_controller.HandleArrowDown, InvalidateNavigation);
 
     public void HandleArrowUp()
-    {
-        _controller.HandleArrowUp();
-        InvalidateNavigation();
-    }
+        => Dispatch(_controller.HandleArrowUp, InvalidateNavigation);
 
     public void HandleArrowRight(bool shortJump = false)
     {
@@ -498,22 +468,13 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     }
 
     public void HandleLineHome()
-    {
-        _controller.HandleLineHome();
-        InvalidateCameraAndTab();
-    }
+        => Dispatch(_controller.HandleLineHome, InvalidateCameraAndTab);
 
     public void HandleLineEnd()
-    {
-        _controller.HandleLineEnd();
-        InvalidateCameraAndTab();
-    }
+        => Dispatch(_controller.HandleLineEnd, InvalidateCameraAndTab);
 
     public void HandleArrowRelease(bool isHorizontal)
-    {
-        _controller.HandleArrowRelease(isHorizontal);
-        RequestAnimationFrame();
-    }
+        => Dispatch(() => _controller.HandleArrowRelease(isHorizontal), animate: true);
 
     public void HandleClick(double canvasX, double canvasY)
     {
@@ -1052,6 +1013,17 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     public void UpdateCurrentPageMatches() => _controller.Search.UpdateCurrentPageMatches();
 
     // --- Invalidation helpers ---
+
+    /// <summary>
+    /// Common pattern: call a controller method, invalidate, optionally request animation.
+    /// Reduces boilerplate in the many one-liner passthrough methods.
+    /// </summary>
+    private void Dispatch(Action action, Action? invalidate = null, bool animate = false)
+    {
+        action();
+        invalidate?.Invoke();
+        if (animate) RequestAnimationFrame();
+    }
 
     private void InvalidateCamera() => _invalidation?.InvalidateCamera?.Invoke();
     private void InvalidatePage() => _invalidation?.InvalidatePage?.Invoke();

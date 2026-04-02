@@ -31,6 +31,7 @@ public sealed class DocumentState : IDisposable
     /// <summary>Sets a backing field and fires StateChanged if the value changed.</summary>
     private bool SetField<T>(ref T field, T value, string propertyName)
     {
+        _marshaller.AssertUIThread();
         if (EqualityComparer<T>.Default.Equals(field, value)) return false;
         field = value;
         StateChanged?.Invoke(propertyName);
@@ -575,26 +576,43 @@ public sealed class DocumentState : IDisposable
 
     // --- Cache mutation methods ---
 
-    internal void SetAnalysis(int page, PageAnalysis analysis) => _analysisCache[page] = analysis;
-    internal void SetText(int page, PageText text) => _textCache[page] = text;
-    internal void SetLinks(int page, List<PdfLink> links) => _linkCache[page] = links;
+    internal void SetAnalysis(int page, PageAnalysis analysis)
+    {
+        _marshaller.AssertUIThread();
+        _analysisCache[page] = analysis;
+    }
+
+    internal void SetText(int page, PageText text)
+    {
+        _marshaller.AssertUIThread();
+        _textCache[page] = text;
+    }
+
+    internal void SetLinks(int page, List<PdfLink> links)
+    {
+        _marshaller.AssertUIThread();
+        _linkCache[page] = links;
+    }
 
     // --- Navigation history mutation ---
 
     internal void PushHistory(int currentPage)
     {
+        _marshaller.AssertUIThread();
         _backStack.Push(currentPage);
         _forwardStack.Clear();
     }
 
     internal int PopBack(int currentPage)
     {
+        _marshaller.AssertUIThread();
         _forwardStack.Push(currentPage);
         return _backStack.Pop();
     }
 
     internal int PopForward(int currentPage)
     {
+        _marshaller.AssertUIThread();
         _backStack.Push(currentPage);
         return _forwardStack.Pop();
     }

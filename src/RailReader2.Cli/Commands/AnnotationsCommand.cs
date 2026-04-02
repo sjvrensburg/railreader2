@@ -23,6 +23,9 @@ public static class AnnotationsCommand
         var includeText = Program.HasFlag(args, "include-text");
         var includeBlocks = Program.HasFlag(args, "include-blocks");
 
+        if (format is not "json" and not "pdf")
+            return Program.Fail($"Unknown format '{format}'. Valid options: json, pdf");
+
         var annotations = AnnotationService.Load(pdfPath);
         if (annotations == null)
         {
@@ -41,21 +44,8 @@ public static class AnnotationsCommand
 
         var pdf2 = factory.CreatePdfService(pdfPath);
 
-        LayoutAnalyzer? analyzer = null;
-        if (includeBlocks)
-        {
-            var modelPath = DocumentController.FindModelPath();
-            if (modelPath == null)
-            {
-                Console.Error.WriteLine("Warning: ONNX model not found. Cannot correlate annotations with layout blocks.");
-                Console.Error.WriteLine("  Download the model with: ./scripts/download-model.sh");
-                includeBlocks = false;
-            }
-            else
-            {
-                analyzer = new LayoutAnalyzer(modelPath);
-            }
-        }
+        using var analyzer = Shared.CreateAnalyzer(includeBlocks);
+        includeBlocks = analyzer is not null;
 
         IPdfTextService? textService = null;
         if (includeText)
@@ -128,8 +118,6 @@ public static class AnnotationsCommand
 
             result.Pages.Add(pageOutput);
         }
-
-        analyzer?.Dispose();
 
         result.Bookmarks = annotations.Bookmarks.Select(b => new BookmarkOutput
         {

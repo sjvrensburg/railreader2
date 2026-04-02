@@ -27,21 +27,8 @@ public static class StructureCommand
         if (rangeError != null)
             return Program.Fail(rangeError);
 
-        LayoutAnalyzer? analyzer = null;
-        if (analyze)
-        {
-            var modelPath = DocumentController.FindModelPath();
-            if (modelPath == null)
-            {
-                Console.Error.WriteLine("Warning: ONNX model not found. Skipping layout analysis.");
-                Console.Error.WriteLine("  Download the model with: ./scripts/download-model.sh");
-                analyze = false;
-            }
-            else
-            {
-                analyzer = new LayoutAnalyzer(modelPath);
-            }
-        }
+        using var analyzer = Shared.CreateAnalyzer(analyze);
+        analyze = analyzer is not null;
 
         IPdfTextService? textService = null;
         if (includeText)
@@ -107,8 +94,6 @@ public static class StructureCommand
                 result.Pages.Add(pageOutput);
             }
         }
-
-        analyzer?.Dispose();
 
         var json = JsonSerializer.Serialize(result, Shared.JsonOptions);
 

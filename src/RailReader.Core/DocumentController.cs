@@ -87,6 +87,7 @@ public sealed class DocumentController : IDisposable
         _autoScroll = new AutoScrollController(config);
         _autoScroll.StateChanged = name => StateChanged?.Invoke(name);
         _annotationManager = new AnnotationFileManager(marshaller);
+        _annotationManager.OnSaveFailure = msg => StatusMessage?.Invoke(msg);
         Annotations = new AnnotationInteractionHandler();
         Search = new SearchService(
             () => ActiveDocument,

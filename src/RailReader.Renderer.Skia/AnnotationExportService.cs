@@ -1,9 +1,8 @@
 using RailReader.Core.Models;
 using RailReader.Core.Services;
-using RailReader.Renderer.Skia;
 using SkiaSharp;
 
-namespace RailReader.Core.Services;
+namespace RailReader.Renderer.Skia;
 
 /// <summary>
 /// Exports a PDF with annotations rasterised onto each page.
