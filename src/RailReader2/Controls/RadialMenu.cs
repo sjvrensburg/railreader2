@@ -272,6 +272,18 @@ public class RadialMenu : Control
         private readonly int _hoveredColorIndex;
         private readonly double _colorRingR;
 
+        // Cached paints — reused across frames
+        [ThreadStatic] private static SKPaint? s_shadowPaint;
+        [ThreadStatic] private static SKPaint? s_bgPaint;
+        [ThreadStatic] private static SKPaint? s_ringPaint;
+        [ThreadStatic] private static SKPaint? s_divPaint;
+        [ThreadStatic] private static SKPaint? s_fillPaint;
+        [ThreadStatic] private static SKPaint? s_strokePaint;
+        [ThreadStatic] private static SKPaint? s_labelPaint;
+        [ThreadStatic] private static SKFont? s_labelFont;
+        [ThreadStatic] private static SKPaint? s_iconPaint;
+        [ThreadStatic] private static SKFont? s_iconFont;
+
         public RadialMenuDrawOp(Rect bounds, List<Segment> segments,
             double innerR, double outerR, int hovered, bool hoverCentre,
             SKTypeface? iconTypeface, double scale,
@@ -307,27 +319,46 @@ public class RadialMenu : Control
             float innerR = (float)_innerR;
             float outerR = (float)_outerR;
 
-            // Drop shadow
-            using var shadowPaint = new SKPaint
-            {
-                Color = new SKColor(0, 0, 0, 100),
-                IsAntialias = true,
-                MaskFilter = SKMaskFilter.CreateBlur(SKBlurStyle.Normal, 6 * _scale),
-            };
-            canvas.DrawCircle(cx, cy + 2 * _scale, outerR + 2 * _scale, shadowPaint);
+            // Cached paints — create once, update mutable properties per frame
+            var shadowPaint = s_shadowPaint ??= new SKPaint { Color = new SKColor(0, 0, 0, 100), IsAntialias = true };
+            shadowPaint.MaskFilter?.Dispose();
+            shadowPaint.MaskFilter = SKMaskFilter.CreateBlur(SKBlurStyle.Normal, 6 * _scale);
 
-            // Background circle
-            using var bgPaint = new SKPaint { Color = new SKColor(38, 38, 42, 245), IsAntialias = true };
-            canvas.DrawCircle(cx, cy, outerR, bgPaint);
+            var bgPaint = s_bgPaint ??= new SKPaint { Color = new SKColor(38, 38, 42, 245), IsAntialias = true };
 
-            // Outer ring border
-            using var ringPaint = new SKPaint
+            var ringPaint = s_ringPaint ??= new SKPaint
             {
                 Color = new SKColor(70, 70, 74, 200),
                 Style = SKPaintStyle.Stroke,
                 StrokeWidth = 1,
                 IsAntialias = true,
             };
+
+            var divPaint = s_divPaint ??= new SKPaint
+            {
+                Color = new SKColor(70, 70, 74, 180),
+                StrokeWidth = 1,
+                IsAntialias = true,
+            };
+
+            // Reusable fill/stroke paints whose Color is set before each use
+            var fillPaint = s_fillPaint ??= new SKPaint { IsAntialias = true };
+            var strokePaint = s_strokePaint ??= new SKPaint
+            {
+                IsAntialias = true,
+                Style = SKPaintStyle.Stroke,
+            };
+
+            var labelPaint = s_labelPaint ??= new SKPaint { Color = new SKColor(255, 255, 255, 220), IsAntialias = true };
+            var labelFont = s_labelFont ??= new SKFont(SKTypeface.Default, 11f);
+
+            // Drop shadow
+            canvas.DrawCircle(cx, cy + 2 * _scale, outerR + 2 * _scale, shadowPaint);
+
+            // Background circle
+            canvas.DrawCircle(cx, cy, outerR, bgPaint);
+
+            // Outer ring border
             canvas.DrawCircle(cx, cy, outerR, ringPaint);
 
             if (_segments.Count > 0)
@@ -342,14 +373,12 @@ public class RadialMenu : Control
                     bool expanded = i == _expandedSegment;
 
                     // Wedge fill
-                    SKColor wedgeColor;
                     if (expanded)
-                        wedgeColor = new SKColor(0, 100, 180, 210);
+                        fillPaint.Color = new SKColor(0, 100, 180, 210);
                     else if (hovered)
-                        wedgeColor = new SKColor(0, 120, 212, 210);
+                        fillPaint.Color = new SKColor(0, 120, 212, 210);
                     else
-                        wedgeColor = new SKColor(52, 52, 56, 220);
-                    using var wedgePaint = new SKPaint { Color = wedgeColor, IsAntialias = true };
+                        fillPaint.Color = new SKColor(52, 52, 56, 220);
 
                     using var wedgePath = new SKPath();
                     var outerRect = new SKRect(cx - outerR, cy - outerR, cx + outerR, cy + outerR);
@@ -357,16 +386,10 @@ public class RadialMenu : Control
                     wedgePath.ArcTo(outerRect, startA, segAngle, true);
                     wedgePath.ArcTo(innerRect, startA + segAngle, -segAngle, false);
                     wedgePath.Close();
-                    canvas.DrawPath(wedgePath, wedgePaint);
+                    canvas.DrawPath(wedgePath, fillPaint);
 
                     // Divider line
                     double rad = startA * Math.PI / 180;
-                    using var divPaint = new SKPaint
-                    {
-                        Color = new SKColor(70, 70, 74, 180),
-                        StrokeWidth = 1,
-                        IsAntialias = true,
-                    };
                     canvas.DrawLine(
                         cx + innerR * (float)Math.Cos(rad), cy + innerR * (float)Math.Sin(rad),
                         cx + outerR * (float)Math.Cos(rad), cy + outerR * (float)Math.Sin(rad),
@@ -388,30 +411,22 @@ public class RadialMenu : Control
                         if (activeIdx >= 0 && activeIdx < opts.Count)
                         {
                             var ac = opts[activeIdx];
-                            var dotColor = ParseHexColor(ac.HexColor, (byte)(ac.Opacity * 255));
                             float indicatorR = 4f * _scale;
                             float indicatorDist = midR + 16 * _scale;
                             float ix = cx + indicatorDist * (float)Math.Cos(midAngle);
                             float iy = cy + indicatorDist * (float)Math.Sin(midAngle);
-                            using var dotPaint = new SKPaint { Color = dotColor, IsAntialias = true };
-                            canvas.DrawCircle(ix, iy, indicatorR, dotPaint);
-                            using var dotBorder = new SKPaint
-                            {
-                                Color = SKColors.White,
-                                Style = SKPaintStyle.Stroke,
-                                StrokeWidth = 1,
-                                IsAntialias = true,
-                            };
-                            canvas.DrawCircle(ix, iy, indicatorR, dotBorder);
+                            fillPaint.Color = ParseHexColor(ac.HexColor, (byte)(ac.Opacity * 255));
+                            canvas.DrawCircle(ix, iy, indicatorR, fillPaint);
+                            strokePaint.Color = SKColors.White;
+                            strokePaint.StrokeWidth = 1;
+                            canvas.DrawCircle(ix, iy, indicatorR, strokePaint);
                         }
                     }
 
                     // Label below icon on hover
                     if (hovered && !expanded)
                     {
-                        float labelSize = 11f * _scale;
-                        using var labelFont = new SKFont(SKTypeface.Default, labelSize);
-                        using var labelPaint = new SKPaint { Color = new SKColor(255, 255, 255, 220), IsAntialias = true };
+                        labelFont.Size = 11f * _scale;
                         float labelW = labelFont.MeasureText(_segments[i].Label);
                         canvas.DrawText(_segments[i].Label, tx - labelW / 2, ty + 16 * _scale, labelFont, labelPaint);
                     }
@@ -436,56 +451,35 @@ public class RadialMenu : Control
                             float dotY = cy + dotR * (float)Math.Sin(angle);
 
                             var opt = colorOpts[ci];
-                            var fillColor = ParseHexColor(opt.HexColor, (byte)(opt.Opacity * 255));
                             bool isHovered = ci == _hoveredColorIndex;
 
                             // Background circle for visibility
-                            using var bgDot = new SKPaint
-                            {
-                                Color = new SKColor(38, 38, 42, 240),
-                                IsAntialias = true,
-                            };
-                            canvas.DrawCircle(dotX, dotY, dotSize + 2 * _scale, bgDot);
+                            fillPaint.Color = new SKColor(38, 38, 42, 240);
+                            canvas.DrawCircle(dotX, dotY, dotSize + 2 * _scale, fillPaint);
 
                             // Colour fill
-                            using var colorPaint = new SKPaint { Color = fillColor, IsAntialias = true };
-                            canvas.DrawCircle(dotX, dotY, dotSize, colorPaint);
+                            fillPaint.Color = ParseHexColor(opt.HexColor, (byte)(opt.Opacity * 255));
+                            canvas.DrawCircle(dotX, dotY, dotSize, fillPaint);
 
                             // Full-opacity border for visibility
-                            var borderColor = ParseHexColor(opt.HexColor, 255);
-                            using var border = new SKPaint
-                            {
-                                Color = borderColor,
-                                Style = SKPaintStyle.Stroke,
-                                StrokeWidth = 1.5f,
-                                IsAntialias = true,
-                            };
-                            canvas.DrawCircle(dotX, dotY, dotSize, border);
+                            strokePaint.Color = ParseHexColor(opt.HexColor, 255);
+                            strokePaint.StrokeWidth = 1.5f;
+                            canvas.DrawCircle(dotX, dotY, dotSize, strokePaint);
 
                             // Hover highlight
                             if (isHovered)
                             {
-                                using var hoverRing = new SKPaint
-                                {
-                                    Color = SKColors.White,
-                                    Style = SKPaintStyle.Stroke,
-                                    StrokeWidth = 2f,
-                                    IsAntialias = true,
-                                };
-                                canvas.DrawCircle(dotX, dotY, dotSize + 2 * _scale, hoverRing);
+                                strokePaint.Color = SKColors.White;
+                                strokePaint.StrokeWidth = 2f;
+                                canvas.DrawCircle(dotX, dotY, dotSize + 2 * _scale, strokePaint);
                             }
 
-                            // Active indicator (small checkmark-like inner ring)
+                            // Active indicator
                             if (ci == seg.ActiveColorIndex)
                             {
-                                using var activePaint = new SKPaint
-                                {
-                                    Color = SKColors.White,
-                                    Style = SKPaintStyle.Stroke,
-                                    StrokeWidth = 2f,
-                                    IsAntialias = true,
-                                };
-                                canvas.DrawCircle(dotX, dotY, dotSize - 3 * _scale, activePaint);
+                                strokePaint.Color = SKColors.White;
+                                strokePaint.StrokeWidth = 2f;
+                                canvas.DrawCircle(dotX, dotY, dotSize - 3 * _scale, strokePaint);
                             }
                         }
                     }
@@ -496,11 +490,10 @@ public class RadialMenu : Control
             canvas.DrawCircle(cx, cy, innerR, ringPaint);
 
             // Centre button
-            var centreColor = _hoverCentre
+            fillPaint.Color = _hoverCentre
                 ? new SKColor(200, 50, 50, 240)
                 : new SKColor(48, 48, 52, 245);
-            using var centrePaint = new SKPaint { Color = centreColor, IsAntialias = true };
-            canvas.DrawCircle(cx, cy, innerR, centrePaint);
+            canvas.DrawCircle(cx, cy, innerR, fillPaint);
 
             // Centre X icon
             var xColor = _hoverCentre ? SKColors.White : new SKColor(170, 170, 174);
@@ -510,10 +503,12 @@ public class RadialMenu : Control
         private void DrawIcon(SKCanvas canvas, string iconChar, float x, float y, float size, SKColor color)
         {
             var typeface = _iconTypeface ?? SKTypeface.Default;
-            using var font = new SKFont(typeface, size);
-            using var paint = new SKPaint { Color = color, IsAntialias = true };
+            var font = s_iconFont ??= new SKFont(typeface, size);
+            font.Size = size;
+            font.Typeface = typeface;
+            var paint = s_iconPaint ??= new SKPaint { IsAntialias = true };
+            paint.Color = color;
             float w = font.MeasureText(iconChar);
-            // Centre vertically: offset by ~40% of font size (ascent approximation)
             canvas.DrawText(iconChar, x - w / 2, y + size * 0.38f, font, paint);
         }
 

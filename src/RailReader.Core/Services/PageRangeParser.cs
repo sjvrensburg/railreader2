@@ -1,4 +1,4 @@
-namespace RailReader.Cli;
+namespace RailReader.Core.Services;
 
 /// <summary>
 /// Parses page range strings like "1,3,5-10" into 0-based page indices.
@@ -24,11 +24,14 @@ public static class PageRangeParser
                 if (!int.TryParse(parts[0], out int start) || !int.TryParse(parts[1], out int end))
                     return (null, $"Invalid range: '{segment}'");
 
+                if (start > end)
+                    return (null, $"Invalid range: '{segment}' (start > end)");
+
                 if (start < 1 || end < 1 || start > totalPages || end > totalPages)
                     return (null, $"Page out of range: '{segment}' (document has {totalPages} pages)");
 
                 for (int i = start; i <= end; i++)
-                    pages.Add(i - 1); // Convert to 0-based
+                    pages.Add(i - 1);
             }
             else
             {
@@ -38,7 +41,7 @@ public static class PageRangeParser
                 if (page < 1 || page > totalPages)
                     return (null, $"Page {page} out of range (document has {totalPages} pages)");
 
-                pages.Add(page - 1); // Convert to 0-based
+                pages.Add(page - 1);
             }
         }
 

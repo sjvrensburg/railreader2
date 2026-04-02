@@ -21,6 +21,8 @@ static class Program
 
         var factory = new SkiaPdfServiceFactory();
 
+        bool verbose = HasFlag(args, "verbose");
+
         try
         {
             return args[0] switch
@@ -33,7 +35,7 @@ static class Program
         }
         catch (Exception ex)
         {
-            return Fail($"{ex.Message}");
+            return Fail(verbose ? ex.ToString() : ex.Message);
         }
     }
 

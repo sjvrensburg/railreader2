@@ -14,6 +14,12 @@ public sealed class AnnotationFileManager : IDisposable
     private readonly IThreadMarshaller _marshaller;
     private readonly Dictionary<string, SharedEntry> _entries = new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// Called when an annotation save fails. Allows the controller to surface
+    /// the failure to the user (e.g. via status toast).
+    /// </summary>
+    public Action<string>? OnSaveFailure { get; set; }
+
     public AnnotationFileManager(IThreadMarshaller marshaller)
     {
         _marshaller = marshaller;
@@ -101,19 +107,21 @@ public sealed class AnnotationFileManager : IDisposable
         _entries.Clear();
     }
 
-    private static void FlushEntry(SharedEntry entry)
+    private void FlushEntry(SharedEntry entry)
     {
         if (!entry.Dirty) return;
 
         bool hasContent = entry.Annotations.Pages.Values.Any(list => list.Count > 0)
             || entry.Annotations.Bookmarks.Count > 0;
 
-        if (hasContent)
-            AnnotationService.Save(entry.PdfPath, entry.Annotations);
-        else
-            AnnotationService.Delete(entry.PdfPath);
+        bool ok = hasContent
+            ? AnnotationService.Save(entry.PdfPath, entry.Annotations)
+            : AnnotationService.Delete(entry.PdfPath);
 
-        entry.Dirty = false;
+        if (ok)
+            entry.Dirty = false;
+        else if (hasContent)
+            OnSaveFailure?.Invoke($"Failed to save annotations for {Path.GetFileName(entry.PdfPath)}");
     }
 
     private sealed class SharedEntry

@@ -1,8 +1,8 @@
 using RailReader.Core.Models;
-using RailReader.Renderer.Skia;
+using RailReader.Core.Services;
 using SkiaSharp;
 
-namespace RailReader.Core.Services;
+namespace RailReader.Renderer.Skia;
 
 /// <summary>
 /// Shared drawing logic for rail overlays, debug overlays, and search highlights.

@@ -55,7 +55,7 @@ public static class TestFixtures
         for (int i = 0; i < 5; i++)
             block.Lines.Add(new LineInfo(72 + i * 20, 16));
         analysis.Blocks.Add(block);
-        doc.AnalysisCache[doc.CurrentPage] = analysis;
+        doc.SetAnalysis(doc.CurrentPage, analysis);
         doc.Rail.SetAnalysis(analysis, config.NavigableClasses);
         doc.Camera.Zoom = config.RailZoomThreshold + 1;
         doc.Rail.UpdateZoom(doc.Camera.Zoom, doc.Camera.OffsetX, doc.Camera.OffsetY, vpWidth, vpHeight);

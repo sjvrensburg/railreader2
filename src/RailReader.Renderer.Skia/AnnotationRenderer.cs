@@ -1,8 +1,8 @@
 using RailReader.Core.Models;
-using RailReader.Renderer.Skia;
+using RailReader.Core.Services;
 using SkiaSharp;
 
-namespace RailReader.Core.Services;
+namespace RailReader.Renderer.Skia;
 
 /// <summary>
 /// Shared annotation drawing logic used by both the overlay layer and the export path.
@@ -22,13 +22,15 @@ public static class AnnotationRenderer
     [ThreadStatic] private static SKPaint? s_handleFillPaint;
     [ThreadStatic] private static SKPaint? s_handleStrokePaint;
 
-    public static void DrawAnnotations(SKCanvas canvas, List<Annotation> annotations, Annotation? selected)
+    public static void DrawAnnotations(SKCanvas canvas, List<Annotation> annotations, Annotation? selected,
+        bool expandAllNotes = false)
     {
         foreach (var ann in annotations)
-            DrawAnnotation(canvas, ann, ann == selected);
+            DrawAnnotation(canvas, ann, ann == selected, expandAllNotes);
     }
 
-    public static void DrawAnnotation(SKCanvas canvas, Annotation annotation, bool isSelected)
+    public static void DrawAnnotation(SKCanvas canvas, Annotation annotation, bool isSelected,
+        bool expandAllNotes = false)
     {
         var color = ParseColor(annotation.Color, annotation.Opacity);
 
@@ -41,7 +43,7 @@ public static class AnnotationRenderer
                 DrawFreehand(canvas, freehand, color);
                 break;
             case TextNoteAnnotation textNote:
-                DrawTextNote(canvas, textNote, color);
+                DrawTextNote(canvas, textNote, color, expandAllNotes);
                 break;
             case RectAnnotation rect:
                 DrawRect(canvas, rect, color);
@@ -91,7 +93,8 @@ public static class AnnotationRenderer
     private const float PopupMaxWidth = 200f;
     private const float PopupPadding = 6f;
 
-    private static void DrawTextNote(SKCanvas canvas, TextNoteAnnotation note, SKColor color)
+    private static void DrawTextNote(SKCanvas canvas, TextNoteAnnotation note, SKColor color,
+        bool forceExpand = false)
     {
         float ix = note.X - NoteIconSize / 2;
         float iy = note.Y - NoteIconSize / 2;
@@ -131,7 +134,7 @@ public static class AnnotationRenderer
         canvas.DrawPath(iconPath, borderPaint);
 
         // Expanded popup
-        if (note.IsExpanded && !string.IsNullOrEmpty(note.Text))
+        if ((note.IsExpanded || forceExpand) && !string.IsNullOrEmpty(note.Text))
         {
             var font = s_noteFont ??= new SKFont(SKTypeface.Default, 9);
             var textPaint = s_noteTextPaint ??= new SKPaint { Color = new SKColor(0, 0, 0, 220), IsAntialias = true };

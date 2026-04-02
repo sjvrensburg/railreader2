@@ -2,7 +2,7 @@ using RailReader.Core;
 using RailReader.Core.Models;
 using SkiaSharp;
 
-namespace RailReader.Core.Services;
+namespace RailReader.Renderer.Skia;
 
 public sealed class ColourEffectShaders : IDisposable
 {

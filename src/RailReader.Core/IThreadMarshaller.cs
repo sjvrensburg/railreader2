@@ -7,6 +7,12 @@ namespace RailReader.Core;
 public interface IThreadMarshaller
 {
     void Post(Action action);
+
+    /// <summary>
+    /// Debug assertion that the current thread is the UI thread.
+    /// Default implementation is a no-op (for tests/CLI).
+    /// </summary>
+    void AssertUIThread() { }
 }
 
 /// <summary>

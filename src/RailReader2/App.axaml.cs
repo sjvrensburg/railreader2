@@ -43,7 +43,7 @@ public partial class App : Application
                 vm.SetWindow(window);
 
                 window.Opened += (_, _) => splash.Close();
-                window.Closing += (_, _) => vm.SaveAllReadingPositions();
+                window.Closing += (_, _) => vm.Dispose();
                 desktop.MainWindow = window;
 
                 if (args is { Length: > 0 } && File.Exists(args[0]))

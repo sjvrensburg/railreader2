@@ -24,7 +24,7 @@ public class PdfLinkTests
             Rect = new RectF(100, 200, 300, 220),
             Destination = new PageDestination { PageIndex = 5 },
         };
-        state.LinkCache[0] = [link];
+        state.SetLinks(0, [link]);
 
         // Hit inside the rect
         var hit = state.HitTestLink(200, 210);

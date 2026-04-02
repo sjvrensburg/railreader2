@@ -81,11 +81,11 @@ public static class AnnotationService
         return null;
     }
 
-    /// <summary>Save annotations to internal storage.</summary>
-    public static void Save(string pdfPath, AnnotationFile annotations)
+    /// <summary>Save annotations to internal storage. Returns false if the write fails.</summary>
+    public static bool Save(string pdfPath, AnnotationFile annotations)
     {
         annotations.SourcePdfPath = Path.GetFullPath(pdfPath);
-        SaveToFile(GetInternalPath(pdfPath), annotations);
+        return SaveToFile(GetInternalPath(pdfPath), annotations);
     }
 
     /// <summary>Export annotations to a JSON file at a user-chosen path. Throws on failure.</summary>
@@ -205,16 +205,18 @@ public static class AnnotationService
         }
     }
 
-    private static void SaveToFile(string path, AnnotationFile annotations)
+    private static bool SaveToFile(string path, AnnotationFile annotations)
     {
         try
         {
             var json = JsonSerializer.Serialize(annotations, s_options);
             File.WriteAllText(path, json);
+            return true;
         }
         catch (Exception ex)
         {
             Logger.Error($"[Annotations] Failed to save {path}", ex);
+            return false;
         }
     }
 

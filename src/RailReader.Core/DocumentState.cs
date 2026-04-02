@@ -31,6 +31,7 @@ public sealed class DocumentState : IDisposable
     /// <summary>Sets a backing field and fires StateChanged if the value changed.</summary>
     private bool SetField<T>(ref T field, T value, string propertyName)
     {
+        _marshaller.AssertUIThread();
         if (EqualityComparer<T>.Default.Equals(field, value)) return false;
         field = value;
         StateChanged?.Invoke(propertyName);
@@ -97,9 +98,12 @@ public sealed class DocumentState : IDisposable
     public IPdfTextService PdfText => _pdfText;
     public Camera Camera { get; } = new();
     public RailNav Rail { get; }
-    public Dictionary<int, PageAnalysis> AnalysisCache { get; } = [];
-    public Dictionary<int, PageText> TextCache { get; } = [];
-    public Dictionary<int, List<PdfLink>> LinkCache { get; } = [];
+    private readonly Dictionary<int, PageAnalysis> _analysisCache = [];
+    private readonly Dictionary<int, PageText> _textCache = [];
+    private readonly Dictionary<int, List<PdfLink>> _linkCache = [];
+    public IReadOnlyDictionary<int, PageAnalysis> AnalysisCache => _analysisCache;
+    public IReadOnlyDictionary<int, PageText> TextCache => _textCache;
+    public IReadOnlyDictionary<int, List<PdfLink>> LinkCache => _linkCache;
     public Queue<int> PendingAnalysis { get; } = new();
 
     /// <summary>
@@ -110,8 +114,12 @@ public sealed class DocumentState : IDisposable
     public List<OutlineEntry> Outline { get; }
 
     // Navigation history (back/forward) — per-document so tab switching doesn't cross-pollinate
-    public Stack<int> BackStack { get; } = new();
-    public Stack<int> ForwardStack { get; } = new();
+    private readonly Stack<int> _backStack = new();
+    private readonly Stack<int> _forwardStack = new();
+    public int BackStackCount => _backStack.Count;
+    public int ForwardStackCount => _forwardStack.Count;
+    public int PeekBack() => _backStack.Peek();
+    public int PeekForward() => _forwardStack.Peek();
 
     // Annotations (shared via AnnotationFileManager when set)
     public AnnotationFile Annotations { get; set; } = new();
@@ -185,7 +193,7 @@ public sealed class DocumentState : IDisposable
     /// picks this up and invalidates the page layer atomically with the
     /// camera update, avoiding mid-frame bitmap swaps.
     /// </summary>
-    public bool DpiRenderReady { get; set; }
+    public bool DpiRenderReady { get; internal set; }
 
     /// <summary>
     /// Called on the UI thread when a DPI re-render completes, so the view can
@@ -244,7 +252,7 @@ public sealed class DocumentState : IDisposable
 
     public void SubmitAnalysis(AnalysisWorker? worker, HashSet<int> navigableClasses)
     {
-        if (AnalysisCache.TryGetValue(CurrentPage, out var cached))
+        if (_analysisCache.TryGetValue(CurrentPage, out var cached))
         {
             _logger.Debug($"[SubmitAnalysis] Page {CurrentPage}: cache hit, {cached.Blocks.Count} blocks");
             ApplyAnalysis(cached, navigableClasses);
@@ -291,7 +299,7 @@ public sealed class DocumentState : IDisposable
 
     public void ReapplyNavigableClasses(HashSet<int> navigableClasses)
     {
-        if (AnalysisCache.TryGetValue(CurrentPage, out var cached))
+        if (_analysisCache.TryGetValue(CurrentPage, out var cached))
             Rail.SetAnalysis(cached, navigableClasses);
     }
 
@@ -307,7 +315,7 @@ public sealed class DocumentState : IDisposable
         for (int i = 1; i <= count; i++)
         {
             int page = CurrentPage + i;
-            if (page < PageCount && !AnalysisCache.ContainsKey(page))
+            if (page < PageCount && !_analysisCache.ContainsKey(page))
                 PendingAnalysis.Enqueue(page);
         }
     }
@@ -320,7 +328,7 @@ public sealed class DocumentState : IDisposable
         while (PendingAnalysis.Count > 0)
         {
             int page = PendingAnalysis.Dequeue();
-            if (AnalysisCache.ContainsKey(page) || worker.IsInFlight(FilePath, page)) continue;
+            if (_analysisCache.ContainsKey(page) || worker.IsInFlight(FilePath, page)) continue;
 
             string filePath = FilePath;
             double pageW = PageWidth, pageH = PageHeight;
@@ -532,10 +540,10 @@ public sealed class DocumentState : IDisposable
     /// </summary>
     public PageText GetOrExtractText(int pageIndex)
     {
-        if (TextCache.TryGetValue(pageIndex, out var cached))
+        if (_textCache.TryGetValue(pageIndex, out var cached))
             return cached;
         var text = _pdfText.ExtractPageText(_pdf.PdfBytes, pageIndex);
-        TextCache[pageIndex] = text;
+        _textCache[pageIndex] = text;
         return text;
     }
 
@@ -544,10 +552,10 @@ public sealed class DocumentState : IDisposable
     /// </summary>
     public List<PdfLink> GetOrExtractLinks(int pageIndex)
     {
-        if (LinkCache.TryGetValue(pageIndex, out var cached))
+        if (_linkCache.TryGetValue(pageIndex, out var cached))
             return cached;
         var links = PdfLinkService.ExtractPageLinks(_pdf.PdfBytes, pageIndex);
-        LinkCache[pageIndex] = links;
+        _linkCache[pageIndex] = links;
         return links;
     }
 
@@ -566,6 +574,49 @@ public sealed class DocumentState : IDisposable
         return null;
     }
 
+    // --- Cache mutation methods ---
+
+    internal void SetAnalysis(int page, PageAnalysis analysis)
+    {
+        _marshaller.AssertUIThread();
+        _analysisCache[page] = analysis;
+    }
+
+    internal void SetText(int page, PageText text)
+    {
+        _marshaller.AssertUIThread();
+        _textCache[page] = text;
+    }
+
+    internal void SetLinks(int page, List<PdfLink> links)
+    {
+        _marshaller.AssertUIThread();
+        _linkCache[page] = links;
+    }
+
+    // --- Navigation history mutation ---
+
+    internal void PushHistory(int currentPage)
+    {
+        _marshaller.AssertUIThread();
+        _backStack.Push(currentPage);
+        _forwardStack.Clear();
+    }
+
+    internal int PopBack(int currentPage)
+    {
+        _marshaller.AssertUIThread();
+        _forwardStack.Push(currentPage);
+        return _backStack.Pop();
+    }
+
+    internal int PopForward(int currentPage)
+    {
+        _marshaller.AssertUIThread();
+        _backStack.Push(currentPage);
+        return _forwardStack.Pop();
+    }
+
     /// <summary>
     /// Calculates the appropriate render DPI for a zoom level.
     /// Pure math — no rendering-library dependency.
@@ -579,6 +630,7 @@ public sealed class DocumentState : IDisposable
 
     public void Dispose()
     {
+        if (IsDisposed) return;
         IsDisposed = true;
         _cts.Cancel();
         _annotationManager?.Release(FilePath);
