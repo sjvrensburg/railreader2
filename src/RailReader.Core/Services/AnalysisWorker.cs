@@ -64,7 +64,7 @@ public sealed class AnalysisWorker : IDisposable
             {
                 _logger.Debug($"[Worker] Running ONNX for {Path.GetFileName(request.FilePath)} page {request.Page}...");
                 var analysis = analyzer.RunAnalysis(
-                    request.RgbBytes, request.PxW, request.PxH, request.PageW, request.PageH);
+                    request.RgbBytes, request.PxW, request.PxH, request.PageW, request.PageH, ct);
                 _logger.Debug($"[Worker] Page {request.Page}: {analysis.Blocks.Count} blocks detected");
 
                 await _resultChannel.Writer.WriteAsync(

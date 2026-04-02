@@ -183,7 +183,7 @@ public class SearchServiceTests : IDisposable
     {
         // Inject known text into TextCache for page 0
         string longText = new string('x', 60) + "MATCH" + new string('y', 60);
-        _state.TextCache[0] = new PageText(longText, []);
+        _state.SetText(0, new PageText(longText, []));
 
         var match = new SearchMatch(0, 60, 5, [new RectF(10, 10, 50, 20)]);
         var (pre, matchStr, post) = _search.GetMatchSnippet(match, contextChars: 40);
@@ -202,7 +202,7 @@ public class SearchServiceTests : IDisposable
     public void GetMatchSnippet_ReplacesNewlines()
     {
         string text = "before\nthe\nmatch\nHERE\nafter\nthe\nmatch";
-        _state.TextCache[0] = new PageText(text, []);
+        _state.SetText(0, new PageText(text, []));
 
         // "HERE" starts at index 18, length 4
         int matchStart = text.IndexOf("HERE");

@@ -347,7 +347,7 @@ public class DocumentControllerTests : IDisposable
         // Pan as far up as possible to reach the edge
         for (int i = 0; i < 20; i++)
             _controller.HandleArrowUp();
-        _controller.ClearNonRailEdgeHold();
+        _controller.ClearPageEdgeHold();
 
         // Now hold ArrowDown to reach bottom edge, then edge-hold advance
         // First, pan down many times to reach the bottom edge
@@ -363,7 +363,7 @@ public class DocumentControllerTests : IDisposable
     }
 
     [Fact]
-    public void ClearNonRailEdgeHold_WhenNotHolding_IsNoOp()
+    public void ClearPageEdgeHold_WhenNotHolding_IsNoOp()
     {
         var state = _controller.CreateDocument(_pdfPath);
         state.LoadPageBitmap();
@@ -371,7 +371,7 @@ public class DocumentControllerTests : IDisposable
         _controller.SetViewportSize(800, 600);
 
         // Clear should be a no-op when not edge-holding
-        _controller.ClearNonRailEdgeHold();
+        _controller.ClearPageEdgeHold();
         Assert.Equal(0, state.CurrentPage);
     }
 
@@ -391,8 +391,8 @@ public class DocumentControllerTests : IDisposable
 
         _controller.NavigateToBookmark(0);
         Assert.Equal(2, state.CurrentPage);
-        Assert.Single(state.BackStack);
-        Assert.Equal(0, state.BackStack.Peek());
+        Assert.Equal(1, state.BackStackCount);
+        Assert.Equal(0, state.PeekBack());
     }
 
     [Fact]
@@ -410,9 +410,9 @@ public class DocumentControllerTests : IDisposable
 
         _controller.NavigateBack();
         Assert.Equal(0, state.CurrentPage);
-        Assert.Empty(state.BackStack);
-        Assert.Single(state.ForwardStack);
-        Assert.Equal(2, state.ForwardStack.Peek());
+        Assert.Equal(0, state.BackStackCount);
+        Assert.Equal(1, state.ForwardStackCount);
+        Assert.Equal(2, state.PeekForward());
     }
 
     [Fact]
@@ -456,14 +456,14 @@ public class DocumentControllerTests : IDisposable
         _controller.SetViewportSize(800, 600);
 
         // Inject a link at page-point (100, 100) → page 2
-        state.LinkCache[0] =
+        state.SetLinks(0,
         [
             new PdfLink
             {
                 Rect = new RectF(50, 50, 200, 200),
                 Destination = new PageDestination { PageIndex = 2 }
             }
-        ];
+        ]);
 
         // Convert page coords to canvas coords
         double canvasX = 100 * state.Camera.Zoom + state.Camera.OffsetX;
@@ -474,8 +474,8 @@ public class DocumentControllerTests : IDisposable
         Assert.NotNull(dest);
         Assert.IsType<PageDestination>(dest);
         Assert.Equal(2, state.CurrentPage);
-        Assert.Single(state.BackStack);
-        Assert.Equal(0, state.BackStack.Peek());
+        Assert.Equal(1, state.BackStackCount);
+        Assert.Equal(0, state.PeekBack());
     }
 
     [Fact]

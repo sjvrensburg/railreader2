@@ -37,7 +37,7 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
     public IPdfService Pdf => State.Pdf;
     public Camera Camera => State.Camera;
     public RailNav Rail => State.Rail;
-    public Dictionary<int, PageAnalysis> AnalysisCache => State.AnalysisCache;
+    public IReadOnlyDictionary<int, PageAnalysis> AnalysisCache => State.AnalysisCache;
     public List<OutlineEntry> Outline => State.Outline;
     public AnnotationFile Annotations => State.Annotations;
     public int CachedDpi => State.CachedDpi;

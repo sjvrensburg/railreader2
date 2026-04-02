@@ -19,7 +19,7 @@ public record struct TickResult(
 /// Headless controller that owns all document business logic.
 /// No Avalonia dependency — can be driven by AI agent, tests, or UI.
 /// </summary>
-public sealed class DocumentController
+public sealed class DocumentController : IDisposable
 {
     private const double PanStep = 50.0;
     private const double DestMarginTop = 0.1;   // 10% from top when scrolling to link target
@@ -63,8 +63,8 @@ public sealed class DocumentController
     private RailPauseState? _railPause;
     public bool RailPaused => _railPause is not null;
 
-    // Non-rail edge-hold page advance
-    private readonly EdgeHoldStateMachine _edgeHold = new();
+    // Edge-hold page advance (non-rail vertical scrolling)
+    private readonly EdgeHoldStateMachine _pageEdgeHold = new();
 
     /// <summary>
     /// Fired when a property changes. UI can subscribe to update bindings.
@@ -201,6 +201,17 @@ public sealed class DocumentController
         _annotationManager.FlushAll();
     }
 
+    public void Dispose()
+    {
+        SaveAllReadingPositions();
+        foreach (var doc in Documents)
+            doc.Dispose();
+        Documents.Clear();
+        _worker?.Dispose();
+        _worker = null;
+        _annotationManager.Dispose();
+    }
+
     // --- Bookmarks ---
 
     /// <summary>
@@ -236,15 +247,14 @@ public sealed class DocumentController
     // --- Navigation history (back/forward) ---
     // Stacks live on DocumentState so each tab has independent history.
 
-    public bool CanGoBack => ActiveDocument is { } d && d.BackStack.Count > 0;
-    public bool CanGoForward => ActiveDocument is { } d && d.ForwardStack.Count > 0;
+    public bool CanGoBack => ActiveDocument is { } d && d.BackStackCount > 0;
+    public bool CanGoForward => ActiveDocument is { } d && d.ForwardStackCount > 0;
 
     /// <summary>Pushes the current page onto the back stack and clears forward history.</summary>
     private void PushHistory()
     {
         if (ActiveDocument is not { } doc) return;
-        doc.BackStack.Push(doc.CurrentPage);
-        doc.ForwardStack.Clear();
+        doc.PushHistory(doc.CurrentPage);
     }
 
     public void NavigateToBookmark(int index)
@@ -259,17 +269,15 @@ public sealed class DocumentController
     public void NavigateBack()
     {
         if (ActiveDocument is not { } doc) return;
-        if (doc.BackStack.Count == 0) return;
-        doc.ForwardStack.Push(doc.CurrentPage);
-        GoToPage(doc.BackStack.Pop());
+        if (doc.BackStackCount == 0) return;
+        GoToPage(doc.PopBack(doc.CurrentPage));
     }
 
     public void NavigateForward()
     {
         if (ActiveDocument is not { } doc) return;
-        if (doc.ForwardStack.Count == 0) return;
-        doc.BackStack.Push(doc.CurrentPage);
-        GoToPage(doc.ForwardStack.Pop());
+        if (doc.ForwardStackCount == 0) return;
+        GoToPage(doc.PopForward(doc.CurrentPage));
     }
 
     /// <summary>
@@ -547,7 +555,7 @@ public sealed class DocumentController
         }
         else
         {
-            if (_edgeHold.ShouldSuppressInput) return;
+            if (_pageEdgeHold.ShouldSuppressInput) return;
 
             double prevY = doc.Camera.OffsetY;
             doc.Camera.OffsetY += forward ? -PanStep : PanStep;
@@ -556,7 +564,7 @@ public sealed class DocumentController
             bool atEdge = Math.Abs(doc.Camera.OffsetY - prevY) < 1.0;
             if (atEdge)
             {
-                if (_edgeHold.OnEdgeHit(forward))
+                if (_pageEdgeHold.OnEdgeHit(forward))
                 {
                     int targetPage = doc.CurrentPage + (forward ? 1 : -1);
                     if (targetPage >= 0 && targetPage < doc.PageCount)
@@ -570,13 +578,13 @@ public sealed class DocumentController
             }
             else
             {
-                _edgeHold.OnMoved();
+                _pageEdgeHold.OnMoved();
             }
         }
     }
 
     /// <summary>Clear non-rail edge-hold state (call on key release).</summary>
-    public void ClearNonRailEdgeHold() => _edgeHold.Reset();
+    public void ClearPageEdgeHold() => _pageEdgeHold.Reset();
 
     public void HandleArrowRight(bool shortJump = false)
     {
@@ -951,7 +959,7 @@ public sealed class DocumentController
             {
                 if (doc.IsDisposed || doc.FilePath != result.FilePath) continue;
 
-                doc.AnalysisCache[result.Page] = result.Analysis;
+                doc.SetAnalysis(result.Page, result.Analysis);
                 if (doc.CurrentPage == result.Page && doc.PendingRailSetup)
                 {
                     doc.Rail.SetAnalysis(result.Analysis, _config.NavigableClasses);

@@ -22,8 +22,6 @@ public static class AnnotationExportService
         using var stream = File.Create(outputPath);
         using var document = SKDocument.CreatePdf(stream);
 
-        var collapsed = new List<TextNoteAnnotation>();
-
         for (int page = 0; page < pdf.PageCount; page++)
         {
             onProgress?.Invoke(page, pdf.PageCount);
@@ -45,29 +43,10 @@ public static class AnnotationExportService
             // Draw annotations scaled to match the DPI
             if (annotations.Pages.TryGetValue(page, out var pageAnnotations) && pageAnnotations.Count > 0)
             {
-                // Expand all text notes so their popup text is rendered into the export
-                collapsed.Clear();
-                foreach (var ann in pageAnnotations)
-                {
-                    if (ann is TextNoteAnnotation tn && !tn.IsExpanded)
-                    {
-                        tn.IsExpanded = true;
-                        collapsed.Add(tn);
-                    }
-                }
-
-                try
-                {
-                    canvas.Save();
-                    canvas.Scale(scaleX, scaleY);
-                    AnnotationRenderer.DrawAnnotations(canvas, pageAnnotations, null);
-                    canvas.Restore();
-                }
-                finally
-                {
-                    foreach (var tn in collapsed)
-                        tn.IsExpanded = false;
-                }
+                canvas.Save();
+                canvas.Scale(scaleX, scaleY);
+                AnnotationRenderer.DrawAnnotations(canvas, pageAnnotations, null, expandAllNotes: true);
+                canvas.Restore();
             }
 
             document.EndPage();

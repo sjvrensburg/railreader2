@@ -41,7 +41,7 @@ public sealed class RailNav : ICameraClamp
 
     // Edge-hold advance: when the user holds D/Right (or A/Left) against the line boundary,
     // the state machine fires a line advance after a hold threshold.
-    private readonly EdgeHoldStateMachine _edgeHold = new();
+    private readonly EdgeHoldStateMachine _lineEdgeHold = new();
 
     /// <summary>
     /// Multiplier applied to RailZoomThreshold to produce a zoom-independent
@@ -71,9 +71,9 @@ public sealed class RailNav : ICameraClamp
     /// </summary>
     private bool ShouldSuppressAfterEdgeAdvance()
     {
-        if (!_edgeHold.AdvanceJustFired) return false;
+        if (!_lineEdgeHold.AdvanceJustFired) return false;
         if (_snap is not null) return true; // snap still running
-        _edgeHold.ClearAdvanceFlag();
+        _lineEdgeHold.ClearAdvanceFlag();
         return false;
     }
 
@@ -275,7 +275,7 @@ public sealed class RailNav : ICameraClamp
     public void StopScrollAndEdgeHold()
     {
         StopScroll();
-        _edgeHold.Reset();
+        _lineEdgeHold.Reset();
     }
 
     /// <summary>
@@ -283,7 +283,7 @@ public sealed class RailNav : ICameraClamp
     /// against the line boundary) and clears it. Returns null if none pending.
     /// </summary>
     public ScrollDirection? ConsumePendingEdgeAdvance()
-        => _edgeHold.ConsumePendingAdvance();
+        => _lineEdgeHold.ConsumePendingAdvance();
 
     /// <summary>
     /// Checks whether the camera is at the hard edge for the given direction and, if so,
@@ -293,9 +293,9 @@ public sealed class RailNav : ICameraClamp
     private bool CheckEdgeHoldAdvance(double cameraX, double zoom, double windowWidth, ScrollDirection dir)
     {
         if (IsAtHardEdge(cameraX, zoom, windowWidth, dir))
-            return _edgeHold.OnEdgeHit(forward: dir == ScrollDirection.Forward);
+            return _lineEdgeHold.OnEdgeHit(forward: dir == ScrollDirection.Forward);
 
-        _edgeHold.OnMoved();
+        _lineEdgeHold.OnMoved();
         return false;
     }
 

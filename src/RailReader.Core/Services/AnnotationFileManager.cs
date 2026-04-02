@@ -108,12 +108,11 @@ public sealed class AnnotationFileManager : IDisposable
         bool hasContent = entry.Annotations.Pages.Values.Any(list => list.Count > 0)
             || entry.Annotations.Bookmarks.Count > 0;
 
-        if (hasContent)
-            AnnotationService.Save(entry.PdfPath, entry.Annotations);
-        else
-            AnnotationService.Delete(entry.PdfPath);
+        bool ok = hasContent
+            ? AnnotationService.Save(entry.PdfPath, entry.Annotations)
+            : AnnotationService.Delete(entry.PdfPath);
 
-        entry.Dirty = false;
+        if (ok) entry.Dirty = false;
     }
 
     private sealed class SharedEntry

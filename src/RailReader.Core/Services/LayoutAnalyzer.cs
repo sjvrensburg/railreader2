@@ -65,15 +65,20 @@ public sealed class LayoutAnalyzer : IDisposable
         Logger.Debug($"[ONNX] Output names: {string.Join(", ", _session.OutputNames)}");
     }
 
-    public PageAnalysis RunAnalysis(byte[] rgbBytes, int pxW, int pxH, double pageW, double pageH)
+    public PageAnalysis RunAnalysis(byte[] rgbBytes, int pxW, int pxH, double pageW, double pageH,
+        CancellationToken ct = default)
     {
         int target = LayoutConstants.InputSize;
+
+        ct.ThrowIfCancellationRequested();
 
         // Letterbox: place undistorted image at (0,0) in target×target canvas.
         // FitPageToTarget already ensures max(pxW, pxH) == target, so no resizing
         // is needed — just padding the shorter dimension with black pixels.
         // scale_factor = [1, 1] since the image pixels map 1:1 to canvas pixels.
         var chwData = PreprocessImage(rgbBytes, pxW, pxH, target, ref _chwBuffer);
+
+        ct.ThrowIfCancellationRequested();
 
         var imShape = new DenseTensor<float>(new float[] { target, target }, new[] { 1, 2 });
         var image = new DenseTensor<float>(chwData, new[] { 1, 3, target, target });

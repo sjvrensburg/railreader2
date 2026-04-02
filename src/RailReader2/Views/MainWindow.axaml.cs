@@ -558,7 +558,7 @@ public partial class MainWindow : Window
         // Clear non-rail edge-hold on vertical key release
         if (Vm is { } vm3 && e.Key is Key.Down or Key.Up or Key.S or Key.W or Key.Space)
         {
-            vm3.Controller.ClearNonRailEdgeHold();
+            vm3.Controller.ClearPageEdgeHold();
             e.Handled = true;
         }
 

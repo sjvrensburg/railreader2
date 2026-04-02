@@ -8,13 +8,14 @@ using CommunityToolkit.Mvvm.Input;
 using RailReader.Core;
 using RailReader.Core.Models;
 using RailReader.Core.Services;
+using RailReader.Renderer.Skia;
 using RailReader2.Views;
 
 namespace RailReader2.ViewModels;
 
 // TODO: Many methods are single-line passthroughs (controller call + invalidation).
 //       Consider a helper like Dispatch(Action<DocumentController>, InvalidationFlags) to reduce boilerplate.
-public sealed partial class MainWindowViewModel : ObservableObject
+public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 {
     private readonly DocumentController _controller;
     private readonly ILogger _logger;
@@ -344,6 +345,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
     }
 
     public void SaveAllReadingPositions() => _controller.SaveAllReadingPositions();
+
+    public void Dispose() => _controller.Dispose();
 
     [RelayCommand]
     public void SelectTab(int index)
