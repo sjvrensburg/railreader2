@@ -242,7 +242,8 @@ public sealed class DocumentState : IDisposable
                 catch (Exception ex)
                 {
                     _logger.Error($"Failed to re-render page at {neededDpi} DPI: {ex.Message}", ex);
-                    _marshaller.Post(() => _dpiRenderPending = false);
+                    try { _marshaller.Post(() => _dpiRenderPending = false); }
+                    catch { _dpiRenderPending = false; }
                 }
             }, ct);
             return true;

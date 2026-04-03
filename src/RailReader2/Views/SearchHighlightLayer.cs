@@ -48,9 +48,6 @@ public class SearchHighlightLayer : Control
         private readonly int _activeMatchIndex;
         private readonly int _currentPage;
 
-        [ThreadStatic] private static SKPaint? s_highlightPaint;
-        [ThreadStatic] private static SKPaint? s_activePaint;
-
         public SearchDrawOperation(Rect bounds, TabViewModel tab, MainWindowViewModel vm)
         {
             _bounds = bounds;
@@ -84,12 +81,10 @@ public class SearchHighlightLayer : Control
             var matches = _matches;
             if (matches is null || matches.Count == 0) return;
 
-            var highlightPaint = s_highlightPaint ??= new SKPaint { Color = new SKColor(255, 255, 0, 100), IsAntialias = true };
-            var activePaint = s_activePaint ??= new SKPaint { Color = new SKColor(255, 165, 0, 160), IsAntialias = true };
-
             int activeLocalIndex = OverlayRenderer.ComputeActiveLocalIndex(
                 _vm.SearchMatches, matches, _activeMatchIndex, _currentPage);
-            OverlayRenderer.DrawSearchHighlights(canvas, matches, activeLocalIndex, highlightPaint, activePaint);
+            OverlayRenderer.DrawSearchHighlights(canvas, matches, activeLocalIndex,
+                OverlayRenderer.GetHighlightPaint(), OverlayRenderer.GetActivePaint());
         }
     }
 }

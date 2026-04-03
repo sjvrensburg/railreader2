@@ -3,7 +3,7 @@
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
-    <Version>3.4.9.0</Version>
+    <Version>3.4.10.0</Version>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -21,11 +21,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Avalonia" Version="11.*" />
-    <PackageReference Include="Avalonia.Desktop" Version="11.*" />
-    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.*" />
-    <PackageReference Include="Avalonia.Fonts.Inter" Version="11.*" />
-    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.*" />
+    <PackageReference Include="Avalonia" Version="11.3.*" />
+    <PackageReference Include="Avalonia.Desktop" Version="11.3.*" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.*" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="11.3.*" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.*" />
   </ItemGroup>
 
   <ItemGroup>

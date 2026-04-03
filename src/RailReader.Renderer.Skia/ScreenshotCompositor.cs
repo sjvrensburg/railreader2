@@ -207,23 +207,19 @@ public static class ScreenshotCompositor
         bool lineHighlightEnabled = true, double linePadding = 0.2, LineHighlightTint tint = LineHighlightTint.Auto, double tintOpacity = 0.25)
     {
         if (doc.Rail.NavigableCount == 0) return;
-        using var dimPaint = new SKPaint();
-        using var revealPaint = new SKPaint();
-        using var outlinePaint = new SKPaint { Style = SKPaintStyle.Stroke, IsAntialias = true };
-        using var linePaint = new SKPaint();
         OverlayRenderer.DrawRailOverlays(canvas, doc.Rail.CurrentNavigableBlock, doc.Rail.CurrentLineInfo,
             (float)doc.PageWidth, (float)doc.PageHeight, palette, lineFocusBlur, lineHighlightEnabled,
-            linePadding, tint, tintOpacity, dimPaint, revealPaint, outlinePaint, linePaint);
+            linePadding, tint, tintOpacity,
+            OverlayRenderer.GetDimPaint(), OverlayRenderer.GetRevealPaint(),
+            OverlayRenderer.GetOutlinePaint(), OverlayRenderer.GetLinePaint());
     }
 
     private static void DrawDebugOverlay(SKCanvas canvas, PageAnalysis analysis)
     {
-        using var font = new SKFont(SKTypeface.Default, 8);
-        using var fillPaint = new SKPaint();
-        using var strokePaint = new SKPaint { Style = SKPaintStyle.Stroke, StrokeWidth = 1 };
-        using var bgPaint = new SKPaint { Color = new SKColor(0, 0, 0, 200) };
-        using var textPaint = new SKPaint { IsAntialias = true };
-        OverlayRenderer.DrawDebugOverlay(canvas, analysis, font, fillPaint, strokePaint, bgPaint, textPaint);
+        OverlayRenderer.DrawDebugOverlay(canvas, analysis,
+            OverlayRenderer.GetDebugFont(), OverlayRenderer.GetDebugFillPaint(),
+            OverlayRenderer.GetDebugStrokePaint(), OverlayRenderer.GetDebugBgPaint(),
+            OverlayRenderer.GetDebugTextPaint());
     }
 
     private static void DrawSearchHighlights(SKCanvas canvas, DocumentController controller)
@@ -234,11 +230,9 @@ public static class ScreenshotCompositor
         var doc = controller.ActiveDocument;
         if (doc is null) return;
 
-        using var highlightPaint = new SKPaint { Color = new SKColor(255, 255, 0, 100), IsAntialias = true };
-        using var activePaint = new SKPaint { Color = new SKColor(255, 165, 0, 160), IsAntialias = true };
-
         int activeLocalIndex = OverlayRenderer.ComputeActiveLocalIndex(
             controller.Search.SearchMatches, matches, controller.Search.ActiveMatchIndex, doc.CurrentPage);
-        OverlayRenderer.DrawSearchHighlights(canvas, matches, activeLocalIndex, highlightPaint, activePaint);
+        OverlayRenderer.DrawSearchHighlights(canvas, matches, activeLocalIndex,
+            OverlayRenderer.GetHighlightPaint(), OverlayRenderer.GetActivePaint());
     }
 }

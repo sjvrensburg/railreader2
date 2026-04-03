@@ -18,6 +18,33 @@ public static class OverlayRenderer
         new(255, 152, 0), new(156, 39, 176), new(0, 188, 212),
     ];
 
+    // --- ThreadStatic paint caches (matching AnnotationRenderer pattern) ---
+    // Color/StrokeWidth are mutated per call; Style is stable.
+
+    [ThreadStatic] private static SKPaint? s_dimPaint;
+    [ThreadStatic] private static SKPaint? s_revealPaint;
+    [ThreadStatic] private static SKPaint? s_outlinePaint;
+    [ThreadStatic] private static SKPaint? s_linePaint;
+    [ThreadStatic] private static SKPaint? s_debugFillPaint;
+    [ThreadStatic] private static SKPaint? s_debugStrokePaint;
+    [ThreadStatic] private static SKPaint? s_debugBgPaint;
+    [ThreadStatic] private static SKPaint? s_debugTextPaint;
+    [ThreadStatic] private static SKFont? s_debugFont;
+    [ThreadStatic] private static SKPaint? s_highlightPaint;
+    [ThreadStatic] private static SKPaint? s_activePaint;
+
+    internal static SKPaint GetDimPaint() => s_dimPaint ??= new SKPaint();
+    internal static SKPaint GetRevealPaint() => s_revealPaint ??= new SKPaint();
+    internal static SKPaint GetOutlinePaint() => s_outlinePaint ??= new SKPaint { Style = SKPaintStyle.Stroke, IsAntialias = true };
+    internal static SKPaint GetLinePaint() => s_linePaint ??= new SKPaint();
+    internal static SKPaint GetDebugFillPaint() => s_debugFillPaint ??= new SKPaint();
+    internal static SKPaint GetDebugStrokePaint() => s_debugStrokePaint ??= new SKPaint { Style = SKPaintStyle.Stroke, StrokeWidth = 1 };
+    internal static SKPaint GetDebugBgPaint() => s_debugBgPaint ??= new SKPaint { Color = new SKColor(0, 0, 0, 200) };
+    internal static SKPaint GetDebugTextPaint() => s_debugTextPaint ??= new SKPaint { IsAntialias = true };
+    internal static SKFont GetDebugFont() => s_debugFont ??= new SKFont(SKTypeface.Default, 8);
+    internal static SKPaint GetHighlightPaint() => s_highlightPaint ??= new SKPaint { Color = new SKColor(255, 255, 0, 100), IsAntialias = true };
+    internal static SKPaint GetActivePaint() => s_activePaint ??= new SKPaint { Color = new SKColor(255, 165, 0, 160), IsAntialias = true };
+
     /// <summary>
     /// Draws rail mode overlays: page dim, block reveal, block outline, and line highlight.
     /// Paint objects are passed in so callers can manage lifetime (cached or disposable).

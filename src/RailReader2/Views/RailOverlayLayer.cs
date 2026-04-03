@@ -52,18 +52,6 @@ public class RailOverlayLayer : Control
         private readonly LineHighlightTint _tint;
         private readonly double _tintOpacity;
 
-        // Cached paints — one set per render thread to avoid cross-thread mutation.
-        // Reused every frame; only Color/BlendMode/StrokeWidth are mutated between draws.
-        [ThreadStatic] private static SKPaint? s_dimPaint;
-        [ThreadStatic] private static SKPaint? s_revealPaint;
-        [ThreadStatic] private static SKPaint? s_outlinePaint;
-        [ThreadStatic] private static SKPaint? s_linePaint;
-        [ThreadStatic] private static SKPaint? s_debugFillPaint;
-        [ThreadStatic] private static SKPaint? s_debugStrokePaint;
-        [ThreadStatic] private static SKPaint? s_debugBgPaint;
-        [ThreadStatic] private static SKPaint? s_debugTextPaint;
-        [ThreadStatic] private static SKFont? s_debugFont;
-
         // Snapshot of dynamic state for Equals — during horizontal scroll
         // block/line indices don't change, so the overlay output is identical.
         private readonly int _currentBlock, _currentLine;
@@ -118,23 +106,19 @@ public class RailOverlayLayer : Control
             if (tab.Rail.Active && tab.Rail.HasAnalysis && tab.Rail.NavigableCount > 0)
             {
                 var palette = _effect.GetOverlayPalette();
-                var dimPaint = s_dimPaint ??= new SKPaint();
-                var revealPaint = s_revealPaint ??= new SKPaint();
-                var outlinePaint = s_outlinePaint ??= new SKPaint { Style = SKPaintStyle.Stroke, IsAntialias = true };
-                var linePaint = s_linePaint ??= new SKPaint();
                 OverlayRenderer.DrawRailOverlays(canvas, tab.Rail.CurrentNavigableBlock, tab.Rail.CurrentLineInfo,
                     (float)tab.PageWidth, (float)tab.PageHeight, palette, _lineFocusBlur, _lineHighlightEnabled,
-                    _linePadding, _tint, _tintOpacity, dimPaint, revealPaint, outlinePaint, linePaint);
+                    _linePadding, _tint, _tintOpacity,
+                    OverlayRenderer.GetDimPaint(), OverlayRenderer.GetRevealPaint(),
+                    OverlayRenderer.GetOutlinePaint(), OverlayRenderer.GetLinePaint());
             }
 
             if (tab.DebugOverlay && tab.AnalysisCache.TryGetValue(tab.CurrentPage, out var debugAnalysis))
             {
-                var font = s_debugFont ??= new SKFont(SKTypeface.Default, 8);
-                var fillPaint = s_debugFillPaint ??= new SKPaint();
-                var strokePaint = s_debugStrokePaint ??= new SKPaint { Style = SKPaintStyle.Stroke, StrokeWidth = 1 };
-                var bgPaint = s_debugBgPaint ??= new SKPaint { Color = new SKColor(0, 0, 0, 200) };
-                var textPaint = s_debugTextPaint ??= new SKPaint { IsAntialias = true };
-                OverlayRenderer.DrawDebugOverlay(canvas, debugAnalysis, font, fillPaint, strokePaint, bgPaint, textPaint);
+                OverlayRenderer.DrawDebugOverlay(canvas, debugAnalysis,
+                    OverlayRenderer.GetDebugFont(), OverlayRenderer.GetDebugFillPaint(),
+                    OverlayRenderer.GetDebugStrokePaint(), OverlayRenderer.GetDebugBgPaint(),
+                    OverlayRenderer.GetDebugTextPaint());
             }
         }
     }

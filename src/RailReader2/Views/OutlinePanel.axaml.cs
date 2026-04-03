@@ -428,8 +428,13 @@ public partial class OutlinePanel : UserControl
         var doc = _vm.Controller.ActiveDocument;
         if (doc is null) return;
 
-        var (regex, comparison) = SearchService.PrepareSearchParams(query, caseSensitive, useRegex);
-        if (useRegex && regex is null) return;
+        var (regex, comparison, regexError) = SearchService.PrepareSearchParams(query, caseSensitive, useRegex);
+        if (useRegex && regex is null)
+        {
+            SearchMatchCount.Text = regexError ?? "Invalid regex";
+            SearchResultsList.ItemsSource = null;
+            return;
+        }
 
         // Clear previous results
         _vm.Controller.Search.CloseSearch();
