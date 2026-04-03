@@ -19,11 +19,20 @@ public partial class MenuBarView : UserControl
         _vm = DataContext as MainWindowViewModel;
         UpdateRecentFiles();
         if (_vm is not null)
-            _vm.PropertyChanged += (_, args) =>
-            {
-                if (args.PropertyName == nameof(MainWindowViewModel.ActiveTab))
-                    UpdateRecentFiles();
-            };
+            _vm.PropertyChanged += OnVmPropertyChanged;
+    }
+
+    protected override void OnUnloaded(RoutedEventArgs e)
+    {
+        if (_vm is not null)
+            _vm.PropertyChanged -= OnVmPropertyChanged;
+        base.OnUnloaded(e);
+    }
+
+    private void OnVmPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs args)
+    {
+        if (args.PropertyName == nameof(MainWindowViewModel.ActiveTab))
+            UpdateRecentFiles();
     }
 
     private void UpdateRecentFiles()

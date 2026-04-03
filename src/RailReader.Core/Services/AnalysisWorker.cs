@@ -15,10 +15,12 @@ public sealed class AnalysisWorker : IDisposable
 {
     private readonly Channel<AnalysisRequest> _requestChannel;
     private readonly Channel<AnalysisResult> _resultChannel;
+    // UI-thread-only: accessed exclusively from Submit/Poll/IsInFlight/IsIdle on the UI thread.
     private readonly HashSet<(string FilePath, int Page)> _inFlight = [];
     private readonly CancellationTokenSource _cts = new();
     private readonly Task _workerTask;
     private readonly ILogger _logger;
+    private readonly IThreadMarshaller _marshaller;
 
     /// <summary>Set to true once the worker loop has initialized the ONNX session.</summary>
     public bool IsReady { get; private set; }
@@ -26,9 +28,10 @@ public sealed class AnalysisWorker : IDisposable
     /// <summary>Set if the worker loop failed to start (e.g. ONNX model load failure).</summary>
     public string? StartupError { get; private set; }
 
-    public AnalysisWorker(string modelPath, ILogger? logger = null)
+    public AnalysisWorker(string modelPath, IThreadMarshaller? marshaller = null, ILogger? logger = null)
     {
         _logger = logger ?? NullLogger.Instance;
+        _marshaller = marshaller ?? NoOpMarshaller.Instance;
         _requestChannel = Channel.CreateUnbounded<AnalysisRequest>();
         _resultChannel = Channel.CreateUnbounded<AnalysisResult>();
 
@@ -73,8 +76,10 @@ public sealed class AnalysisWorker : IDisposable
         }
     }
 
+    /// <summary>Submit an analysis request. Must be called on the UI thread.</summary>
     public bool Submit(AnalysisRequest request)
     {
+        _marshaller.AssertUIThread();
         var key = (request.FilePath, request.Page);
         if (!_inFlight.Add(key))
             return false;
@@ -87,8 +92,10 @@ public sealed class AnalysisWorker : IDisposable
         return true;
     }
 
+    /// <summary>Poll for completed results. Must be called on the UI thread.</summary>
     public AnalysisResult? Poll()
     {
+        _marshaller.AssertUIThread();
         if (!_resultChannel.Reader.TryRead(out var result))
             return null;
 
@@ -96,8 +103,22 @@ public sealed class AnalysisWorker : IDisposable
         return result;
     }
 
-    public bool IsInFlight(string filePath, int page) => _inFlight.Contains((filePath, page));
-    public bool IsIdle => _inFlight.Count == 0;
+    /// <summary>Check if a page is currently being analyzed. Must be called on the UI thread.</summary>
+    public bool IsInFlight(string filePath, int page)
+    {
+        _marshaller.AssertUIThread();
+        return _inFlight.Contains((filePath, page));
+    }
+
+    /// <summary>Check if no analysis requests are in flight. Must be called on the UI thread.</summary>
+    public bool IsIdle
+    {
+        get
+        {
+            _marshaller.AssertUIThread();
+            return _inFlight.Count == 0;
+        }
+    }
 
     public void Dispose()
     {

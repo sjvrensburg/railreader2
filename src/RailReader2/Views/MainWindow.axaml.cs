@@ -14,6 +14,7 @@ public partial class MainWindow : Window
     private double _lastMinimapOx;
     private double _lastMinimapOy;
     private double _lastMinimapZoom;
+    private MainWindowViewModel? _subscribedVm;
 
     // Fullscreen hover reveal: show threshold < hide threshold for hysteresis
     private const double FullScreenShowThreshold = 5.0;
@@ -74,16 +75,7 @@ public partial class MainWindow : Window
             // SizeChanged fires during the initial layout pass (before window.Opened),
             // so OpenDocument will already see correct dimensions when it runs.
             vm.SetViewportSize(Viewport.Bounds.Width, Viewport.Bounds.Height);
-            Viewport.SizeChanged += (_, _) =>
-            {
-                vm.SetViewportSize(Viewport.Bounds.Width, Viewport.Bounds.Height);
-                if (vm.ActiveTab is { } tab)
-                {
-                    var (ww, wh) = (Viewport.Bounds.Width, Viewport.Bounds.Height);
-                    tab.ClampCamera(ww, wh);
-                    UpdateCameraTransform();
-                }
-            };
+            Viewport.SizeChanged += OnViewportSizeChanged;
 
             UpdateLayerBindings(vm.ActiveTab);
             SetupRadialMenu(vm);
@@ -109,72 +101,99 @@ public partial class MainWindow : Window
                 PageLayer.InvalidateVisual();
             }
 
-            vm.PropertyChanged += async (_, args) =>
-            {
-                switch (args.PropertyName)
+            _subscribedVm = vm;
+            vm.PropertyChanged += OnVmPropertyChanged;
+        }
+    }
+
+    protected override void OnUnloaded(Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (_subscribedVm is { } vm)
+        {
+            vm.PropertyChanged -= OnVmPropertyChanged;
+            Viewport.SizeChanged -= OnViewportSizeChanged;
+            _subscribedVm = null;
+        }
+        base.OnUnloaded(e);
+    }
+
+    private void OnViewportSizeChanged(object? sender, SizeChangedEventArgs e)
+    {
+        if (Vm is not { } vm) return;
+        vm.SetViewportSize(Viewport.Bounds.Width, Viewport.Bounds.Height);
+        if (vm.ActiveTab is { } tab)
+        {
+            var (ww, wh) = (Viewport.Bounds.Width, Viewport.Bounds.Height);
+            tab.ClampCamera(ww, wh);
+            UpdateCameraTransform();
+        }
+    }
+
+    private async void OnVmPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs args)
+    {
+        if (Vm is not { } vm) return;
+        switch (args.PropertyName)
+        {
+            case nameof(MainWindowViewModel.ActiveTab):
+                UpdateLayerBindings(vm.ActiveTab);
+                UpdateCameraTransform();
+                UpdateRailToolBarVisibility();
+                PageLayer.InvalidateVisual();
+                SearchLayer.InvalidateVisual();
+                AnnotationLayer.InvalidateVisual();
+                OverlayLayer.InvalidateVisual();
+                Minimap.InvalidateVisual();
+                break;
+            case nameof(MainWindowViewModel.ShowOutline):
+                UpdateSidebarColumnWidth(vm.ShowOutline);
+                break;
+            case nameof(MainWindowViewModel.ShowShortcuts) when vm.ShowShortcuts:
+                vm.ShowShortcuts = false;
+                await new ShortcutsDialog { FontSize = vm.CurrentFontSize }.ShowDialog(this);
+                break;
+            case nameof(MainWindowViewModel.ShowAbout) when vm.ShowAbout:
+                vm.ShowAbout = false;
+                var aboutDlg = new AboutDialog { FontSize = vm.CurrentFontSize };
+                aboutDlg.SetLogFilePath(vm.LogFilePath);
+                await aboutDlg.ShowDialog(this);
+                break;
+            case nameof(MainWindowViewModel.ShowSettings) when vm.ShowSettings:
+                vm.ShowSettings = false;
+                await new SettingsWindow { DataContext = vm, FontSize = vm.CurrentFontSize }.ShowDialog(this);
+                break;
+            case nameof(MainWindowViewModel.ActiveTool):
+                Viewport.UpdateAnnotationCursor();
+                break;
+            case nameof(MainWindowViewModel.IsFullScreen):
+                WindowState = vm.IsFullScreen ? WindowState.FullScreen : WindowState.Normal;
+                SystemDecorations = vm.IsFullScreen ? SystemDecorations.None : SystemDecorations.Full;
+                break;
+            case nameof(MainWindowViewModel.ShowBookmarkDialog) when vm.ShowBookmarkDialog:
+                vm.ShowBookmarkDialog = false;
+                if (vm.ActiveTab is { } bmTab)
                 {
-                    case nameof(MainWindowViewModel.ActiveTab):
-                        UpdateLayerBindings(vm.ActiveTab);
-                        UpdateCameraTransform();
-                        UpdateRailToolBarVisibility();
-                        PageLayer.InvalidateVisual();
-                        SearchLayer.InvalidateVisual();
-                        AnnotationLayer.InvalidateVisual();
-                        OverlayLayer.InvalidateVisual();
-                        Minimap.InvalidateVisual();
-                        break;
-                    case nameof(MainWindowViewModel.ShowOutline):
-                        UpdateSidebarColumnWidth(vm.ShowOutline);
-                        break;
-                    case nameof(MainWindowViewModel.ShowShortcuts) when vm.ShowShortcuts:
-                        vm.ShowShortcuts = false;
-                        await new ShortcutsDialog { FontSize = vm.CurrentFontSize }.ShowDialog(this);
-                        break;
-                    case nameof(MainWindowViewModel.ShowAbout) when vm.ShowAbout:
-                        vm.ShowAbout = false;
-                        var aboutDlg = new AboutDialog { FontSize = vm.CurrentFontSize };
-                        aboutDlg.SetLogFilePath(vm.LogFilePath);
-                        await aboutDlg.ShowDialog(this);
-                        break;
-                    case nameof(MainWindowViewModel.ShowSettings) when vm.ShowSettings:
-                        vm.ShowSettings = false;
-                        await new SettingsWindow { DataContext = vm, FontSize = vm.CurrentFontSize }.ShowDialog(this);
-                        break;
-                    case nameof(MainWindowViewModel.ActiveTool):
-                        Viewport.UpdateAnnotationCursor();
-                        break;
-                    case nameof(MainWindowViewModel.IsFullScreen):
-                        WindowState = vm.IsFullScreen ? WindowState.FullScreen : WindowState.Normal;
-                        SystemDecorations = vm.IsFullScreen ? SystemDecorations.None : SystemDecorations.Full;
-                        break;
-                    case nameof(MainWindowViewModel.ShowBookmarkDialog) when vm.ShowBookmarkDialog:
-                        vm.ShowBookmarkDialog = false;
-                        if (vm.ActiveTab is { } bmTab)
-                        {
-                            var bmDialog = new BookmarkNameDialog(bmTab.CurrentPage + 1)
-                                { FontSize = vm.CurrentFontSize };
-                            var bmName = await bmDialog.ShowDialog<string?>(this);
-                            if (bmName is not null)
-                            {
-                                bool added = vm.Controller.AddBookmark(bmName);
-                                OutlinePanel.UpdateBookmarkSource();
-                                vm.ShowStatusToast(added ? $"Bookmark: {bmName}" : $"Updated bookmark: {bmName}");
-                            }
-                        }
-                        break;
-                    case nameof(MainWindowViewModel.ShowGoToPage) when vm.ShowGoToPage:
-                        vm.ShowGoToPage = false;
-                        if (vm.ActiveTab is { } gotoTab)
-                        {
-                            var dialog = new GoToPageDialog(gotoTab.CurrentPage + 1, gotoTab.PageCount)
-                                { FontSize = vm.CurrentFontSize };
-                            var result = await dialog.ShowDialog<int>(this);
-                            if (result > 0)
-                                vm.GoToPage(result - 1);
-                        }
-                        break;
+                    var bmDialog = new BookmarkNameDialog(bmTab.CurrentPage + 1)
+                        { FontSize = vm.CurrentFontSize };
+                    var bmName = await bmDialog.ShowDialog<string?>(this);
+                    if (bmName is not null)
+                    {
+                        bool added = vm.Controller.AddBookmark(bmName);
+                        OutlinePanel.UpdateBookmarkSource();
+                        vm.ShowStatusToast(added ? $"Bookmark: {bmName}" : $"Updated bookmark: {bmName}");
+                    }
                 }
-            };
+                break;
+            case nameof(MainWindowViewModel.ShowGoToPage) when vm.ShowGoToPage:
+                vm.ShowGoToPage = false;
+                if (vm.ActiveTab is { } gotoTab)
+                {
+                    var dialog = new GoToPageDialog(gotoTab.CurrentPage + 1, gotoTab.PageCount)
+                        { FontSize = vm.CurrentFontSize };
+                    var result = await dialog.ShowDialog<int>(this);
+                    if (result > 0)
+                        vm.GoToPage(result - 1);
+                }
+                break;
         }
     }
 

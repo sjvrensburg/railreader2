@@ -143,17 +143,7 @@ public partial class RailToolBar : UserControl
             TickFrequency = 5,
         };
         ToolTip.SetTip(_speedSlider, "Scroll speed ([ / ] keys)");
-        _speedSlider.PropertyChanged += (_, e) =>
-        {
-            if (e.Property == RangeBase.ValueProperty && ViewModel is { } vm)
-            {
-                if (_jumpMode)
-                    vm.Config.JumpPercentage = _speedSlider.Value;
-                else
-                    vm.Config.ScrollSpeedMax = _speedSlider.Value;
-                vm.OnSliderChanged();
-            }
-        };
+        _speedSlider.PropertyChanged += OnSpeedSliderPropertyChanged;
         SliderPanel.Children.Add(_speedSlider);
 
         // Blur slider
@@ -171,14 +161,7 @@ public partial class RailToolBar : UserControl
             TickFrequency = 0.1,
         };
         ToolTip.SetTip(_blurSlider, "Motion blur intensity (Shift+[ / Shift+] keys)");
-        _blurSlider.PropertyChanged += (_, e) =>
-        {
-            if (e.Property == RangeBase.ValueProperty && ViewModel is { } vm)
-            {
-                vm.Config.MotionBlurIntensity = _blurSlider.Value;
-                vm.OnSliderChanged();
-            }
-        };
+        _blurSlider.PropertyChanged += OnBlurSliderPropertyChanged;
         SliderPanel.Children.Add(_blurSlider);
     }
 
@@ -190,6 +173,36 @@ public partial class RailToolBar : UserControl
         HorizontalAlignment = HorizontalAlignment.Center,
         TextAlignment = TextAlignment.Center,
     };
+
+    protected override void OnUnloaded(Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (_speedSlider is not null)
+            _speedSlider.PropertyChanged -= OnSpeedSliderPropertyChanged;
+        if (_blurSlider is not null)
+            _blurSlider.PropertyChanged -= OnBlurSliderPropertyChanged;
+        base.OnUnloaded(e);
+    }
+
+    private void OnSpeedSliderPropertyChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
+    {
+        if (e.Property == RangeBase.ValueProperty && ViewModel is { } vm && _speedSlider is not null)
+        {
+            if (_jumpMode)
+                vm.Config.JumpPercentage = _speedSlider.Value;
+            else
+                vm.Config.ScrollSpeedMax = _speedSlider.Value;
+            vm.OnSliderChanged();
+        }
+    }
+
+    private void OnBlurSliderPropertyChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
+    {
+        if (e.Property == RangeBase.ValueProperty && ViewModel is { } vm && _blurSlider is not null)
+        {
+            vm.Config.MotionBlurIntensity = _blurSlider.Value;
+            vm.OnSliderChanged();
+        }
+    }
 
     /// <summary>
     /// Convenience method combining SetJumpMode + UpdateToggleStates.

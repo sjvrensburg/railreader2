@@ -363,6 +363,12 @@ public sealed class DocumentState : IDisposable
 
         int oldPage = CurrentPage;
         double oldZoom = Camera.Zoom;
+
+        // Clear stale state from the previous page — the background task
+        // for the old page will check CurrentPage != page and discard its
+        // result, so these flags must not linger.
+        ClearPendingState();
+
         CurrentPage = page;
         if (!LoadPageBitmap())
         {
@@ -373,6 +379,16 @@ public sealed class DocumentState : IDisposable
         Camera.Zoom = oldZoom;
         ClampCamera(windowWidth, windowHeight);
         return true;
+    }
+
+    /// <summary>
+    /// Clears transient state tied to the current page. Call before
+    /// navigating away so that stale flags don't leak across pages.
+    /// </summary>
+    internal void ClearPendingState()
+    {
+        PendingRailSetup = false;
+        PendingSkip = null;
     }
 
     public void CenterPage(double windowWidth, double windowHeight)
@@ -537,9 +553,11 @@ public sealed class DocumentState : IDisposable
 
     /// <summary>
     /// Returns cached text for a page, extracting it on first access.
+    /// Must be called on the UI thread (PDFium is not thread-safe).
     /// </summary>
     public PageText GetOrExtractText(int pageIndex)
     {
+        _marshaller.AssertUIThread();
         if (_textCache.TryGetValue(pageIndex, out var cached))
             return cached;
         var text = _pdfText.ExtractPageText(_pdf.PdfBytes, pageIndex);
@@ -549,9 +567,11 @@ public sealed class DocumentState : IDisposable
 
     /// <summary>
     /// Returns cached links for a page, extracting them on first access.
+    /// Must be called on the UI thread (PDFium is not thread-safe).
     /// </summary>
     public List<PdfLink> GetOrExtractLinks(int pageIndex)
     {
+        _marshaller.AssertUIThread();
         if (_linkCache.TryGetValue(pageIndex, out var cached))
             return cached;
         var links = PdfLinkService.ExtractPageLinks(_pdf.PdfBytes, pageIndex);

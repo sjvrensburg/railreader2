@@ -105,7 +105,7 @@ public sealed class DocumentController : IDisposable
                 "ONNX model not found (PP-DocLayoutV3.onnx). Run ./scripts/download-model.sh");
 
         _logger.Debug($"[ONNX] Starting worker with model: {modelPath}");
-        _worker = new AnalysisWorker(modelPath, logger: _logger);
+        _worker = new AnalysisWorker(modelPath, _marshaller, _logger);
         _logger.Debug("[ONNX] Worker started (ONNX session loading in background)");
     }
 
@@ -961,7 +961,17 @@ public sealed class DocumentController : IDisposable
                 if (doc.IsDisposed || doc.FilePath != result.FilePath) continue;
 
                 doc.SetAnalysis(result.Page, result.Analysis);
-                if (doc.CurrentPage == result.Page && doc.PendingRailSetup)
+
+                if (doc.CurrentPage != result.Page)
+                {
+                    // The user navigated away while analysis was in-flight.
+                    // The result is cached above, but pending state for the
+                    // old page must not linger.
+                    doc.ClearPendingState();
+                    continue;
+                }
+
+                if (doc.PendingRailSetup)
                 {
                     doc.Rail.SetAnalysis(result.Analysis, _config.NavigableClasses);
                     doc.PendingRailSetup = false;
