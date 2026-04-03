@@ -107,9 +107,17 @@ public sealed class SearchService
     public void FinalizeSearch(DocumentState doc, List<SearchMatch> allMatches)
     {
         SearchMatches = allMatches;
-        _searchMatchesByPage = allMatches
-            .GroupBy(m => m.PageIndex)
-            .ToDictionary(g => g.Key, g => g.ToList());
+        var byPage = new Dictionary<int, List<SearchMatch>>();
+        foreach (var m in allMatches)
+        {
+            if (!byPage.TryGetValue(m.PageIndex, out var list))
+            {
+                list = [];
+                byPage[m.PageIndex] = list;
+            }
+            list.Add(m);
+        }
+        _searchMatchesByPage = byPage;
         if (allMatches.Count > 0)
         {
             int firstOnCurrentOrAfter = allMatches.FindIndex(m => m.PageIndex >= doc.CurrentPage);

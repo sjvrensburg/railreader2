@@ -185,23 +185,28 @@ public static class AnnotationRenderer
     private static List<string> WrapText(string text, SKFont font, float maxWidth)
     {
         var lines = new List<string>();
+        float spaceWidth = font.MeasureText(" ");
         foreach (var paragraph in text.Split('\n'))
         {
             if (string.IsNullOrEmpty(paragraph)) { lines.Add(""); continue; }
 
             var words = paragraph.Split(' ');
             string current = "";
+            float currentWidth = 0;
             foreach (var word in words)
             {
-                string test = current.Length == 0 ? word : current + " " + word;
-                if (font.MeasureText(test) > maxWidth && current.Length > 0)
+                float wordWidth = font.MeasureText(word);
+                float testWidth = current.Length == 0 ? wordWidth : currentWidth + spaceWidth + wordWidth;
+                if (testWidth > maxWidth && current.Length > 0)
                 {
                     lines.Add(current);
                     current = word;
+                    currentWidth = wordWidth;
                 }
                 else
                 {
-                    current = test;
+                    current = current.Length == 0 ? word : current + " " + word;
+                    currentWidth = testWidth;
                 }
             }
             if (current.Length > 0) lines.Add(current);
