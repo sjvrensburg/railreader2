@@ -469,8 +469,15 @@ public sealed class DocumentState : IDisposable
         Annotations = manager.Checkout(FilePath);
     }
 
+    /// <summary>
+    /// Generation counter incremented on every annotation mutation.
+    /// Used by the UI to detect changes without deep comparison.
+    /// </summary>
+    public int AnnotationGeneration { get; private set; }
+
     public void MarkAnnotationsDirty()
     {
+        AnnotationGeneration++;
         _annotationManager?.MarkDirty(FilePath);
     }
 
@@ -645,7 +652,7 @@ public sealed class DocumentState : IDisposable
     public static int CalculateRenderDpi(double zoom)
     {
         int raw = (int)(zoom * 150);
-        int rounded = ((raw + 37) / 75) * 75;
+        int rounded = ((raw + 25) / 50) * 50;
         return Math.Clamp(rounded, 150, 600);
     }
 

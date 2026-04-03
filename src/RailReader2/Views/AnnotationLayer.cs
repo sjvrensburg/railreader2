@@ -45,6 +45,14 @@ public class AnnotationLayer : Control
         private readonly TabViewModel _tab;
         private readonly MainWindowViewModel _vm;
 
+        // Snapshot of mutable state for Equals — when these match, the
+        // annotation layer output is identical and Avalonia can skip re-execution.
+        private readonly int _page;
+        private readonly int _annotationGeneration;
+        private readonly Annotation? _selected;
+        private readonly Annotation? _preview;
+        private readonly List<HighlightRect>? _selectionRects;
+
         [ThreadStatic] private static SKPaint? s_selPaint;
 
         public AnnotationDrawOperation(Rect bounds, TabViewModel tab, MainWindowViewModel vm)
@@ -52,11 +60,25 @@ public class AnnotationLayer : Control
             _bounds = bounds;
             _tab = tab;
             _vm = vm;
+            _page = tab.CurrentPage;
+            _annotationGeneration = tab.State.AnnotationGeneration;
+            _selected = vm.SelectedAnnotation;
+            _preview = vm.PreviewAnnotation;
+            _selectionRects = vm.TextSelectionRects;
         }
 
         public Rect Bounds => _bounds;
         public void Dispose() { }
-        public bool Equals(ICustomDrawOperation? other) => false;
+
+        public bool Equals(ICustomDrawOperation? other)
+            => other is AnnotationDrawOperation op
+            && _bounds == op._bounds
+            && _page == op._page
+            && _annotationGeneration == op._annotationGeneration
+            && ReferenceEquals(_selected, op._selected)
+            && ReferenceEquals(_preview, op._preview)
+            && ReferenceEquals(_selectionRects, op._selectionRects);
+
         public bool HitTest(Point p) => false;
 
         public void Render(ImmediateDrawingContext context)
