@@ -13,6 +13,7 @@ public sealed class AnnotationFileManager : IDisposable
 {
     private readonly IThreadMarshaller _marshaller;
     private readonly Dictionary<string, SharedEntry> _entries = new(StringComparer.OrdinalIgnoreCase);
+    private bool _disposed;
 
     /// <summary>
     /// Called when an annotation save fails. Allows the controller to surface
@@ -86,7 +87,7 @@ public sealed class AnnotationFileManager : IDisposable
             entry.AutoSaveTimer.Change(1000, Timeout.Infinite);
         else
             entry.AutoSaveTimer = new Timer(
-                _ => _marshaller.Post(() => FlushEntry(entry)),
+                _ => _marshaller.Post(() => { if (!_disposed) FlushEntry(entry); }),
                 null, 1000, Timeout.Infinite);
     }
 
@@ -99,6 +100,7 @@ public sealed class AnnotationFileManager : IDisposable
 
     public void Dispose()
     {
+        _disposed = true;
         foreach (var entry in _entries.Values)
         {
             FlushEntry(entry);

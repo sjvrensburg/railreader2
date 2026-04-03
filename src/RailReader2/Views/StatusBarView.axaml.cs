@@ -14,6 +14,7 @@ public partial class StatusBarView : UserControl
     private static readonly IBrush AmberBrush = new SolidColorBrush(Color.FromRgb(255, 170, 0));
     private static readonly IBrush DangerBrush = new SolidColorBrush(Color.FromRgb(255, 100, 100));
 
+    private MainWindowViewModel? _subscribedVm;
     private TabViewModel? _subscribedTab;
     private TextBlock? _zoomLabel;
 
@@ -28,20 +29,34 @@ public partial class StatusBarView : UserControl
         base.OnLoaded(e);
         if (DataContext is MainWindowViewModel vm)
         {
-            vm.PropertyChanged += (_, args) =>
-            {
-                if (args.PropertyName is nameof(MainWindowViewModel.ActiveTab) or
-                    nameof(MainWindowViewModel.ActiveTabIndex) or
-                    nameof(MainWindowViewModel.ActiveTool) or
-                    nameof(MainWindowViewModel.AutoScrollActive) or
-                    nameof(MainWindowViewModel.JumpMode) or
-                    nameof(MainWindowViewModel.StatusToast))
-                {
-                    SubscribeToTab(vm.ActiveTab);
-                    UpdateStatus();
-                }
-            };
+            _subscribedVm = vm;
+            vm.PropertyChanged += OnVmPropertyChanged;
             SubscribeToTab(vm.ActiveTab);
+        }
+    }
+
+    protected override void OnUnloaded(RoutedEventArgs e)
+    {
+        if (_subscribedVm is not null)
+        {
+            _subscribedVm.PropertyChanged -= OnVmPropertyChanged;
+            _subscribedVm = null;
+        }
+        SubscribeToTab(null);
+        base.OnUnloaded(e);
+    }
+
+    private void OnVmPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs args)
+    {
+        if (args.PropertyName is nameof(MainWindowViewModel.ActiveTab) or
+            nameof(MainWindowViewModel.ActiveTabIndex) or
+            nameof(MainWindowViewModel.ActiveTool) or
+            nameof(MainWindowViewModel.AutoScrollActive) or
+            nameof(MainWindowViewModel.JumpMode) or
+            nameof(MainWindowViewModel.StatusToast))
+        {
+            SubscribeToTab(_subscribedVm?.ActiveTab);
+            UpdateStatus();
         }
     }
 

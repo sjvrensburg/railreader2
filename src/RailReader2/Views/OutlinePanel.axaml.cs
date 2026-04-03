@@ -43,6 +43,39 @@ public partial class OutlinePanel : UserControl
         RegexToggle.IsCheckedChanged += OnSearchOptionChanged;
     }
 
+    protected override void OnUnloaded(RoutedEventArgs e)
+    {
+        // Clean up DataContext subscriptions
+        if (_vm is not null)
+        {
+            _vm.PropertyChanged -= OnVmPropertyChanged;
+            _vm.SearchRequested -= OnSearchRequested;
+        }
+        if (_watchedTab is not null)
+        {
+            _watchedTab.PropertyChanged -= OnTabPropertyChanged;
+            _watchedTab = null;
+        }
+        _vm = null;
+
+        // Dispose the debounce timer
+        _debounceTimer?.Stop();
+        _debounceTimer = null;
+
+        _searchCts?.Cancel();
+        _searchCts?.Dispose();
+        _searchCts = null;
+
+        // Unsubscribe constructor-level subscriptions
+        DataContextChanged -= OnDataContextChanged;
+        SearchInput.TextChanged -= OnSearchTextChanged;
+        SearchInput.KeyDown -= OnSearchKeyDown;
+        CaseSensitiveToggle.IsCheckedChanged -= OnSearchOptionChanged;
+        RegexToggle.IsCheckedChanged -= OnSearchOptionChanged;
+
+        base.OnUnloaded(e);
+    }
+
     private void OnDataContextChanged(object? sender, EventArgs e)
     {
         if (_vm is not null)
