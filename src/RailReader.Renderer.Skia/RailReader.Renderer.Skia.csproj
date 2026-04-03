@@ -18,11 +18,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="PDFtoImage" Version="5.*" />
-    <PackageReference Include="SkiaSharp" Version="3.*" />
-    <PackageReference Include="SkiaSharp.NativeAssets.Linux" Version="3.*" />
-    <PackageReference Include="SkiaSharp.NativeAssets.Win32" Version="3.*" />
-    <PackageReference Include="SkiaSharp.NativeAssets.macOS" Version="3.*" />
+    <PackageReference Include="PDFtoImage" Version="5.2.*" />
+    <PackageReference Include="SkiaSharp" Version="3.119.*" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux" Version="3.119.*" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Win32" Version="3.119.*" />
+    <PackageReference Include="SkiaSharp.NativeAssets.macOS" Version="3.119.*" />
   </ItemGroup>
 
 </Project>

@@ -40,8 +40,8 @@ public sealed class SearchService
         if (string.IsNullOrEmpty(query) || _getActiveDocument() is not { } doc)
             return;
 
-        var (regex, comparison) = PrepareSearchParams(query, caseSensitive, useRegex);
-        if (useRegex && regex is null) return; // invalid regex
+        var (regex, comparison, _) = PrepareSearchParams(query, caseSensitive, useRegex);
+        if (useRegex && regex is null) return; // invalid regex — caller shows error via RegexError
 
         var allMatches = new List<SearchMatch>();
         for (int page = 0; page < doc.PageCount; page++)
@@ -51,12 +51,13 @@ public sealed class SearchService
     }
 
     /// <summary>
-    /// Prepares search parameters. Returns null regex for invalid regex patterns.
+    /// Prepares search parameters. Returns null regex and an error message for invalid regex patterns.
     /// </summary>
-    public static (Regex? Regex, StringComparison Comparison) PrepareSearchParams(
+    public static (Regex? Regex, StringComparison Comparison, string? RegexError) PrepareSearchParams(
         string query, bool caseSensitive, bool useRegex)
     {
         Regex? regex = null;
+        string? regexError = null;
         if (useRegex)
         {
             try
@@ -64,10 +65,10 @@ public sealed class SearchService
                 var options = caseSensitive ? RegexOptions.None : RegexOptions.IgnoreCase;
                 regex = new Regex(query, options);
             }
-            catch (RegexParseException) { }
+            catch (RegexParseException ex) { regexError = ex.Message; }
         }
         var comparison = caseSensitive ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
-        return (regex, comparison);
+        return (regex, comparison, regexError);
     }
 
     /// <summary>

@@ -35,31 +35,34 @@ public class SearchServiceTests : IDisposable
     [Fact]
     public void PrepareSearchParams_PlainText_NullRegex()
     {
-        var (regex, comparison) = SearchService.PrepareSearchParams("hello", caseSensitive: true, useRegex: false);
+        var (regex, comparison, error) = SearchService.PrepareSearchParams("hello", caseSensitive: true, useRegex: false);
         Assert.Null(regex);
+        Assert.Null(error);
         Assert.Equal(StringComparison.Ordinal, comparison);
     }
 
     [Fact]
     public void PrepareSearchParams_ValidRegex_Compiles()
     {
-        var (regex, _) = SearchService.PrepareSearchParams(@"test\d+", caseSensitive: true, useRegex: true);
+        var (regex, _, error) = SearchService.PrepareSearchParams(@"test\d+", caseSensitive: true, useRegex: true);
         Assert.NotNull(regex);
+        Assert.Null(error);
         Assert.Matches(regex, "test123");
         Assert.DoesNotMatch(regex, "hello");
     }
 
     [Fact]
-    public void PrepareSearchParams_InvalidRegex_NullRegex()
+    public void PrepareSearchParams_InvalidRegex_ReturnsError()
     {
-        var (regex, _) = SearchService.PrepareSearchParams("[", caseSensitive: true, useRegex: true);
+        var (regex, _, error) = SearchService.PrepareSearchParams("[", caseSensitive: true, useRegex: true);
         Assert.Null(regex);
+        Assert.NotNull(error);
     }
 
     [Fact]
     public void PrepareSearchParams_CaseInsensitive_SetsComparison()
     {
-        var (_, comparison) = SearchService.PrepareSearchParams("test", caseSensitive: false, useRegex: false);
+        var (_, comparison, _) = SearchService.PrepareSearchParams("test", caseSensitive: false, useRegex: false);
         Assert.Equal(StringComparison.OrdinalIgnoreCase, comparison);
     }
 
