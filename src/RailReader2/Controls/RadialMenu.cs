@@ -273,6 +273,7 @@ public class RadialMenu : Control
         private readonly double _colorRingR;
 
         // Cached paints — reused across frames
+        [ThreadStatic] private static float s_cachedShadowScale;
         [ThreadStatic] private static SKPaint? s_shadowPaint;
         [ThreadStatic] private static SKPaint? s_bgPaint;
         [ThreadStatic] private static SKPaint? s_ringPaint;
@@ -304,7 +305,15 @@ public class RadialMenu : Control
 
         public Rect Bounds => _bounds;
         public void Dispose() { }
-        public bool Equals(ICustomDrawOperation? other) => false;
+
+        public bool Equals(ICustomDrawOperation? other)
+            => other is RadialMenuDrawOp op
+            && _bounds == op._bounds
+            && _hovered == op._hovered
+            && _hoverCentre == op._hoverCentre
+            && _expandedSegment == op._expandedSegment
+            && _hoveredColorIndex == op._hoveredColorIndex
+            && _segments.Count == op._segments.Count;
         public bool HitTest(Point p) => true;
 
         public void Render(ImmediateDrawingContext context)
@@ -319,10 +328,14 @@ public class RadialMenu : Control
             float innerR = (float)_innerR;
             float outerR = (float)_outerR;
 
-            // Cached paints — create once, update mutable properties per frame
+            // Cached paints — create once, update mutable properties only when changed
             var shadowPaint = s_shadowPaint ??= new SKPaint { Color = new SKColor(0, 0, 0, 100), IsAntialias = true };
-            shadowPaint.MaskFilter?.Dispose();
-            shadowPaint.MaskFilter = SKMaskFilter.CreateBlur(SKBlurStyle.Normal, 6 * _scale);
+            if (shadowPaint.MaskFilter is null || s_cachedShadowScale != _scale)
+            {
+                shadowPaint.MaskFilter?.Dispose();
+                shadowPaint.MaskFilter = SKMaskFilter.CreateBlur(SKBlurStyle.Normal, 6 * _scale);
+                s_cachedShadowScale = _scale;
+            }
 
             var bgPaint = s_bgPaint ??= new SKPaint { Color = new SKColor(38, 38, 42, 245), IsAntialias = true };
 

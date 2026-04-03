@@ -960,13 +960,11 @@ public sealed class DocumentController : IDisposable
             {
                 if (doc.IsDisposed || doc.FilePath != result.FilePath) continue;
 
+                // Cache the result for all tabs showing this PDF
                 doc.SetAnalysis(result.Page, result.Analysis);
 
                 if (doc.CurrentPage != result.Page)
                 {
-                    // The user navigated away while analysis was in-flight.
-                    // The result is cached above, but pending state for the
-                    // old page must not linger.
                     doc.ClearPendingState();
                     continue;
                 }
@@ -985,8 +983,6 @@ public sealed class DocumentController : IDisposable
                     }
                     else if (doc.PendingSkip is not null)
                     {
-                        // Analysis arrived but no navigable blocks — skip to next page.
-                        // Only resume if this is the active document; clear stale state otherwise.
                         if (doc == ActiveDocument)
                             needsAnim |= TryResumeSkip(doc, ww, wh);
                         else

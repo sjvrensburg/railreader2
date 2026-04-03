@@ -91,6 +91,11 @@ public partial class MinimapControl : UserControl
         private readonly Rect _bounds;
         private readonly MainWindowViewModel? _vm;
 
+        // Snapshot for Equals — quantised to avoid per-pixel redraws.
+        // The minimap is small (~200x280px) so sub-pixel changes are invisible.
+        private readonly SKBitmap? _bitmap;
+        private readonly int _oxQ, _oyQ, _zoomQ; // quantised camera state
+
         [ThreadStatic] private static SKPaint? s_bgPaint;
         [ThreadStatic] private static SKPaint? s_vpFill;
         [ThreadStatic] private static SKPaint? s_vpStroke;
@@ -100,11 +105,24 @@ public partial class MinimapControl : UserControl
         {
             _bounds = bounds;
             _vm = vm;
+            var tab = vm?.ActiveTab;
+            _bitmap = tab?.MinimapBitmap;
+            // Quantise camera to avoid redraws for sub-pixel movement
+            _oxQ = (int)(tab?.Camera.OffsetX ?? 0) / 16;
+            _oyQ = (int)(tab?.Camera.OffsetY ?? 0) / 16;
+            _zoomQ = (int)((tab?.Camera.Zoom ?? 1.0) * 50);
         }
 
         public Rect Bounds => _bounds;
         public void Dispose() { }
-        public bool Equals(ICustomDrawOperation? other) => false;
+
+        public bool Equals(ICustomDrawOperation? other)
+            => other is MinimapDrawOperation op
+            && _bounds == op._bounds
+            && ReferenceEquals(_bitmap, op._bitmap)
+            && _oxQ == op._oxQ
+            && _oyQ == op._oyQ
+            && _zoomQ == op._zoomQ;
         public bool HitTest(Point p) => _bounds.Contains(p);
 
         public void Render(ImmediateDrawingContext context)

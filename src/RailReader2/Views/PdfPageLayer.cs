@@ -171,7 +171,7 @@ public class PdfPageLayer : Control
             {
                 if (s_cachedEffectFilter is null
                     || s_cachedEffectType != _opts.ActiveEffect
-                    || s_cachedEffectIntensity != _opts.ActiveIntensity)
+                    || Math.Abs(s_cachedEffectIntensity - _opts.ActiveIntensity) > 0.001f)
                 {
                     s_cachedEffectFilter?.Dispose();
                     s_cachedEffectFilter = _effects.CreateColorFilter(_opts.ActiveEffect, _opts.ActiveIntensity);
