@@ -2,7 +2,7 @@ namespace RailReader.Core.Models;
 
 public sealed class Camera
 {
-    public const double ZoomMin = 0.1;
+    public const double ZoomMin = 0.5;
     public const double ZoomMax = 20.0;
 
     public double OffsetX { get; set; }
