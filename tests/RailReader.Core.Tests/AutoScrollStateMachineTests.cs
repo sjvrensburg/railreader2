@@ -19,7 +19,6 @@ public class AutoScrollStateMachineTests
         double linePauseMs = 200,
         double windowWidth = 600,
         double zoom = 1.0,
-        double referenceSpeed = 100,
         double maxSpeed = 5.0)
     {
         return new AutoScrollContext
@@ -32,7 +31,6 @@ public class AutoScrollStateMachineTests
             LinePauseMs = linePauseMs,
             WindowWidth = windowWidth,
             Zoom = zoom,
-            ReferenceSpeed = referenceSpeed,
             MaxSpeed = maxSpeed,
         };
     }
