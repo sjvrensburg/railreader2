@@ -29,7 +29,6 @@ internal readonly struct AutoScrollContext
     public required double LinePauseMs { get; init; }
     public required double WindowWidth { get; init; }
     public required double Zoom { get; init; }
-    public required double ReferenceSpeed { get; init; }
     public required double MaxSpeed { get; init; }
 }
 
@@ -168,7 +167,7 @@ internal sealed class AutoScrollStateMachine
     private bool TickScrolling(ref double cameraX, double dtSecs, in AutoScrollContext ctx)
     {
         double speed = _boost ? _speed * 2.0 : _speed;
-        cameraX -= speed * ctx.ReferenceSpeed * dtSecs;
+        cameraX -= speed * ctx.Zoom * dtSecs;
         NormalizedSpeed = ctx.MaxSpeed > 0 ? Math.Clamp(speed / ctx.MaxSpeed, 0.0, 1.0) : 0.0;
         cameraX = _clamp.ClampX(cameraX, ctx.Zoom, ctx.WindowWidth);
 

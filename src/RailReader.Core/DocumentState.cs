@@ -652,7 +652,7 @@ public sealed class DocumentState : IDisposable
     public static int CalculateRenderDpi(double zoom)
     {
         int raw = (int)(zoom * 150);
-        int rounded = ((raw + 25) / 50) * 50;
+        int rounded = ((raw + 37) / 75) * 75;
         return Math.Clamp(rounded, 150, 600);
     }
 

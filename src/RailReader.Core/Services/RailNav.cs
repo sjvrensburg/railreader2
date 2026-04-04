@@ -43,15 +43,6 @@ public sealed class RailNav : ICameraClamp
     // the state machine fires a line advance after a hold threshold.
     private readonly EdgeHoldStateMachine _lineEdgeHold = new();
 
-    /// <summary>
-    /// Multiplier applied to RailZoomThreshold to produce a zoom-independent
-    /// reference speed. Calibrated so that at twice the threshold zoom the
-    /// screen-space speed matches the old zoom-proportional behaviour.
-    /// </summary>
-    private const double SpeedReferenceMultiplier = 2.0;
-
-    /// <summary>Zoom-independent speed factor: constant across all zoom levels.</summary>
-    private double ReferenceSpeed => _config.RailZoomThreshold * SpeedReferenceMultiplier;
 
     /// <summary>
     /// When a block's width is less than this fraction of the viewport,
@@ -631,9 +622,7 @@ public sealed class RailNav : ICameraClamp
         ScrollSpeed = sMax > 0 ? instantSpeed / sMax : 0.0;
 
         double sign = dir == ScrollDirection.Forward ? -1.0 : 1.0;
-        // Use rail zoom threshold as reference so screen-space speed is constant
-        // regardless of current zoom (matches auto-scroll behaviour).
-        cameraX = ClampX(_scroll.StartX + sign * totalDisplacement * ReferenceSpeed, zoom, windowWidth);
+        cameraX = ClampX(_scroll.StartX + sign * totalDisplacement * zoom, zoom, windowWidth);
 
         // Auto-scroll trigger: if holding forward scroll for longer than the
         // configured delay, transition to auto-scroll mode.
@@ -740,7 +729,6 @@ public sealed class RailNav : ICameraClamp
             LinePauseMs = _config.AutoScrollLinePauseMs,
             WindowWidth = windowWidth,
             Zoom = zoom,
-            ReferenceSpeed = ReferenceSpeed,
             MaxSpeed = _config.ScrollSpeedMax,
         };
 
