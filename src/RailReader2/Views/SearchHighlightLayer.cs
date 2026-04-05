@@ -1,7 +1,5 @@
-using Avalonia;
-using Avalonia.Controls;
-using Avalonia.Rendering.Composition;
 using Avalonia.Media;
+using Avalonia.Rendering.Composition;
 using Avalonia.Skia;
 using RailReader.Core.Models;
 using RailReader.Renderer.Skia;
@@ -23,45 +21,7 @@ internal sealed record SearchRenderState(
 /// Hosts a CompositionCustomVisual for search highlight rendering.
 /// Camera transform applied inside Skia; match rects are in page space.
 /// </summary>
-public class SearchHighlightLayer : Control
-{
-    private CompositionCustomVisual? _visual;
-    private readonly SearchVisualHandler _handler = new();
-
-    public SearchHighlightLayer()
-    {
-        IsHitTestVisible = false;
-    }
-
-    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
-    {
-        base.OnAttachedToVisualTree(e);
-        var compositor = ElementComposition.GetElementVisual(this)?.Compositor;
-        if (compositor is not null)
-        {
-            _visual = compositor.CreateCustomVisual(_handler);
-            _visual.Size = new Vector(Bounds.Width, Bounds.Height);
-            ElementComposition.SetElementChildVisual(this, _visual);
-        }
-    }
-
-    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
-    {
-        ElementComposition.SetElementChildVisual(this, null);
-        _visual = null;
-        base.OnDetachedFromVisualTree(e);
-    }
-
-    protected override void OnSizeChanged(SizeChangedEventArgs e)
-    {
-        base.OnSizeChanged(e);
-        if (_visual is not null)
-            _visual.Size = new Vector(e.NewSize.Width, e.NewSize.Height);
-    }
-
-    internal void UpdateState(SearchRenderState state) =>
-        _visual?.SendHandlerMessage(state);
-}
+internal class SearchHighlightLayer : CompositionLayerControl<SearchVisualHandler>;
 
 internal sealed class SearchVisualHandler : CompositionCustomVisualHandler
 {

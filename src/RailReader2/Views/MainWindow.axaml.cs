@@ -47,12 +47,7 @@ public partial class MainWindow : Window
                 {
                     UpdatePagePanelSize(vm.ActiveTab);
                     StatusBar.UpdateZoom();
-                    // Camera changed → all layers need new state (camera is baked in)
-                    var tab = vm.ActiveTab;
-                    PageLayer.UpdateState(BuildPageState(vm, tab));
-                    OverlayLayer.UpdateState(BuildOverlayState(vm, tab));
-                    SearchLayer.UpdateState(BuildSearchState(vm, tab));
-                    AnnotationLayer.UpdateState(BuildAnnotationState(vm, tab));
+                    UpdateAllLayers(vm, vm.ActiveTab);
                 },
                 InvalidatePage = () =>
                 {
@@ -132,11 +127,7 @@ public partial class MainWindow : Window
             var (ww, wh) = (Viewport.Bounds.Width, Viewport.Bounds.Height);
             tab.ClampCamera(ww, wh);
             UpdatePagePanelSize(tab);
-            // Viewport size changed → all layers need new state (Size updated via OnSizeChanged)
-            PageLayer.UpdateState(BuildPageState(vm, tab));
-            OverlayLayer.UpdateState(BuildOverlayState(vm, tab));
-            SearchLayer.UpdateState(BuildSearchState(vm, tab));
-            AnnotationLayer.UpdateState(BuildAnnotationState(vm, tab));
+            UpdateAllLayers(vm, tab);
         }
     }
 
@@ -260,14 +251,7 @@ public partial class MainWindow : Window
     private void UpdateLayerBindings(TabViewModel? tab)
     {
         if (Vm is not { } vm) return;
-
-        // Push fresh state to all composition layer handlers.
-        // This replaces the old property-setter pattern — state is now built
-        // here and sent atomically to the composition thread.
-        PageLayer.UpdateState(BuildPageState(vm, tab));
-        OverlayLayer.UpdateState(BuildOverlayState(vm, tab));
-        SearchLayer.UpdateState(BuildSearchState(vm, tab));
-        AnnotationLayer.UpdateState(BuildAnnotationState(vm, tab));
+        UpdateAllLayers(vm, tab);
 
         if (tab is not null)
             tab.OnDpiRenderComplete = () => vm.RequestAnimationFrame();
@@ -331,18 +315,25 @@ public partial class MainWindow : Window
         }
     }
 
+    /// <summary>
+    /// Sends fresh state to all four composition layer handlers.
+    /// </summary>
+    private void UpdateAllLayers(MainWindowViewModel vm, TabViewModel? tab)
+    {
+        PageLayer.UpdateState(BuildPageState(vm, tab));
+        OverlayLayer.UpdateState(BuildOverlayState(vm, tab));
+        SearchLayer.UpdateState(BuildSearchState(vm, tab));
+        AnnotationLayer.UpdateState(BuildAnnotationState(vm, tab));
+    }
+
     // ── State builders ─────────────────────────────────────────────────────────
-    // Each method snapshots all fields needed for one layer's frame, including
-    // the camera matrix. Called on the UI thread; result is sent to the
-    // corresponding CompositionCustomVisualHandler via SendHandlerMessage.
 
     private static SKMatrix BuildCamera(TabViewModel? tab)
     {
         if (tab is null) return SKMatrix.Identity;
-        return new SKMatrix(
-            (float)tab.Camera.Zoom, 0f, (float)tab.Camera.OffsetX,
-            0f, (float)tab.Camera.Zoom, (float)tab.Camera.OffsetY,
-            0f, 0f, 1f);
+        float zoom = (float)tab.Camera.Zoom;
+        return SKMatrix.CreateScaleTranslation(
+            zoom, zoom, (float)tab.Camera.OffsetX, (float)tab.Camera.OffsetY);
     }
 
     private PdfPageRenderState BuildPageState(MainWindowViewModel vm, TabViewModel? tab)
@@ -355,9 +346,16 @@ public partial class MainWindow : Window
             lineH = line.Height;
         }
         var (image, retired) = tab?.GetCachedImage() ?? (null, null);
+        if (retired is not null)
+        {
+            // Send the retired image to the composition thread for safe disposal.
+            // If the layer is detached (visual gone), the message is silently dropped,
+            // so dispose immediately on the UI thread as a fallback.
+            if (!PageLayer.TrySendMessage(new RetireImage(retired)))
+                retired.Dispose();
+        }
         return new PdfPageRenderState(
             Image: image,
-            RetiredImage: retired,
             PageW: (float)(tab?.PageWidth ?? 0),
             PageH: (float)(tab?.PageHeight ?? 0),
             Camera: BuildCamera(tab),

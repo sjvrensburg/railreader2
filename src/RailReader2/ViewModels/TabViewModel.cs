@@ -43,15 +43,11 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
     public int CachedDpi => State.CachedDpi;
 
     /// <summary>
-    /// Returns the cached SKImage for GPU rendering. Created on demand from the
-    /// IRenderedPage; the UI layer owns this because SKImage.FromBitmap must be
-    /// called on the UI thread and is SkiaSharp-specific.
-    /// </summary>
-    /// <summary>
     /// Returns the cached SKImage for GPU rendering and the previous image that
     /// was replaced (if any). The caller is responsible for disposing the retired
     /// image on a thread-safe boundary (e.g. the composition thread via OnMessage).
-    /// This avoids disposing an SKImage that the composition thread may still be drawing.
+    /// Created on demand from the IRenderedPage; the UI layer owns this because
+    /// SKImage.FromBitmap must be called on the UI thread.
     /// </summary>
     public (SKImage? Current, SKImage? Retired) GetCachedImage()
     {

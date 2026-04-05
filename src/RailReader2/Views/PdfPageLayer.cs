@@ -1,7 +1,5 @@
-using Avalonia;
-using Avalonia.Controls;
-using Avalonia.Rendering.Composition;
 using Avalonia.Media;
+using Avalonia.Rendering.Composition;
 using Avalonia.Skia;
 using RailReader.Core.Models;
 using RailReader.Renderer.Skia;
@@ -13,9 +11,14 @@ namespace RailReader2.Views;
 /// Immutable snapshot of all state needed to render one PDF page frame.
 /// Built on the UI thread, sent to the composition thread via SendHandlerMessage.
 /// </summary>
+/// <summary>
+/// Sent to the composition thread to dispose an SKImage that was replaced
+/// by a DPI upgrade. Separate from render state to keep the state record pure.
+/// </summary>
+internal sealed record RetireImage(SKImage Image);
+
 internal sealed record PdfPageRenderState(
     SKImage? Image,
-    SKImage? RetiredImage,
     float PageW,
     float PageH,
     SKMatrix Camera,
@@ -38,49 +41,8 @@ internal sealed record PdfPageRenderState(
 /// need for a MatrixTransform on the parent panel and the intermediate
 /// compositing step that caused jitter on Windows/ANGLE.
 /// </summary>
-public class PdfPageLayer : Control
-{
-    private CompositionCustomVisual? _visual;
-    private readonly PdfPageVisualHandler _handler = new();
+internal class PdfPageLayer : CompositionLayerControl<PdfPageVisualHandler>;
 
-    public PdfPageLayer()
-    {
-        IsHitTestVisible = false;
-    }
-
-    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
-    {
-        base.OnAttachedToVisualTree(e);
-        var compositor = ElementComposition.GetElementVisual(this)?.Compositor;
-        if (compositor is not null)
-        {
-            _visual = compositor.CreateCustomVisual(_handler);
-            _visual.Size = new Vector(Bounds.Width, Bounds.Height);
-            ElementComposition.SetElementChildVisual(this, _visual);
-        }
-    }
-
-    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
-    {
-        ElementComposition.SetElementChildVisual(this, null);
-        _visual = null;
-        base.OnDetachedFromVisualTree(e);
-    }
-
-    protected override void OnSizeChanged(SizeChangedEventArgs e)
-    {
-        base.OnSizeChanged(e);
-        if (_visual is not null)
-            _visual.Size = new Vector(e.NewSize.Width, e.NewSize.Height);
-    }
-
-    /// <summary>
-    /// Sends a new render state snapshot to the composition thread.
-    /// The handler re-renders on the next composition frame if the state differs.
-    /// </summary>
-    internal void UpdateState(PdfPageRenderState state) =>
-        _visual?.SendHandlerMessage(state);
-}
 
 /// <summary>
 /// Composition-thread handler for PDF page rendering.
@@ -126,12 +88,16 @@ internal sealed class PdfPageVisualHandler : CompositionCustomVisualHandler
 
     public override void OnMessage(object message)
     {
+        if (message is RetireImage retire)
+        {
+            // Dispose the old SKImage on the composition thread where we
+            // know OnRender is not concurrently accessing it.
+            retire.Image.Dispose();
+            return;
+        }
+
         if (message is PdfPageRenderState state)
         {
-            // Dispose the retired image on the composition thread where we
-            // know OnRender is not concurrently accessing it.
-            state.RetiredImage?.Dispose();
-
             // Invalidate GPU texture cache when source image changes
             if (!ReferenceEquals(state.Image, _gpuTextureSource))
             {
