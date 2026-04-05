@@ -971,11 +971,13 @@ public sealed class DocumentController : IDisposable
                 // Cache the result for all tabs showing this PDF
                 doc.SetAnalysis(result.Page, result.Analysis);
 
+                // Stale result for a page we've already navigated away from —
+                // just skip. Do NOT call ClearPendingState() here: if the user
+                // navigated to a new page and PendingRailSetup was set for that
+                // page, clearing it would prevent Rail.SetAnalysis from being
+                // called when the current page's result arrives.
                 if (doc.CurrentPage != result.Page)
-                {
-                    doc.ClearPendingState();
                     continue;
-                }
 
                 if (doc.PendingRailSetup)
                 {
