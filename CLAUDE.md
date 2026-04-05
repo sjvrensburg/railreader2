@@ -83,7 +83,8 @@ Thin wrapper delegating all logic to `DocumentController`/`DocumentState` in Cor
 
 - `ViewModels/MainWindowViewModel.cs` — thin wrapper handling Avalonia-specific concerns (file dialogs, clipboard, invalidation)
 - `ViewModels/TabViewModel.cs` — `[ObservableProperty]` wrapper for `DocumentState` binding
-- `Views/MainWindow.axaml.cs` — keyboard shortcuts, camera transform, animation frame scheduling
+- `Views/MainWindow.axaml.cs` — keyboard shortcuts, state builders for composition layers, animation frame scheduling
+- `Views/CompositionLayerControl.cs` — generic base class for `CompositionCustomVisual`-backed layers (manages visual lifecycle, state/message dispatch)
 - `Views/` — layers (PdfPageLayer, RailOverlayLayer, AnnotationLayer, SearchHighlightLayer), dialogs (ConfirmUrlDialog, BookmarkNameDialog, etc.), panels
 - `Controls/RadialMenu.cs` — Skia-rendered radial context menu with Font Awesome icons
 
@@ -124,7 +125,7 @@ Core uses `InternalsVisibleTo` to expose internals to `RailReader.Core.Tests`, `
 
 ### Rendering Pipeline
 
-PDF → PDFium rasterises to `SKBitmap` at zoom-proportional DPI (150–600, capped at ~35 MP) → `SKImage` uploaded to GPU → drawn via `ICustomDrawOperation`/`ISkiaSharpApiLeaseFeature` with `SKCubicResampler.Mitchell`. Camera pan/zoom is compositor-level `MatrixTransform` on `CameraPanel` (no bitmap repaint). DPI upgrades async via `Task.Run`; `SKImage.FromBitmap()` must be called on UI thread. DPI tier rounding to 75 DPI steps with 1.5x hysteresis.
+PDF → PDFium rasterises to `SKBitmap` at zoom-proportional DPI (150–600, capped at ~35 MP) → `SKImage` uploaded as mipmapped GPU texture via `SKImage.ToTextureImage(grContext, mipmapped: true)` → drawn on Avalonia's composition thread via `CompositionCustomVisual`/`CompositionCustomVisualHandler` with trilinear sampling (`SKFilterMode.Linear` + `SKMipmapMode.Linear`). Camera transform is applied atomically inside Skia draw calls (not via Avalonia `MatrixTransform`) — this eliminates Windows jitter caused by stale-draw/new-transform frame mismatches. Four rendering layers (`PdfPageLayer`, `SearchHighlightLayer`, `AnnotationLayer`, `RailOverlayLayer`) each inherit from `CompositionLayerControl<THandler>`, a generic base class that manages `CompositionCustomVisual` lifecycle. State is passed to handlers via `SendHandlerMessage()`. Retired `SKImage` instances are disposed on the composition thread via `RetireImage` messages to avoid cross-thread access violations. DPI upgrades async via `Task.Run`; `SKImage.FromBitmap()` must be called on UI thread. DPI tier rounding to 75 DPI steps with 1.5x hysteresis.
 
 ### Layout Analysis
 
@@ -172,10 +173,11 @@ Key fields: `rail_zoom_threshold`, `snap_duration_ms`, `scroll_speed_start/max`,
 
 ## Thread Safety
 
-- **UI thread**: All Avalonia UI, keyboard/mouse, viewport rendering, PDFium calls
+- **UI thread**: All Avalonia UI, keyboard/mouse, state building, PDFium calls
+- **Composition thread**: `CompositionCustomVisualHandler.OnRender()` draws via Skia. Receives immutable state snapshots from UI thread via `SendHandlerMessage()`. Disposes retired `SKImage` instances. Never accesses `DocumentState` directly.
 - **Analysis Worker**: Single dedicated thread via `Channel<T>` for ONNX inference
 - **Thread pool**: `RenderPagePixmap()` and DPI upgrades via `Task.Run()`
-- **Critical**: Never call `PdfService` from background threads (PDFium crashes). Never modify `DocumentState` from the analysis worker — use `IThreadMarshaller` to post to UI thread.
+- **Critical**: Never call `PdfService` from background threads (PDFium crashes). Never modify `DocumentState` from the analysis worker — use `IThreadMarshaller` to post to UI thread. Never dispose `SKImage` on the UI thread if the composition thread may still be drawing it — use `RetireImage` message for deferred disposal.
 - `AnalysisCache` is written via UI thread marshalling, read during animation frame polls — no locks needed.
 
 ## CI / Release Packaging
@@ -189,4 +191,4 @@ Releases triggered by pushing a `v*` tag (`.github/workflows/release.yml`).
 
 ## Debugging
 
-Press `Shift+D` for debug overlay (layout blocks, confidence, reading order, nav anchors). Rail mode activates at >3x zoom — if blocks aren't detected, run `./scripts/download-model.sh`. Animation frame dt is measured at the top of the callback and capped at 50ms.
+Press `Shift+D` for debug overlay (layout blocks, confidence, reading order, nav anchors). Rail mode activates at >3x zoom — if blocks aren't detected, run `./scripts/download-model.sh`. Animation frame dt is capped at 1/30s to prevent large jumps after stalls.
