@@ -175,6 +175,12 @@ public sealed class DocumentController : IDisposable
         {
             _railPause = null;
             ActiveDocumentIndex = index;
+
+            // Sync the global auto-scroll flag with the newly active document.
+            // Without this, switching away from a tab with active auto-scroll leaves
+            // the flag stale, which prevents hold-scroll (and its trigger) on other tabs.
+            if (AutoScrollActive && !(ActiveDocument?.Rail.AutoScrolling ?? false))
+                _autoScroll.StopAutoScroll(null);
         }
     }
 
@@ -589,7 +595,7 @@ public sealed class DocumentController : IDisposable
 
     public void HandleArrowRight(bool shortJump = false)
     {
-        if (AutoScrollActive && ActiveDocument is { } d && d.Rail.Active)
+        if (AutoScrollActive && ActiveDocument is { } d && d.Rail.Active && d.Rail.AutoScrolling)
         {
             d.Rail.SetAutoScrollBoost(true);
             return;
@@ -750,7 +756,7 @@ public sealed class DocumentController : IDisposable
     /// </summary>
     public TickResult Tick(double dt)
     {
-        dt = Math.Min(dt, 0.05);
+        dt = Math.Min(dt, 1.0 / 30.0);
 
         var doc = ActiveDocument;
         if (doc is null) return default;
@@ -918,11 +924,13 @@ public sealed class DocumentController : IDisposable
                         }
                         doc.StartSnap(ww, wh);
                         bool enteredNewBlock = doc.Rail.CurrentBlock != prevBlock;
-                        // Block entry pause is deferred until after the snap animation
-                        // so the user sees the new block while paused, not the old one.
-                        // Mid-block line pauses are already handled inside RailNav.
-                        if (enteredNewBlock)
-                            doc.Rail.PauseAutoScroll(GetBlockEntryPause(doc));
+                        // Always defer autoscroll until the snap animation completes.
+                        // Without this, TickAutoScroll subtracts from cameraX every
+                        // frame while TickRailSnap absolutely sets it — they fight
+                        // each other and produce visible jitter during the transition.
+                        // Block entry pause uses the full configured duration;
+                        // mid-block line advances use 0ms (snap-wait only, no display pause).
+                        doc.Rail.PauseAutoScroll(enteredNewBlock ? GetBlockEntryPause(doc) : 0);
                         break;
                 }
                 overlayChanged = true;
@@ -963,11 +971,13 @@ public sealed class DocumentController : IDisposable
                 // Cache the result for all tabs showing this PDF
                 doc.SetAnalysis(result.Page, result.Analysis);
 
+                // Stale result for a page we've already navigated away from —
+                // just skip. Do NOT call ClearPendingState() here: if the user
+                // navigated to a new page and PendingRailSetup was set for that
+                // page, clearing it would prevent Rail.SetAnalysis from being
+                // called when the current page's result arrives.
                 if (doc.CurrentPage != result.Page)
-                {
-                    doc.ClearPendingState();
                     continue;
-                }
 
                 if (doc.PendingRailSetup)
                 {
@@ -1061,6 +1071,9 @@ public sealed class DocumentController : IDisposable
             Path.Combine(AppContext.BaseDirectory, "models", filename),
             Environment.GetEnvironmentVariable("APPDIR") is { } appDir
                 ? Path.Combine(appDir, "models", filename) : null,
+            // Use the same base directory as AppConfig.ConfigDir so the model
+            // is found wherever the app stored it (%APPDATA% on Windows, ~/.config on Linux).
+            Path.Combine(AppConfig.ConfigDir, "models", filename),
             Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 "railreader2", "models", filename),

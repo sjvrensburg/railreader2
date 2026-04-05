@@ -1,90 +1,57 @@
-using Avalonia;
-using Avalonia.Controls;
 using Avalonia.Media;
-using Avalonia.Rendering.SceneGraph;
+using Avalonia.Rendering.Composition;
 using Avalonia.Skia;
 using RailReader.Core.Models;
-using RailReader.Core.Services;
 using RailReader.Renderer.Skia;
-using RailReader2.ViewModels;
 using SkiaSharp;
 
 namespace RailReader2.Views;
 
-public class SearchHighlightLayer : Control
+/// <summary>
+/// Immutable snapshot of all state needed to render search highlights for one frame.
+/// The active-match local index is pre-computed on the UI thread to keep the
+/// composition thread free of search-list traversal.
+/// </summary>
+internal sealed record SearchRenderState(
+    SKMatrix Camera,
+    List<SearchMatch>? Matches,
+    int ActiveLocalIndex);
+
+/// <summary>
+/// Hosts a CompositionCustomVisual for search highlight rendering.
+/// Camera transform applied inside Skia; match rects are in page space.
+/// </summary>
+internal class SearchHighlightLayer : CompositionLayerControl<SearchVisualHandler>;
+
+internal sealed class SearchVisualHandler : CompositionCustomVisualHandler
 {
-    public TabViewModel? Tab { get; set; }
-    public MainWindowViewModel? ViewModel { get; set; }
+    private SearchRenderState? _state;
 
-    public SearchHighlightLayer()
+    public override void OnMessage(object message)
     {
-        IsHitTestVisible = false;
-    }
-
-    protected override void OnSizeChanged(SizeChangedEventArgs e)
-    {
-        base.OnSizeChanged(e);
-        InvalidateVisual();
-    }
-
-    public override void Render(DrawingContext context)
-    {
-        base.Render(context);
-        var tab = Tab;
-        var vm = ViewModel;
-        if (tab is null || vm is null) return;
-
-        double w = tab.PageWidth > 0 ? tab.PageWidth : Bounds.Width;
-        double h = tab.PageHeight > 0 ? tab.PageHeight : Bounds.Height;
-        context.Custom(new SearchDrawOperation(new Rect(0, 0, w, h), tab, vm));
-    }
-
-    private sealed class SearchDrawOperation : ICustomDrawOperation
-    {
-        private readonly Rect _bounds;
-        private readonly TabViewModel _tab;
-        private readonly MainWindowViewModel _vm;
-        private readonly List<SearchMatch>? _matches;
-        private readonly int _activeMatchIndex;
-        private readonly int _currentPage;
-
-        public SearchDrawOperation(Rect bounds, TabViewModel tab, MainWindowViewModel vm)
+        if (message is SearchRenderState state)
         {
-            _bounds = bounds;
-            _tab = tab;
-            _vm = vm;
-            _matches = vm.CurrentPageSearchMatches;
-            _activeMatchIndex = vm.ActiveMatchIndex;
-            _currentPage = tab.CurrentPage;
+            _state = state;
+            Invalidate();
         }
+    }
 
-        public Rect Bounds => _bounds;
-        public void Dispose() { }
+    public override void OnRender(ImmediateDrawingContext context)
+    {
+        var state = _state;
+        if (state?.Matches is not { Count: > 0 } matches) return;
 
-        public bool Equals(ICustomDrawOperation? other)
-            => other is SearchDrawOperation op
-            && _bounds == op._bounds
-            && ReferenceEquals(_matches, op._matches)
-            && _activeMatchIndex == op._activeMatchIndex
-            && _currentPage == op._currentPage;
+        if (context.TryGetFeature(typeof(ISkiaSharpApiLeaseFeature)) is not ISkiaSharpApiLeaseFeature leaseFeature)
+            return;
+        using var lease = leaseFeature.Lease();
+        var canvas = lease.SkCanvas;
 
-        public bool HitTest(Point p) => false;
+        canvas.Save();
+        canvas.SetMatrix(SKMatrix.Concat(canvas.TotalMatrix, state.Camera));
 
-        public void Render(ImmediateDrawingContext context)
-        {
-            if (context.TryGetFeature(typeof(ISkiaSharpApiLeaseFeature)) is not ISkiaSharpApiLeaseFeature leaseFeature)
-                return;
+        OverlayRenderer.DrawSearchHighlights(canvas, matches, state.ActiveLocalIndex,
+            OverlayRenderer.GetHighlightPaint(), OverlayRenderer.GetActivePaint());
 
-            using var lease = leaseFeature.Lease();
-            var canvas = lease.SkCanvas;
-
-            var matches = _matches;
-            if (matches is null || matches.Count == 0) return;
-
-            int activeLocalIndex = OverlayRenderer.ComputeActiveLocalIndex(
-                _vm.SearchMatches, matches, _activeMatchIndex, _currentPage);
-            OverlayRenderer.DrawSearchHighlights(canvas, matches, activeLocalIndex,
-                OverlayRenderer.GetHighlightPaint(), OverlayRenderer.GetActivePaint());
-        }
+        canvas.Restore();
     }
 }

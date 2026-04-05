@@ -70,6 +70,27 @@ internal sealed class AutoScrollStateMachine
     // Dwell tracking: prevents repeated dwell on the same block
     private bool _dwelt;
 
+    // Wall-clock scroll positioning: camera position is computed as an absolute
+    // function of elapsed time rather than accumulated frame deltas. This means
+    // each frame shows exactly where the content should be at that moment.
+    // A dropped frame (33ms instead of 16ms) produces a clean 2-frame jump
+    // instead of a sustained lag-then-catchup, which is perceived as jitter.
+    // _scrollInitialized = false signals that the next TickScrolling call must
+    // capture the current cameraX as the reference start position.
+    private bool _scrollInitialized;
+    private Stopwatch? _scrollClock;
+    private double _scrollStartX;
+
+    /// <summary>
+    /// Inject a controlled elapsed-seconds source for unit tests.
+    /// When set, the real Stopwatch is not used.
+    /// </summary>
+    internal Func<double>? GetScrollElapsedSeconds;
+
+    private double ScrollElapsed => GetScrollElapsedSeconds?.Invoke()
+        ?? _scrollClock?.Elapsed.TotalSeconds
+        ?? 0.0;
+
     /// <summary>Normalized scroll speed (0-1) for UI display.</summary>
     public double NormalizedSpeed { get; private set; }
 
@@ -99,21 +120,37 @@ internal sealed class AutoScrollStateMachine
         _pendingPauseMs = 0;
         _dwelt = false;
         NormalizedSpeed = 0;
+        _scrollInitialized = false;
+        _scrollClock = null;
+        _scrollStartX = 0;
     }
 
     /// <summary>Set/clear the boost flag (user holding D/Right during auto-scroll).</summary>
-    public void SetBoost(bool boost) => _boost = boost;
+    public void SetBoost(bool boost)
+    {
+        if (_boost == boost) return;
+        _boost = boost;
+        // Re-capture current position as new reference so the speed change
+        // takes effect from the current camera position without a jump.
+        _scrollInitialized = false;
+    }
 
     /// <summary>
     /// Request a pause that starts after the current snap animation completes.
-    /// Used when entering a new block (block entry pause).
+    /// Used when entering a new block (block entry pause) or after a mid-block
+    /// line advance to prevent autoscroll from fighting the snap animation.
+    /// Pass durationMs=0 to wait for snap completion without any display pause.
     /// Transition: current state -> WaitingForSnap.
     /// </summary>
     public void RequestDeferredPause(double durationMs)
     {
-        if (CurrentState == AutoScrollState.Inactive || durationMs <= 0) return;
+        if (CurrentState == AutoScrollState.Inactive) return;
         _pendingPauseMs = durationMs;
-        _dwelt = false; // reset for the new block
+        // Only reset dwell tracking for genuine new-block entries (durationMs > 0).
+        // Mid-block line advances (durationMs = 0) stay within the same block —
+        // resetting _dwelt here caused every line of a narrow block to re-trigger
+        // a full LinePauseMs * BlockLineCount dwell, compounding over time.
+        if (durationMs > 0) _dwelt = false;
         CurrentState = AutoScrollState.WaitingForSnap;
     }
 
@@ -122,7 +159,10 @@ internal sealed class AutoScrollStateMachine
     /// </summary>
     public void UpdateSpeed(double speed)
     {
-        if (IsActive) _speed = speed;
+        if (!IsActive || _speed == speed) return;
+        _speed = speed;
+        // Re-capture current position so the new speed starts from here.
+        _scrollInitialized = false;
     }
 
     /// <summary>
@@ -144,9 +184,16 @@ internal sealed class AutoScrollStateMachine
     {
         if (ctx.SnapInProgress) return false; // still snapping
 
-        // Snap completed -> activate the deferred pause
-        BeginPause(_pendingPauseMs, advances: false, AutoScrollState.Paused);
+        // Snap completed -> activate the deferred pause, or resume immediately if none
+        double pauseMs = _pendingPauseMs;
         _pendingPauseMs = 0;
+        if (pauseMs > 0)
+            BeginPause(pauseMs, advances: false, AutoScrollState.Paused);
+        else
+        {
+            CurrentState = AutoScrollState.Scrolling;
+            _scrollInitialized = false; // capture new start position from snap target
+        }
         return false;
     }
 
@@ -159,6 +206,7 @@ internal sealed class AutoScrollStateMachine
             bool advance = _pauseAdvances;
             _pauseTimer = null;
             CurrentState = AutoScrollState.Scrolling;
+            _scrollInitialized = false; // capture new start position from post-pause camera
             return advance;
         }
         return false; // still pausing
@@ -166,8 +214,19 @@ internal sealed class AutoScrollStateMachine
 
     private bool TickScrolling(ref double cameraX, double dtSecs, in AutoScrollContext ctx)
     {
+        // Wall-clock positioning: compute cameraX as an absolute function of elapsed
+        // time since scrolling started. This means every frame shows exactly where
+        // the content should be at that moment — dropped frames produce a clean jump
+        // to the correct position rather than sustained lag followed by catchup jitter.
+        if (!_scrollInitialized)
+        {
+            _scrollStartX = cameraX;
+            _scrollClock = GetScrollElapsedSeconds is null ? Stopwatch.StartNew() : null;
+            _scrollInitialized = true;
+        }
+
         double speed = _boost ? _speed * 2.0 : _speed;
-        cameraX -= speed * ctx.Zoom * dtSecs;
+        cameraX = _scrollStartX - speed * ctx.Zoom * ScrollElapsed;
         NormalizedSpeed = ctx.MaxSpeed > 0 ? Math.Clamp(speed / ctx.MaxSpeed, 0.0, 1.0) : 0.0;
         cameraX = _clamp.ClampX(cameraX, ctx.Zoom, ctx.WindowWidth);
 

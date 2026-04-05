@@ -9,7 +9,7 @@
   <Identity
     Name="ProbityDataAnalytics.5701382B25AF5"
     Publisher="CN=1760E4F3-7B38-4A64-8D2D-B4F7703D7D10"
-    Version="3.1.4.0"
+    Version="3.5.0.0"
     ProcessorArchitecture="x64" />
 
   <Properties>

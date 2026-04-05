@@ -19,9 +19,13 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     private readonly ILogger _logger;
     private Window? _window;
     private DispatcherTimer? _pollTimer;
-    private readonly Stopwatch _frameTimer = Stopwatch.StartNew();
     private InvalidationCallbacks? _invalidation;
     private bool _animationRequested;
+
+    // Avalonia passes a compositor-synchronized TimeSpan to RequestAnimationFrame
+    // callbacks. We use successive timestamps to compute dt. A null value means
+    // the next callback is the first of a new animation sequence (after idle).
+    private TimeSpan? _lastFrameTime;
 
     [ObservableProperty] private int _activeTabIndex;
     [ObservableProperty] private bool _showOutline;
@@ -189,12 +193,19 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         };
     }
 
-    private void OnAnimationFrame(TimeSpan _)
+    private void OnAnimationFrame(TimeSpan frameTime)
     {
         _animationRequested = false;
 
-        double dt = _frameTimer.Elapsed.TotalSeconds;
-        _frameTimer.Restart();
+        // Raw dt from Avalonia's compositor-synchronized timestamp.
+        // Capped at 33ms (one frame at 30 fps) so a stall (app backgrounded,
+        // system waking from sleep) doesn't produce a huge position jump in
+        // snap and zoom animations. Autoscroll is wall-clock based and ignores
+        // this value, so the cap only affects those short-lived animations.
+        double dt = _lastFrameTime is { } last
+            ? Math.Min((frameTime - last).TotalSeconds, 1.0 / 30.0)
+            : 1.0 / 60.0;
+        _lastFrameTime = frameTime;
 
         var result = _controller.Tick(dt);
 
@@ -216,7 +227,6 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
         if (_animationRequested) return;
         _animationRequested = true;
-        _frameTimer.Restart();
         _window?.RequestAnimationFrame(OnAnimationFrame);
     }
 

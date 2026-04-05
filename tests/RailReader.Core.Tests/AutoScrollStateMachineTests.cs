@@ -192,20 +192,23 @@ public class AutoScrollStateMachineTests
     [Fact]
     public void SetBoost_DoublesScrollSpeed()
     {
+        // Inject a controlled elapsed-time source so the wall-clock positioning
+        // produces deterministic results independent of real execution time.
         var sm = new AutoScrollStateMachine(new NoOpClamp());
+        sm.GetScrollElapsedSeconds = () => 1.0;
         sm.Start(1.0);
 
-        // Tick without boost
+        // Tick without boost: elapsed = 1.0s, speed = 1.0, zoom = 1.0 → displacement = -1.0
         double cameraX1 = 0;
         var ctx = MakeContext(blockRight: 10000);
-        sm.Tick(ref cameraX1, 1.0, in ctx);
+        sm.Tick(ref cameraX1, 0, in ctx);
 
-        // Reset and tick with boost
+        // Reset and tick with boost: elapsed = 1.0s, speed = 2.0, zoom = 1.0 → displacement = -2.0
         sm.Stop();
         sm.Start(1.0);
         sm.SetBoost(true);
         double cameraX2 = 0;
-        sm.Tick(ref cameraX2, 1.0, in ctx);
+        sm.Tick(ref cameraX2, 0, in ctx);
 
         Assert.Equal(cameraX1 * 2, cameraX2, precision: 10);
     }
