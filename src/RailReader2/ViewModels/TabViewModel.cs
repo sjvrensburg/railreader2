@@ -47,23 +47,34 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
     /// IRenderedPage; the UI layer owns this because SKImage.FromBitmap must be
     /// called on the UI thread and is SkiaSharp-specific.
     /// </summary>
-    public SKImage? CachedImage
+    /// <summary>
+    /// Returns the cached SKImage for GPU rendering and the previous image that
+    /// was replaced (if any). The caller is responsible for disposing the retired
+    /// image on a thread-safe boundary (e.g. the composition thread via OnMessage).
+    /// This avoids disposing an SKImage that the composition thread may still be drawing.
+    /// </summary>
+    public (SKImage? Current, SKImage? Retired) GetCachedImage()
     {
-        get
+        if (State.CachedPage is SkiaRenderedPage sp)
         {
-            if (State.CachedPage is SkiaRenderedPage sp)
+            if (_cachedImage is null || _cachedImagePage != sp)
             {
-                if (_cachedImage is null || _cachedImagePage != sp)
-                {
-                    _cachedImage?.Dispose();
-                    _cachedImage = SKImage.FromBitmap(sp.Bitmap);
-                    _cachedImagePage = sp;
-                }
-                return _cachedImage;
+                var retired = _cachedImage;
+                _cachedImage = SKImage.FromBitmap(sp.Bitmap);
+                _cachedImagePage = sp;
+                return (_cachedImage, retired);
             }
-            return null;
+            return (_cachedImage, null);
         }
+        return (null, null);
     }
+
+    /// <summary>
+    /// Returns the current cached image without lifecycle management.
+    /// Use only when no image transition is expected (e.g. minimap snapshot).
+    /// </summary>
+    public SKImage? CachedImage => _cachedImage;
+
     private SKImage? _cachedImage;
     private SkiaRenderedPage? _cachedImagePage;
 

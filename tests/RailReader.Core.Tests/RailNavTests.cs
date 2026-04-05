@@ -440,30 +440,28 @@ public class RailNavTests
     public void SetAutoScrollBoost_AffectsState()
     {
         ActivateWithAnalysis(1, 3);
-        _nav.StartAutoScroll(100.0);
 
-        // With boost, auto-scroll moves at 2x speed. We verify by ticking
-        // with and without boost and comparing displacement.
-        double cx1 = 0, cx2 = 0;
-
-        // Position both at same start via snap
-        _nav.StartSnapToCurrent(0, 0, Zoom, WindowWidth, WindowHeight);
-        Thread.Sleep(5);
-        double cy = 0;
-        _nav.Tick(ref cx1, ref cy, 0.016, Zoom, WindowWidth);
-        cx2 = cx1;
+        // Inject a controlled clock so wall-clock positioning is deterministic.
+        // elapsed = 1.0s, speed = 100, zoom = 4 → displacement = -400 (no boost)
+        //                                                          = -800 (with boost)
+        _nav.AutoScrollElapsedSecondsOverride = () => 1.0;
 
         // Tick without boost
-        _nav.SetAutoScrollBoost(false);
-        _nav.TickAutoScroll(ref cx1, 0.1, Zoom, WindowWidth);
+        _nav.StartAutoScroll(100.0);
+        double cx1 = 0;
+        _nav.TickAutoScroll(ref cx1, 0, Zoom, WindowWidth);
 
-        // Tick with boost
+        // Tick with boost (restart so clock re-captures from 0)
+        _nav.StopAutoScroll();
+        _nav.StartAutoScroll(100.0);
         _nav.SetAutoScrollBoost(true);
-        _nav.TickAutoScroll(ref cx2, 0.1, Zoom, WindowWidth);
+        double cx2 = 0;
+        _nav.TickAutoScroll(ref cx2, 0, Zoom, WindowWidth);
 
         // Boosted should have moved further (more negative = scrolled more)
         Assert.True(cx2 < cx1,
             $"Expected boosted position ({cx2}) < non-boosted ({cx1})");
+        Assert.Equal(cx1 * 2, cx2, precision: 10);
     }
 
     [Fact]

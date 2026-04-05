@@ -49,16 +49,19 @@
                 <Panel>
                     <!-- Layered PDF viewport with compositor-driven camera -->
                     <v:ViewportPanel Name="Viewport">
-                        <Panel Name="CameraPanel" RenderTransformOrigin="0%,0%">
+                        <!-- PagePanel tracks page dimensions for minimap/scrollbar calculations.
+                             No RenderTransform: camera is applied inside each layer's Skia canvas. -->
+                        <Panel Name="CameraPanel">
                             <Panel Name="PagePanel"
                                    HorizontalAlignment="Left"
-                                   VerticalAlignment="Top">
-                                <v:PdfPageLayer Name="PageLayer" />
-                                <v:SearchHighlightLayer Name="SearchLayer" />
-                                <v:AnnotationLayer Name="AnnotationLayer" />
-                                <v:RailOverlayLayer Name="OverlayLayer" />
-                            </Panel>
+                                   VerticalAlignment="Top" />
                         </Panel>
+                        <!-- Rendering layers fill the full viewport; each applies the camera
+                             transform inside its CompositionCustomVisual handler. -->
+                        <v:PdfPageLayer Name="PageLayer" />
+                        <v:SearchHighlightLayer Name="SearchLayer" />
+                        <v:AnnotationLayer Name="AnnotationLayer" />
+                        <v:RailOverlayLayer Name="OverlayLayer" />
                     </v:ViewportPanel>
 
                     <!-- Minimap overlay -->

@@ -1,11 +1,12 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
-using Avalonia.Media;
 using RailReader.Core;
-using RailReader2.Controls;
 using RailReader.Core.Models;
+using RailReader.Renderer.Skia;
+using RailReader2.Controls;
 using RailReader2.ViewModels;
+using SkiaSharp;
 
 namespace RailReader2.Views;
 
@@ -14,6 +15,7 @@ public partial class MainWindow : Window
     private double _lastMinimapOx;
     private double _lastMinimapOy;
     private double _lastMinimapZoom;
+    private SKImage? _lastMinimapImage;
     private MainWindowViewModel? _subscribedVm;
 
     // Fullscreen hover reveal: show threshold < hide threshold for hysteresis
@@ -35,40 +37,44 @@ public partial class MainWindow : Window
             Viewport.ViewModel = vm;
             Minimap.ViewModel = vm;
 
-            // Wire granular invalidation callbacks
+            // Wire granular invalidation callbacks.
+            // Each callback builds an immutable state snapshot on the UI thread
+            // and sends it to the appropriate CompositionCustomVisual handler,
+            // which re-renders on the next compositor frame.
             vm.SetInvalidation(new InvalidationCallbacks
             {
-                InvalidateCamera = () => { UpdateCameraTransform(); StatusBar.UpdateZoom(); },
+                InvalidateCamera = () =>
+                {
+                    UpdatePagePanelSize(vm.ActiveTab);
+                    StatusBar.UpdateZoom();
+                    // Camera changed → all layers need new state (camera is baked in)
+                    var tab = vm.ActiveTab;
+                    PageLayer.UpdateState(BuildPageState(vm, tab));
+                    OverlayLayer.UpdateState(BuildOverlayState(vm, tab));
+                    SearchLayer.UpdateState(BuildSearchState(vm, tab));
+                    AnnotationLayer.UpdateState(BuildAnnotationState(vm, tab));
+                },
                 InvalidatePage = () =>
                 {
-                    PageLayer.ActiveEffect = vm.Controller.ActiveColourEffect;
-                    PageLayer.ActiveIntensity = vm.Controller.ActiveColourIntensity;
-                    PageLayer.MotionBlurEnabled = vm.Config.MotionBlur;
-                    PageLayer.MotionBlurIntensity = vm.Config.MotionBlurIntensity;
                     var tab = vm.ActiveTab;
-                    bool blur = tab?.LineFocusBlur ?? false;
-                    PageLayer.LineFocusBlurEnabled = blur;
-                    PageLayer.LineFocusBlurIntensity = vm.Config.LineFocusBlurIntensity;
-                    PageLayer.LinePadding = vm.Config.LinePadding;
-                    PageLayer.InvalidateVisual();
-                    Minimap.InvalidateVisual();
+                    var state = BuildPageState(vm, tab);
+                    PageLayer.UpdateState(state);
+                    // Update minimap when the page image itself changes
+                    if (!ReferenceEquals(state.Image, _lastMinimapImage))
+                    {
+                        _lastMinimapImage = state.Image;
+                        Minimap.InvalidateVisual();
+                    }
                 },
                 InvalidateOverlay = () =>
-                {
-                    OverlayLayer.ActiveEffect = vm.Controller.ActiveColourEffect;
-                    OverlayLayer.LineFocusBlurActive = vm.ActiveTab?.LineFocusBlur ?? false;
-                    OverlayLayer.LineHighlightEnabled = vm.ActiveTab?.LineHighlightEnabled ?? true;
-                    OverlayLayer.LinePadding = vm.Config.LinePadding;
-                    OverlayLayer.Tint = vm.Config.LineHighlightTint;
-                    OverlayLayer.TintOpacity = vm.Config.LineHighlightOpacity;
-                    OverlayLayer.InvalidateVisual();
-                },
+                    OverlayLayer.UpdateState(BuildOverlayState(vm, vm.ActiveTab)),
                 InvalidateSearch = () =>
                 {
-                    SearchLayer.InvalidateVisual();
+                    SearchLayer.UpdateState(BuildSearchState(vm, vm.ActiveTab));
                     OutlinePanel.OnSearchInvalidated();
                 },
-                InvalidateAnnotations = () => AnnotationLayer.InvalidateVisual(),
+                InvalidateAnnotations = () =>
+                    AnnotationLayer.UpdateState(BuildAnnotationState(vm, vm.ActiveTab)),
             });
 
             // Keep ViewModel's viewport size in sync with the actual drawable area.
@@ -91,14 +97,14 @@ public partial class MainWindow : Window
 
             // window.Opened (which calls OpenDocument) can fire before OnLoaded
             // finishes wiring _invalidation. If a tab is already present, the
-            // camera transform was never applied and CenterPage used the wrong
-            // viewport size. Re-center and apply now that layout is complete.
+            // camera state was never sent and CenterPage used the wrong viewport size.
+            // Re-center and push fresh state to all layers now that layout is complete.
             if (vm.ActiveTab is { } earlyTab && Viewport.Bounds.Width > 0)
             {
                 earlyTab.CenterPage(Viewport.Bounds.Width, Viewport.Bounds.Height);
                 earlyTab.UpdateRailZoom(Viewport.Bounds.Width, Viewport.Bounds.Height);
-                UpdateCameraTransform();
-                PageLayer.InvalidateVisual();
+                UpdatePagePanelSize(earlyTab);
+                UpdateLayerBindings(earlyTab);
             }
 
             _subscribedVm = vm;
@@ -125,7 +131,12 @@ public partial class MainWindow : Window
         {
             var (ww, wh) = (Viewport.Bounds.Width, Viewport.Bounds.Height);
             tab.ClampCamera(ww, wh);
-            UpdateCameraTransform();
+            UpdatePagePanelSize(tab);
+            // Viewport size changed → all layers need new state (Size updated via OnSizeChanged)
+            PageLayer.UpdateState(BuildPageState(vm, tab));
+            OverlayLayer.UpdateState(BuildOverlayState(vm, tab));
+            SearchLayer.UpdateState(BuildSearchState(vm, tab));
+            AnnotationLayer.UpdateState(BuildAnnotationState(vm, tab));
         }
     }
 
@@ -136,12 +147,8 @@ public partial class MainWindow : Window
         {
             case nameof(MainWindowViewModel.ActiveTab):
                 UpdateLayerBindings(vm.ActiveTab);
-                UpdateCameraTransform();
+                UpdatePagePanelSize(vm.ActiveTab);
                 UpdateRailToolBarVisibility();
-                PageLayer.InvalidateVisual();
-                SearchLayer.InvalidateVisual();
-                AnnotationLayer.InvalidateVisual();
-                OverlayLayer.InvalidateVisual();
                 Minimap.InvalidateVisual();
                 break;
             case nameof(MainWindowViewModel.ShowOutline):
@@ -252,33 +259,18 @@ public partial class MainWindow : Window
 
     private void UpdateLayerBindings(TabViewModel? tab)
     {
-        var config = Vm?.Config;
-        var ctrl = Vm?.Controller;
+        if (Vm is not { } vm) return;
 
-        PageLayer.Tab = tab;
-        PageLayer.ColourEffects = Vm?.ColourEffects;
-        PageLayer.ActiveEffect = ctrl?.ActiveColourEffect ?? ColourEffect.None;
-        PageLayer.ActiveIntensity = ctrl?.ActiveColourIntensity ?? 1.0f;
-        PageLayer.MotionBlurEnabled = config?.MotionBlur ?? true;
-        PageLayer.MotionBlurIntensity = config?.MotionBlurIntensity ?? 0.5;
-        bool blur = tab?.LineFocusBlur ?? false;
-        PageLayer.LineFocusBlurEnabled = blur;
-        PageLayer.LineFocusBlurIntensity = config?.LineFocusBlurIntensity ?? 0.5;
-        PageLayer.LinePadding = config?.LinePadding ?? 0.2;
-        SearchLayer.Tab = tab;
-        SearchLayer.ViewModel = Vm;
-        AnnotationLayer.Tab = tab;
-        AnnotationLayer.ViewModel = Vm;
-        OverlayLayer.Tab = tab;
-        OverlayLayer.ActiveEffect = ctrl?.ActiveColourEffect ?? ColourEffect.None;
-        OverlayLayer.LineFocusBlurActive = tab?.LineFocusBlur ?? false;
-        OverlayLayer.LineHighlightEnabled = tab?.LineHighlightEnabled ?? true;
-        OverlayLayer.LinePadding = config?.LinePadding ?? 0.2;
-        OverlayLayer.Tint = config?.LineHighlightTint ?? LineHighlightTint.Auto;
-        OverlayLayer.TintOpacity = config?.LineHighlightOpacity ?? 0.25;
+        // Push fresh state to all composition layer handlers.
+        // This replaces the old property-setter pattern — state is now built
+        // here and sent atomically to the composition thread.
+        PageLayer.UpdateState(BuildPageState(vm, tab));
+        OverlayLayer.UpdateState(BuildOverlayState(vm, tab));
+        SearchLayer.UpdateState(BuildSearchState(vm, tab));
+        AnnotationLayer.UpdateState(BuildAnnotationState(vm, tab));
 
         if (tab is not null)
-            tab.OnDpiRenderComplete = () => Vm?.RequestAnimationFrame();
+            tab.OnDpiRenderComplete = () => vm.RequestAnimationFrame();
     }
 
     private void UpdateRailToolBarVisibility()
@@ -307,24 +299,21 @@ public partial class MainWindow : Window
         col.Width = showOutline ? new GridLength(width) : new GridLength(0);
     }
 
-    private void UpdateCameraTransform()
+    /// <summary>
+    /// Updates PagePanel dimensions (used by the minimap and scrollbar calculations)
+    /// and conditionally invalidates the minimap when the viewport position changes
+    /// enough to be visible at its small display size.
+    /// The camera transform itself is now applied inside each layer's Skia canvas.
+    /// </summary>
+    private void UpdatePagePanelSize(TabViewModel? tab)
     {
-        var tab = Vm?.ActiveTab;
         if (tab is null)
         {
-            CameraPanel.RenderTransform = null;
             PagePanel.Width = 0;
             PagePanel.Height = 0;
             return;
         }
 
-        // Reuse the MatrixTransform to avoid heap allocation every frame.
-        var matrix = new Matrix(tab.Camera.Zoom, 0, 0, tab.Camera.Zoom,
-                                tab.Camera.OffsetX, tab.Camera.OffsetY);
-        if (CameraPanel.RenderTransform is MatrixTransform mt)
-            mt.Matrix = matrix;
-        else
-            CameraPanel.RenderTransform = new MatrixTransform(matrix);
         PagePanel.Width = tab.PageWidth;
         PagePanel.Height = tab.PageHeight;
 
@@ -340,6 +329,107 @@ public partial class MainWindow : Window
             _lastMinimapZoom = tab.Camera.Zoom;
             Minimap.InvalidateVisual();
         }
+    }
+
+    // ── State builders ─────────────────────────────────────────────────────────
+    // Each method snapshots all fields needed for one layer's frame, including
+    // the camera matrix. Called on the UI thread; result is sent to the
+    // corresponding CompositionCustomVisualHandler via SendHandlerMessage.
+
+    private static SKMatrix BuildCamera(TabViewModel? tab)
+    {
+        if (tab is null) return SKMatrix.Identity;
+        return new SKMatrix(
+            (float)tab.Camera.Zoom, 0f, (float)tab.Camera.OffsetX,
+            0f, (float)tab.Camera.Zoom, (float)tab.Camera.OffsetY,
+            0f, 0f, 1f);
+    }
+
+    private PdfPageRenderState BuildPageState(MainWindowViewModel vm, TabViewModel? tab)
+    {
+        float lineY = 0, lineH = 0;
+        if (tab?.Rail is { Active: true, NavigableCount: > 0 })
+        {
+            var line = tab.Rail.CurrentLineInfo;
+            lineY = line.Y;
+            lineH = line.Height;
+        }
+        var (image, retired) = tab?.GetCachedImage() ?? (null, null);
+        return new PdfPageRenderState(
+            Image: image,
+            RetiredImage: retired,
+            PageW: (float)(tab?.PageWidth ?? 0),
+            PageH: (float)(tab?.PageHeight ?? 0),
+            Camera: BuildCamera(tab),
+            ScrollSpeed: (float)(tab?.Rail.ScrollSpeed ?? 0),
+            ZoomSpeed: (float)(tab?.Camera.ZoomSpeed ?? 0),
+            MotionBlur: vm.Config.MotionBlur,
+            MotionBlurIntensity: (float)vm.Config.MotionBlurIntensity,
+            LineFocusBlur: tab?.LineFocusBlur ?? false,
+            LineFocusIntensity: (float)vm.Config.LineFocusBlurIntensity,
+            LinePadding: (float)vm.Config.LinePadding,
+            LineY: lineY,
+            LineH: lineH,
+            Effect: vm.Controller.ActiveColourEffect,
+            EffectIntensity: vm.Controller.ActiveColourIntensity,
+            Effects: vm.ColourEffects);
+    }
+
+    private static RailOverlayRenderState BuildOverlayState(MainWindowViewModel vm, TabViewModel? tab)
+    {
+        LayoutBlock? currentBlock = null;
+        LineInfo currentLine = default;
+        if (tab?.Rail is { Active: true, HasAnalysis: true } rail && rail.NavigableCount > 0)
+        {
+            currentBlock = rail.CurrentNavigableBlock;
+            currentLine = rail.CurrentLineInfo;
+        }
+        PageAnalysis? debugAnalysis = null;
+        if (tab?.DebugOverlay == true)
+            tab.AnalysisCache.TryGetValue(tab.CurrentPage, out debugAnalysis);
+
+        return new RailOverlayRenderState(
+            Camera: BuildCamera(tab),
+            PageW: (float)(tab?.PageWidth ?? 0),
+            PageH: (float)(tab?.PageHeight ?? 0),
+            CurrentBlock: currentBlock,
+            CurrentLine: currentLine,
+            DebugOverlay: tab?.DebugOverlay ?? false,
+            DebugAnalysis: debugAnalysis,
+            Effect: vm.Controller.ActiveColourEffect,
+            LineFocusBlur: tab?.LineFocusBlur ?? false,
+            LineHighlightEnabled: tab?.LineHighlightEnabled ?? true,
+            LinePadding: (float)vm.Config.LinePadding,
+            Tint: vm.Config.LineHighlightTint,
+            TintOpacity: (float)vm.Config.LineHighlightOpacity);
+    }
+
+    private static AnnotationRenderState BuildAnnotationState(MainWindowViewModel vm, TabViewModel? tab)
+    {
+        List<Annotation>? pageAnnotations = null;
+        if (tab is not null)
+            tab.Annotations.Pages.TryGetValue(tab.CurrentPage, out pageAnnotations);
+
+        return new AnnotationRenderState(
+            Camera: BuildCamera(tab),
+            PageAnnotations: pageAnnotations,
+            SelectedAnnotation: vm.SelectedAnnotation,
+            PreviewAnnotation: vm.PreviewAnnotation,
+            TextSelectionRects: vm.TextSelectionRects);
+    }
+
+    private SearchRenderState BuildSearchState(MainWindowViewModel vm, TabViewModel? tab)
+    {
+        var matches = vm.CurrentPageSearchMatches;
+        int activeLocalIndex = -1;
+        if (matches is { Count: > 0 } && tab is not null)
+            activeLocalIndex = OverlayRenderer.ComputeActiveLocalIndex(
+                vm.SearchMatches, matches, vm.ActiveMatchIndex, tab.CurrentPage);
+
+        return new SearchRenderState(
+            Camera: BuildCamera(tab),
+            Matches: matches,
+            ActiveLocalIndex: activeLocalIndex);
     }
 
     /// <summary>
@@ -490,7 +580,7 @@ public partial class MainWindow : Window
                 if (vm.ActiveTab is { } dbgTab)
                 {
                     dbgTab.DebugOverlay = !dbgTab.DebugOverlay;
-                    OverlayLayer.InvalidateVisual();
+                    OverlayLayer.UpdateState(BuildOverlayState(vm, dbgTab));
                 }
                 e.Handled = true; return true;
             case Key.D:

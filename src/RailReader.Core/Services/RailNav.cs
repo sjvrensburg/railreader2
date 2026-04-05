@@ -709,6 +709,15 @@ public sealed class RailNav : ICameraClamp
     public void SetAutoScrollBoost(bool boost) => _autoScrollState.SetBoost(boost);
 
     /// <summary>
+    /// Inject a controlled elapsed-seconds source for unit tests.
+    /// Forwarded to the underlying <see cref="AutoScrollStateMachine"/>.
+    /// </summary>
+    internal Func<double>? AutoScrollElapsedSecondsOverride
+    {
+        set => _autoScrollState.GetScrollElapsedSeconds = value;
+    }
+
+    /// <summary>
     /// Returns true if auto-scroll has reached the right edge and should advance.
     /// Called from Tick; the caller is responsible for calling NextLine and snapping.
     /// </summary>
