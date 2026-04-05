@@ -38,7 +38,8 @@ public static class CleanupService
     public static string FormatReport(int filesRemoved, long bytesFreed)
     {
         if (filesRemoved == 0) return "Nothing to clean up.";
-        return $"Removed {filesRemoved} file(s), freed {bytesFreed / 1024.0:F1} KB.";
+        return string.Create(System.Globalization.CultureInfo.InvariantCulture,
+            $"Removed {filesRemoved} file(s), freed {bytesFreed / 1024.0:F1} KB.");
     }
 
     private static bool IsProtectedFile(string name) =>
