@@ -210,6 +210,7 @@ public partial class MainWindow : Window
 
         var highlightColors = BuildColorOptions(vm, AnnotationTool.Highlight, AnnotationInteractionHandler.HighlightColors, 0);
         var penColors = BuildColorOptions(vm, AnnotationTool.Pen, AnnotationInteractionHandler.PenColors, 1);
+        var rectColors = BuildColorOptions(vm, AnnotationTool.Rectangle, AnnotationInteractionHandler.RectColors, 3);
         var penThickness = BuildThicknessOptions(vm, AnnotationTool.Pen, 1);
         var rectThickness = BuildThicknessOptions(vm, AnnotationTool.Rectangle, 3);
 
@@ -226,8 +227,8 @@ public partial class MainWindow : Window
                 () => vm.SetAnnotationTool(AnnotationTool.TextNote)),
             new("Rect", RadialMenu.IconChars.Square,
                 () => vm.SetAnnotationTool(AnnotationTool.Rectangle),
-                ThicknessOptions: rectThickness,
-                ActiveThicknessIndex: vm.Controller.Annotations.GetThicknessIndex(AnnotationTool.Rectangle)),
+                rectColors, vm.Controller.Annotations.GetAnnotationColorIndex(AnnotationTool.Rectangle),
+                rectThickness, vm.Controller.Annotations.GetThicknessIndex(AnnotationTool.Rectangle)),
             new("Eraser", RadialMenu.IconChars.Eraser,
                 () => vm.SetAnnotationTool(AnnotationTool.Eraser)),
         };

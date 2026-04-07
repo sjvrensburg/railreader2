@@ -305,11 +305,13 @@ public class RadialMenu : Control
         base.Render(context);
         double w = Width > 0 ? Width : Bounds.Width;
         double h = Height > 0 ? Height : Bounds.Height;
+        double effectiveColorR = _expandedSegment >= 0
+            ? EffectiveColorRingRadius(_expandedSegment) : ColorRingRadius;
         context.Custom(new RadialMenuDrawOp(
             new Rect(0, 0, w, h), _segments, InnerRadius, OuterRadius,
             _hoveredIndex, _hoveringCentre, s_iconTypeface, _scale,
             _expandedSegment, _hoveredColorIndex, _hoveredThicknessIndex,
-            ThicknessRingRadius, ColorRingRadius));
+            ThicknessRingRadius, effectiveColorR));
     }
 
     private sealed class RadialMenuDrawOp : ICustomDrawOperation
@@ -372,20 +374,9 @@ public class RadialMenu : Control
             && _expandedSegment == op._expandedSegment
             && _hoveredColorIndex == op._hoveredColorIndex
             && _hoveredThicknessIndex == op._hoveredThicknessIndex
+            && _colorRingR == op._colorRingR
             && _segments.Count == op._segments.Count;
         public bool HitTest(Point p) => true;
-
-        /// <summary>
-        /// Returns the effective colour ring radius for a segment — uses the
-        /// closer ring position when the segment has no thickness options.
-        /// </summary>
-        private double EffectiveColorRingR(int segIndex)
-        {
-            if (segIndex < 0 || segIndex >= _segments.Count) return _colorRingR;
-            return _segments[segIndex].ThicknessOptions is { Count: > 0 }
-                ? _colorRingR
-                : _thicknessRingR;
-        }
 
         public void Render(ImmediateDrawingContext context)
         {
@@ -530,9 +521,8 @@ public class RadialMenu : Control
                     // Colour ring (outer, or middle if no thickness)
                     if (seg.ColorOptions is { Count: > 0 } colorOpts)
                     {
-                        double effectiveR = EffectiveColorRingR(_expandedSegment);
                         DrawColorRing(canvas, cx, cy, _expandedSegment, colorOpts,
-                            seg.ActiveColorIndex, effectiveR, fillPaint, strokePaint);
+                            seg.ActiveColorIndex, _colorRingR, fillPaint, strokePaint);
                     }
                 }
             }
