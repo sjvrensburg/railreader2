@@ -558,7 +558,12 @@ public sealed class DocumentController : IDisposable
         {
             var adv = AdvanceLine(doc, forward, ww, wh);
             if (adv == LineAdvanceResult.LineAdvanced)
+            {
                 doc.StartSnap(ww, wh);
+                // During autoscroll: pause until snap completes + line pause, then resume
+                if (AutoScrollActive)
+                    doc.Rail.PauseAutoScroll(_config.AutoScrollLinePauseMs);
+            }
         }
         else
         {
@@ -643,7 +648,12 @@ public sealed class DocumentController : IDisposable
             ? doc.Rail.ComputeLineStartX(doc.Camera.Zoom, ww)
             : doc.Rail.ComputeLineEndX(doc.Camera.Zoom, ww);
         if (x is { } val)
+        {
             doc.Camera.OffsetX = val;
+            // During autoscroll: brief settle pause, then resume from new position
+            if (AutoScrollActive)
+                doc.Rail.PauseAutoScroll(_config.AutoScrollLinePauseMs);
+        }
     }
 
     public void HandleArrowRelease(bool isHorizontal)
