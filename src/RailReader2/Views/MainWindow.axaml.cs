@@ -210,6 +210,8 @@ public partial class MainWindow : Window
 
         var highlightColors = BuildColorOptions(vm, AnnotationTool.Highlight, AnnotationInteractionHandler.HighlightColors, 0);
         var penColors = BuildColorOptions(vm, AnnotationTool.Pen, AnnotationInteractionHandler.PenColors, 1);
+        var penThickness = BuildThicknessOptions(vm, AnnotationTool.Pen, 1);
+        var rectThickness = BuildThicknessOptions(vm, AnnotationTool.Rectangle, 3);
 
         var segments = new List<RadialMenu.Segment>
         {
@@ -218,11 +220,14 @@ public partial class MainWindow : Window
                 highlightColors, vm.Controller.Annotations.GetAnnotationColorIndex(AnnotationTool.Highlight)),
             new("Pen", RadialMenu.IconChars.Pen,
                 () => vm.SetAnnotationTool(AnnotationTool.Pen),
-                penColors, vm.Controller.Annotations.GetAnnotationColorIndex(AnnotationTool.Pen)),
+                penColors, vm.Controller.Annotations.GetAnnotationColorIndex(AnnotationTool.Pen),
+                penThickness, vm.Controller.Annotations.GetThicknessIndex(AnnotationTool.Pen)),
             new("Text", RadialMenu.IconChars.TextHeight,
                 () => vm.SetAnnotationTool(AnnotationTool.TextNote)),
             new("Rect", RadialMenu.IconChars.Square,
-                () => vm.SetAnnotationTool(AnnotationTool.Rectangle)),
+                () => vm.SetAnnotationTool(AnnotationTool.Rectangle),
+                ThicknessOptions: rectThickness,
+                ActiveThicknessIndex: vm.Controller.Annotations.GetThicknessIndex(AnnotationTool.Rectangle)),
             new("Eraser", RadialMenu.IconChars.Eraser,
                 () => vm.SetAnnotationTool(AnnotationTool.Eraser)),
         };
@@ -243,6 +248,23 @@ public partial class MainWindow : Window
                 vm.Controller.Annotations.SetAnnotationColorIndex(tool, idx);
                 vm.SetAnnotationTool(tool);
                 RadialMenuControl.UpdateSegmentColorIndex(segmentIndex, idx);
+            }));
+        }
+        return options;
+    }
+
+    private List<RadialMenu.ThicknessOption> BuildThicknessOptions(
+        MainWindowViewModel vm, AnnotationTool tool, int segmentIndex)
+    {
+        var presets = AnnotationInteractionHandler.ThicknessPresets;
+        var options = new List<RadialMenu.ThicknessOption>(presets.Length);
+        for (int i = 0; i < presets.Length; i++)
+        {
+            int idx = i;
+            options.Add(new RadialMenu.ThicknessOption(presets[i], () =>
+            {
+                vm.Controller.Annotations.SetThicknessIndex(tool, idx);
+                RadialMenuControl.UpdateSegmentThicknessIndex(segmentIndex, idx);
             }));
         }
         return options;
