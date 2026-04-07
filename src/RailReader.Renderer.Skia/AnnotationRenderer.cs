@@ -22,10 +22,23 @@ public static class AnnotationRenderer
     [ThreadStatic] private static SKPaint? s_handleFillPaint;
     [ThreadStatic] private static SKPaint? s_handleStrokePaint;
 
+    /// <summary>
+    /// Z-order: highlights → freehand + rectangles → text notes.
+    /// </summary>
+    private static int ZOrder(Annotation ann) => ann switch
+    {
+        HighlightAnnotation => 0,
+        FreehandAnnotation  => 1,
+        RectAnnotation      => 1,
+        TextNoteAnnotation  => 2,
+        _ => 1,
+    };
+
     public static void DrawAnnotations(SKCanvas canvas, List<Annotation> annotations, Annotation? selected,
         bool expandAllNotes = false)
     {
-        foreach (var ann in annotations)
+        // Draw in z-order; stable sort preserves user creation order within each tier
+        foreach (var ann in annotations.OrderBy(ZOrder))
             DrawAnnotation(canvas, ann, ann == selected, expandAllNotes);
     }
 

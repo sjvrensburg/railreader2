@@ -234,9 +234,9 @@ Right-click anywhere on the page to open the **radial menu** with five annotatio
 
 | Tool | Key | Description |
 |------|-----|-------------|
-| **Highlight** | `1` | Click and drag over text to highlight. Uses character-level detection. Choose from yellow, green, or pink via the radial menu colour picker. |
-| **Pen** | `2` | Freehand drawing. Choose from red, blue, or black via the radial menu colour picker. |
-| **Rectangle** | `3` | Draw rectangular outlines or filled regions. |
+| **Highlight** | `1` | Click and drag over text to highlight. Uses character-level detection. Choose from yellow, green, or pink via the colour ring. |
+| **Pen** | `2` | Freehand drawing. Choose stroke thickness (thin/normal/thick) via the thickness ring, and colour (red/blue/black) via the colour ring. |
+| **Rectangle** | `3` | Draw rectangular outlines or filled regions. Choose stroke thickness and colour (blue/red/black) via the radial menu rings. |
 | **Text Note** | `4` | Click to place a note. Shows as a small folded-corner icon; click the icon in browse mode to expand/collapse the popup. Click an existing note in Text Note mode to edit. |
 | **Eraser** | `5` | Click on an annotation to remove it. |
 
@@ -248,9 +248,19 @@ Each annotation tool shows a distinct mouse cursor so you always know the active
 - **Text Select** — I-beam cursor
 - **Browse (no tool)** — default arrow cursor
 
-### Colour picker
+### Radial menu rings
 
-The **Highlight** and **Pen** segments on the radial menu have colour options. Tap the segment to reveal an outer ring of colour dots. Tap a colour to select it and activate the tool. A small indicator dot on the segment shows the currently active colour.
+The radial menu has up to three rings:
+
+- **Inner ring** — tool selection (always visible)
+- **Middle ring** — stroke thickness: thin, normal, thick (shown for Pen and Rectangle). Displayed as size-varied circles.
+- **Outer ring** — colour selection (shown for Highlight, Pen, and Rectangle)
+
+Tap a segment to expand its rings. **Selecting a thickness** keeps the menu open so you can also pick a colour. **Selecting a colour** or clicking outside the rings activates the tool and closes the menu. A small indicator dot on the segment shows the currently active colour.
+
+### Annotation z-order
+
+Annotations are drawn in a fixed z-order: highlights appear below freehand strokes and rectangles, which appear below text notes. Within each tier, annotations are drawn in the order they were created.
 
 ### Popup notes
 
@@ -532,7 +542,7 @@ The log is overwritten at the start of each session. Old `.log` files are automa
 | `Ctrl+F` | Open search panel |
 | `F3` / `Shift+F3` | Next / previous match |
 | `1` / `2` / `3` / `4` / `5` | Highlight / Pen / Rectangle / Text Note / Eraser |
-| Right-click | Open radial menu (with colour picker for Highlight/Pen) |
+| Right-click | Open radial menu (thickness + colour rings for Pen/Rect, colour ring for Highlight) |
 | `Ctrl+Z` | Undo |
 | `Ctrl+Y` | Redo |
 | `Delete` / `Backspace` | Delete selected annotation (browse mode) |

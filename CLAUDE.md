@@ -86,7 +86,7 @@ Thin wrapper delegating all logic to `DocumentController`/`DocumentState` in Cor
 - `Views/MainWindow.axaml.cs` — keyboard shortcuts, state builders for composition layers, animation frame scheduling
 - `Views/CompositionLayerControl.cs` — generic base class for `CompositionCustomVisual`-backed layers (manages visual lifecycle, state/message dispatch)
 - `Views/` — layers (PdfPageLayer, RailOverlayLayer, AnnotationLayer, SearchHighlightLayer), dialogs (ConfirmUrlDialog, BookmarkNameDialog, etc.), panels
-- `Controls/RadialMenu.cs` — Skia-rendered radial context menu with Font Awesome icons
+- `Controls/RadialMenu.cs` — Skia-rendered three-ring radial context menu (tools → thickness → colours) with Font Awesome icons
 
 **AXAML bindings**: `AvaloniaUseCompiledBindingsByDefault` is enabled — all bindings are compiled by default. Use `{x:Bind}`-style compiled bindings in AXAML files.
 
@@ -96,7 +96,7 @@ Implements Core's `IPdfService`/`IPdfTextService` interfaces using PDFium + Skia
 
 - `SkiaPdfService.cs` / `SkiaPdfTextService.cs` / `SkiaPdfServiceFactory.cs` — PDFium-backed PDF services
 - `SkiaRenderedPage.cs` — `IRenderedPage` wrapping `SKBitmap`
-- `AnnotationRenderer.cs` — Skia annotation drawing (highlight, freehand, text note, rectangle)
+- `AnnotationRenderer.cs` — Skia annotation drawing (highlight, freehand, text note, rectangle) with z-order sorting
 - `OverlayRenderer.cs` — rail overlay drawing (dim, block outline, line highlight)
 - `ScreenshotCompositor.cs` — multi-layer composition to `SKBitmap`
 - `ColourEffectShaders.cs` — SkSL shader compilation (HighContrast, HighVisibility, Amber, Invert)
@@ -143,7 +143,7 @@ Activates above `rail_zoom_threshold` when analysis is available. Locks to detec
 
 ### Annotations
 
-Five tools (Highlight, Pen, Rectangle, TextNote, Eraser) via right-click radial menu with colour pickers. Select/move/resize in browse mode. Per-tab undo/redo stacks. Stored internally in `ConfigDir/annotations/<hash>.json`, keyed by SHA256 hash of the PDF's full path. Legacy sidecar files (alongside the PDF) are loaded as a migration fallback but never written to. `AnnotationFileManager` provides reference-counted shared `AnnotationFile` instances — multiple tabs opening the same PDF share a single in-memory object, eliminating last-writer-wins data loss. Auto-save is per-file (one debounced timer per unique PDF, not per tab). Export to PDF via `AnnotationExportService`. Export/import as JSON for sharing between users — `AnnotationService.MergeInto()` appends imported annotations per page and deduplicates bookmarks. Named bookmarks also stored in the annotation file. `AnnotationService` handles file-level persistence; `AnnotationFileManager` manages shared lifetimes; `AnnotationService.CleanOrphaned()` removes annotation files whose source PDFs no longer exist.
+Five tools (Highlight, Pen, Rectangle, TextNote, Eraser) via right-click radial menu. Three-ring radial menu: inner ring for tool selection, middle ring for stroke thickness (thin/normal/thick — Pen and Rectangle), outer ring for colour selection (Highlight, Pen, Rectangle). Thickness selection keeps the menu open for colour picking; colour selection or clicking outside closes the menu and activates the tool. Annotations render in z-order: highlights below freehand and rectangles, text notes on top (stable sort preserves creation order within each tier). Select/move/resize in browse mode. Per-tab undo/redo stacks. Stored internally in `ConfigDir/annotations/<hash>.json`, keyed by SHA256 hash of the PDF's full path. Legacy sidecar files (alongside the PDF) are loaded as a migration fallback but never written to. `AnnotationFileManager` provides reference-counted shared `AnnotationFile` instances — multiple tabs opening the same PDF share a single in-memory object, eliminating last-writer-wins data loss. Auto-save is per-file (one debounced timer per unique PDF, not per tab). Export to PDF via `AnnotationExportService`. Export/import as JSON for sharing between users — `AnnotationService.MergeInto()` appends imported annotations per page and deduplicates bookmarks. Named bookmarks also stored in the annotation file. `AnnotationService` handles file-level persistence; `AnnotationFileManager` manages shared lifetimes; `AnnotationService.CleanOrphaned()` removes annotation files whose source PDFs no longer exist.
 
 ### Colour Effects
 

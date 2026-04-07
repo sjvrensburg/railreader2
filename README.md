@@ -101,7 +101,7 @@ At high zoom levels, navigation switches to "rail mode" — the viewer locks ont
 #### Annotations & text
 
 - **PDF links** — click internal cross-references (citations, figure refs, TOC entries) to navigate to the exact target position, or external URLs to open in the browser with a confirmation prompt. Back/forward history with `Alt+Left`/`Alt+Right`. Hand cursor on hover
-- **Annotations** — highlight, freehand pen, rectangles, text notes, and eraser via radial menu (right-click). Colour picker for highlight (yellow/green/pink) and pen (red/blue/black). Collapsible popup notes with folded-corner icon. Select, move, and resize annotations in browse mode. Delete selected annotations with the Delete key.
+- **Annotations** — highlight, freehand pen, rectangles, text notes, and eraser via a three-ring radial menu (right-click): tool selection (inner), stroke thickness — thin/normal/thick (middle, for pen and rectangle), and colour picker (outer). Colour options: highlight (yellow/green/pink), pen (red/blue/black), rectangle (blue/red/black). Annotations render in z-order: highlights below strokes and rectangles, text notes on top. Collapsible popup notes with folded-corner icon. Select, move, and resize annotations in browse mode. Delete selected annotations with the Delete key.
 - **Text selection** — select and copy text from PDF pages via the toolbar
 - **Toolbar** — floating Browse/Text Select/Copy toolbar for quick mode switching
 - **Annotation export** — export PDFs with embedded annotations (File → Export with Annotations)

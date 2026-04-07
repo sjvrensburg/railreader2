@@ -33,8 +33,21 @@ public sealed class AnnotationInteractionHandler
         ("#000000", 0.9f),   // Black
     ];
 
+    public static readonly (string Color, float Opacity)[] RectColors =
+    [
+        ("#0066FF", 0.5f),   // Blue
+        ("#FF0000", 0.5f),   // Red
+        ("#000000", 0.6f),   // Black
+    ];
+
+    /// <summary>Stroke width presets: thin, normal, thick.</summary>
+    public static readonly float[] ThicknessPresets = [1f, 2f, 4f];
+
     private int _highlightColorIndex;
     private int _penColorIndex;
+    private int _rectColorIndex;
+    private int _penThicknessIndex = 1;  // default: normal (2f)
+    private int _rectThicknessIndex = 1;
 
     // In-progress annotation building state
     private List<PointF>? _freehandPoints;
@@ -83,12 +96,13 @@ public sealed class AnnotationInteractionHandler
                 var pc = PenColors[_penColorIndex];
                 ActiveAnnotationColor = pc.Color;
                 ActiveAnnotationOpacity = pc.Opacity;
-                ActiveStrokeWidth = 2f;
+                ActiveStrokeWidth = ThicknessPresets[_penThicknessIndex];
                 break;
             case AnnotationTool.Rectangle:
-                ActiveAnnotationColor = "#0066FF";
-                ActiveAnnotationOpacity = 0.5f;
-                ActiveStrokeWidth = 2f;
+                var rc = RectColors[_rectColorIndex];
+                ActiveAnnotationColor = rc.Color;
+                ActiveAnnotationOpacity = rc.Opacity;
+                ActiveStrokeWidth = ThicknessPresets[_rectThicknessIndex];
                 break;
             case AnnotationTool.TextNote:
                 ActiveAnnotationColor = "#FFCC00";
@@ -110,6 +124,9 @@ public sealed class AnnotationInteractionHandler
             case AnnotationTool.Pen:
                 _penColorIndex = Math.Clamp(index, 0, PenColors.Length - 1);
                 break;
+            case AnnotationTool.Rectangle:
+                _rectColorIndex = Math.Clamp(index, 0, RectColors.Length - 1);
+                break;
         }
     }
 
@@ -117,7 +134,26 @@ public sealed class AnnotationInteractionHandler
     {
         AnnotationTool.Highlight => _highlightColorIndex,
         AnnotationTool.Pen => _penColorIndex,
+        AnnotationTool.Rectangle => _rectColorIndex,
         _ => 0,
+    };
+
+    public void SetThicknessIndex(AnnotationTool tool, int index)
+    {
+        int clamped = Math.Clamp(index, 0, ThicknessPresets.Length - 1);
+        switch (tool)
+        {
+            case AnnotationTool.Pen: _penThicknessIndex = clamped; break;
+            case AnnotationTool.Rectangle: _rectThicknessIndex = clamped; break;
+        }
+        ActiveStrokeWidth = ThicknessPresets[clamped];
+    }
+
+    public int GetThicknessIndex(AnnotationTool tool) => tool switch
+    {
+        AnnotationTool.Pen => _penThicknessIndex,
+        AnnotationTool.Rectangle => _rectThicknessIndex,
+        _ => 1,
     };
 
     public void CancelAnnotationTool()
