@@ -374,6 +374,7 @@ public class RadialMenu : Control
             && _expandedSegment == op._expandedSegment
             && _hoveredColorIndex == op._hoveredColorIndex
             && _hoveredThicknessIndex == op._hoveredThicknessIndex
+            && _thicknessRingR == op._thicknessRingR
             && _colorRingR == op._colorRingR
             && _segments.Count == op._segments.Count;
         public bool HitTest(Point p) => true;
