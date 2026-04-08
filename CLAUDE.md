@@ -133,6 +133,8 @@ Page bitmap → BGRA-to-RGB → 800x800 rescale → CHW float tensor → PP-DocL
 
 **Background read-ahead**: A dedicated `DispatcherTimer` (500ms) progressively analyses all pages when idle, scanning outward from the current page via `BackgroundAnalysisQueue`. Pauses during rail mode to avoid PDFium contention. Results never evicted from cache. The Figures tab in OutlinePanel (`Ctrl+Shift+I`) uses `PeekIndexBuilder` to surface detected figures, tables, and equations — showing thumbnails for visual blocks and extracted text (via `PageText.ExtractTextInRect`) for equations.
 
+**VLM integration (Copy as LaTeX)**: `VlmService` in Core sends block crops to any OpenAI-compatible vision API (Ollama, cloud, etc.) via the `OpenAI` NuGet package. `BlockCropRenderer` in Renderer.Skia renders block regions as PNG at 300 DPI with 5% padding. Three access paths: `Ctrl+L` (current rail block), `Ctrl+right-click` (any block), Edit menu. Adapts prompt by block type: equations → LaTeX, tables → Markdown, figures → description. Configured via `AppConfig.VlmEndpoint`/`VlmModel`/`VlmApiKey` (Settings > VLM tab).
+
 **Fallback (model unavailable)**: Without the ONNX model, layout falls back to simple horizontal strip detection. Rail mode still activates but with basic fixed-height blocks instead of detected regions. Download the model via `./scripts/download-model.sh` for full functionality.
 
 ### Rail Mode

@@ -4,6 +4,7 @@ using Avalonia.Input;
 using Avalonia.Media;
 using RailReader.Core.Models;
 using RailReader2.ViewModels;
+using static RailReader.Core.Services.VlmService;
 
 namespace RailReader2.Views;
 
@@ -68,6 +69,18 @@ public class ViewportPanel : Panel
         Focus();
 
         var point = e.GetCurrentPoint(this);
+
+        // Ctrl+right-click: block context menu (Copy LaTeX / Markdown / Description / Image)
+        if (point.Properties.IsRightButtonPressed
+            && e.KeyModifiers.HasFlag(KeyModifiers.Control)
+            && ViewModel is { } ctrlVm)
+        {
+            var pos = e.GetPosition(this);
+            var (pageX, pageY) = ScreenToPage(pos);
+            ShowBlockContextMenu(ctrlVm, pageX, pageY);
+            e.Handled = true;
+            return;
+        }
 
         // Right-click: context menu for text selection, radial menu, or cancel tool
         if (point.Properties.IsRightButtonPressed && ViewModel is { } vm)
@@ -205,6 +218,38 @@ public class ViewportPanel : Panel
         _dragging = false;
         _browseAnnotationDrag = false;
         e.Handled = true;
+    }
+
+    private void ShowBlockContextMenu(MainWindowViewModel vm, double pageX, double pageY)
+    {
+        var block = vm.FindBlockAt(pageX, pageY);
+        if (block is null)
+        {
+            vm.ShowStatusToast("No block at this position");
+            return;
+        }
+
+        var menu = new ContextMenu();
+
+        var latexItem = new MenuItem { Header = "Copy as LaTeX" };
+        latexItem.Click += (_, _) => vm.CopyBlockWithAction(block, BlockAction.LaTeX);
+        menu.Items.Add(latexItem);
+
+        var markdownItem = new MenuItem { Header = "Copy as Markdown" };
+        markdownItem.Click += (_, _) => vm.CopyBlockWithAction(block, BlockAction.Markdown);
+        menu.Items.Add(markdownItem);
+
+        var descItem = new MenuItem { Header = "Copy Description" };
+        descItem.Click += (_, _) => vm.CopyBlockWithAction(block, BlockAction.Description);
+        menu.Items.Add(descItem);
+
+        menu.Items.Add(new Separator());
+
+        var imageItem = new MenuItem { Header = "Copy Image" };
+        imageItem.Click += (_, _) => vm.CopyBlockAsImage(block);
+        menu.Items.Add(imageItem);
+
+        menu.Open(this);
     }
 
     private void ShowTextSelectionContextMenu()

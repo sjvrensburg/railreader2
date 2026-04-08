@@ -242,6 +242,40 @@
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>
+
+            <TabItem Header="VLM">
+                <ScrollViewer>
+                    <StackPanel Margin="12">
+                        <TextBlock Text="Vision Language Model" FontWeight="Bold" />
+                        <Separator />
+                        <TextBlock Text="Configure an OpenAI-compatible API endpoint to enable Copy as LaTeX (Ctrl+L). Works with Ollama, vLLM, LMStudio, or cloud APIs."
+                                   TextWrapping="Wrap" Opacity="0.7" Margin="0,0,0,8" />
+
+                        <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto,8,Auto,8,Auto" Margin="0,0,0,8">
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Endpoint" VerticalAlignment="Center" />
+                            <TextBox Grid.Row="0" Grid.Column="2" Name="VlmEndpoint"
+                                     Watermark="http://localhost:11434/v1" />
+
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Model" VerticalAlignment="Center" />
+                            <TextBox Grid.Row="2" Grid.Column="2" Name="VlmModelName"
+                                     Watermark="smolvlm:latest" />
+
+                            <TextBlock Grid.Row="4" Grid.Column="0" Text="API Key" VerticalAlignment="Center" />
+                            <TextBox Grid.Row="4" Grid.Column="2" Name="VlmApiKey"
+                                     PasswordChar="*"
+                                     Watermark="Leave blank if not required" />
+                        </Grid>
+
+                        <TextBlock Text="The API key is stored locally in your config file."
+                                   Opacity="0.5" FontSize="11" Margin="0,0,0,8" />
+
+                        <Button Name="TestVlmButton" Content="Test Connection"
+                                HorizontalAlignment="Left"
+                                Click="OnTestVlmConnection" />
+                        <TextBlock Name="VlmTestResult" Opacity="0.7" Margin="0,4,0,0" />
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
         </TabControl>
     </DockPanel>
 </Window>

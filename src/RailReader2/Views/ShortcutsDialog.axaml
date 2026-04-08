@@ -142,6 +142,14 @@
                 <TextBlock Grid.Row="9" Grid.Column="0" Text="Ctrl+C" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
                 <TextBlock Grid.Row="9" Grid.Column="1" Text="Copy selected text" Margin="0,2" />
             </Grid>
+
+            <TextBlock Text="VLM (requires configured endpoint)" FontWeight="Bold" />
+            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" Margin="8,0">
+                <TextBlock Grid.Row="0" Grid.Column="0" Text="Ctrl+L" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="0" Grid.Column="1" Text="Copy current block as LaTeX / Markdown / description" Margin="0,2" />
+                <TextBlock Grid.Row="1" Grid.Column="0" Text="Ctrl+Right-click" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="1" Grid.Column="1" Text="Copy clicked block as LaTeX / Markdown / description" Margin="0,2" />
+            </Grid>
         </StackPanel>
     </ScrollViewer>
 </Window>

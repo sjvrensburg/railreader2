@@ -27,6 +27,8 @@
             <Separator />
             <MenuItem Header="_Undo" InputGesture="Ctrl+Z" Click="OnUndo" />
             <MenuItem Header="_Redo" InputGesture="Ctrl+Shift+Z" Click="OnRedo" />
+            <Separator />
+            <MenuItem Header="Copy Block as _LaTeX" InputGesture="Ctrl+L" Click="OnCopyBlockAsLatex" />
         </MenuItem>
         <MenuItem Header="_View">
             <MenuItem Header="Zoom _In" InputGesture="Ctrl+OemPlus" Click="OnZoomIn" />

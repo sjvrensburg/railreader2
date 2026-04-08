@@ -97,6 +97,7 @@ At high zoom levels, navigation switches to "rail mode" — the viewer locks ont
 - **Interactive minimap** — click or drag to navigate the page
 - **On-screen nav buttons** — ◀/▶ buttons in the status bar for mouse-only page navigation
 - **Search** — full-text search in a sidebar panel with results grouped by page, text snippets with highlighted match terms, regex and case sensitivity toggles, and match highlighting on the page (Ctrl+F)
+- **Copy as LaTeX** — send any detected equation, table, or figure to an OpenAI-compatible vision API (Ollama, cloud, etc.) and copy the result to clipboard. Equations → LaTeX, tables → Markdown, figures → description (Ctrl+L or Ctrl+right-click). Configure endpoint in Settings > VLM
 
 #### Annotations & text
 
@@ -228,6 +229,7 @@ Run `railreader2-cli --help` or `railreader2-cli <command> --help` for all optio
 | D (shift) | Toggle debug overlay (shows detected blocks) |
 | Ctrl+Shift+B | Toggle bookmarks pane |
 | Ctrl+Shift+I | Toggle figures panel |
+| Ctrl+L | Copy current block as LaTeX / Markdown / description (VLM) |
 | Ctrl+F | Open search panel |
 | F3 / Shift+F3 | Next / previous search match |
 | Right-click | Open annotation radial menu |

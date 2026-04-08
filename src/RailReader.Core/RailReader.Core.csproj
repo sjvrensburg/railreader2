@@ -16,6 +16,7 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.24.*" />
+    <PackageReference Include="OpenAI" Version="2.10.0" />
   </ItemGroup>
 
 </Project>
