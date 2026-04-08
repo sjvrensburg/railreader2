@@ -16,7 +16,7 @@ public static class PeekIndexBuilder
         LayoutConstants.ClassImage,
     ];
     private static readonly HashSet<int> TableClasses = [LayoutConstants.ClassTable];
-    private static readonly HashSet<int> EquationClasses = [LayoutConstants.ClassDisplayFormula];
+    internal static readonly HashSet<int> EquationClasses = [LayoutConstants.ClassDisplayFormula];
 
     public static PeekIndex Build(IReadOnlyDictionary<int, PageAnalysis> cache, int pageCount)
     {

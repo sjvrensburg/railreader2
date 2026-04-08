@@ -88,7 +88,7 @@ public static class StructureCommand
                             };
 
                             if (includeText && pageText != null)
-                                block.Text = Shared.ExtractBlockText(pageText, b);
+                                block.Text = pageText.ExtractBlockText(b);
 
                             return block;
                         }).ToList();

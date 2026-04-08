@@ -489,21 +489,17 @@ public partial class OutlinePanel : UserControl
         }
     }
 
-    private static readonly HashSet<int> EquationClassIds =
-        [LayoutConstants.ClassDisplayFormula];
-
     private void GenerateThumbnails(List<PeekEntryViewModel> entries, DocumentState doc)
     {
         foreach (var vm in entries)
         {
             int cacheKey = vm.Entry.PageIndex * 10000 + vm.Entry.BlockIndex;
 
-            // For equations, extract text from the PDF text layer instead of thumbnails
-            if (EquationClassIds.Contains(vm.Entry.ClassId))
+            if (PeekIndexBuilder.EquationClasses.Contains(vm.Entry.ClassId))
             {
                 if (!_textCache.TryGetValue(cacheKey, out var cachedText))
                 {
-                    cachedText = ExtractBlockText(doc, vm.Entry);
+                    cachedText = ExtractEntryText(doc, vm.Entry);
                     _textCache[cacheKey] = cachedText;
                 }
                 vm.ExtractedText = cachedText;
@@ -522,9 +518,9 @@ public partial class OutlinePanel : UserControl
         }
     }
 
-    private static string? ExtractBlockText(DocumentState doc, PeekEntry entry)
+    private static string? ExtractEntryText(DocumentState doc, PeekEntry entry)
     {
-        var pageText = doc.PdfText.ExtractPageText(doc.Pdf.PdfBytes, entry.PageIndex);
+        var pageText = doc.GetOrExtractText(entry.PageIndex);
         var bbox = entry.BBox;
         return pageText.ExtractTextInRect(bbox.X, bbox.Y, bbox.X + bbox.W, bbox.Y + bbox.H);
     }

@@ -22,12 +22,6 @@ internal static class Shared
         Children = entry.Children.Select(SerializeOutlineEntry).ToList()
     };
 
-    internal static string? ExtractTextInRect(PageText pageText, float left, float top, float right, float bottom)
-        => pageText.ExtractTextInRect(left, top, right, bottom);
-
-    internal static string ExtractBlockText(PageText pageText, LayoutBlock block)
-        => pageText.ExtractBlockText(block);
-
     /// <summary>
     /// Creates a LayoutAnalyzer if the ONNX model is available.
     /// Returns null and prints a warning if the model is not found.
