@@ -70,6 +70,7 @@ public sealed partial class MainWindowViewModel
 
             Dispatcher.UIThread.Post(() => InvalidatePage(), DispatcherPriority.Background);
             RequestAnimationFrame();
+            StartBackgroundAnalysis();
 
             _logger.Debug("[OpenDocument] Tab added successfully");
         }

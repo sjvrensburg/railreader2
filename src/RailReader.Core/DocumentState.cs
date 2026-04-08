@@ -105,6 +105,14 @@ public sealed class DocumentState : IDisposable
     public IReadOnlyDictionary<int, PageText> TextCache => _textCache;
     public IReadOnlyDictionary<int, List<PdfLink>> LinkCache => _linkCache;
     public Queue<int> PendingAnalysis { get; } = new();
+    internal BackgroundAnalysisQueue BackgroundQueue { get; private set; } = null!;
+    private bool _backgroundSubmitPending;
+
+    /// <summary>Number of pages with cached analysis results.</summary>
+    public int AnalysedPageCount => _analysisCache.Count;
+
+    /// <summary>Fires on the UI thread when a new page analysis result is cached.</summary>
+    public event Action? AnalysisCacheUpdated;
 
     /// <summary>
     /// When set, this page was reached via rail navigation and should be
@@ -149,6 +157,7 @@ public sealed class DocumentState : IDisposable
         _lineHighlightEnabled = config.LineHighlightEnabled;
         Rail = new RailNav(config);
         Outline = _pdf.Outline;
+        BackgroundQueue = new BackgroundAnalysisQueue(PageCount);
     }
 
     /// <summary>
@@ -313,6 +322,9 @@ public sealed class DocumentState : IDisposable
     public void QueueLookahead(int count)
     {
         PendingAnalysis.Clear();
+        // Only reset background queue if there are uncached pages to analyse
+        if (_analysisCache.Count < PageCount)
+            BackgroundQueue.Reset(CurrentPage);
         for (int i = 1; i <= count; i++)
         {
             int page = CurrentPage + i;
@@ -355,6 +367,55 @@ public sealed class DocumentState : IDisposable
             return true;
         }
         return false;
+    }
+
+    /// <summary>
+    /// Submits the next background analysis page (outside the lookahead window).
+    /// Returns true if a page was submitted, false if exhausted or worker busy.
+    /// Guards against concurrent submissions with a pending flag.
+    /// </summary>
+    public bool SubmitBackgroundAnalysis(AnalysisWorker worker)
+    {
+        if (_backgroundSubmitPending) return false;
+        if (!worker.IsIdle) return false;
+        if (PendingRailSetup) return false;
+        if (BackgroundQueue.IsExhausted) return false;
+
+        int? nextPage = BackgroundQueue.TryGetNext(
+            _analysisCache, page => worker.IsInFlight(FilePath, page));
+        if (nextPage is not { } page) return false;
+
+        string filePath = FilePath;
+        var pdf = _pdf;
+        var ct = _cts.Token;
+        _backgroundSubmitPending = true;
+        Task.Run(() =>
+        {
+            try
+            {
+                ct.ThrowIfCancellationRequested();
+                // Get page dimensions and render pixmap together on the background thread
+                // to avoid blocking the UI thread with PDFium calls.
+                var (pageW, pageH) = pdf.GetPageSize(page);
+                var (rgb, pxW, pxH) = pdf.RenderPagePixmap(page, LayoutConstants.InputSize);
+                _marshaller.Post(() =>
+                {
+                    _backgroundSubmitPending = false;
+                    if (!IsDisposed)
+                        worker.Submit(new AnalysisRequest(filePath, page, rgb, pxW, pxH, pageW, pageH));
+                });
+            }
+            catch (OperationCanceledException)
+            {
+                try { _marshaller.Post(() => _backgroundSubmitPending = false); } catch { }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Background analysis prepare failed for page {page + 1}: {ex.Message}", ex);
+                try { _marshaller.Post(() => _backgroundSubmitPending = false); } catch { }
+            }
+        }, ct);
+        return true;
     }
 
     public bool GoToPage(int page, AnalysisWorker? worker, HashSet<int> navigableClasses, double windowWidth, double windowHeight)
@@ -608,6 +669,7 @@ public sealed class DocumentState : IDisposable
     {
         _marshaller.AssertUIThread();
         _analysisCache[page] = analysis;
+        AnalysisCacheUpdated?.Invoke();
     }
 
     internal void SetText(int page, PageText text)

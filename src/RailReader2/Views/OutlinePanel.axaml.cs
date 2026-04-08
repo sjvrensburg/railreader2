@@ -1,12 +1,15 @@
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using RailReader.Core;
 using RailReader.Core.Models;
 using RailReader.Core.Services;
+using RailReader.Renderer.Skia;
 using RailReader2.ViewModels;
+using SkiaSharp;
 
 namespace RailReader2.Views;
 
@@ -25,6 +28,14 @@ public class SearchResultItem
     public string PostText { get; init; } = "";
 }
 
+public class PeekEntryViewModel
+{
+    public required string Label { get; init; }
+    public required string PageDisplay { get; init; }
+    public Bitmap? Thumbnail { get; set; }
+    public required PeekEntry Entry { get; init; }
+}
+
 public partial class OutlinePanel : UserControl
 {
     private MainWindowViewModel? _vm;
@@ -41,6 +52,7 @@ public partial class OutlinePanel : UserControl
         SearchInput.KeyDown += OnSearchKeyDown;
         CaseSensitiveToggle.IsCheckedChanged += OnSearchOptionChanged;
         RegexToggle.IsCheckedChanged += OnSearchOptionChanged;
+        PaneTabs.SelectionChanged += OnPaneTabChanged;
     }
 
     protected override void OnUnloaded(RoutedEventArgs e)
@@ -66,12 +78,15 @@ public partial class OutlinePanel : UserControl
         _searchCts?.Dispose();
         _searchCts = null;
 
+        UnsubscribePeekUpdates();
+
         // Unsubscribe constructor-level subscriptions
         DataContextChanged -= OnDataContextChanged;
         SearchInput.TextChanged -= OnSearchTextChanged;
         SearchInput.KeyDown -= OnSearchKeyDown;
         CaseSensitiveToggle.IsCheckedChanged -= OnSearchOptionChanged;
         RegexToggle.IsCheckedChanged -= OnSearchOptionChanged;
+        PaneTabs.SelectionChanged -= OnPaneTabChanged;
 
         base.OnUnloaded(e);
     }
@@ -99,6 +114,7 @@ public partial class OutlinePanel : UserControl
             UpdateOutlineSource();
             SyncOutlineToPage();
             UpdateBookmarkSource();
+            SubscribePeekUpdates();
         }
     }
 
@@ -119,6 +135,16 @@ public partial class OutlinePanel : UserControl
             UpdateOutlineSource();
             SyncOutlineToPage();
             UpdateBookmarkSource();
+
+            // Only reset peek state when the actual document changes (tab switch),
+            // not on every page navigation within the same document.
+            var newDoc = _vm?.Controller.ActiveDocument;
+            if (newDoc != _peekWatchedDoc)
+            {
+                SubscribePeekUpdates();
+                ClearThumbnailCache();
+                if (IsFiguresTabActive) RefreshPeekIndex();
+            }
         }
     }
 
@@ -206,15 +232,17 @@ public partial class OutlinePanel : UserControl
     }
 
     public bool IsBookmarksTabActive => PaneTabs.SelectedIndex == 1;
-    public bool IsSearchTabActive => PaneTabs.SelectedIndex == 2;
+    public bool IsFiguresTabActive => PaneTabs.SelectedIndex == 2;
+    public bool IsSearchTabActive => PaneTabs.SelectedIndex == 3;
     public bool IsSearchInputFocused => IsSearchTabActive && SearchInput.IsFocused;
 
     public void SwitchToOutlineTab() => PaneTabs.SelectedIndex = 0;
     public void SwitchToBookmarksTab() => PaneTabs.SelectedIndex = 1;
+    public void SwitchToFiguresTab() => PaneTabs.SelectedIndex = 2;
 
     public void SwitchToSearchTab()
     {
-        PaneTabs.SelectedIndex = 2;
+        PaneTabs.SelectedIndex = 3;
     }
 
     public void FocusSearch()
@@ -326,6 +354,235 @@ public partial class OutlinePanel : UserControl
 
         int index = bookmarks.IndexOf(bm);
         return index >= 0 ? (bm, index) : null;
+    }
+
+    private void OnPaneTabChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (IsFiguresTabActive)
+        {
+            SubscribePeekUpdates();
+            RefreshPeekIndex();
+        }
+    }
+
+    // --- Figures/Peek events ---
+
+    private DispatcherTimer? _peekDebounceTimer;
+    private DocumentState? _peekWatchedDoc;
+    private readonly Dictionary<int, Bitmap?> _thumbnailCache = [];
+    private readonly Dictionary<int, SKBitmap?> _pageThumbCache = [];
+    private bool _peekDirty;
+
+    private void SubscribePeekUpdates()
+    {
+        var doc = _vm?.Controller.ActiveDocument;
+        if (doc == _peekWatchedDoc) return;
+
+        if (_peekWatchedDoc is not null)
+            _peekWatchedDoc.AnalysisCacheUpdated -= OnAnalysisCacheUpdated;
+
+        _peekWatchedDoc = doc;
+
+        if (_peekWatchedDoc is not null)
+            _peekWatchedDoc.AnalysisCacheUpdated += OnAnalysisCacheUpdated;
+    }
+
+    private void UnsubscribePeekUpdates()
+    {
+        if (_peekWatchedDoc is not null)
+        {
+            _peekWatchedDoc.AnalysisCacheUpdated -= OnAnalysisCacheUpdated;
+            _peekWatchedDoc = null;
+        }
+        _peekDebounceTimer?.Stop();
+        ClearThumbnailCache();
+    }
+
+    private void OnAnalysisCacheUpdated()
+    {
+        if (!IsFiguresTabActive) return;
+
+        _peekDirty = true;
+
+        if (_peekDebounceTimer is null)
+        {
+            _peekDebounceTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+            _peekDebounceTimer.Tick += (_, _) =>
+            {
+                if (_peekDirty)
+                {
+                    _peekDirty = false;
+                    RefreshPeekIndex();
+                    // Keep timer running — if more results arrive, we'll refresh again
+                }
+                else
+                {
+                    // No new results since last refresh — stop polling
+                    _peekDebounceTimer.Stop();
+                }
+            };
+        }
+
+        // Start the timer if not already running — don't reset it
+        if (!_peekDebounceTimer.IsEnabled)
+            _peekDebounceTimer.Start();
+    }
+
+    private void RefreshPeekIndex()
+    {
+        var doc = _vm?.Controller.ActiveDocument;
+        if (doc is null)
+        {
+            PeekEntryList.ItemsSource = null;
+            PeekProgress.Text = "";
+            return;
+        }
+
+        var index = PeekIndexBuilder.Build(doc.AnalysisCache, doc.PageCount);
+        if (index.ScannedPages >= index.TotalPages)
+            PeekProgress.Text = $"All {index.TotalPages} pages scanned";
+        else if (doc.Rail.Active)
+            PeekProgress.Text = $"{index.ScannedPages} of {index.TotalPages} pages scanned (paused in rail mode)";
+        else
+            PeekProgress.Text = $"{index.ScannedPages} of {index.TotalPages} pages scanned";
+
+        var entries = new List<PeekEntryViewModel>();
+        bool showFigures = ShowFiguresToggle.IsChecked == true;
+        bool showTables = ShowTablesToggle.IsChecked == true;
+        bool showEquations = ShowEquationsToggle.IsChecked == true;
+
+        if (showFigures)
+            AddEntries(entries, index.Figures, "Figure");
+        if (showTables)
+            AddEntries(entries, index.Tables, "Table");
+        if (showEquations)
+            AddEntries(entries, index.Equations, "Equation");
+
+        // Sort by page, then reading order within page
+        entries.Sort((a, b) =>
+        {
+            int cmp = a.Entry.PageIndex.CompareTo(b.Entry.PageIndex);
+            return cmp != 0 ? cmp : a.Entry.BlockIndex.CompareTo(b.Entry.BlockIndex);
+        });
+
+        // Generate thumbnails before assigning to ItemsSource
+        GenerateThumbnails(entries, doc);
+
+        PeekEntryList.ItemsSource = entries;
+    }
+
+    private static void AddEntries(List<PeekEntryViewModel> list, IReadOnlyList<PeekEntry> entries, string category)
+    {
+        foreach (var entry in entries)
+        {
+            var className = LayoutConstants.LayoutClasses[entry.ClassId];
+            list.Add(new PeekEntryViewModel
+            {
+                Label = category,
+                PageDisplay = $"Page {entry.PageIndex + 1} \u2014 {className}",
+                Entry = entry,
+            });
+        }
+    }
+
+    private void GenerateThumbnails(List<PeekEntryViewModel> entries, DocumentState doc)
+    {
+        foreach (var vm in entries)
+        {
+            int cacheKey = vm.Entry.PageIndex * 10000 + vm.Entry.BlockIndex;
+            if (_thumbnailCache.TryGetValue(cacheKey, out var cached))
+            {
+                vm.Thumbnail = cached;
+                continue;
+            }
+
+            var thumb = CropBlockThumbnail(doc, vm.Entry);
+            _thumbnailCache[cacheKey] = thumb;
+            vm.Thumbnail = thumb;
+        }
+    }
+
+    /// <summary>
+    /// Gets or renders a page thumbnail SKBitmap, cached per page.
+    /// Avoids calling RenderThumbnail (PDFium) multiple times for the same page.
+    /// </summary>
+    private SKBitmap? GetPageThumb(DocumentState doc, int pageIndex)
+    {
+        if (_pageThumbCache.TryGetValue(pageIndex, out var cached))
+            return cached;
+
+        SKBitmap? result = null;
+        try
+        {
+            var rendered = doc.Pdf.RenderThumbnail(pageIndex);
+            if (rendered is SkiaRenderedPage skiaPage)
+            {
+                // Copy the bitmap so we own it (RenderThumbnail result may be disposed)
+                result = skiaPage.Bitmap.Copy();
+            }
+            rendered?.Dispose();
+        }
+        catch { }
+
+        _pageThumbCache[pageIndex] = result;
+        return result;
+    }
+
+    private Bitmap? CropBlockThumbnail(DocumentState doc, PeekEntry entry)
+    {
+        var bitmap = GetPageThumb(doc, entry.PageIndex);
+        if (bitmap is null) return null;
+
+        try
+        {
+            var (pageW, pageH) = doc.Pdf.GetPageSize(entry.PageIndex);
+            float scaleX = bitmap.Width / (float)pageW;
+            float scaleY = bitmap.Height / (float)pageH;
+
+            var cropRect = new SKRectI(
+                Math.Max(0, (int)(entry.BBox.X * scaleX)),
+                Math.Max(0, (int)(entry.BBox.Y * scaleY)),
+                Math.Min(bitmap.Width, (int)((entry.BBox.X + entry.BBox.W) * scaleX)),
+                Math.Min(bitmap.Height, (int)((entry.BBox.Y + entry.BBox.H) * scaleY)));
+
+            if (cropRect.Width <= 0 || cropRect.Height <= 0) return null;
+
+            using var cropped = new SKBitmap();
+            if (!bitmap.ExtractSubset(cropped, cropRect)) return null;
+
+            using var data = cropped.Encode(SKEncodedImageFormat.Png, 90);
+            if (data is null) return null;
+
+            using var stream = new MemoryStream(data.ToArray());
+            return new Bitmap(stream);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private void ClearThumbnailCache()
+    {
+        foreach (var bmp in _thumbnailCache.Values)
+            bmp?.Dispose();
+        _thumbnailCache.Clear();
+
+        foreach (var bmp in _pageThumbCache.Values)
+            bmp?.Dispose();
+        _pageThumbCache.Clear();
+    }
+
+    private void OnPeekFilterChanged(object? sender, RoutedEventArgs e)
+    {
+        RefreshPeekIndex();
+    }
+
+    private void OnPeekEntryClick(object? sender, RoutedEventArgs e)
+    {
+        if (_vm is null) return;
+        if (sender is not Button { DataContext: PeekEntryViewModel entry }) return;
+        _vm.GoToPage(entry.Entry.PageIndex);
     }
 
     // --- Search events ---

@@ -823,7 +823,12 @@ public sealed class DocumentController : IDisposable
         overlayChanged |= gotResults;
 
         if (!animating)
-            doc.SubmitPendingLookahead(_worker);
+        {
+            if (!doc.SubmitPendingLookahead(_worker)
+                && !doc.Rail.Active
+                && _worker is not null && _worker.IsIdle)
+                TrySubmitBackgroundReadAhead();
+        }
 
         // DPI bitmap swap
         if (doc.DpiRenderReady)
@@ -1024,6 +1029,50 @@ public sealed class DocumentController : IDisposable
             }
         }
         return (got, needsAnim);
+    }
+
+    /// <summary>
+    /// Returns true if any document has unanalysed pages remaining.
+    /// </summary>
+    public bool HasBackgroundAnalysisWork
+    {
+        get
+        {
+            for (int i = 0; i < Documents.Count; i++)
+            {
+                var doc = Documents[i];
+                if (!doc.IsDisposed && !doc.BackgroundQueue.IsExhausted)
+                    return true;
+            }
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Submits background analysis work when the lookahead queue is empty.
+    /// Active document gets priority; other tabs are served round-robin.
+    /// Can be called from the poll timer when the animation loop isn't running.
+    /// </summary>
+    public bool TrySubmitBackgroundReadAhead()
+    {
+        if (_worker is null) return false;
+
+        var active = ActiveDocument;
+
+        // Try active document first
+        if (active is not null && !active.IsDisposed
+            && active.SubmitBackgroundAnalysis(_worker))
+            return true;
+
+        // Then try other documents
+        for (int i = 0; i < Documents.Count; i++)
+        {
+            var doc = Documents[i];
+            if (doc == active || doc.IsDisposed) continue;
+            if (doc.SubmitBackgroundAnalysis(_worker))
+                return true;
+        }
+        return false;
     }
 
     // --- Query methods (for agent / headless use) ---
