@@ -85,7 +85,7 @@ Thin wrapper delegating all logic to `DocumentController`/`DocumentState` in Cor
 - `ViewModels/TabViewModel.cs` — `[ObservableProperty]` wrapper for `DocumentState` binding
 - `Views/MainWindow.axaml.cs` — keyboard shortcuts, state builders for composition layers, animation frame scheduling
 - `Views/CompositionLayerControl.cs` — generic base class for `CompositionCustomVisual`-backed layers (manages visual lifecycle, state/message dispatch)
-- `Views/` — layers (PdfPageLayer, RailOverlayLayer, AnnotationLayer, SearchHighlightLayer), dialogs (ConfirmUrlDialog, BookmarkNameDialog, etc.), panels
+- `Views/` — layers (PdfPageLayer, RailOverlayLayer, AnnotationLayer, SearchHighlightLayer), dialogs (ConfirmUrlDialog, BookmarkNameDialog, etc.), panels (OutlinePanel with Outline/Bookmarks/Figures/Search tabs)
 - `Controls/RadialMenu.cs` — Skia-rendered three-ring radial context menu (tools → thickness → colours) with Font Awesome icons
 
 **AXAML bindings**: `AvaloniaUseCompiledBindingsByDefault` is enabled — all bindings are compiled by default. Use `{x:Bind}`-style compiled bindings in AXAML files.
@@ -130,6 +130,8 @@ PDF → PDFium rasterises to `SKBitmap` at zoom-proportional DPI (150–600, cap
 ### Layout Analysis
 
 Page bitmap → BGRA-to-RGB → 800x800 rescale → CHW float tensor → PP-DocLayoutV3 ONNX → `[N,7]` tensor `[classId, confidence, xmin, ymin, xmax, ymax, readingOrder]` → confidence filter (0.4) → NMS (IoU 0.5) → sort by reading order → line detection per block. Pixmap prep runs on thread pool; inference on dedicated `AnalysisWorker` thread. Results cached per-tab in `DocumentState.AnalysisCache`.
+
+**Background read-ahead**: A dedicated `DispatcherTimer` (500ms) progressively analyses all pages when idle, scanning outward from the current page via `BackgroundAnalysisQueue`. Pauses during rail mode to avoid PDFium contention. Results never evicted from cache. The Figures tab in OutlinePanel (`Ctrl+Shift+I`) uses `PeekIndexBuilder` to surface detected figures, tables, and equations — showing thumbnails for visual blocks and extracted text (via `PageText.ExtractTextInRect`) for equations.
 
 **Fallback (model unavailable)**: Without the ONNX model, layout falls back to simple horizontal strip detection. Rail mode still activates but with basic fixed-height blocks instead of detected regions. Download the model via `./scripts/download-model.sh` for full functionality.
 

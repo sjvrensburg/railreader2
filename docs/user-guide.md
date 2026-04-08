@@ -18,11 +18,12 @@ Everything you need to know to get the most out of railreader2.
 10. [PDF Links](#pdf-links)
 11. [Text Selection](#text-selection)
 12. [Bookmarks](#bookmarks)
-13. [CLI Tool](#cli-tool)
-14. [Settings](#settings)
-15. [Troubleshooting](#troubleshooting)
-16. [Keyboard Shortcuts](#keyboard-shortcuts)
-17. [Removed Features](#removed-features)
+13. [Figures Panel](#figures-panel)
+14. [CLI Tool](#cli-tool)
+15. [Settings](#settings)
+16. [Troubleshooting](#troubleshooting)
+17. [Keyboard Shortcuts](#keyboard-shortcuts)
+18. [Removed Features](#removed-features)
 
 ---
 
@@ -71,7 +72,7 @@ Once a PDF is open, scroll through pages with `PgDn`/`PgUp`, zoom with `+`/`-` o
 
 Press `Ctrl+M` to toggle the **minimap** — a small page thumbnail in the corner. Click or drag on it to navigate.
 
-Press `Ctrl+Shift+O` to open the **outline panel** (table of contents). Click entries to jump to sections. Press `Ctrl+Shift+B` to open the **bookmarks panel** — see [Bookmarks](#bookmarks).
+Press `Ctrl+Shift+O` to open the **outline panel** (table of contents). Click entries to jump to sections. Press `Ctrl+Shift+B` to open the **bookmarks panel** — see [Bookmarks](#bookmarks). Press `Ctrl+Shift+I` to open the **figures panel** — a browsable index of all detected figures, tables, and equations in the document. See [Figures Panel](#figures-panel).
 
 ### Multi-tab
 
@@ -349,6 +350,25 @@ Bookmarks are stored in the same annotation file as highlights, notes, and other
 
 ---
 
+## Figures Panel
+
+Press `Ctrl+Shift+I` to open the **figures panel** — a browsable index of all figures, tables, and equations detected by the layout analysis model. The panel sits alongside the Outline, Bookmarks, and Search tabs in the sidebar.
+
+### How it works
+
+RailReader2 progressively analyses all pages in the background when idle. As pages are scanned, detected figures, tables, and equations appear in the panel. A progress indicator shows how many pages have been scanned (e.g., "12 of 20 pages scanned"). Background scanning pauses automatically during rail mode to avoid interfering with reading.
+
+### Browsing entries
+
+Each entry shows:
+
+- **Figures and tables** — a thumbnail crop of the detected region
+- **Equations** — the extracted text content from the PDF text layer (e.g., Unicode math symbols)
+
+Use the **Figures**, **Tables**, and **Equations** toggle buttons at the top to filter by category. Click any entry to navigate directly to that page.
+
+---
+
 ## CLI Tool
 
 RailReader2 ships a standalone headless CLI for automated PDF extraction. Download `railreader2-cli-linux-x64.tar.gz` (Linux) or `railreader2-cli-win-x64.zip` (Windows) from [GitHub Releases](https://github.com/sjvrensburg/railreader2/releases/latest), then extract the archive. On Linux, make the binary executable with `chmod +x RailReader2.Cli`.
@@ -497,6 +517,7 @@ The log is overwritten at the start of each session. Old `.log` files are automa
 | `Ctrl+M` | Toggle minimap |
 | `Ctrl+Shift+O` | Toggle outline panel |
 | `Ctrl+Shift+B` | Toggle bookmarks panel |
+| `Ctrl+Shift+I` | Toggle figures panel |
 | `Ctrl+G` | Go to page |
 | `F1` | Keyboard shortcuts dialog |
 | `F11` | Toggle fullscreen |

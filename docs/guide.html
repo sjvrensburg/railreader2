@@ -112,6 +112,7 @@
         <li><a href="#pdf-links">PDF Links</a></li>
         <li><a href="#text-selection">Text Selection</a></li>
         <li><a href="#bookmarks">Bookmarks</a></li>
+        <li><a href="#figures-panel">Figures Panel</a></li>
         <li><a href="#cli-tool">CLI Tool</a></li>
         <li><a href="#settings">Settings</a></li>
         <li><a href="#troubleshooting">Troubleshooting</a></li>
@@ -193,6 +194,9 @@
         Press <code>Ctrl+Shift+O</code> to open the <strong>outline panel</strong> (table of contents).
         Click entries to jump to sections. Press <code>Ctrl+Shift+B</code> to open the
         <strong>bookmarks panel</strong> &mdash; see <a href="#bookmarks">Bookmarks</a>.
+        Press <code>Ctrl+Shift+I</code> to open the <strong>figures panel</strong> &mdash;
+        a browsable index of all detected figures, tables, and equations with
+        thumbnails and extracted text. See <a href="#figures-panel">Figures Panel</a>.
       </p>
 
       <h3>Multi-tab</h3>
@@ -425,7 +429,7 @@
       <h2>Search</h2>
       <p>
         Press <code>Ctrl+F</code> to open the search panel in the sidebar. The search tab sits alongside
-        the Outline and Bookmarks tabs. Type your query &mdash; results appear automatically after a brief debounce.
+        the Outline, Bookmarks, and Figures tabs. Type your query &mdash; results appear automatically after a brief debounce.
       </p>
 
       <figure class="guide-screenshot">
@@ -637,6 +641,34 @@
       </p>
     </section>
 
+    <!-- Figures Panel -->
+    <section class="guide-section" id="figures-panel">
+      <h2>Figures Panel</h2>
+      <p>
+        Press <code>Ctrl+Shift+I</code> to open the <strong>figures panel</strong> &mdash;
+        a browsable index of all figures, tables, and equations detected by the layout analysis model.
+        The panel sits alongside the Outline, Bookmarks, and Search tabs in the sidebar.
+      </p>
+
+      <h3>Background scanning</h3>
+      <p>
+        RailReader2 progressively analyses all pages in the background when idle.
+        As pages are scanned, detected figures, tables, and equations appear in the panel.
+        A progress indicator shows how many pages have been scanned
+        (e.g., &ldquo;12 of 20 pages scanned&rdquo;). Background scanning pauses automatically
+        during rail mode to avoid interfering with reading.
+      </p>
+
+      <h3>Browsing entries</h3>
+      <p>
+        Each entry shows a thumbnail crop for figures and tables, or extracted text content
+        for equations (Unicode math symbols from the PDF text layer).
+        Use the <strong>Figures</strong>, <strong>Tables</strong>, and <strong>Equations</strong>
+        toggle buttons at the top to filter by category. Click any entry to navigate directly
+        to that page.
+      </p>
+    </section>
+
     <!-- CLI Tool -->
     <section class="guide-section" id="cli-tool">
       <h2>CLI Tool</h2>
@@ -824,6 +856,7 @@ railreader2-cli annotations paper.pdf --format pdf --output paper.annotated.pdf<
           <tr><td>Ctrl+M</td><td>Toggle minimap</td></tr>
           <tr><td>Ctrl+Shift+O</td><td>Toggle outline panel</td></tr>
           <tr><td>Ctrl+Shift+B</td><td>Toggle bookmarks panel</td></tr>
+          <tr><td>Ctrl+Shift+I</td><td>Toggle figures panel</td></tr>
           <tr><td>Ctrl+G</td><td>Go to page</td></tr>
           <tr><td>F1</td><td>Keyboard shortcuts dialog</td></tr>
           <tr><td>F11</td><td>Toggle fullscreen</td></tr>

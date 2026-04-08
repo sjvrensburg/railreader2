@@ -80,6 +80,79 @@
             </DockPanel>
         </TabItem>
 
+        <!-- Figures tab -->
+        <TabItem Header="Figures">
+            <DockPanel>
+                <!-- Category filter toggles -->
+                <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="4" Margin="4">
+                    <ToggleButton Name="ShowFiguresToggle"
+                                  Content="Figures"
+                                  IsChecked="True"
+                                  Width="60" Height="26"
+                                  HorizontalContentAlignment="Center"
+                                  VerticalContentAlignment="Center"
+                                  Padding="0"
+                                  IsCheckedChanged="OnPeekFilterChanged" />
+                    <ToggleButton Name="ShowTablesToggle"
+                                  Content="Tables"
+                                  IsChecked="True"
+                                  Width="60" Height="26"
+                                  HorizontalContentAlignment="Center"
+                                  VerticalContentAlignment="Center"
+                                  Padding="0"
+                                  IsCheckedChanged="OnPeekFilterChanged" />
+                    <ToggleButton Name="ShowEquationsToggle"
+                                  Content="Equations"
+                                  IsChecked="True"
+                                  Width="70" Height="26"
+                                  HorizontalContentAlignment="Center"
+                                  VerticalContentAlignment="Center"
+                                  Padding="0"
+                                  IsCheckedChanged="OnPeekFilterChanged" />
+                </StackPanel>
+
+                <!-- Progress indicator -->
+                <TextBlock Name="PeekProgress" DockPanel.Dock="Top"
+                           Margin="6,2" Opacity="0.6" />
+
+                <!-- Scrollable list of entries -->
+                <ScrollViewer>
+                    <ItemsControl Name="PeekEntryList">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="v:PeekEntryViewModel">
+                                <Button Click="OnPeekEntryClick"
+                                        HorizontalAlignment="Stretch"
+                                        HorizontalContentAlignment="Stretch"
+                                        Margin="2,1" Padding="4">
+                                    <DockPanel>
+                                        <!-- Thumbnail for figures/tables -->
+                                        <Image DockPanel.Dock="Left" Width="80" Height="60"
+                                               Stretch="Uniform"
+                                               Source="{Binding Thumbnail}"
+                                               IsVisible="{Binding HasThumbnail}"
+                                               Margin="0,0,8,0" />
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding Label}" FontWeight="SemiBold"
+                                                       TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Text="{Binding PageDisplay}" Opacity="0.6" />
+                                            <!-- Extracted text for equations -->
+                                            <TextBlock Text="{Binding ExtractedText}"
+                                                       IsVisible="{Binding HasExtractedText}"
+                                                       Opacity="0.8"
+                                                       TextWrapping="Wrap"
+                                                       MaxLines="3"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       Margin="0,2,0,0" />
+                                        </StackPanel>
+                                    </DockPanel>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </DockPanel>
+        </TabItem>
+
         <!-- Search tab -->
         <TabItem Header="Search">
             <DockPanel>

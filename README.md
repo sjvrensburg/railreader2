@@ -92,7 +92,7 @@ At high zoom levels, navigation switches to "rail mode" — the viewer locks ont
 
 - **Multi-tab support** — open multiple PDFs with independent per-tab state. Right-click a tab to duplicate or close
 - **Tab bar overflow** — tabs shrink with ellipsis when many are open. Horizontal mouse wheel scrolls the tab bar. Overflow dropdown button lists all tabs
-- **Outline and bookmarks panel** — tabbed pane with table of contents and named bookmarks (Ctrl+Shift+O for outline, Ctrl+Shift+B for bookmarks)
+- **Outline, bookmarks, and figures panel** — tabbed sidebar with table of contents (Ctrl+Shift+O), named bookmarks (Ctrl+Shift+B), and a figures/tables/equations browser (Ctrl+Shift+I) with thumbnails and extracted equation text
 - **Named bookmarks** — bookmark any page with a custom name (B key or + button in the bookmarks pane). Navigate to bookmarks with a single click. Rename and delete inline. "Back to previous location" button for quick return after jumping. Bookmarks persist in the annotation sidecar file
 - **Interactive minimap** — click or drag to navigate the page
 - **On-screen nav buttons** — ◀/▶ buttons in the status bar for mouse-only page navigation
@@ -227,6 +227,7 @@ Run `railreader2-cli --help` or `railreader2-cli <command> --help` for all optio
 | Shift+[ / Shift+] | Adjust blur intensity (rail mode) |
 | D (shift) | Toggle debug overlay (shows detected blocks) |
 | Ctrl+Shift+B | Toggle bookmarks pane |
+| Ctrl+Shift+I | Toggle figures panel |
 | Ctrl+F | Open search panel |
 | F3 / Shift+F3 | Next / previous search match |
 | Right-click | Open annotation radial menu |

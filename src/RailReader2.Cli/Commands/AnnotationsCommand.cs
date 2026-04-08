@@ -89,7 +89,7 @@ public static class AnnotationsCommand
                     var annBounds = AnnotationGeometry.GetAnnotationBounds(ann);
 
                     if (includeText && pageText != null && annBounds is { } textRect)
-                        annOutput.Text = Shared.ExtractTextInRect(pageText, textRect.Left, textRect.Top, textRect.Right, textRect.Bottom);
+                        annOutput.Text = pageText.ExtractTextInRect(textRect.Left, textRect.Top, textRect.Right, textRect.Bottom);
 
                     if (includeBlocks && analysis != null && annBounds is { } blockRect)
                     {
@@ -108,7 +108,7 @@ public static class AnnotationsCommand
                                 };
 
                                 if (includeText && pageText != null)
-                                    blockOutput.Text = Shared.ExtractBlockText(pageText, block);
+                                    blockOutput.Text = pageText.ExtractBlockText(block);
 
                                 annOutput.OverlappingBlocks.Add(blockOutput);
                             }

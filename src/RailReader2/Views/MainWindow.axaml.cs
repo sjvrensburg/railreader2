@@ -494,6 +494,7 @@ public partial class MainWindow : Window
         {
             case Key.O when shift:
                 if (vm.ShowOutline && !OutlinePanel.IsBookmarksTabActive
+                    && !OutlinePanel.IsFiguresTabActive
                     && !OutlinePanel.IsSearchTabActive)
                     vm.ShowOutline = false;
                 else
@@ -509,6 +510,15 @@ public partial class MainWindow : Window
                 {
                     vm.ShowOutline = true;
                     OutlinePanel.SwitchToBookmarksTab();
+                }
+                e.Handled = true; return true;
+            case Key.I when shift:
+                if (vm.ShowOutline && OutlinePanel.IsFiguresTabActive)
+                    vm.ShowOutline = false;
+                else
+                {
+                    vm.ShowOutline = true;
+                    OutlinePanel.SwitchToFiguresTab();
                 }
                 e.Handled = true; return true;
             case Key.O:

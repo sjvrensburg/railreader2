@@ -19,6 +19,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     private readonly ILogger _logger;
     private Window? _window;
     private DispatcherTimer? _pollTimer;
+    private DispatcherTimer? _backgroundTimer;
     private InvalidationCallbacks? _invalidation;
     private bool _animationRequested;
 
@@ -191,6 +192,40 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             bool workerBusy = _controller.Worker is not null && !_controller.Worker.IsIdle;
             if (!workerBusy) _pollTimer?.Stop();
         };
+
+        // Separate low-frequency timer for background analysis.
+        // Runs independently of the animation loop to avoid interfering with
+        // zoom/scroll performance. Polls at 500ms — fast enough to keep
+        // the pipeline fed, slow enough to be invisible.
+        _backgroundTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
+        _backgroundTimer.Tick += (_, _) =>
+        {
+            if (_controller.Worker is null) return;
+
+            // Poll results even if no animation frame is running
+            var (gotResults, _) = _controller.PollAnalysisResults();
+            if (gotResults)
+                InvalidateOverlay();
+
+            bool hasWork = _controller.HasBackgroundAnalysisWork;
+            bool railActive = _controller.ActiveDocument?.Rail.Active == true;
+            if (!railActive && _controller.Worker.IsIdle && hasWork)
+                _controller.TrySubmitBackgroundReadAhead();
+
+            if (!hasWork)
+                _backgroundTimer?.Stop();
+        };
+    }
+
+    /// <summary>
+    /// Start the background analysis timer if there's work to do.
+    /// Called after adding a document.
+    /// </summary>
+    public void StartBackgroundAnalysis()
+    {
+        if (_backgroundTimer is not null && !_backgroundTimer.IsEnabled
+            && _controller.HasBackgroundAnalysisWork)
+            _backgroundTimer.Start();
     }
 
     private void OnAnimationFrame(TimeSpan frameTime)
