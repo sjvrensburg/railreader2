@@ -10,9 +10,14 @@ public static class LayoutConstants
     public const int MinLineHeightPx = 3;
 
     // Frequently referenced class indices (must match LayoutClasses order below)
+    public const int ClassChart = 3;
     public const int ClassDisplayFormula = 5;
     public const int ClassDocTitle = 6;
+    public const int ClassFooterImage = 9;
+    public const int ClassHeaderImage = 13;
+    public const int ClassImage = 14;
     public const int ClassParagraphTitle = 17;
+    public const int ClassTable = 21;
 
     // PP-DocLayoutV3 official label list (25 classes, alphabetical order)
     // Source: https://huggingface.co/PaddlePaddle/PP-DocLayoutV3 inference.yml

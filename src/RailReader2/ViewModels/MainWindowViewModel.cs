@@ -207,13 +207,12 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             if (gotResults)
                 InvalidateOverlay();
 
-            // Don't submit background work while the user is in rail mode —
-            // PDFium pixmap renders compete with DPI upgrades and cause stutter.
+            bool hasWork = _controller.HasBackgroundAnalysisWork;
             bool railActive = _controller.ActiveDocument?.Rail.Active == true;
-            if (!railActive && _controller.Worker.IsIdle && _controller.HasBackgroundAnalysisWork)
+            if (!railActive && _controller.Worker.IsIdle && hasWork)
                 _controller.TrySubmitBackgroundReadAhead();
 
-            if (!_controller.HasBackgroundAnalysisWork)
+            if (!hasWork)
                 _backgroundTimer?.Stop();
         };
     }

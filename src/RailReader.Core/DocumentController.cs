@@ -1041,7 +1041,7 @@ public sealed class DocumentController : IDisposable
             for (int i = 0; i < Documents.Count; i++)
             {
                 var doc = Documents[i];
-                if (!doc.IsDisposed && !doc.BackgroundQueue.IsExhausted)
+                if (!doc.IsDisposed && doc.HasPendingBackgroundWork)
                     return true;
             }
             return false;
@@ -1059,12 +1059,10 @@ public sealed class DocumentController : IDisposable
 
         var active = ActiveDocument;
 
-        // Try active document first
         if (active is not null && !active.IsDisposed
             && active.SubmitBackgroundAnalysis(_worker))
             return true;
 
-        // Then try other documents
         for (int i = 0; i < Documents.Count; i++)
         {
             var doc = Documents[i];

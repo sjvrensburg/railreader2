@@ -9,11 +9,7 @@ public sealed class PeekEntry
     public required int BlockIndex { get; init; }
     public required int ClassId { get; init; }
     public required BBox BBox { get; init; }
-    public required float Confidence { get; init; }
 }
-
-/// <summary>Category grouping for peek entries.</summary>
-public enum PeekCategory { Figures, Tables, Equations }
 
 /// <summary>
 /// Index of all detected figures, tables, and equations across scanned pages.

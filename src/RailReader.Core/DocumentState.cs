@@ -111,6 +111,9 @@ public sealed class DocumentState : IDisposable
     /// <summary>Number of pages with cached analysis results.</summary>
     public int AnalysedPageCount => _analysisCache.Count;
 
+    /// <summary>Whether this document has unanalysed pages remaining.</summary>
+    public bool HasPendingBackgroundWork => !BackgroundQueue.IsExhausted;
+
     /// <summary>Fires on the UI thread when a new page analysis result is cached.</summary>
     public event Action? AnalysisCacheUpdated;
 
@@ -322,7 +325,6 @@ public sealed class DocumentState : IDisposable
     public void QueueLookahead(int count)
     {
         PendingAnalysis.Clear();
-        // Only reset background queue if there are uncached pages to analyse
         if (_analysisCache.Count < PageCount)
             BackgroundQueue.Reset(CurrentPage);
         for (int i = 1; i <= count; i++)

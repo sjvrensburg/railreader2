@@ -39,43 +39,35 @@ internal sealed class BackgroundAnalysisQueue
 
     /// <summary>
     /// Returns the next page to analyse, or null if all pages are covered.
-    /// Alternates forward/backward from the scan origin, skipping cached/in-flight pages.
+    /// Tries forward first, then backward, skipping cached/in-flight pages.
     /// </summary>
     public int? TryGetNext(IReadOnlyDictionary<int, PageAnalysis> cache,
         Func<int, bool> isInFlight)
     {
-        // Try forward first, then backward, alternating until both exhausted
-        for (int attempts = 0; attempts < _pageCount; attempts++)
+        if (!_forwardExhausted)
         {
-            // Prefer forward on even attempts, backward on odd
-            bool tryForward = (attempts % 2 == 0) ? !_forwardExhausted : _forwardExhausted;
-            if (_forwardExhausted && _backwardExhausted)
-                return null;
+            while (_nextForward < _pageCount)
+            {
+                int page = _nextForward++;
+                if (_nextForward >= _pageCount)
+                    _forwardExhausted = true;
+                if (!cache.ContainsKey(page) && !isInFlight(page))
+                    return page;
+            }
+            _forwardExhausted = true;
+        }
 
-            if (tryForward && !_forwardExhausted)
+        if (!_backwardExhausted)
+        {
+            while (_nextBackward >= 0)
             {
-                while (_nextForward < _pageCount)
-                {
-                    int page = _nextForward++;
-                    if (_nextForward >= _pageCount)
-                        _forwardExhausted = true;
-                    if (!cache.ContainsKey(page) && !isInFlight(page))
-                        return page;
-                }
-                _forwardExhausted = true;
+                int page = _nextBackward--;
+                if (_nextBackward < 0)
+                    _backwardExhausted = true;
+                if (!cache.ContainsKey(page) && !isInFlight(page))
+                    return page;
             }
-            else if (!_backwardExhausted)
-            {
-                while (_nextBackward >= 0)
-                {
-                    int page = _nextBackward--;
-                    if (_nextBackward < 0)
-                        _backwardExhausted = true;
-                    if (!cache.ContainsKey(page) && !isInFlight(page))
-                        return page;
-                }
-                _backwardExhausted = true;
-            }
+            _backwardExhausted = true;
         }
 
         return null;

@@ -8,9 +8,15 @@ namespace RailReader.Core.Services;
 /// </summary>
 public static class PeekIndexBuilder
 {
-    private static readonly HashSet<int> FigureClasses = [3, 9, 13, 14]; // chart, footer_image, header_image, image
-    private static readonly HashSet<int> TableClasses = [21];            // table
-    private static readonly HashSet<int> EquationClasses = [5];          // display_formula
+    private static readonly HashSet<int> FigureClasses =
+    [
+        LayoutConstants.ClassChart,
+        LayoutConstants.ClassFooterImage,
+        LayoutConstants.ClassHeaderImage,
+        LayoutConstants.ClassImage,
+    ];
+    private static readonly HashSet<int> TableClasses = [LayoutConstants.ClassTable];
+    private static readonly HashSet<int> EquationClasses = [LayoutConstants.ClassDisplayFormula];
 
     public static PeekIndex Build(IReadOnlyDictionary<int, PageAnalysis> cache, int pageCount)
     {
@@ -55,6 +61,5 @@ public static class PeekIndexBuilder
             BlockIndex = blockIndex,
             ClassId = block.ClassId,
             BBox = block.BBox,
-            Confidence = block.Confidence,
         };
 }
