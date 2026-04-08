@@ -38,7 +38,7 @@
             </Grid>
 
             <TextBlock Text="View" FontWeight="Bold" />
-            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" Margin="8,0">
+            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" Margin="8,0">
                 <TextBlock Grid.Row="0" Grid.Column="0" Text="+ / =" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
                 <TextBlock Grid.Row="0" Grid.Column="1" Text="Zoom in" Margin="0,2" />
                 <TextBlock Grid.Row="1" Grid.Column="0" Text="-" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
@@ -47,14 +47,16 @@
                 <TextBlock Grid.Row="2" Grid.Column="1" Text="Fit page" Margin="0,2" />
                 <TextBlock Grid.Row="3" Grid.Column="0" Text="Ctrl+Shift+O" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
                 <TextBlock Grid.Row="3" Grid.Column="1" Text="Toggle outline" Margin="0,2" />
-                <TextBlock Grid.Row="4" Grid.Column="0" Text="Ctrl+M" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
-                <TextBlock Grid.Row="4" Grid.Column="1" Text="Toggle minimap" Margin="0,2" />
-                <TextBlock Grid.Row="5" Grid.Column="0" Text="F11" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
-                <TextBlock Grid.Row="5" Grid.Column="1" Text="Toggle fullscreen" Margin="0,2" />
-                <TextBlock Grid.Row="6" Grid.Column="0" Text="Ctrl+," FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
-                <TextBlock Grid.Row="6" Grid.Column="1" Text="Settings" Margin="0,2" />
-                <TextBlock Grid.Row="7" Grid.Column="0" Text="Shift+D" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
-                <TextBlock Grid.Row="7" Grid.Column="1" Text="Toggle debug overlay" Margin="0,2" />
+                <TextBlock Grid.Row="4" Grid.Column="0" Text="Ctrl+Shift+I" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="4" Grid.Column="1" Text="Toggle figures panel" Margin="0,2" />
+                <TextBlock Grid.Row="5" Grid.Column="0" Text="Ctrl+M" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="5" Grid.Column="1" Text="Toggle minimap" Margin="0,2" />
+                <TextBlock Grid.Row="6" Grid.Column="0" Text="F11" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="6" Grid.Column="1" Text="Toggle fullscreen" Margin="0,2" />
+                <TextBlock Grid.Row="7" Grid.Column="0" Text="Ctrl+," FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="7" Grid.Column="1" Text="Settings" Margin="0,2" />
+                <TextBlock Grid.Row="8" Grid.Column="0" Text="Shift+D" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="8" Grid.Column="1" Text="Toggle debug overlay" Margin="0,2" />
             </Grid>
 
             <TextBlock Text="Search" FontWeight="Bold" />
