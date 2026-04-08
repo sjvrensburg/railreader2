@@ -23,28 +23,10 @@ internal static class Shared
     };
 
     internal static string? ExtractTextInRect(PageText pageText, float left, float top, float right, float bottom)
-    {
-        var chars = new List<(int Index, char Ch)>();
-        foreach (var cb in pageText.CharBoxes)
-        {
-            float midX = (cb.Left + cb.Right) / 2f;
-            float midY = (cb.Top + cb.Bottom) / 2f;
-            if (midX >= left && midX <= right && midY >= top && midY <= bottom
-                && cb.Index >= 0 && cb.Index < pageText.Text.Length)
-            {
-                chars.Add((cb.Index, pageText.Text[cb.Index]));
-            }
-        }
-        if (chars.Count == 0) return null;
-        chars.Sort((a, b) => a.Index.CompareTo(b.Index));
-        return new string(chars.Select(c => c.Ch).ToArray()).Trim();
-    }
+        => pageText.ExtractTextInRect(left, top, right, bottom);
 
     internal static string ExtractBlockText(PageText pageText, LayoutBlock block)
-    {
-        var bbox = block.BBox;
-        return ExtractTextInRect(pageText, bbox.X, bbox.Y, bbox.X + bbox.W, bbox.Y + bbox.H) ?? "";
-    }
+        => pageText.ExtractBlockText(block);
 
     /// <summary>
     /// Creates a LayoutAnalyzer if the ONNX model is available.

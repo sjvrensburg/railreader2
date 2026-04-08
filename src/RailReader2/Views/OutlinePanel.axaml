@@ -113,7 +113,7 @@
 
                 <!-- Progress indicator -->
                 <TextBlock Name="PeekProgress" DockPanel.Dock="Top"
-                           Margin="6,2" Opacity="0.6" FontSize="11" />
+                           Margin="6,2" Opacity="0.6" />
 
                 <!-- Scrollable list of entries -->
                 <ScrollViewer>
@@ -125,14 +125,24 @@
                                         HorizontalContentAlignment="Stretch"
                                         Margin="2,1" Padding="4">
                                     <DockPanel>
+                                        <!-- Thumbnail for figures/tables -->
                                         <Image DockPanel.Dock="Left" Width="80" Height="60"
                                                Stretch="Uniform"
                                                Source="{Binding Thumbnail}"
+                                               IsVisible="{Binding HasThumbnail}"
                                                Margin="0,0,8,0" />
                                         <StackPanel VerticalAlignment="Center">
                                             <TextBlock Text="{Binding Label}" FontWeight="SemiBold"
                                                        TextTrimming="CharacterEllipsis" />
-                                            <TextBlock Text="{Binding PageDisplay}" FontSize="11" Opacity="0.6" />
+                                            <TextBlock Text="{Binding PageDisplay}" Opacity="0.6" />
+                                            <!-- Extracted text for equations -->
+                                            <TextBlock Text="{Binding ExtractedText}"
+                                                       IsVisible="{Binding HasExtractedText}"
+                                                       Opacity="0.8"
+                                                       TextWrapping="Wrap"
+                                                       MaxLines="3"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       Margin="0,2,0,0" />
                                         </StackPanel>
                                     </DockPanel>
                                 </Button>

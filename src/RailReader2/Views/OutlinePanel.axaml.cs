@@ -33,6 +33,9 @@ public class PeekEntryViewModel
     public required string Label { get; init; }
     public required string PageDisplay { get; init; }
     public Bitmap? Thumbnail { get; set; }
+    public string? ExtractedText { get; set; }
+    public bool HasThumbnail => Thumbnail is not null;
+    public bool HasExtractedText => ExtractedText is not null;
     public required PeekEntry Entry { get; init; }
 }
 
@@ -371,6 +374,7 @@ public partial class OutlinePanel : UserControl
     private DocumentState? _peekWatchedDoc;
     private readonly Dictionary<int, Bitmap?> _thumbnailCache = [];
     private readonly Dictionary<int, SKBitmap?> _pageThumbCache = [];
+    private readonly Dictionary<int, string?> _textCache = [];
     private bool _peekDirty;
 
     private void SubscribePeekUpdates()
@@ -485,11 +489,27 @@ public partial class OutlinePanel : UserControl
         }
     }
 
+    private static readonly HashSet<int> EquationClassIds =
+        [LayoutConstants.ClassDisplayFormula];
+
     private void GenerateThumbnails(List<PeekEntryViewModel> entries, DocumentState doc)
     {
         foreach (var vm in entries)
         {
             int cacheKey = vm.Entry.PageIndex * 10000 + vm.Entry.BlockIndex;
+
+            // For equations, extract text from the PDF text layer instead of thumbnails
+            if (EquationClassIds.Contains(vm.Entry.ClassId))
+            {
+                if (!_textCache.TryGetValue(cacheKey, out var cachedText))
+                {
+                    cachedText = ExtractBlockText(doc, vm.Entry);
+                    _textCache[cacheKey] = cachedText;
+                }
+                vm.ExtractedText = cachedText;
+                continue;
+            }
+
             if (_thumbnailCache.TryGetValue(cacheKey, out var cached))
             {
                 vm.Thumbnail = cached;
@@ -500,6 +520,13 @@ public partial class OutlinePanel : UserControl
             _thumbnailCache[cacheKey] = thumb;
             vm.Thumbnail = thumb;
         }
+    }
+
+    private static string? ExtractBlockText(DocumentState doc, PeekEntry entry)
+    {
+        var pageText = doc.PdfText.ExtractPageText(doc.Pdf.PdfBytes, entry.PageIndex);
+        var bbox = entry.BBox;
+        return pageText.ExtractTextInRect(bbox.X, bbox.Y, bbox.X + bbox.W, bbox.Y + bbox.H);
     }
 
     /// <summary>
@@ -567,6 +594,7 @@ public partial class OutlinePanel : UserControl
         foreach (var bmp in _thumbnailCache.Values)
             bmp?.Dispose();
         _thumbnailCache.Clear();
+        _textCache.Clear();
 
         foreach (var bmp in _pageThumbCache.Values)
             bmp?.Dispose();
