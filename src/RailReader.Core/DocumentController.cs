@@ -474,6 +474,10 @@ public sealed class DocumentController : IDisposable
         int step = forward ? 1 : -1;
         int targetPage = doc.CurrentPage + step;
 
+        // Preserve vertical bias across page transitions so the line stays
+        // at the same screen position instead of snapping to center.
+        double savedBias = doc.Rail.VerticalBias;
+
         while (targetPage >= 0 && targetPage < doc.PageCount)
         {
             // Fast path: skip cached pages with no navigable blocks without rasterizing
@@ -498,7 +502,7 @@ public sealed class DocumentController : IDisposable
             {
                 doc.PendingSkip = null;
                 doc.QueueLookahead(_config.AnalysisLookaheadPages);
-                if (!forward) doc.Rail.JumpToEnd();
+                ApplySkipLanding(doc, forward, savedBias);
                 doc.StartSnap(ww, wh);
                 if (skipped > 0) NotifyPagesSkipped(skipped);
                 return SkipResult.FoundNavigable;
@@ -506,7 +510,7 @@ public sealed class DocumentController : IDisposable
 
             if (doc.PendingRailSetup)
             {
-                doc.PendingSkip = new(forward, skipped);
+                doc.PendingSkip = new(forward, skipped, savedBias);
                 doc.QueueLookahead(_config.AnalysisLookaheadPages);
                 return SkipResult.Deferred;
             }
@@ -534,6 +538,12 @@ public sealed class DocumentController : IDisposable
             : $"Skipped {count} pages (no text blocks)");
     }
 
+    private static void ApplySkipLanding(DocumentState doc, bool forward, double savedBias)
+    {
+        if (!forward) doc.Rail.JumpToEnd();
+        doc.Rail.VerticalBias = savedBias;
+    }
+
     /// <summary>
     /// Resume a deferred skip after analysis arrived with no navigable blocks.
     /// Called from <see cref="PollAnalysisResults"/>.
@@ -541,7 +551,7 @@ public sealed class DocumentController : IDisposable
     private bool TryResumeSkip(DocumentState doc, double ww, double wh)
     {
         var skip = doc.PendingSkip!;
-        // The current page (whose analysis just arrived with no blocks) counts as skipped
+        doc.Rail.VerticalBias = skip.SavedVerticalBias;
         return SkipToNavigablePage(doc, skip.Forward, skip.Skipped + 1, ww, wh) == SkipResult.FoundNavigable;
     }
 
@@ -997,6 +1007,8 @@ public sealed class DocumentController : IDisposable
                     _logger.Debug($"[Analysis] Rail has {doc.Rail.NavigableCount} navigable blocks, Active={doc.Rail.Active}");
                     if (doc.Rail.Active)
                     {
+                        if (doc.PendingSkip is { } pendingSkip)
+                            ApplySkipLanding(doc, pendingSkip.Forward, pendingSkip.SavedVerticalBias);
                         doc.PendingSkip = null;
                         doc.StartSnap(ww, wh);
                         needsAnim = true;
