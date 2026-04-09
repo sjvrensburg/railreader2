@@ -74,6 +74,10 @@ public partial class SettingsWindow : Window
         BuildClassCheckboxes(_centeringClassItems, c.CenteringClasses,
             set => { vm.Config.CenteringClasses = set; vm.OnConfigChanged(); },
             CenteringClassesList);
+
+        VlmEndpoint.Text = c.VlmEndpoint ?? "";
+        VlmModelName.Text = c.VlmModel ?? "";
+        VlmApiKey.Text = c.VlmApiKey ?? "";
     }
 
     private void SaveToConfig()
@@ -94,6 +98,9 @@ public partial class SettingsWindow : Window
         c.AutoScrollHeaderPauseMs = (double)(AutoScrollHeaderPause.Value ?? 600m);
         c.AutoScrollTriggerDelayMs = (double)(AutoScrollTriggerDelay.Value ?? 2000m);
         c.JumpPercentage = (double)(JumpPercentage.Value ?? 25m);
+        c.VlmEndpoint = string.IsNullOrWhiteSpace(VlmEndpoint.Text) ? null : VlmEndpoint.Text.Trim();
+        c.VlmModel = string.IsNullOrWhiteSpace(VlmModelName.Text) ? null : VlmModelName.Text.Trim();
+        c.VlmApiKey = string.IsNullOrWhiteSpace(VlmApiKey.Text) ? null : VlmApiKey.Text.Trim();
         vm.OnConfigChanged();
     }
 
@@ -240,9 +247,43 @@ public partial class SettingsWindow : Window
         vm.Config.LineHighlightEnabled = defaults.LineHighlightEnabled;
         vm.Config.LineHighlightTint = defaults.LineHighlightTint;
         vm.Config.LineHighlightOpacity = defaults.LineHighlightOpacity;
+        vm.Config.VlmEndpoint = defaults.VlmEndpoint;
+        vm.Config.VlmModel = defaults.VlmModel;
+        vm.Config.VlmApiKey = defaults.VlmApiKey;
         _loading = true;
         LoadFromConfig();
         _loading = false;
         vm.OnConfigChanged();
+    }
+
+    private void OnVlmTextChanged(object? sender, TextChangedEventArgs e) => SaveToConfig();
+
+    private async void OnTestVlmConnection(object? sender, RoutedEventArgs e)
+    {
+        SaveToConfig();
+        var config = Vm?.Config;
+        if (config is null) return;
+
+        if (string.IsNullOrWhiteSpace(config.VlmEndpoint))
+        {
+            VlmTestResult.Text = "Enter an endpoint URL first.";
+            return;
+        }
+
+        VlmTestResult.Text = "Testing...";
+        TestVlmButton.IsEnabled = false;
+        try
+        {
+            var result = await VlmService.TestConnectionAsync(config);
+            VlmTestResult.Text = result ?? "Connection successful!";
+        }
+        catch (Exception ex)
+        {
+            VlmTestResult.Text = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            TestVlmButton.IsEnabled = true;
+        }
     }
 }

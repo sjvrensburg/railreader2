@@ -19,11 +19,12 @@ Everything you need to know to get the most out of railreader2.
 11. [Text Selection](#text-selection)
 12. [Bookmarks](#bookmarks)
 13. [Figures Panel](#figures-panel)
-14. [CLI Tool](#cli-tool)
-15. [Settings](#settings)
-16. [Troubleshooting](#troubleshooting)
-17. [Keyboard Shortcuts](#keyboard-shortcuts)
-18. [Removed Features](#removed-features)
+14. [Copy as LaTeX (VLM)](#copy-as-latex-vlm)
+15. [CLI Tool](#cli-tool)
+16. [Settings](#settings)
+17. [Troubleshooting](#troubleshooting)
+18. [Keyboard Shortcuts](#keyboard-shortcuts)
+19. [Removed Features](#removed-features)
 
 ---
 
@@ -369,6 +370,36 @@ Use the **Figures**, **Tables**, and **Equations** toggle buttons at the top to 
 
 ---
 
+## Copy as LaTeX (VLM)
+
+Press `Ctrl+L` to send the current rail block to a Vision Language Model and copy the result to the clipboard. The action adapts to the block type:
+
+- **Equations** → copied as LaTeX
+- **Tables** → copied as Markdown
+- **Figures** → copied as a brief description
+
+You can also `Ctrl+right-click` any detected block to open a context menu with **Copy as LaTeX**, **Copy as Markdown**, **Copy Description**, and **Copy Image** options.
+
+### Setup
+
+Open **Settings > VLM** and configure:
+
+- **Endpoint** — the URL of an OpenAI-compatible API (e.g., `http://localhost:11434/v1` for Ollama)
+- **Model** — the model name (e.g., `qwen2.5-vl:7b`, `lightonai/LightOnOCR-2-1B`, `gpt-4o`)
+- **API Key** — leave blank for local endpoints that don't require authentication
+
+Use the **Test Connection** button to verify your setup. The API key is stored locally in your config file.
+
+### Recommended models
+
+- **Cloud (OpenAI):** `gpt-4.1-mini` — best accuracy for equations and tables. Requires an API key from [platform.openai.com](https://platform.openai.com). Note: sends cropped block images to external servers.
+- **Local (Ollama):** `qwen2.5-vl:7b` — good general-purpose vision model, no data leaves your machine
+- **Local (vLLM + LightOnOCR):** `lightonai/LightOnOCR-2-1B` — specialised OCR model, fast local inference
+
+See the [VLM setup guide](vllm-guide.md) for detailed instructions on all three options.
+
+---
+
 ## CLI Tool
 
 RailReader2 ships a standalone headless CLI for automated PDF extraction. Download `railreader2-cli-linux-x64.tar.gz` (Linux) or `railreader2-cli-win-x64.zip` (Windows) from [GitHub Releases](https://github.com/sjvrensburg/railreader2/releases/latest), then extract the archive. On Linux, make the binary executable with `chmod +x RailReader2.Cli`.
@@ -567,6 +598,7 @@ The log is overwritten at the start of each session. Old `.log` files are automa
 | `Ctrl+Z` | Undo |
 | `Ctrl+Y` | Redo |
 | `Delete` / `Backspace` | Delete selected annotation (browse mode) |
+| `Ctrl+L` | Copy current block as LaTeX / Markdown / description (VLM) |
 | `Ctrl+C` | Copy selected text |
 | `Escape` | Cancel / close / stop / exit fullscreen |
 

@@ -45,6 +45,11 @@ public sealed class AppConfig
     [JsonConverter(typeof(NavigableClassesConverter))]
     public HashSet<int> CenteringClasses { get; set; } = LayoutConstants.DefaultCenteringClasses();
 
+    // VLM (Vision Language Model) settings for Copy as LaTeX / Markdown / Description
+    public string? VlmEndpoint { get; set; }
+    public string? VlmModel { get; set; }
+    public string? VlmApiKey { get; set; }
+
     /// <summary>Creates an independent deep copy via JSON round-trip.</summary>
     public AppConfig Clone() =>
         JsonSerializer.Deserialize<AppConfig>(JsonSerializer.Serialize(this, s_options), s_options)

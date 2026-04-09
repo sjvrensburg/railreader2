@@ -73,6 +73,11 @@ public static class LayoutConstants
         22, // text
     ];
 
+    public static readonly HashSet<int> FigureClasses =
+    [ClassChart, ClassFooterImage, ClassHeaderImage, ClassImage];
+
+    public static readonly HashSet<int> TableClasses = [ClassTable];
+
     public static int? ClassNameToIndex(string name) =>
         Array.IndexOf(LayoutClasses, name) is var idx and >= 0 ? idx : null;
 }

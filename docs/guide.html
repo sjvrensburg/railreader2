@@ -113,6 +113,7 @@
         <li><a href="#text-selection">Text Selection</a></li>
         <li><a href="#bookmarks">Bookmarks</a></li>
         <li><a href="#figures-panel">Figures Panel</a></li>
+        <li><a href="#vlm">Copy as LaTeX (VLM)</a></li>
         <li><a href="#cli-tool">CLI Tool</a></li>
         <li><a href="#settings">Settings</a></li>
         <li><a href="#troubleshooting">Troubleshooting</a></li>
@@ -669,6 +670,40 @@
       </p>
     </section>
 
+    <!-- VLM -->
+    <section class="guide-section" id="vlm">
+      <h2>Copy as LaTeX (VLM)</h2>
+      <p>
+        Press <code>Ctrl+L</code> to send the current rail block to a Vision Language Model and
+        copy the result to the clipboard. You can also <code>Ctrl+right-click</code> any detected
+        block to open a context menu with <strong>Copy as LaTeX</strong>,
+        <strong>Copy as Markdown</strong>, <strong>Copy Description</strong>, and
+        <strong>Copy Image</strong> options. The <code>Ctrl+L</code> shortcut auto-selects
+        the action by block type: equations &rarr; LaTeX, tables &rarr; Markdown,
+        figures &rarr; description.
+      </p>
+
+      <h3>Setup</h3>
+      <p>
+        Open <strong>Settings &gt; VLM</strong> and configure an OpenAI-compatible API endpoint.
+        Use <strong>Test Connection</strong> to verify your setup.
+      </p>
+
+      <h3>Recommended models</h3>
+      <ul>
+        <li><strong>Cloud (OpenAI):</strong> <code>gpt-4.1-mini</code> &mdash;
+            best accuracy for equations and tables. Requires an API key. Note: sends images to external servers.</li>
+        <li><strong>Local (Ollama):</strong> <code>qwen2.5-vl:7b</code> &mdash;
+            good general-purpose vision model, no data leaves your machine</li>
+        <li><strong>Local (vLLM + LightOnOCR):</strong> <code>lightonai/LightOnOCR-2-1B</code> &mdash;
+            specialised OCR model, fast local inference</li>
+      </ul>
+      <p>
+        See the <a href="https://github.com/sjvrensburg/railreader2/blob/main/docs/vllm-guide.md">VLM setup guide</a>
+        for detailed instructions on all three options.
+      </p>
+    </section>
+
     <!-- CLI Tool -->
     <section class="guide-section" id="cli-tool">
       <h2>CLI Tool</h2>
@@ -857,6 +892,7 @@ railreader2-cli annotations paper.pdf --format pdf --output paper.annotated.pdf<
           <tr><td>Ctrl+Shift+O</td><td>Toggle outline panel</td></tr>
           <tr><td>Ctrl+Shift+B</td><td>Toggle bookmarks panel</td></tr>
           <tr><td>Ctrl+Shift+I</td><td>Toggle figures panel</td></tr>
+          <tr><td>Ctrl+L</td><td>Copy block as LaTeX (VLM)</td></tr>
           <tr><td>Ctrl+G</td><td>Go to page</td></tr>
           <tr><td>F1</td><td>Keyboard shortcuts dialog</td></tr>
           <tr><td>F11</td><td>Toggle fullscreen</td></tr>

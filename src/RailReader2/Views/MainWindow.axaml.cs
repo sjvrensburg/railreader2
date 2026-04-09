@@ -206,6 +206,19 @@ public partial class MainWindow : Window
                 await clipboard.SetTextAsync(text);
         };
 
+        #pragma warning disable CS0618 // DataObject/SetDataObjectAsync are deprecated but the replacement API isn't available yet
+        vm.CopyImageToClipboard = async pngBytes =>
+        {
+            var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
+            if (clipboard is not null)
+            {
+                var data = new DataObject();
+                data.Set("image/png", pngBytes);
+                await clipboard.SetDataObjectAsync(data);
+            }
+        };
+        #pragma warning restore CS0618
+
         ToolBar.ViewModel = vm;
 
         var highlightColors = BuildColorOptions(vm, AnnotationTool.Highlight, AnnotationInteractionHandler.HighlightColors, 0);
@@ -543,6 +556,8 @@ public partial class MainWindow : Window
             case Key.C:
                 if (vm.SelectedText is not null) vm.CopySelectedText();
                 e.Handled = true; return true;
+            case Key.L:
+                vm.CopyBlockAsLatex(); e.Handled = true; return true;
             case Key.Home:
                 vm.GoToPage(0); e.Handled = true; return true;
             case Key.End:

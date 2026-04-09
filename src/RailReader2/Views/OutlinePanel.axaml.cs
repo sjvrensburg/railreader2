@@ -376,6 +376,8 @@ public partial class OutlinePanel : UserControl
     private readonly Dictionary<int, SKBitmap?> _pageThumbCache = [];
     private readonly Dictionary<int, string?> _textCache = [];
     private bool _peekDirty;
+    private int _lastPeekEntryCount;
+    private int _lastPeekScannedPages;
 
     private void SubscribePeekUpdates()
     {
@@ -469,10 +471,16 @@ public partial class OutlinePanel : UserControl
             return cmp != 0 ? cmp : a.Entry.BlockIndex.CompareTo(b.Entry.BlockIndex);
         });
 
-        // Generate thumbnails before assigning to ItemsSource
-        GenerateThumbnails(entries, doc);
-
-        PeekEntryList.ItemsSource = entries;
+        // Only rebuild the visual tree if the entries actually changed —
+        // replacing ItemsSource mid-click destroys the button the user pressed.
+        int totalEntries = entries.Count;
+        if (totalEntries != _lastPeekEntryCount || index.ScannedPages != _lastPeekScannedPages)
+        {
+            _lastPeekEntryCount = totalEntries;
+            _lastPeekScannedPages = index.ScannedPages;
+            GenerateThumbnails(entries, doc);
+            PeekEntryList.ItemsSource = entries;
+        }
     }
 
     private static void AddEntries(List<PeekEntryViewModel> list, IReadOnlyList<PeekEntry> entries, string category)
@@ -591,6 +599,8 @@ public partial class OutlinePanel : UserControl
             bmp?.Dispose();
         _thumbnailCache.Clear();
         _textCache.Clear();
+        _lastPeekEntryCount = 0;
+        _lastPeekScannedPages = 0;
 
         foreach (var bmp in _pageThumbCache.Values)
             bmp?.Dispose();
