@@ -378,22 +378,25 @@ Press `Ctrl+L` to send the current rail block to a Vision Language Model and cop
 - **Tables** → copied as Markdown
 - **Figures** → copied as a brief description
 
-You can also `Ctrl+right-click` any detected block to target it directly.
+You can also `Ctrl+right-click` any detected block to open a context menu with **Copy as LaTeX**, **Copy as Markdown**, **Copy Description**, and **Copy Image** options.
 
 ### Setup
 
 Open **Settings > VLM** and configure:
 
 - **Endpoint** — the URL of an OpenAI-compatible API (e.g., `http://localhost:11434/v1` for Ollama)
-- **Model** — the model name (e.g., `smolvlm:latest`, `qwen2.5-vl:7b`, `gpt-4o`)
+- **Model** — the model name (e.g., `qwen2.5-vl:7b`, `lightonai/LightOnOCR-2-1B`, `gpt-4o`)
 - **API Key** — leave blank for local endpoints that don't require authentication
 
 Use the **Test Connection** button to verify your setup. The API key is stored locally in your config file.
 
 ### Recommended models
 
-- **Local (Ollama):** `qwen2.5-vl:7b` or `smolvlm:latest` — free, private, no data leaves your machine
-- **Cloud:** `gpt-4o` or `claude-sonnet-4-20250514` via compatible endpoints — best quality
+- **Cloud (OpenAI):** `gpt-4.1-mini` — best accuracy for equations and tables. Requires an API key from [platform.openai.com](https://platform.openai.com). Note: sends cropped block images to external servers.
+- **Local (Ollama):** `qwen2.5-vl:7b` — good general-purpose vision model, no data leaves your machine
+- **Local (vLLM + LightOnOCR):** `lightonai/LightOnOCR-2-1B` — specialised OCR model, fast local inference
+
+See the [VLM setup guide](vllm-guide.md) for detailed instructions on all three options.
 
 ---
 

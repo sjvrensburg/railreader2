@@ -676,16 +676,31 @@
       <p>
         Press <code>Ctrl+L</code> to send the current rail block to a Vision Language Model and
         copy the result to the clipboard. You can also <code>Ctrl+right-click</code> any detected
-        block to target it directly. The action adapts to the block type:
-        equations &rarr; LaTeX, tables &rarr; Markdown, figures &rarr; description.
+        block to open a context menu with <strong>Copy as LaTeX</strong>,
+        <strong>Copy as Markdown</strong>, <strong>Copy Description</strong>, and
+        <strong>Copy Image</strong> options. The <code>Ctrl+L</code> shortcut auto-selects
+        the action by block type: equations &rarr; LaTeX, tables &rarr; Markdown,
+        figures &rarr; description.
       </p>
 
       <h3>Setup</h3>
       <p>
         Open <strong>Settings &gt; VLM</strong> and configure an OpenAI-compatible API endpoint.
-        For local inference, use <a href="https://ollama.com">Ollama</a> with a vision model
-        (e.g., <code>qwen2.5-vl:7b</code>). For cloud APIs, enter the provider&rsquo;s endpoint
-        and API key. Use <strong>Test Connection</strong> to verify.
+        Use <strong>Test Connection</strong> to verify your setup.
+      </p>
+
+      <h3>Recommended models</h3>
+      <ul>
+        <li><strong>Cloud (OpenAI):</strong> <code>gpt-4.1-mini</code> &mdash;
+            best accuracy for equations and tables. Requires an API key. Note: sends images to external servers.</li>
+        <li><strong>Local (Ollama):</strong> <code>qwen2.5-vl:7b</code> &mdash;
+            good general-purpose vision model, no data leaves your machine</li>
+        <li><strong>Local (vLLM + LightOnOCR):</strong> <code>lightonai/LightOnOCR-2-1B</code> &mdash;
+            specialised OCR model, fast local inference</li>
+      </ul>
+      <p>
+        See the <a href="https://github.com/sjvrensburg/railreader2/blob/main/docs/vllm-guide.md">VLM setup guide</a>
+        for detailed instructions on all three options.
       </p>
     </section>
 

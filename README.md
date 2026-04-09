@@ -97,7 +97,7 @@ At high zoom levels, navigation switches to "rail mode" — the viewer locks ont
 - **Interactive minimap** — click or drag to navigate the page
 - **On-screen nav buttons** — ◀/▶ buttons in the status bar for mouse-only page navigation
 - **Search** — full-text search in a sidebar panel with results grouped by page, text snippets with highlighted match terms, regex and case sensitivity toggles, and match highlighting on the page (Ctrl+F)
-- **Copy as LaTeX** — send any detected equation, table, or figure to an OpenAI-compatible vision API (Ollama, cloud, etc.) and copy the result to clipboard. Equations → LaTeX, tables → Markdown, figures → description (Ctrl+L or Ctrl+right-click). Configure endpoint in Settings > VLM
+- **Copy as LaTeX** — send any detected equation, table, or figure to a Vision Language Model and copy the result to clipboard. Equations → LaTeX, tables → Markdown, figures → description. Access via `Ctrl+L` (current block), `Ctrl+right-click` (context menu), or Edit menu. Works with cloud APIs (OpenAI `gpt-4.1-mini` recommended) or local models ([Ollama](https://ollama.com), [vLLM](docs/vllm-guide.md)). Configure in Settings > VLM. See the [VLM setup guide](docs/vllm-guide.md) for all options
 
 #### Annotations & text
 
