@@ -20,6 +20,7 @@ public static class AnnotationsCommand
         var pdfPath = Program.GetRequiredPdf(args);
         var outputPath = Program.GetOption(args, "output");
         var format = Program.GetOption(args, "format") ?? "json";
+        var pageRange = Program.GetOption(args, "pages");
         var includeText = Program.HasFlag(args, "include-text");
         var includeBlocks = Program.HasFlag(args, "include-blocks");
 
@@ -44,6 +45,10 @@ public static class AnnotationsCommand
 
         var pdf2 = factory.CreatePdfService(pdfPath);
 
+        var (pages, rangeError) = PageRangeParser.Parse(pageRange, pdf2.PageCount);
+        if (rangeError != null) return Program.Fail(rangeError);
+        var pageSet = pages is not null ? new HashSet<int>(pages) : null;
+
         using var analyzer = Shared.CreateAnalyzer(includeBlocks);
         includeBlocks = analyzer is not null;
 
@@ -60,7 +65,8 @@ public static class AnnotationsCommand
         };
 
         int failed = 0;
-        foreach (var (pageIdx, pageAnnotations) in annotations.Pages.OrderBy(p => p.Key))
+        foreach (var (pageIdx, pageAnnotations) in annotations.Pages.OrderBy(p => p.Key)
+            .Where(p => pageSet is null || pageSet.Contains(p.Key)))
         {
             try
             {
@@ -268,6 +274,7 @@ public static class AnnotationsCommand
         Console.WriteLine("Options:");
         Console.WriteLine("  --output <path>       Output file path (default: stdout for JSON)");
         Console.WriteLine("  --format <json|pdf>   Export format (default: json)");
+        Console.WriteLine("  --pages <range>       Page range to export (e.g. 1,3,5-10; default: all)");
         Console.WriteLine("  --include-text        Extract text under each annotation");
         Console.WriteLine("  --include-blocks      Correlate annotations with layout blocks (implies ONNX analysis)");
     }

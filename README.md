@@ -339,10 +339,14 @@ railreader2-cli render paper.pdf --pages 1-5 --dpi 300 --effect amber --output-d
 railreader2-cli structure paper.pdf --analyze --include-text --output structure.json
 
 # Export annotations with text and layout context
-railreader2-cli annotations paper.pdf --include-text --include-blocks --output annotations.json
+railreader2-cli annotations paper.pdf --include-text --include-blocks --pages 1-10 --output annotations.json
 ```
 
 The CLI uses the ONNX layout model from the GUI installation. If the GUI isn't installed, download the model with `./scripts/download-model.sh`.
+
+### Stable output format
+
+The CLI's JSON output format is a stable API. The `structure` and `annotations` commands produce JSON with snake_case keys. Breaking changes to the output schema will only occur in major version bumps. Downstream tools (see [Related projects](#related-projects)) can depend on this format.
 
 ## Building
 
@@ -395,3 +399,7 @@ dotnet publish src/RailReader2 -c Release -r linux-x64 --self-contained
 # Windows
 dotnet publish src/RailReader2 -c Release -r win-x64 --self-contained
 ```
+
+## Related projects
+
+- **[rr2annotate](https://github.com/sjvrensburg/rr2parser)** — CLI tool that extracts your RailReader2 annotations into structured Markdown documents, grouped by section headings with surrounding paragraph context. Useful for feeding annotated PDFs to an AI for summarisation. Uses the RailReader2 CLI's `annotations` command as its data source.
