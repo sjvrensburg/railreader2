@@ -9,9 +9,6 @@ namespace RailReader2.ViewModels;
 
 public sealed partial class MainWindowViewModel
 {
-    /// <summary>
-    /// Copies the current rail block via VLM, auto-selecting the action by block type.
-    /// </summary>
     public async void CopyBlockAsLatex()
     {
         var doc = _controller.ActiveDocument;
@@ -28,9 +25,6 @@ public sealed partial class MainWindowViewModel
         await SendBlockToVlm(doc, block, action);
     }
 
-    /// <summary>
-    /// Finds the layout block at the given page coordinates on the current page.
-    /// </summary>
     public LayoutBlock? FindBlockAt(double pageX, double pageY)
     {
         var doc = _controller.ActiveDocument;
@@ -48,9 +42,6 @@ public sealed partial class MainWindowViewModel
         return null;
     }
 
-    /// <summary>
-    /// Sends a block to the VLM with a specific action chosen by the user.
-    /// </summary>
     public async void CopyBlockWithAction(LayoutBlock block, BlockAction action)
     {
         var doc = _controller.ActiveDocument;
@@ -58,10 +49,7 @@ public sealed partial class MainWindowViewModel
         await SendBlockToVlm(doc, block, action);
     }
 
-    /// <summary>
-    /// Copies a block region as an image to the clipboard (no VLM needed).
-    /// </summary>
-    public void CopyBlockAsImage(LayoutBlock block)
+    public async void CopyBlockAsImage(LayoutBlock block)
     {
         var doc = _controller.ActiveDocument;
         if (doc is null) return;
@@ -74,23 +62,19 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        CopyImageToClipboard?.Invoke(pngBytes);
+        if (CopyImageToClipboard is not null)
+            await CopyImageToClipboard(pngBytes);
         ShowStatusToast("Image copied to clipboard!");
     }
 
-    /// <summary>
-    /// Callback for copying image bytes to clipboard. Set by the view.
-    /// </summary>
     public Func<byte[], Task>? CopyImageToClipboard { get; set; }
 
-    private static BlockAction DefaultActionForBlock(int classId) => classId switch
+    private static BlockAction DefaultActionForBlock(int classId)
     {
-        LayoutConstants.ClassTable => BlockAction.Markdown,
-        LayoutConstants.ClassChart or LayoutConstants.ClassFooterImage
-            or LayoutConstants.ClassHeaderImage or LayoutConstants.ClassImage
-            => BlockAction.Description,
-        _ => BlockAction.LaTeX,
-    };
+        if (LayoutConstants.TableClasses.Contains(classId)) return BlockAction.Markdown;
+        if (LayoutConstants.FigureClasses.Contains(classId)) return BlockAction.Description;
+        return BlockAction.LaTeX;
+    }
 
     private async Task SendBlockToVlm(DocumentState doc, LayoutBlock block, BlockAction action)
     {

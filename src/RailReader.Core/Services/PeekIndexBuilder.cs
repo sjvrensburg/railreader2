@@ -8,14 +8,6 @@ namespace RailReader.Core.Services;
 /// </summary>
 public static class PeekIndexBuilder
 {
-    private static readonly HashSet<int> FigureClasses =
-    [
-        LayoutConstants.ClassChart,
-        LayoutConstants.ClassFooterImage,
-        LayoutConstants.ClassHeaderImage,
-        LayoutConstants.ClassImage,
-    ];
-    private static readonly HashSet<int> TableClasses = [LayoutConstants.ClassTable];
     internal static readonly HashSet<int> EquationClasses = [LayoutConstants.ClassDisplayFormula];
 
     public static PeekIndex Build(IReadOnlyDictionary<int, PageAnalysis> cache, int pageCount)
@@ -33,12 +25,12 @@ public static class PeekIndexBuilder
                 var block = analysis.Blocks[b];
                 PeekEntry? entry = null;
 
-                if (FigureClasses.Contains(block.ClassId))
+                if (LayoutConstants.FigureClasses.Contains(block.ClassId))
                 {
                     entry = MakeEntry(page, b, block);
                     figures.Add(entry);
                 }
-                else if (TableClasses.Contains(block.ClassId))
+                else if (LayoutConstants.TableClasses.Contains(block.ClassId))
                 {
                     entry = MakeEntry(page, b, block);
                     tables.Add(entry);

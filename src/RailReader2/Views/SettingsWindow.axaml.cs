@@ -256,6 +256,8 @@ public partial class SettingsWindow : Window
         vm.OnConfigChanged();
     }
 
+    private void OnVlmTextChanged(object? sender, TextChangedEventArgs e) => SaveToConfig();
+
     private async void OnTestVlmConnection(object? sender, RoutedEventArgs e)
     {
         SaveToConfig();

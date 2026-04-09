@@ -36,16 +36,7 @@ public static class VlmService
 
         try
         {
-            var options = new OpenAIClientOptions
-            {
-                Endpoint = new Uri(config.VlmEndpoint),
-            };
-
-            // Use a dummy key if none provided (local endpoints like Ollama don't require one)
-            var credential = new ApiKeyCredential(
-                string.IsNullOrWhiteSpace(config.VlmApiKey) ? "not-required" : config.VlmApiKey);
-
-            var client = new ChatClient(config.VlmModel, credential, options);
+            var client = CreateClient(config);
 
             var imageContent = ChatMessageContentPart.CreateImagePart(
                 BinaryData.FromBytes(pngBytes), "image/png");
@@ -102,15 +93,7 @@ public static class VlmService
 
         try
         {
-            var options = new OpenAIClientOptions
-            {
-                Endpoint = new Uri(config.VlmEndpoint),
-            };
-
-            var credential = new ApiKeyCredential(
-                string.IsNullOrWhiteSpace(config.VlmApiKey) ? "not-required" : config.VlmApiKey);
-
-            var client = new ChatClient(config.VlmModel, credential, options);
+            var client = CreateClient(config);
 
             var messages = new List<ChatMessage>
             {
@@ -141,5 +124,17 @@ public static class VlmService
         {
             return $"Error: {ex.Message}";
         }
+    }
+
+    private static ChatClient CreateClient(AppConfig config)
+    {
+        var options = new OpenAIClientOptions
+        {
+            Endpoint = new Uri(config.VlmEndpoint!),
+        };
+        // Local endpoints like Ollama don't require an API key
+        var credential = new ApiKeyCredential(
+            string.IsNullOrWhiteSpace(config.VlmApiKey) ? "not-required" : config.VlmApiKey);
+        return new ChatClient(config.VlmModel!, credential, options);
     }
 }
