@@ -106,7 +106,6 @@ public sealed class DocumentState : IDisposable
     public IReadOnlyDictionary<int, List<PdfLink>> LinkCache => _linkCache;
     public Queue<int> PendingAnalysis { get; } = new();
     internal BackgroundAnalysisQueue BackgroundQueue { get; private set; } = null!;
-    private bool _backgroundSubmitPending;
 
     /// <summary>Number of pages with cached analysis results.</summary>
     public int AnalysedPageCount => _analysisCache.Count;
@@ -374,11 +373,12 @@ public sealed class DocumentState : IDisposable
     /// <summary>
     /// Submits the next background analysis page (outside the lookahead window).
     /// Returns true if a page was submitted, false if exhausted or worker busy.
-    /// Guards against concurrent submissions with a pending flag.
+    /// Renders the pixmap synchronously on the UI thread to avoid concurrent
+    /// PDFium access — the pixmap is only 800x800 so this takes ~5ms.
     /// </summary>
     public bool SubmitBackgroundAnalysis(AnalysisWorker worker)
     {
-        if (_backgroundSubmitPending) return false;
+        _marshaller.AssertUIThread();
         if (!worker.IsIdle) return false;
         if (PendingRailSetup) return false;
         if (BackgroundQueue.IsExhausted) return false;
@@ -387,37 +387,18 @@ public sealed class DocumentState : IDisposable
             _analysisCache, page => worker.IsInFlight(FilePath, page));
         if (nextPage is not { } page) return false;
 
-        string filePath = FilePath;
-        var pdf = _pdf;
-        var ct = _cts.Token;
-        _backgroundSubmitPending = true;
-        Task.Run(() =>
+        try
         {
-            try
-            {
-                ct.ThrowIfCancellationRequested();
-                // Get page dimensions and render pixmap together on the background thread
-                // to avoid blocking the UI thread with PDFium calls.
-                var (pageW, pageH) = pdf.GetPageSize(page);
-                var (rgb, pxW, pxH) = pdf.RenderPagePixmap(page, LayoutConstants.InputSize);
-                _marshaller.Post(() =>
-                {
-                    _backgroundSubmitPending = false;
-                    if (!IsDisposed)
-                        worker.Submit(new AnalysisRequest(filePath, page, rgb, pxW, pxH, pageW, pageH));
-                });
-            }
-            catch (OperationCanceledException)
-            {
-                try { _marshaller.Post(() => _backgroundSubmitPending = false); } catch { }
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"Background analysis prepare failed for page {page + 1}: {ex.Message}", ex);
-                try { _marshaller.Post(() => _backgroundSubmitPending = false); } catch { }
-            }
-        }, ct);
-        return true;
+            var (pageW, pageH) = _pdf.GetPageSize(page);
+            var (rgb, pxW, pxH) = _pdf.RenderPagePixmap(page, LayoutConstants.InputSize);
+            worker.Submit(new AnalysisRequest(FilePath, page, rgb, pxW, pxH, pageW, pageH));
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Background analysis prepare failed for page {page + 1}: {ex.Message}", ex);
+            return false;
+        }
     }
 
     public bool GoToPage(int page, AnalysisWorker? worker, HashSet<int> navigableClasses, double windowWidth, double windowHeight)

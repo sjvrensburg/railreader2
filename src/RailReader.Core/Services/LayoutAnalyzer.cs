@@ -59,6 +59,8 @@ public sealed class LayoutAnalyzer : IDisposable
     {
         var opts = new SessionOptions();
         opts.GraphOptimizationLevel = GraphOptimizationLevel.ORT_ENABLE_ALL;
+        // Suppress noisy NCHWc Conv kernel warnings while preserving genuine errors
+        opts.LogSeverityLevel = OrtLoggingLevel.ORT_LOGGING_LEVEL_ERROR;
         _session = new InferenceSession(modelPath, opts);
 
         Logger.Debug($"[ONNX] Input names: {string.Join(", ", _session.InputNames)}");
