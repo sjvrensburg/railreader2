@@ -13,20 +13,35 @@ public static class VlmService
 {
     public enum BlockAction { LaTeX, Markdown, Description }
 
+    /// <summary>
+    /// Prompt phrasing style. Instruction-tuned VLMs (Qwen, GPT-4, etc.) follow
+    /// explicit "convert to X" directives. OCR-specialised models (LightOnOCR)
+    /// respond better to short "transcribe" phrasing and tend to emit HTML for
+    /// tables regardless of prompt.
+    /// </summary>
+    public enum PromptStyle { Instruction, Ocr }
+
     public record VlmResult(string? Text, string? Error);
 
-    private static string GetPrompt(BlockAction action) => action switch
+    private static string GetPrompt(BlockAction action, PromptStyle style) => (action, style) switch
     {
-        BlockAction.Markdown =>
+        (BlockAction.Markdown, PromptStyle.Ocr) =>
+            "Transcribe this table.",
+        (BlockAction.Description, PromptStyle.Ocr) =>
+            "Transcribe the contents of this figure.",
+        (BlockAction.LaTeX, PromptStyle.Ocr) =>
+            "Transcribe this equation as LaTeX.",
+        (BlockAction.Markdown, _) =>
             "Convert this table to Markdown format. Return only the Markdown table, no explanation.",
-        BlockAction.Description =>
+        (BlockAction.Description, _) =>
             "Describe this figure briefly in one sentence.",
         _ =>
             "Convert this to LaTeX. Return only the LaTeX code, no explanation, no surrounding delimiters.",
     };
 
     public static async Task<VlmResult> DescribeBlockAsync(
-        byte[] pngBytes, BlockAction action, AppConfig config, CancellationToken ct = default)
+        byte[] pngBytes, BlockAction action, AppConfig config,
+        PromptStyle style = PromptStyle.Instruction, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(config.VlmEndpoint))
             return new VlmResult(null, "VLM not configured \u2014 check Settings");
@@ -40,7 +55,7 @@ public static class VlmService
 
             var imageContent = ChatMessageContentPart.CreateImagePart(
                 BinaryData.FromBytes(pngBytes), "image/png");
-            var textContent = ChatMessageContentPart.CreateTextPart(GetPrompt(action));
+            var textContent = ChatMessageContentPart.CreateTextPart(GetPrompt(action, style));
 
             var messages = new List<ChatMessage>
             {
