@@ -9,6 +9,8 @@ namespace RailReader.Cli.Commands;
 
 public static class VlmCommand
 {
+    private record Target(int Page, int BlockIdx, LayoutBlock Block, double PageW, double PageH);
+
     public static int Execute(string[] args, IPdfServiceFactory factory, ILogger logger)
     {
         if (Program.HasFlag(args, "help") || Program.HasFlag(args, "-h"))
@@ -45,7 +47,6 @@ public static class VlmCommand
         var noHtmlToMd = Program.HasFlag(args, "no-html-to-md");
         var noStructured = Program.HasFlag(args, "no-structured-output");
 
-        // Parse numeric options
         int dpi = 300;
         if (dpiStr != null && int.TryParse(dpiStr, out var d))
         {
@@ -61,41 +62,35 @@ public static class VlmCommand
         if (minConfStr != null && float.TryParse(minConfStr, out var mc))
             minConfidence = Math.Clamp(mc, 0f, 1f);
 
-        // Class filter
         var wantedClasses = ResolveClasses(classesOpt, all);
         if (wantedClasses.Count == 0)
             return Program.Fail("No classes selected. Use --classes equation,table,figure or --all.");
 
-        // Prompt style
         var promptStyle = VlmService.PromptStyle.Instruction;
-        if (promptStyleStr != null)
-        {
-            if (!Enum.TryParse<VlmService.PromptStyle>(promptStyleStr, ignoreCase: true, out promptStyle))
-                return Program.Fail($"Invalid --prompt-style: {promptStyleStr} (expected: instruction, ocr)");
-        }
+        if (promptStyleStr != null
+            && !Enum.TryParse<VlmService.PromptStyle>(promptStyleStr, ignoreCase: true, out promptStyle))
+            return Program.Fail($"Invalid --prompt-style: {promptStyleStr} (expected: instruction, ocr)");
 
-        // Load base config + apply default overrides.
+        // Resolve default VLM config.
         // API key precedence: --api-key > OPENAI_API_KEY env var > AppConfig.
-        var baseConfig = AppConfig.Load();
-        if (endpointOverride != null) baseConfig.VlmEndpoint = endpointOverride;
-        if (modelOverride != null) baseConfig.VlmModel = modelOverride;
-        if (apiKeyOverride != null)
-            baseConfig.VlmApiKey = apiKeyOverride;
-        else if (string.IsNullOrWhiteSpace(baseConfig.VlmApiKey))
-        {
-            var envKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
-            if (!string.IsNullOrWhiteSpace(envKey)) baseConfig.VlmApiKey = envKey;
-        }
+        var appConfig = AppConfig.Load();
+        var baseApiKey = apiKeyOverride
+            ?? (string.IsNullOrWhiteSpace(appConfig.VlmApiKey)
+                ? Environment.GetEnvironmentVariable("OPENAI_API_KEY")
+                : appConfig.VlmApiKey);
+        var baseCfg = new VlmEndpointConfig(
+            endpointOverride ?? appConfig.VlmEndpoint,
+            modelOverride ?? appConfig.VlmModel,
+            baseApiKey);
 
-        // Per-class resolved configs
-        var eqCfg = MakeClassConfig(baseConfig, eqEndpoint, eqModel, eqApiKey);
-        var tblCfg = MakeClassConfig(baseConfig, tblEndpoint, tblModel, tblApiKey);
-        var figCfg = MakeClassConfig(baseConfig, figEndpoint, figModel, figApiKey);
+        var eqCfg = Override(baseCfg, eqEndpoint, eqModel, eqApiKey);
+        var tblCfg = Override(baseCfg, tblEndpoint, tblModel, tblApiKey);
+        var figCfg = Override(baseCfg, figEndpoint, figModel, figApiKey);
 
         bool anyEndpoint =
-            !string.IsNullOrWhiteSpace(eqCfg.VlmEndpoint) ||
-            !string.IsNullOrWhiteSpace(tblCfg.VlmEndpoint) ||
-            !string.IsNullOrWhiteSpace(figCfg.VlmEndpoint);
+            !string.IsNullOrWhiteSpace(eqCfg.Endpoint) ||
+            !string.IsNullOrWhiteSpace(tblCfg.Endpoint) ||
+            !string.IsNullOrWhiteSpace(figCfg.Endpoint);
 
         bool dryRun = dumpCrops != null && !anyEndpoint;
         if (dryRun)
@@ -105,27 +100,14 @@ public static class VlmCommand
 
         var pdf = factory.CreatePdfService(pdfPath);
 
-        // Build list of (pageIdx, blockIdx, block) tuples to process
-        List<(int Page, int BlockIdx, LayoutBlock Block, double PageW, double PageH)> targets;
-        try
-        {
-            targets = BuildTargets(pdf, pageRange, singlePageStr, singleBlockStr,
-                fromStructure, wantedClasses, minConfidence);
-        }
-        catch (Exception ex)
-        {
-            return Program.Fail(ex.Message);
-        }
+        var (targets, buildErr) = BuildTargets(pdf, pageRange, singlePageStr, singleBlockStr,
+            fromStructure, wantedClasses, minConfidence);
+        if (buildErr != null) return Program.Fail(buildErr);
 
-        if (targets.Count == 0)
+        if (targets!.Count == 0)
         {
             Console.Error.WriteLine("No blocks matched the selection.");
-            var empty = new VlmOutput
-            {
-                Source = Path.GetFileName(pdfPath),
-                Model = baseConfig.VlmModel ?? "",
-            };
-            WriteJson(empty, outputPath);
+            WriteJson(new VlmOutput { Source = Path.GetFileName(pdfPath) }, outputPath);
             return 0;
         }
 
@@ -134,16 +116,33 @@ public static class VlmCommand
         if (dumpCrops != null)
             Directory.CreateDirectory(dumpCrops);
 
-        // Render all crops sequentially (PDFium is single-threaded), then fan
-        // out the VLM requests concurrently.
-        var prepared = new List<(int Page, int BlockIdx, LayoutBlock Block, byte[]? Png)>();
-        foreach (var t in targets)
+        // Render crops: one page render per N blocks on that page (PDFium is
+        // single-threaded and rasterising at 300 DPI is the expensive step).
+        var prepared = new List<(Target Target, byte[]? Png)>(targets.Count);
+        foreach (var pageGroup in targets.GroupBy(t => t.Page))
         {
+            var blocks = pageGroup.ToList();
+            var bboxes = blocks.Select(t => t.Block.BBox).ToList();
+            var pageW = blocks[0].PageW;
+            var pageH = blocks[0].PageH;
+
+            List<byte[]?> pngs;
             try
             {
-                var png = BlockCropRenderer.RenderBlockAsPng(
-                    pdf, t.Page, t.Block.BBox, t.PageW, t.PageH, dpi);
-                prepared.Add((t.Page, t.BlockIdx, t.Block, png));
+                pngs = BlockCropRenderer.RenderBlocksAsPng(pdf, pageGroup.Key, bboxes, pageW, pageH, dpi);
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"  Error rendering page {pageGroup.Key + 1}: {ex.Message}");
+                foreach (var t in blocks) prepared.Add((t, null));
+                continue;
+            }
+
+            for (int i = 0; i < blocks.Count; i++)
+            {
+                var t = blocks[i];
+                var png = pngs[i];
+                prepared.Add((t, png));
 
                 if (png != null && dumpCrops != null)
                 {
@@ -151,14 +150,8 @@ public static class VlmCommand
                     File.WriteAllBytes(Path.Combine(dumpCrops, cropName), png);
                 }
             }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine($"  Error rendering page {t.Page + 1} block {t.BlockIdx}: {ex.Message}");
-                prepared.Add((t.Page, t.BlockIdx, t.Block, null));
-            }
         }
 
-        // Dispatch VLM calls with bounded concurrency
         var results = new List<VlmBlockResult>(prepared.Count);
         if (!dryRun)
         {
@@ -174,19 +167,18 @@ public static class VlmCommand
                     await gate.WaitAsync();
                     try
                     {
-                        var action = GetAction(p.Block.ClassId);
+                        var action = GetAction(p.Target.Block.ClassId);
                         var classCfg = PickConfig(action, eqCfg, tblCfg, figCfg);
 
                         VlmService.VlmResult result;
                         if (p.Png == null)
                             result = new VlmService.VlmResult(null, "Failed to render crop");
-                        else if (string.IsNullOrWhiteSpace(classCfg.VlmEndpoint))
+                        else if (string.IsNullOrWhiteSpace(classCfg.Endpoint))
                             result = new VlmService.VlmResult(null, $"No endpoint configured for {action}");
                         else
                             result = await VlmService.DescribeBlockAsync(
                                 p.Png, action, classCfg, promptStyle, structuredOutput: !noStructured);
 
-                        // Post-process: HTML tables → Markdown
                         if (!noHtmlToMd && action == VlmService.BlockAction.Markdown
                             && result.Text != null && LooksLikeHtmlTable(result.Text))
                         {
@@ -195,9 +187,9 @@ public static class VlmCommand
                         }
 
                         var cur = Interlocked.Increment(ref done);
-                        Console.Error.WriteLine($"  [{cur}/{total}] page {p.Page + 1} block {p.BlockIdx} ({LayoutConstants.LayoutClasses[p.Block.ClassId]}) — {(result.Error ?? "ok")}");
+                        Console.Error.WriteLine($"  [{cur}/{total}] page {p.Target.Page + 1} block {p.Target.BlockIdx} ({LayoutConstants.LayoutClasses[p.Target.Block.ClassId]}) — {(result.Error ?? "ok")}");
 
-                        return BuildResult(p.Page, p.BlockIdx, p.Block, action, result, classCfg.VlmModel);
+                        return BuildResult(p.Target, action, result, classCfg.Model);
                     }
                     finally
                     {
@@ -211,22 +203,16 @@ public static class VlmCommand
         }
         else
         {
-            // Dry run — record metadata only
             foreach (var p in prepared)
             {
-                var action = GetAction(p.Block.ClassId);
-                results.Add(BuildResult(p.Page, p.BlockIdx, p.Block, action,
+                var action = GetAction(p.Target.Block.ClassId);
+                results.Add(BuildResult(p.Target, action,
                     new VlmService.VlmResult(null, p.Png == null ? "Failed to render crop" : "dry run"),
-                    PickConfig(action, eqCfg, tblCfg, figCfg).VlmModel));
+                    PickConfig(action, eqCfg, tblCfg, figCfg).Model));
             }
         }
 
-        // Group by page
-        var output = new VlmOutput
-        {
-            Source = Path.GetFileName(pdfPath),
-            Model = baseConfig.VlmModel ?? "",
-        };
+        var output = new VlmOutput { Source = Path.GetFileName(pdfPath) };
         foreach (var grp in results.GroupBy(r => r.Page).OrderBy(g => g.Key))
         {
             output.Pages.Add(new VlmPage
@@ -242,24 +228,21 @@ public static class VlmCommand
         return errors > 0 ? 1 : 0;
     }
 
-    static List<(int Page, int BlockIdx, LayoutBlock Block, double PageW, double PageH)> BuildTargets(
+    static (List<Target>? Targets, string? Error) BuildTargets(
         IPdfService pdf, string? pageRange, string? singlePageStr, string? singleBlockStr,
         string? fromStructure, HashSet<int> wantedClasses, float minConfidence)
     {
-        var result = new List<(int, int, LayoutBlock, double, double)>();
-
-        // Single block mode: --page N --block M
         int? singlePage = null, singleBlock = null;
         if (singlePageStr != null)
         {
             if (!int.TryParse(singlePageStr, out var p) || p < 1 || p > pdf.PageCount)
-                throw new InvalidOperationException($"Invalid --page: {singlePageStr}");
+                return (null, $"Invalid --page: {singlePageStr}");
             singlePage = p - 1;
         }
         if (singleBlockStr != null)
         {
             if (!int.TryParse(singleBlockStr, out var b) || b < 0)
-                throw new InvalidOperationException($"Invalid --block: {singleBlockStr}");
+                return (null, $"Invalid --block: {singleBlockStr}");
             singleBlock = b;
         }
 
@@ -271,19 +254,30 @@ public static class VlmCommand
         else
         {
             var (parsed, err) = PageRangeParser.Parse(pageRange, pdf.PageCount);
-            if (err != null) throw new InvalidOperationException(err);
+            if (err != null) return (null, err);
             pages = parsed!;
         }
+
+        var result = new List<Target>();
 
         // Path 1: reuse existing structure JSON
         if (fromStructure != null)
         {
-            if (!File.Exists(fromStructure))
-                throw new FileNotFoundException($"Structure file not found: {fromStructure}");
-
-            var json = File.ReadAllText(fromStructure);
-            var structure = JsonSerializer.Deserialize<StructureOutput>(json, Shared.JsonOptions)
-                ?? throw new InvalidOperationException("Failed to parse structure JSON");
+            StructureOutput? structure;
+            try
+            {
+                var json = File.ReadAllText(fromStructure);
+                structure = JsonSerializer.Deserialize<StructureOutput>(json, Shared.JsonOptions);
+            }
+            catch (FileNotFoundException)
+            {
+                return (null, $"Structure file not found: {fromStructure}");
+            }
+            catch (Exception ex)
+            {
+                return (null, $"Failed to read structure JSON: {ex.Message}");
+            }
+            if (structure == null) return (null, "Failed to parse structure JSON");
 
             var pageSet = pages.ToHashSet();
             foreach (var sp in structure.Pages)
@@ -304,16 +298,16 @@ public static class VlmCommand
                         Confidence = sb.Confidence,
                         Order = sb.ReadingOrder,
                     };
-                    result.Add((sp.Page, i, lb, sp.Width, sp.Height));
+                    result.Add(new Target(sp.Page, i, lb, sp.Width, sp.Height));
                 }
             }
-            return result;
+            return (result, null);
         }
 
         // Path 2: run inline layout analysis
         using var analyzer = Shared.CreateAnalyzer(true);
         if (analyzer == null)
-            throw new InvalidOperationException("ONNX model not available — cannot run layout analysis. Use --from-structure or install the model.");
+            return (null, "ONNX model not available — cannot run layout analysis. Use --from-structure or install the model.");
 
         foreach (var pageIdx in pages)
         {
@@ -329,56 +323,48 @@ public static class VlmCommand
                 if (b.Confidence < minConfidence) continue;
                 if (singleBlock.HasValue && i != singleBlock.Value) continue;
 
-                result.Add((pageIdx, i, b, pw, ph));
+                result.Add(new Target(pageIdx, i, b, pw, ph));
             }
         }
-        return result;
+        return (result, null);
     }
 
     static HashSet<int> ResolveClasses(string? classesOpt, bool all)
     {
         var set = new HashSet<int>();
-        if (all || (classesOpt != null && classesOpt.Contains("equation")))
-        {
-            set.Add(LayoutConstants.ClassDisplayFormula);
-            set.Add(15); // inline_formula
-            set.Add(11); // formula_number
-            set.Add(1);  // algorithm
-        }
-        if (all || (classesOpt != null && classesOpt.Contains("table")))
-        {
-            set.Add(LayoutConstants.ClassTable);
-        }
-        if (all || (classesOpt != null && classesOpt.Contains("figure")))
-        {
-            set.Add(LayoutConstants.ClassImage);
-            set.Add(LayoutConstants.ClassChart);
-            set.Add(LayoutConstants.ClassFooterImage);
-            set.Add(LayoutConstants.ClassHeaderImage);
-        }
+        var tokens = classesOpt?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(t => t.ToLowerInvariant()).ToHashSet() ?? [];
+
+        if (all || tokens.Contains("equation"))
+            set.UnionWith(LayoutConstants.EquationClasses);
+        if (all || tokens.Contains("table"))
+            set.UnionWith(LayoutConstants.TableClasses);
+        if (all || tokens.Contains("figure"))
+            set.UnionWith(LayoutConstants.FigureClasses);
+
         return set;
     }
 
     static VlmService.BlockAction GetAction(int classId)
     {
-        if (classId == LayoutConstants.ClassTable)
+        if (LayoutConstants.TableClasses.Contains(classId))
             return VlmService.BlockAction.Markdown;
         if (LayoutConstants.FigureClasses.Contains(classId))
             return VlmService.BlockAction.Description;
         return VlmService.BlockAction.LaTeX;
     }
 
-    static VlmBlockResult BuildResult(int page, int blockIdx, LayoutBlock block,
-        VlmService.BlockAction action, VlmService.VlmResult result, string? model)
+    static VlmBlockResult BuildResult(Target t, VlmService.BlockAction action,
+        VlmService.VlmResult result, string? model)
     {
         return new VlmBlockResult
         {
-            Page = page,
-            Index = blockIdx,
-            Class = LayoutConstants.LayoutClasses[block.ClassId],
-            ClassId = block.ClassId,
-            BBox = new BBoxOutput(block.BBox.X, block.BBox.Y, block.BBox.W, block.BBox.H),
-            Confidence = block.Confidence,
+            Page = t.Page,
+            Index = t.BlockIdx,
+            Class = LayoutConstants.LayoutClasses[t.Block.ClassId],
+            ClassId = t.Block.ClassId,
+            BBox = new BBoxOutput(t.Block.BBox.X, t.Block.BBox.Y, t.Block.BBox.W, t.Block.BBox.H),
+            Confidence = t.Block.Confidence,
             Action = action.ToString(),
             Model = model,
             Text = result.Text,
@@ -386,17 +372,11 @@ public static class VlmCommand
         };
     }
 
-    static AppConfig MakeClassConfig(AppConfig baseCfg, string? endpoint, string? model, string? apiKey)
-    {
-        return new AppConfig
-        {
-            VlmEndpoint = endpoint ?? baseCfg.VlmEndpoint,
-            VlmModel = model ?? baseCfg.VlmModel,
-            VlmApiKey = apiKey ?? baseCfg.VlmApiKey,
-        };
-    }
+    static VlmEndpointConfig Override(VlmEndpointConfig baseCfg, string? endpoint, string? model, string? apiKey) =>
+        new(endpoint ?? baseCfg.Endpoint, model ?? baseCfg.Model, apiKey ?? baseCfg.ApiKey);
 
-    static AppConfig PickConfig(VlmService.BlockAction action, AppConfig eq, AppConfig tbl, AppConfig fig) =>
+    static VlmEndpointConfig PickConfig(VlmService.BlockAction action,
+        VlmEndpointConfig eq, VlmEndpointConfig tbl, VlmEndpointConfig fig) =>
         action switch
         {
             VlmService.BlockAction.Markdown => tbl,
@@ -523,7 +503,6 @@ public static class VlmCommand
 public class VlmOutput
 {
     public string Source { get; set; } = "";
-    public string Model { get; set; } = "";
     public List<VlmPage> Pages { get; set; } = [];
 }
 

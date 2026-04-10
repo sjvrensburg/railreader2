@@ -10,6 +10,13 @@ namespace RailReader.Core.Services;
 /// Sends block crops to an OpenAI-compatible vision API and returns
 /// LaTeX, Markdown, or a description depending on the block type.
 /// </summary>
+/// <summary>Minimal config needed to call a VLM endpoint.</summary>
+public record VlmEndpointConfig(string? Endpoint, string? Model, string? ApiKey)
+{
+    public static VlmEndpointConfig FromAppConfig(AppConfig config) =>
+        new(config.VlmEndpoint, config.VlmModel, config.VlmApiKey);
+}
+
 public static class VlmService
 {
     public enum BlockAction { LaTeX, Markdown, Description }
@@ -60,7 +67,6 @@ public static class VlmService
     }
 
     // Per-action response schemas for strict JSON schema mode.
-    // Keys match what the CLI extracts in ParseStructuredResponse.
     private static readonly Dictionary<BlockAction, (string FieldName, BinaryData Schema)> Schemas = new()
     {
         [BlockAction.LaTeX] = ("latex", BinaryData.FromString("""
@@ -75,19 +81,19 @@ public static class VlmService
     };
 
     public static async Task<VlmResult> DescribeBlockAsync(
-        byte[] pngBytes, BlockAction action, AppConfig config,
+        byte[] pngBytes, BlockAction action, VlmEndpointConfig endpoint,
         PromptStyle style = PromptStyle.Instruction,
         bool structuredOutput = false, CancellationToken ct = default)
     {
-        if (string.IsNullOrWhiteSpace(config.VlmEndpoint))
+        if (string.IsNullOrWhiteSpace(endpoint.Endpoint))
             return new VlmResult(null, "VLM not configured \u2014 check Settings");
 
-        if (string.IsNullOrWhiteSpace(config.VlmModel))
+        if (string.IsNullOrWhiteSpace(endpoint.Model))
             return new VlmResult(null, "VLM model not configured \u2014 check Settings");
 
         try
         {
-            var client = CreateClient(config);
+            var client = CreateClient(endpoint);
 
             var imageContent = ChatMessageContentPart.CreateImagePart(
                 BinaryData.FromBytes(pngBytes), "image/png");
@@ -160,7 +166,7 @@ public static class VlmService
 
         try
         {
-            var client = CreateClient(config);
+            var client = CreateClient(VlmEndpointConfig.FromAppConfig(config));
 
             var messages = new List<ChatMessage>
             {
@@ -212,15 +218,15 @@ public static class VlmService
         }
     }
 
-    private static ChatClient CreateClient(AppConfig config)
+    private static ChatClient CreateClient(VlmEndpointConfig endpoint)
     {
         var options = new OpenAIClientOptions
         {
-            Endpoint = new Uri(config.VlmEndpoint!),
+            Endpoint = new Uri(endpoint.Endpoint!),
         };
         // Local endpoints like Ollama don't require an API key
         var credential = new ApiKeyCredential(
-            string.IsNullOrWhiteSpace(config.VlmApiKey) ? "not-required" : config.VlmApiKey);
-        return new ChatClient(config.VlmModel!, credential, options);
+            string.IsNullOrWhiteSpace(endpoint.ApiKey) ? "not-required" : endpoint.ApiKey);
+        return new ChatClient(endpoint.Model!, credential, options);
     }
 }
