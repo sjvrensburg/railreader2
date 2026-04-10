@@ -689,6 +689,16 @@
         Use <strong>Test Connection</strong> to verify your setup.
       </p>
 
+      <h3>Structured JSON output</h3>
+      <p>
+        Under <strong>Settings &gt; VLM</strong> there's a <strong>Use structured JSON schema
+        responses</strong> checkbox (off by default). Enabling it forces capable models
+        (GPT-4o, Qwen2.5-VL, Gemini) to return a JSON object matching a strict schema,
+        producing cleaner output &mdash; no stray <code>$$</code> wrappers, code fences, or
+        prompt echoes. Some local or OCR-specialised models don't reliably support JSON schema
+        and may return truncated output; disable the checkbox in that case.
+      </p>
+
       <h3>Recommended models</h3>
       <ul>
         <li><strong>Cloud (OpenAI):</strong> <code>gpt-4.1-mini</code> &mdash;
@@ -792,6 +802,49 @@ railreader2-cli annotations paper.pdf --include-text --include-blocks --output a
 
 # Export as annotated PDF
 railreader2-cli annotations paper.pdf --format pdf --output paper.annotated.pdf</code></pre>
+
+      <h3>vlm &mdash; transcribe blocks via a vision LLM</h3>
+      <p>
+        Sends detected equation, table, and figure crops to an OpenAI-compatible vision API and
+        writes the transcriptions as JSON. Equations become LaTeX, tables become Markdown,
+        figures become one-sentence descriptions. Uses the same endpoints as the GUI's
+        <strong>Copy as LaTeX</strong> feature (OpenAI, Ollama, vLLM, LMStudio, etc.).
+      </p>
+      <pre><code>railreader2-cli vlm &lt;pdf&gt; [options]</code></pre>
+      <table class="shortcuts-table">
+        <thead class="sr-only">
+          <tr><th>Option</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>--classes &lt;list&gt;</code></td><td>Comma-separated subset: <code>equation</code>, <code>table</code>, <code>figure</code></td></tr>
+          <tr><td><code>--all</code></td><td>Shortcut for all three classes</td></tr>
+          <tr><td><code>--pages &lt;range&gt;</code></td><td>Page range (default: all)</td></tr>
+          <tr><td><code>--page &lt;n&gt; --block &lt;i&gt;</code></td><td>Transcribe a single block by page + block index</td></tr>
+          <tr><td><code>--from-structure &lt;path&gt;</code></td><td>Reuse an existing <code>structure --analyze</code> JSON instead of re-running ONNX</td></tr>
+          <tr><td><code>--endpoint &lt;url&gt;</code> / <code>--model</code> / <code>--api-key</code></td><td>Override AppConfig VLM settings (API key also read from <code>$OPENAI_API_KEY</code>)</td></tr>
+          <tr><td><code>--equation-* / --table-* / --figure-*</code></td><td>Per-class endpoint/model/api-key overrides for mixed routing</td></tr>
+          <tr><td><code>--prompt-style &lt;style&gt;</code></td><td><code>instruction</code> (default) or <code>ocr</code></td></tr>
+          <tr><td><code>--concurrency &lt;n&gt;</code></td><td>Parallel VLM requests (default: 1)</td></tr>
+          <tr><td><code>--dump-crops &lt;dir&gt;</code></td><td>Write the PNG crops to disk (useful for debugging)</td></tr>
+          <tr><td><code>--no-structured-output</code></td><td>Disable JSON schema response format (default: on)</td></tr>
+          <tr><td><code>--no-html-to-md</code></td><td>Keep HTML tables as-is (default: convert to Markdown)</td></tr>
+          <tr><td><code>--output &lt;path&gt;</code></td><td>Output JSON file path (default: stdout)</td></tr>
+        </tbody>
+      </table>
+      <pre><code># Transcribe every equation and table in a paper to LaTeX/Markdown
+railreader2-cli vlm paper.pdf --classes equation,table \
+    --endpoint https://api.openai.com/v1 --model gpt-4o-mini \
+    --output transcriptions.json
+
+# Mixed routing: local Ollama for equations, OpenAI for figures
+railreader2-cli vlm paper.pdf --classes equation,figure \
+    --equation-endpoint http://localhost:11434/v1 --equation-model qwen2.5-vl:7b \
+    --figure-endpoint https://api.openai.com/v1 --figure-model gpt-4o-mini \
+    --output rich.json
+
+# Reuse a pre-computed structure JSON (skip ONNX)
+railreader2-cli structure paper.pdf --analyze --output structure.json
+railreader2-cli vlm paper.pdf --from-structure structure.json --all --output vlm.json</code></pre>
     </section>
 
     <!-- 12. Settings -->

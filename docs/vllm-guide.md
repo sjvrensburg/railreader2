@@ -35,6 +35,10 @@ OpenAI's models produce the most reliable LaTeX and Markdown output, especially 
 
 > **Privacy note:** cloud APIs send cropped block images to external servers. For sensitive documents, use a local model instead.
 
+### Structured output (recommended for cloud models)
+
+After configuring an OpenAI-compatible endpoint, enable **Use structured JSON schema responses** under **Settings > VLM**. Capable models (GPT-4o, Qwen2.5-VL, Gemini) will return stricter, cleaner output — no stray `$$` wrappers, no code fences, no prompt echoes. Disable this checkbox if your model returns errors or truncated responses (some local and OCR-specialised models don't support JSON schema enforcement).
+
 ---
 
 ## Option 2: Ollama (simplest local setup)
@@ -129,3 +133,16 @@ Once configured, use any of these to copy a block:
 - **Edit > Copy Block as LaTeX** — same as `Ctrl+L`
 
 A toast notification shows progress ("Sending to VLM...") and confirms when the result is on the clipboard.
+
+### Batch transcription from the CLI
+
+For bulk workflows (entire papers, directory of PDFs, pipeline integration) the headless CLI has a `vlm` subcommand that applies the same transcription pipeline to every detected block in one run:
+
+```bash
+# Transcribe every equation and table to JSON
+railreader2-cli vlm paper.pdf --classes equation,table \
+    --endpoint https://api.openai.com/v1 --model gpt-4o-mini \
+    --output transcriptions.json
+```
+
+It supports per-class endpoint routing (e.g. local LightOnOCR for equations + cloud GPT-4o for figures in one pass), `$OPENAI_API_KEY` env-var fallback, and structured JSON schema output by default. See [CLI Tool > vlm](user-guide.md#vlm--transcribe-blocks-via-a-vision-llm) in the user guide for the full option list.

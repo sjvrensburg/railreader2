@@ -390,6 +390,12 @@ Open **Settings > VLM** and configure:
 
 Use the **Test Connection** button to verify your setup. The API key is stored locally in your config file.
 
+### Structured JSON output
+
+Under **Settings > VLM** there's a **Use structured JSON schema responses** checkbox (off by default). Enabling it forces the model to return a JSON object matching a strict schema (`{latex}`, `{markdown}`, or `{description}`), which produces cleaner output on capable models — no stray `$$` wrappers, code fences, or prompt echoes. Recommended for GPT-4o, Qwen2.5-VL, Gemini, and other instruction-tuned vision models served via an OpenAI-compatible API that honours `response_format: json_schema`.
+
+Some local or OCR-specialised models (LightOnOCR, certain older Ollama builds) don't reliably support JSON schema and may return truncated or mis-escaped output. If you see errors, disable this checkbox.
+
 ### Recommended models
 
 - **Cloud (OpenAI):** `gpt-4.1-mini` — best accuracy for equations and tables. Requires an API key from [platform.openai.com](https://platform.openai.com). Note: sends cropped block images to external servers.
@@ -478,6 +484,75 @@ railreader2-cli annotations paper.pdf --include-text --include-blocks --output a
 # Export as annotated PDF
 railreader2-cli annotations paper.pdf --format pdf --output paper.annotated.pdf
 ```
+
+### vlm — transcribe blocks via a vision LLM
+
+Sends detected equation, table, and figure crops to an OpenAI-compatible vision API and writes the transcriptions as JSON. Equations become LaTeX, tables become Markdown, figures become one-sentence descriptions. Works with any endpoint the GUI's **Copy as LaTeX** feature supports (OpenAI, Ollama, vLLM, LMStudio, etc.).
+
+```
+railreader2-cli vlm <pdf> [options]
+```
+
+**Selection:**
+
+| Option | Description |
+|--------|-------------|
+| `--classes <list>` | Comma-separated subset: `equation`, `table`, `figure` |
+| `--all` | Shortcut for all three classes |
+| `--pages <range>` | Page range (e.g. `1,3,5-10`) |
+| `--page <n> --block <i>` | Transcribe a single block by page + block index |
+| `--min-confidence <f>` | Skip blocks below this detection confidence (0–1) |
+| `--from-structure <path>` | Reuse an existing `structure --analyze` JSON instead of re-running ONNX |
+
+**Endpoint config (override `Settings > VLM`):**
+
+| Option | Description |
+|--------|-------------|
+| `--endpoint <url>` | OpenAI-compatible endpoint |
+| `--model <name>` | Model identifier |
+| `--api-key <key>` | API key (or set `$OPENAI_API_KEY`; blank for local endpoints) |
+| `--prompt-style <style>` | `instruction` (default) or `ocr` — the latter works better with OCR-specialised models |
+
+Per-class overrides allow routing different block types to different backends (e.g. local LightOnOCR for equations, cloud GPT-4o for figure descriptions) in a single run. Each class gets its own fallback-chained `{endpoint, model, api-key}` trio:
+
+```
+--equation-endpoint / --equation-model / --equation-api-key
+--table-endpoint    / --table-model    / --table-api-key
+--figure-endpoint   / --figure-model   / --figure-api-key
+```
+
+**Output & post-processing:**
+
+| Option | Description |
+|--------|-------------|
+| `--output <path>` | JSON output (default: stdout) |
+| `--dpi <n>` | Crop render DPI (default: 300) |
+| `--concurrency <n>` | Parallel VLM requests (default: 1) |
+| `--dump-crops <dir>` | Write the PNG crops to disk (useful for debugging) |
+| `--no-structured-output` | Disable JSON schema response format (default: on — use when the model doesn't support strict JSON schema) |
+| `--no-html-to-md` | Keep HTML tables as-is (default: convert to Markdown) |
+
+```bash
+# Transcribe every equation and table in a paper to LaTeX/Markdown
+railreader2-cli vlm paper.pdf --classes equation,table \
+    --endpoint https://api.openai.com/v1 --model gpt-4o-mini \
+    --output transcriptions.json
+
+# Dry run — dump the detected crops without calling any API
+railreader2-cli vlm paper.pdf --all --dump-crops ./crops/
+
+# Mixed routing: local Ollama for equations, OpenAI for figures
+railreader2-cli vlm paper.pdf --classes equation,figure \
+    --equation-endpoint http://localhost:11434/v1 --equation-model qwen2.5-vl:7b \
+    --figure-endpoint https://api.openai.com/v1 --figure-model gpt-4o-mini \
+    --output rich.json
+
+# Reuse a pre-computed structure JSON (skip ONNX)
+railreader2-cli structure paper.pdf --analyze --output structure.json
+railreader2-cli vlm paper.pdf --from-structure structure.json --all --output vlm.json
+```
+
+When `--api-key` is not set, the command falls back to the `OPENAI_API_KEY` environment variable before finally consulting the saved AppConfig — letting you run the command without putting your key on the command line or in shell history.
 
 ---
 

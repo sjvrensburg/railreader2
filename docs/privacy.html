@@ -33,14 +33,20 @@
 
   <main class="content" id="main-content">
     <h1>Privacy Policy</h1>
-    <p class="subtitle">Last updated: 15 March 2026</p>
+    <p class="subtitle">Last updated: 10 April 2026</p>
 
     <section class="guide-section">
       <h2>Summary</h2>
       <p>
         <strong>railreader2 does not collect, transmit, or store any personal data.</strong>
-        It is a fully offline desktop application. No analytics, no telemetry, no network
-        requests, no accounts.
+        No analytics, no telemetry, no accounts, no crash reports. The application runs
+        entirely on your device by default.
+      </p>
+      <p>
+        The only exception is the optional <strong>Vision Language Model (VLM)</strong>
+        integration, which is <strong>disabled by default</strong> and, when enabled, sends
+        data only to an endpoint you explicitly configure. See
+        <a href="#vlm">Vision Language Model integration</a> below for details.
       </p>
     </section>
 
@@ -57,6 +63,10 @@
           you create on PDF documents, stored as JSON files in the application data directory.</li>
         <li><strong>Recent files list</strong> &mdash; paths to recently opened PDFs, stored in
           the configuration file for convenience. These are local file paths only.</li>
+        <li><strong>VLM settings (if configured)</strong> &mdash; the endpoint URL, model name,
+          and API key you enter in <strong>Settings &gt; VLM</strong> are stored in the same
+          local configuration file. The API key is not transmitted to any party other than the
+          endpoint you configured.</li>
       </ul>
       <p>
         None of this data leaves your computer. You can delete all stored data at any time
@@ -73,23 +83,76 @@
     <section class="guide-section">
       <h2>Network access</h2>
       <p>
-        railreader2 makes <strong>no network requests</strong>. PDF rendering, layout analysis
-        (via the bundled ONNX model), and all other features run entirely on your device.
-        The application does not check for updates, send crash reports, or communicate with
-        any server.
+        By default, railreader2 makes <strong>no network requests</strong>. PDF rendering,
+        layout analysis (via the bundled ONNX model), and all other features run entirely on
+        your device. The application does not check for updates, send crash reports, or
+        communicate with any server.
+      </p>
+      <p>
+        The only network activity that can occur is when you explicitly enable and invoke the
+        optional Vision Language Model integration described below. Until you configure a VLM
+        endpoint in Settings, no network requests are made.
+      </p>
+    </section>
+
+    <section class="guide-section" id="vlm">
+      <h2>Vision Language Model integration</h2>
+      <p>
+        railreader2 provides an optional <strong>Copy as LaTeX</strong> feature (keyboard
+        shortcut <code>Ctrl+L</code>) and a corresponding CLI subcommand
+        (<code>railreader2-cli vlm</code>) that send cropped images of detected layout blocks
+        (equations, tables, figures) to an OpenAI-compatible Vision Language Model API for
+        transcription. This feature is <strong>disabled by default</strong> and requires
+        explicit user action to enable:
+      </p>
+      <ol>
+        <li>Open <strong>Settings &gt; VLM</strong> and enter an endpoint URL, model name,
+          and (optionally) an API key.</li>
+        <li>Press <code>Ctrl+L</code>, use the context menu, or invoke the CLI subcommand to
+          send a block to the configured endpoint.</li>
+      </ol>
+      <p>
+        You choose the endpoint. It may be a fully local server (such as
+        <a href="https://ollama.com">Ollama</a> or
+        <a href="https://docs.vllm.ai">vLLM</a> running on your own machine), in which case
+        no data leaves your device, or a cloud API (such as OpenAI, Google Gemini, or any
+        other OpenAI-compatible provider), in which case the cropped block image and prompt
+        text are transmitted to that provider.
+      </p>
+      <p>
+        <strong>railreader2 is not affiliated with, and is not responsible for, any
+        third-party AI service you choose to use.</strong> Before enabling this feature
+        with a cloud endpoint, you should:
+      </p>
+      <ul>
+        <li>Review the privacy policy and terms of service of the specific AI provider you
+          intend to use. Different providers have very different policies regarding data
+          retention, model training on user inputs, and data sharing.</li>
+        <li>Consider the sensitivity of the documents you are reading. Cropped images may
+          include copyrighted material, confidential content, or personally identifiable
+          information visible on the page.</li>
+        <li>Check whether your institution or employer permits sending document content to
+          external AI services.</li>
+      </ul>
+      <p>
+        If you want the benefits of the feature without sending any data off your machine,
+        use a locally hosted endpoint (Ollama, vLLM, LM Studio, or similar). See the
+        <a href="https://github.com/sjvrensburg/railreader2/blob/main/docs/vllm-guide.md">VLM
+        setup guide</a> for options.
+      </p>
+      <p>
+        To disable the feature entirely, leave the VLM settings blank (or clear them via
+        <strong>Settings &gt; VLM &gt; Reset</strong>). With no endpoint configured,
+        railreader2 makes no VLM network requests and the keyboard shortcut becomes a no-op.
       </p>
     </section>
 
     <section class="guide-section">
       <h2>Third-party services</h2>
       <p>
-        railreader2 does not integrate with any third-party services, advertising networks,
-        or analytics platforms.
-      </p>
-      <p>
-        The optional <strong>CLI tool</strong> (available as a standalone binary from
-        GitHub Releases) is fully offline and makes no network connections. It processes
-        PDFs entirely on your local machine.
+        railreader2 does not integrate with any advertising networks or analytics platforms.
+        The only third-party integration is the user-configurable VLM endpoint described
+        above, which is disabled by default.
       </p>
     </section>
 
