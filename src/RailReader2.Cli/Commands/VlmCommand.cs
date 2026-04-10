@@ -43,6 +43,7 @@ public static class VlmCommand
         var minConfStr = Program.GetOption(args, "min-confidence");
         var fromStructure = Program.GetOption(args, "from-structure");
         var noHtmlToMd = Program.HasFlag(args, "no-html-to-md");
+        var noStructured = Program.HasFlag(args, "no-structured-output");
 
         // Parse numeric options
         int dpi = 300;
@@ -182,7 +183,8 @@ public static class VlmCommand
                         else if (string.IsNullOrWhiteSpace(classCfg.VlmEndpoint))
                             result = new VlmService.VlmResult(null, $"No endpoint configured for {action}");
                         else
-                            result = await VlmService.DescribeBlockAsync(p.Png, action, classCfg, promptStyle);
+                            result = await VlmService.DescribeBlockAsync(
+                                p.Png, action, classCfg, promptStyle, structuredOutput: !noStructured);
 
                         // Post-process: HTML tables → Markdown
                         if (!noHtmlToMd && action == VlmService.BlockAction.Markdown
@@ -505,6 +507,7 @@ public static class VlmCommand
         Console.WriteLine("  --figure-endpoint <url>     --figure-model <name>     --figure-api-key <key>");
         Console.WriteLine();
         Console.WriteLine("Post-processing:");
+        Console.WriteLine("  --no-structured-output      Disable JSON schema response format (default: on)");
         Console.WriteLine("  --no-html-to-md             Keep HTML tables as-is (default: convert to Markdown)");
         Console.WriteLine();
         Console.WriteLine("Output:");

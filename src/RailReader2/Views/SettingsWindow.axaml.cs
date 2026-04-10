@@ -78,6 +78,7 @@ public partial class SettingsWindow : Window
         VlmEndpoint.Text = c.VlmEndpoint ?? "";
         VlmModelName.Text = c.VlmModel ?? "";
         VlmApiKey.Text = c.VlmApiKey ?? "";
+        VlmStructuredOutput.IsChecked = c.VlmStructuredOutput;
     }
 
     private void SaveToConfig()
@@ -101,6 +102,7 @@ public partial class SettingsWindow : Window
         c.VlmEndpoint = string.IsNullOrWhiteSpace(VlmEndpoint.Text) ? null : VlmEndpoint.Text.Trim();
         c.VlmModel = string.IsNullOrWhiteSpace(VlmModelName.Text) ? null : VlmModelName.Text.Trim();
         c.VlmApiKey = string.IsNullOrWhiteSpace(VlmApiKey.Text) ? null : VlmApiKey.Text.Trim();
+        c.VlmStructuredOutput = VlmStructuredOutput.IsChecked ?? false;
         vm.OnConfigChanged();
     }
 
@@ -250,6 +252,7 @@ public partial class SettingsWindow : Window
         vm.Config.VlmEndpoint = defaults.VlmEndpoint;
         vm.Config.VlmModel = defaults.VlmModel;
         vm.Config.VlmApiKey = defaults.VlmApiKey;
+        vm.Config.VlmStructuredOutput = defaults.VlmStructuredOutput;
         _loading = true;
         LoadFromConfig();
         _loading = false;
@@ -257,6 +260,8 @@ public partial class SettingsWindow : Window
     }
 
     private void OnVlmTextChanged(object? sender, TextChangedEventArgs e) => SaveToConfig();
+
+    private void OnVlmCheckChanged(object? sender, RoutedEventArgs e) => SaveToConfig();
 
     private async void OnTestVlmConnection(object? sender, RoutedEventArgs e)
     {

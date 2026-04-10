@@ -1,4 +1,5 @@
 using System.ClientModel;
+using System.Text.Json;
 using OpenAI;
 using OpenAI.Chat;
 using RailReader.Core.Models;
@@ -23,25 +24,60 @@ public static class VlmService
 
     public record VlmResult(string? Text, string? Error);
 
-    private static string GetPrompt(BlockAction action, PromptStyle style) => (action, style) switch
+    private static string GetPrompt(BlockAction action, PromptStyle style, bool structured)
     {
-        (BlockAction.Markdown, PromptStyle.Ocr) =>
-            "Transcribe this table.",
-        (BlockAction.Description, PromptStyle.Ocr) =>
-            "Transcribe the contents of this figure.",
-        (BlockAction.LaTeX, PromptStyle.Ocr) =>
-            "Transcribe this equation as LaTeX.",
-        (BlockAction.Markdown, _) =>
-            "Convert this table to Markdown format. Return only the Markdown table, no explanation.",
-        (BlockAction.Description, _) =>
-            "Describe this figure briefly in one sentence.",
-        _ =>
-            "Convert this to LaTeX. Return only the LaTeX code, no explanation, no surrounding delimiters.",
+        // Structured mode: the response schema enforces shape at decode time,
+        // but OpenAI's docs recommend repeating the expectation in the prompt
+        // for best model behaviour.
+        if (structured)
+        {
+            return action switch
+            {
+                BlockAction.Markdown =>
+                    "Transcribe this table as a Markdown pipe table. Respond as JSON with a single `markdown` field.",
+                BlockAction.Description =>
+                    "Describe this figure in one concise sentence. Respond as JSON with a single `description` field.",
+                _ =>
+                    "Transcribe this equation as LaTeX (no delimiters, no $$). Respond as JSON with a single `latex` field.",
+            };
+        }
+
+        return (action, style) switch
+        {
+            (BlockAction.Markdown, PromptStyle.Ocr) =>
+                "Transcribe this table.",
+            (BlockAction.Description, PromptStyle.Ocr) =>
+                "Transcribe the contents of this figure.",
+            (BlockAction.LaTeX, PromptStyle.Ocr) =>
+                "Transcribe this equation as LaTeX.",
+            (BlockAction.Markdown, _) =>
+                "Convert this table to Markdown format. Return only the Markdown table, no explanation.",
+            (BlockAction.Description, _) =>
+                "Describe this figure briefly in one sentence.",
+            _ =>
+                "Convert this to LaTeX. Return only the LaTeX code, no explanation, no surrounding delimiters.",
+        };
+    }
+
+    // Per-action response schemas for strict JSON schema mode.
+    // Keys match what the CLI extracts in ParseStructuredResponse.
+    private static readonly Dictionary<BlockAction, (string FieldName, BinaryData Schema)> Schemas = new()
+    {
+        [BlockAction.LaTeX] = ("latex", BinaryData.FromString("""
+            {"type":"object","properties":{"latex":{"type":"string"}},"required":["latex"],"additionalProperties":false}
+            """)),
+        [BlockAction.Markdown] = ("markdown", BinaryData.FromString("""
+            {"type":"object","properties":{"markdown":{"type":"string"}},"required":["markdown"],"additionalProperties":false}
+            """)),
+        [BlockAction.Description] = ("description", BinaryData.FromString("""
+            {"type":"object","properties":{"description":{"type":"string"}},"required":["description"],"additionalProperties":false}
+            """)),
     };
 
     public static async Task<VlmResult> DescribeBlockAsync(
         byte[] pngBytes, BlockAction action, AppConfig config,
-        PromptStyle style = PromptStyle.Instruction, CancellationToken ct = default)
+        PromptStyle style = PromptStyle.Instruction,
+        bool structuredOutput = false, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(config.VlmEndpoint))
             return new VlmResult(null, "VLM not configured \u2014 check Settings");
@@ -55,7 +91,7 @@ public static class VlmService
 
             var imageContent = ChatMessageContentPart.CreateImagePart(
                 BinaryData.FromBytes(pngBytes), "image/png");
-            var textContent = ChatMessageContentPart.CreateTextPart(GetPrompt(action, style));
+            var textContent = ChatMessageContentPart.CreateTextPart(GetPrompt(action, style, structuredOutput));
 
             var messages = new List<ChatMessage>
             {
@@ -63,12 +99,28 @@ public static class VlmService
             };
 
             var chatOptions = new ChatCompletionOptions { MaxOutputTokenCount = 1024 };
+            if (structuredOutput)
+            {
+                var (_, schema) = Schemas[action];
+                chatOptions.ResponseFormat = ChatResponseFormat.CreateJsonSchemaFormat(
+                    jsonSchemaFormatName: $"railreader_{action.ToString().ToLowerInvariant()}",
+                    jsonSchema: schema,
+                    jsonSchemaIsStrict: true);
+            }
 
             var completion = await client.CompleteChatAsync(messages, chatOptions, ct);
             var text = completion.Value.Content[0].Text?.Trim();
 
             if (string.IsNullOrWhiteSpace(text))
                 return new VlmResult(null, "VLM returned empty response");
+
+            if (structuredOutput)
+            {
+                var (parsed, parseError) = ExtractSchemaField(text, Schemas[action].FieldName);
+                if (parsed != null) return new VlmResult(parsed, null);
+                // Parse failure: return raw text so the user can recover, but flag it.
+                return new VlmResult(text, $"Structured parse failed: {parseError}");
+            }
 
             return new VlmResult(text, null);
         }
@@ -138,6 +190,25 @@ public static class VlmService
         catch (Exception ex)
         {
             return $"Error: {ex.Message}";
+        }
+    }
+
+    private static (string? Value, string? Error) ExtractSchemaField(string json, string field)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            if (doc.RootElement.ValueKind != JsonValueKind.Object)
+                return (null, "response was not a JSON object");
+            if (!doc.RootElement.TryGetProperty(field, out var valueElem))
+                return (null, $"missing `{field}` field");
+            if (valueElem.ValueKind != JsonValueKind.String)
+                return (null, $"`{field}` was not a string");
+            return (valueElem.GetString(), null);
+        }
+        catch (JsonException ex)
+        {
+            return (null, ex.Message);
         }
     }
 
