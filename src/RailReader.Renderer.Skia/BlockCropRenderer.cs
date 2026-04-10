@@ -11,15 +11,40 @@ public static class BlockCropRenderer
 {
     /// <summary>
     /// Renders the page at the given DPI, crops to the block's BBox with padding,
-    /// and returns the result as PNG bytes.
+    /// and returns the result as PNG bytes. Single-block convenience; for multiple
+    /// blocks on the same page use <see cref="RenderBlocksAsPng"/> to avoid
+    /// re-rasterising the page.
     /// </summary>
     public static byte[]? RenderBlockAsPng(IPdfService pdf, int pageIndex,
         BBox blockBBox, double pageWidth, double pageHeight, int dpi = 300)
     {
         using var rendered = pdf.RenderPage(pageIndex, dpi);
         if (rendered is not SkiaRenderedPage skiaPage) return null;
+        return CropFromBitmap(skiaPage.Bitmap, blockBBox, pageWidth, pageHeight);
+    }
 
-        var bitmap = skiaPage.Bitmap;
+    /// <summary>
+    /// Renders the page once and extracts PNG crops for every block. Order of
+    /// the returned list matches the input order. Entries are null for blocks
+    /// whose crop was empty or failed.
+    /// </summary>
+    public static List<byte[]?> RenderBlocksAsPng(IPdfService pdf, int pageIndex,
+        IReadOnlyList<BBox> blockBBoxes, double pageWidth, double pageHeight, int dpi = 300)
+    {
+        var results = new List<byte[]?>(blockBBoxes.Count);
+        using var rendered = pdf.RenderPage(pageIndex, dpi);
+        if (rendered is not SkiaRenderedPage skiaPage)
+        {
+            for (int i = 0; i < blockBBoxes.Count; i++) results.Add(null);
+            return results;
+        }
+        foreach (var bbox in blockBBoxes)
+            results.Add(CropFromBitmap(skiaPage.Bitmap, bbox, pageWidth, pageHeight));
+        return results;
+    }
+
+    private static byte[]? CropFromBitmap(SKBitmap bitmap, BBox blockBBox, double pageWidth, double pageHeight)
+    {
         float scaleX = bitmap.Width / (float)pageWidth;
         float scaleY = bitmap.Height / (float)pageHeight;
 

@@ -118,6 +118,7 @@ At high zoom levels, navigation switches to "rail mode" — the viewer locks ont
 - **Render pages as PNG** — export PDF pages as images with optional colour effects (high contrast, high visibility, amber, invert) and annotation overlay baked in
 - **Extract document structure** — output outline, ONNX layout blocks, and per-block text as JSON
 - **Export annotations** — export annotations as rich JSON (with extracted text, layout block correlations, and nearest section headings) or as an annotated PDF
+- **Batch VLM transcription** — send detected equations, tables, and figures to an OpenAI-compatible vision API and write LaTeX/Markdown/descriptions as JSON. Supports strict JSON schema output, per-class endpoint routing (e.g. local for equations + cloud for figures), and `$OPENAI_API_KEY` env-var fallback
 - Ships as separate standalone binaries for Linux and Windows on [GitHub Releases](https://github.com/sjvrensburg/railreader2/releases/latest)
 
 #### General
@@ -178,7 +179,7 @@ Use **File → Open** (Ctrl+O) to open a PDF from within the app.
 
 ### CLI usage
 
-The headless CLI (`railreader2-cli`) provides three commands for automated PDF extraction:
+The headless CLI (`railreader2-cli`) provides four commands for automated PDF extraction:
 
 ```bash
 # Render pages as PNG with amber colour effect
@@ -189,9 +190,14 @@ railreader2-cli structure paper.pdf --analyze --include-text --output structure.
 
 # Export annotations with extracted text and block context
 railreader2-cli annotations paper.pdf --include-text --output annotations.json
+
+# Transcribe every equation and table to LaTeX/Markdown via a vision LLM
+railreader2-cli vlm paper.pdf --classes equation,table \
+    --endpoint https://api.openai.com/v1 --model gpt-4o-mini \
+    --output transcriptions.json
 ```
 
-Run `railreader2-cli --help` or `railreader2-cli <command> --help` for all options.
+Run `railreader2-cli --help` or `railreader2-cli <command> --help` for all options. See [docs/user-guide.md](docs/user-guide.md#cli-tool) for full reference.
 
 ### Controls
 

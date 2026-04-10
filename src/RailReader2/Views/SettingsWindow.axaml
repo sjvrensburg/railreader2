@@ -272,6 +272,13 @@
                         <TextBlock Text="The API key is stored locally in your config file."
                                    Opacity="0.5" FontSize="11" Margin="0,0,0,8" />
 
+                        <CheckBox Name="VlmStructuredOutput"
+                                  Content="Use structured JSON schema responses"
+                                  IsCheckedChanged="OnVlmCheckChanged"
+                                  Margin="0,0,0,4" />
+                        <TextBlock TextWrapping="Wrap" Opacity="0.6" FontSize="11" Margin="0,0,0,8"
+                                   Text="Forces the model to return a JSON object matching a strict schema. Produces cleaner LaTeX/Markdown on capable models (GPT-4o, Qwen2.5-VL, Gemini, etc.). Some local or OCR-specialised models may not support JSON schema and will fail or return truncated output — disable this if you see errors." />
+
                         <Button Name="TestVlmButton" Content="Test Connection"
                                 HorizontalAlignment="Left"
                                 Click="OnTestVlmConnection" />

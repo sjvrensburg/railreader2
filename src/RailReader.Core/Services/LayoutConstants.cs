@@ -10,12 +10,15 @@ public static class LayoutConstants
     public const int MinLineHeightPx = 3;
 
     // Frequently referenced class indices (must match LayoutClasses order below)
+    public const int ClassAlgorithm = 1;
     public const int ClassChart = 3;
     public const int ClassDisplayFormula = 5;
     public const int ClassDocTitle = 6;
     public const int ClassFooterImage = 9;
+    public const int ClassFormulaNumber = 11;
     public const int ClassHeaderImage = 13;
     public const int ClassImage = 14;
+    public const int ClassInlineFormula = 15;
     public const int ClassParagraphTitle = 17;
     public const int ClassTable = 21;
 
@@ -77,6 +80,9 @@ public static class LayoutConstants
     [ClassChart, ClassFooterImage, ClassHeaderImage, ClassImage];
 
     public static readonly HashSet<int> TableClasses = [ClassTable];
+
+    public static readonly HashSet<int> EquationClasses =
+    [ClassAlgorithm, ClassDisplayFormula, ClassFormulaNumber, ClassInlineFormula];
 
     public static int? ClassNameToIndex(string name) =>
         Array.IndexOf(LayoutClasses, name) is var idx and >= 0 ? idx : null;

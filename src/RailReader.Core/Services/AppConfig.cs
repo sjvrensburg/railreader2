@@ -49,6 +49,7 @@ public sealed class AppConfig
     public string? VlmEndpoint { get; set; }
     public string? VlmModel { get; set; }
     public string? VlmApiKey { get; set; }
+    public bool VlmStructuredOutput { get; set; } = false;
 
     /// <summary>Creates an independent deep copy via JSON round-trip.</summary>
     public AppConfig Clone() =>
