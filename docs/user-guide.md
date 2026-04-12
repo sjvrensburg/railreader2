@@ -554,6 +554,65 @@ railreader2-cli vlm paper.pdf --from-structure structure.json --all --output vlm
 
 When `--api-key` is not set, the command falls back to the `OPENAI_API_KEY` environment variable before finally consulting the saved AppConfig — letting you run the command without putting your key on the command line or in shell history.
 
+### export — convert PDF to Markdown
+
+Exports a PDF to structured Markdown using layout analysis, VLM transcription, and annotation extraction. Heading hierarchy is resolved by matching detected heading blocks against the PDF outline tree. Degrades gracefully depending on available tools.
+
+```
+railreader2-cli export <pdf> [options]
+```
+
+**Output:**
+
+| Option | Description |
+|--------|-------------|
+| `--output <path>` | Markdown output file (default: stdout) |
+| `--pages <range>` | Page range (e.g. `1,3,5-10`) |
+| `--no-page-breaks` | Omit page break markers (`---`) between pages |
+
+**Content:**
+
+| Option | Description |
+|--------|-------------|
+| `--no-vlm` | Disable VLM transcription (equations/tables/figures become placeholders) |
+| `--no-annotations` | Exclude annotations from output |
+| `--figure-dir <dir>` | Save figure PNGs and reference them in the Markdown |
+
+**VLM config (override `Settings > VLM`):**
+
+| Option | Description |
+|--------|-------------|
+| `--endpoint <url>` | OpenAI-compatible endpoint |
+| `--model <name>` | Model identifier |
+| `--api-key <key>` | API key (or set `$OPENAI_API_KEY`; blank for local endpoints) |
+| `--concurrency <n>` | Parallel VLM requests (default: 2) |
+| `--prompt-style <style>` | `instruction` (default) or `ocr` |
+| `--no-structured-output` | Disable JSON schema response format |
+
+```bash
+# Basic export (text + headings, equations/figures as placeholders)
+railreader2-cli export paper.pdf --no-vlm --output paper.md
+
+# Full fidelity with VLM (LaTeX equations, Markdown tables, figure descriptions)
+railreader2-cli export paper.pdf \
+    --endpoint https://api.openai.com/v1 --model gpt-4o-mini \
+    --output paper.md
+
+# Export with figure images saved to disk
+railreader2-cli export paper.pdf --figure-dir ./figures --output paper.md
+
+# Export specific pages without annotations
+railreader2-cli export paper.pdf --pages 1-10 --no-annotations --output chapter1.md
+```
+
+**Graceful degradation:**
+
+| Available tools | Behaviour |
+|----------------|-----------|
+| ONNX + VLM + Annotations | Full fidelity: headings, LaTeX equations, pipe tables, figure images/descriptions, annotation blockquotes |
+| ONNX only (no VLM) | Headings + text + `[equation]`/`[figure]` placeholders + code-block tables |
+| Neither | Plain text per page with heading markers from the PDF outline |
+
 ---
 
 ## Settings

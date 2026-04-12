@@ -15,6 +15,24 @@ public record VlmEndpointConfig(string? Endpoint, string? Model, string? ApiKey)
 {
     public static VlmEndpointConfig FromAppConfig(AppConfig config) =>
         new(config.VlmEndpoint, config.VlmModel, config.VlmApiKey);
+
+    /// <summary>
+    /// Resolves a VLM endpoint from CLI overrides, AppConfig, and OPENAI_API_KEY env var.
+    /// Precedence: explicit override > AppConfig > $OPENAI_API_KEY.
+    /// </summary>
+    public static VlmEndpointConfig FromAppConfigWithOverrides(
+        string? endpointOverride = null, string? modelOverride = null, string? apiKeyOverride = null)
+    {
+        var appConfig = AppConfig.Load();
+        var apiKey = apiKeyOverride
+            ?? (string.IsNullOrWhiteSpace(appConfig.VlmApiKey)
+                ? Environment.GetEnvironmentVariable("OPENAI_API_KEY")
+                : appConfig.VlmApiKey);
+        return new VlmEndpointConfig(
+            endpointOverride ?? appConfig.VlmEndpoint,
+            modelOverride ?? appConfig.VlmModel,
+            apiKey);
+    }
 }
 
 public static class VlmService
@@ -197,6 +215,21 @@ public static class VlmService
         {
             return $"Error: {ex.Message}";
         }
+    }
+
+    /// <summary>
+    /// Returns the VLM action for a layout block class, or null if the class
+    /// is not a VLM-eligible type (equation, table, or figure).
+    /// </summary>
+    public static BlockAction? GetBlockAction(int classId)
+    {
+        if (LayoutConstants.EquationClasses.Contains(classId))
+            return BlockAction.LaTeX;
+        if (LayoutConstants.TableClasses.Contains(classId))
+            return BlockAction.Markdown;
+        if (LayoutConstants.FigureClasses.Contains(classId))
+            return BlockAction.Description;
+        return null;
     }
 
     private static (string? Value, string? Error) ExtractSchemaField(string json, string field)

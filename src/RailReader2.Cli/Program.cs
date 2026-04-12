@@ -31,6 +31,7 @@ static class Program
                 "structure" => Commands.StructureCommand.Execute(args[1..], factory, logger),
                 "annotations" => Commands.AnnotationsCommand.Execute(args[1..], factory, logger),
                 "vlm" => Commands.VlmCommand.Execute(args[1..], factory, logger),
+                "export" => Commands.ExportCommand.Execute(args[1..], factory, logger),
                 _ => Fail($"Unknown command: '{args[0]}'. Run with --help for usage.")
             };
         }
@@ -51,6 +52,7 @@ static class Program
         Console.WriteLine("  structure <pdf>       Extract document structure as JSON");
         Console.WriteLine("  annotations <pdf>     Export annotations as JSON or PDF");
         Console.WriteLine("  vlm <pdf>             Transcribe equations/tables/figures via a vision LLM");
+        Console.WriteLine("  export <pdf>          Export PDF to structured Markdown");
         Console.WriteLine();
         Console.WriteLine("Run 'railreader2-cli <command> --help' for command-specific options.");
         return 0;

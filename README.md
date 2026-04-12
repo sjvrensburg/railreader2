@@ -119,6 +119,7 @@ At high zoom levels, navigation switches to "rail mode" — the viewer locks ont
 - **Extract document structure** — output outline, ONNX layout blocks, and per-block text as JSON
 - **Export annotations** — export annotations as rich JSON (with extracted text, layout block correlations, and nearest section headings) or as an annotated PDF
 - **Batch VLM transcription** — send detected equations, tables, and figures to an OpenAI-compatible vision API and write LaTeX/Markdown/descriptions as JSON. Supports strict JSON schema output, per-class endpoint routing (e.g. local for equations + cloud for figures), and `$OPENAI_API_KEY` env-var fallback
+- **Export to Markdown** — convert a PDF to structured Markdown with heading hierarchy (matched against the PDF outline), LaTeX equations, pipe tables, figure images/descriptions, and annotation blockquotes. Degrades gracefully: full fidelity with ONNX + VLM, text-with-placeholders with ONNX only, plain text without either
 - Ships as separate standalone binaries for Linux and Windows on [GitHub Releases](https://github.com/sjvrensburg/railreader2/releases/latest)
 
 #### General
@@ -179,7 +180,7 @@ Use **File → Open** (Ctrl+O) to open a PDF from within the app.
 
 ### CLI usage
 
-The headless CLI (`railreader2-cli`) provides four commands for automated PDF extraction:
+The headless CLI (`railreader2-cli`) provides five commands for automated PDF extraction:
 
 ```bash
 # Render pages as PNG with amber colour effect
@@ -195,6 +196,9 @@ railreader2-cli annotations paper.pdf --include-text --output annotations.json
 railreader2-cli vlm paper.pdf --classes equation,table \
     --endpoint https://api.openai.com/v1 --model gpt-4o-mini \
     --output transcriptions.json
+
+# Export PDF to structured Markdown (headings, LaTeX, tables, figures, annotations)
+railreader2-cli export paper.pdf --output paper.md
 ```
 
 Run `railreader2-cli --help` or `railreader2-cli <command> --help` for all options. See [docs/user-guide.md](docs/user-guide.md#cli-tool) for full reference.
@@ -324,9 +328,11 @@ The codebase is split into a rendering-agnostic core library, a shared SkiaSharp
 RailReader2.slnx              # Default solution
 ├── src/RailReader.Core/        # Business logic (zero Avalonia, zero SkiaSharp)
 ├── src/RailReader.Renderer.Skia/ # SkiaSharp rendering (implements Core interfaces)
+├── src/RailReader.Export/      # Markdown export pipeline (references Core + Renderer.Skia)
 ├── src/RailReader2/            # Thin Avalonia UI shell
-├── src/RailReader2.Cli/        # Headless CLI (references Core + Renderer.Skia, zero Avalonia)
-└── tests/RailReader.Core.Tests/  # 105+ xUnit headless tests
+├── src/RailReader2.Cli/        # Headless CLI (references Core + Renderer.Skia + Export)
+├── tests/RailReader.Core.Tests/  # xUnit headless tests for Core
+└── tests/RailReader.Export.Tests/ # xUnit tests for Export
 ```
 
 **RailReader.Core** contains `DocumentController` (the headless orchestration facade), `DocumentState` (per-document state), all Models and Services. It has no rendering-library dependency — PDF rendering is abstracted behind `IPdfService`/`IPdfTextService` interfaces. The test project uses it directly.
@@ -346,6 +352,12 @@ railreader2-cli structure paper.pdf --analyze --include-text --output structure.
 
 # Export annotations with text and layout context
 railreader2-cli annotations paper.pdf --include-text --include-blocks --pages 1-10 --output annotations.json
+
+# Export to structured Markdown
+railreader2-cli export paper.pdf --pages 1-20 --output paper.md
+
+# Export with VLM transcription for equations and tables
+railreader2-cli export paper.pdf --endpoint https://api.openai.com/v1 --model gpt-4o-mini --output paper.md
 ```
 
 The CLI uses the ONNX layout model from the GUI installation. If the GUI isn't installed, download the model with `./scripts/download-model.sh`.
