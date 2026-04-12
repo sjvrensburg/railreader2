@@ -3,7 +3,7 @@ using System.Runtime.InteropServices;
 namespace RailReader.Core.Services;
 
 /// <summary>
-/// Centralised PDFium P/Invoke declarations used by PdfOutlineExtractor and PdfTextService.
+/// Centralised PDFium P/Invoke declarations.
 /// </summary>
 internal static class PdfiumNative
 {
@@ -70,6 +70,67 @@ internal static class PdfiumNative
         float offsetY = hasCropBox ? cropBottom : 0;
         double visibleHeight = hasCropBox ? cropTop - cropBottom : FPDF_GetPageHeight(page);
         return (offsetX, offsetY, visibleHeight);
+    }
+
+    // Document creation & page copying
+    [DllImport(Lib)] internal static extern IntPtr FPDF_CreateNewDocument();
+    [DllImport(Lib)] internal static extern bool FPDF_ImportPages(IntPtr destDoc, IntPtr srcDoc,
+        [MarshalAs(UnmanagedType.LPStr)] string? pageRange, int insertIndex);
+    [DllImport(Lib)] internal static extern bool FPDF_SaveAsCopy(
+        IntPtr document, ref FpdfFileWrite fileWrite, uint flags);
+
+    // Annotation creation
+    [DllImport(Lib)] internal static extern IntPtr FPDFPage_CreateAnnot(IntPtr page, int subtype);
+    [DllImport(Lib)] internal static extern void FPDFPage_CloseAnnot(IntPtr annot);
+    [DllImport(Lib)] internal static extern bool FPDFAnnot_SetRect(IntPtr annot, ref FsRectF rect);
+    [DllImport(Lib)] internal static extern bool FPDFAnnot_SetColor(IntPtr annot, int colorType,
+        uint r, uint g, uint b, uint a);
+    [DllImport(Lib)] internal static extern bool FPDFAnnot_SetBorder(IntPtr annot,
+        float horizontalRadius, float verticalRadius, float borderWidth);
+    [DllImport(Lib)] internal static extern bool FPDFAnnot_SetFlags(IntPtr annot, int flags);
+    [DllImport(Lib)] internal static extern bool FPDFAnnot_SetStringValue(IntPtr annot,
+        [MarshalAs(UnmanagedType.LPStr)] string key, IntPtr value);
+    [DllImport(Lib)] internal static extern bool FPDFAnnot_AppendAttachmentPoints(
+        IntPtr annot, ref FsQuadPointsF quadPoints);
+    [DllImport(Lib)] internal static extern int FPDFAnnot_AddInkStroke(
+        IntPtr annot, FsPointF[] points, nuint pointCount);
+
+    // Annotation subtype constants
+    internal const int FPDF_ANNOT_TEXT = 1;
+    internal const int FPDF_ANNOT_SQUARE = 5;
+    internal const int FPDF_ANNOT_HIGHLIGHT = 9;
+    internal const int FPDF_ANNOT_INK = 15;
+    internal const int FPDF_ANNOT_FLAG_PRINT = 4;
+    internal const int FPDFANNOT_COLORTYPE_COLOR = 0;
+    internal const int FPDFANNOT_COLORTYPE_INTERIOR = 1;
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct FsQuadPointsF
+    {
+        public float X1, Y1, X2, Y2, X3, Y3, X4, Y4;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct FsPointF { public float X, Y; }
+
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+    internal delegate int WriteBlockDelegate(IntPtr self, IntPtr data, uint size);
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct FpdfFileWrite
+    {
+        public int Version;
+        public IntPtr WriteBlock;
+    }
+
+    /// <summary>
+    /// Converts a point from page-point space (top-left origin, Y-down) to
+    /// PDF user space (bottom-left origin, Y-up), accounting for CropBox offset.
+    /// </summary>
+    internal static (float PdfX, float PdfY) PagePointToPdf(
+        float pointX, float pointY, float cropLeft, float cropBottom, double visibleHeight)
+    {
+        return (pointX + cropLeft, (float)(visibleHeight - pointY) + cropBottom);
     }
 
     // Text
