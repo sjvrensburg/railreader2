@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using RailReader.Core.Models;
 using RailReader.Core.Services;
 using SkiaSharp;
@@ -22,10 +23,26 @@ public static class AnnotationRenderer
     [ThreadStatic] private static SKPaint? s_handleFillPaint;
     [ThreadStatic] private static SKPaint? s_handleStrokePaint;
 
+    // Cached freehand SKPath per thread — avoids rebuilding native path every frame.
+    // ConditionalWeakTable so paths are GC'd when annotations are collected.
+    [ThreadStatic] private static ConditionalWeakTable<FreehandAnnotation, SKPath>? s_freehandPaths;
+    [ThreadStatic] private static ConditionalWeakTable<FreehandAnnotation, StrongBox<int>>? s_freehandPointCounts;
+
+    // Cached text note popup layout per thread — avoids WrapText + MeasureText every frame.
+    [ThreadStatic] private static TextNoteAnnotation? s_noteLayoutOwner;
+    [ThreadStatic] private static string? s_noteLayoutText;
+    [ThreadStatic] private static List<string>? s_noteLayoutLines;
+    [ThreadStatic] private static float s_noteLayoutPopupW;
+    [ThreadStatic] private static float s_noteLayoutPopupH;
+
+    // Shared unit-size icon path for text notes — translated per note, never rebuilt.
+    [ThreadStatic] private static SKPath? s_noteIconPath;
+    [ThreadStatic] private static SKPath? s_noteFoldPath;
+
     /// <summary>
     /// Z-order: highlights → freehand + rectangles → text notes.
     /// </summary>
-    private static int ZOrder(Annotation ann) => ann switch
+    internal static int ZOrder(Annotation ann) => ann switch
     {
         HighlightAnnotation => 0,
         FreehandAnnotation  => 1,
@@ -34,11 +51,28 @@ public static class AnnotationRenderer
         _ => 1,
     };
 
+    /// <summary>
+    /// Returns a pre-sorted copy of annotations in z-order for use by the compositor.
+    /// Call on the UI thread when building render state to avoid LINQ on the render path.
+    /// </summary>
+    public static List<Annotation> SortByZOrder(List<Annotation> annotations)
+    {
+        var sorted = new List<Annotation>(annotations.Count);
+        // Three-pass stable sort avoids LINQ allocation: highlights, then freehand/rect, then text notes.
+        foreach (var a in annotations) if (a is HighlightAnnotation) sorted.Add(a);
+        foreach (var a in annotations) if (a is FreehandAnnotation or RectAnnotation) sorted.Add(a);
+        foreach (var a in annotations) if (a is TextNoteAnnotation) sorted.Add(a);
+        // Catch any unknown types
+        if (sorted.Count < annotations.Count)
+            foreach (var a in annotations) if (!sorted.Contains(a)) sorted.Add(a);
+        return sorted;
+    }
+
     public static void DrawAnnotations(SKCanvas canvas, List<Annotation> annotations, Annotation? selected,
         bool expandAllNotes = false)
     {
-        // Draw in z-order; stable sort preserves user creation order within each tier
-        foreach (var ann in annotations.OrderBy(ZOrder))
+        // Annotations are expected to arrive pre-sorted by ZOrder from the UI thread.
+        foreach (var ann in annotations)
             DrawAnnotation(canvas, ann, ann == selected, expandAllNotes);
     }
 
@@ -91,15 +125,46 @@ public static class AnnotationRenderer
     {
         if (freehand.Points.Count < 2) return;
 
-        using var path = new SKPath();
-        path.MoveTo(freehand.Points[0].X, freehand.Points[0].Y);
-        for (int i = 1; i < freehand.Points.Count; i++)
-            path.LineTo(freehand.Points[i].X, freehand.Points[i].Y);
-
+        var path = GetOrCreateFreehandPath(freehand);
         var paint = GetStrokePaint();
         paint.Color = color;
         paint.StrokeWidth = freehand.StrokeWidth;
         canvas.DrawPath(path, paint);
+    }
+
+    /// <summary>
+    /// Returns a cached SKPath for the freehand annotation, rebuilding only when
+    /// the point count changes. Eliminates O(points) native interop per frame.
+    /// </summary>
+    private static SKPath GetOrCreateFreehandPath(FreehandAnnotation freehand)
+    {
+        var paths = s_freehandPaths ??= new();
+        var counts = s_freehandPointCounts ??= new();
+
+        if (paths.TryGetValue(freehand, out var cached)
+            && counts.TryGetValue(freehand, out var countBox)
+            && countBox.Value == freehand.Points.Count)
+        {
+            return cached;
+        }
+
+        // Rebuild path
+        var path = new SKPath();
+        path.MoveTo(freehand.Points[0].X, freehand.Points[0].Y);
+        for (int i = 1; i < freehand.Points.Count; i++)
+            path.LineTo(freehand.Points[i].X, freehand.Points[i].Y);
+
+        // Dispose old cached path if present
+        if (cached is not null)
+        {
+            cached.Dispose();
+            paths.Remove(freehand);
+            counts.Remove(freehand);
+        }
+
+        paths.AddOrUpdate(freehand, path);
+        counts.AddOrUpdate(freehand, new StrongBox<int>(freehand.Points.Count));
+        return path;
     }
 
     private const float NoteIconSize = 16f;
@@ -111,27 +176,19 @@ public static class AnnotationRenderer
     {
         float ix = note.X - NoteIconSize / 2;
         float iy = note.Y - NoteIconSize / 2;
-        float foldSize = 4f;
 
-        // Icon body (folded corner note shape)
-        using var iconPath = new SKPath();
-        iconPath.MoveTo(ix, iy);
-        iconPath.LineTo(ix + NoteIconSize - foldSize, iy);
-        iconPath.LineTo(ix + NoteIconSize, iy + foldSize);
-        iconPath.LineTo(ix + NoteIconSize, iy + NoteIconSize);
-        iconPath.LineTo(ix, iy + NoteIconSize);
-        iconPath.Close();
+        // Shared unit-size icon paths — built once per thread, translated per note.
+        var iconPath = GetNoteIconPath();
+        var foldPath = GetNoteFoldPath();
+
+        canvas.Save();
+        canvas.Translate(ix, iy);
 
         var fillPaint = GetFillPaint();
         fillPaint.Color = color;
         canvas.DrawPath(iconPath, fillPaint);
 
         // Fold triangle
-        using var foldPath = new SKPath();
-        foldPath.MoveTo(ix + NoteIconSize - foldSize, iy);
-        foldPath.LineTo(ix + NoteIconSize - foldSize, iy + foldSize);
-        foldPath.LineTo(ix + NoteIconSize, iy + foldSize);
-        foldPath.Close();
         var foldColor = color.WithAlpha((byte)(color.Alpha * 0.6f));
         fillPaint.Color = foldColor;
         canvas.DrawPath(foldPath, fillPaint);
@@ -146,6 +203,8 @@ public static class AnnotationRenderer
         borderPaint.Color = color.WithAlpha(255);
         canvas.DrawPath(iconPath, borderPaint);
 
+        canvas.Restore();
+
         // Expanded popup
         if ((note.IsExpanded || forceExpand) && !string.IsNullOrEmpty(note.Text))
         {
@@ -153,17 +212,8 @@ public static class AnnotationRenderer
             var textPaint = s_noteTextPaint ??= new SKPaint { Color = new SKColor(0, 0, 0, 220), IsAntialias = true };
             var bgPaint = s_noteBgPaint ??= new SKPaint { Color = new SKColor(255, 255, 200, 240) };
 
-            // Word-wrap text
-            var lines = WrapText(note.Text, font, PopupMaxWidth - PopupPadding * 2);
-            float lineHeight = font.Size * 1.4f;
-            float popupW = PopupPadding * 2;
-            foreach (var line in lines)
-            {
-                float lw = font.MeasureText(line);
-                if (lw + PopupPadding * 2 > popupW) popupW = lw + PopupPadding * 2;
-            }
-            popupW = Math.Min(popupW, PopupMaxWidth);
-            float popupH = lines.Count * lineHeight + PopupPadding * 2;
+            // Cached text layout — skip WrapText + MeasureText when note text hasn't changed.
+            var (lines, popupW, popupH) = GetOrComputeNoteLayout(note, font);
 
             float popupX = note.X + NoteIconSize / 2 + 4;
             float popupY = note.Y + NoteIconSize / 2 + 2;
@@ -186,6 +236,7 @@ public static class AnnotationRenderer
             canvas.DrawRoundRect(popupRect, 3, 3, borderPaint);
 
             // Text lines
+            float lineHeight = font.Size * 1.4f;
             float ty = popupY + PopupPadding + font.Size;
             foreach (var line in lines)
             {
@@ -193,6 +244,70 @@ public static class AnnotationRenderer
                 ty += lineHeight;
             }
         }
+    }
+
+    /// <summary>
+    /// Returns the shared unit-size note icon path (built once per thread).
+    /// Path is in local coordinates [0, 0] → [NoteIconSize, NoteIconSize].
+    /// </summary>
+    private static SKPath GetNoteIconPath()
+    {
+        if (s_noteIconPath is not null) return s_noteIconPath;
+        const float foldSize = 4f;
+        var path = new SKPath();
+        path.MoveTo(0, 0);
+        path.LineTo(NoteIconSize - foldSize, 0);
+        path.LineTo(NoteIconSize, foldSize);
+        path.LineTo(NoteIconSize, NoteIconSize);
+        path.LineTo(0, NoteIconSize);
+        path.Close();
+        s_noteIconPath = path;
+        return path;
+    }
+
+    /// <summary>
+    /// Returns the shared unit-size note fold triangle path (built once per thread).
+    /// </summary>
+    private static SKPath GetNoteFoldPath()
+    {
+        if (s_noteFoldPath is not null) return s_noteFoldPath;
+        const float foldSize = 4f;
+        var path = new SKPath();
+        path.MoveTo(NoteIconSize - foldSize, 0);
+        path.LineTo(NoteIconSize - foldSize, foldSize);
+        path.LineTo(NoteIconSize, foldSize);
+        path.Close();
+        s_noteFoldPath = path;
+        return path;
+    }
+
+    /// <summary>
+    /// Returns cached text layout for a note popup. Recomputes only when the
+    /// note identity or text changes, eliminating WrapText + MeasureText per frame.
+    /// </summary>
+    private static (List<string> Lines, float PopupW, float PopupH) GetOrComputeNoteLayout(
+        TextNoteAnnotation note, SKFont font)
+    {
+        if (s_noteLayoutOwner == note && s_noteLayoutText == note.Text && s_noteLayoutLines is not null)
+            return (s_noteLayoutLines, s_noteLayoutPopupW, s_noteLayoutPopupH);
+
+        var lines = WrapText(note.Text, font, PopupMaxWidth - PopupPadding * 2);
+        float lineHeight = font.Size * 1.4f;
+        float popupW = PopupPadding * 2;
+        foreach (var line in lines)
+        {
+            float lw = font.MeasureText(line);
+            if (lw + PopupPadding * 2 > popupW) popupW = lw + PopupPadding * 2;
+        }
+        popupW = Math.Min(popupW, PopupMaxWidth);
+        float popupH = lines.Count * lineHeight + PopupPadding * 2;
+
+        s_noteLayoutOwner = note;
+        s_noteLayoutText = note.Text;
+        s_noteLayoutLines = lines;
+        s_noteLayoutPopupW = popupW;
+        s_noteLayoutPopupH = popupH;
+        return (lines, popupW, popupH);
     }
 
     private static List<string> WrapText(string text, SKFont font, float maxWidth)

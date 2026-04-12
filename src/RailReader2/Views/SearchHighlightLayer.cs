@@ -15,7 +15,8 @@ namespace RailReader2.Views;
 internal sealed record SearchRenderState(
     SKMatrix Camera,
     List<SearchMatch>? Matches,
-    int ActiveLocalIndex);
+    int ActiveLocalIndex,
+    SKRect ViewportInPageSpace);
 
 /// <summary>
 /// Hosts a CompositionCustomVisual for search highlight rendering.
@@ -50,7 +51,8 @@ internal sealed class SearchVisualHandler : CompositionCustomVisualHandler
         canvas.SetMatrix(SKMatrix.Concat(canvas.TotalMatrix, state.Camera));
 
         OverlayRenderer.DrawSearchHighlights(canvas, matches, state.ActiveLocalIndex,
-            OverlayRenderer.GetHighlightPaint(), OverlayRenderer.GetActivePaint());
+            OverlayRenderer.GetHighlightPaint(), OverlayRenderer.GetActivePaint(),
+            state.ViewportInPageSpace);
 
         canvas.Restore();
     }

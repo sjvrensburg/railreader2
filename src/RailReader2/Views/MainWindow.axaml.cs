@@ -444,9 +444,14 @@ public partial class MainWindow : Window
         if (tab is not null)
             tab.Annotations.Pages.TryGetValue(tab.CurrentPage, out pageAnnotations);
 
+        // Pre-sort by z-order on the UI thread so the compositor doesn't need LINQ.
+        var sorted = pageAnnotations is { Count: > 1 }
+            ? AnnotationRenderer.SortByZOrder(pageAnnotations)
+            : pageAnnotations;
+
         return new AnnotationRenderState(
             Camera: BuildCamera(tab),
-            PageAnnotations: pageAnnotations,
+            PageAnnotations: sorted,
             SelectedAnnotation: vm.SelectedAnnotation,
             PreviewAnnotation: vm.PreviewAnnotation,
             TextSelectionRects: vm.TextSelectionRects);
@@ -460,10 +465,20 @@ public partial class MainWindow : Window
             activeLocalIndex = OverlayRenderer.ComputeActiveLocalIndex(
                 vm.SearchMatches, matches, vm.ActiveMatchIndex, tab.CurrentPage);
 
+        // Compute viewport in page space for search highlight culling.
+        var camera = BuildCamera(tab);
+        SKRect viewport = SKRect.Empty;
+        if (camera.TryInvert(out var inv))
+        {
+            var bounds = Bounds;
+            viewport = inv.MapRect(new SKRect(0, 0, (float)bounds.Width, (float)bounds.Height));
+        }
+
         return new SearchRenderState(
-            Camera: BuildCamera(tab),
+            Camera: camera,
             Matches: matches,
-            ActiveLocalIndex: activeLocalIndex);
+            ActiveLocalIndex: activeLocalIndex,
+            ViewportInPageSpace: viewport);
     }
 
     /// <summary>

@@ -166,6 +166,7 @@ public sealed class DocumentState : IDisposable
     /// Renders the current page bitmap. Safe to call from a background thread.
     /// Does NOT submit analysis (which requires UI-thread access to the worker).
     /// Returns false if the page could not be rendered.
+    /// Uses prefetched bitmap if available for the current page (seamless auto-scroll transitions).
     /// </summary>
     public bool LoadPageBitmap()
     {
@@ -174,6 +175,22 @@ public sealed class DocumentState : IDisposable
 
         try
         {
+            // Fast path: use prefetched page if available (e.g. from auto-scroll lookahead).
+            if (_prefetchedPageIndex == CurrentPage && _prefetchedPage is not null)
+            {
+                CachedPage = _prefetchedPage;
+                CachedDpi = CalculateRenderDpi(Camera.Zoom);
+                MinimapPage = _prefetchedMinimap;
+                PageWidth = _prefetchedPageWidth;
+                PageHeight = _prefetchedPageHeight;
+                _prefetchedPage = null;
+                _prefetchedMinimap = null;
+                _prefetchedPageIndex = -1;
+                oldPage?.Dispose();
+                oldMinimap?.Dispose();
+                return true;
+            }
+
             var (w, h) = _pdf.GetPageSize(CurrentPage);
             int dpi = CalculateRenderDpi(Camera.Zoom);
             var newPage = _pdf.RenderPage(CurrentPage, dpi);
@@ -197,7 +214,73 @@ public sealed class DocumentState : IDisposable
         }
     }
 
+    /// <summary>
+    /// Schedules background rendering of the specified page for seamless auto-scroll
+    /// page transitions. The prefetched bitmap is consumed by the next LoadPageBitmap()
+    /// call if it targets the same page. No-op if a prefetch is already pending or
+    /// the page is out of range.
+    /// </summary>
+    internal void PrefetchPage(int pageIndex)
+    {
+        if (_prefetchPending || pageIndex < 0 || pageIndex >= PageCount || IsDisposed)
+            return;
+        if (_prefetchedPageIndex == pageIndex)
+            return; // already prefetched
+
+        _prefetchPending = true;
+        int dpi = CalculateRenderDpi(Camera.Zoom);
+        var ct = _cts.Token;
+
+        Task.Run(() =>
+        {
+            try
+            {
+                ct.ThrowIfCancellationRequested();
+                var (w, h) = _pdf.GetPageSize(pageIndex);
+                var page = _pdf.RenderPage(pageIndex, dpi);
+                var minimap = _pdf.RenderThumbnail(pageIndex);
+
+                _marshaller.Post(() =>
+                {
+                    if (IsDisposed)
+                    {
+                        page.Dispose();
+                        minimap.Dispose();
+                        _prefetchPending = false;
+                        return;
+                    }
+
+                    // Dispose any stale prefetch
+                    _prefetchedPage?.Dispose();
+                    _prefetchedMinimap?.Dispose();
+
+                    _prefetchedPage = page;
+                    _prefetchedMinimap = minimap;
+                    _prefetchedPageWidth = w;
+                    _prefetchedPageHeight = h;
+                    _prefetchedPageIndex = pageIndex;
+                    _prefetchPending = false;
+                });
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception ex)
+            {
+                _logger.Error($"Failed to prefetch page {pageIndex + 1}: {ex.Message}", ex);
+                try { _marshaller.Post(() => _prefetchPending = false); }
+                catch { _prefetchPending = false; }
+            }
+        }, ct);
+    }
+
     private bool _dpiRenderPending;
+
+    // Page prefetch for seamless auto-scroll page transitions.
+    private int _prefetchedPageIndex = -1;
+    private IRenderedPage? _prefetchedPage;
+    private IRenderedPage? _prefetchedMinimap;
+    private double _prefetchedPageWidth;
+    private double _prefetchedPageHeight;
+    private bool _prefetchPending;
 
     /// <summary>
     /// Set to true when a DPI re-render completes. The next animation frame
@@ -713,6 +796,11 @@ public sealed class DocumentState : IDisposable
         var mm = MinimapPage;
         MinimapPage = null;
         mm?.Dispose();
+        _prefetchedPage?.Dispose();
+        _prefetchedPage = null;
+        _prefetchedMinimap?.Dispose();
+        _prefetchedMinimap = null;
+        _prefetchedPageIndex = -1;
         _cts.Dispose();
     }
 }
