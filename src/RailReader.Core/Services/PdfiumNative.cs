@@ -3,7 +3,7 @@ using System.Runtime.InteropServices;
 namespace RailReader.Core.Services;
 
 /// <summary>
-/// Centralised PDFium P/Invoke declarations used by PdfOutlineExtractor and PdfTextService.
+/// Centralised PDFium P/Invoke declarations.
 /// </summary>
 internal static class PdfiumNative
 {
@@ -76,7 +76,6 @@ internal static class PdfiumNative
     [DllImport(Lib)] internal static extern IntPtr FPDF_CreateNewDocument();
     [DllImport(Lib)] internal static extern bool FPDF_ImportPages(IntPtr destDoc, IntPtr srcDoc,
         [MarshalAs(UnmanagedType.LPStr)] string? pageRange, int insertIndex);
-    [DllImport(Lib)] internal static extern double FPDF_GetPageWidth(IntPtr page);
     [DllImport(Lib)] internal static extern bool FPDF_SaveAsCopy(
         IntPtr document, ref FpdfFileWrite fileWrite, uint flags);
 
