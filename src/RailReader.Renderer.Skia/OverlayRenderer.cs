@@ -202,7 +202,7 @@ public static class OverlayRenderer
 
             var paint = i == activeLocalIndex ? activePaint : highlightPaint;
             foreach (var rect in rects)
-                canvas.DrawRect(new SKRect(rect.Left, rect.Top, rect.Right, rect.Bottom), paint);
+                canvas.DrawRect(rect.ToSKRect(), paint);
         }
     }
 

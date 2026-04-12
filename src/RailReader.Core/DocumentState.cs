@@ -175,17 +175,15 @@ public sealed class DocumentState : IDisposable
 
         try
         {
-            // Fast path: use prefetched page if available (e.g. from auto-scroll lookahead).
-            if (_prefetchedPageIndex == CurrentPage && _prefetchedPage is not null)
+            // Use prefetched page if available (e.g. from auto-scroll lookahead).
+            if (_prefetched is { } pf && pf.PageIndex == CurrentPage)
             {
-                CachedPage = _prefetchedPage;
-                CachedDpi = CalculateRenderDpi(Camera.Zoom);
-                MinimapPage = _prefetchedMinimap;
-                PageWidth = _prefetchedPageWidth;
-                PageHeight = _prefetchedPageHeight;
-                _prefetchedPage = null;
-                _prefetchedMinimap = null;
-                _prefetchedPageIndex = -1;
+                CachedPage = pf.Page;
+                CachedDpi = pf.Dpi;
+                MinimapPage = pf.Minimap;
+                PageWidth = pf.PageWidth;
+                PageHeight = pf.PageHeight;
+                _prefetched = null; // consumed — don't dispose, we're using the bitmaps
                 oldPage?.Dispose();
                 oldMinimap?.Dispose();
                 return true;
@@ -222,10 +220,10 @@ public sealed class DocumentState : IDisposable
     /// </summary>
     internal void PrefetchPage(int pageIndex)
     {
-        if (_prefetchPending || pageIndex < 0 || pageIndex >= PageCount || IsDisposed)
-            return;
-        if (_prefetchedPageIndex == pageIndex)
-            return; // already prefetched
+        // Serialize with DPI re-render to avoid concurrent PDFium access.
+        if (_prefetchPending || _dpiRenderPending) return;
+        if (pageIndex < 0 || pageIndex >= PageCount || IsDisposed) return;
+        if (_prefetched?.PageIndex == pageIndex) return;
 
         _prefetchPending = true;
         int dpi = CalculateRenderDpi(Camera.Zoom);
@@ -250,15 +248,8 @@ public sealed class DocumentState : IDisposable
                         return;
                     }
 
-                    // Dispose any stale prefetch
-                    _prefetchedPage?.Dispose();
-                    _prefetchedMinimap?.Dispose();
-
-                    _prefetchedPage = page;
-                    _prefetchedMinimap = minimap;
-                    _prefetchedPageWidth = w;
-                    _prefetchedPageHeight = h;
-                    _prefetchedPageIndex = pageIndex;
+                    _prefetched?.Dispose();
+                    _prefetched = new(pageIndex, dpi, page, minimap, w, h);
                     _prefetchPending = false;
                 });
             }
@@ -275,11 +266,14 @@ public sealed class DocumentState : IDisposable
     private bool _dpiRenderPending;
 
     // Page prefetch for seamless auto-scroll page transitions.
-    private int _prefetchedPageIndex = -1;
-    private IRenderedPage? _prefetchedPage;
-    private IRenderedPage? _prefetchedMinimap;
-    private double _prefetchedPageWidth;
-    private double _prefetchedPageHeight;
+    private sealed record PrefetchedPageData(
+        int PageIndex, int Dpi, IRenderedPage Page, IRenderedPage Minimap,
+        double PageWidth, double PageHeight) : IDisposable
+    {
+        public void Dispose() { Page.Dispose(); Minimap.Dispose(); }
+    }
+
+    private PrefetchedPageData? _prefetched;
     private bool _prefetchPending;
 
     /// <summary>
@@ -301,7 +295,8 @@ public sealed class DocumentState : IDisposable
     /// </summary>
     public bool UpdateRenderDpiIfNeeded()
     {
-        if (_dpiRenderPending) return false;
+        // Serialize with prefetch to avoid concurrent PDFium access.
+        if (_dpiRenderPending || _prefetchPending) return false;
 
         int neededDpi = CalculateRenderDpi(Camera.Zoom);
         if (neededDpi > CachedDpi * 1.5 || (neededDpi < CachedDpi * 0.5 && CachedDpi > 150))
@@ -517,6 +512,8 @@ public sealed class DocumentState : IDisposable
     {
         PendingRailSetup = false;
         PendingSkip = null;
+        _prefetched?.Dispose();
+        _prefetched = null;
     }
 
     public void CenterPage(double windowWidth, double windowHeight)
@@ -796,11 +793,8 @@ public sealed class DocumentState : IDisposable
         var mm = MinimapPage;
         MinimapPage = null;
         mm?.Dispose();
-        _prefetchedPage?.Dispose();
-        _prefetchedPage = null;
-        _prefetchedMinimap?.Dispose();
-        _prefetchedMinimap = null;
-        _prefetchedPageIndex = -1;
+        _prefetched?.Dispose();
+        _prefetched = null;
         _cts.Dispose();
     }
 }

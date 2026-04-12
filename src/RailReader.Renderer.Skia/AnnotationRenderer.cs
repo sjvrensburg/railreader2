@@ -29,11 +29,8 @@ public static class AnnotationRenderer
     [ThreadStatic] private static ConditionalWeakTable<FreehandAnnotation, StrongBox<int>>? s_freehandPointCounts;
 
     // Cached text note popup layout per thread — avoids WrapText + MeasureText every frame.
-    [ThreadStatic] private static TextNoteAnnotation? s_noteLayoutOwner;
-    [ThreadStatic] private static string? s_noteLayoutText;
-    [ThreadStatic] private static List<string>? s_noteLayoutLines;
-    [ThreadStatic] private static float s_noteLayoutPopupW;
-    [ThreadStatic] private static float s_noteLayoutPopupH;
+    private sealed record NoteLayoutCache(TextNoteAnnotation Owner, string Text, List<string> Lines, float PopupW, float PopupH);
+    [ThreadStatic] private static NoteLayoutCache? s_noteLayout;
 
     // Shared unit-size icon path for text notes — translated per note, never rebuilt.
     [ThreadStatic] private static SKPath? s_noteIconPath;
@@ -58,13 +55,12 @@ public static class AnnotationRenderer
     public static List<Annotation> SortByZOrder(List<Annotation> annotations)
     {
         var sorted = new List<Annotation>(annotations.Count);
-        // Three-pass stable sort avoids LINQ allocation: highlights, then freehand/rect, then text notes.
+        // Three-pass avoids LINQ allocation on the render path.
         foreach (var a in annotations) if (a is HighlightAnnotation) sorted.Add(a);
         foreach (var a in annotations) if (a is FreehandAnnotation or RectAnnotation) sorted.Add(a);
         foreach (var a in annotations) if (a is TextNoteAnnotation) sorted.Add(a);
-        // Catch any unknown types
-        if (sorted.Count < annotations.Count)
-            foreach (var a in annotations) if (!sorted.Contains(a)) sorted.Add(a);
+        System.Diagnostics.Debug.Assert(sorted.Count == annotations.Count,
+            "Unknown annotation type — update SortByZOrder to handle it");
         return sorted;
     }
 
@@ -148,13 +144,11 @@ public static class AnnotationRenderer
             return cached;
         }
 
-        // Rebuild path
         var path = new SKPath();
         path.MoveTo(freehand.Points[0].X, freehand.Points[0].Y);
         for (int i = 1; i < freehand.Points.Count; i++)
             path.LineTo(freehand.Points[i].X, freehand.Points[i].Y);
 
-        // Dispose old cached path if present
         if (cached is not null)
         {
             cached.Dispose();
@@ -288,8 +282,8 @@ public static class AnnotationRenderer
     private static (List<string> Lines, float PopupW, float PopupH) GetOrComputeNoteLayout(
         TextNoteAnnotation note, SKFont font)
     {
-        if (s_noteLayoutOwner == note && s_noteLayoutText == note.Text && s_noteLayoutLines is not null)
-            return (s_noteLayoutLines, s_noteLayoutPopupW, s_noteLayoutPopupH);
+        if (s_noteLayout is { } cached && cached.Owner == note && cached.Text == note.Text)
+            return (cached.Lines, cached.PopupW, cached.PopupH);
 
         var lines = WrapText(note.Text, font, PopupMaxWidth - PopupPadding * 2);
         float lineHeight = font.Size * 1.4f;
@@ -302,11 +296,7 @@ public static class AnnotationRenderer
         popupW = Math.Min(popupW, PopupMaxWidth);
         float popupH = lines.Count * lineHeight + PopupPadding * 2;
 
-        s_noteLayoutOwner = note;
-        s_noteLayoutText = note.Text;
-        s_noteLayoutLines = lines;
-        s_noteLayoutPopupW = popupW;
-        s_noteLayoutPopupH = popupH;
+        s_noteLayout = new(note, note.Text, lines, popupW, popupH);
         return (lines, popupW, popupH);
     }
 
