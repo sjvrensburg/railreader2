@@ -845,6 +845,48 @@ railreader2-cli vlm paper.pdf --classes equation,figure \
 # Reuse a pre-computed structure JSON (skip ONNX)
 railreader2-cli structure paper.pdf --analyze --output structure.json
 railreader2-cli vlm paper.pdf --from-structure structure.json --all --output vlm.json</code></pre>
+
+      <h3>export &mdash; convert PDF to Markdown</h3>
+      <p>
+        Exports a PDF to structured Markdown using layout analysis, VLM transcription,
+        and annotation extraction. Heading hierarchy is resolved by matching detected
+        heading blocks against the PDF outline tree. Degrades gracefully depending on
+        available tools.
+      </p>
+      <pre><code>railreader2-cli export &lt;pdf&gt; [options]</code></pre>
+      <table class="shortcuts-table">
+        <thead class="sr-only">
+          <tr><th>Option</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>--output &lt;path&gt;</code></td><td>Markdown output file (default: stdout)</td></tr>
+          <tr><td><code>--pages &lt;range&gt;</code></td><td>Page range (e.g. <code>1,3,5-10</code>)</td></tr>
+          <tr><td><code>--no-page-breaks</code></td><td>Omit page break markers (<code>---</code>) between pages</td></tr>
+          <tr><td><code>--no-vlm</code></td><td>Disable VLM transcription (placeholders instead)</td></tr>
+          <tr><td><code>--no-annotations</code></td><td>Exclude annotations from output</td></tr>
+          <tr><td><code>--figure-dir &lt;dir&gt;</code></td><td>Save figure PNGs and reference them in the Markdown</td></tr>
+          <tr><td><code>--endpoint / --model / --api-key</code></td><td>VLM overrides (same as vlm command)</td></tr>
+          <tr><td><code>--concurrency &lt;n&gt;</code></td><td>Parallel VLM requests (default: 2)</td></tr>
+          <tr><td><code>--prompt-style &lt;style&gt;</code></td><td><code>instruction</code> (default) or <code>ocr</code></td></tr>
+          <tr><td><code>--no-structured-output</code></td><td>Disable JSON schema response format</td></tr>
+        </tbody>
+      </table>
+      <pre><code># Basic export (text + headings, equations/figures as placeholders)
+railreader2-cli export paper.pdf --no-vlm --output paper.md
+
+# Full fidelity with VLM (LaTeX equations, Markdown tables, figure descriptions)
+railreader2-cli export paper.pdf \
+    --endpoint https://api.openai.com/v1 --model gpt-4o-mini \
+    --output paper.md
+
+# Export with figure images saved to disk
+railreader2-cli export paper.pdf --figure-dir ./figures --output paper.md</code></pre>
+      <p>
+        <strong>Graceful degradation:</strong> With ONNX + VLM, you get full fidelity
+        (headings, LaTeX, pipe tables, figure images). With ONNX only (no VLM), equations
+        and figures become placeholders and tables render as code blocks. Without either,
+        the output is plain text per page with heading markers from the PDF outline.
+      </p>
     </section>
 
     <!-- 12. Settings -->

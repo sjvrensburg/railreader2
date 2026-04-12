@@ -24,6 +24,7 @@ dotnet run -c Release --project src/RailReader2
 dotnet run -c Release --project src/RailReader2.Cli -- render <pdf> --output-dir ./out
 dotnet run -c Release --project src/RailReader2.Cli -- structure <pdf> --output out.json
 dotnet run -c Release --project src/RailReader2.Cli -- annotations <pdf> --include-text --output ann.json
+dotnet run -c Release --project src/RailReader2.Cli -- export <pdf> --no-vlm --output doc.md
 
 # Run tests (all)
 dotnet test tests/RailReader.Core.Tests
@@ -47,12 +48,14 @@ dotnet publish src/RailReader2 -c Release -r win-x64 --self-contained     # Wind
 ## Architecture
 
 ```
-RailReader2.slnx              # Default: app + core + renderer + CLI + tests
+RailReader2.slnx              # Default: app + core + renderer + export + CLI + tests
 ├── src/RailReader.Core/        # UI-free library: all business logic, models, services (zero rendering deps)
 ├── src/RailReader.Renderer.Skia/ # SkiaSharp rendering, PDFium PDF services (implements Core interfaces)
+├── src/RailReader.Export/      # Markdown export pipeline (references Core + Renderer.Skia, zero Avalonia)
 ├── src/RailReader2/            # Thin Avalonia UI shell (references Core + Renderer.Skia)
-├── src/RailReader2.Cli/        # Headless CLI tool (references Core + Renderer.Skia, zero Avalonia)
-└── tests/RailReader.Core.Tests/# xUnit headless tests against Core
+├── src/RailReader2.Cli/        # Headless CLI tool (references Core + Renderer.Skia + Export, zero Avalonia)
+├── tests/RailReader.Core.Tests/# xUnit headless tests against Core
+└── tests/RailReader.Export.Tests/ # xUnit tests for Export
 ```
 
 ### RailReader.Core (UI-free library)
@@ -107,19 +110,31 @@ Implements Core's `IPdfService`/`IPdfTextService` interfaces using PDFium + Skia
 
 xUnit tests in `tests/RailReader.Core.Tests/` — DocumentController, Camera, Annotations (including merge), AppConfig, RailNav, SearchService, AnnotationGeometry, ZoomAnimation, AutoScroll. `TestFixtures.cs` generates test PDFs via SkiaSharp (test project references both Core and Renderer.Skia for this reason).
 
+xUnit tests in `tests/RailReader.Export.Tests/` — HeadingLevelResolver (outline matching, depth clamping, Levenshtein), PageMarkdownBuilder (all block types, annotations, plain-text fallback), MarkdownExportService (end-to-end with real PDFs: plain-text fallback, page range, progress reporting, cancellation, page break options).
+
 ### RailReader2.Cli (Headless CLI)
 
-Separate console binary (`RailReader2.Cli`) for automated extraction. Zero Avalonia deps — references Core + Renderer.Skia only. Three commands:
+Separate console binary (`RailReader2.Cli`) for automated extraction. Zero Avalonia deps — references Core + Renderer.Skia + Export. Five commands:
 
 - `render <pdf>` — Render pages as PNG with optional colour effects (`--effect highcontrast|highvisibility|amber|invert`) and annotation overlay. Uses `IPdfService.RenderPage()` → `SkiaRenderedPage.Bitmap` → `ColourEffectShaders` + `AnnotationRenderer` directly (no `DocumentState`/`DocumentController`).
 - `structure <pdf>` — Extract outline + ONNX layout blocks + per-block text as JSON. Uses `LayoutAnalyzer` directly (no `AnalysisWorker`), `IPdfTextService` for text extraction, `CharBox`↔`BBox` centre-point matching for block text.
 - `annotations <pdf>` — Export annotations as JSON or annotated PDF. Supports `--pages <range>` to filter by page. Rich mode (`--include-text` + `--include-blocks`): correlates annotations with layout blocks via `AnnotationGeometry.GetAnnotationBounds()` → `RectF`↔`BBox` overlap, extracts text under each annotation, finds nearest heading from outline + `paragraph_title`/`doc_title` blocks.
+- `vlm <pdf>` — Transcribe detected equations/tables/figures via an OpenAI-compatible vision API. Outputs LaTeX/Markdown/descriptions as JSON.
+- `export <pdf>` — Export PDF to structured Markdown. Uses `MarkdownExportService` from the Export library. Per-page pipeline: layout analysis → text extraction → heading resolution (outline fuzzy-match) → VLM transcription (equations → LaTeX, tables → pipe tables, figures → descriptions/images) → annotation blockquotes. Graceful degradation: ONNX+VLM → ONNX-only (`[equation]`/`[figure]`/code-block tables) → plain text with outline headings.
 
 Shipped as additional artifacts on GitHub Releases (Linux + Windows). ONNX model bundled in `models/` subdirectory within the archive.
 
+### RailReader.Export (Markdown export pipeline)
+
+Structured PDF-to-Markdown export library. Zero Avalonia deps — references Core + Renderer.Skia.
+
+- `MarkdownExportService.cs` — `IMarkdownExportService` implementation. Orchestrates per-page pipeline: layout analysis → text extraction → heading level resolution → VLM dispatch → annotation extraction → Markdown assembly. Writes to `TextWriter` for flexible output (file, stdout, StringWriter).
+- `HeadingLevelResolver.cs` — Maps `doc_title`/`paragraph_title` blocks to Markdown heading levels (H1–H6) by fuzzy-matching extracted text against the flattened PDF outline tree (case-insensitive containment, then Levenshtein similarity > 80%). Falls back to doc_title → H1, paragraph_title → H2.
+- `PageMarkdownBuilder.cs` — Walks blocks in reading order, renders each to Markdown by class (headings, paragraphs, `$$latex$$`, pipe tables, `![desc](path)`, `*captions*`). Skips page furniture (header/footer/number/seal). Appends highlight blockquotes and text notes from annotations.
+
 ### Cross-Project Internals
 
-Core uses `InternalsVisibleTo` to expose internals to `RailReader.Core.Tests`, `RailReader.Renderer.Skia`, `RailReader2`, and `RailReader2.Cli`. Renderer.Skia also exposes internals to `RailReader2` and `RailReader2.Cli`. This allows the thin UI shell and CLI to access internal types without making them public.
+Core uses `InternalsVisibleTo` to expose internals to `RailReader.Core.Tests`, `RailReader.Renderer.Skia`, `RailReader2`, `RailReader2.Cli`, `RailReader.Export`, and `RailReader.Export.Tests`. Renderer.Skia also exposes internals to `RailReader2`, `RailReader2.Cli`, `RailReader.Export`, and `RailReader.Export.Tests`. Export exposes internals to `RailReader.Export.Tests`. This allows the thin UI shell, CLI, and export library to access internal types without making them public.
 
 ## Key Concepts
 
