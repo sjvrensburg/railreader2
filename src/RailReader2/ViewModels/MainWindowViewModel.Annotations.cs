@@ -62,9 +62,9 @@ public sealed partial class MainWindowViewModel
         }
     }
 
-    public void HandleAnnotationPointerMove(double pageX, double pageY)
+    public void HandleAnnotationPointerMove(double pageX, double pageY, bool shiftHeld = false)
     {
-        if (_controller.Annotations.HandleAnnotationPointerMove(_controller.ActiveDocument, pageX, pageY))
+        if (_controller.Annotations.HandleAnnotationPointerMove(_controller.ActiveDocument, pageX, pageY, shiftHeld))
         {
             OnPropertyChanged(nameof(SelectedText));
             InvalidateAnnotations();

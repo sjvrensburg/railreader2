@@ -223,7 +223,8 @@ public sealed class AnnotationInteractionHandler
         doc.UpdateAnnotationText(doc.CurrentPage, note, newText);
     }
 
-    public bool HandleAnnotationPointerMove(DocumentState? doc, double pageX, double pageY)
+    public bool HandleAnnotationPointerMove(DocumentState? doc, double pageX, double pageY,
+        bool shiftHeld = false)
     {
         if (doc is null) return false;
         bool changed = false;
@@ -264,9 +265,12 @@ public sealed class AnnotationInteractionHandler
                 break;
             case AnnotationTool.Pen when _freehandPoints is not null:
                 _freehandPoints.Add(new PointF((float)pageX, (float)pageY));
+                List<PointF> penPoints = shiftHeld
+                    ? [_freehandPoints[0], new PointF((float)pageX, (float)pageY)]
+                    : [.. _freehandPoints];
                 PreviewAnnotation = new FreehandAnnotation
                 {
-                    Points = [.. _freehandPoints],
+                    Points = penPoints,
                     Color = ActiveAnnotationColor,
                     Opacity = ActiveAnnotationOpacity,
                     StrokeWidth = ActiveStrokeWidth,
