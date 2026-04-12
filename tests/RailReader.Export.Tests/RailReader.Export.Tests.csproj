@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <NoWarn>CA1416</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.*" />
+    <PackageReference Include="xunit" Version="2.9.*" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/RailReader.Core/RailReader.Core.csproj" />
+    <ProjectReference Include="../../src/RailReader.Renderer.Skia/RailReader.Renderer.Skia.csproj" />
+    <ProjectReference Include="../../src/RailReader.Export/RailReader.Export.csproj" />
+  </ItemGroup>
+
+</Project>
