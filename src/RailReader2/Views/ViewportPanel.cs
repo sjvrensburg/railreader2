@@ -157,7 +157,8 @@ public class ViewportPanel : Panel
         if (ViewModel.IsAnnotating)
         {
             var (pageX, pageY) = ScreenToPage(dragPos);
-            ViewModel.HandleAnnotationPointerMove(pageX, pageY);
+            bool shift = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
+            ViewModel.HandleAnnotationPointerMove(pageX, pageY, shift);
         }
         else if (_browseAnnotationDrag)
         {

@@ -205,4 +205,56 @@ public class AnnotationInteractionHandlerTests : IDisposable
         Assert.Equal("#66CC66", secondColor);
         Assert.Equal("#FF8FA0", thirdColor);
     }
+
+    [Fact]
+    public void ShiftHeld_Pen_ConstrainsStraightLine()
+    {
+        _handler.SetAnnotationTool(AnnotationTool.Pen);
+        _handler.HandleAnnotationPointerDown(_doc, 100, 100);
+
+        // Draw several moves with Shift held
+        _handler.HandleAnnotationPointerMove(_doc, 110, 115, shiftHeld: true);
+        _handler.HandleAnnotationPointerMove(_doc, 120, 130, shiftHeld: true);
+        _handler.HandleAnnotationPointerMove(_doc, 150, 160, shiftHeld: true);
+
+        var preview = Assert.IsType<FreehandAnnotation>(_handler.PreviewAnnotation);
+        // Shift constrains to 2 points: start + current
+        Assert.Equal(2, preview.Points.Count);
+        Assert.Equal(100f, preview.Points[0].X);
+        Assert.Equal(100f, preview.Points[0].Y);
+        Assert.Equal(150f, preview.Points[1].X);
+        Assert.Equal(160f, preview.Points[1].Y);
+    }
+
+    [Fact]
+    public void ShiftReleased_Pen_ResumesFreehand()
+    {
+        _handler.SetAnnotationTool(AnnotationTool.Pen);
+        _handler.HandleAnnotationPointerDown(_doc, 100, 100);
+
+        // Start with Shift held
+        _handler.HandleAnnotationPointerMove(_doc, 110, 110, shiftHeld: true);
+        var constrained = Assert.IsType<FreehandAnnotation>(_handler.PreviewAnnotation);
+        Assert.Equal(2, constrained.Points.Count);
+
+        // Release Shift — freehand resumes with all accumulated points
+        _handler.HandleAnnotationPointerMove(_doc, 120, 120, shiftHeld: false);
+        _handler.HandleAnnotationPointerMove(_doc, 130, 130, shiftHeld: false);
+        var freehand = Assert.IsType<FreehandAnnotation>(_handler.PreviewAnnotation);
+        Assert.True(freehand.Points.Count > 2);
+    }
+
+    [Fact]
+    public void ShiftHeld_Pen_CommitsStraightLine()
+    {
+        _handler.SetAnnotationTool(AnnotationTool.Pen);
+        _handler.HandleAnnotationPointerDown(_doc, 100, 100);
+
+        _handler.HandleAnnotationPointerMove(_doc, 150, 200, shiftHeld: true);
+        _handler.HandleAnnotationPointerUp(_doc, 150, 200);
+
+        Assert.Null(_handler.PreviewAnnotation);
+        var committed = Assert.IsType<FreehandAnnotation>(_doc.Annotations.Pages[0][0]);
+        Assert.Equal(2, committed.Points.Count);
+    }
 }
