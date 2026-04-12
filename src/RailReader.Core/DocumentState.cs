@@ -166,6 +166,7 @@ public sealed class DocumentState : IDisposable
     /// Renders the current page bitmap. Safe to call from a background thread.
     /// Does NOT submit analysis (which requires UI-thread access to the worker).
     /// Returns false if the page could not be rendered.
+    /// Uses prefetched bitmap if available for the current page (seamless auto-scroll transitions).
     /// </summary>
     public bool LoadPageBitmap()
     {
@@ -174,6 +175,20 @@ public sealed class DocumentState : IDisposable
 
         try
         {
+            // Use prefetched page if available (e.g. from auto-scroll lookahead).
+            if (_prefetched is { } pf && pf.PageIndex == CurrentPage)
+            {
+                CachedPage = pf.Page;
+                CachedDpi = pf.Dpi;
+                MinimapPage = pf.Minimap;
+                PageWidth = pf.PageWidth;
+                PageHeight = pf.PageHeight;
+                _prefetched = null; // consumed — don't dispose, we're using the bitmaps
+                oldPage?.Dispose();
+                oldMinimap?.Dispose();
+                return true;
+            }
+
             var (w, h) = _pdf.GetPageSize(CurrentPage);
             int dpi = CalculateRenderDpi(Camera.Zoom);
             var newPage = _pdf.RenderPage(CurrentPage, dpi);
@@ -197,7 +212,69 @@ public sealed class DocumentState : IDisposable
         }
     }
 
+    /// <summary>
+    /// Schedules background rendering of the specified page for seamless auto-scroll
+    /// page transitions. The prefetched bitmap is consumed by the next LoadPageBitmap()
+    /// call if it targets the same page. No-op if a prefetch is already pending or
+    /// the page is out of range.
+    /// </summary>
+    internal void PrefetchPage(int pageIndex)
+    {
+        // Serialize with DPI re-render to avoid concurrent PDFium access.
+        if (_prefetchPending || _dpiRenderPending) return;
+        if (pageIndex < 0 || pageIndex >= PageCount || IsDisposed) return;
+        if (_prefetched?.PageIndex == pageIndex) return;
+
+        _prefetchPending = true;
+        int dpi = CalculateRenderDpi(Camera.Zoom);
+        var ct = _cts.Token;
+
+        Task.Run(() =>
+        {
+            try
+            {
+                ct.ThrowIfCancellationRequested();
+                var (w, h) = _pdf.GetPageSize(pageIndex);
+                var page = _pdf.RenderPage(pageIndex, dpi);
+                var minimap = _pdf.RenderThumbnail(pageIndex);
+
+                _marshaller.Post(() =>
+                {
+                    if (IsDisposed)
+                    {
+                        page.Dispose();
+                        minimap.Dispose();
+                        _prefetchPending = false;
+                        return;
+                    }
+
+                    _prefetched?.Dispose();
+                    _prefetched = new(pageIndex, dpi, page, minimap, w, h);
+                    _prefetchPending = false;
+                });
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception ex)
+            {
+                _logger.Error($"Failed to prefetch page {pageIndex + 1}: {ex.Message}", ex);
+                try { _marshaller.Post(() => _prefetchPending = false); }
+                catch { _prefetchPending = false; }
+            }
+        }, ct);
+    }
+
     private bool _dpiRenderPending;
+
+    // Page prefetch for seamless auto-scroll page transitions.
+    private sealed record PrefetchedPageData(
+        int PageIndex, int Dpi, IRenderedPage Page, IRenderedPage Minimap,
+        double PageWidth, double PageHeight) : IDisposable
+    {
+        public void Dispose() { Page.Dispose(); Minimap.Dispose(); }
+    }
+
+    private PrefetchedPageData? _prefetched;
+    private bool _prefetchPending;
 
     /// <summary>
     /// Set to true when a DPI re-render completes. The next animation frame
@@ -218,7 +295,8 @@ public sealed class DocumentState : IDisposable
     /// </summary>
     public bool UpdateRenderDpiIfNeeded()
     {
-        if (_dpiRenderPending) return false;
+        // Serialize with prefetch to avoid concurrent PDFium access.
+        if (_dpiRenderPending || _prefetchPending) return false;
 
         int neededDpi = CalculateRenderDpi(Camera.Zoom);
         if (neededDpi > CachedDpi * 1.5 || (neededDpi < CachedDpi * 0.5 && CachedDpi > 150))
@@ -434,6 +512,8 @@ public sealed class DocumentState : IDisposable
     {
         PendingRailSetup = false;
         PendingSkip = null;
+        _prefetched?.Dispose();
+        _prefetched = null;
     }
 
     public void CenterPage(double windowWidth, double windowHeight)
@@ -713,6 +793,8 @@ public sealed class DocumentState : IDisposable
         var mm = MinimapPage;
         MinimapPage = null;
         mm?.Dispose();
+        _prefetched?.Dispose();
+        _prefetched = null;
         _cts.Dispose();
     }
 }

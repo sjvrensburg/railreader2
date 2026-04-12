@@ -792,8 +792,11 @@ public sealed class DocumentController : IDisposable
         if (!RailPaused)
             TickRailSnap(doc, dt, ww, wh, ref cameraChanged, ref pageChanged, ref overlayChanged, ref animating);
 
-        // Snap Y to integer pixel when rail mode is stable
-        if (_config.PixelSnapping && doc.Rail.Active && !animating)
+        // Snap Y to integer pixel when rail mode is stable or nearly so.
+        // Snapping during the snap animation tail (progress > 0.95) eliminates
+        // the last few frames of sub-pixel text shimmer before full stop.
+        if (_config.PixelSnapping && doc.Rail.Active
+            && (!animating || doc.Rail.SnapProgress > 0.95))
         {
             double snapped = Math.Round(doc.Camera.OffsetY);
             if (snapped != doc.Camera.OffsetY)
@@ -913,6 +916,15 @@ public sealed class DocumentController : IDisposable
     {
         if (doc.Rail.AutoScrolling)
         {
+            // Prefetch next page when approaching end of current page to eliminate
+            // the rendering stall on page transitions during auto-scroll.
+            if (doc.Rail.NavigableCount > 0
+                && doc.Rail.CurrentBlock >= doc.Rail.NavigableCount - 2
+                && doc.CurrentPage + 1 < doc.PageCount)
+            {
+                doc.PrefetchPage(doc.CurrentPage + 1);
+            }
+
             double cx = doc.Camera.OffsetX;
             bool reachedEnd = doc.Rail.TickAutoScroll(ref cx, dt, doc.Camera.Zoom, ww);
             if (cx != doc.Camera.OffsetX)

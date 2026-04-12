@@ -170,19 +170,39 @@ public static class OverlayRenderer
 
     /// <summary>
     /// Draws search match highlights with the active match in a distinct colour.
+    /// Matches outside the viewport are skipped to avoid unnecessary draw calls.
     /// </summary>
     public static void DrawSearchHighlights(
         SKCanvas canvas,
         IReadOnlyList<SearchMatch> matches,
         int activeLocalIndex,
         SKPaint highlightPaint,
-        SKPaint activePaint)
+        SKPaint activePaint,
+        SKRect viewport = default)
     {
+        bool cull = viewport.Width > 0 && viewport.Height > 0;
+
         for (int i = 0; i < matches.Count; i++)
         {
+            var rects = matches[i].Rects;
+            if (rects.Count == 0) continue;
+
+            // Quick viewport cull: skip matches whose vertical extent is entirely off-screen.
+            if (cull)
+            {
+                float minY = float.MaxValue, maxY = float.MinValue;
+                foreach (var r in rects)
+                {
+                    if (r.Top < minY) minY = r.Top;
+                    if (r.Bottom > maxY) maxY = r.Bottom;
+                }
+                if (maxY < viewport.Top || minY > viewport.Bottom)
+                    continue;
+            }
+
             var paint = i == activeLocalIndex ? activePaint : highlightPaint;
-            foreach (var rect in matches[i].Rects)
-                canvas.DrawRect(new SKRect(rect.Left, rect.Top, rect.Right, rect.Bottom), paint);
+            foreach (var rect in rects)
+                canvas.DrawRect(rect.ToSKRect(), paint);
         }
     }
 

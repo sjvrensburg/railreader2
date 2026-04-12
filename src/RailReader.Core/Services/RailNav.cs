@@ -114,6 +114,14 @@ public sealed class RailNav : ICameraClamp
     public PageAnalysis? Analysis => _analysis;
     public int NavigableCount => _navigableIndices.Count;
 
+    /// <summary>
+    /// Progress of the current snap animation (0.0–1.0). Returns 1.0 if no snap is active.
+    /// Used to enable early pixel snapping during the animation tail.
+    /// </summary>
+    public double SnapProgress => _snap is { } s
+        ? Math.Min(s.Timer.Elapsed.TotalMilliseconds / s.DurationMs, 1.0)
+        : 1.0;
+
     /// <summary>True when rail mode is active and has navigable blocks.</summary>
     private bool CanNavigate => Active && _navigableIndices.Count > 0;
 
@@ -371,7 +379,7 @@ public sealed class RailNav : ICameraClamp
             targetX = windowWidth - blockRight * zoom;
         var (_, targetY) = ComputeTargetCamera(zoom, windowWidth, windowHeight);
 
-        BeginSnap(cameraX, cameraY, SnapX(targetX), SnapY(targetY));
+        BeginSnap(cameraX, cameraY, SnapX(targetX, zoom), SnapY(targetY));
     }
 
     /// <summary>
@@ -387,7 +395,7 @@ public sealed class RailNav : ICameraClamp
         var (_, targetY) = ComputeTargetCamera(zoom, windowWidth, windowHeight);
         double targetX = ClampX(windowWidth / 2.0 - pageX * zoom, zoom, windowWidth);
 
-        BeginSnap(cameraX, cameraY, SnapX(targetX), SnapY(targetY));
+        BeginSnap(cameraX, cameraY, SnapX(targetX, zoom), SnapY(targetY));
     }
 
     /// <summary>
@@ -442,7 +450,7 @@ public sealed class RailNav : ICameraClamp
         }
 
         targetX = ClampX(targetX, zoom, windowWidth);
-        BeginSnap(cameraX, cameraY, SnapX(targetX), SnapY(targetY));
+        BeginSnap(cameraX, cameraY, SnapX(targetX, zoom), SnapY(targetY));
     }
 
     private void BeginSnap(double startX, double startY, double targetX, double targetY)
@@ -456,7 +464,18 @@ public sealed class RailNav : ICameraClamp
         };
     }
 
-    private double SnapX(double x) => _config.PixelSnapping ? Math.Round(x * 4.0) / 4.0 : x;
+    /// <summary>
+    /// Snap X to a grid that guarantees at least 1 screen pixel of precision.
+    /// At high zoom the grid is finer (smooth feel); at low zoom it coarsens
+    /// to prevent sub-pixel text shimmer.
+    /// </summary>
+    private double SnapX(double x, double zoom)
+    {
+        if (!_config.PixelSnapping) return x;
+        double grid = Math.Max(4.0, zoom);
+        return Math.Round(x * grid) / grid;
+    }
+
     private double SnapY(double y) => _config.PixelSnapping ? Math.Round(y) : y;
 
     private (double X, double Y) ComputeTargetCamera(double zoom, double windowWidth, double windowHeight)
@@ -482,7 +501,7 @@ public sealed class RailNav : ICameraClamp
         if (_config.PixelSnapping)
         {
             targetY = Math.Round(targetY);               // integer Y = baseline on pixel grid
-            targetX = Math.Round(targetX * 4.0) / 4.0;   // 1/4 pixel X for smooth feel
+            targetX = SnapX(targetX, zoom);               // zoom-aware grid for smooth feel
         }
 
         return (targetX, targetY);
@@ -555,7 +574,7 @@ public sealed class RailNav : ICameraClamp
                 result = cameraX;
         }
 
-        return _config.PixelSnapping ? Math.Round(result * 4.0) / 4.0 : result;
+        return SnapX(result, zoom);
     }
 
     private (double Left, double Right, double WidthPx) GetBlockBounds(double zoom)
