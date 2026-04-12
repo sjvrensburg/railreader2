@@ -15,9 +15,9 @@ public class PageMarkdownBuilderTests
             MakeBlock(LayoutConstants.ClassDocTitle, 0),
         };
         var headingLevels = new Dictionary<int, int> { [0] = 1 };
-        var pageText = MakePageText("Introduction", blocks[0]);
+        var blockTexts = new Dictionary<int, string> { [0] = "Introduction" };
 
-        var md = PageMarkdownBuilder.Build(blocks, headingLevels, pageText, null, null, null);
+        var md = PageMarkdownBuilder.Build(blocks, headingLevels, blockTexts, null, null);
 
         Assert.Contains("# Introduction", md);
     }
@@ -29,9 +29,9 @@ public class PageMarkdownBuilderTests
         {
             MakeBlock(22, 0), // text class
         };
-        var pageText = MakePageText("Some paragraph text here.", blocks[0]);
+        var blockTexts = new Dictionary<int, string> { [0] = "Some paragraph text here." };
 
-        var md = PageMarkdownBuilder.Build(blocks, new Dictionary<int, int>(), pageText, null, null, null);
+        var md = PageMarkdownBuilder.Build(blocks, new Dictionary<int, int>(), blockTexts, null, null);
 
         Assert.Contains("Some paragraph text here.", md);
         Assert.DoesNotContain("#", md);
@@ -49,7 +49,7 @@ public class PageMarkdownBuilderTests
             [0] = new(0, @"E = mc^2", null),
         };
 
-        var md = PageMarkdownBuilder.Build(blocks, new Dictionary<int, int>(), null, vlm, null, null);
+        var md = PageMarkdownBuilder.Build(blocks, new Dictionary<int, int>(), new Dictionary<int, string>(), vlm, null);
 
         Assert.Contains("$$E = mc^2$$", md);
     }
@@ -62,7 +62,7 @@ public class PageMarkdownBuilderTests
             MakeBlock(LayoutConstants.ClassDisplayFormula, 0),
         };
 
-        var md = PageMarkdownBuilder.Build(blocks, new Dictionary<int, int>(), null, null, null, null);
+        var md = PageMarkdownBuilder.Build(blocks, new Dictionary<int, int>(), new Dictionary<int, string>(), null, null);
 
         Assert.Contains("[equation]", md);
     }
@@ -74,9 +74,9 @@ public class PageMarkdownBuilderTests
         {
             MakeBlock(LayoutConstants.ClassDisplayFormula, 0),
         };
-        var pageText = MakePageText("x + y = z", blocks[0]);
+        var blockTexts = new Dictionary<int, string> { [0] = "x + y = z" };
 
-        var md = PageMarkdownBuilder.Build(blocks, new Dictionary<int, int>(), pageText, null, null, null);
+        var md = PageMarkdownBuilder.Build(blocks, new Dictionary<int, int>(), blockTexts, null, null);
 
         Assert.Contains("[equation: x + y = z]", md);
     }
@@ -94,7 +94,7 @@ public class PageMarkdownBuilderTests
             [0] = new(0, tableMarkdown, null),
         };
 
-        var md = PageMarkdownBuilder.Build(blocks, new Dictionary<int, int>(), null, vlm, null, null);
+        var md = PageMarkdownBuilder.Build(blocks, new Dictionary<int, int>(), new Dictionary<int, string>(), vlm, null);
 
         Assert.Contains("| A | B |", md);
     }
@@ -106,9 +106,9 @@ public class PageMarkdownBuilderTests
         {
             MakeBlock(LayoutConstants.ClassTable, 0),
         };
-        var pageText = MakePageText("A B\n1 2", blocks[0]);
+        var blockTexts = new Dictionary<int, string> { [0] = "A B\n1 2" };
 
-        var md = PageMarkdownBuilder.Build(blocks, new Dictionary<int, int>(), pageText, null, null, null);
+        var md = PageMarkdownBuilder.Build(blocks, new Dictionary<int, int>(), blockTexts, null, null);
 
         Assert.Contains("```", md);
         Assert.Contains("A B", md);
@@ -130,7 +130,7 @@ public class PageMarkdownBuilderTests
             [0] = "figures/fig_p1_b0.png",
         };
 
-        var md = PageMarkdownBuilder.Build(blocks, new Dictionary<int, int>(), null, vlm, null, figurePaths);
+        var md = PageMarkdownBuilder.Build(blocks, new Dictionary<int, int>(), new Dictionary<int, string>(), vlm, figurePaths);
 
         Assert.Contains("![A scatter plot showing correlation](figures/fig_p1_b0.png)", md);
     }
@@ -147,7 +147,7 @@ public class PageMarkdownBuilderTests
             [0] = new(0, "A bar chart of results", null),
         };
 
-        var md = PageMarkdownBuilder.Build(blocks, new Dictionary<int, int>(), null, vlm, null, null);
+        var md = PageMarkdownBuilder.Build(blocks, new Dictionary<int, int>(), new Dictionary<int, string>(), vlm, null);
 
         Assert.Contains("[figure: A bar chart of results]", md);
     }
@@ -159,9 +159,9 @@ public class PageMarkdownBuilderTests
         {
             MakeBlock(7, 0), // figure_title
         };
-        var pageText = MakePageText("Figure 3: Results overview", blocks[0]);
+        var blockTexts = new Dictionary<int, string> { [0] = "Figure 3: Results overview" };
 
-        var md = PageMarkdownBuilder.Build(blocks, new Dictionary<int, int>(), pageText, null, null, null);
+        var md = PageMarkdownBuilder.Build(blocks, new Dictionary<int, int>(), blockTexts, null, null);
 
         Assert.Contains("*Figure 3: Results overview*", md);
     }
@@ -177,7 +177,7 @@ public class PageMarkdownBuilderTests
             MakeBlock(20, 3), // seal
         };
 
-        var md = PageMarkdownBuilder.Build(blocks, new Dictionary<int, int>(), null, null, null, null);
+        var md = PageMarkdownBuilder.Build(blocks, new Dictionary<int, int>(), new Dictionary<int, string>(), null, null);
 
         Assert.Equal("", md.Trim());
     }
@@ -191,12 +191,13 @@ public class PageMarkdownBuilderTests
             MakeBlock(22, 1, 0, 30, 100, 20), // text
         };
         var headingLevels = new Dictionary<int, int> { [0] = 1 };
-        var charBoxes = new List<CharBox>();
-        charBoxes.AddRange(MakeCharBoxes("Introduction", 0, 0, 100, 20, 0));
-        charBoxes.AddRange(MakeCharBoxes("Some body text.", 0, 30, 100, 50, 12));
-        var pageText = new PageText("IntroductionSome body text.", charBoxes);
+        var blockTexts = new Dictionary<int, string>
+        {
+            [0] = "Introduction",
+            [1] = "Some body text.",
+        };
 
-        var md = PageMarkdownBuilder.Build(blocks, headingLevels, pageText, null, null, null);
+        var md = PageMarkdownBuilder.Build(blocks, headingLevels, blockTexts, null, null);
 
         var introIdx = md.IndexOf("# Introduction");
         var bodyIdx = md.IndexOf("Some body text.");
@@ -207,27 +208,43 @@ public class PageMarkdownBuilderTests
     [Fact]
     public void Annotations_TextNote_RendersBlockquote()
     {
-        var blocks = new List<LayoutBlock>();
+        var sb = new System.Text.StringBuilder();
         var annotations = new PageMarkdownBuilder.PageAnnotations(
             [],
             [new TextNoteAnnotation { Text = "Important point here", X = 10, Y = 10 }]);
 
-        var md = PageMarkdownBuilder.Build(blocks, new Dictionary<int, int>(), null, null, annotations, null);
+        PageMarkdownBuilder.AppendAnnotations(sb, annotations);
 
-        Assert.Contains("> **Note:** Important point here", md);
+        Assert.Contains("> **Note:** Important point here", sb.ToString());
     }
 
     [Fact]
-    public void Annotations_Highlight_RendersWithColor()
+    public void Annotations_Highlight_WithoutText_RendersColorMarker()
     {
-        var blocks = new List<LayoutBlock>();
+        var sb = new System.Text.StringBuilder();
         var annotations = new PageMarkdownBuilder.PageAnnotations(
             [new HighlightAnnotation { Color = "#FFFF00", Rects = [new HighlightRect(10, 10, 100, 20)] }],
             []);
 
-        var md = PageMarkdownBuilder.Build(blocks, new Dictionary<int, int>(), null, null, annotations, null);
+        PageMarkdownBuilder.AppendAnnotations(sb, annotations);
 
-        Assert.Contains("[highlight: #FFFF00]", md);
+        Assert.Contains("[highlight: #FFFF00]", sb.ToString());
+    }
+
+    [Fact]
+    public void Annotations_Highlight_WithText_ExtractsContent()
+    {
+        var sb = new System.Text.StringBuilder();
+        var annotations = new PageMarkdownBuilder.PageAnnotations(
+            [new HighlightAnnotation { Color = "#FFFF00", Rects = [new HighlightRect(10, 10, 100, 20)] }],
+            []);
+        var pageText = MakePageText("highlighted text", 10, 10, 110, 30);
+
+        PageMarkdownBuilder.AppendAnnotations(sb, annotations, pageText);
+
+        var result = sb.ToString();
+        Assert.Contains("> highlighted text", result);
+        Assert.Contains("<!-- highlight: #FFFF00 -->", result);
     }
 
     [Fact]
@@ -245,9 +262,10 @@ public class PageMarkdownBuilderTests
                 ],
             },
         };
+        var flatOutline = HeadingLevelResolver.FlattenOutline(outline);
+        var pageText = new PageText("Body text of the page.", []);
 
-        var md = PageMarkdownBuilder.BuildPlainText(
-            "Body text of the page.", outline, 0, null);
+        var md = PageMarkdownBuilder.BuildPlainText(pageText, flatOutline, 0, null);
 
         Assert.Contains("# Chapter 1", md);
         Assert.Contains("## Section 1.1", md);
@@ -260,8 +278,10 @@ public class PageMarkdownBuilderTests
         var annotations = new PageMarkdownBuilder.PageAnnotations(
             [],
             [new TextNoteAnnotation { Text = "My note", X = 0, Y = 0 }]);
+        var pageText = new PageText("Text.", []);
+        var flatOutline = HeadingLevelResolver.FlattenOutline([]);
 
-        var md = PageMarkdownBuilder.BuildPlainText("Text.", null, 0, annotations);
+        var md = PageMarkdownBuilder.BuildPlainText(pageText, flatOutline, 0, annotations);
 
         Assert.Contains("> **Note:** My note", md);
     }
@@ -278,26 +298,19 @@ public class PageMarkdownBuilderTests
         };
     }
 
-    private static PageText MakePageText(string text, LayoutBlock block)
-    {
-        var bbox = block.BBox;
-        var charBoxes = MakeCharBoxes(text, bbox.X, bbox.Y, bbox.X + bbox.W, bbox.Y + bbox.H, 0);
-        return new PageText(text, charBoxes);
-    }
-
-    private static List<CharBox> MakeCharBoxes(string text, float x, float y, float right, float bottom, int startIndex)
+    private static PageText MakePageText(string text, float x, float y, float right, float bottom)
     {
         float charWidth = (right - x) / Math.Max(text.Length, 1);
         var boxes = new List<CharBox>();
         for (int i = 0; i < text.Length; i++)
         {
             boxes.Add(new CharBox(
-                startIndex + i,
+                i,
                 x + i * charWidth,
                 y,
                 x + (i + 1) * charWidth,
                 bottom));
         }
-        return boxes;
+        return new PageText(text, boxes);
     }
 }

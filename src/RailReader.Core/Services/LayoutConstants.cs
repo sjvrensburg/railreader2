@@ -86,4 +86,7 @@ public static class LayoutConstants
 
     public static int? ClassNameToIndex(string name) =>
         Array.IndexOf(LayoutClasses, name) is var idx and >= 0 ? idx : null;
+
+    public static string GetClassName(int classId) =>
+        classId >= 0 && classId < LayoutClasses.Length ? LayoutClasses[classId] : "unknown";
 }

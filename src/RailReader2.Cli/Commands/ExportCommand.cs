@@ -37,20 +37,9 @@ public static class ExportCommand
             && !Enum.TryParse<VlmService.PromptStyle>(promptStyleStr, ignoreCase: true, out promptStyle))
             return Program.Fail($"Invalid --prompt-style: {promptStyleStr} (expected: instruction, ocr)");
 
-        // Resolve VLM endpoint
         VlmEndpointConfig? vlmEndpoint = null;
         if (!noVlm)
-        {
-            var appConfig = AppConfig.Load();
-            var apiKey = apiKeyOverride
-                ?? (string.IsNullOrWhiteSpace(appConfig.VlmApiKey)
-                    ? Environment.GetEnvironmentVariable("OPENAI_API_KEY")
-                    : appConfig.VlmApiKey);
-            vlmEndpoint = new VlmEndpointConfig(
-                endpointOverride ?? appConfig.VlmEndpoint,
-                modelOverride ?? appConfig.VlmModel,
-                apiKey);
-        }
+            vlmEndpoint = VlmEndpointConfig.FromAppConfigWithOverrides(endpointOverride, modelOverride, apiKeyOverride);
 
         var options = new MarkdownExportOptions
         {

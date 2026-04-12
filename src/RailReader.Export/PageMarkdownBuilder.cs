@@ -17,33 +17,22 @@ public static class PageMarkdownBuilder
         List<TextNoteAnnotation> Notes);
 
     /// <summary>
-    /// Builds Markdown for a single page.
+    /// Builds Markdown for a single page from layout blocks.
     /// </summary>
-    /// <param name="blocks">Layout blocks in reading order.</param>
-    /// <param name="headingLevels">Block index → heading level (1–6).</param>
-    /// <param name="pageText">Extracted page text for text blocks.</param>
-    /// <param name="vlmResults">VLM transcriptions keyed by block index.</param>
-    /// <param name="annotations">Highlights and text notes for this page.</param>
-    /// <param name="figurePaths">Block index → relative figure image path.</param>
     public static string Build(
         IReadOnlyList<LayoutBlock> blocks,
         IReadOnlyDictionary<int, int> headingLevels,
-        PageText? pageText,
+        IReadOnlyDictionary<int, string> blockTexts,
         IReadOnlyDictionary<int, VlmBlockResult>? vlmResults,
-        PageAnnotations? annotations,
         IReadOnlyDictionary<int, string>? figurePaths)
     {
         var sb = new StringBuilder();
 
         for (int i = 0; i < blocks.Count; i++)
         {
-            var block = blocks[i];
-            var className = block.ClassId < LayoutConstants.LayoutClasses.Length
-                ? LayoutConstants.LayoutClasses[block.ClassId]
-                : "unknown";
-
+            var className = LayoutConstants.GetClassName(blocks[i].ClassId);
             var vlm = vlmResults?.GetValueOrDefault(i);
-            var text = pageText?.ExtractBlockText(block);
+            blockTexts.TryGetValue(i, out var text);
 
             var blockMd = RenderBlock(className, i, text, headingLevels, vlm, figurePaths);
             if (blockMd != null)
@@ -55,9 +44,6 @@ public static class PageMarkdownBuilder
             }
         }
 
-        if (annotations != null)
-            AppendAnnotations(sb, annotations);
-
         return sb.ToString();
     }
 
@@ -66,29 +52,25 @@ public static class PageMarkdownBuilder
     /// Uses outline entries at page boundaries for heading markers.
     /// </summary>
     public static string BuildPlainText(
-        string pageText,
-        IReadOnlyList<OutlineEntry>? outlineEntries,
+        PageText pageText,
+        IReadOnlyList<HeadingLevelResolver.FlatOutlineEntry> flatOutline,
         int pageIndex,
         PageAnnotations? annotations)
     {
         var sb = new StringBuilder();
 
-        if (outlineEntries != null)
-        {
-            var flatOutline = HeadingLevelResolver.FlattenOutline(outlineEntries);
-            var pageHeadings = flatOutline
-                .Where(e => e.Page == pageIndex)
-                .ToList();
+        var pageHeadings = flatOutline
+            .Where(e => e.Page == pageIndex)
+            .ToList();
 
-            foreach (var heading in pageHeadings)
-            {
-                var prefix = new string('#', Math.Clamp(heading.Depth, 1, 6));
-                sb.AppendLine($"{prefix} {heading.Title}");
-                sb.AppendLine();
-            }
+        foreach (var heading in pageHeadings)
+        {
+            var prefix = new string('#', Math.Clamp(heading.Depth, 1, 6));
+            sb.AppendLine($"{prefix} {heading.Title}");
+            sb.AppendLine();
         }
 
-        var trimmed = pageText.Trim();
+        var trimmed = pageText.Text.Trim();
         if (!string.IsNullOrEmpty(trimmed))
         {
             sb.AppendLine(trimmed);
@@ -96,9 +78,57 @@ public static class PageMarkdownBuilder
         }
 
         if (annotations != null)
-            AppendAnnotations(sb, annotations);
+            AppendAnnotations(sb, annotations, pageText);
 
         return sb.ToString();
+    }
+
+    /// <summary>
+    /// Appends annotation blockquotes. When pageText is provided, highlights
+    /// include the extracted highlighted text; otherwise a generic colour marker.
+    /// </summary>
+    internal static void AppendAnnotations(StringBuilder sb, PageAnnotations annotations, PageText? pageText = null)
+    {
+        if (annotations.Highlights.Count == 0 && annotations.Notes.Count == 0)
+            return;
+
+        sb.AppendLine();
+
+        foreach (var highlight in annotations.Highlights)
+        {
+            string? highlightedText = null;
+            if (pageText != null && highlight.Rects.Count > 0)
+            {
+                var texts = new List<string>();
+                foreach (var rect in highlight.Rects)
+                {
+                    var t = pageText.ExtractTextInRect(rect.X, rect.Y, rect.X + rect.W, rect.Y + rect.H);
+                    if (t != null) texts.Add(t);
+                }
+                if (texts.Count > 0)
+                    highlightedText = string.Join(" ", texts);
+            }
+
+            if (highlightedText != null)
+            {
+                sb.AppendLine($"> {highlightedText}");
+                sb.AppendLine($"<!-- highlight: {highlight.Color} -->");
+            }
+            else
+            {
+                sb.AppendLine($"> [highlight: {highlight.Color}]");
+            }
+            sb.AppendLine();
+        }
+
+        foreach (var note in annotations.Notes)
+        {
+            if (!string.IsNullOrWhiteSpace(note.Text))
+            {
+                sb.AppendLine($"> **Note:** {note.Text.Trim()}");
+                sb.AppendLine();
+            }
+        }
     }
 
     private static string? RenderBlock(
@@ -115,11 +145,10 @@ public static class PageMarkdownBuilder
             "text" or "abstract" or "content" or "reference" or "reference_content"
                 or "footnote" or "aside_text" or "vertical_text" => RenderTextBlock(text),
             "display_formula" or "inline_formula" or "algorithm" => RenderEquation(vlm, text),
-            "formula_number" => null, // Handled inline with preceding equation
+            "formula_number" => null,
             "table" => RenderTable(vlm, text),
             "image" or "chart" or "footer_image" or "header_image" => RenderFigure(blockIndex, vlm, figurePaths),
             "figure_title" => RenderFigureTitle(text),
-            // Page furniture — skip
             "header" or "footer" or "number" or "seal" => null,
             _ => RenderTextBlock(text),
         };
@@ -189,82 +218,5 @@ public static class PageMarkdownBuilder
         if (string.IsNullOrWhiteSpace(text))
             return null;
         return $"*{text.Trim()}*";
-    }
-
-    private static void AppendAnnotations(StringBuilder sb, PageAnnotations annotations)
-    {
-        if (annotations.Highlights.Count == 0 && annotations.Notes.Count == 0)
-            return;
-
-        sb.AppendLine();
-
-        foreach (var highlight in annotations.Highlights)
-        {
-            // We can't extract the highlighted text from just the annotation rects
-            // without the page text. Use a generic marker with colour info.
-            sb.AppendLine($"> [highlight: {highlight.Color}]");
-            sb.AppendLine();
-        }
-
-        foreach (var note in annotations.Notes)
-        {
-            if (!string.IsNullOrWhiteSpace(note.Text))
-            {
-                sb.AppendLine($"> **Note:** {note.Text.Trim()}");
-                sb.AppendLine();
-            }
-        }
-    }
-
-    /// <summary>
-    /// Appends annotations with access to page text for extracting highlighted content.
-    /// </summary>
-    internal static void AppendAnnotationsWithText(
-        StringBuilder sb,
-        PageAnnotations annotations,
-        PageText? pageText,
-        double pageWidth,
-        double pageHeight)
-    {
-        if (annotations.Highlights.Count == 0 && annotations.Notes.Count == 0)
-            return;
-
-        sb.AppendLine();
-
-        foreach (var highlight in annotations.Highlights)
-        {
-            string? highlightedText = null;
-            if (pageText != null && highlight.Rects.Count > 0)
-            {
-                var texts = new List<string>();
-                foreach (var rect in highlight.Rects)
-                {
-                    var t = pageText.ExtractTextInRect(rect.X, rect.Y, rect.X + rect.W, rect.Y + rect.H);
-                    if (t != null) texts.Add(t);
-                }
-                if (texts.Count > 0)
-                    highlightedText = string.Join(" ", texts);
-            }
-
-            if (highlightedText != null)
-            {
-                sb.AppendLine($"> {highlightedText}");
-                sb.AppendLine($"<!-- highlight: {highlight.Color} -->");
-            }
-            else
-            {
-                sb.AppendLine($"> [highlight: {highlight.Color}]");
-            }
-            sb.AppendLine();
-        }
-
-        foreach (var note in annotations.Notes)
-        {
-            if (!string.IsNullOrWhiteSpace(note.Text))
-            {
-                sb.AppendLine($"> **Note:** {note.Text.Trim()}");
-                sb.AppendLine();
-            }
-        }
     }
 }

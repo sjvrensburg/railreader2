@@ -13,62 +13,70 @@ public static class HeadingLevelResolver
 
     /// <summary>
     /// Resolves heading levels for all heading blocks on a given page.
+    /// Flattens the outline tree internally — use <see cref="ResolveWithFlatOutline"/>
+    /// to avoid repeated flattening across pages.
     /// </summary>
-    /// <param name="blocks">Layout blocks for the page, in reading order.</param>
-    /// <param name="pageText">Extracted text for the page.</param>
-    /// <param name="outline">Full PDF outline tree.</param>
-    /// <param name="pageIndex">0-based page index.</param>
-    /// <returns>Map from block index to heading level (1–6).</returns>
     public static Dictionary<int, int> Resolve(
         IReadOnlyList<LayoutBlock> blocks,
         PageText? pageText,
         IReadOnlyList<OutlineEntry> outline,
         int pageIndex)
     {
-        var result = new Dictionary<int, int>();
-
-        // Flatten the outline tree into (title, page, depth) tuples
         var flatOutline = FlattenOutline(outline);
 
-        // Filter to entries targeting this page
+        var blockTexts = new Dictionary<int, string>();
+        if (pageText != null)
+        {
+            for (int i = 0; i < blocks.Count; i++)
+            {
+                var text = pageText.ExtractBlockText(blocks[i]);
+                if (!string.IsNullOrEmpty(text))
+                    blockTexts[i] = text;
+            }
+        }
+
+        return ResolveWithFlatOutline(blocks, blockTexts, flatOutline, pageIndex);
+    }
+
+    /// <summary>
+    /// Resolves heading levels using a pre-flattened outline and pre-extracted block texts.
+    /// Avoids redundant outline flattening and text extraction when called per-page.
+    /// </summary>
+    public static Dictionary<int, int> ResolveWithFlatOutline(
+        IReadOnlyList<LayoutBlock> blocks,
+        IReadOnlyDictionary<int, string> blockTexts,
+        IReadOnlyList<FlatOutlineEntry> flatOutline,
+        int pageIndex)
+    {
+        var result = new Dictionary<int, int>();
+
         var pageEntries = flatOutline
             .Where(e => e.Page == pageIndex)
             .ToList();
 
         for (int i = 0; i < blocks.Count; i++)
         {
-            var block = blocks[i];
-            var className = block.ClassId < LayoutConstants.LayoutClasses.Length
-                ? LayoutConstants.LayoutClasses[block.ClassId]
-                : null;
+            var className = LayoutConstants.GetClassName(blocks[i].ClassId);
 
             if (className is not ("doc_title" or "paragraph_title"))
                 continue;
 
-            // Try to extract the block's text for matching
-            string? blockText = pageText?.ExtractBlockText(block);
+            blockTexts.TryGetValue(i, out var blockText);
             int? matchedDepth = null;
 
             if (!string.IsNullOrWhiteSpace(blockText) && pageEntries.Count > 0)
-            {
                 matchedDepth = FuzzyMatchOutline(blockText, pageEntries);
-            }
 
             if (matchedDepth.HasValue)
-            {
                 result[i] = Math.Clamp(matchedDepth.Value, 1, 6);
-            }
             else
-            {
-                // Fallback: doc_title → H1, paragraph_title → H2
                 result[i] = className == "doc_title" ? 1 : 2;
-            }
         }
 
         return result;
     }
 
-    internal record FlatOutlineEntry(string Title, int? Page, int Depth);
+    public record FlatOutlineEntry(string Title, int? Page, int Depth);
 
     internal static List<FlatOutlineEntry> FlattenOutline(IReadOnlyList<OutlineEntry> entries)
     {
@@ -93,17 +101,22 @@ public static class HeadingLevelResolver
         if (string.IsNullOrEmpty(normalized))
             return null;
 
-        // Try exact containment first (case-insensitive)
+        // Pre-normalize outline entries to avoid redundant work across both loops
+        var normalizedEntries = new List<(string Norm, int Depth)>(pageEntries.Count);
         foreach (var entry in pageEntries)
         {
             var entryNorm = NormalizeForMatch(entry.Title);
-            if (string.IsNullOrEmpty(entryNorm))
-                continue;
+            if (!string.IsNullOrEmpty(entryNorm))
+                normalizedEntries.Add((entryNorm, entry.Depth));
+        }
 
+        // Try exact containment first (case-insensitive)
+        foreach (var (entryNorm, depth) in normalizedEntries)
+        {
             if (normalized.Contains(entryNorm, StringComparison.OrdinalIgnoreCase) ||
                 entryNorm.Contains(normalized, StringComparison.OrdinalIgnoreCase))
             {
-                return entry.Depth;
+                return depth;
             }
         }
 
@@ -111,12 +124,8 @@ public static class HeadingLevelResolver
         int? bestDepth = null;
         double bestSimilarity = 0;
 
-        foreach (var entry in pageEntries)
+        foreach (var (entryNorm, depth) in normalizedEntries)
         {
-            var entryNorm = NormalizeForMatch(entry.Title);
-            if (string.IsNullOrEmpty(entryNorm))
-                continue;
-
             int maxLen = Math.Max(normalized.Length, entryNorm.Length);
             int distance = LevenshteinDistance(normalized, entryNorm);
             double similarity = 1.0 - (double)distance / maxLen;
@@ -124,7 +133,7 @@ public static class HeadingLevelResolver
             if (similarity > 0.8 && similarity > bestSimilarity)
             {
                 bestSimilarity = similarity;
-                bestDepth = entry.Depth;
+                bestDepth = depth;
             }
         }
 
@@ -133,7 +142,6 @@ public static class HeadingLevelResolver
 
     private static string NormalizeForMatch(string text)
     {
-        // Collapse whitespace and trim
         var chars = new char[text.Length];
         int len = 0;
         bool prevSpace = true;
@@ -162,7 +170,6 @@ public static class HeadingLevelResolver
         if (s.Length == 0) return t.Length;
         if (t.Length == 0) return s.Length;
 
-        // Single-row approach
         var prev = new int[t.Length + 1];
         for (int j = 0; j <= t.Length; j++) prev[j] = j;
 

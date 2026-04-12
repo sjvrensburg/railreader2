@@ -345,14 +345,8 @@ public static class VlmCommand
         return set;
     }
 
-    static VlmService.BlockAction GetAction(int classId)
-    {
-        if (LayoutConstants.TableClasses.Contains(classId))
-            return VlmService.BlockAction.Markdown;
-        if (LayoutConstants.FigureClasses.Contains(classId))
-            return VlmService.BlockAction.Description;
-        return VlmService.BlockAction.LaTeX;
-    }
+    static VlmService.BlockAction GetAction(int classId) =>
+        VlmService.GetBlockAction(classId) ?? VlmService.BlockAction.LaTeX;
 
     static VlmBlockResult BuildResult(Target t, VlmService.BlockAction action,
         VlmService.VlmResult result, string? model)
