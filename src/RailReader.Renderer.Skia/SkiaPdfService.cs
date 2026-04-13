@@ -2,6 +2,7 @@ using PDFtoImage;
 using RailReader.Core;
 using RailReader.Core.Models;
 using RailReader.Core.Services;
+using SkiaSharp;
 
 namespace RailReader.Renderer.Skia;
 
@@ -60,27 +61,34 @@ public sealed class SkiaPdfService : IPdfService
 
     public (byte[] RgbBytes, int Width, int Height) RenderPagePixmap(int pageIndex, int targetSize)
     {
+        SKBitmap bitmap;
         lock (PdfiumGate.Lock)
         {
-        var (pixW, pixH) = FitPageToTarget(pageIndex, targetSize);
-
-        using var bitmap = Conversion.ToImage(PdfBytes, page: pageIndex,
-            options: new RenderOptions(Width: pixW, Height: pixH));
-
-        // Convert BGRA (PDFium/SkiaSharp native) to RGB for ONNX
-        var pixels = bitmap.GetPixelSpan();
-        int pixelCount = bitmap.Width * bitmap.Height;
-        var rgb = new byte[pixelCount * 3];
-        for (int i = 0; i < pixelCount; i++)
-        {
-            int src = i * 4;
-            int dst = i * 3;
-            rgb[dst] = pixels[src + 2];     // R (BGRA -> RGB)
-            rgb[dst + 1] = pixels[src + 1]; // G
-            rgb[dst + 2] = pixels[src];     // B
+            var (pixW, pixH) = FitPageToTarget(pageIndex, targetSize);
+            bitmap = Conversion.ToImage(PdfBytes, page: pageIndex,
+                options: new RenderOptions(Width: pixW, Height: pixH));
         }
 
-        return (rgb, bitmap.Width, bitmap.Height);
+        // BGRA->RGB conversion is pure CPU; run outside the PDFium gate so
+        // other tabs' render/text-extract calls aren't blocked by this loop.
+        try
+        {
+            var pixels = bitmap.GetPixelSpan();
+            int pixelCount = bitmap.Width * bitmap.Height;
+            var rgb = new byte[pixelCount * 3];
+            for (int i = 0; i < pixelCount; i++)
+            {
+                int src = i * 4;
+                int dst = i * 3;
+                rgb[dst] = pixels[src + 2];
+                rgb[dst + 1] = pixels[src + 1];
+                rgb[dst + 2] = pixels[src];
+            }
+            return (rgb, bitmap.Width, bitmap.Height);
+        }
+        finally
+        {
+            bitmap.Dispose();
         }
     }
 
