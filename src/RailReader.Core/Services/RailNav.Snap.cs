@@ -110,9 +110,10 @@ public sealed partial class RailNav
     /// <summary>
     /// Snap X to a grid that guarantees at least 1 screen pixel of precision.
     /// At high zoom the grid is finer (smooth feel); at low zoom it coarsens
-    /// to prevent sub-pixel text shimmer.
+    /// to prevent sub-pixel text shimmer. Internal so the scroll/auto-scroll
+    /// ticks (in sibling partials) can apply the same snapping every frame.
     /// </summary>
-    private double SnapX(double x, double zoom)
+    internal double SnapX(double x, double zoom)
     {
         if (!_config.PixelSnapping) return x;
         double grid = Math.Max(4.0, zoom);
