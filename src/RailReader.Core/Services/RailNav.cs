@@ -3,7 +3,7 @@ using RailReader.Core.Models;
 
 namespace RailReader.Core.Services;
 
-public sealed class RailNav : ICameraClamp
+public sealed partial class RailNav : ICameraClamp
 {
     private AppConfig _config;
     private PageAnalysis? _analysis;
@@ -351,156 +351,6 @@ public sealed class RailNav : ICameraClamp
         StopScroll();
     }
 
-    public void StartSnapToCurrent(double cameraX, double cameraY, double zoom, double windowWidth, double windowHeight)
-    {
-        if (!CanNavigate) return;
-        var (targetX, targetY) = ComputeTargetCamera(zoom, windowWidth, windowHeight);
-        BeginSnap(cameraX, cameraY, targetX, targetY);
-    }
-
-    /// <summary>
-    /// Snap to the right (end) edge of the current line. Used when navigating backward
-    /// via edge-hold so the user lands at the end of the previous line and can continue scrolling.
-    /// </summary>
-    public void StartSnapToCurrentEnd(double cameraX, double cameraY, double zoom, double windowWidth, double windowHeight)
-    {
-        if (!CanNavigate) return;
-
-        var (blockLeft, blockRight, blockWidthPx) = GetBlockBounds(zoom);
-        double targetX;
-        if (blockWidthPx <= windowWidth && ShouldCenterBlock())
-            targetX = windowWidth / 2.0 - (blockLeft + blockRight) / 2.0 * zoom;
-        else
-            targetX = windowWidth - blockRight * zoom;
-        var (_, targetY) = ComputeTargetCamera(zoom, windowWidth, windowHeight);
-
-        BeginSnap(cameraX, cameraY, SnapX(targetX, zoom), SnapY(targetY));
-    }
-
-    /// <summary>
-    /// Snap to the current line, centering a specific page X coordinate horizontally.
-    /// Used for search result navigation so the match is visible rather than
-    /// snapping to the block's left edge.
-    /// </summary>
-    public void StartSnapToPoint(double cameraX, double cameraY, double zoom,
-        double windowWidth, double windowHeight, double pageX)
-    {
-        if (!CanNavigate) return;
-
-        var (_, targetY) = ComputeTargetCamera(zoom, windowWidth, windowHeight);
-        double targetX = ClampX(windowWidth / 2.0 - pageX * zoom, zoom, windowWidth);
-
-        BeginSnap(cameraX, cameraY, SnapX(targetX, zoom), SnapY(targetY));
-    }
-
-    /// <summary>
-    /// Computes horizontal scroll fraction (0=line start, 1=line end) for the current
-    /// camera position. Used to preserve reading position across zoom changes.
-    /// </summary>
-    public double ComputeHorizontalFraction(double cameraX, double zoom, double windowWidth)
-    {
-        if (!CanNavigate) return 0;
-        var (blockLeft, blockRight, blockWidthPx) = GetBlockBounds(zoom);
-        if (blockWidthPx <= windowWidth) return 0; // block fits in viewport, no scrolling
-
-        double maxX = -blockLeft * zoom;           // camera X at line start (left edge visible)
-        double minX = windowWidth - blockRight * zoom; // camera X at line end (right edge visible)
-        if (Math.Abs(maxX - minX) < 1) return 0;
-
-        return Math.Clamp((maxX - cameraX) / (maxX - minX), 0, 1);
-    }
-
-    /// <summary>
-    /// Snap to the current line, preserving horizontal fraction and vertical screen position.
-    /// Used after zoom changes to maintain the user's reading position.
-    /// </summary>
-    public void StartSnapPreservingPosition(double cameraX, double cameraY, double zoom,
-        double windowWidth, double windowHeight, double horizontalFraction, double lineScreenY)
-    {
-        if (!CanNavigate) return;
-
-        var line = CurrentLineInfo;
-
-        // Compute target Y so the line stays at lineScreenY on screen
-        // lineScreenY = line.Y * zoom + targetY  →  targetY = lineScreenY - line.Y * zoom
-        double targetY = lineScreenY - line.Y * zoom;
-        // Update VerticalBias to match this position (so future snaps preserve it)
-        double centeredY = windowHeight / 2.0 - line.Y * zoom;
-        VerticalBias = targetY - centeredY;
-
-        // Compute target X from horizontal fraction
-        var (blockLeft, blockRight, blockWidthPx) = GetBlockBounds(zoom);
-        double targetX;
-        if (blockWidthPx <= windowWidth)
-        {
-            // Block fits — use standard positioning
-            var (stdX, _) = ComputeTargetCamera(zoom, windowWidth, windowHeight);
-            targetX = stdX;
-        }
-        else
-        {
-            double maxX = -blockLeft * zoom;
-            double minX = windowWidth - blockRight * zoom;
-            targetX = maxX - horizontalFraction * (maxX - minX);
-        }
-
-        targetX = ClampX(targetX, zoom, windowWidth);
-        BeginSnap(cameraX, cameraY, SnapX(targetX, zoom), SnapY(targetY));
-    }
-
-    private void BeginSnap(double startX, double startY, double targetX, double targetY)
-    {
-        _snap = new SnapAnimation
-        {
-            StartX = startX, StartY = startY,
-            TargetX = targetX, TargetY = targetY,
-            Timer = Stopwatch.StartNew(),
-            DurationMs = _config.SnapDurationMs,
-        };
-    }
-
-    /// <summary>
-    /// Snap X to a grid that guarantees at least 1 screen pixel of precision.
-    /// At high zoom the grid is finer (smooth feel); at low zoom it coarsens
-    /// to prevent sub-pixel text shimmer.
-    /// </summary>
-    private double SnapX(double x, double zoom)
-    {
-        if (!_config.PixelSnapping) return x;
-        double grid = Math.Max(4.0, zoom);
-        return Math.Round(x * grid) / grid;
-    }
-
-    private double SnapY(double y) => _config.PixelSnapping ? Math.Round(y) : y;
-
-    private (double X, double Y) ComputeTargetCamera(double zoom, double windowWidth, double windowHeight)
-    {
-        var block = CurrentNavigableBlock;
-        var line = CurrentLineInfo;
-        double targetY = windowHeight / 2.0 - line.Y * zoom + VerticalBias;
-
-        double blockWidthPx = block.BBox.W * zoom;
-        double targetX;
-        if (blockWidthPx < windowWidth * CoreTuning.CenterBlockThreshold && ShouldCenterBlock())
-        {
-            // Block is narrow relative to viewport — center it horizontally
-            double blockCenterX = block.BBox.X + block.BBox.W / 2.0;
-            targetX = windowWidth / 2.0 - blockCenterX * zoom;
-        }
-        else
-        {
-            // Block fills most of the viewport — left-align with 5% margin
-            targetX = windowWidth * 0.05 - block.BBox.X * zoom;
-        }
-
-        if (_config.PixelSnapping)
-        {
-            targetY = Math.Round(targetY);               // integer Y = baseline on pixel grid
-            targetX = SnapX(targetX, zoom);               // zoom-aware grid for smooth feel
-        }
-
-        return (targetX, targetY);
-    }
 
     /// <summary>
     /// Captures the vertical bias from the current camera position relative to
@@ -595,25 +445,6 @@ public sealed class RailNav : ICameraClamp
         return animating;
     }
 
-    private bool TickSnapAnimation(ref double cameraX, ref double cameraY)
-    {
-        if (_snap is not { } snap)
-            return false;
-
-        double elapsed = snap.Timer.Elapsed.TotalMilliseconds;
-        double t = Math.Min(elapsed / snap.DurationMs, 1.0);
-        double eased = 1.0 - Math.Pow(1.0 - t, 3); // cubic ease-out
-
-        cameraX = snap.StartX + (snap.TargetX - snap.StartX) * eased;
-        cameraY = snap.StartY + (snap.TargetY - snap.StartY) * eased;
-
-        if (t >= 1.0)
-        {
-            _snap = null;
-            return false;
-        }
-        return true;
-    }
 
     private bool TickScrollHold(ref double cameraX, double zoom, double windowWidth)
     {
@@ -695,70 +526,6 @@ public sealed class RailNav : ICameraClamp
         return null;
     }
 
-    /// <summary>
-    /// Starts auto-scroll at the given speed (page-coordinate pixels/sec).
-    /// </summary>
-    public void StartAutoScroll(double speed)
-    {
-        if (!CanNavigate) return;
-        _autoScrollState.Start(speed);
-        StopScrollAndEdgeHold();
-    }
-
-    public void StopAutoScroll()
-    {
-        _autoScrollState.Stop();
-        ScrollSpeed = 0.0;
-    }
-
-    /// <summary>Inject a settling pause into auto-scroll (e.g. after advancing to a new block).
-    /// The pause is deferred until any snap animation completes, so the full duration
-    /// is perceived as stillness after the camera reaches its target.</summary>
-    public void PauseAutoScroll(double durationMs)
-    {
-        _autoScrollState.RequestDeferredPause(durationMs);
-    }
-
-    /// <summary>Set/clear the boost flag (user holding D/Right during auto-scroll).</summary>
-    public void SetAutoScrollBoost(bool boost) => _autoScrollState.SetBoost(boost);
-
-    /// <summary>
-    /// Inject a controlled elapsed-seconds source for unit tests.
-    /// Forwarded to the underlying <see cref="AutoScrollStateMachine"/>.
-    /// </summary>
-    internal Func<double>? AutoScrollElapsedSecondsOverride
-    {
-        set => _autoScrollState.GetScrollElapsedSeconds = value;
-    }
-
-    /// <summary>
-    /// Returns true if auto-scroll has reached the right edge and should advance.
-    /// Called from Tick; the caller is responsible for calling NextLine and snapping.
-    /// </summary>
-    public bool TickAutoScroll(ref double cameraX, double dtSecs, double zoom, double windowWidth)
-    {
-        if (!_autoScrollState.IsActive || _navigableIndices.Count == 0) return false;
-
-        var (_, blockRight, _) = GetBlockBounds(zoom);
-        var block = CurrentNavigableBlock;
-
-        var ctx = new AutoScrollContext
-        {
-            SnapInProgress = _snap is not null,
-            BlockRight = blockRight,
-            RawBlockWidthPx = block.BBox.W * zoom,
-            CurrentLine = CurrentLine,
-            BlockLineCount = block.Lines.Count,
-            LinePauseMs = _config.AutoScrollLinePauseMs,
-            WindowWidth = windowWidth,
-            Zoom = zoom,
-            MaxSpeed = _config.ScrollSpeedMax,
-        };
-
-        bool reachedEnd = _autoScrollState.Tick(ref cameraX, dtSecs, in ctx);
-        ScrollSpeed = _autoScrollState.NormalizedSpeed;
-        return reachedEnd;
-    }
 
     public void UpdateConfig(AppConfig config)
     {
@@ -768,10 +535,4 @@ public sealed class RailNav : ICameraClamp
         _autoScrollState.UpdateSpeed(config.DefaultAutoScrollSpeed);
     }
 
-    private sealed class SnapAnimation
-    {
-        public double StartX, StartY, TargetX, TargetY;
-        public required Stopwatch Timer;
-        public double DurationMs;
-    }
 }

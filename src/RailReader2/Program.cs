@@ -43,6 +43,13 @@ internal sealed class Program
             logger.Error("[WARN] Unobserved task exception", e.Exception);
             e.SetObserved();
         };
+        AppDomain.CurrentDomain.ProcessExit += (_, _) =>
+        {
+            logger.Info("[EXIT] ProcessExit fired (clean shutdown path)");
+        };
+        FirstChanceCrashTracer.Install(logger);
+        if (!OperatingSystem.IsWindows())
+            NativeSignalTrap.Install(logger);
 
         try
         {

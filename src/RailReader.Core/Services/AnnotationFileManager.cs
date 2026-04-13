@@ -13,6 +13,7 @@ public sealed class AnnotationFileManager : IDisposable
 {
     private readonly IThreadMarshaller _marshaller;
     private readonly Dictionary<string, SharedEntry> _entries = new(StringComparer.OrdinalIgnoreCase);
+    private readonly object _lock = new();
     private bool _disposed;
 
     /// <summary>
@@ -34,25 +35,28 @@ public sealed class AnnotationFileManager : IDisposable
     {
         var key = Path.GetFullPath(pdfPath);
 
-        if (_entries.TryGetValue(key, out var entry))
+        lock (_lock)
         {
-            entry.RefCount++;
-            return entry.Annotations;
+            if (_entries.TryGetValue(key, out var entry))
+            {
+                entry.RefCount++;
+                return entry.Annotations;
+            }
+
+            var annotations = AnnotationService.Load(pdfPath) ?? new AnnotationFile
+            {
+                SourcePdf = Path.GetFileName(pdfPath),
+                SourcePdfPath = key,
+            };
+
+            _entries[key] = new SharedEntry
+            {
+                PdfPath = pdfPath,
+                Annotations = annotations,
+                RefCount = 1,
+            };
+            return annotations;
         }
-
-        var annotations = AnnotationService.Load(pdfPath) ?? new AnnotationFile
-        {
-            SourcePdf = Path.GetFileName(pdfPath),
-            SourcePdfPath = key,
-        };
-
-        _entries[key] = new SharedEntry
-        {
-            PdfPath = pdfPath,
-            Annotations = annotations,
-            RefCount = 1,
-        };
-        return annotations;
     }
 
     /// <summary>
@@ -62,15 +66,21 @@ public sealed class AnnotationFileManager : IDisposable
     public void Release(string pdfPath)
     {
         var key = Path.GetFullPath(pdfPath);
-        if (!_entries.TryGetValue(key, out var entry)) return;
-
-        entry.RefCount--;
-        if (entry.RefCount <= 0)
+        SharedEntry? toFlush = null;
+        lock (_lock)
         {
-            FlushEntry(entry);
-            entry.AutoSaveTimer?.Dispose();
-            _entries.Remove(key);
+            if (!_entries.TryGetValue(key, out var entry)) return;
+
+            entry.RefCount--;
+            if (entry.RefCount <= 0)
+            {
+                entry.AutoSaveTimer?.Dispose();
+                entry.AutoSaveTimer = null;
+                _entries.Remove(key);
+                toFlush = entry;
+            }
         }
+        if (toFlush is not null) FlushEntry(toFlush);
     }
 
     /// <summary>
@@ -80,33 +90,43 @@ public sealed class AnnotationFileManager : IDisposable
     public void MarkDirty(string pdfPath)
     {
         var key = Path.GetFullPath(pdfPath);
-        if (!_entries.TryGetValue(key, out var entry)) return;
+        lock (_lock)
+        {
+            if (!_entries.TryGetValue(key, out var entry)) return;
 
-        entry.Dirty = true;
-        if (entry.AutoSaveTimer is not null)
-            entry.AutoSaveTimer.Change(1000, Timeout.Infinite);
-        else
-            entry.AutoSaveTimer = new Timer(
-                _ => _marshaller.Post(() => { if (!_disposed) FlushEntry(entry); }),
-                null, 1000, Timeout.Infinite);
+            entry.Dirty = true;
+            if (entry.AutoSaveTimer is not null)
+                entry.AutoSaveTimer.Change(1000, Timeout.Infinite);
+            else
+                entry.AutoSaveTimer = new Timer(
+                    _ => _marshaller.Post(() => { if (!_disposed) FlushEntry(entry); }),
+                    null, 1000, Timeout.Infinite);
+        }
     }
 
     /// <summary>Flush all dirty files to disk. Call on app shutdown.</summary>
     public void FlushAll()
     {
-        foreach (var entry in _entries.Values)
+        List<SharedEntry> snapshot;
+        lock (_lock) snapshot = [.. _entries.Values];
+        foreach (var entry in snapshot)
             FlushEntry(entry);
     }
 
     public void Dispose()
     {
-        _disposed = true;
-        foreach (var entry in _entries.Values)
+        List<SharedEntry> snapshot;
+        lock (_lock)
+        {
+            _disposed = true;
+            snapshot = [.. _entries.Values];
+            _entries.Clear();
+        }
+        foreach (var entry in snapshot)
         {
             FlushEntry(entry);
             entry.AutoSaveTimer?.Dispose();
         }
-        _entries.Clear();
     }
 
     private void FlushEntry(SharedEntry entry)
