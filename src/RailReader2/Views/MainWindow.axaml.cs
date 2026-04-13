@@ -37,40 +37,7 @@ public partial class MainWindow : Window
             Viewport.ViewModel = vm;
             Minimap.ViewModel = vm;
 
-            // Wire granular invalidation callbacks.
-            // Each callback builds an immutable state snapshot on the UI thread
-            // and sends it to the appropriate CompositionCustomVisual handler,
-            // which re-renders on the next compositor frame.
-            vm.SetInvalidation(new InvalidationCallbacks
-            {
-                InvalidateCamera = () =>
-                {
-                    UpdatePagePanelSize(vm.ActiveTab);
-                    StatusBar.UpdateZoom();
-                    UpdateAllLayers(vm, vm.ActiveTab);
-                },
-                InvalidatePage = () =>
-                {
-                    var tab = vm.ActiveTab;
-                    var state = BuildPageState(vm, tab);
-                    PageLayer.UpdateState(state);
-                    // Update minimap when the page image itself changes
-                    if (!ReferenceEquals(state.Image, _lastMinimapImage))
-                    {
-                        _lastMinimapImage = state.Image;
-                        Minimap.InvalidateVisual();
-                    }
-                },
-                InvalidateOverlay = () =>
-                    OverlayLayer.UpdateState(BuildOverlayState(vm, vm.ActiveTab)),
-                InvalidateSearch = () =>
-                {
-                    SearchLayer.UpdateState(BuildSearchState(vm, vm.ActiveTab));
-                    OutlinePanel.OnSearchInvalidated();
-                },
-                InvalidateAnnotations = () =>
-                    AnnotationLayer.UpdateState(BuildAnnotationState(vm, vm.ActiveTab)),
-            });
+            vm.SetInvalidation(BuildInvalidationCallbacks(vm));
 
             // Keep ViewModel's viewport size in sync with the actual drawable area.
             // SizeChanged fires during the initial layout pass (before window.Opened),
@@ -106,6 +73,42 @@ public partial class MainWindow : Window
             vm.PropertyChanged += OnVmPropertyChanged;
         }
     }
+
+    /// <summary>
+    /// Build the granular invalidation callbacks passed to the ViewModel. Each
+    /// callback builds an immutable state snapshot on the UI thread and sends
+    /// it to the appropriate CompositionCustomVisual handler, which re-renders
+    /// on the next compositor frame.
+    /// </summary>
+    private InvalidationCallbacks BuildInvalidationCallbacks(MainWindowViewModel vm) => new()
+    {
+        InvalidateCamera = () =>
+        {
+            UpdatePagePanelSize(vm.ActiveTab);
+            StatusBar.UpdateZoom();
+            UpdateAllLayers(vm, vm.ActiveTab);
+        },
+        InvalidatePage = () =>
+        {
+            var tab = vm.ActiveTab;
+            var state = BuildPageState(vm, tab);
+            PageLayer.UpdateState(state);
+            if (!ReferenceEquals(state.Image, _lastMinimapImage))
+            {
+                _lastMinimapImage = state.Image;
+                Minimap.InvalidateVisual();
+            }
+        },
+        InvalidateOverlay = () =>
+            OverlayLayer.UpdateState(BuildOverlayState(vm, vm.ActiveTab)),
+        InvalidateSearch = () =>
+        {
+            SearchLayer.UpdateState(BuildSearchState(vm, vm.ActiveTab));
+            OutlinePanel.OnSearchInvalidated();
+        },
+        InvalidateAnnotations = () =>
+            AnnotationLayer.UpdateState(BuildAnnotationState(vm, vm.ActiveTab)),
+    };
 
     protected override void OnUnloaded(Avalonia.Interactivity.RoutedEventArgs e)
     {
