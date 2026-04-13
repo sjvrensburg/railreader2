@@ -28,10 +28,10 @@ public sealed class AnalysisWorker : IDisposable
     /// <summary>Set if the worker loop failed to start (e.g. ONNX model load failure).</summary>
     public string? StartupError { get; private set; }
 
-    public AnalysisWorker(string modelPath, IThreadMarshaller? marshaller = null, ILogger? logger = null)
+    public AnalysisWorker(string modelPath, IThreadMarshaller marshaller, ILogger? logger = null)
     {
         _logger = logger ?? NullLogger.Instance;
-        _marshaller = marshaller ?? NoOpMarshaller.Instance;
+        _marshaller = marshaller;
         _requestChannel = Channel.CreateUnbounded<AnalysisRequest>();
         _resultChannel = Channel.CreateUnbounded<AnalysisResult>();
 
