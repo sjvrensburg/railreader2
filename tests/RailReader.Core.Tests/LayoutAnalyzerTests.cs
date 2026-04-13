@@ -109,16 +109,27 @@ public class LayoutAnalyzerTests
     }
 
     [Fact]
-    public void SuppressNestedBlocks_WithinTolerance_TreatsAsContained()
+    public void SuppressNestedBlocks_InnerBarelyOutsideMargin_TreatsAsContained()
     {
         var blocks = new List<LayoutBlock>
         {
             Block(0, 0, 100, 100),
-            Block(-1, -1, 100, 100), // inner slightly outside outer, within 2pt margin
+            Block(-1, -1, 50, 50), // inner 1pt outside on top-left, within 2pt tolerance
         };
         LayoutAnalyzer.SuppressNestedBlocks(blocks);
-        // Both have same area (100*100); SuppressNestedBlocks only removes inner when strictly smaller.
-        // Here they're equal area so both remain.
+        Assert.Single(blocks);
+        Assert.Equal(100f, blocks[0].BBox.W);
+    }
+
+    [Fact]
+    public void SuppressNestedBlocks_InnerOutsideMargin_KeepsBoth()
+    {
+        var blocks = new List<LayoutBlock>
+        {
+            Block(0, 0, 100, 100),
+            Block(-5, -5, 50, 50), // 5pt outside on top-left, exceeds 2pt tolerance
+        };
+        LayoutAnalyzer.SuppressNestedBlocks(blocks);
         Assert.Equal(2, blocks.Count);
     }
 }

@@ -284,7 +284,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         {
             if (t.Exception is { } ex)
                 _logger.Error($"[{context}] Unhandled task fault", ex);
-        }, TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously);
+        }, TaskContinuationOptions.OnlyOnFaulted);
     }
 
     // --- Status toast ---
