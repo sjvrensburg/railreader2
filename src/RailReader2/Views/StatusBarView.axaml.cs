@@ -2,6 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media;
+using RailReader.Core;
 using RailReader.Core.Models;
 using RailReader2.ViewModels;
 
@@ -147,6 +148,45 @@ public partial class StatusBarView : UserControl
     private void AddSeparator() =>
         StatusPanel.Children.Add(new TextBlock { Text = "|", Opacity = 0.5 });
 
+    private const int BreadcrumbMaxChars = 60;
+    private const string BreadcrumbSeparator = " \u203a ";  // ›
+
+    private void AddBreadcrumb(TabViewModel tab)
+    {
+        var outline = tab.Outline;
+        if (outline is null || outline.Count == 0) return;
+
+        var path = OutlineBreadcrumb.BuildPath(outline, tab.CurrentPage);
+        if (path.Count == 0) return;
+
+        var full = string.Join(BreadcrumbSeparator, path.Select(e => e.Title));
+        AddSeparator();
+        var label = new TextBlock
+        {
+            Text = TruncateBreadcrumb(full, BreadcrumbMaxChars),
+            FontStyle = FontStyle.Italic,
+            Opacity = 0.85,
+            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+        };
+        if (full.Length > BreadcrumbMaxChars)
+            ToolTip.SetTip(label, full);
+        StatusPanel.Children.Add(label);
+    }
+
+    /// <summary>
+    /// If the path exceeds maxChars, keep the leaf and prepend an ellipsis.
+    /// Tooltip carries the full path so context isn't lost.
+    /// </summary>
+    private static string TruncateBreadcrumb(string full, int maxChars)
+    {
+        if (full.Length <= maxChars) return full;
+        const string ellipsis = "\u2026" + BreadcrumbSeparator;  // …›
+        int sepIdx = full.LastIndexOf(BreadcrumbSeparator, StringComparison.Ordinal);
+        if (sepIdx < 0) return ellipsis + full[^Math.Min(maxChars, full.Length)..];
+        var leaf = full[(sepIdx + BreadcrumbSeparator.Length)..];
+        return ellipsis + leaf;
+    }
+
     private static TextBlock MakeBoldLabel(string text, IBrush foreground) => new()
     {
         Text = text,
@@ -183,6 +223,8 @@ public partial class StatusBarView : UserControl
         AddSeparator();
         _zoomLabel = new TextBlock { Text = $"Zoom: {zoomPct}%" };
         StatusPanel.Children.Add(_zoomLabel);
+
+        AddBreadcrumb(tab);
 
         if (tab.PendingRailSetup)
         {
