@@ -79,7 +79,7 @@ public sealed partial class DocumentController : IDisposable
         _marshaller = marshaller;
         _pdfFactory = pdfFactory;
         _logger = logger ?? NullLogger.Instance;
-        _zoom = new ZoomAnimationController(config);
+        _zoom = new ZoomAnimationController();
         _autoScroll = new AutoScrollController(config);
         _autoScroll.StateChanged = name => StateChanged?.Invoke(name);
         _annotationManager = new AnnotationFileManager(marshaller);
@@ -362,7 +362,7 @@ public sealed partial class DocumentController : IDisposable
         }
         else
         {
-            double factor = 1.0 + scrollDelta * ZoomAnimationController.ZoomScrollSensitivity;
+            double factor = 1.0 + scrollDelta * CoreTuning.ZoomScrollSensitivity;
             double baseZoom = _zoom.PendingTargetZoom ?? doc.Camera.Zoom;
             double newZoom = Math.Clamp(baseZoom * factor, Camera.ZoomMin, Camera.ZoomMax);
             _zoom.Start(doc, newZoom, cursorX, cursorY, _vpWidth);
@@ -430,7 +430,7 @@ public sealed partial class DocumentController : IDisposable
 
         double baseZoom = _zoom.PendingTargetZoom ?? doc.Camera.Zoom;
         double newZoom = Math.Clamp(
-            zoomIn ? baseZoom * ZoomAnimationController.ZoomStep : baseZoom / ZoomAnimationController.ZoomStep,
+            zoomIn ? baseZoom * CoreTuning.ZoomStep : baseZoom / CoreTuning.ZoomStep,
             Camera.ZoomMin, Camera.ZoomMax);
 
         _zoom.Start(doc, newZoom, ww / 2.0, wh / 2.0, _vpWidth);
@@ -513,38 +513,6 @@ public sealed partial class DocumentController : IDisposable
             doc.Camera.Zoom, doc.Camera.OffsetX, doc.Camera.OffsetY,
             doc.Rail.Active, doc.Rail.HasAnalysis, doc.Rail.NavigableCount,
             AutoScrollActive, JumpMode);
-    }
-
-    public TextContent? GetPageText(int? page = null)
-    {
-        var doc = ActiveDocument;
-        if (doc is null) return null;
-        int p = page ?? doc.CurrentPage;
-        if (p < 0 || p >= doc.PageCount) return null;
-        var text = doc.GetOrExtractText(p);
-        return new TextContent(p, text.Text);
-    }
-
-    public LayoutInfo? GetLayoutInfo(int? page = null)
-    {
-        var doc = ActiveDocument;
-        if (doc is null) return null;
-        int p = page ?? doc.CurrentPage;
-        if (!doc.AnalysisCache.TryGetValue(p, out var analysis)) return null;
-
-        var navigableSet = Config.NavigableClasses;
-        var blocks = analysis.Blocks.Select(b =>
-        {
-            var className = b.ClassId >= 0 && b.ClassId < LayoutConstants.LayoutClasses.Length
-                ? LayoutConstants.LayoutClasses[b.ClassId]
-                : $"class_{b.ClassId}";
-            return new BlockInfo(
-                className, b.BBox.X, b.BBox.Y, b.BBox.W, b.BBox.H,
-                b.Confidence, b.Order, b.Lines.Count,
-                navigableSet.Contains(b.ClassId));
-        }).ToList();
-
-        return new LayoutInfo(p, blocks);
     }
 
     public SearchResult GetSearchState() => Search.GetSearchState();

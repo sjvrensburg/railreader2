@@ -19,7 +19,7 @@ public class ZoomAnimationControllerTests : IDisposable
             factory.CreatePdfTextService(), config, new SynchronousThreadMarshaller());
         _doc.LoadPageBitmap();
         _doc.CenterPage(800, 600);
-        _zoom = new ZoomAnimationController(config);
+        _zoom = new ZoomAnimationController();
     }
 
     public void Dispose()

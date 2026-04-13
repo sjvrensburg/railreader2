@@ -19,4 +19,9 @@ internal static class CoreTuning
     // Edge-hold state machine
     public const double EdgeHoldMs = 400.0;
     public const double EdgeCooldownMs = 300.0;
+
+    // Zoom animation
+    public const double ZoomStep = 1.25;
+    public const double ZoomScrollSensitivity = 0.003;
+    public const double ZoomAnimationDurationMs = 180.0;
 }

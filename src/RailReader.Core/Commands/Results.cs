@@ -34,45 +34,12 @@ public sealed record DocumentSummary(
     int CurrentPage);
 
 /// <summary>
-/// Result of a navigation action.
-/// </summary>
-public sealed record NavigationResult(
-    bool Success,
-    int CurrentPage,
-    string? Message = null);
-
-/// <summary>
 /// Result of a search operation.
 /// </summary>
 public sealed record SearchResult(
     int TotalMatches,
     int ActiveIndex,
     Dictionary<int, int> MatchesPerPage);
-
-/// <summary>
-/// Extracted text content for a page.
-/// </summary>
-public sealed record TextContent(
-    int Page,
-    string Text);
-
-/// <summary>
-/// Layout analysis information for a page.
-/// </summary>
-public sealed record LayoutInfo(
-    int Page,
-    List<BlockInfo> Blocks);
-
-public sealed record BlockInfo(
-    string ClassName,
-    float X,
-    float Y,
-    float W,
-    float H,
-    float Confidence,
-    int ReadingOrder,
-    int LineCount,
-    bool Navigable);
 
 /// <summary>
 /// Options for headless screenshot export.
@@ -101,7 +68,3 @@ public sealed record ScreenshotOptions
     public int ViewportHeight { get; init; } = 900;
 }
 
-/// <summary>
-/// Result of a screenshot or image export.
-/// </summary>
-public sealed record ExportResult(string FilePath, int Width, int Height, long FileSize);
