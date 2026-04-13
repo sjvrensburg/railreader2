@@ -9,6 +9,15 @@ public sealed class AppConfig
 {
     internal static ILogger Logger { get; set; } = NullLogger.Instance;
 
+    /// <summary>
+    /// Schema version. Increment when introducing a field change that needs
+    /// migration (renames, removed defaults, semantic shifts). Migrations run
+    /// once in <see cref="Load"/> and bump this to <see cref="CurrentSchemaVersion"/>.
+    /// </summary>
+    public int SchemaVersion { get; set; } = CurrentSchemaVersion;
+
+    internal const int CurrentSchemaVersion = 1;
+
     public double RailZoomThreshold { get; set; } = 3.0;
     public double SnapDurationMs { get; set; } = 300.0;
     public double ScrollSpeedStart { get; set; } = 14.0;
@@ -96,7 +105,10 @@ public sealed class AppConfig
             if (File.Exists(ConfigPath))
             {
                 var json = File.ReadAllText(ConfigPath);
-                return JsonSerializer.Deserialize<AppConfig>(json, s_options) ?? new AppConfig();
+                var loaded = JsonSerializer.Deserialize<AppConfig>(json, s_options) ?? new AppConfig();
+                if (Migrate(loaded))
+                    loaded.Save();
+                return loaded;
             }
         }
         catch (Exception ex)
@@ -107,6 +119,22 @@ public sealed class AppConfig
         var config = new AppConfig();
         config.Save();
         return config;
+    }
+
+    /// <summary>
+    /// Upgrade a loaded config to <see cref="CurrentSchemaVersion"/>. Returns
+    /// true if any migration ran (caller should persist the result). When adding
+    /// a new schema version, append a block here that reads old fields and
+    /// writes new ones, then bumps <see cref="SchemaVersion"/>.
+    /// </summary>
+    private static bool Migrate(AppConfig config)
+    {
+        if (config.SchemaVersion >= CurrentSchemaVersion) return false;
+
+        // Pre-versioning configs (SchemaVersion deserializes to 0). No field
+        // migrations needed at v1 — just stamp the current version.
+        config.SchemaVersion = CurrentSchemaVersion;
+        return true;
     }
 
     public void AddRecentFile(string filePath)
