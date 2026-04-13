@@ -236,7 +236,7 @@ public sealed class LayoutAnalyzer : IDisposable
         return chwData;
     }
 
-    private static float Iou(BBox a, BBox b)
+    internal static float Iou(BBox a, BBox b)
     {
         float x1 = Math.Max(a.X, b.X);
         float y1 = Math.Max(a.Y, b.Y);
@@ -250,7 +250,7 @@ public sealed class LayoutAnalyzer : IDisposable
         return union <= 0 ? 0 : inter / union;
     }
 
-    private static void Nms(List<LayoutBlock> blocks, float threshold)
+    internal static void Nms(List<LayoutBlock> blocks, float threshold)
     {
         blocks.Sort((a, b) => b.Confidence.CompareTo(a.Confidence));
         var keep = new bool[blocks.Count];
@@ -275,7 +275,7 @@ public sealed class LayoutAnalyzer : IDisposable
     /// Handles cases like inline_formula detected inside a text block,
     /// which would otherwise create redundant navigation targets.
     /// </summary>
-    private static void SuppressNestedBlocks(List<LayoutBlock> blocks)
+    internal static void SuppressNestedBlocks(List<LayoutBlock> blocks)
     {
         const float margin = 2f; // tolerance in page points
         var keep = new bool[blocks.Count];
