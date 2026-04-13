@@ -79,7 +79,7 @@ public sealed partial class DocumentController : IDisposable
         _marshaller = marshaller;
         _pdfFactory = pdfFactory;
         _logger = logger ?? NullLogger.Instance;
-        _zoom = new ZoomAnimationController(config);
+        _zoom = new ZoomAnimationController();
         _autoScroll = new AutoScrollController(config);
         _autoScroll.StateChanged = name => StateChanged?.Invoke(name);
         _annotationManager = new AnnotationFileManager(marshaller);
@@ -362,7 +362,7 @@ public sealed partial class DocumentController : IDisposable
         }
         else
         {
-            double factor = 1.0 + scrollDelta * ZoomAnimationController.ZoomScrollSensitivity;
+            double factor = 1.0 + scrollDelta * CoreTuning.ZoomScrollSensitivity;
             double baseZoom = _zoom.PendingTargetZoom ?? doc.Camera.Zoom;
             double newZoom = Math.Clamp(baseZoom * factor, Camera.ZoomMin, Camera.ZoomMax);
             _zoom.Start(doc, newZoom, cursorX, cursorY, _vpWidth);
@@ -430,7 +430,7 @@ public sealed partial class DocumentController : IDisposable
 
         double baseZoom = _zoom.PendingTargetZoom ?? doc.Camera.Zoom;
         double newZoom = Math.Clamp(
-            zoomIn ? baseZoom * ZoomAnimationController.ZoomStep : baseZoom / ZoomAnimationController.ZoomStep,
+            zoomIn ? baseZoom * CoreTuning.ZoomStep : baseZoom / CoreTuning.ZoomStep,
             Camera.ZoomMin, Camera.ZoomMax);
 
         _zoom.Start(doc, newZoom, ww / 2.0, wh / 2.0, _vpWidth);

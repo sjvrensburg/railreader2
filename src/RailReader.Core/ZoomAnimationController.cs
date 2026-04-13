@@ -10,11 +10,6 @@ namespace RailReader.Core;
 /// </summary>
 internal sealed class ZoomAnimationController
 {
-    internal const double ZoomStep = 1.25;
-    internal const double ZoomScrollSensitivity = 0.003;
-
-    private readonly AppConfig _config;
-
     private sealed class ZoomAnimation
     {
         public double StartZoom, TargetZoom;
@@ -22,18 +17,12 @@ internal sealed class ZoomAnimationController
         public double TargetOffsetX, TargetOffsetY;
         public double CursorPageX, CursorPageY;
         public Stopwatch Timer = Stopwatch.StartNew();
-        public const double DurationMs = 180;
         // Rail position preservation: captured when zoom starts in rail mode
         public double HorizontalFraction = -1; // 0=line start, 1=line end; <0 means not in rail
         public double LineScreenY;              // Y position of active line on screen
     }
 
     private ZoomAnimation? _zoomAnim;
-
-    public ZoomAnimationController(AppConfig config)
-    {
-        _config = config;
-    }
 
     /// <summary>Whether a zoom animation is currently in progress.</summary>
     public bool IsAnimating => _zoomAnim is not null;
@@ -97,7 +86,7 @@ internal sealed class ZoomAnimationController
         if (_zoomAnim is { } za)
         {
             double elapsed = za.Timer.Elapsed.TotalMilliseconds;
-            double t = Math.Clamp(elapsed / ZoomAnimation.DurationMs, 0, 1);
+            double t = Math.Clamp(elapsed / CoreTuning.ZoomAnimationDurationMs, 0, 1);
             // Cubic ease-out: 1 - (1-t)^3
             double ease = 1.0 - (1.0 - t) * (1.0 - t) * (1.0 - t);
 
