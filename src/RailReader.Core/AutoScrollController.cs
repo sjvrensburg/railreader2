@@ -16,7 +16,17 @@ internal sealed class AutoScrollController
     }
 
     /// <summary>Whether auto-scroll is currently active.</summary>
-    public bool AutoScrollActive { get; private set; }
+    public bool AutoScrollActive
+    {
+        get => _autoScrollActive;
+        private set
+        {
+            if (_autoScrollActive == value) return;
+            _autoScrollActive = value;
+            StateChanged?.Invoke(nameof(AutoScrollActive));
+        }
+    }
+    private bool _autoScrollActive;
 
     /// <summary>Whether jump mode is currently active.</summary>
     public bool JumpMode
@@ -50,7 +60,6 @@ internal sealed class AutoScrollController
 
         doc.Rail.StartAutoScroll(_config.DefaultAutoScrollSpeed);
         AutoScrollActive = true;
-        StateChanged?.Invoke(nameof(AutoScrollActive));
     }
 
     /// <summary>
@@ -60,7 +69,6 @@ internal sealed class AutoScrollController
     {
         doc?.Rail.StopAutoScroll();
         AutoScrollActive = false;
-        StateChanged?.Invoke(nameof(AutoScrollActive));
     }
 
     /// <summary>
@@ -84,11 +92,7 @@ internal sealed class AutoScrollController
     /// <summary>
     /// Activates auto-scroll directly (used by TickRailSnap when auto-scroll trigger fires).
     /// </summary>
-    public void ActivateAutoScroll()
-    {
-        AutoScrollActive = true;
-        StateChanged?.Invoke(nameof(AutoScrollActive));
-    }
+    public void ActivateAutoScroll() => AutoScrollActive = true;
 
     /// <summary>
     /// The configured auto-scroll speed.
