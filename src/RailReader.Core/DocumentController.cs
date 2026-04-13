@@ -21,10 +21,6 @@ public record struct TickResult(
 /// </summary>
 public sealed class DocumentController : IDisposable
 {
-    private const double PanStep = 50.0;
-    private const double DestMarginTop = 0.1;   // 10% from top when scrolling to link target
-    private const double DestMarginLeft = 0.05;  // 5% from left
-
     private readonly AppConfig _config;
     private readonly IThreadMarshaller _marshaller;
     private readonly IPdfServiceFactory _pdfFactory;
@@ -301,12 +297,12 @@ public sealed class DocumentController : IDisposable
         if (dest.PdfY is { } pdfY)
         {
             double pageY = doc.PageHeight - pdfY;
-            doc.Camera.OffsetY = -pageY * doc.Camera.Zoom + wh * DestMarginTop;
+            doc.Camera.OffsetY = -pageY * doc.Camera.Zoom + wh * CoreTuning.DestMarginTop;
         }
 
         if (dest.PdfX is { } pdfX)
         {
-            doc.Camera.OffsetX = -pdfX * doc.Camera.Zoom + ww * DestMarginLeft;
+            doc.Camera.OffsetX = -pdfX * doc.Camera.Zoom + ww * CoreTuning.DestMarginLeft;
         }
 
         doc.ClampCamera(ww, wh);
@@ -580,7 +576,7 @@ public sealed class DocumentController : IDisposable
             if (_pageEdgeHold.ShouldSuppressInput) return;
 
             double prevY = doc.Camera.OffsetY;
-            doc.Camera.OffsetY += forward ? -PanStep : PanStep;
+            doc.Camera.OffsetY += forward ? -CoreTuning.PanStep : CoreTuning.PanStep;
             doc.ClampCamera(ww, wh);
 
             bool atEdge = Math.Abs(doc.Camera.OffsetY - prevY) < 1.0;
@@ -616,14 +612,14 @@ public sealed class DocumentController : IDisposable
             return;
         }
         if (TryJump(forward: true, half: shortJump)) return;
-        HandleHorizontalArrow(ScrollDirection.Forward, -PanStep);
+        HandleHorizontalArrow(ScrollDirection.Forward, -CoreTuning.PanStep);
     }
 
     public void HandleArrowLeft(bool shortJump = false)
     {
         if (AutoScrollActive) StopAutoScroll();
         if (TryJump(forward: false, half: shortJump)) return;
-        HandleHorizontalArrow(ScrollDirection.Backward, PanStep);
+        HandleHorizontalArrow(ScrollDirection.Backward, CoreTuning.PanStep);
     }
 
     private bool TryJump(bool forward, bool half = false)

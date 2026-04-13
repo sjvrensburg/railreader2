@@ -18,9 +18,6 @@ internal enum EdgeHoldState
 /// </summary>
 internal sealed class EdgeHoldStateMachine
 {
-    private const double HoldMs = 400.0;
-    private const double CooldownMs = 300.0;
-
     public EdgeHoldState CurrentState { get; private set; } = EdgeHoldState.Idle;
 
     private Stopwatch? _timer;
@@ -41,7 +38,7 @@ internal sealed class EdgeHoldStateMachine
         switch (CurrentState)
         {
             case EdgeHoldState.Cooldown:
-                if (_timer!.Elapsed.TotalMilliseconds < CooldownMs) return false;
+                if (_timer!.Elapsed.TotalMilliseconds < CoreTuning.EdgeCooldownMs) return false;
                 // Cooldown expired, fall through to start a new hold
                 goto case EdgeHoldState.Idle;
 
@@ -59,7 +56,7 @@ internal sealed class EdgeHoldStateMachine
                     _forward = forward;
                     return false;
                 }
-                if (_timer!.Elapsed.TotalMilliseconds >= HoldMs)
+                if (_timer!.Elapsed.TotalMilliseconds >= CoreTuning.EdgeHoldMs)
                 {
                     _timer = Stopwatch.StartNew();
                     CurrentState = EdgeHoldState.Cooldown;
@@ -89,7 +86,7 @@ internal sealed class EdgeHoldStateMachine
     /// </summary>
     public bool ShouldSuppressInput =>
         CurrentState == EdgeHoldState.Cooldown
-        && _timer!.Elapsed.TotalMilliseconds < CooldownMs;
+        && _timer!.Elapsed.TotalMilliseconds < CoreTuning.EdgeCooldownMs;
 
     /// <summary>
     /// Returns the direction of a pending edge advance and clears it.
