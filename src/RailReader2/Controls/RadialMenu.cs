@@ -1,5 +1,6 @@
 using System.Reflection;
 using Avalonia;
+using RailReader.Core;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
@@ -198,13 +199,7 @@ public class RadialMenu : Control
         else if (dist < OuterRadius && _segments.Count > 0)
         {
             _hoveringCentre = false;
-            double angle = Math.Atan2(dy, dx);
-            if (angle < 0) angle += 2 * Math.PI;
-            double segAngle = 2 * Math.PI / _segments.Count;
-            double offset = -Math.PI / 2 - segAngle / 2;
-            double adjusted = angle - offset;
-            if (adjusted < 0) adjusted += 2 * Math.PI;
-            _hoveredIndex = (int)(adjusted / segAngle) % _segments.Count;
+            _hoveredIndex = RadialMenuGeometry.SegmentIndexAt(dx, dy, _segments.Count);
         }
         else
         {
@@ -218,25 +213,9 @@ public class RadialMenu : Control
     }
 
     private int HitTestRingDot(double dx, double dy, int segIndex, int dotCount,
-        double ringRadius, double innerEdge)
-    {
-        double segAngle = 2 * Math.PI / _segments.Count;
-        double startAngle = -Math.PI / 2 - segAngle / 2 + segIndex * segAngle;
-        double dotR = (innerEdge + ringRadius) / 2;
-        double hitSize = 9 * _scale;
-
-        for (int i = 0; i < dotCount; i++)
-        {
-            double t = (i + 0.5) / dotCount;
-            double angle = startAngle + t * segAngle;
-            double dotX = dotR * Math.Cos(angle);
-            double dotY = dotR * Math.Sin(angle);
-            double ddx = dx - dotX, ddy = dy - dotY;
-            if (ddx * ddx + ddy * ddy <= hitSize * hitSize)
-                return i;
-        }
-        return -1;
-    }
+        double ringRadius, double innerEdge) =>
+        RadialMenuGeometry.HitTestRingDot(dx, dy, segIndex, dotCount, _segments.Count,
+            ringRadius, innerEdge, hitSize: 9 * _scale);
 
     protected override void OnPointerPressed(PointerPressedEventArgs e)
     {
