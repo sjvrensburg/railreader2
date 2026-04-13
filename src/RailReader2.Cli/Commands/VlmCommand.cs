@@ -19,7 +19,7 @@ public static class VlmCommand
             return 0;
         }
 
-        var pdfPath = Program.GetRequiredPdf(args);
+        var (pdfPath, pdf) = Shared.OpenPdf(args, factory);
         var outputPath = Program.GetOption(args, "output");
         var classesOpt = Program.GetOption(args, "classes");
         var all = Program.HasFlag(args, "all");
@@ -71,17 +71,8 @@ public static class VlmCommand
             && !Enum.TryParse<VlmService.PromptStyle>(promptStyleStr, ignoreCase: true, out promptStyle))
             return Program.Fail($"Invalid --prompt-style: {promptStyleStr} (expected: instruction, ocr)");
 
-        // Resolve default VLM config.
-        // API key precedence: --api-key > OPENAI_API_KEY env var > AppConfig.
-        var appConfig = AppConfig.Load();
-        var baseApiKey = apiKeyOverride
-            ?? (string.IsNullOrWhiteSpace(appConfig.VlmApiKey)
-                ? Environment.GetEnvironmentVariable("OPENAI_API_KEY")
-                : appConfig.VlmApiKey);
-        var baseCfg = new VlmEndpointConfig(
-            endpointOverride ?? appConfig.VlmEndpoint,
-            modelOverride ?? appConfig.VlmModel,
-            baseApiKey);
+        var baseCfg = VlmEndpointConfig.FromAppConfigWithOverrides(
+            endpointOverride, modelOverride, apiKeyOverride);
 
         var eqCfg = Override(baseCfg, eqEndpoint, eqModel, eqApiKey);
         var tblCfg = Override(baseCfg, tblEndpoint, tblModel, tblApiKey);
@@ -97,8 +88,6 @@ public static class VlmCommand
             Console.Error.WriteLine("VLM endpoint not configured — running in dry mode (crops only, no API calls).");
         else if (!anyEndpoint)
             return Program.Fail("VLM endpoint not configured. Use --endpoint or set it in Settings, or pass --dump-crops for a dry run.");
-
-        var pdf = factory.CreatePdfService(pdfPath);
 
         var (targets, buildErr) = BuildTargets(pdf, pageRange, singlePageStr, singleBlockStr,
             fromStructure, wantedClasses, minConfidence);

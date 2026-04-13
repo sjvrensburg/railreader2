@@ -16,12 +16,11 @@ public static class StructureCommand
             return 0;
         }
 
-        var pdfPath = Program.GetRequiredPdf(args);
+        var (pdfPath, pdf) = Shared.OpenPdf(args, factory);
         var outputPath = Program.GetOption(args, "output");
         var includeText = Program.HasFlag(args, "include-text");
         var analyze = Program.HasFlag(args, "analyze");
 
-        var pdf = factory.CreatePdfService(pdfPath);
         var pageRange = Program.GetOption(args, "pages");
         var (pages, rangeError) = PageRangeParser.Parse(pageRange, pdf.PageCount);
         if (rangeError != null)

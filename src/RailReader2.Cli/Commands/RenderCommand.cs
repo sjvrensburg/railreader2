@@ -16,7 +16,7 @@ public static class RenderCommand
             return 0;
         }
 
-        var pdfPath = Program.GetRequiredPdf(args);
+        var (pdfPath, pdf) = Shared.OpenPdf(args, factory);
         var pageRange = Program.GetOption(args, "pages");
         var dpiStr = Program.GetOption(args, "dpi");
         var effectName = Program.GetOption(args, "effect");
@@ -38,7 +38,6 @@ public static class RenderCommand
         }
         var effect = ParseEffect(effectName);
 
-        var pdf = factory.CreatePdfService(pdfPath);
         var (pages, rangeError) = PageRangeParser.Parse(pageRange, pdf.PageCount);
         if (rangeError != null)
             return Program.Fail(rangeError);

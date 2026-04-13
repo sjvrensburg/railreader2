@@ -23,6 +23,18 @@ internal static class Shared
     };
 
     /// <summary>
+    /// Resolves the PDF path from args (first non-flag argument), verifies it exists,
+    /// and opens the PDF via the factory. Throws if missing. Used as the first step
+    /// in every command.
+    /// </summary>
+    internal static (string PdfPath, IPdfService Pdf) OpenPdf(string[] args, IPdfServiceFactory factory)
+    {
+        var pdfPath = Program.GetRequiredPdf(args);
+        var pdf = factory.CreatePdfService(pdfPath);
+        return (pdfPath, pdf);
+    }
+
+    /// <summary>
     /// Creates a LayoutAnalyzer if the ONNX model is available.
     /// Returns null and prints a warning if the model is not found.
     /// </summary>
