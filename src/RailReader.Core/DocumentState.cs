@@ -804,5 +804,9 @@ public sealed class DocumentState : IDisposable
         _prefetched?.Dispose();
         _prefetched = null;
         _cts.Dispose();
+
+        StateChanged = null;
+        AnalysisCacheUpdated = null;
+        OnDpiRenderComplete = null;
     }
 }
