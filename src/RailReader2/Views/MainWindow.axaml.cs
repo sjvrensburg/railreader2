@@ -22,6 +22,13 @@ public partial class MainWindow : Window
     private const double FullScreenShowThreshold = 5.0;
     private const double FullScreenHideThreshold = 60.0;
 
+    // Throttle chrome reveal toggles. Each flip reflows the DockPanel and
+    // resizes the Viewport, which in turn invalidates the page layer's GPU
+    // texture cache. 150ms is well below user-perceptible reveal latency but
+    // turns 60Hz pointer-move noise into at most ~6 toggles/sec.
+    private const double ChromeToggleMinIntervalMs = 150.0;
+    private DateTime _lastChromeToggle = DateTime.MinValue;
+
     public MainWindow()
     {
         InitializeComponent();
@@ -750,22 +757,38 @@ public partial class MainWindow : Window
     protected override void OnPointerMoved(PointerEventArgs e)
     {
         base.OnPointerMoved(e);
-        if (Vm is { IsFullScreen: true } vm)
-        {
-            var pos = e.GetPosition(this);
+        if (Vm is not { IsFullScreen: true } vm) return;
 
-            // Top edge: tab bar reveal
-            if (!vm.ShowFullScreenHeader && pos.Y <= FullScreenShowThreshold)
-                vm.ShowFullScreenHeader = true;
-            else if (vm.ShowFullScreenHeader && pos.Y > FullScreenHideThreshold)
-                vm.ShowFullScreenHeader = false;
+        // Suppress hover-reveal entirely while the user is actively rail-scrolling.
+        // A chrome toggle reflows the layout and may force a GPU texture re-upload
+        // on the page layer; that's exactly what we don't want during scroll. The
+        // user isn't trying to surface the chrome mid-scroll anyway.
+        var doc = vm.Controller.ActiveDocument;
+        if (vm.AutoScrollActive || (doc is not null && doc.Rail.ScrollSpeed > 0.1))
+            return;
 
-            // Bottom edge: status bar reveal
-            double distFromBottom = Bounds.Height - pos.Y;
-            if (!vm.ShowFullScreenFooter && distFromBottom <= FullScreenShowThreshold)
-                vm.ShowFullScreenFooter = true;
-            else if (vm.ShowFullScreenFooter && distFromBottom > FullScreenHideThreshold)
-                vm.ShowFullScreenFooter = false;
-        }
+        // Throttle: don't flip the chrome more than once per ChromeToggleMinIntervalMs.
+        // Pointer moves arrive at ~60Hz; without throttling, hovering near an edge
+        // produces a sustained reflow storm.
+        if ((DateTime.UtcNow - _lastChromeToggle).TotalMilliseconds < ChromeToggleMinIntervalMs)
+            return;
+
+        var pos = e.GetPosition(this);
+        bool toggled = false;
+
+        // Top edge: tab bar reveal
+        if (!vm.ShowFullScreenHeader && pos.Y <= FullScreenShowThreshold)
+        { vm.ShowFullScreenHeader = true; toggled = true; }
+        else if (vm.ShowFullScreenHeader && pos.Y > FullScreenHideThreshold)
+        { vm.ShowFullScreenHeader = false; toggled = true; }
+
+        // Bottom edge: status bar reveal
+        double distFromBottom = Bounds.Height - pos.Y;
+        if (!vm.ShowFullScreenFooter && distFromBottom <= FullScreenShowThreshold)
+        { vm.ShowFullScreenFooter = true; toggled = true; }
+        else if (vm.ShowFullScreenFooter && distFromBottom > FullScreenHideThreshold)
+        { vm.ShowFullScreenFooter = false; toggled = true; }
+
+        if (toggled) _lastChromeToggle = DateTime.UtcNow;
     }
 }
