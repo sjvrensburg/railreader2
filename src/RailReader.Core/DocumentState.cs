@@ -303,6 +303,13 @@ public sealed class DocumentState : IDisposable
         // Serialize with prefetch to avoid concurrent PDFium access.
         if (_dpiRenderPending || _prefetchPending) return false;
 
+        // Skip DPI re-renders while the user is actively scrolling. PDFium runs
+        // under a process-wide gate; a 100-200ms re-render at high zoom blocks
+        // any subsequent text/link extraction the scroll path may need and the
+        // bitmap-swap defers a frame. Re-attempt fires from the animation tick
+        // once scroll velocity drops to zero.
+        if (Rail.ScrollSpeed > 0.1 || Rail.AutoScrolling) return false;
+
         int neededDpi = CalculateRenderDpi(Camera.Zoom);
         if (neededDpi > CachedDpi * 1.5 || (neededDpi < CachedDpi * 0.5 && CachedDpi > 150))
         {

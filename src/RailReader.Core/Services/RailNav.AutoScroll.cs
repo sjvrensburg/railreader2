@@ -63,6 +63,7 @@ public sealed partial class RailNav
         };
 
         bool reachedEnd = _autoScrollState.Tick(ref cameraX, dtSecs, in ctx);
+        cameraX = SnapX(cameraX, zoom);
         ScrollSpeed = _autoScrollState.NormalizedSpeed;
         return reachedEnd;
     }
