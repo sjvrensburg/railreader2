@@ -16,6 +16,8 @@ internal static class PdfLinkService
 
     public static List<PdfLink> ExtractPageLinks(byte[] pdfBytes, int pageIndex)
     {
+        lock (PdfiumGate.Lock)
+        {
         IntPtr doc = IntPtr.Zero;
         IntPtr page = IntPtr.Zero;
         GCHandle pinned = default;
@@ -58,6 +60,7 @@ internal static class PdfLinkService
             if (page != IntPtr.Zero) FPDF_ClosePage(page);
             if (doc != IntPtr.Zero) FPDF_CloseDocument(doc);
             if (pinned.IsAllocated) pinned.Free();
+        }
         }
     }
 
