@@ -234,6 +234,7 @@ public sealed class DocumentState : IDisposable
             try
             {
                 ct.ThrowIfCancellationRequested();
+                _logger.Debug($"[PDFium] prefetch pg {pageIndex} @ {dpi}dpi tid={Environment.CurrentManagedThreadId} file={Path.GetFileName(FilePath)}");
                 var (w, h) = _pdf.GetPageSize(pageIndex);
                 var page = _pdf.RenderPage(pageIndex, dpi);
                 var minimap = _pdf.RenderThumbnail(pageIndex);
@@ -313,6 +314,7 @@ public sealed class DocumentState : IDisposable
                 try
                 {
                     ct.ThrowIfCancellationRequested();
+                    _logger.Debug($"[PDFium] dpi-rerender pg {page} @ {neededDpi}dpi tid={Environment.CurrentManagedThreadId} file={Path.GetFileName(FilePath)}");
                     var newPage = _pdf.RenderPage(page, neededDpi);
                     _marshaller.Post(() =>
                     {
@@ -375,6 +377,7 @@ public sealed class DocumentState : IDisposable
         var ct = _cts.Token;
         Task.Run(() =>
         {
+            _logger.Debug($"[PDFium] analysis-pixmap pg {page} tid={Environment.CurrentManagedThreadId} file={Path.GetFileName(FilePath)}");
             try
             {
                 ct.ThrowIfCancellationRequested();
