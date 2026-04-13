@@ -273,6 +273,20 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
     public void Dispose() => _controller.Dispose();
 
+    /// <summary>
+    /// Fire-and-forget a Task from a UI event handler, logging any fault.
+    /// Use this only where the caller is an Avalonia event handler that cannot
+    /// return Task (routed event, window.Opened, click handler lambda).
+    /// </summary>
+    public void FireAndForget(Task task, string context)
+    {
+        _ = task.ContinueWith(t =>
+        {
+            if (t.Exception is { } ex)
+                _logger.Error($"[{context}] Unhandled task fault", ex);
+        }, TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously);
+    }
+
     // --- Status toast ---
 
     [ObservableProperty] private string? _statusToast;

@@ -51,9 +51,9 @@ public sealed partial class MainWindowViewModel
         if (needsDialog)
         {
             if (isEdit && existingNote is not null)
-                EditTextNote(existingNote);
+                FireAndForget(EditTextNote(existingNote), nameof(EditTextNote));
             else
-                CreateTextNote(px, py);
+                FireAndForget(CreateTextNote(px, py), nameof(CreateTextNote));
         }
         else
         {
@@ -77,7 +77,7 @@ public sealed partial class MainWindowViewModel
             InvalidateAnnotations();
     }
 
-    private async void CreateTextNote(float pageX, float pageY)
+    private async Task CreateTextNote(float pageX, float pageY)
     {
         if (_window is null) return;
         var dialog = new TextNoteDialog { FontSize = CurrentFontSize };
@@ -88,7 +88,7 @@ public sealed partial class MainWindowViewModel
         InvalidateAnnotations();
     }
 
-    private async void EditTextNote(TextNoteAnnotation note)
+    private async Task EditTextNote(TextNoteAnnotation note)
     {
         if (_window is null) return;
         var dialog = new TextNoteDialog(note.Text) { FontSize = CurrentFontSize };
@@ -142,7 +142,7 @@ public sealed partial class MainWindowViewModel
             InvalidateAnnotations();
         }
         if (result.EditNote is not null)
-            EditTextNote(result.EditNote);
+            FireAndForget(EditTextNote(result.EditNote), nameof(EditTextNote));
         return result;
     }
 

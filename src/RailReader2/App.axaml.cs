@@ -47,7 +47,7 @@ public partial class App : Application
                 desktop.MainWindow = window;
 
                 if (args is { Length: > 0 } && File.Exists(args[0]))
-                    window.Opened += (_, _) => vm.OpenDocument(args[0]);
+                    window.Opened += (_, _) => vm.FireAndForget(vm.OpenDocument(args[0]), nameof(vm.OpenDocument));
 
                 window.Show();
             }, DispatcherPriority.Background);
