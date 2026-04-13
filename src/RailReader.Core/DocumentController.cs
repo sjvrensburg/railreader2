@@ -515,38 +515,6 @@ public sealed partial class DocumentController : IDisposable
             AutoScrollActive, JumpMode);
     }
 
-    public TextContent? GetPageText(int? page = null)
-    {
-        var doc = ActiveDocument;
-        if (doc is null) return null;
-        int p = page ?? doc.CurrentPage;
-        if (p < 0 || p >= doc.PageCount) return null;
-        var text = doc.GetOrExtractText(p);
-        return new TextContent(p, text.Text);
-    }
-
-    public LayoutInfo? GetLayoutInfo(int? page = null)
-    {
-        var doc = ActiveDocument;
-        if (doc is null) return null;
-        int p = page ?? doc.CurrentPage;
-        if (!doc.AnalysisCache.TryGetValue(p, out var analysis)) return null;
-
-        var navigableSet = Config.NavigableClasses;
-        var blocks = analysis.Blocks.Select(b =>
-        {
-            var className = b.ClassId >= 0 && b.ClassId < LayoutConstants.LayoutClasses.Length
-                ? LayoutConstants.LayoutClasses[b.ClassId]
-                : $"class_{b.ClassId}";
-            return new BlockInfo(
-                className, b.BBox.X, b.BBox.Y, b.BBox.W, b.BBox.H,
-                b.Confidence, b.Order, b.Lines.Count,
-                navigableSet.Contains(b.ClassId));
-        }).ToList();
-
-        return new LayoutInfo(p, blocks);
-    }
-
     public SearchResult GetSearchState() => Search.GetSearchState();
 
     // --- Static helpers ---
