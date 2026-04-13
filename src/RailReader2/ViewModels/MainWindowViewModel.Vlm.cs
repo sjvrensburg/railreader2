@@ -9,7 +9,7 @@ namespace RailReader2.ViewModels;
 
 public sealed partial class MainWindowViewModel
 {
-    public async void CopyBlockAsLatex()
+    public async Task CopyBlockAsLatex()
     {
         var doc = _controller.ActiveDocument;
         if (doc is null) return;
@@ -42,14 +42,14 @@ public sealed partial class MainWindowViewModel
         return null;
     }
 
-    public async void CopyBlockWithAction(LayoutBlock block, BlockAction action)
+    public async Task CopyBlockWithAction(LayoutBlock block, BlockAction action)
     {
         var doc = _controller.ActiveDocument;
         if (doc is null) return;
         await SendBlockToVlm(doc, block, action);
     }
 
-    public async void CopyBlockAsImage(LayoutBlock block)
+    public async Task CopyBlockAsImage(LayoutBlock block)
     {
         var doc = _controller.ActiveDocument;
         if (doc is null) return;

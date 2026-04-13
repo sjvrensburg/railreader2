@@ -572,7 +572,8 @@ public partial class MainWindow : Window
                 if (vm.SelectedText is not null) vm.CopySelectedText();
                 e.Handled = true; return true;
             case Key.L:
-                vm.CopyBlockAsLatex(); e.Handled = true; return true;
+                vm.FireAndForget(vm.CopyBlockAsLatex(), nameof(vm.CopyBlockAsLatex));
+                e.Handled = true; return true;
             case Key.Home:
                 vm.GoToPage(0); e.Handled = true; return true;
             case Key.End:

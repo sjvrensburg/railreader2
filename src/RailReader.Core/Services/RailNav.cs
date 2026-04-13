@@ -44,11 +44,6 @@ public sealed class RailNav : ICameraClamp
     private readonly EdgeHoldStateMachine _lineEdgeHold = new();
 
 
-    /// <summary>
-    /// When a block's width is less than this fraction of the viewport,
-    /// center it horizontally instead of left-aligning (if the block type allows centering).
-    /// </summary>
-    private const double CenterBlockThreshold = 0.75;
 
     /// <summary>
     /// Whether the current navigable block's type is in the centering class set.
@@ -486,7 +481,7 @@ public sealed class RailNav : ICameraClamp
 
         double blockWidthPx = block.BBox.W * zoom;
         double targetX;
-        if (blockWidthPx < windowWidth * CenterBlockThreshold && ShouldCenterBlock())
+        if (blockWidthPx < windowWidth * CoreTuning.CenterBlockThreshold && ShouldCenterBlock())
         {
             // Block is narrow relative to viewport — center it horizontally
             double blockCenterX = block.BBox.X + block.BBox.W / 2.0;

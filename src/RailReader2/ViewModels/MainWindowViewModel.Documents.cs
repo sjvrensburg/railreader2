@@ -24,7 +24,7 @@ public sealed partial class MainWindowViewModel
         // Width is applied by UpdateSidebarColumnWidth via the ShowOutline PropertyChanged handler
     }
 
-    public async void OpenDocument(string path)
+    public async Task OpenDocument(string path)
     {
         try
         {
@@ -97,7 +97,7 @@ public sealed partial class MainWindowViewModel
             var path = files[0].TryGetLocalPath()
                        ?? files[0].Path.LocalPath;
             _logger.Debug($"[OpenFile] Selected: {path}");
-            if (path is not null) OpenDocument(path);
+            if (path is not null) await OpenDocument(path);
         }
     }
 
@@ -163,12 +163,12 @@ public sealed partial class MainWindowViewModel
     }
 
     [RelayCommand]
-    public void DuplicateTab()
+    public async Task DuplicateTab()
     {
         if (ActiveTab is { } tab)
         {
             _pendingDuplicatePage = tab.CurrentPage;
-            OpenDocument(tab.FilePath);
+            await OpenDocument(tab.FilePath);
         }
     }
 }

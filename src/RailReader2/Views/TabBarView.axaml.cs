@@ -319,7 +319,7 @@ public partial class TabBarView : UserControl
         duplicateItem.Click += (_, _) =>
         {
             vm.SelectTab(tabIndex);
-            vm.DuplicateTab();
+            vm.FireAndForget(vm.DuplicateTab(), nameof(vm.DuplicateTab));
         };
         menu.Items.Add(duplicateItem);
 

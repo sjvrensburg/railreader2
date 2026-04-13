@@ -258,7 +258,11 @@ public sealed class DocumentState : IDisposable
             {
                 _logger.Error($"Failed to prefetch page {pageIndex + 1}: {ex.Message}", ex);
                 try { _marshaller.Post(() => _prefetchPending = false); }
-                catch { _prefetchPending = false; }
+                catch (Exception postEx)
+                {
+                    _logger.Warn($"Marshaller post failed resetting prefetch flag: {postEx.Message}");
+                    _prefetchPending = false;
+                }
             }
         }, ct);
     }
@@ -332,7 +336,11 @@ public sealed class DocumentState : IDisposable
                 {
                     _logger.Error($"Failed to re-render page at {neededDpi} DPI: {ex.Message}", ex);
                     try { _marshaller.Post(() => _dpiRenderPending = false); }
-                    catch { _dpiRenderPending = false; }
+                    catch (Exception postEx)
+                    {
+                        _logger.Warn($"Marshaller post failed resetting DPI render flag: {postEx.Message}");
+                        _dpiRenderPending = false;
+                    }
                 }
             }, ct);
             return true;

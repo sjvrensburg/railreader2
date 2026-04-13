@@ -55,7 +55,7 @@ public partial class MenuBarView : UserControl
             var name = System.IO.Path.GetFileName(filePath);
             var dir = System.IO.Path.GetDirectoryName(filePath);
             var item = new MenuItem { Header = $"{name}  ({dir})" };
-            item.Click += (_, _) => vm!.OpenDocument(filePath);
+            item.Click += (_, _) => vm!.FireAndForget(vm.OpenDocument(filePath), nameof(vm.OpenDocument));
             menu.Items.Add(item);
         }
         if (menu.Items.Count == 0)
@@ -115,5 +115,8 @@ public partial class MenuBarView : UserControl
     private void OnFindPrevious(object? s, RoutedEventArgs e) => Vm?.PreviousMatch();
     private void OnUndo(object? s, RoutedEventArgs e) => Vm?.UndoAnnotation();
     private void OnRedo(object? s, RoutedEventArgs e) => Vm?.RedoAnnotation();
-    private void OnCopyBlockAsLatex(object? s, RoutedEventArgs e) => Vm?.CopyBlockAsLatex();
+    private void OnCopyBlockAsLatex(object? s, RoutedEventArgs e)
+    {
+        if (Vm is { } vm) vm.FireAndForget(vm.CopyBlockAsLatex(), nameof(vm.CopyBlockAsLatex));
+    }
 }

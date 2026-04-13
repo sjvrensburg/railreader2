@@ -233,21 +233,21 @@ public class ViewportPanel : Panel
         var menu = new ContextMenu();
 
         var latexItem = new MenuItem { Header = "Copy as LaTeX" };
-        latexItem.Click += (_, _) => vm.CopyBlockWithAction(block, BlockAction.LaTeX);
+        latexItem.Click += (_, _) => vm.FireAndForget(vm.CopyBlockWithAction(block, BlockAction.LaTeX), nameof(vm.CopyBlockWithAction));
         menu.Items.Add(latexItem);
 
         var markdownItem = new MenuItem { Header = "Copy as Markdown" };
-        markdownItem.Click += (_, _) => vm.CopyBlockWithAction(block, BlockAction.Markdown);
+        markdownItem.Click += (_, _) => vm.FireAndForget(vm.CopyBlockWithAction(block, BlockAction.Markdown), nameof(vm.CopyBlockWithAction));
         menu.Items.Add(markdownItem);
 
         var descItem = new MenuItem { Header = "Copy Description" };
-        descItem.Click += (_, _) => vm.CopyBlockWithAction(block, BlockAction.Description);
+        descItem.Click += (_, _) => vm.FireAndForget(vm.CopyBlockWithAction(block, BlockAction.Description), nameof(vm.CopyBlockWithAction));
         menu.Items.Add(descItem);
 
         menu.Items.Add(new Separator());
 
         var imageItem = new MenuItem { Header = "Copy Image" };
-        imageItem.Click += (_, _) => vm.CopyBlockAsImage(block);
+        imageItem.Click += (_, _) => vm.FireAndForget(vm.CopyBlockAsImage(block), nameof(vm.CopyBlockAsImage));
         menu.Items.Add(imageItem);
 
         menu.Open(this);
