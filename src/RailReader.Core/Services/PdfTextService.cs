@@ -110,6 +110,8 @@ public static class PdfTextService
     private static T WithTextPage<T>(byte[] pdfBytes, int pageIndex, T defaultValue,
         string operationName, Func<IntPtr, float, float, double, T> action)
     {
+        lock (PdfiumGate.Lock)
+        {
         IntPtr doc = IntPtr.Zero;
         IntPtr page = IntPtr.Zero;
         IntPtr textPage = IntPtr.Zero;
@@ -145,6 +147,7 @@ public static class PdfTextService
             if (page != IntPtr.Zero) FPDF_ClosePage(page);
             if (doc != IntPtr.Zero) FPDF_CloseDocument(doc);
             if (pinned.IsAllocated) pinned.Free();
+        }
         }
     }
 }

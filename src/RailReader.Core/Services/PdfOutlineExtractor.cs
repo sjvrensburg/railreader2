@@ -17,6 +17,8 @@ public static class PdfOutlineExtractor
     {
         var result = new List<OutlineEntry>();
 
+        lock (PdfiumGate.Lock)
+        {
         IntPtr doc = IntPtr.Zero;
         GCHandle pinned = default;
         try
@@ -37,6 +39,7 @@ public static class PdfOutlineExtractor
         {
             if (doc != IntPtr.Zero) FPDF_CloseDocument(doc);
             if (pinned.IsAllocated) pinned.Free();
+        }
         }
 
         return result;

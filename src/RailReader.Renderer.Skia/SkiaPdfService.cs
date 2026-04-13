@@ -19,35 +19,49 @@ public sealed class SkiaPdfService : IPdfService
     public SkiaPdfService(string filePath)
     {
         PdfBytes = File.ReadAllBytes(filePath);
-        PageCount = Conversion.GetPageCount(PdfBytes);
-        Outline = PdfOutlineExtractor.Extract(PdfBytes);
+        lock (PdfiumGate.Lock)
+        {
+            PageCount = Conversion.GetPageCount(PdfBytes);
+            Outline = PdfOutlineExtractor.Extract(PdfBytes);
+        }
         if (Outline.Count > 0)
             Logger.Debug($"[PDF] Extracted {Outline.Count} outline entries");
     }
 
     public (double Width, double Height) GetPageSize(int pageIndex)
     {
-        var size = Conversion.GetPageSize(PdfBytes, page: pageIndex);
-        return (size.Width, size.Height);
+        lock (PdfiumGate.Lock)
+        {
+            var size = Conversion.GetPageSize(PdfBytes, page: pageIndex);
+            return (size.Width, size.Height);
+        }
     }
 
     public IRenderedPage RenderPage(int pageIndex, int dpi = 200)
     {
-        var bitmap = Conversion.ToImage(PdfBytes, page: pageIndex,
-            options: new RenderOptions(Dpi: dpi));
-        return new SkiaRenderedPage(bitmap);
+        lock (PdfiumGate.Lock)
+        {
+            var bitmap = Conversion.ToImage(PdfBytes, page: pageIndex,
+                options: new RenderOptions(Dpi: dpi));
+            return new SkiaRenderedPage(bitmap);
+        }
     }
 
     public IRenderedPage RenderThumbnail(int pageIndex)
     {
-        var (pixW, pixH) = FitPageToTarget(pageIndex, 200);
-        var bitmap = Conversion.ToImage(PdfBytes, page: pageIndex,
-            options: new RenderOptions(Width: pixW, Height: pixH));
-        return new SkiaRenderedPage(bitmap);
+        lock (PdfiumGate.Lock)
+        {
+            var (pixW, pixH) = FitPageToTarget(pageIndex, 200);
+            var bitmap = Conversion.ToImage(PdfBytes, page: pageIndex,
+                options: new RenderOptions(Width: pixW, Height: pixH));
+            return new SkiaRenderedPage(bitmap);
+        }
     }
 
     public (byte[] RgbBytes, int Width, int Height) RenderPagePixmap(int pageIndex, int targetSize)
     {
+        lock (PdfiumGate.Lock)
+        {
         var (pixW, pixH) = FitPageToTarget(pageIndex, targetSize);
 
         using var bitmap = Conversion.ToImage(PdfBytes, page: pageIndex,
@@ -67,6 +81,7 @@ public sealed class SkiaPdfService : IPdfService
         }
 
         return (rgb, bitmap.Width, bitmap.Height);
+        }
     }
 
     private (int Width, int Height) FitPageToTarget(int pageIndex, int targetSize)

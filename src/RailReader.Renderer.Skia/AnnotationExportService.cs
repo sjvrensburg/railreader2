@@ -23,6 +23,8 @@ public static class AnnotationExportService
         Action<int, int>? onProgress = null)
     {
         var pdfBytes = pdf.PdfBytes;
+        lock (PdfiumGate.Lock)
+        {
         var pinnedSrc = GCHandle.Alloc(pdfBytes, GCHandleType.Pinned);
         try
         {
@@ -76,6 +78,7 @@ public static class AnnotationExportService
         finally
         {
             pinnedSrc.Free();
+        }
         }
     }
 
