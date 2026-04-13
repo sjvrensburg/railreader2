@@ -4,6 +4,17 @@ using RailReader.Core.Models;
 
 namespace RailReader.Core.Services;
 
+/// <summary>
+/// Full-text search over the active document.
+///
+/// <b>Thread-safety:</b> single-threaded. All public members (ExecuteSearch,
+/// CloseSearch, NextMatch, PreviousMatch, SearchMatches, CurrentPageSearchMatches,
+/// ActiveMatchIndex) must be called from the UI thread. Internal state
+/// (<c>SearchMatches</c>, <c>_searchMatchesByPage</c>, <c>CurrentPageSearchMatches</c>)
+/// is mutated without synchronisation; concurrent access from background threads
+/// will race. Background work (e.g. a future async search) must marshal back to
+/// the UI thread before touching this service.
+/// </summary>
 public sealed class SearchService
 {
     private readonly Func<DocumentState?> _getActiveDocument;
