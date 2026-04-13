@@ -73,81 +73,54 @@ public interface IUndoAction
     void Redo(AnnotationFile file);
 }
 
-public class AddAnnotationAction : IUndoAction
+public sealed class AddAnnotationAction(int pageIndex, Annotation annotation) : IUndoAction
 {
-    private readonly int _pageIndex;
-    private readonly Annotation _annotation;
-
-    public AddAnnotationAction(int pageIndex, Annotation annotation)
-    {
-        _pageIndex = pageIndex;
-        _annotation = annotation;
-    }
-
     public void Undo(AnnotationFile file)
     {
-        if (file.Pages.TryGetValue(_pageIndex, out var list))
-            list.Remove(_annotation);
+        if (file.Pages.TryGetValue(pageIndex, out var list))
+            list.Remove(annotation);
     }
 
     public void Redo(AnnotationFile file)
     {
-        if (!file.Pages.TryGetValue(_pageIndex, out var list))
+        if (!file.Pages.TryGetValue(pageIndex, out var list))
         {
             list = [];
-            file.Pages[_pageIndex] = list;
+            file.Pages[pageIndex] = list;
         }
-        list.Add(_annotation);
+        list.Add(annotation);
     }
 }
 
-public class RemoveAnnotationAction : IUndoAction
+public sealed class RemoveAnnotationAction(int pageIndex, Annotation annotation) : IUndoAction
 {
-    private readonly int _pageIndex;
-    private readonly Annotation _annotation;
     private int _index;
 
-    public RemoveAnnotationAction(int pageIndex, Annotation annotation)
-    {
-        _pageIndex = pageIndex;
-        _annotation = annotation;
-    }
-
     public void Undo(AnnotationFile file)
     {
-        if (!file.Pages.TryGetValue(_pageIndex, out var list))
+        if (!file.Pages.TryGetValue(pageIndex, out var list))
         {
             list = [];
-            file.Pages[_pageIndex] = list;
+            file.Pages[pageIndex] = list;
         }
-        list.Insert(Math.Min(_index, list.Count), _annotation);
+        list.Insert(Math.Min(_index, list.Count), annotation);
     }
 
     public void Redo(AnnotationFile file)
     {
-        if (file.Pages.TryGetValue(_pageIndex, out var list))
+        if (file.Pages.TryGetValue(pageIndex, out var list))
         {
-            _index = list.IndexOf(_annotation);
-            list.Remove(_annotation);
+            _index = list.IndexOf(annotation);
+            list.Remove(annotation);
         }
     }
 }
 
-public class MoveAnnotationAction : IUndoAction
+public sealed class MoveAnnotationAction(
+    Annotation annotation, PositionSnapshot oldPosition, PositionSnapshot newPosition) : IUndoAction
 {
-    private readonly Annotation _annotation;
-    private readonly PositionSnapshot _oldPosition;
-    private readonly PositionSnapshot _newPosition;
-
-    public MoveAnnotationAction(Annotation annotation, PositionSnapshot oldPosition, PositionSnapshot newPosition)
-    {
-        _annotation = annotation;
-        _oldPosition = oldPosition;
-        _newPosition = newPosition;
-    }
-
-    public void Undo(AnnotationFile file) => _oldPosition.ApplyTo(_annotation);
-    public void Redo(AnnotationFile file) => _newPosition.ApplyTo(_annotation);
+    public void Undo(AnnotationFile file) => oldPosition.ApplyTo(annotation);
+    public void Redo(AnnotationFile file) => newPosition.ApplyTo(annotation);
 }
 
 public class PositionSnapshot
@@ -195,19 +168,9 @@ public enum ResizeHandle
     Left,
 }
 
-public class ResizeFreehandAction : IUndoAction
+public sealed class ResizeFreehandAction(
+    FreehandAnnotation annotation, List<PointF> oldPoints, List<PointF> newPoints) : IUndoAction
 {
-    private readonly FreehandAnnotation _annotation;
-    private readonly List<PointF> _oldPoints;
-    private readonly List<PointF> _newPoints;
-
-    public ResizeFreehandAction(FreehandAnnotation annotation, List<PointF> oldPoints, List<PointF> newPoints)
-    {
-        _annotation = annotation;
-        _oldPoints = oldPoints;
-        _newPoints = newPoints;
-    }
-
-    public void Undo(AnnotationFile file) => _annotation.Points = [.. _oldPoints];
-    public void Redo(AnnotationFile file) => _annotation.Points = [.. _newPoints];
+    public void Undo(AnnotationFile file) => annotation.Points = [.. oldPoints];
+    public void Redo(AnnotationFile file) => annotation.Points = [.. newPoints];
 }
