@@ -1,5 +1,9 @@
+using System.Text.Json.Serialization;
+using RailReader.Core;
+
 namespace RailReader.Core.Models;
 
+[JsonConverter(typeof(CamelCaseEnumConverter<ColourEffect>))]
 public enum ColourEffect
 {
     None,

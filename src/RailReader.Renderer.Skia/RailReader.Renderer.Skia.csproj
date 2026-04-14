@@ -4,6 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <IsAotCompatible>true</IsAotCompatible>
     <!-- PDFtoImage marks APIs as platform-specific; we only target desktop (Win/Linux/macOS) -->
     <NoWarn>CA1416</NoWarn>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
