@@ -1,8 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using System.Text.Json.Serialization;
-using RailReader.Core;
 using RailReader.Core.Models;
 
 namespace RailReader.Core.Services;
@@ -16,13 +14,6 @@ namespace RailReader.Core.Services;
 public static class AnnotationService
 {
     internal static ILogger Logger { get; set; } = NullLogger.Instance;
-
-    private static readonly JsonSerializerOptions s_options = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
-        WriteIndented = true,
-        Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) },
-    };
 
     private static string? _annotationDir;
 
@@ -91,7 +82,7 @@ public static class AnnotationService
     /// <summary>Export annotations to a JSON file at a user-chosen path. Throws on failure.</summary>
     public static void ExportJson(AnnotationFile annotations, string outputPath)
     {
-        var json = JsonSerializer.Serialize(annotations, s_options);
+        var json = JsonSerializer.Serialize(annotations, RailReaderJsonContext.Default.AnnotationFile);
         File.WriteAllText(outputPath, json);
     }
 
@@ -153,7 +144,7 @@ public static class AnnotationService
             try
             {
                 var json = File.ReadAllText(file);
-                var af = JsonSerializer.Deserialize<AnnotationFile>(json, s_options);
+                var af = JsonSerializer.Deserialize(json, RailReaderJsonContext.Default.AnnotationFile);
                 if (af is null) continue;
 
                 var fi = new FileInfo(file);
@@ -196,7 +187,7 @@ public static class AnnotationService
         try
         {
             var json = File.ReadAllText(path);
-            return JsonSerializer.Deserialize<AnnotationFile>(json, s_options);
+            return JsonSerializer.Deserialize(json, RailReaderJsonContext.Default.AnnotationFile);
         }
         catch (Exception ex)
         {
@@ -209,7 +200,7 @@ public static class AnnotationService
     {
         try
         {
-            var json = JsonSerializer.Serialize(annotations, s_options);
+            var json = JsonSerializer.Serialize(annotations, RailReaderJsonContext.Default.AnnotationFile);
             File.WriteAllText(path, json);
             return true;
         }

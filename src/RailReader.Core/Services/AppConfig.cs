@@ -67,15 +67,10 @@ public sealed class AppConfig
 
     /// <summary>Creates an independent deep copy via JSON round-trip.</summary>
     public AppConfig Clone() =>
-        JsonSerializer.Deserialize<AppConfig>(JsonSerializer.Serialize(this, s_options), s_options)
+        JsonSerializer.Deserialize(
+            JsonSerializer.Serialize(this, RailReaderJsonContext.Default.AppConfig),
+            RailReaderJsonContext.Default.AppConfig)
         ?? new AppConfig();
-
-    private static readonly JsonSerializerOptions s_options = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
-        WriteIndented = true,
-        Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) },
-    };
 
     private static string? s_configDir;
 
@@ -110,7 +105,7 @@ public sealed class AppConfig
             if (File.Exists(ConfigPath))
             {
                 var json = File.ReadAllText(ConfigPath);
-                var loaded = JsonSerializer.Deserialize<AppConfig>(json, s_options) ?? new AppConfig();
+                var loaded = JsonSerializer.Deserialize(json, RailReaderJsonContext.Default.AppConfig) ?? new AppConfig();
                 if (Migrate(loaded))
                     loaded.Save();
                 return loaded;
@@ -188,7 +183,7 @@ public sealed class AppConfig
     {
         try
         {
-            var json = JsonSerializer.Serialize(this, s_options);
+            var json = JsonSerializer.Serialize(this, RailReaderJsonContext.Default.AppConfig);
             File.WriteAllText(ConfigPath, json);
         }
         catch (Exception ex)
@@ -204,12 +199,6 @@ public sealed class AppConfig
 /// </summary>
 internal sealed class RecentFilesConverter : JsonConverter<List<RecentFileEntry>>
 {
-    private static readonly JsonSerializerOptions s_entryOptions = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
-        Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) },
-    };
-
     public override List<RecentFileEntry>? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
         var result = new List<RecentFileEntry>();
@@ -229,7 +218,7 @@ internal sealed class RecentFilesConverter : JsonConverter<List<RecentFileEntry>
             else if (reader.TokenType == JsonTokenType.StartObject)
             {
                 // New format: object with file_path, page, zoom, etc.
-                var entry = JsonSerializer.Deserialize<RecentFileEntry>(ref reader, s_entryOptions);
+                var entry = JsonSerializer.Deserialize(ref reader, RailReaderJsonContext.Default.RecentFileEntry);
                 if (entry is not null)
                     result.Add(entry);
             }
@@ -241,7 +230,7 @@ internal sealed class RecentFilesConverter : JsonConverter<List<RecentFileEntry>
     {
         writer.WriteStartArray();
         foreach (var entry in value)
-            JsonSerializer.Serialize(writer, entry, s_entryOptions);
+            JsonSerializer.Serialize(writer, entry, RailReaderJsonContext.Default.RecentFileEntry);
         writer.WriteEndArray();
     }
 }
