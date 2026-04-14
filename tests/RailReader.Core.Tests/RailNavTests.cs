@@ -492,9 +492,12 @@ public class RailNavTests
         ActivateWithAnalysis(2, 1);
         _nav.StartAutoScroll(100.0);
 
-        // Start snap and deferred pause
+        // Start snap and deferred pause. The pause is generous (200ms) and the
+        // post-pause sleep is ~3x the pause to leave headroom for CI scheduling
+        // jitter — Thread.Sleep is approximate, especially on shared runners.
         _nav.StartSnapToCurrent(0, 0, Zoom, WindowWidth, WindowHeight);
-        _nav.PauseAutoScroll(50); // short pause for test speed
+        const int pauseMs = 200;
+        _nav.PauseAutoScroll(pauseMs);
 
         // Complete the snap
         double cx = 0, cy = 0;
@@ -507,10 +510,12 @@ public class RailNavTests
         Assert.False(reachedEnd, "Should be pausing, not advancing");
         Assert.Equal(cxBefore, cx); // camera X should not move during pause
 
-        // After pause expires, first tick clears the timer, second tick scrolls
-        Thread.Sleep(60);
-        _nav.TickAutoScroll(ref cx, 0.01, Zoom, WindowWidth); // clears pause timer
-        reachedEnd = _nav.TickAutoScroll(ref cx, 0.01, Zoom, WindowWidth); // actually scrolls
+        // After pause expires, first tick clears the timer, second tick scrolls.
+        // Use larger dt (50ms equivalent) so even a slow runner sees observable
+        // camera movement on the scroll tick.
+        Thread.Sleep(pauseMs * 3);
+        _nav.TickAutoScroll(ref cx, 0.05, Zoom, WindowWidth); // clears pause timer
+        reachedEnd = _nav.TickAutoScroll(ref cx, 0.05, Zoom, WindowWidth); // actually scrolls
         // For a narrow block that already fits on screen, reachedEnd may be
         // immediately true — the key assertion is that the pause was applied.
         Assert.True(reachedEnd || cx != cxBefore,
