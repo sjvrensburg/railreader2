@@ -79,7 +79,9 @@ Margin cropping never pushes you into rail mode: if the tighter fit would cross 
 
 ### Minimap and outline
 
-Press `Ctrl+M` to toggle the **minimap** — a small page thumbnail in the corner. Click or drag on it to navigate.
+Press `Ctrl+M` to toggle the **minimap** — a page thumbnail in the corner. Click or drag inside it to navigate. **Drag the top edge** (grip handle) to move it anywhere on the window. **Drag the inner corner** (resize handle, opposite the screen edge it's docked against) to resize. The minimap maintains the page's aspect ratio. Position and size persist across sessions.
+
+When you make the minimap large, it switches its source bitmap to the primary view's high-DPI page render so the thumbnail stays crisp.
 
 Press `Ctrl+Shift+O` to open the **outline panel** (table of contents). Click entries to jump to sections. Press `Ctrl+Shift+B` to open the **bookmarks panel** — see [Bookmarks](#bookmarks). Press `Ctrl+Shift+I` to open the **figures panel** — a browsable index of all detected figures, tables, and equations in the document. See [Figures Panel](#figures-panel).
 

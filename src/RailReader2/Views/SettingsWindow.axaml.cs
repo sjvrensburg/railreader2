@@ -243,6 +243,10 @@ public partial class SettingsWindow : Window
         vm.Config.CenteringClasses = LayoutConstants.DefaultCenteringClasses();
         vm.Config.PixelSnapping = defaults.PixelSnapping;
         vm.Config.MarginCropping = defaults.MarginCropping;
+        vm.Config.MinimapWidth = defaults.MinimapWidth;
+        vm.Config.MinimapHeight = defaults.MinimapHeight;
+        vm.Config.MinimapMarginRight = defaults.MinimapMarginRight;
+        vm.Config.MinimapMarginBottom = defaults.MinimapMarginBottom;
         vm.Config.LineFocusBlur = defaults.LineFocusBlur;
         vm.Config.LineFocusBlurIntensity = defaults.LineFocusBlurIntensity;
         if (vm.ActiveTab is { } resetTab)

@@ -50,7 +50,7 @@
                 <TextBlock Grid.Row="4" Grid.Column="0" Text="Ctrl+Shift+I" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
                 <TextBlock Grid.Row="4" Grid.Column="1" Text="Toggle figures panel" Margin="0,2" />
                 <TextBlock Grid.Row="5" Grid.Column="0" Text="Ctrl+M" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
-                <TextBlock Grid.Row="5" Grid.Column="1" Text="Toggle minimap" Margin="0,2" />
+                <TextBlock Grid.Row="5" Grid.Column="1" Text="Toggle minimap (drag top to move, corner to resize)" Margin="0,2" />
                 <TextBlock Grid.Row="6" Grid.Column="0" Text="Ctrl+Shift+M" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
                 <TextBlock Grid.Row="6" Grid.Column="1" Text="Toggle margin cropping" Margin="0,2" />
                 <TextBlock Grid.Row="7" Grid.Column="0" Text="F11" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />

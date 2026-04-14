@@ -77,6 +77,29 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
 
     public SKBitmap? MinimapBitmap => (State.MinimapPage as SkiaRenderedPage)?.Bitmap;
 
+    /// <summary>
+    /// Returns <see cref="MinimapBitmap"/> wrapped as an SKImage so the canvas
+    /// can use sampling-aware DrawImage. Re-wraps when the underlying bitmap
+    /// changes; previous wrappers are disposed.
+    /// </summary>
+    public SKImage? MinimapImage
+    {
+        get
+        {
+            var bm = MinimapBitmap;
+            if (bm is null) return null;
+            if (_minimapImageSource is null || !ReferenceEquals(_minimapImageSource, bm))
+            {
+                _minimapImage?.Dispose();
+                _minimapImage = SKImage.FromBitmap(bm);
+                _minimapImageSource = bm;
+            }
+            return _minimapImage;
+        }
+    }
+    private SKImage? _minimapImage;
+    private SKBitmap? _minimapImageSource;
+
     public Action? OnDpiRenderComplete
     {
         get => State.OnDpiRenderComplete;
@@ -142,6 +165,9 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
         _cachedImage?.Dispose();
         _cachedImage = null;
         _cachedImagePage = null;
+        _minimapImage?.Dispose();
+        _minimapImage = null;
+        _minimapImageSource = null;
         State.Dispose();
     }
 }

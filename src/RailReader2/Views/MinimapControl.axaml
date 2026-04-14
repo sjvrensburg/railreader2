@@ -2,9 +2,8 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="RailReader2.Views.MinimapControl"
              ClipToBounds="True"
-             Width="180" Height="240"
              HorizontalAlignment="Right"
              VerticalAlignment="Bottom"
-             Margin="0,0,10,10"
-             ToolTip.Tip="Minimap — click to navigate (Ctrl+M to toggle)">
+             Cursor="Hand"
+             ToolTip.Tip="Minimap — click to navigate; drag top edge to move; drag corner to resize (Ctrl+M to toggle)">
 </UserControl>
