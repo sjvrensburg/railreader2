@@ -156,9 +156,6 @@ public sealed partial class DocumentController
                     if (targetPage >= 0 && targetPage < doc.PageCount)
                     {
                         GoToPage(targetPage);
-                        // Align the content edge with the viewport edge (reduces to page
-                        // edge when margin cropping is off, since GetFitRect returns the
-                        // full page).
                         var (_, ry, _, rh) = doc.GetFitRect();
                         double topTarget = -ry * doc.Camera.Zoom;
                         doc.Camera.OffsetY = forward

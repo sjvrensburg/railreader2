@@ -573,13 +573,19 @@ public sealed class DocumentState : IDisposable
         return (0, 0, PageWidth, PageHeight);
     }
 
+    /// <summary>
+    /// Sub-rail-threshold epsilon: keeps margin-cropping fit zoom strictly
+    /// below the rail trigger so cropping never accidentally enters rail mode.
+    /// </summary>
+    private const double RailThresholdEpsilon = 0.001;
+
     public void CenterPage(double windowWidth, double windowHeight)
     {
         if (PageWidth <= 0 || PageHeight <= 0 || windowWidth <= 0 || windowHeight <= 0) return;
         var (rx, ry, rw, rh) = GetFitRect();
         if (rw <= 0 || rh <= 0) return;
         Camera.Zoom = Math.Min(windowWidth / rw, windowHeight / rh);
-        Camera.OffsetX = (windowWidth - rw * Camera.Zoom) / 2.0 - rx * Camera.Zoom;
+        Camera.OffsetX = CenteredOffsetX(windowWidth, rx, rw, Camera.Zoom);
         Camera.OffsetY = (windowHeight - rh * Camera.Zoom) / 2.0 - ry * Camera.Zoom;
     }
 
@@ -589,9 +595,9 @@ public sealed class DocumentState : IDisposable
         var (rx, ry, rw, rh) = GetFitRect();
         if (rw <= 0) return;
 
-        Camera.Zoom = ComputeFitWidthZoom(windowWidth);
+        Camera.Zoom = ComputeFitWidthZoom(windowWidth, rw);
         double scaledRectH = rh * Camera.Zoom;
-        Camera.OffsetX = (windowWidth - rw * Camera.Zoom) / 2.0 - rx * Camera.Zoom;
+        Camera.OffsetX = CenteredOffsetX(windowWidth, rx, rw, Camera.Zoom);
         Camera.OffsetY = scaledRectH <= windowHeight
             ? (windowHeight - scaledRectH) / 2.0 - ry * Camera.Zoom
             : -ry * Camera.Zoom;
@@ -608,20 +614,22 @@ public sealed class DocumentState : IDisposable
         if (PageWidth <= 0 || windowWidth <= 0 || Camera.Zoom <= 0) return;
         double pageTopY = -Camera.OffsetY / Camera.Zoom;
 
-        double newZoom = ComputeFitWidthZoom(windowWidth);
-        if (newZoom <= 0) return;
         var (rx, _, rw, _) = GetFitRect();
+        double newZoom = ComputeFitWidthZoom(windowWidth, rw);
+        if (newZoom <= 0) return;
 
         Camera.Zoom = newZoom;
-        Camera.OffsetX = (windowWidth - rw * newZoom) / 2.0 - rx * newZoom;
+        Camera.OffsetX = CenteredOffsetX(windowWidth, rx, rw, newZoom);
         Camera.OffsetY = -pageTopY * newZoom;
         ClampCamera(windowWidth, windowHeight);
     }
 
-    private double ComputeFitWidthZoom(double windowWidth)
+    private static double CenteredOffsetX(double windowWidth, double rectX, double rectW, double zoom)
+        => (windowWidth - rectW * zoom) / 2.0 - rectX * zoom;
+
+    private double ComputeFitWidthZoom(double windowWidth, double rectW)
     {
-        var (_, _, rw, _) = GetFitRect();
-        if (rw <= 0) return Camera.Zoom;
+        if (rectW <= 0) return Camera.Zoom;
 
         double maxZoom = Camera.ZoomMax;
         // Keep margin cropping from pushing the user into rail mode on large
@@ -632,9 +640,9 @@ public sealed class DocumentState : IDisposable
         {
             double uncroppedFit = windowWidth / PageWidth;
             if (uncroppedFit < Rail.ZoomThreshold)
-                maxZoom = Math.Min(maxZoom, Rail.ZoomThreshold - 0.001);
+                maxZoom = Math.Min(maxZoom, Rail.ZoomThreshold - RailThresholdEpsilon);
         }
-        return Math.Clamp(windowWidth / rw, Camera.ZoomMin, maxZoom);
+        return Math.Clamp(windowWidth / rectW, Camera.ZoomMin, maxZoom);
     }
 
     public void ClampCamera(double windowWidth, double windowHeight)
@@ -833,9 +841,9 @@ public sealed class DocumentState : IDisposable
         _analysisCache[page] = analysis;
 
         var frac = PageCropUtil.ComputeFraction(analysis);
-        DocumentContentFraction = DocumentContentFraction is { } existing
-            ? existing.Union(frac)
-            : frac;
+        var next = DocumentContentFraction is { } existing ? existing.Union(frac) : frac;
+        if (!next.Equals(DocumentContentFraction))
+            DocumentContentFraction = next;
 
         AnalysisCacheUpdated?.Invoke();
     }
