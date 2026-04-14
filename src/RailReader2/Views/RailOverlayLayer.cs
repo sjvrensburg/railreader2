@@ -59,7 +59,7 @@ internal sealed class RailOverlayVisualHandler : CompositionCustomVisualHandler
         var canvas = lease.SkCanvas;
 
         canvas.Save();
-        canvas.SetMatrix(SKMatrix.Concat(canvas.TotalMatrix, state.Camera));
+        canvas.Concat(state.Camera);
 
         if (state.CurrentBlock is { } block)
         {
