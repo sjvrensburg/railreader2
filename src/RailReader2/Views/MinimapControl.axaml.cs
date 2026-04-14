@@ -28,9 +28,17 @@ public partial class MinimapControl : UserControl
 
     private enum DragMode { None, Pending, Move, Resize, Navigate }
     private DragMode _drag = DragMode.None;
-    private Point _dragStart;
+    private Point _dragStartLocal;     // for hit zones and navigation
+    private Point _dragStartGlobal;    // for stable deltas (window coords)
+    private Visual? _dragSpace;        // visual the drag-start global coords are relative to
     private double _dragStartW, _dragStartH, _dragStartMR, _dragStartMB;
     private bool _hover;
+
+    // Mipmapped GPU texture for the high-DPI source bitmap. Without this,
+    // every redraw resamples a multi-megapixel CPU image from scratch on the
+    // UI thread, which stutters during rail scrolling when the minimap is large.
+    private SKImage? _gpuTexture;
+    private SKImage? _gpuTextureSource;
 
     public MinimapControl()
     {
@@ -39,11 +47,31 @@ public partial class MinimapControl : UserControl
         PointerExited += (_, _) =>
         {
             _hover = false;
-            // Reset cursor when the pointer leaves so a stale resize/move
-            // cursor doesn't linger if the control was hovered then exited.
             Cursor = new Cursor(StandardCursorType.Hand);
             InvalidateVisual();
         };
+        DetachedFromVisualTree += (_, _) =>
+        {
+            _gpuTexture?.Dispose();
+            _gpuTexture = null;
+            _gpuTextureSource = null;
+        };
+    }
+
+    /// <summary>
+    /// Returns a mipmapped GPU-backed image for the supplied source. Reuploads
+    /// only when the source identity changes. Falls back to <paramref name="source"/>
+    /// itself if no GPU context is available.
+    /// </summary>
+    internal SKImage GetOrUploadTexture(SKImage source, GRContext? grContext)
+    {
+        if (grContext is null) return source;
+        if (ReferenceEquals(source, _gpuTextureSource) && _gpuTexture is not null)
+            return _gpuTexture;
+        _gpuTexture?.Dispose();
+        _gpuTexture = source.ToTextureImage(grContext, mipmapped: true);
+        _gpuTextureSource = source;
+        return _gpuTexture;
     }
 
     private void ApplyConfig()
@@ -60,6 +88,7 @@ public partial class MinimapControl : UserControl
         bool dragging = _drag is DragMode.Move or DragMode.Resize;
         context.Custom(new MinimapDrawOperation(
             new Rect(0, 0, Bounds.Width, Bounds.Height),
+            this,
             _vm,
             showChrome: _hover || dragging,
             drag: dragging,
@@ -91,15 +120,17 @@ public partial class MinimapControl : UserControl
         base.OnPointerPressed(e);
         if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
 
-        _dragStart = e.GetPosition(this);
+        _dragStartLocal = e.GetPosition(this);
+        _dragSpace = TopLevel.GetTopLevel(this);
+        _dragStartGlobal = _dragSpace is null ? _dragStartLocal : e.GetPosition(_dragSpace);
         _dragStartW = Bounds.Width;
         _dragStartH = Bounds.Height;
         _dragStartMR = Margin.Right;
         _dragStartMB = Margin.Bottom;
 
-        _drag = HitResizeHandle(_dragStart) ? DragMode.Resize
-              : HitMoveStripe(_dragStart)   ? DragMode.Move
-              :                               DragMode.Pending;
+        _drag = HitResizeHandle(_dragStartLocal) ? DragMode.Resize
+              : HitMoveStripe(_dragStartLocal)   ? DragMode.Move
+              :                                    DragMode.Pending;
 
         e.Pointer.Capture(this);
         e.Handled = true;
@@ -108,23 +139,27 @@ public partial class MinimapControl : UserControl
     protected override void OnPointerMoved(PointerEventArgs e)
     {
         base.OnPointerMoved(e);
-        var pt = e.GetPosition(this);
+        var local = e.GetPosition(this);
 
         if (_drag == DragMode.None)
         {
-            UpdateCursor(pt);
+            UpdateCursor(local);
             return;
         }
 
-        double dx = pt.X - _dragStart.X;
-        double dy = pt.Y - _dragStart.Y;
+        // Use window-coords for deltas so they're invariant to the control
+        // moving/resizing during the drag (otherwise the change in relative
+        // position would feed back and cause jitter).
+        var global = _dragSpace is null ? local : e.GetPosition(_dragSpace);
+        double dx = global.X - _dragStartGlobal.X;
+        double dy = global.Y - _dragStartGlobal.Y;
 
         if (_drag == DragMode.Pending)
         {
             if (Math.Abs(dx) < NavigateDragThreshold && Math.Abs(dy) < NavigateDragThreshold)
                 return;
             _drag = DragMode.Navigate;
-            if (_vm?.ActiveTab is { } t0) NavigateToPoint(_dragStart, t0);
+            if (_vm?.ActiveTab is { } t0) NavigateToPoint(_dragStartLocal, t0);
         }
 
         switch (_drag)
@@ -136,7 +171,7 @@ public partial class MinimapControl : UserControl
                 ApplyMove(dx, dy);
                 break;
             case DragMode.Navigate:
-                if (_vm?.ActiveTab is { } tab) NavigateToPoint(pt, tab);
+                if (_vm?.ActiveTab is { } tab) NavigateToPoint(local, tab);
                 break;
         }
         e.Handled = true;
@@ -208,38 +243,36 @@ public partial class MinimapControl : UserControl
         var c = ResizeCornerInside();
         double signX = c is Corner.TopLeft or Corner.BottomLeft ? -1 : 1;
         double signY = c is Corner.TopLeft or Corner.TopRight ? -1 : 1;
-        double rawW = _dragStartW + signX * dx;
-        double rawH = _dragStartH + signY * dy;
 
         var (winW, winH) = WindowClientSize();
         double maxW = Math.Max(MinSize, winW * 0.8);
         double maxH = Math.Max(MinSize, winH * 0.8);
 
-        // Lock to page aspect: whichever drag axis is proportionally larger
-        // drives the resize, and the other dimension follows.
-        double newW = rawW, newH = rawH;
+        double newW, newH;
         if (_vm?.ActiveTab is { } tab && tab.PageWidth > 0 && tab.PageHeight > 0)
         {
+            // Project the drag onto the page-aspect diagonal direction so any
+            // direction of motion produces a continuous, aspect-preserving
+            // resize. Avoids axis-driven flipping that caused jitter.
             double aspect = tab.PageWidth / tab.PageHeight;
-            double propX = Math.Abs(dx) / Math.Max(1, _dragStartW);
-            double propY = Math.Abs(dy) / Math.Max(1, _dragStartH);
-            if (propX >= propY) newH = rawW / aspect;
-            else                newW = rawH * aspect;
+            double dirLen = Math.Sqrt(aspect * aspect + 1);
+            double dirX = aspect / dirLen; // unit vector along the corner ray
+            double dirY = 1.0 / dirLen;
+            double proj = signX * dx * dirX + signY * dy * dirY;
+            newW = _dragStartW + proj * dirX;
+            newH = _dragStartH + proj * dirY;
 
-            if (newW > maxW)   { newW = maxW;   newH = newW / aspect; }
-            if (newH > maxH)   { newH = maxH;   newW = newH * aspect; }
+            if (newW > maxW)    { newW = maxW;    newH = newW / aspect; }
+            if (newH > maxH)    { newH = maxH;    newW = newH * aspect; }
             if (newW < MinSize) { newW = MinSize; newH = newW / aspect; }
             if (newH < MinSize) { newH = MinSize; newW = newH * aspect; }
         }
         else
         {
-            newW = Math.Clamp(rawW, MinSize, maxW);
-            newH = Math.Clamp(rawH, MinSize, maxH);
+            newW = Math.Clamp(_dragStartW + signX * dx, MinSize, maxW);
+            newH = Math.Clamp(_dragStartH + signY * dy, MinSize, maxH);
         }
 
-        // For "into the screen" handles (top-left when docked bottom-right),
-        // the right/bottom margins stay anchored — Avalonia layout grows the
-        // control toward the top-left automatically.
         Width = newW;
         Height = newH;
         InvalidateVisual();
@@ -305,6 +338,7 @@ public partial class MinimapControl : UserControl
     private sealed class MinimapDrawOperation : ICustomDrawOperation
     {
         private readonly Rect _bounds;
+        private readonly MinimapControl _control;
         private readonly MainWindowViewModel? _vm;
         private readonly bool _showChrome;
         private readonly bool _drag;
@@ -328,10 +362,11 @@ public partial class MinimapControl : UserControl
         private static readonly SKSamplingOptions s_samplingDrag =
             new(SKFilterMode.Linear, SKMipmapMode.Linear);
 
-        public MinimapDrawOperation(Rect bounds, MainWindowViewModel? vm,
-            bool showChrome, bool drag, Corner resizeCorner)
+        public MinimapDrawOperation(Rect bounds, MinimapControl control,
+            MainWindowViewModel? vm, bool showChrome, bool drag, Corner resizeCorner)
         {
             _bounds = bounds;
+            _control = control;
             _vm = vm;
             _showChrome = showChrome;
             _drag = drag;
@@ -393,7 +428,14 @@ public partial class MinimapControl : UserControl
 
             var source = preferPrimary ? _primaryImage : _thumbImage;
             if (source is not null)
-                canvas.DrawImage(source, destRect, sampling);
+            {
+                // Mipmapped GPU upload (cached on the control) avoids per-frame
+                // resampling of the large primary bitmap during rail scrolling.
+                var drawn = preferPrimary
+                    ? _control.GetOrUploadTexture(source, lease.GrContext)
+                    : source;
+                canvas.DrawImage(drawn, destRect, sampling);
+            }
 
             // Viewport indicator.
             var window = Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop
