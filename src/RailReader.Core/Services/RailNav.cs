@@ -14,6 +14,9 @@ public sealed partial class RailNav : ICameraClamp
     public bool Active { get; set; }
     public double ScrollSpeed { get; private set; }
 
+    /// <summary>Zoom level at or above which rail mode activates.</summary>
+    public double ZoomThreshold => _config.RailZoomThreshold;
+
     /// <summary>
     /// Vertical offset from center (in pixels). Positive = line drawn above center.
     /// Set by user panning in rail mode; preserved across line navigation.

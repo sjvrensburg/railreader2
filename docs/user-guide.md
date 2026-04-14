@@ -69,6 +69,14 @@ Once a PDF is open, scroll through pages with `PgDn`/`PgUp`, zoom with `+`/`-` o
 
 > **Edge-hold page navigation:** When not in rail mode, holding `Down` or `S` at the bottom of the page for 400ms automatically advances to the next page. Similarly, holding `Up` or `W` at the top of the page goes to the previous page.
 
+### Margin cropping
+
+Press `Ctrl+Shift+M` to toggle **margin cropping**, or enable it in Settings. When on, fit/centre operations (the `F` and `0` keys, plus the page-flip on edge-hold) target the detected content area instead of the full page, so whitespace margins don't waste screen space at high zoom.
+
+The crop is computed from the analysed layout blocks and grows automatically as more pages are analysed — it never clips content. Without the ONNX model, cropping is a no-op.
+
+Margin cropping never pushes you into rail mode: if the tighter fit would cross the rail zoom threshold, the fit is capped just below it. Toggling while zoomed past fit-width leaves your camera alone; the effect takes hold on your next fit or page flip.
+
 ### Minimap and outline
 
 Press `Ctrl+M` to toggle the **minimap** — a small page thumbnail in the corner. Click or drag on it to navigate.
@@ -680,6 +688,7 @@ The log is overwritten at the start of each session. Old `.log` files are automa
 | `Ctrl+Q` | Quit |
 | `Ctrl+,` | Settings |
 | `Ctrl+M` | Toggle minimap |
+| `Ctrl+Shift+M` | Toggle margin cropping |
 | `Ctrl+Shift+O` | Toggle outline panel |
 | `Ctrl+Shift+B` | Toggle bookmarks panel |
 | `Ctrl+Shift+I` | Toggle figures panel |

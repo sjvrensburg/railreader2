@@ -156,8 +156,11 @@ public sealed partial class DocumentController
                     if (targetPage >= 0 && targetPage < doc.PageCount)
                     {
                         GoToPage(targetPage);
-                        double scaledH = doc.PageHeight * doc.Camera.Zoom;
-                        doc.Camera.OffsetY = forward ? 0 : Math.Min(wh - scaledH, 0);
+                        var (_, ry, _, rh) = doc.GetFitRect();
+                        double topTarget = -ry * doc.Camera.Zoom;
+                        doc.Camera.OffsetY = forward
+                            ? topTarget
+                            : Math.Min(wh - (ry + rh) * doc.Camera.Zoom, topTarget);
                         doc.ClampCamera(ww, wh);
                     }
                 }

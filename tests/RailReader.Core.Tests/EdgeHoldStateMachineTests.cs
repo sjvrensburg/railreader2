@@ -54,25 +54,28 @@ public class EdgeHoldStateMachineTests
     }
 
     [Fact]
-    public void ShouldSuppressInput_TrueDuringCooldown()
+    public void ShouldSuppressInput_TrueAfterAdvance()
     {
         var sm = new EdgeHoldStateMachine();
         sm.OnEdgeHit(forward: true);
         Thread.Sleep(405);
-        sm.OnEdgeHit(forward: true); // fires advance, enters cooldown
+        sm.OnEdgeHit(forward: true); // fires advance
 
         Assert.True(sm.ShouldSuppressInput);
     }
 
     [Fact]
-    public void ShouldSuppressInput_FalseAfterCooldown()
+    public void ShouldSuppressInput_RemainsTrueUntilReset()
     {
         var sm = new EdgeHoldStateMachine();
         sm.OnEdgeHit(forward: true);
         Thread.Sleep(405);
-        sm.OnEdgeHit(forward: true); // fires advance, enters cooldown
+        sm.OnEdgeHit(forward: true); // fires advance
 
-        Thread.Sleep(305);
+        Thread.Sleep(500); // long past any plausible cooldown
+        Assert.True(sm.ShouldSuppressInput);
+
+        sm.Reset();
         Assert.False(sm.ShouldSuppressInput);
     }
 

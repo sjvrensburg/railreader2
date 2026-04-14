@@ -563,6 +563,8 @@ public partial class MainWindow : Window
                 _ = vm.OpenFileCommand.ExecuteAsync(null); e.Handled = true; return true;
             case Key.W: vm.CloseTab(vm.ActiveTabIndex); e.Handled = true; return true;
             case Key.Q: Close(); e.Handled = true; return true;
+            case Key.M when shift:
+                vm.ToggleMarginCropping(); e.Handled = true; return true;
             case Key.M:
                 vm.ShowMinimap = !vm.ShowMinimap; e.Handled = true; return true;
             case Key.OemComma:

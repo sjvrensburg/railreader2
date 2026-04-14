@@ -186,6 +186,45 @@ public sealed partial class MainWindowViewModel
         }
     }
 
+    // Slack above fit-width below which the user counts as "at fit-width" for
+    // margin-cropping toggle purposes. Above this they're considered zoomed in.
+    private const double AtFitWidthHysteresis = 1.1;
+
+    /// <summary>
+    /// Applies a margin-cropping setting to the active document. If the user
+    /// was approximately at fit-width, re-fits to the new content width while
+    /// preserving the page-space point at viewport center (no jump to top).
+    /// If the user has deliberately zoomed in past fit-width, only the flag
+    /// changes — the effect becomes visible on the next fit or page flip.
+    /// </summary>
+    public void ApplyMarginCropping(bool enabled)
+    {
+        if (_controller.ActiveDocument is not { } doc) return;
+        if (doc.MarginCropping == enabled) return;
+
+        var (ww, wh) = _controller.GetViewportSize();
+        var (_, _, preRw, _) = doc.GetFitRect();
+        double preFitZoom = preRw > 0 ? ww / preRw : doc.Camera.Zoom;
+        bool atFitWidth = doc.Camera.Zoom <= preFitZoom * AtFitWidthHysteresis;
+
+        doc.MarginCropping = enabled;
+
+        if (atFitWidth)
+        {
+            Dispatch(() =>
+            {
+                doc.FitWidthPreservingTop(ww, wh);
+                doc.UpdateRailZoom(ww, wh);
+            }, InvalidateCameraAndTab);
+        }
+    }
+
+    public void ToggleMarginCropping()
+    {
+        if (_controller.ActiveDocument is { } doc)
+            ApplyMarginCropping(!doc.MarginCropping);
+    }
+
     public void ToggleLineHighlight()
     {
         if (_controller.ActiveDocument is { } doc)

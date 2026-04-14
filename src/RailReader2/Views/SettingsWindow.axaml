@@ -103,6 +103,8 @@
                         <Separator />
                         <CheckBox Name="PixelSnappingCheck" Content="Pixel snapping (reduces text shimmer)"
                                   IsCheckedChanged="OnPixelSnappingChanged" />
+                        <CheckBox Name="MarginCroppingCheck" Content="Crop page margins (fit to detected content)"
+                                  IsCheckedChanged="OnMarginCroppingChanged" />
                         <CheckBox Name="LineFocusBlurCheck" Content="Blur non-active lines in rail mode"
                                   IsCheckedChanged="OnLineFocusBlurChanged" />
                         <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto,8,Auto">

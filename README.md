@@ -73,6 +73,7 @@ At high zoom levels, navigation switches to "rail mode" — the viewer locks ont
 - **Line snap shortcuts** — Home/End keys snap to the start/end of the current line in rail mode
 - **Pixel snapping** — quantises camera positions to the pixel grid to eliminate sub-pixel text shimmer at high zoom
 - **Edge-hold page navigation** — in non-rail mode, hold Down/S at the page bottom for 400ms to advance to the next page. Same for Up/W at the top edge
+- **Margin cropping** — fit/centre operations target the detected content area instead of the full page, so whitespace margins don't waste screen space at high zoom. Toggle with Ctrl+Shift+M or via Settings. Capped just below the rail zoom threshold so cropping never accidentally switches you into rail mode
 - **Analysis lookahead** — pre-analyzes upcoming pages in the background for instant navigation
 - **Analysis indicator** — status bar shows "Analyzing..." during layout inference
 - **Configurable navigation** — choose which block types are navigable in rail mode via Settings → Advanced

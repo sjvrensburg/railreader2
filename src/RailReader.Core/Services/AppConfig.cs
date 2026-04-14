@@ -45,6 +45,7 @@ public sealed class AppConfig
     public bool LineHighlightEnabled { get; set; } = true;
     public LineHighlightTint LineHighlightTint { get; set; } = LineHighlightTint.Auto;
     public double LineHighlightOpacity { get; set; } = 0.25;
+    public bool MarginCropping { get; set; }
     [JsonConverter(typeof(RecentFilesConverter))]
     public List<RecentFileEntry> RecentFiles { get; set; } = [];
 
