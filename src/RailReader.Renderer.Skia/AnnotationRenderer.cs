@@ -123,14 +123,20 @@ public static class AnnotationRenderer
 
         var path = s_previewFreehandPath ??= new SKPath();
         path.Reset();
-        path.MoveTo(freehand.Points[0].X, freehand.Points[0].Y);
-        for (int i = 1; i < freehand.Points.Count; i++)
-            path.LineTo(freehand.Points[i].X, freehand.Points[i].Y);
+        BuildFreehandPath(path, freehand);
 
         var paint = GetStrokePaint();
         paint.Color = ParseColor(freehand.Color, freehand.Opacity);
         paint.StrokeWidth = freehand.StrokeWidth;
         canvas.DrawPath(path, paint);
+    }
+
+    private static void BuildFreehandPath(SKPath path, FreehandAnnotation freehand)
+    {
+        var points = freehand.Points;
+        path.MoveTo(points[0].X, points[0].Y);
+        for (int i = 1; i < points.Count; i++)
+            path.LineTo(points[i].X, points[i].Y);
     }
 
     private static SKPaint GetFillPaint()
@@ -177,9 +183,7 @@ public static class AnnotationRenderer
             return cache.Path;
 
         var path = new SKPath();
-        path.MoveTo(freehand.Points[0].X, freehand.Points[0].Y);
-        for (int i = 1; i < count; i++)
-            path.LineTo(freehand.Points[i].X, freehand.Points[i].Y);
+        BuildFreehandPath(path, freehand);
 
         if (cache is not null)
         {
