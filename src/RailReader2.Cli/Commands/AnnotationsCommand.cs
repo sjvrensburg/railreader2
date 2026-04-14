@@ -140,7 +140,7 @@ public static class AnnotationsCommand
             Page = b.Page
         }).ToList();
 
-        var json = JsonSerializer.Serialize(result, Shared.JsonOptions);
+        var json = JsonSerializer.Serialize(result, CliJsonContext.Default.AnnotationExportOutput);
 
         if (outputPath != null)
         {
