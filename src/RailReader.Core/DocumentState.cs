@@ -113,6 +113,14 @@ public sealed class DocumentState : IDisposable
     /// <summary>Whether this document has unanalysed pages remaining.</summary>
     public bool HasPendingBackgroundWork => !BackgroundQueue.IsExhausted;
 
+    /// <summary>
+    /// True when a user-initiated PDFium render (DPI re-render or page prefetch)
+    /// is in flight. Background work should defer while this is true to keep
+    /// the PDFium gate free for the in-flight task and any follow-up scroll-path
+    /// calls (text/link extraction) the user is about to need.
+    /// </summary>
+    public bool IsPdfiumBusy => _dpiRenderPending || _prefetchPending;
+
     /// <summary>Fires on the UI thread when a new page analysis result is cached.</summary>
     public event Action? AnalysisCacheUpdated;
 
@@ -477,6 +485,7 @@ public sealed class DocumentState : IDisposable
         _marshaller.AssertUIThread();
         if (!worker.IsIdle) return false;
         if (PendingRailSetup) return false;
+        if (IsPdfiumBusy) return false;
         if (BackgroundQueue.IsExhausted) return false;
 
         int? nextPage = BackgroundQueue.TryGetNext(

@@ -25,8 +25,8 @@ public static class AnnotationRenderer
 
     // Cached freehand SKPath per thread — avoids rebuilding native path every frame.
     // ConditionalWeakTable so paths are GC'd when annotations are collected.
-    [ThreadStatic] private static ConditionalWeakTable<FreehandAnnotation, SKPath>? s_freehandPaths;
-    [ThreadStatic] private static ConditionalWeakTable<FreehandAnnotation, StrongBox<int>>? s_freehandPointCounts;
+    private sealed class FreehandPathCache { public SKPath Path = null!; public int PointCount; }
+    [ThreadStatic] private static ConditionalWeakTable<FreehandAnnotation, FreehandPathCache>? s_freehandPaths;
 
     // Cached text note popup layout per thread — avoids WrapText + MeasureText every frame.
     private sealed record NoteLayoutCache(TextNoteAnnotation Owner, string Text, List<string> Lines, float PopupW, float PopupH);
@@ -135,29 +135,26 @@ public static class AnnotationRenderer
     private static SKPath GetOrCreateFreehandPath(FreehandAnnotation freehand)
     {
         var paths = s_freehandPaths ??= new();
-        var counts = s_freehandPointCounts ??= new();
+        int count = freehand.Points.Count;
 
-        if (paths.TryGetValue(freehand, out var cached)
-            && counts.TryGetValue(freehand, out var countBox)
-            && countBox.Value == freehand.Points.Count)
-        {
-            return cached;
-        }
+        if (paths.TryGetValue(freehand, out var cache) && cache.PointCount == count)
+            return cache.Path;
 
         var path = new SKPath();
         path.MoveTo(freehand.Points[0].X, freehand.Points[0].Y);
-        for (int i = 1; i < freehand.Points.Count; i++)
+        for (int i = 1; i < count; i++)
             path.LineTo(freehand.Points[i].X, freehand.Points[i].Y);
 
-        if (cached is not null)
+        if (cache is not null)
         {
-            cached.Dispose();
-            paths.Remove(freehand);
-            counts.Remove(freehand);
+            cache.Path.Dispose();
+            cache.Path = path;
+            cache.PointCount = count;
         }
-
-        paths.AddOrUpdate(freehand, path);
-        counts.AddOrUpdate(freehand, new StrongBox<int>(freehand.Points.Count));
+        else
+        {
+            paths.AddOrUpdate(freehand, new FreehandPathCache { Path = path, PointCount = count });
+        }
         return path;
     }
 

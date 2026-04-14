@@ -48,7 +48,7 @@ internal sealed class SearchVisualHandler : CompositionCustomVisualHandler
         var canvas = lease.SkCanvas;
 
         canvas.Save();
-        canvas.SetMatrix(SKMatrix.Concat(canvas.TotalMatrix, state.Camera));
+        canvas.Concat(state.Camera);
 
         OverlayRenderer.DrawSearchHighlights(canvas, matches, state.ActiveLocalIndex,
             OverlayRenderer.GetHighlightPaint(), OverlayRenderer.GetActivePaint(),

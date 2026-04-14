@@ -140,7 +140,7 @@ internal sealed class PdfPageVisualHandler : CompositionCustomVisualHandler
         // difference from the old design: camera + draw are atomic in one
         // compositor pass, so there is no stale-draw/new-transform frame mismatch.
         canvas.Save();
-        canvas.SetMatrix(SKMatrix.Concat(canvas.TotalMatrix, state.Camera));
+        canvas.Concat(state.Camera);
 
         bool animating = state.ScrollSpeed > MinSpeedThreshold || state.ZoomSpeed > MinSpeedThreshold;
         var sampling = animating ? s_samplingFast : s_sampling;

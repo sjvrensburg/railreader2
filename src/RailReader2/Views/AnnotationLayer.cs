@@ -54,7 +54,7 @@ internal sealed class AnnotationVisualHandler : CompositionCustomVisualHandler
         var canvas = lease.SkCanvas;
 
         canvas.Save();
-        canvas.SetMatrix(SKMatrix.Concat(canvas.TotalMatrix, state.Camera));
+        canvas.Concat(state.Camera);
 
         if (state.PageAnnotations is { } annotations)
             AnnotationRenderer.DrawAnnotations(canvas, annotations, state.SelectedAnnotation);
