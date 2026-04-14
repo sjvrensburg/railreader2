@@ -256,7 +256,7 @@ public static class VlmCommand
             try
             {
                 var json = File.ReadAllText(fromStructure);
-                structure = JsonSerializer.Deserialize<StructureOutput>(json, Shared.JsonOptions);
+                structure = JsonSerializer.Deserialize(json, CliJsonContext.Default.StructureOutput);
             }
             catch (FileNotFoundException)
             {
@@ -424,7 +424,7 @@ public static class VlmCommand
 
     static void WriteJson(VlmOutput output, string? outputPath)
     {
-        var json = JsonSerializer.Serialize(output, Shared.JsonOptions);
+        var json = JsonSerializer.Serialize(output, CliJsonContext.Default.VlmOutput);
         if (outputPath != null)
         {
             var dir = Path.GetDirectoryName(outputPath);

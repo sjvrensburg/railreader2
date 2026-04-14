@@ -13,6 +13,7 @@ internal static class Shared
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
         WriteIndented = true,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        TypeInfoResolver = CliJsonContext.Default,
     };
 
     internal static OutlineEntryOutput SerializeOutlineEntry(OutlineEntry entry) => new()
