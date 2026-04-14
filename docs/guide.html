@@ -186,6 +186,21 @@
         number directly and press Enter to navigate.
       </p>
 
+      <h3>Margin cropping</h3>
+      <p>
+        Press <code>Ctrl+Shift+M</code> to toggle <strong>margin cropping</strong>, or enable it in
+        Settings. When on, fit/centre operations (<code>F</code>, <code>0</code>, and the page-flip
+        on edge-hold) target the detected content area instead of the full page, so whitespace
+        margins don&rsquo;t waste screen space at high zoom.
+      </p>
+      <p>
+        The crop is computed from the analysed layout blocks and grows automatically as more
+        pages are analysed &mdash; it never clips content. Without the ONNX model, cropping is a
+        no-op. Margin cropping never pushes you into rail mode: if the tighter fit would cross
+        the rail zoom threshold, the fit is capped just below it. Toggling while zoomed past
+        fit-width leaves your camera alone; the effect takes hold on your next fit or page flip.
+      </p>
+
       <h3>Minimap and outline</h3>
       <p>
         Press <code>Ctrl+M</code> to toggle the <strong>minimap</strong> &mdash; a small page thumbnail
@@ -984,6 +999,7 @@ railreader2-cli export paper.pdf --figure-dir ./figures --output paper.md</code>
           <tr><td>Ctrl+Q</td><td>Quit</td></tr>
           <tr><td>Ctrl+,</td><td>Settings</td></tr>
           <tr><td>Ctrl+M</td><td>Toggle minimap</td></tr>
+          <tr><td>Ctrl+Shift+M</td><td>Toggle margin cropping</td></tr>
           <tr><td>Ctrl+Shift+O</td><td>Toggle outline panel</td></tr>
           <tr><td>Ctrl+Shift+B</td><td>Toggle bookmarks panel</td></tr>
           <tr><td>Ctrl+Shift+I</td><td>Toggle figures panel</td></tr>
