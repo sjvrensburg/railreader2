@@ -52,6 +52,7 @@ public partial class SettingsWindow : Window
         EffectCombo.SelectedIndex = (int)c.ColourEffect;
         IntensitySlider.Value = c.ColourEffectIntensity;
         PixelSnappingCheck.IsChecked = c.PixelSnapping;
+        MarginCroppingCheck.IsChecked = c.MarginCropping;
         LineFocusBlurCheck.IsChecked = c.LineFocusBlur;
         LineFocusBlurSlider.Value = c.LineFocusBlurIntensity;
         LinePaddingSlider.Value = c.LinePadding;
@@ -168,6 +169,15 @@ public partial class SettingsWindow : Window
         vm.OnConfigChanged();
     }
 
+    private void OnMarginCroppingChanged(object? sender, RoutedEventArgs e)
+    {
+        if (Vm is not { } vm || _loading) return;
+        bool value = MarginCroppingCheck.IsChecked == true;
+        vm.Config.MarginCropping = value;
+        vm.ApplyMarginCropping(value);
+        vm.OnConfigChanged();
+    }
+
     private void OnLineFocusBlurIntensityChanged(object? sender, Avalonia.AvaloniaPropertyChangedEventArgs e)
         => OnSliderChanged(e, c => c.LineFocusBlurIntensity = LineFocusBlurSlider.Value);
 
@@ -232,12 +242,14 @@ public partial class SettingsWindow : Window
         vm.Config.NavigableClasses = LayoutConstants.DefaultNavigableClasses();
         vm.Config.CenteringClasses = LayoutConstants.DefaultCenteringClasses();
         vm.Config.PixelSnapping = defaults.PixelSnapping;
+        vm.Config.MarginCropping = defaults.MarginCropping;
         vm.Config.LineFocusBlur = defaults.LineFocusBlur;
         vm.Config.LineFocusBlurIntensity = defaults.LineFocusBlurIntensity;
         if (vm.ActiveTab is { } resetTab)
         {
             resetTab.LineFocusBlur = defaults.LineFocusBlur;
             resetTab.LineHighlightEnabled = defaults.LineHighlightEnabled;
+            resetTab.MarginCropping = defaults.MarginCropping;
         }
         vm.Config.AutoScrollLinePauseMs = defaults.AutoScrollLinePauseMs;
         vm.Config.AutoScrollBlockPauseMs = defaults.AutoScrollBlockPauseMs;

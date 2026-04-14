@@ -156,8 +156,14 @@ public sealed partial class DocumentController
                     if (targetPage >= 0 && targetPage < doc.PageCount)
                     {
                         GoToPage(targetPage);
-                        double scaledH = doc.PageHeight * doc.Camera.Zoom;
-                        doc.Camera.OffsetY = forward ? 0 : Math.Min(wh - scaledH, 0);
+                        // Align the content edge with the viewport edge (reduces to page
+                        // edge when margin cropping is off, since GetFitRect returns the
+                        // full page).
+                        var (_, ry, _, rh) = doc.GetFitRect();
+                        double topTarget = -ry * doc.Camera.Zoom;
+                        doc.Camera.OffsetY = forward
+                            ? topTarget
+                            : Math.Min(wh - (ry + rh) * doc.Camera.Zoom, topTarget);
                         doc.ClampCamera(ww, wh);
                     }
                 }

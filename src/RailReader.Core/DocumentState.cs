@@ -25,6 +25,7 @@ public sealed class DocumentState : IDisposable
     private ColourEffect _colourEffect;
     private bool _lineFocusBlur;
     private bool _lineHighlightEnabled = true;
+    private bool _marginCropping;
     /// <summary>Fires when a property changes. Parameter is the property name.</summary>
     public Action<string>? StateChanged;
 
@@ -92,6 +93,12 @@ public sealed class DocumentState : IDisposable
         set => SetField(ref _lineHighlightEnabled, value, nameof(LineHighlightEnabled));
     }
 
+    public bool MarginCropping
+    {
+        get => _marginCropping;
+        set => SetField(ref _marginCropping, value, nameof(MarginCropping));
+    }
+
     public string FilePath { get; }
     public int PageCount { get; }
     public IPdfService Pdf => _pdf;
@@ -149,6 +156,13 @@ public sealed class DocumentState : IDisposable
     public IRenderedPage? CachedPage { get; private set; }
     public int CachedDpi { get; private set; }
 
+    /// <summary>
+    /// Document-wide content fraction: the smallest page-fractional rectangle that
+    /// contains the union of analysed blocks across all pages seen so far.
+    /// Only grows outward as more analyses land. Null until any analysis arrives.
+    /// </summary>
+    public ContentFraction? DocumentContentFraction { get; private set; }
+
     // Small pre-scaled thumbnail used by the minimap (≤200×280 px).
     public IRenderedPage? MinimapPage { get; private set; }
 
@@ -165,6 +179,7 @@ public sealed class DocumentState : IDisposable
         _colourEffect = config.ColourEffect;
         _lineFocusBlur = config.LineFocusBlur;
         _lineHighlightEnabled = config.LineHighlightEnabled;
+        _marginCropping = config.MarginCropping;
         Rail = new RailNav(config);
         Outline = _pdf.Outline;
         BackgroundQueue = new BackgroundAnalysisQueue(PageCount);
@@ -543,26 +558,83 @@ public sealed class DocumentState : IDisposable
         _prefetched = null;
     }
 
+    /// <summary>
+    /// Returns the page-space rectangle used by fit/centre operations.
+    /// With margin cropping off (or no analysis yet), this is the full page.
+    /// With margin cropping on, it's the content region of the page.
+    /// </summary>
+    public (double X, double Y, double W, double H) GetFitRect()
+    {
+        if (MarginCropping && DocumentContentFraction is { } f)
+        {
+            return (f.X * PageWidth, f.Y * PageHeight,
+                    f.W * PageWidth, f.H * PageHeight);
+        }
+        return (0, 0, PageWidth, PageHeight);
+    }
+
     public void CenterPage(double windowWidth, double windowHeight)
     {
         if (PageWidth <= 0 || PageHeight <= 0 || windowWidth <= 0 || windowHeight <= 0) return;
-        double scaleX = windowWidth / PageWidth;
-        double scaleY = windowHeight / PageHeight;
-        Camera.Zoom = Math.Min(scaleX, scaleY);
-        double scaledW = PageWidth * Camera.Zoom;
-        double scaledH = PageHeight * Camera.Zoom;
-        Camera.OffsetX = (windowWidth - scaledW) / 2.0;
-        Camera.OffsetY = (windowHeight - scaledH) / 2.0;
+        var (rx, ry, rw, rh) = GetFitRect();
+        if (rw <= 0 || rh <= 0) return;
+        Camera.Zoom = Math.Min(windowWidth / rw, windowHeight / rh);
+        Camera.OffsetX = (windowWidth - rw * Camera.Zoom) / 2.0 - rx * Camera.Zoom;
+        Camera.OffsetY = (windowHeight - rh * Camera.Zoom) / 2.0 - ry * Camera.Zoom;
     }
 
     public void FitWidth(double windowWidth, double windowHeight)
     {
         if (PageWidth <= 0 || windowWidth <= 0) return;
-        Camera.Zoom = Math.Clamp(windowWidth / PageWidth, Camera.ZoomMin, Camera.ZoomMax);
-        double scaledW = PageWidth * Camera.Zoom;
-        double scaledH = PageHeight * Camera.Zoom;
-        Camera.OffsetX = (windowWidth - scaledW) / 2.0;
-        Camera.OffsetY = scaledH <= windowHeight ? (windowHeight - scaledH) / 2.0 : 0;
+        var (rx, ry, rw, rh) = GetFitRect();
+        if (rw <= 0) return;
+
+        Camera.Zoom = ComputeFitWidthZoom(windowWidth);
+        double scaledRectH = rh * Camera.Zoom;
+        Camera.OffsetX = (windowWidth - rw * Camera.Zoom) / 2.0 - rx * Camera.Zoom;
+        Camera.OffsetY = scaledRectH <= windowHeight
+            ? (windowHeight - scaledRectH) / 2.0 - ry * Camera.Zoom
+            : -ry * Camera.Zoom;
+    }
+
+    /// <summary>
+    /// Applies the fit-width zoom while keeping the page-space y currently at
+    /// the viewport top edge in place. Used when toggling margin cropping at
+    /// fit-width zoom so the reading position stays anchored to the top.
+    /// Horizontally, content is centred (same as <see cref="FitWidth"/>).
+    /// </summary>
+    public void FitWidthPreservingTop(double windowWidth, double windowHeight)
+    {
+        if (PageWidth <= 0 || windowWidth <= 0 || Camera.Zoom <= 0) return;
+        double pageTopY = -Camera.OffsetY / Camera.Zoom;
+
+        double newZoom = ComputeFitWidthZoom(windowWidth);
+        if (newZoom <= 0) return;
+        var (rx, _, rw, _) = GetFitRect();
+
+        Camera.Zoom = newZoom;
+        Camera.OffsetX = (windowWidth - rw * newZoom) / 2.0 - rx * newZoom;
+        Camera.OffsetY = -pageTopY * newZoom;
+        ClampCamera(windowWidth, windowHeight);
+    }
+
+    private double ComputeFitWidthZoom(double windowWidth)
+    {
+        var (_, _, rw, _) = GetFitRect();
+        if (rw <= 0) return Camera.Zoom;
+
+        double maxZoom = Camera.ZoomMax;
+        // Keep margin cropping from pushing the user into rail mode on large
+        // screens. Only caps when the uncropped fit was itself below the rail
+        // threshold — if the user would already be in rail without cropping,
+        // cropping shouldn't un-rail them.
+        if (MarginCropping && Rail.ZoomThreshold > 0)
+        {
+            double uncroppedFit = windowWidth / PageWidth;
+            if (uncroppedFit < Rail.ZoomThreshold)
+                maxZoom = Math.Min(maxZoom, Rail.ZoomThreshold - 0.001);
+        }
+        return Math.Clamp(windowWidth / rw, Camera.ZoomMin, maxZoom);
     }
 
     public void ClampCamera(double windowWidth, double windowHeight)
@@ -759,6 +831,12 @@ public sealed class DocumentState : IDisposable
     {
         _marshaller.AssertUIThread();
         _analysisCache[page] = analysis;
+
+        var frac = PageCropUtil.ComputeFraction(analysis);
+        DocumentContentFraction = DocumentContentFraction is { } existing
+            ? existing.Union(frac)
+            : frac;
+
         AnalysisCacheUpdated?.Invoke();
     }
 

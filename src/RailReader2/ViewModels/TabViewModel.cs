@@ -25,6 +25,7 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
     [ObservableProperty] private ColourEffect _colourEffect;
     [ObservableProperty] private bool _lineFocusBlur;
     [ObservableProperty] private bool _lineHighlightEnabled = true;
+    [ObservableProperty] private bool _marginCropping;
     /// <summary>Whether the side panel (outline/bookmarks/search) is visible for this tab.</summary>
     public bool ShowSidePanel { get; set; }
 
@@ -95,6 +96,7 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
         _colourEffect = state.ColourEffect;
         _lineFocusBlur = state.LineFocusBlur;
         _lineHighlightEnabled = state.LineHighlightEnabled;
+        _marginCropping = state.MarginCropping;
         state.StateChanged += OnStateChanged;
     }
 
@@ -111,6 +113,7 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
             case nameof(ColourEffect): ColourEffect = State.ColourEffect; break;
             case nameof(LineFocusBlur): LineFocusBlur = State.LineFocusBlur; break;
             case nameof(LineHighlightEnabled): LineHighlightEnabled = State.LineHighlightEnabled; break;
+            case nameof(MarginCropping): MarginCropping = State.MarginCropping; break;
         }
     }
 
@@ -124,6 +127,7 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
     partial void OnColourEffectChanged(ColourEffect value) => State.ColourEffect = value;
     partial void OnLineFocusBlurChanged(bool value) => State.LineFocusBlur = value;
     partial void OnLineHighlightEnabledChanged(bool value) => State.LineHighlightEnabled = value;
+    partial void OnMarginCroppingChanged(bool value) => State.MarginCropping = value;
     // Methods used by Views (MinimapControl, MainWindow)
     public void CenterPage(double ww, double wh) => State.CenterPage(ww, wh);
     public void ClampCamera(double ww, double wh) => State.ClampCamera(ww, wh);

@@ -26,6 +26,9 @@ internal sealed class EdgeHoldStateMachine
     // Output signals: set when OnEdgeHit fires, consumed by the caller.
     private ScrollDirection? _pendingAdvance;
     private bool _advanceJustFired;
+    // True after an advance fires until the caller resets on key release.
+    // Stops a continued key-hold from panning on the just-flipped page.
+    private bool _suppressUntilRelease;
 
     /// <summary>
     /// Called when the camera is at the content edge after a nav attempt.
@@ -62,6 +65,7 @@ internal sealed class EdgeHoldStateMachine
                     CurrentState = EdgeHoldState.Cooldown;
                     _pendingAdvance = forward ? ScrollDirection.Forward : ScrollDirection.Backward;
                     _advanceJustFired = true;
+                    _suppressUntilRelease = true;
                     return true; // fire advance
                 }
                 return false;
@@ -81,12 +85,11 @@ internal sealed class EdgeHoldStateMachine
     }
 
     /// <summary>
-    /// True during the cooldown period after an advance fires.
-    /// Used by non-rail navigation to suppress key-repeat panning.
+    /// True from when an advance fires until the caller resets on key release.
+    /// Used by non-rail navigation to stop auto-repeat from panning past the
+    /// just-flipped page top/bottom while the user still holds the key.
     /// </summary>
-    public bool ShouldSuppressInput =>
-        CurrentState == EdgeHoldState.Cooldown
-        && _timer!.Elapsed.TotalMilliseconds < CoreTuning.EdgeCooldownMs;
+    public bool ShouldSuppressInput => _suppressUntilRelease;
 
     /// <summary>
     /// Returns the direction of a pending edge advance and clears it.
@@ -116,5 +119,6 @@ internal sealed class EdgeHoldStateMachine
         _timer = null;
         _pendingAdvance = null;
         _advanceJustFired = false;
+        _suppressUntilRelease = false;
     }
 }
