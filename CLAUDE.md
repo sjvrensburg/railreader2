@@ -24,10 +24,12 @@ dotnet run -c Release --project src/RailReader2
 dotnet run -c Release --project src/RailReader2.Cli -- render <pdf> --output-dir ./out
 dotnet run -c Release --project src/RailReader2.Cli -- structure <pdf> --output out.json
 dotnet run -c Release --project src/RailReader2.Cli -- annotations <pdf> --include-text --output ann.json
+dotnet run -c Release --project src/RailReader2.Cli -- vlm <pdf> --output vlm.json
 dotnet run -c Release --project src/RailReader2.Cli -- export <pdf> --no-vlm --output doc.md
 
 # Run tests (all)
 dotnet test tests/RailReader.Core.Tests
+dotnet test tests/RailReader.Export.Tests
 
 # Run specific test class
 dotnet test tests/RailReader.Core.Tests --filter "ClassName=RailReader.Core.Tests.CameraTests"
@@ -185,7 +187,7 @@ Key fields: `rail_zoom_threshold`, `snap_duration_ms`, `scroll_speed_start/max`,
 - SkiaSharp 3.x explicitly overrides Avalonia 11's bundled 2.88 — required for `SKRuntimeEffect.CreateColorFilter()`
 - TODO.md is a legacy Rust file — disregard it
 - DISTRIBUTION.md documents the release process for all channels (GitHub, Microsoft Store)
-- Without the ONNX model, layout falls back to simple horizontal strip detection
+- `scripts/` contains a single helper: `download-model.sh` (PP-DocLayoutV3 ONNX download)
 - `CleanupService.RunCleanup()` runs at startup and via Help menu (removes cache, temp, old logs)
 - `SplashWindow` shows during startup; heavy init deferred via `Dispatcher.Post` at Background priority
 - `window.Opened` can fire before `OnLoaded` wiring — guard against this in startup sequencing
