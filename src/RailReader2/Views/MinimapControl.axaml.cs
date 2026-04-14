@@ -25,6 +25,12 @@ public partial class MinimapControl : UserControl
     private const double ResizeHandleSize = 18;
     private const double NavigateDragThreshold = 4;
     private const double MinSize = 120;
+    // Upper bound on minimap size as a fraction of the viewport.
+    private const double MaxViewportFraction = 0.8;
+    // Displayed-size / source-size ratio above which we switch from the
+    // thumbnail bitmap to the primary's high-DPI bitmap. Slack so micro
+    // differences don't thrash between sources.
+    private const double PrimarySourceThreshold = 1.1;
 
     private enum DragMode { None, Pending, Move, Resize, Navigate }
     private DragMode _drag = DragMode.None;
@@ -245,8 +251,8 @@ public partial class MinimapControl : UserControl
         double signY = c is Corner.TopLeft or Corner.TopRight ? -1 : 1;
 
         var (winW, winH) = WindowClientSize();
-        double maxW = Math.Max(MinSize, winW * 0.8);
-        double maxH = Math.Max(MinSize, winH * 0.8);
+        double maxW = Math.Max(MinSize, winW * MaxViewportFraction);
+        double maxH = Math.Max(MinSize, winH * MaxViewportFraction);
 
         double newW, newH;
         if (_vm?.ActiveTab is { } tab && tab.PageWidth > 0 && tab.PageHeight > 0)
@@ -355,6 +361,7 @@ public partial class MinimapControl : UserControl
         [ThreadStatic] private static SKPaint? s_borderPaint;
         [ThreadStatic] private static SKPaint? s_chromeFill;
         [ThreadStatic] private static SKPaint? s_gripDot;
+        [ThreadStatic] private static SKPaint? s_hashLine;
 
         // Mitchell at rest for crisp thumbnails; Linear during drag for cheapness.
         private static readonly SKSamplingOptions s_samplingRest =
@@ -424,7 +431,7 @@ public partial class MinimapControl : UserControl
             var sampling = _drag ? s_samplingDrag : s_samplingRest;
             int displayLong = (int)Math.Max(t.W, t.H);
             int thumbLong = _thumbImage is { } th ? Math.Max(th.Width, th.Height) : 0;
-            bool preferPrimary = _primaryImage is not null && displayLong > thumbLong * 1.1;
+            bool preferPrimary = _primaryImage is not null && displayLong > thumbLong * PrimarySourceThreshold;
 
             var source = preferPrimary ? _primaryImage : _thumbImage;
             if (source is not null)
@@ -506,10 +513,13 @@ public partial class MinimapControl : UserControl
             };
             canvas.DrawRect(SKRect.Create(x, y, s, s), fill);
 
-            // Diagonal hash lines, oriented toward the screen edge.
-            var line = s_gripDot ??= new SKPaint { Color = new SKColor(220, 220, 220, 220), IsAntialias = true };
-            line.Style = SKPaintStyle.Stroke;
-            line.StrokeWidth = 1f;
+            var line = s_hashLine ??= new SKPaint
+            {
+                Color = new SKColor(220, 220, 220, 220),
+                IsAntialias = true,
+                Style = SKPaintStyle.Stroke,
+                StrokeWidth = 1f,
+            };
             for (int i = 1; i <= 3; i++)
             {
                 float off = i * 4f;
@@ -529,8 +539,6 @@ public partial class MinimapControl : UserControl
                         break;
                 }
             }
-            line.Style = SKPaintStyle.Fill;
-            line.StrokeWidth = 0;
         }
     }
 }
