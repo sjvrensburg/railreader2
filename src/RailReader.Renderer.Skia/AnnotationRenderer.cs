@@ -28,6 +28,11 @@ public static class AnnotationRenderer
     private sealed class FreehandPathCache { public SKPath Path = null!; public int PointCount; }
     [ThreadStatic] private static ConditionalWeakTable<FreehandAnnotation, FreehandPathCache>? s_freehandPaths;
 
+    // Shared SKPath for ephemeral preview freehand rendering. Preview annotations
+    // are recreated on every pointer move, which would pollute the cache and
+    // leak native SKPath handles to the finalizer thread at pointer-input rate.
+    [ThreadStatic] private static SKPath? s_previewFreehandPath;
+
     // Cached text note popup layout per thread — avoids WrapText + MeasureText every frame.
     private sealed record NoteLayoutCache(TextNoteAnnotation Owner, string Text, List<string> Lines, float PopupW, float PopupH);
     [ThreadStatic] private static NoteLayoutCache? s_noteLayout;
@@ -95,6 +100,37 @@ public static class AnnotationRenderer
 
         if (isSelected)
             DrawSelectionIndicator(canvas, annotation);
+    }
+
+    /// <summary>
+    /// Renders a preview annotation — one that may be recreated every pointer move.
+    /// Uses a shared SKPath for freehand to avoid allocating a native path handle
+    /// per move (which would pile up on the finalizer thread).
+    /// </summary>
+    public static void DrawPreviewAnnotation(SKCanvas canvas, Annotation annotation)
+    {
+        if (annotation is FreehandAnnotation freehand)
+        {
+            DrawFreehandEphemeral(canvas, freehand);
+            return;
+        }
+        DrawAnnotation(canvas, annotation, isSelected: false);
+    }
+
+    private static void DrawFreehandEphemeral(SKCanvas canvas, FreehandAnnotation freehand)
+    {
+        if (freehand.Points.Count < 2) return;
+
+        var path = s_previewFreehandPath ??= new SKPath();
+        path.Reset();
+        path.MoveTo(freehand.Points[0].X, freehand.Points[0].Y);
+        for (int i = 1; i < freehand.Points.Count; i++)
+            path.LineTo(freehand.Points[i].X, freehand.Points[i].Y);
+
+        var paint = GetStrokePaint();
+        paint.Color = ParseColor(freehand.Color, freehand.Opacity);
+        paint.StrokeWidth = freehand.StrokeWidth;
+        canvas.DrawPath(path, paint);
     }
 
     private static SKPaint GetFillPaint()

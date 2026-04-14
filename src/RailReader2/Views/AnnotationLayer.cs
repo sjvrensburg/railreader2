@@ -60,7 +60,7 @@ internal sealed class AnnotationVisualHandler : CompositionCustomVisualHandler
             AnnotationRenderer.DrawAnnotations(canvas, annotations, state.SelectedAnnotation);
 
         if (state.PreviewAnnotation is { } preview)
-            AnnotationRenderer.DrawAnnotation(canvas, preview, false);
+            AnnotationRenderer.DrawPreviewAnnotation(canvas, preview);
 
         if (state.TextSelectionRects is { Count: > 0 } selRects)
         {
