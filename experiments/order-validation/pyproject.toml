@@ -1,0 +1,16 @@
+[project]
+name = "order-validation"
+version = "0.1.0"
+description = "Visualise PP-DocLayoutV3 reading order on PDFs to validate/improve RailReader2's XY-cut"
+requires-python = ">=3.11"
+dependencies = [
+    "onnxruntime>=1.18",
+    "pillow>=10.0",
+    "pypdfium2>=4.30",
+    "numpy>=1.26",
+    "scipy>=1.11",         # Kendall tau
+    "tqdm>=4.66",
+]
+
+[tool.uv]
+package = false

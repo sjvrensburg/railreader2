@@ -15,9 +15,9 @@ public class RailNavTests
     private const double Zoom = 4.0; // above default RailZoomThreshold of 3.0
 
     // Class IDs
-    private const int TextClass = 22;
-    private const int ImageClass = 14;
-    private const int HeaderClass = 12;
+    private const int TextClass = LayoutConstants.ClassParagraph;       // body text
+    private const int ImageClass = LayoutConstants.ClassImage;          // figure
+    private const int HeaderClass = LayoutConstants.ClassParagraphTitle; // heading
 
     public RailNavTests()
     {

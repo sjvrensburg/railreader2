@@ -37,9 +37,13 @@ dotnet test tests/RailReader.Core.Tests --filter "ClassName=RailReader.Core.Test
 # Run specific test method
 dotnet test tests/RailReader.Core.Tests --filter "FullyQualifiedName~TestMethodName"
 
-# Publish self-contained release
+# Publish self-contained release (GUI shell — not AOT)
 dotnet publish src/RailReader2 -c Release -r linux-x64 --self-contained   # Linux
 dotnet publish src/RailReader2 -c Release -r win-x64 --self-contained     # Windows
+
+# Publish AOT CLI (native binary, no .NET runtime needed)
+dotnet publish src/RailReader2.Cli -c Release -r linux-x64
+dotnet publish src/RailReader2.Cli -c Release -r win-x64
 
 # Download ONNX model (required for AI layout)
 ./scripts/download-model.sh
@@ -62,15 +66,17 @@ RailReader2.slnx              # Default: app + core + renderer + export + CLI + 
 
 ### RailReader.Core (UI-free library)
 
-All business logic with zero Avalonia and zero SkiaSharp dependencies. Key files:
+All business logic with zero Avalonia and zero SkiaSharp dependencies. Marked `IsAotCompatible` — see [AOT compatibility](#aot-compatibility) for the constraints this places on new code. Key files:
 
-- `DocumentController.cs` — headless controller facade (orchestration, animation tick loop, viewport). Delegates zoom animation to `ZoomAnimationController.cs`, auto-scroll to `AutoScrollController.cs`, annotation interaction to `AnnotationInteractionHandler.cs`, search to `Services/SearchService.cs`
+- `DocumentController.{cs,Animation.cs,Navigation.cs}` — headless controller facade (orchestration, animation tick loop, viewport) split into partial classes. Delegates zoom animation to `ZoomAnimationController.cs`, auto-scroll to `AutoScrollController.cs`, annotation interaction to `AnnotationInteractionHandler.cs`, search to `Services/SearchService.cs`
 - `DocumentState.cs` — per-document state (PDF via `IPdfService`, camera, rail nav, analysis cache, annotations, bookmarks)
 - `ZoomAnimationController.cs` — smooth zoom animation with easing, focus point preservation, rail position restoration
 - `AutoScrollController.cs` — auto-scroll toggle/stop, jump mode exclusivity, speed management
 - `Models/` — data models (Annotations, BookmarkEntry, Camera, LayoutBlock, RectF, ColorRGBA, PdfLink, etc.)
 - `Services/AnalysisWorker.cs` — background ONNX inference thread (`Channel<T>` queue)
-- `Services/RailNav.cs` — rail navigation state machine (snap, scroll, clamp, auto-scroll, jump mode)
+- `Services/RailNav.{cs,AutoScroll.cs,Snap.cs}` — rail navigation state machine (snap, scroll, clamp, auto-scroll, jump mode) split into partial classes
+- `Services/PdfiumGate.cs` — process-wide reentrant lock (`PdfiumGate.Lock`) for all PDFium access. See [Thread Safety](#thread-safety)
+- `Services/RailReaderJsonContext.cs` — source-generated `JsonSerializerContext` for AOT-safe persistence (config, annotations, bookmarks). Add `[JsonSerializable(typeof(T))]` here when persisting new types
 - `Services/IPdfService.cs` — rendering-agnostic PDF service interfaces (`IPdfService`, `IRenderedPage`, `IPdfServiceFactory`)
 - `Services/PdfTextService.cs` — text extraction with per-character bounding boxes (PDFium P/Invoke)
 - `Services/PdfLinkService.cs` — PDF hyperlink extraction and hit-testing (PDFium P/Invoke). Extracts link rects and destinations (internal page links, external URLs) per page with CropBox coordinate transform
@@ -194,12 +200,23 @@ Key fields: `rail_zoom_threshold`, `snap_duration_ms`, `scroll_speed_start/max`,
 
 ## Thread Safety
 
-- **UI thread**: All Avalonia UI, keyboard/mouse, state building, PDFium calls
+- **UI thread**: All Avalonia UI, keyboard/mouse, state building
 - **Composition thread**: `CompositionCustomVisualHandler.OnRender()` draws via Skia. Receives immutable state snapshots from UI thread via `SendHandlerMessage()`. Disposes retired `SKImage` instances. Never accesses `DocumentState` directly.
 - **Analysis Worker**: Single dedicated thread via `Channel<T>` for ONNX inference
 - **Thread pool**: `RenderPagePixmap()` and DPI upgrades via `Task.Run()`
-- **Critical**: Never call `PdfService` from background threads (PDFium crashes). Never modify `DocumentState` from the analysis worker — use `IThreadMarshaller` to post to UI thread. Never dispose `SKImage` on the UI thread if the composition thread may still be drawing it — use `RetireImage` message for deferred disposal.
+- **PDFium serialization (`PdfiumGate`)**: PDFium holds global state (font cache, image decoder) that is unsafe under concurrent use even across separate documents — concurrent access crashes the process below the CLR with no managed exception. **Every call into PDFium** (render, text extract, link enumerate, outline, annotation export, `SkiaPdfService` ctor) must happen inside `lock (PdfiumGate.Lock)`. The lock is reentrant so nesting is safe. With the gate held, background-thread PDFium calls (e.g. `RenderPagePixmap` on the thread pool) are valid.
+- **Critical**: Never modify `DocumentState` from the analysis worker — use `IThreadMarshaller` to post to UI thread. Never dispose `SKImage` on the UI thread if the composition thread may still be drawing it — use `RetireImage` message for deferred disposal.
 - `AnalysisCache` is written via UI thread marshalling, read during animation frame polls — no locks needed.
+
+## AOT compatibility
+
+`RailReader.Core`, `RailReader.Renderer.Skia`, and `RailReader.Export` are `IsAotCompatible`. `RailReader2.Cli` uses `PublishAot=true` and ships as a native binary. The Avalonia UI shell is not AOT-published.
+
+This means:
+
+- **No reflection-based serialization.** All `System.Text.Json` calls go through `RailReaderJsonContext` (snake_case naming, indented). When adding a new persisted type, add `[JsonSerializable(typeof(T))]` to `Services/RailReaderJsonContext.cs` — otherwise the CLI will fail at runtime with `NotSupportedException`.
+- **No unbounded reflection / `Activator.CreateInstance` on arbitrary types**, no `Assembly.GetTypes()` walks, no dynamic code gen. Test with `dotnet publish src/RailReader2.Cli -c Release -r linux-x64` (or `win-x64`) and watch for trim/AOT warnings — they're errors in CI.
+- The Core csproj has `AllowUnsafeBlocks=true` for PDFium P/Invoke (`PdfiumNative.cs`).
 
 ## CI / Release Packaging
 

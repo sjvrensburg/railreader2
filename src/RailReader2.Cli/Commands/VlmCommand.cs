@@ -302,7 +302,7 @@ public static class VlmCommand
         {
             Console.Error.WriteLine($"  Analyzing page {pageIdx + 1}/{pdf.PageCount}...");
             var (pw, ph) = pdf.GetPageSize(pageIdx);
-            var (rgbBytes, pxW, pxH) = pdf.RenderPagePixmap(pageIdx, 800);
+            var (rgbBytes, pxW, pxH) = pdf.RenderPagePixmap(pageIdx, LayoutConstants.InputSize);
             var analysis = analyzer.RunAnalysis(rgbBytes, pxW, pxH, pw, ph);
 
             for (int i = 0; i < analysis.Blocks.Count; i++)

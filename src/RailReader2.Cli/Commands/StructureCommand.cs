@@ -54,7 +54,7 @@ public static class StructureCommand
 
                 if (analyze && analyzer != null)
                 {
-                    var (rgbBytes, pxW, pxH) = pdf.RenderPagePixmap(pageIdx, 800);
+                    var (rgbBytes, pxW, pxH) = pdf.RenderPagePixmap(pageIdx, LayoutConstants.InputSize);
                     analysis = analyzer.RunAnalysis(rgbBytes, pxW, pxH, pw, ph);
                 }
 

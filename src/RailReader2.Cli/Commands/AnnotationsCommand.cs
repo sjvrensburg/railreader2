@@ -81,7 +81,7 @@ public static class AnnotationsCommand
                 PageAnalysis? analysis = null;
                 if (includeBlocks && analyzer != null)
                 {
-                    var (rgbBytes, pxW, pxH) = pdf2.RenderPagePixmap(pageIdx, 800);
+                    var (rgbBytes, pxW, pxH) = pdf2.RenderPagePixmap(pageIdx, LayoutConstants.InputSize);
                     analysis = analyzer.RunAnalysis(rgbBytes, pxW, pxH, pw, ph);
                 }
 

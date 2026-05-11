@@ -49,7 +49,7 @@ public static class TestFixtures
         var analysis = new PageAnalysis();
         var block = new LayoutBlock
         {
-            ClassId = 22, BBox = new BBox(72, 72, 468, 200),
+            ClassId = LayoutConstants.ClassParagraph, BBox = new BBox(72, 72, 468, 200),
             Confidence = 0.9f, Order = 0,
         };
         for (int i = 0; i < 5; i++)

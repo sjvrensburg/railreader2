@@ -74,23 +74,19 @@ public sealed class LayoutAnalyzer : IDisposable
 
         ct.ThrowIfCancellationRequested();
 
-        // Letterbox: place undistorted image at (0,0) in target×target canvas.
-        // FitPageToTarget already ensures max(pxW, pxH) == target, so no resizing
-        // is needed — just padding the shorter dimension with black pixels.
-        // scale_factor = [1, 1] since the image pixels map 1:1 to canvas pixels.
-        var chwData = PreprocessImage(rgbBytes, pxW, pxH, target, ref _chwBuffer);
+        // YOLO Ultralytics letterbox: scale-preserving fit into target×target with
+        // grey (114) padding, centered. FitPageToTarget already returned an image
+        // with max(pxW,pxH) == target, so we only pad the shorter axis.
+        int padX = (target - pxW) / 2;
+        int padY = (target - pxH) / 2;
+        var chwData = PreprocessImage(rgbBytes, pxW, pxH, target, padX, padY, ref _chwBuffer);
 
         ct.ThrowIfCancellationRequested();
 
-        var imShape = new DenseTensor<float>(new float[] { target, target }, new[] { 1, 2 });
         var image = new DenseTensor<float>(chwData, new[] { 1, 3, target, target });
-        var scaleFactor = new DenseTensor<float>(new float[] { 1.0f, 1.0f }, new[] { 1, 2 });
-
         List<NamedOnnxValue> inputs =
         [
-            NamedOnnxValue.CreateFromTensor("im_shape", imShape),
-            NamedOnnxValue.CreateFromTensor("image", image),
-            NamedOnnxValue.CreateFromTensor("scale_factor", scaleFactor),
+            NamedOnnxValue.CreateFromTensor("images", image),
         ];
 
         using var results = _session.Run(inputs);
@@ -98,7 +94,7 @@ public sealed class LayoutAnalyzer : IDisposable
         float mapScaleX = (float)(pageW / pxW);
         float mapScaleY = (float)(pageH / pxH);
 
-        var rawBlocks = ExtractDetections(results, pxW, pxH, mapScaleX, mapScaleY);
+        var rawBlocks = ExtractDetections(results, pxW, pxH, padX, padY, mapScaleX, mapScaleY);
         if (rawBlocks is null)
             return new PageAnalysis { Blocks = [], PageWidth = pageW, PageHeight = pageH };
         PostProcessBlocks(rawBlocks, rgbBytes, pxW, pxH, mapScaleX, mapScaleY);
@@ -113,22 +109,26 @@ public sealed class LayoutAnalyzer : IDisposable
 
     private List<LayoutBlock>? ExtractDetections(
         IDisposableReadOnlyCollection<DisposableNamedOnnxValue> results,
-        int pxW, int pxH, float mapScaleX, float mapScaleY)
+        int pxW, int pxH, int padX, int padY, float mapScaleX, float mapScaleY)
     {
-        // Single pass: log output shapes (first call only) and find detection tensor.
-        // Copy tensor data immediately since the results collection owns the memory.
+        // YOLO26 end-to-end output: [1, max_det, 6] = [x1, y1, x2, y2, conf, cls]
+        // in 640-space (letterboxed canvas). Find that tensor and copy its data
+        // immediately — the results collection owns the underlying memory.
         float[]? detectionData = null;
         int detRows = 0, detCols = 0;
         foreach (var r in results)
         {
             if (r.Value is not Tensor<float> t) continue;
 
-            bool isDetection = detectionData is null && t.Dimensions.Length == 2 && t.Dimensions[1] >= 6;
+            bool isDetection = detectionData is null
+                && t.Dimensions.Length == 3
+                && t.Dimensions[0] == 1
+                && t.Dimensions[2] >= 6;
 
             if (isDetection)
             {
-                detRows = t.Dimensions[0];
-                detCols = t.Dimensions[1];
+                detRows = t.Dimensions[1];
+                detCols = t.Dimensions[2];
                 detectionData = t.ToArray();
             }
 
@@ -136,7 +136,6 @@ public sealed class LayoutAnalyzer : IDisposable
             if (!_loggedOutputShapes)
             {
                 Logger.Debug($"[ONNX] Output '{r.Name}': dims=[{string.Join(",", t.Dimensions.ToArray())}]");
-                // Reuse detectionData if already copied, otherwise take a snapshot for preview
                 var flat = isDetection ? detectionData! : t.ToArray();
                 var preview = string.Join(", ", flat.Take(Math.Min(14, flat.Length)).Select(v => v.ToString("F2")));
                 Logger.Debug($"[ONNX]   First values: [{preview}]");
@@ -150,27 +149,26 @@ public sealed class LayoutAnalyzer : IDisposable
         if (detectionData is null)
             return null;
 
-        bool hasReadingOrder = detCols >= 7;
-
         var rawBlocks = new List<LayoutBlock>();
         for (int i = 0; i < detRows; i++)
         {
             int off = i * detCols;
-            int classId = (int)detectionData[off];
-            float confidence = detectionData[off + 1];
-            float xmin = detectionData[off + 2];
-            float ymin = detectionData[off + 3];
-            float xmax = detectionData[off + 4];
-            float ymax = detectionData[off + 5];
-            int modelOrder = hasReadingOrder ? (int)detectionData[off + 6] : 0;
+            // YOLO26 end-to-end column order: [x1, y1, x2, y2, conf, cls]
+            float xmin = detectionData[off + 0];
+            float ymin = detectionData[off + 1];
+            float xmax = detectionData[off + 2];
+            float ymax = detectionData[off + 3];
+            float confidence = detectionData[off + 4];
+            int classId = (int)detectionData[off + 5];
 
             if (confidence < LayoutConstants.ConfidenceThreshold) continue;
             if (classId < 0 || classId >= LayoutConstants.LayoutClasses.Length) continue;
 
-            float x = Math.Max(xmin, 0);
-            float y = Math.Max(ymin, 0);
-            float w = Math.Min(xmax, pxW) - x;
-            float h = Math.Min(ymax, pxH) - y;
+            // Unproject from letterboxed 640-space back to original image pixels.
+            float x = Math.Max(xmin - padX, 0);
+            float y = Math.Max(ymin - padY, 0);
+            float w = Math.Min(xmax - padX, pxW) - x;
+            float h = Math.Min(ymax - padY, pxH) - y;
 
             if (w < 5 || h < 5) continue;
 
@@ -179,7 +177,7 @@ public sealed class LayoutAnalyzer : IDisposable
                 BBox = new BBox(x * mapScaleX, y * mapScaleY, w * mapScaleX, h * mapScaleY),
                 ClassId = classId,
                 Confidence = confidence,
-                Order = modelOrder,
+                Order = 0,
             });
         }
 
@@ -190,44 +188,46 @@ public sealed class LayoutAnalyzer : IDisposable
         List<LayoutBlock> rawBlocks, byte[] rgbBytes, int pxW, int pxH,
         float mapScaleX, float mapScaleY)
     {
+        // YOLO26 is end-to-end NMS-free per-class, but emits cross-class duplicates
+        // (e.g. `reference` + `graph` over the same figure region). Run a class-
+        // agnostic NMS to dedupe those, then suppress fully nested boxes.
         Nms(rawBlocks, LayoutConstants.NmsIouThreshold);
         SuppressNestedBlocks(rawBlocks);
 
-        rawBlocks.Sort((a, b) =>
-        {
-            int cmp = a.Order.CompareTo(b.Order);
-            return cmp != 0 ? cmp : a.BBox.Y.CompareTo(b.BBox.Y);
-        });
-        for (int i = 0; i < rawBlocks.Count; i++)
-            rawBlocks[i].Order = i;
+        // Reading order: XY-Cut++ (recursive geometric partitioning). Handles
+        // multi-column layouts and headers/footers spanning columns.
+        XYCutSorter.SortInPlace(rawBlocks);
 
         ResolveVerticalOverlaps(rawBlocks);
         DetectLinesForBlocks(rawBlocks, rgbBytes, pxW, pxH, mapScaleX, mapScaleY);
     }
 
-    private static float[] PreprocessImage(byte[] rgbBytes, int origW, int origH, int target, ref float[]? buffer)
+    private static float[] PreprocessImage(
+        byte[] rgbBytes, int origW, int origH, int target, int padX, int padY, ref float[]? buffer)
     {
-        // PP-DocLayoutV3 uses mean=[0,0,0] std=[1,1,1] (no ImageNet normalization)
-        // Letterbox: place image at (0,0) in target×target canvas with black padding.
-        // FitPageToTarget ensures max(origW, origH) == target, so pixels copy 1:1.
+        // Ultralytics letterbox: grey (114) fill, RGB, divide by 255 (no mean/std).
+        // FitPageToTarget ensures max(origW, origH) == target, so the image pixels
+        // copy 1:1 — we only pad to centre on the shorter axis.
         int pixelCount = target * target;
         int needed = 3 * pixelCount;
         if (buffer is null || buffer.Length != needed)
             buffer = new float[needed];
-        else
-            Array.Clear(buffer);
         var chwData = buffer;
 
-        int copyW = Math.Min(origW, target);
-        int copyH = Math.Min(origH, target);
+        const float pad = LayoutConstants.LetterboxPadValue / 255.0f;
+        for (int i = 0; i < needed; i++) chwData[i] = pad;
+
+        int copyW = Math.Min(origW, target - padX);
+        int copyH = Math.Min(origH, target - padY);
 
         for (int y = 0; y < copyH; y++)
         {
             int srcRow = y * origW;
+            int dstRow = (y + padY) * target + padX;
             for (int x = 0; x < copyW; x++)
             {
                 int srcIdx = (srcRow + x) * 3;
-                int dstIdx = y * target + x;
+                int dstIdx = dstRow + x;
                 chwData[dstIdx] = rgbBytes[srcIdx] / 255.0f;                     // R
                 chwData[pixelCount + dstIdx] = rgbBytes[srcIdx + 1] / 255.0f;    // G
                 chwData[2 * pixelCount + dstIdx] = rgbBytes[srcIdx + 2] / 255.0f; // B
