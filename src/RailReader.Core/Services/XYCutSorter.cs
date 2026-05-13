@@ -21,13 +21,20 @@ internal static class XYCutSorter
     private const double DefaultDensityThreshold = 0.9;
     private const double OverlapThreshold = 0.1;
     private const int MinOverlapCount = 2;
-    // Minimum gap in PDF points to count as a cut. ICASSP/IEEE conference
-    // templates use ~4pt column gaps, so 5pt (the Java reference's default)
-    // misses them — verified on Distribution-Aware NAMs (ICASSP 2026) where
-    // the left/right column gap is 4.3pt. 2pt is conservative enough to still
-    // ignore measurement noise (sub-pixel detection box jitter) but catches
-    // real layout boundaries.
-    private const double MinGapThreshold = 2.0;            // PDF points
+    // Minimum gap in PDF points to count as a cut.
+    //
+    // History:
+    //   5.0  Java reference default — too coarse for ICASSP-template papers
+    //        whose column gap is ~4.3pt.
+    //   2.0  YOLO26-DLA era. Worked because YOLO26 boxes hit the GT edge
+    //        almost exactly, so the actual column-gap measurement was ~4.3pt.
+    //   1.0  TinyLayoutYOLO v2 era (current). v2 has mIoU 0.92 on TPs but
+    //        boxes can still be 1–2 pt loose at edges. On the same ICASSP
+    //        page where YOLO26 saw a 4.3pt gap, v2 sees only 1.5pt. Lowering
+    //        the threshold restores correct column-cut detection. Safe
+    //        because intra-paragraph gaps are 0pt (the detector groups
+    //        consecutive lines into one block).
+    private const double MinGapThreshold = 1.0;            // PDF points
     private const double NarrowElementWidthRatio = 0.1;
     // Tall-narrow margin element (e.g. rotated conference info on IEEE/ICASSP
     // papers): nearly as tall as the tallest block but ≤10% the widest block.

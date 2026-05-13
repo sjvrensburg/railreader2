@@ -8,7 +8,10 @@ obj/
 # Rust legacy build artifacts (local only)
 target/
 
-# ONNX model (large, downloaded via script)
+# ONNX models (large; not for git).
+# NEVER commit yolo26DLA.onnx — Ultralytics asserts AGPL-3.0 on YOLO-trained
+# weights, which is incompatible with this project's MIT licence. The wildcard
+# below covers it, plus tiny_layout.onnx and any future model artefacts.
 models/*.onnx
 
 # Project-local

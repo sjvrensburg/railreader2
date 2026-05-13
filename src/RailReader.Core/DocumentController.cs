@@ -98,7 +98,7 @@ public sealed partial class DocumentController : IDisposable
     {
         var modelPath = FindModelPath()
             ?? throw new FileNotFoundException(
-                "ONNX model not found (yolo26DLA.onnx). Place it under models/.");
+                "ONNX model not found (tiny_layout.onnx). Place it under models/.");
 
         _logger.Debug($"[ONNX] Starting worker with model: {modelPath}");
         _worker = new AnalysisWorker(modelPath, _marshaller, _logger);
@@ -521,7 +521,7 @@ public sealed partial class DocumentController : IDisposable
 
     public static string? FindModelPath()
     {
-        const string filename = "yolo26DLA.onnx";
+        const string filename = "tiny_layout.onnx";
         var candidates = new List<string?>
         {
             Path.Combine(AppContext.BaseDirectory, "models", filename),

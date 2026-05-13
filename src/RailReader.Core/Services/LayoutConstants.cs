@@ -2,7 +2,7 @@ namespace RailReader.Core.Services;
 
 public static class LayoutConstants
 {
-    public const int InputSize = 640;
+    public const int InputSize = 480;
     public const float ConfidenceThreshold = 0.25f;
     public const float NmsIouThreshold = 0.6f;
     public const float DarkLuminanceThreshold = 160.0f;
@@ -64,24 +64,32 @@ public static class LayoutConstants
     // Alias kept for code paths still using PP-DocLayoutV3 naming.
     public const int ClassDisplayFormula = ClassFormula;
 
+    // Defaults tuned against TinyLayoutYOLO v2 per-class AP (eval on 900 val
+    // images of YOLO-DLA, June 2026). Classes excluded for cause:
+    //   3 t3      — AP 0.000 (effectively no training instances; model can't predict it)
+    //   9 graph   — figures; navigated visually via peek index, not rail-mode
+    //   11 other  — page furniture (headers/footers/page numbers)
+    //   13 table  — peek/VLM-transcribe instead of rail-navigating
+    //   15 class17 — garbage class with ~5 training instances
     public static HashSet<int> DefaultNavigableClasses() =>
     [
-        1,  // t1        (top heading)
-        2,  // t2        (subsection heading)
-        3,  // t3        (rare deeper heading)
-        4,  // paragraph (BODY TEXT — primary reading class)
-        5,  // author
-        6,  // keyword
-        7,  // abstract
-        8,  // reference
-        12, // formula
-        14, // footnote
+        0,  // t         (rare misc text, AP 0.72)
+        1,  // t1        (top heading,     AP 0.64)
+        2,  // t2        (subsection,      AP 0.66)
+        4,  // paragraph (BODY TEXT,       AP 0.90 — primary reading class)
+        5,  // author    (byline,          AP 0.58)
+        6,  // keyword   (keywords list,   AP 0.49)
+        7,  // abstract  (abstract block,  AP 0.71)
+        8,  // reference (bibliography,    AP 0.70)
+        10, // note      (figure/table caption text, AP 0.72)
+        12, // formula   (display equation, AP 0.84)
+        14, // footnote  (footnote/legal,  AP 0.74)
     ];
 
     /// <summary>
     /// Block types that are horizontally centered when narrower than the viewport.
-    /// Excludes heading types (t1/t2/t3) which look better left-aligned, and
-    /// excludes page furniture and captions.
+    /// Excludes heading types (t / t1 / t2) which look better left-aligned, and
+    /// excludes page furniture, figures, and tables.
     /// </summary>
     public static HashSet<int> DefaultCenteringClasses() =>
     [
@@ -90,6 +98,7 @@ public static class LayoutConstants
         6,  // keyword
         7,  // abstract
         8,  // reference
+        10, // note (caption)
         12, // formula
         14, // footnote
     ];
