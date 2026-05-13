@@ -1,0 +1,17 @@
+# Local environment & build artefacts
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+*.dist-info/
+
+# Training outputs — large binaries kept locally, not in repo
+runs/
+*.pt
+*.onnx
+*.npz
+
+# Editor / OS clutter
+.vscode/
+.idea/
+.DS_Store
