@@ -1,13 +1,17 @@
 """TinyLayoutYOLO — multi-level anchor-free document layout detector.
 
 Architecture (v2 — go-big revision):
-  Backbone: MobileNetV3-Small features[0:9]
-    └── intermediate at features[3]: stride  8, 24 ch → c3
-    └── intermediate at features[8]: stride 16, 48 ch → c4
+  Backbone (selectable): MobileNetV3-Small or MobileNetV4-Small
+    MNv3-S: features[0:9]
+      └── features[3]: stride  8, 24 ch → c3
+      └── features[8]: stride 16, 48 ch → c4
+    MNv4-S: timm features_only, out_indices=(2, 3)
+      └── blocks.1: stride  8, 64 ch → c3
+      └── blocks.2: stride 16, 96 ch → c4
   Neck (mini-FPN):
-    P4 = lateral_4(c4)                 # 48 → 128 ch
-    P3 = lateral_3(c3) + upsample(P4)  # 24 → 128 ch + top-down add
-    P3 = smooth_3(P3)                  # 3×3 BN-SiLU smoothing
+    P4 = lateral_4(c4)                       # c4_ch → 128
+    P3 = lateral_3(c3) + upsample(P4)        # c3_ch → 128, top-down add
+    P3 = smooth_3(P3)                        # 3×3 BN-SiLU smoothing
   Heads (decoupled, separate weights per level):
     head_p3 : (cls, reg, obj) at stride 8   (small objects)
     head_p4 : (cls, reg, obj) at stride 16  (large objects)
@@ -20,9 +24,13 @@ Why the rewrite vs single-level v1:
     assignment (radius 0.5) and CIoU loss, target precision drops to a few
     pixels regardless of cell granularity.
 
-State-dict compatibility with v1:
-  - `MobileNetBackbone.features` is preserved as a single `nn.Sequential` so
-    a v1 checkpoint's backbone weights load without renaming.
+State-dict compatibility:
+  - MNv3-S backbone (`MobileNetV3Backbone.features`) preserved as a single
+    `nn.Sequential` so v1/v2/v4/v5b/v6 checkpoint backbone weights load
+    without renaming.
+  - MNv4-S backbone (`MobileNetV4Backbone.backbone`) is a fresh module —
+    not state-dict compatible with MNv3-S. Warm-start from ImageNet via
+    timm's `pretrained=True` instead.
   - Heads change from `head.*` → `head_p3.*` + `head_p4.*`. The warm-start
     helper copies v1's `head.*` into both v2 heads. FPN gets fresh init.
 """
@@ -35,11 +43,16 @@ import torch.nn.functional as F
 from torchvision.models import mobilenet_v3_small, MobileNet_V3_Small_Weights
 
 
-# Feature stages we extract from MobileNetV3-Small features
-P3_INDEX = 3      # output after features[3]: stride 8, 24 channels
-P4_INDEX = 8      # output after features[8]: stride 16, 48 channels
-C3_CH = 24
-C4_CH = 48
+# MNv3-S feature stages we extract from the torchvision model
+P3_INDEX = 3      # features[3]: stride 8, 24 channels
+P4_INDEX = 8      # features[8]: stride 16, 48 channels
+
+# Channel counts per backbone at (stride 8, stride 16)
+BACKBONE_CHANNELS = {
+    "mnv3_small": (24, 48),
+    "mnv4_small": (64, 96),
+}
+
 FPN_CH = 128
 HEAD_CH = 128
 
@@ -57,12 +70,14 @@ def conv_bn_silu(in_ch: int, out_ch: int, k: int = 3, s: int = 1) -> nn.Sequenti
     )
 
 
-class MobileNetBackbone(nn.Module):
-    """Wraps features[:9] but emits two intermediate feature maps.
+class MobileNetV3Backbone(nn.Module):
+    """Torchvision MNv3-Small features[:9] with two intermediate emissions.
 
-    State-dict key `features.N.weight` is unchanged from v1, so v1 backbone
-    weights load directly.
+    State-dict key `features.N.weight` is unchanged from v1, so v1/v2/v4/
+    v5b/v6 backbone weights load directly.
     """
+
+    c3_ch, c4_ch = BACKBONE_CHANNELS["mnv3_small"]
 
     def __init__(self, pretrained: bool = True):
         super().__init__()
@@ -80,6 +95,43 @@ class MobileNetBackbone(nn.Module):
         return c3, x   # c3 stride 8, c4 stride 16
 
 
+class MobileNetV4Backbone(nn.Module):
+    """timm MNv4-Small features_only, out_indices=(2, 3).
+
+    Emits (c3, c4) at strides (8, 16) with channels (64, 96) — wider than
+    MNv3-S (24, 48) for ~1.5× backbone capacity. Pretrained via timm's
+    `mobilenetv4_conv_small.e2400_r224_in1k` ImageNet weights.
+    """
+
+    c3_ch, c4_ch = BACKBONE_CHANNELS["mnv4_small"]
+
+    def __init__(self, pretrained: bool = True):
+        super().__init__()
+        import timm
+        self.backbone = timm.create_model(
+            "mobilenetv4_conv_small.e2400_r224_in1k",
+            pretrained=pretrained,
+            features_only=True,
+            out_indices=(2, 3),
+        )
+
+    def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        c3, c4 = self.backbone(x)
+        return c3, c4
+
+
+def build_backbone(name: str = "mnv3_small", pretrained: bool = True) -> nn.Module:
+    if name == "mnv3_small":
+        return MobileNetV3Backbone(pretrained=pretrained)
+    if name == "mnv4_small":
+        return MobileNetV4Backbone(pretrained=pretrained)
+    raise ValueError(f"unknown backbone: {name!r}. Use 'mnv3_small' or 'mnv4_small'.")
+
+
+# Backwards-compatible alias — older code imports MobileNetBackbone directly.
+MobileNetBackbone = MobileNetV3Backbone
+
+
 class SimpleFPN(nn.Module):
     """2-level top-down FPN.
 
@@ -87,7 +139,7 @@ class SimpleFPN(nn.Module):
     P3 = lateral_3(c3) + upsample(P4) → smooth_3 → smoothed feature map
     """
 
-    def __init__(self, in_ch_3: int = C3_CH, in_ch_4: int = C4_CH, out_ch: int = FPN_CH):
+    def __init__(self, in_ch_3: int, in_ch_4: int, out_ch: int = FPN_CH):
         super().__init__()
         # Lateral 1×1 convs project to common channel count
         self.lateral_3 = nn.Conv2d(in_ch_3, out_ch, kernel_size=1)
@@ -212,13 +264,16 @@ class TinyLayoutYOLO(nn.Module):
     """
 
     def __init__(self, num_classes: int, pretrained: bool = True,
-                 use_rcm: bool = True):
+                 use_rcm: bool = True, backbone: str = "mnv3_small"):
         super().__init__()
         self.num_classes = num_classes
         self.strides = STRIDES
         self.use_rcm = use_rcm
-        self.backbone = MobileNetBackbone(pretrained=pretrained)
-        self.fpn = SimpleFPN(in_ch_3=C3_CH, in_ch_4=C4_CH, out_ch=FPN_CH)
+        self.backbone_name = backbone
+        self.backbone = build_backbone(backbone, pretrained=pretrained)
+        self.fpn = SimpleFPN(in_ch_3=self.backbone.c3_ch,
+                             in_ch_4=self.backbone.c4_ch,
+                             out_ch=FPN_CH)
         # v5: document-axial attention before each head
         if use_rcm:
             self.rcm_p3 = RCM(FPN_CH)
@@ -240,8 +295,10 @@ class TinyLayoutYOLO(nn.Module):
         }
 
 
-def build_model(num_classes: int = 16, pretrained: bool = True) -> TinyLayoutYOLO:
-    return TinyLayoutYOLO(num_classes=num_classes, pretrained=pretrained)
+def build_model(num_classes: int = 16, pretrained: bool = True,
+                backbone: str = "mnv3_small") -> TinyLayoutYOLO:
+    return TinyLayoutYOLO(num_classes=num_classes, pretrained=pretrained,
+                          backbone=backbone)
 
 
 def warmstart_from_v1(model: TinyLayoutYOLO, prior_state: dict) -> dict[str, int]:
@@ -309,11 +366,12 @@ def warmstart_from_v1(model: TinyLayoutYOLO, prior_state: dict) -> dict[str, int
 
 
 if __name__ == "__main__":
-    m = build_model(num_classes=16, pretrained=False)
-    n = sum(p.numel() for p in m.parameters() if p.requires_grad)
-    print(f"TinyLayoutYOLO v2: {n / 1e6:.2f}M params")
-    x = torch.zeros(2, 3, 480, 480)
-    out = m(x)
-    for level, d in out.items():
-        for k, v in d.items():
-            print(f"  {level}.{k}: {tuple(v.shape)}")
+    for backbone in ("mnv3_small", "mnv4_small"):
+        m = build_model(num_classes=16, pretrained=False, backbone=backbone)
+        n = sum(p.numel() for p in m.parameters() if p.requires_grad)
+        print(f"TinyLayoutYOLO ({backbone}): {n / 1e6:.2f}M params")
+        x = torch.zeros(2, 3, 480, 480)
+        out = m(x)
+        for level, d in out.items():
+            for k, v in d.items():
+                print(f"  {level}.{k}: {tuple(v.shape)}")

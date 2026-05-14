@@ -169,6 +169,16 @@ def main() -> int:
                    help="Override loss top_k_positives (default: module constant, "
                         "currently 3). Set to 1 for single-positive v4-style "
                         "assignment.")
+    p.add_argument("--soft-obj", action="store_true",
+                   help="Soft-objectness IoU target: train obj head against "
+                        "detached IoU(pred, GT) instead of hard 1.0 for "
+                        "positives. Calibrates confidence to box-quality.")
+    p.add_argument("--backbone", choices=["mnv3_small", "mnv4_small"],
+                   default="mnv3_small",
+                   help="Backbone family. mnv3_small (default, torchvision) "
+                        "keeps state-dict compatibility with v1-v6. mnv4_small "
+                        "(timm) is ~1.5x params with wider channels (24,48 -> "
+                        "64,96 at strides 8,16).")
     args = p.parse_args()
 
     args.output.mkdir(parents=True, exist_ok=True)
@@ -199,9 +209,10 @@ def main() -> int:
     )
 
     # Model + loss + optim
-    model = build_model(num_classes=args.num_classes, pretrained=args.pretrained).to(device)
+    model = build_model(num_classes=args.num_classes, pretrained=args.pretrained,
+                        backbone=args.backbone).to(device)
     n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    print(f"params: {n_params / 1e6:.2f}M")
+    print(f"backbone: {args.backbone}  params: {n_params / 1e6:.2f}M")
 
     # Per-class focal-loss weights
     if args.class_weights == "uniform":
@@ -220,11 +231,14 @@ def main() -> int:
         loss_kwargs["centre_radius"] = args.centre_radius
     if args.top_k_positives is not None:
         loss_kwargs["top_k_positives"] = args.top_k_positives
+    if args.soft_obj:
+        loss_kwargs["soft_obj"] = True
     loss_fn = TinyYoloLoss(num_classes=args.num_classes,
                            input_size=args.input_size, strides=model.strides,
                            class_weights=cw_list, **loss_kwargs)
     print(f"loss: centre_radius={loss_fn.centre_radius}  "
-          f"top_k_positives={loss_fn.top_k_positives}")
+          f"top_k_positives={loss_fn.top_k_positives}  "
+          f"soft_obj={loss_fn.soft_obj}")
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr,
                                   weight_decay=args.weight_decay)
     scaler = GradScaler("cuda", enabled=args.amp)

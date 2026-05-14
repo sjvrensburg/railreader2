@@ -50,6 +50,26 @@ def _grid_centres(H: int, W: int, stride: int, device, dtype):
     return cx, cy   # each (H, W)
 
 
+def _iou_xyxy(boxes_a: torch.Tensor, boxes_b: torch.Tensor) -> torch.Tensor:
+    """Plain IoU between matched xyxy pairs. Both (N, 4) in pixel space.
+
+    Used as the soft-obj target — the obj head learns to predict *how
+    well-aligned* the box turned out, not just whether the cell is a
+    positive. Caller should `.detach()` the result so obj loss doesn't
+    backprop into reg.
+    """
+    ax1, ay1, ax2, ay2 = boxes_a.unbind(-1)
+    bx1, by1, bx2, by2 = boxes_b.unbind(-1)
+    inter_x1 = torch.maximum(ax1, bx1)
+    inter_y1 = torch.maximum(ay1, by1)
+    inter_x2 = torch.minimum(ax2, bx2)
+    inter_y2 = torch.minimum(ay2, by2)
+    inter = (inter_x2 - inter_x1).clamp(min=0) * (inter_y2 - inter_y1).clamp(min=0)
+    area_a = (ax2 - ax1).clamp(min=0) * (ay2 - ay1).clamp(min=0)
+    area_b = (bx2 - bx1).clamp(min=0) * (by2 - by1).clamp(min=0)
+    return inter / (area_a + area_b - inter + 1e-7)
+
+
 def _ciou(boxes_a: torch.Tensor, boxes_b: torch.Tensor) -> torch.Tensor:
     """CIoU between matched xyxy pairs. Both (N, 4) in pixel space.
 
@@ -112,7 +132,8 @@ class TinyYoloLoss(nn.Module):
                  centre_radius: float = CENTRE_RADIUS,
                  size_route_threshold_px: float = SIZE_ROUTE_THRESHOLD_PX,
                  class_weights: list[float] | None = None,
-                 top_k_positives: int = TOP_K_POSITIVES):
+                 top_k_positives: int = TOP_K_POSITIVES,
+                 soft_obj: bool = False):
         super().__init__()
         self.num_classes = num_classes
         self.input_size = input_size
@@ -125,6 +146,7 @@ class TinyYoloLoss(nn.Module):
         self.centre_radius = centre_radius
         self.size_route_threshold_px = size_route_threshold_px
         self.top_k_positives = top_k_positives
+        self.soft_obj = soft_obj
         # Per-class focal-loss weights (inverse-frequency-sqrt by default).
         # None → uniform weights of 1.0. Length must equal num_classes.
         if class_weights is None:
@@ -322,7 +344,19 @@ class TinyYoloLoss(nn.Module):
             reg_gt_xyxy[b, pos_idx, 3] = gt_pos_y2
             pos_mask[b, pos_idx] = True
 
-            obj_target[b, pos_idx] = 1.0
+            if self.soft_obj:
+                # Soft-obj target: detached IoU between predicted box at this
+                # positive cell and its assigned GT. Model learns to report
+                # how well-aligned the box turned out, not just whether the
+                # cell is a positive. Detached so obj loss doesn't push reg.
+                pred_pos = pred_xyxy[b, pos_idx].detach()
+                gt_pos_xyxy = torch.stack(
+                    [gt_pos_x1, gt_pos_y1, gt_pos_x2, gt_pos_y2], dim=-1
+                )
+                iou = _iou_xyxy(pred_pos, gt_pos_xyxy).clamp(0.0, 1.0)
+                obj_target[b, pos_idx] = iou
+            else:
+                obj_target[b, pos_idx] = 1.0
 
             num_pos += pos_idx.numel()
 
