@@ -30,6 +30,7 @@ from PIL import Image
 from tqdm import tqdm
 
 from layout_detector import build_model
+from layout_detector.model import TinyLayoutYOLO
 from layout_detector.dataset import (
     make_train_val_split,
     letterbox,
@@ -63,7 +64,8 @@ def _iou_one_vs_many(box: np.ndarray, others: np.ndarray) -> np.ndarray:
 
 
 def collect_predictions(model, val_files, image_dir, label_dir, input_size,
-                        device, conf_threshold=0.05, nms_iou=0.5):
+                        device, conf_threshold=0.05, nms_iou=0.5,
+                        class_remap=None):
     """Returns:
         detections: list per image of (cls, score, x1, y1, x2, y2) normalised
         gts:        list per image of (cls, x1, y1, x2, y2) normalised
@@ -120,7 +122,7 @@ def collect_predictions(model, val_files, image_dir, label_dir, input_size,
 
         # GTs: YOLO format → xyxy normalised + class remap
         lbl_path = label_dir / (Path(fname).stem + ".txt")
-        gt_boxes, gt_labels = _load_labels(lbl_path, YOLO_DLA_CLASS_REMAP)
+        gt_boxes, gt_labels = _load_labels(lbl_path, class_remap)
         gts_i: list[tuple] = []
         for (cx, cy, w, h), cls in zip(gt_boxes, gt_labels):
             gts_i.append((int(cls), cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2))
@@ -239,6 +241,11 @@ def main() -> int:
                    default="cuda" if torch.cuda.is_available() else "cpu")
     p.add_argument("--limit", type=int, default=None,
                    help="Limit val images for smoke-test")
+    p.add_argument("--class-remap", type=str, default="auto",
+                   help="'auto' (default): detect from corpus. 'yolo-dla': apply "
+                        "YOLO_DLA_CLASS_REMAP (raw YOLO-DLA dataset schema). "
+                        "'none': no remap (labels already runtime schema, e.g. "
+                        "merged v4_corpus).")
     args = p.parse_args()
 
     device = torch.device(args.device)
@@ -248,7 +255,10 @@ def main() -> int:
     print(f"loading {args.checkpoint}")
     ck = torch.load(args.checkpoint, map_location=device, weights_only=False)
     state = ck["model"] if isinstance(ck, dict) and "model" in ck else ck
-    model = build_model(num_classes=args.num_classes, pretrained=False).to(device)
+    has_rcm = any(k.startswith("rcm_p3.") or k.startswith("rcm_p4.") for k in state)
+    print(f"checkpoint has RCM: {has_rcm}")
+    model = TinyLayoutYOLO(num_classes=args.num_classes,
+                           pretrained=False, use_rcm=has_rcm).to(device)
     model.load_state_dict(state)
 
     # Val split: same files as training
@@ -261,10 +271,25 @@ def main() -> int:
     print(f"val images: {len(val_files)}  "
           f"(seed={args.seed}, val_fraction={args.val_fraction})")
 
+    if args.class_remap == "yolo-dla":
+        class_remap = YOLO_DLA_CLASS_REMAP
+    elif args.class_remap == "none":
+        class_remap = None
+    else:  # auto — detect by presence of YOLO-DLA ID 16 in any label
+        sample_labels = list(args.labels.glob("*.txt"))[:50]
+        has_dla_ids = any(
+            any(int(line.split()[0]) == 16 for line in lf.read_text().splitlines() if line.split())
+            for lf in sample_labels if lf.exists()
+        )
+        class_remap = YOLO_DLA_CLASS_REMAP if has_dla_ids else None
+    print(f"class_remap: "
+          f"{'YOLO_DLA_CLASS_REMAP' if class_remap is YOLO_DLA_CLASS_REMAP else 'None (runtime schema)'}")
+
     detections, gts = collect_predictions(
         model, val_files, args.images, args.labels,
         input_size=args.input_size, device=device,
         conf_threshold=args.conf_threshold, nms_iou=args.nms_iou,
+        class_remap=class_remap,
     )
 
     # Per-class AP

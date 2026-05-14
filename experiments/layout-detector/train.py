@@ -161,6 +161,14 @@ def main() -> int:
     p.add_argument("--class-weights", type=str, default="auto",
                    help="'auto' (default) computes inverse-frequency-sqrt weights "
                         "from the label dir. 'uniform' uses 1.0 for all classes.")
+    p.add_argument("--centre-radius", type=float, default=None,
+                   help="Override loss centre_radius (default: module constant, "
+                        "currently 1.5). Set to 0.5 to reproduce v4-style tight "
+                        "assignment.")
+    p.add_argument("--top-k-positives", type=int, default=None,
+                   help="Override loss top_k_positives (default: module constant, "
+                        "currently 3). Set to 1 for single-positive v4-style "
+                        "assignment.")
     args = p.parse_args()
 
     args.output.mkdir(parents=True, exist_ok=True)
@@ -207,9 +215,16 @@ def main() -> int:
                  "table", "footnote", "class17"]
         for i, (n, c, w) in enumerate(zip(names[: args.num_classes], counts, cw_list)):
             print(f"  {i:>2} {n:<10}  count={c:>7}  weight={w:.3f}")
+    loss_kwargs = {}
+    if args.centre_radius is not None:
+        loss_kwargs["centre_radius"] = args.centre_radius
+    if args.top_k_positives is not None:
+        loss_kwargs["top_k_positives"] = args.top_k_positives
     loss_fn = TinyYoloLoss(num_classes=args.num_classes,
                            input_size=args.input_size, strides=model.strides,
-                           class_weights=cw_list)
+                           class_weights=cw_list, **loss_kwargs)
+    print(f"loss: centre_radius={loss_fn.centre_radius}  "
+          f"top_k_positives={loss_fn.top_k_positives}")
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr,
                                   weight_decay=args.weight_decay)
     scaler = GradScaler("cuda", enabled=args.amp)

@@ -23,6 +23,7 @@ import torch
 import torch.nn as nn
 
 from layout_detector import build_model
+from layout_detector.model import TinyLayoutYOLO
 from layout_detector.model import STRIDES
 
 
@@ -103,7 +104,10 @@ def main() -> int:
     ckpt = torch.load(args.checkpoint, map_location="cpu", weights_only=False)
     state = ckpt["model"] if isinstance(ckpt, dict) and "model" in ckpt else ckpt
 
-    model = build_model(num_classes=args.num_classes, pretrained=False)
+    has_rcm = any(k.startswith("rcm_p3.") or k.startswith("rcm_p4.") for k in state)
+    print(f"checkpoint has RCM: {has_rcm}")
+    model = TinyLayoutYOLO(num_classes=args.num_classes,
+                           pretrained=False, use_rcm=has_rcm)
     model.load_state_dict(state)
     model.eval()
     print(f"params: {sum(t.numel() for t in model.parameters()) / 1e6:.2f}M")
