@@ -1,2 +1,7 @@
 __pycache__/
 *.py[cod]
+
+# Bulk corpora (downloaded artifacts, not source)
+anthology.bib
+anthology.bib.gz
+*.entries.pkl
