@@ -206,6 +206,77 @@ including trained RCM weights → `direct match: 288  fresh: 0  skipped: 0`.
 without them, v6 uses the v5 defaults (1.5 / 3) which we proved
 regress box tightness.
 
+### Step 5b: Resume training after interrupt (2026-05-14 pause)
+
+Training was interrupted after **9 epochs** completed (SIGTERM mid
+epoch 10). Disk state at pause:
+
+- `runs/v6/last.pt` — epoch 9, val total = 2.1747 (full state: model
+  + optimizer + scaler + step counter + best_val)
+- `runs/v6/best.pt` — epoch 1, val total = **2.1422** (the only NEW
+  BEST so far; still beats v5b's 2.322 by 0.18)
+- `runs/v6/history.json` — 9 records
+- `runs/v6/train.log` — ~5 MB of tqdm spam + the epoch summaries
+
+Observed pattern over the 9 epochs:
+- train: 2.122 → 1.944 (cleanly descending)
+- val: 2.142 → 2.175 (mild overfit shape, one spike at ep7=2.243)
+- best_val frozen at epoch 1
+- cosine LR at pause: 8.72e-5 (started 1.50e-4)
+
+**Resume command** (same as Step 5, **add `--resume`**, and **`-a` on tee**
+so we don't clobber train.log):
+
+```bash
+cd /home/stefan/railreader2/experiments/layout-detector
+.venv/bin/python train.py \
+    --images /home/stefan/Downloads/v6_corpus/images \
+    --labels /home/stefan/Downloads/v6_corpus/labels \
+    --output runs/v6 \
+    --warmstart runs/v5b/best.pt \
+    --epochs 20 \
+    --batch-size 12 \
+    --workers 8 \
+    --lr 1.5e-4 \
+    --warmup-epochs 1 \
+    --input-size 480 \
+    --centre-radius 0.5 \
+    --top-k-positives 1 \
+    --resume \
+    2>&1 | tee -a runs/v6/train.log
+```
+
+**What happens on resume** (per `train.py:241`): the `--resume` branch
+takes precedence over `--warmstart`, so the warm-start path is silently
+skipped. Full state is restored: `start_epoch = 10`, `step_counter`
+continues from where it left off, optimizer/scaler/best_val all loaded
+from `last.pt`. **Leaving `--warmstart` in the command is harmless** —
+it's ignored when last.pt exists. The cosine LR schedule continues
+from the resumed step counter, so late-epoch decay proceeds as if
+uninterrupted.
+
+**Expected timeline**: 11 epochs remaining × ~14.5 min = **~2h 40min**
+to completion. Final lr decays from 8.72e-5 to ~1.5e-6 (1% of base).
+
+**Decision point after resume completes** (or any time):
+1. If the cosine LR decay closes the train/val gap and a late epoch
+   beats 2.1422 → v6 is the winner. Proceed to Step 6/7.
+2. If best_val stays at 2.1422 (epoch 1 weights = v5b + 1 epoch of
+   pivot data) → that's still a 0.18 improvement over v5b baseline.
+   Whether to ship requires the visual diagnostic (Step 7) — val loss
+   ≠ the user-visible failure-page improvement we're chasing.
+3. **Shortcut option**: if you don't want to wait the 2h 40m and trust
+   the heuristic that mild overfit + cosine decay rarely produces a new
+   best after epoch 8 of a 20-epoch run, you can call training done
+   now with best.pt (epoch 1) and go straight to Step 6/7.
+
+To interrupt again: `kill -TERM <pid>` where pid is found by
+`pgrep -f 'train.py.*runs/v6' | head -1` (the python parent — not the
+bash wrapper, not the DataLoader workers). SIGINT may be buffered behind
+a CUDA call for several seconds; SIGTERM is cleaner. Either way, the
+in-flight epoch is lost (no mid-epoch checkpointing) but `last.pt` from
+the most recently completed epoch remains intact.
+
 ### Step 6: Evaluate v6 (~10 min)
 
 ```bash
