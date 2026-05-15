@@ -256,9 +256,12 @@ def main() -> int:
     ck = torch.load(args.checkpoint, map_location=device, weights_only=False)
     state = ck["model"] if isinstance(ck, dict) and "model" in ck else ck
     has_rcm = any(k.startswith("rcm_p3.") or k.startswith("rcm_p4.") for k in state)
-    print(f"checkpoint has RCM: {has_rcm}")
+    has_mnv4 = any(k.startswith("backbone.backbone.") for k in state)
+    backbone = "mnv4_small" if has_mnv4 else "mnv3_small"
+    print(f"checkpoint has RCM: {has_rcm}  backbone: {backbone}")
     model = TinyLayoutYOLO(num_classes=args.num_classes,
-                           pretrained=False, use_rcm=has_rcm).to(device)
+                           pretrained=False, use_rcm=has_rcm,
+                           backbone=backbone).to(device)
     model.load_state_dict(state)
 
     # Val split: same files as training

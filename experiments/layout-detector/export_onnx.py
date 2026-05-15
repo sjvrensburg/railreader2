@@ -105,9 +105,15 @@ def main() -> int:
     state = ckpt["model"] if isinstance(ckpt, dict) and "model" in ckpt else ckpt
 
     has_rcm = any(k.startswith("rcm_p3.") or k.startswith("rcm_p4.") for k in state)
-    print(f"checkpoint has RCM: {has_rcm}")
+    # Auto-detect backbone from state_dict key structure:
+    #   MNv3-Small (torchvision): backbone.features.*
+    #   MNv4-Small (timm):        backbone.backbone.*  (timm features-only)
+    has_mnv4 = any(k.startswith("backbone.backbone.") for k in state)
+    backbone = "mnv4_small" if has_mnv4 else "mnv3_small"
+    print(f"checkpoint has RCM: {has_rcm}  backbone: {backbone}")
     model = TinyLayoutYOLO(num_classes=args.num_classes,
-                           pretrained=False, use_rcm=has_rcm)
+                           pretrained=False, use_rcm=has_rcm,
+                           backbone=backbone)
     model.load_state_dict(state)
     model.eval()
     print(f"params: {sum(t.numel() for t in model.parameters()) / 1e6:.2f}M")
