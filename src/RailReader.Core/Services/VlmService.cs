@@ -13,29 +13,8 @@ namespace RailReader.Core.Services;
 /// <summary>Minimal config needed to call a VLM endpoint.</summary>
 public record VlmEndpointConfig(string? Endpoint, string? Model, string? ApiKey)
 {
-    public static VlmEndpointConfig FromAppConfig(AppConfig config) =>
-        new(config.VlmEndpoint, config.VlmModel, config.VlmApiKey);
-
     public static VlmEndpointConfig FromCoreSettings(CoreSettings settings) =>
         new(settings.VlmEndpoint, settings.VlmModel, settings.VlmApiKey);
-
-    /// <summary>
-    /// Resolves a VLM endpoint from CLI overrides, AppConfig, and OPENAI_API_KEY env var.
-    /// Precedence: explicit override > AppConfig > $OPENAI_API_KEY.
-    /// </summary>
-    public static VlmEndpointConfig FromAppConfigWithOverrides(
-        string? endpointOverride = null, string? modelOverride = null, string? apiKeyOverride = null)
-    {
-        var appConfig = AppConfig.Load();
-        var apiKey = apiKeyOverride
-            ?? (string.IsNullOrWhiteSpace(appConfig.VlmApiKey)
-                ? Environment.GetEnvironmentVariable("OPENAI_API_KEY")
-                : appConfig.VlmApiKey);
-        return new VlmEndpointConfig(
-            endpointOverride ?? appConfig.VlmEndpoint,
-            modelOverride ?? appConfig.VlmModel,
-            apiKey);
-    }
 }
 
 public static class VlmService

@@ -39,7 +39,7 @@ public static class ExportCommand
 
         VlmEndpointConfig? vlmEndpoint = null;
         if (!noVlm)
-            vlmEndpoint = VlmEndpointConfig.FromAppConfigWithOverrides(endpointOverride, modelOverride, apiKeyOverride);
+            vlmEndpoint = Shared.BuildVlmEndpoint(endpointOverride, modelOverride, apiKeyOverride);
 
         var options = new MarkdownExportOptions
         {

@@ -33,7 +33,7 @@ public sealed class MarkdownExportService : IMarkdownExportService
         if (err != null)
             throw new ArgumentException(err);
 
-        var modelPath = DocumentController.FindModelPath();
+        var modelPath = LayoutModelLocator.FindModelPath();
         using var analyzer = modelPath != null ? new LayoutAnalyzer(modelPath) : null;
 
         AnnotationFile? annotationFile = null;

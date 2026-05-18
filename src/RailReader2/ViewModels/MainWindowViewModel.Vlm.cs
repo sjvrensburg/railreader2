@@ -101,7 +101,7 @@ public sealed partial class MainWindowViewModel
         }
 
         var result = await VlmService.DescribeBlockAsync(
-            pngBytes, action, VlmEndpointConfig.FromAppConfig(AppConfig),
+            pngBytes, action, VlmEndpointConfig.FromCoreSettings(AppConfig.ToCoreSettings()),
             structuredOutput: AppConfig.VlmStructuredOutput);
 
         if (result.Error is not null)

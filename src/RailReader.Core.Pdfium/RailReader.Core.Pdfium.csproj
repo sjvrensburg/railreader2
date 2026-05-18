@@ -9,18 +9,16 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <InternalsVisibleTo Include="RailReader.Core.Tests" />
-    <InternalsVisibleTo Include="RailReader.Core.Pdfium" />
-    <InternalsVisibleTo Include="RailReader.Core.Analysis" />
     <InternalsVisibleTo Include="RailReader.Renderer.Skia" />
     <InternalsVisibleTo Include="RailReader2" />
     <InternalsVisibleTo Include="RailReader2.Cli" />
     <InternalsVisibleTo Include="RailReader.Export" />
+    <InternalsVisibleTo Include="RailReader.Core.Tests" />
     <InternalsVisibleTo Include="RailReader.Export.Tests" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="OpenAI" Version="2.10.0" />
+    <ProjectReference Include="../RailReader.Core/RailReader.Core.csproj" />
   </ItemGroup>
 
 </Project>

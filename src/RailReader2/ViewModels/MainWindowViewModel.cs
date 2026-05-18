@@ -151,7 +151,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         ColourEffects = new ColourEffectShaders(_logger);
         _controller = new DocumentController(config.ToCoreSettings(), config, AnnotationService.Default,
             new AvaloniaThreadMarshaller(), new RailReader.Renderer.Skia.SkiaPdfServiceFactory(), _logger);
-        var modelPath = DocumentController.FindModelPath();
+        var modelPath = LayoutModelLocator.FindModelPath();
         if (modelPath != null)
         {
             _logger.Debug($"[ONNX] Starting worker with model: {modelPath}");
