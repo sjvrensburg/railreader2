@@ -100,13 +100,12 @@ public sealed class MarkdownExportService : IMarkdownExportService
         var (pageW, pageH) = pdf.GetPageSize(pageIdx);
 
         var (rgbBytes, pxW, pxH) = pdf.RenderPagePixmap(pageIdx, LayoutConstants.InputSize);
-        var analysis = analyzer.RunAnalysis(rgbBytes, pxW, pxH, pageW, pageH, ct);
+        var pageText = PdfTextService.ExtractPageText(pdf.PdfBytes, pageIdx);
+        var analysis = analyzer.RunAnalysis(rgbBytes, pxW, pxH, pageW, pageH, pageText.CharBoxes, ct);
         var blocks = analysis.Blocks;
 
         if (blocks.Count == 0)
             return ExportPagePlainText(pdf, pageIdx, flatOutline, annotationFile, options);
-
-        var pageText = PdfTextService.ExtractPageText(pdf.PdfBytes, pageIdx);
 
         // Cache text extraction per block to avoid redundant O(chars) scans
         var blockTexts = new Dictionary<int, string>(blocks.Count);

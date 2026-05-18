@@ -52,15 +52,17 @@ public static class StructureCommand
                 var (pw, ph) = pdf.GetPageSize(pageIdx);
                 PageAnalysis? analysis = null;
 
+                PageText? pageText = null;
+                if ((includeText || analyze) && textService != null)
+                    pageText = textService.ExtractPageText(pdf.PdfBytes, pageIdx);
+
                 if (analyze && analyzer != null)
                 {
                     var (rgbBytes, pxW, pxH) = pdf.RenderPagePixmap(pageIdx, 800);
-                    analysis = analyzer.RunAnalysis(rgbBytes, pxW, pxH, pw, ph);
+                    analysis = analyzer.RunAnalysis(rgbBytes, pxW, pxH, pw, ph, pageText?.CharBoxes);
                 }
 
-                PageText? pageText = null;
-                if (includeText && textService != null)
-                    pageText = textService.ExtractPageText(pdf.PdfBytes, pageIdx);
+                if (!includeText) pageText = null;
 
                 if (analysis != null || pageText != null)
                 {
