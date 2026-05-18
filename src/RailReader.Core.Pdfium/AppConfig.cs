@@ -5,7 +5,7 @@ using RailReader.Core.Models;
 
 namespace RailReader.Core.Services;
 
-public sealed class AppConfig
+public sealed class AppConfig : IRecentFilesStore
 {
     internal static ILogger Logger { get; set; } = NullLogger.Instance;
 
@@ -64,6 +64,46 @@ public sealed class AppConfig
     public string? VlmModel { get; set; }
     public string? VlmApiKey { get; set; }
     public bool VlmStructuredOutput { get; set; } = false;
+
+    /// <summary>
+    /// Build an immutable <see cref="CoreSettings"/> snapshot of the runtime
+    /// tuning values. UI-only fields (font scale, dark mode, minimap dimensions,
+    /// recent files) are deliberately excluded from the Core contract.
+    /// </summary>
+    public CoreSettings ToCoreSettings() => new()
+    {
+        RailZoomThreshold = RailZoomThreshold,
+        SnapDurationMs = SnapDurationMs,
+        ScrollSpeedStart = ScrollSpeedStart,
+        ScrollSpeedMax = ScrollSpeedMax,
+        ScrollRampTime = ScrollRampTime,
+        AnalysisLookaheadPages = AnalysisLookaheadPages,
+        LinePadding = LinePadding,
+        AutoScrollLinePauseMs = AutoScrollLinePauseMs,
+        AutoScrollBlockPauseMs = AutoScrollBlockPauseMs,
+        AutoScrollEquationPauseMs = AutoScrollEquationPauseMs,
+        AutoScrollHeaderPauseMs = AutoScrollHeaderPauseMs,
+        AutoScrollTriggerEnabled = AutoScrollTriggerEnabled,
+        AutoScrollTriggerDelayMs = AutoScrollTriggerDelayMs,
+        JumpPercentage = JumpPercentage,
+        ColourEffect = ColourEffect,
+        ColourEffectIntensity = ColourEffectIntensity,
+        MotionBlur = MotionBlur,
+        MotionBlurIntensity = MotionBlurIntensity,
+        PixelSnapping = PixelSnapping,
+        LineFocusBlur = LineFocusBlur,
+        LineFocusBlurIntensity = LineFocusBlurIntensity,
+        LineHighlightEnabled = LineHighlightEnabled,
+        LineHighlightTint = LineHighlightTint,
+        LineHighlightOpacity = LineHighlightOpacity,
+        MarginCropping = MarginCropping,
+        NavigableClasses = NavigableClasses,
+        CenteringClasses = CenteringClasses,
+        VlmEndpoint = VlmEndpoint,
+        VlmModel = VlmModel,
+        VlmApiKey = VlmApiKey,
+        VlmStructuredOutput = VlmStructuredOutput,
+    };
 
     /// <summary>Creates an independent deep copy via JSON round-trip.</summary>
     public AppConfig Clone() =>

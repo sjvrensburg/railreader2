@@ -26,7 +26,7 @@ public class RailNavTests
             SnapDurationMs = 1, // near-instant snaps for testing
             PixelSnapping = false, // avoid rounding complications in assertions
         };
-        _nav = new RailNav(_config);
+        _nav = new RailNav(_config.ToCoreSettings());
     }
 
     /// <summary>

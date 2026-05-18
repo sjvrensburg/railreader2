@@ -16,9 +16,9 @@ public class AnnotationTests : IDisposable
         var factory = TestFixtures.CreatePdfFactory();
         var pdfPath = TestFixtures.GetTestPdfPath();
         _state = new DocumentState(pdfPath, factory.CreatePdfService(pdfPath),
-            factory.CreatePdfTextService(), config, marshaller);
+            factory.CreatePdfTextService(), factory.CreatePdfLinkService(), config.ToCoreSettings(), marshaller);
         _state.LoadPageBitmap();
-        _manager = new AnnotationFileManager(marshaller);
+        _manager = new AnnotationFileManager(AnnotationService.Default, marshaller);
         _state.LoadAnnotations(_manager);
     }
 
@@ -120,15 +120,15 @@ public class AnnotationTests : IDisposable
         var factory = TestFixtures.CreatePdfFactory();
         var pdfPath = TestFixtures.GetTestPdfPath();
 
-        using var manager = new AnnotationFileManager(marshaller);
+        using var manager = new AnnotationFileManager(AnnotationService.Default, marshaller);
 
         var stateA = new DocumentState(pdfPath, factory.CreatePdfService(pdfPath),
-            factory.CreatePdfTextService(), config, marshaller);
+            factory.CreatePdfTextService(), factory.CreatePdfLinkService(), config.ToCoreSettings(), marshaller);
         stateA.LoadPageBitmap();
         stateA.LoadAnnotations(manager);
 
         var stateB = new DocumentState(pdfPath, factory.CreatePdfService(pdfPath),
-            factory.CreatePdfTextService(), config, marshaller);
+            factory.CreatePdfTextService(), factory.CreatePdfLinkService(), config.ToCoreSettings(), marshaller);
         stateB.LoadPageBitmap();
         stateB.LoadAnnotations(manager);
 

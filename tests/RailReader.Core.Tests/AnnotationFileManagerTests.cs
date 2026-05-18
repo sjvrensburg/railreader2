@@ -14,7 +14,7 @@ public class AnnotationFileManagerTests : IDisposable
     {
         _tempDir = Path.Combine(Path.GetTempPath(), $"railreader_test_{Guid.NewGuid():N}");
         Directory.CreateDirectory(_tempDir);
-        _manager = new AnnotationFileManager(new SynchronousThreadMarshaller());
+        _manager = new AnnotationFileManager(AnnotationService.Default, new SynchronousThreadMarshaller());
     }
 
     public void Dispose()
@@ -106,7 +106,7 @@ public class AnnotationFileManagerTests : IDisposable
         _manager.Dispose();
 
         // After dispose, new checkout on a fresh manager should not share state
-        var manager2 = new AnnotationFileManager(new SynchronousThreadMarshaller());
+        var manager2 = new AnnotationFileManager(AnnotationService.Default, new SynchronousThreadMarshaller());
         var file = manager2.Checkout(path);
         Assert.NotNull(file);
         manager2.Dispose();

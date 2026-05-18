@@ -17,9 +17,9 @@ public class AnnotationInteractionHandlerTests : IDisposable
         var factory = TestFixtures.CreatePdfFactory();
         var pdfPath = TestFixtures.GetTestPdfPath();
         _doc = new DocumentState(pdfPath, factory.CreatePdfService(pdfPath),
-            factory.CreatePdfTextService(), config, marshaller);
+            factory.CreatePdfTextService(), factory.CreatePdfLinkService(), config.ToCoreSettings(), marshaller);
         _doc.LoadPageBitmap();
-        _manager = new AnnotationFileManager(marshaller);
+        _manager = new AnnotationFileManager(AnnotationService.Default, marshaller);
         _doc.LoadAnnotations(_manager);
         _handler = new AnnotationInteractionHandler();
     }

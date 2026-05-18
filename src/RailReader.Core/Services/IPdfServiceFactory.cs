@@ -8,4 +8,5 @@ public interface IPdfServiceFactory
 {
     IPdfService CreatePdfService(string filePath);
     IPdfTextService CreatePdfTextService();
+    IPdfLinkService CreatePdfLinkService();
 }

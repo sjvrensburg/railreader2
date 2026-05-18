@@ -12,7 +12,7 @@ public sealed partial class MainWindowViewModel
 {
     public void OpenRadialMenu(double screenX, double screenY)
     {
-        double menuSize = 210 * Config.UiFontScale;
+        double menuSize = 210 * AppConfig.UiFontScale;
         RadialMenuX = screenX - menuSize / 2;
         RadialMenuY = screenY - menuSize / 2;
         IsRadialMenuOpen = true;

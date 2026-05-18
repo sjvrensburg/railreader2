@@ -42,7 +42,7 @@ public partial class MenuBarView : UserControl
 
         menu.Items.Clear();
         var vm = Vm;
-        var files = vm?.Config.RecentFiles;
+        var files = vm?.AppConfig.RecentFiles;
         if (files is null || files.Count == 0)
         {
             menu.Items.Add(new MenuItem { Header = "(No recent files)", IsEnabled = false });

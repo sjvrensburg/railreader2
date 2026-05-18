@@ -17,5 +17,8 @@ public sealed class SkiaPdfServiceFactory : IPdfServiceFactory
         => new SkiaPdfService(filePath);
 
     public IPdfTextService CreatePdfTextService()
-        => new SkiaPdfTextService();
+        => new PdfTextService();
+
+    public IPdfLinkService CreatePdfLinkService()
+        => new PdfLinkService();
 }

@@ -16,6 +16,25 @@ internal static class Shared
         TypeInfoResolver = CliJsonContext.Default,
     };
 
+    /// <summary>
+    /// Resolves a VLM endpoint configuration from CLI overrides, the persisted
+    /// AppConfig, and the OPENAI_API_KEY environment variable.
+    /// Precedence: explicit override > AppConfig > $OPENAI_API_KEY.
+    /// </summary>
+    internal static VlmEndpointConfig BuildVlmEndpoint(
+        string? endpointOverride = null, string? modelOverride = null, string? apiKeyOverride = null)
+    {
+        var appConfig = AppConfig.Load();
+        var apiKey = apiKeyOverride
+            ?? (string.IsNullOrWhiteSpace(appConfig.VlmApiKey)
+                ? Environment.GetEnvironmentVariable("OPENAI_API_KEY")
+                : appConfig.VlmApiKey);
+        return new VlmEndpointConfig(
+            endpointOverride ?? appConfig.VlmEndpoint,
+            modelOverride ?? appConfig.VlmModel,
+            apiKey);
+    }
+
     internal static OutlineEntryOutput SerializeOutlineEntry(OutlineEntry entry) => new()
     {
         Title = entry.Title,
@@ -43,7 +62,7 @@ internal static class Shared
     {
         if (!requested) return null;
 
-        var modelPath = DocumentController.FindModelPath();
+        var modelPath = LayoutModelLocator.FindModelPath();
         if (modelPath == null)
         {
             Console.Error.WriteLine("Warning: ONNX model not found. Skipping layout analysis.");

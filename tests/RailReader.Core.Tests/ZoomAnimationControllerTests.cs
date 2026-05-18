@@ -16,7 +16,7 @@ public class ZoomAnimationControllerTests : IDisposable
         var config = new AppConfig();
         var factory = TestFixtures.CreatePdfFactory();
         _doc = new DocumentState(_pdfPath, factory.CreatePdfService(_pdfPath),
-            factory.CreatePdfTextService(), config, new SynchronousThreadMarshaller());
+            factory.CreatePdfTextService(), factory.CreatePdfLinkService(), config.ToCoreSettings(), new SynchronousThreadMarshaller());
         _doc.LoadPageBitmap();
         _doc.CenterPage(800, 600);
         _zoom = new ZoomAnimationController();

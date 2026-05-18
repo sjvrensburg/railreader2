@@ -23,7 +23,7 @@ public sealed class SkiaPdfService : IPdfService
         lock (PdfiumGate.Lock)
         {
             PageCount = Conversion.GetPageCount(PdfBytes);
-            Outline = PdfOutlineExtractor.Extract(PdfBytes);
+            Outline = new PdfOutlineService().Extract(PdfBytes);
         }
         if (Outline.Count > 0)
             Logger.Debug($"[PDF] Extracted {Outline.Count} outline entries");

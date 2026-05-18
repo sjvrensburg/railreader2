@@ -9,7 +9,7 @@ namespace RailReader.Core.Services;
 /// Extracts per-page text and character bounding boxes from PDFs via PDFium P/Invoke.
 /// Relies on PDFtoImage having already loaded the native pdfium library.
 /// </summary>
-public static class PdfTextService
+public sealed class PdfTextService : IPdfTextService
 {
     internal static ILogger Logger { get; set; } = NullLogger.Instance;
 
@@ -21,7 +21,7 @@ public static class PdfTextService
     /// This method converts them to page-point space (origin top-left, Y-down)
     /// matching BBox and the overlay layers.
     /// </summary>
-    public static PageText ExtractPageText(byte[] pdfBytes, int pageIndex)
+    public PageText ExtractPageText(byte[] pdfBytes, int pageIndex)
     {
         return WithTextPage(pdfBytes, pageIndex, s_empty, "extract text",
             (textPage, offsetX, offsetY, visibleHeight) =>
@@ -66,7 +66,7 @@ public static class PdfTextService
     /// for character ranges on a page. Returns rects in page-point space (origin top-left, Y-down),
     /// adjusted for CropBox offset so highlights align with the rendered page.
     /// </summary>
-    public static List<List<RectF>> GetTextRangeRects(byte[] pdfBytes, int pageIndex,
+    public List<List<RectF>> GetTextRangeRects(byte[] pdfBytes, int pageIndex,
         List<(int CharStart, int CharLength)> ranges)
     {
         var result = new List<List<RectF>>(ranges.Count);

@@ -9,11 +9,11 @@ namespace RailReader.Core.Services;
 /// Extracts PDF bookmarks/outline using PDFium's native API.
 /// Relies on PDFtoImage having already loaded the native pdfium library.
 /// </summary>
-public static class PdfOutlineExtractor
+public sealed class PdfOutlineService : IPdfOutlineService
 {
     internal static ILogger Logger { get; set; } = NullLogger.Instance;
 
-    public static List<OutlineEntry> Extract(byte[] pdfBytes)
+    public List<OutlineEntry> Extract(byte[] pdfBytes)
     {
         var result = new List<OutlineEntry>();
 

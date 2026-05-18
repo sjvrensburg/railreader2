@@ -11,8 +11,15 @@ namespace RailReader.Core.Services;
 /// path. Legacy sidecar files (alongside the PDF) are loaded as a migration
 /// fallback but never written to.
 /// </summary>
-public static class AnnotationService
+public sealed class AnnotationService : IAnnotationStore
 {
+    /// <summary>
+    /// Shared default instance. Most callers can use this; consumers that
+    /// need a different store (e.g. tests, or future web implementations)
+    /// inject their own <see cref="IAnnotationStore"/>.
+    /// </summary>
+    public static readonly AnnotationService Default = new();
+
     internal static ILogger Logger { get; set; } = NullLogger.Instance;
 
     private static string? _annotationDir;
@@ -46,7 +53,7 @@ public static class AnnotationService
     /// Load annotations for a PDF. Checks internal storage first,
     /// falls back to legacy sidecar file (and migrates it to internal).
     /// </summary>
-    public static AnnotationFile? Load(string pdfPath)
+    public AnnotationFile? Load(string pdfPath)
     {
         // Try internal storage first
         var internalPath = GetInternalPath(pdfPath);
@@ -73,7 +80,7 @@ public static class AnnotationService
     }
 
     /// <summary>Save annotations to internal storage. Returns false if the write fails.</summary>
-    public static bool Save(string pdfPath, AnnotationFile annotations)
+    public bool Save(string pdfPath, AnnotationFile annotations)
     {
         annotations.SourcePdfPath = Path.GetFullPath(pdfPath);
         return SaveToFile(GetInternalPath(pdfPath), annotations);
@@ -125,7 +132,7 @@ public static class AnnotationService
     }
 
     /// <summary>Delete internal annotation file for a PDF.</summary>
-    public static bool Delete(string pdfPath)
+    public bool Delete(string pdfPath)
     {
         var path = GetInternalPath(pdfPath);
         if (!File.Exists(path)) return false;

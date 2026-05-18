@@ -29,14 +29,14 @@ public sealed class AnalysisWorker : IDisposable
     /// <summary>Set if the worker loop failed to start (e.g. ONNX model load failure).</summary>
     public string? StartupError { get; private set; }
 
-    public AnalysisWorker(string modelPath, IThreadMarshaller marshaller, ILogger? logger = null)
+    public AnalysisWorker(Func<ILayoutAnalyzer> analyzerFactory, IThreadMarshaller marshaller, ILogger? logger = null)
     {
         _logger = logger ?? NullLogger.Instance;
         _marshaller = marshaller;
         _requestChannel = Channel.CreateUnbounded<AnalysisRequest>();
         _resultChannel = Channel.CreateUnbounded<AnalysisResult>();
 
-        _workerTask = Task.Run(() => WorkerLoop(modelPath, _cts.Token));
+        _workerTask = Task.Run(() => WorkerLoop(analyzerFactory, _cts.Token));
         // Observe the task to prevent UnobservedTaskException
         _workerTask.ContinueWith(t =>
         {
@@ -45,19 +45,19 @@ public sealed class AnalysisWorker : IDisposable
         }, TaskContinuationOptions.OnlyOnFaulted);
     }
 
-    private async Task WorkerLoop(string modelPath, CancellationToken ct)
+    private async Task WorkerLoop(Func<ILayoutAnalyzer> analyzerFactory, CancellationToken ct)
     {
-        LayoutAnalyzer analyzer;
+        ILayoutAnalyzer analyzer;
         try
         {
-            analyzer = new LayoutAnalyzer(modelPath);
+            analyzer = analyzerFactory();
             IsReady = true;
-            _logger.Debug("[Worker] ONNX session ready, waiting for requests...");
+            _logger.Debug("[Worker] Layout analyzer ready, waiting for requests...");
         }
         catch (Exception ex)
         {
             StartupError = ex.Message;
-            _logger.Error("[Worker] FATAL: Failed to create ONNX session", ex);
+            _logger.Error("[Worker] FATAL: Failed to create layout analyzer", ex);
             _resultChannel.Writer.TryComplete();
             return;
         }

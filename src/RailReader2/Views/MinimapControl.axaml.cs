@@ -82,7 +82,7 @@ public partial class MinimapControl : UserControl
 
     private void ApplyConfig()
     {
-        if (_vm?.Config is not { } c) return;
+        if (_vm?.AppConfig is not { } c) return;
         Width = c.MinimapWidth;
         Height = c.MinimapHeight;
         Margin = new Thickness(0, 0, c.MinimapMarginRight, c.MinimapMarginBottom);
@@ -286,7 +286,7 @@ public partial class MinimapControl : UserControl
 
     private void PersistLayout()
     {
-        if (_vm?.Config is not { } c) return;
+        if (_vm?.AppConfig is not { } c) return;
         c.MinimapWidth = Bounds.Width;
         c.MinimapHeight = Bounds.Height;
         c.MinimapMarginRight = Margin.Right;

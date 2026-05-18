@@ -33,12 +33,12 @@ public sealed class MarkdownExportService : IMarkdownExportService
         if (err != null)
             throw new ArgumentException(err);
 
-        var modelPath = DocumentController.FindModelPath();
+        var modelPath = LayoutModelLocator.FindModelPath();
         using var analyzer = modelPath != null ? new LayoutAnalyzer(modelPath) : null;
 
         AnnotationFile? annotationFile = null;
         if (options.IncludeAnnotations)
-            annotationFile = AnnotationService.Load(pdfPath);
+            annotationFile = AnnotationService.Default.Load(pdfPath);
 
         var vlmEndpoint = options.VlmEndpoint;
         bool vlmAvailable = options.EnableVlm && vlmEndpoint != null
@@ -100,7 +100,7 @@ public sealed class MarkdownExportService : IMarkdownExportService
         var (pageW, pageH) = pdf.GetPageSize(pageIdx);
 
         var (rgbBytes, pxW, pxH) = pdf.RenderPagePixmap(pageIdx, LayoutConstants.InputSize);
-        var pageText = PdfTextService.ExtractPageText(pdf.PdfBytes, pageIdx);
+        var pageText = new PdfTextService().ExtractPageText(pdf.PdfBytes, pageIdx);
         var analysis = analyzer.RunAnalysis(rgbBytes, pxW, pxH, pageW, pageH, pageText.CharBoxes, ct);
         var blocks = analysis.Blocks;
 
@@ -151,7 +151,7 @@ public sealed class MarkdownExportService : IMarkdownExportService
         AnnotationFile? annotationFile,
         MarkdownExportOptions options)
     {
-        var pageText = PdfTextService.ExtractPageText(pdf.PdfBytes, pageIdx);
+        var pageText = new PdfTextService().ExtractPageText(pdf.PdfBytes, pageIdx);
         var pageAnnotations = options.IncludeAnnotations
             ? ExtractPageAnnotations(annotationFile, pageIdx)
             : null;

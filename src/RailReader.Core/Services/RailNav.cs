@@ -5,7 +5,7 @@ namespace RailReader.Core.Services;
 
 public sealed partial class RailNav : ICameraClamp
 {
-    private AppConfig _config;
+    private CoreSettings _config;
     private PageAnalysis? _analysis;
     private readonly List<int> _navigableIndices = [];
 
@@ -66,7 +66,7 @@ public sealed partial class RailNav : ICameraClamp
         return false;
     }
 
-    public RailNav(AppConfig config)
+    public RailNav(CoreSettings config)
     {
         _config = config;
         _autoScrollState = new AutoScrollStateMachine(this);
@@ -75,7 +75,7 @@ public sealed partial class RailNav : ICameraClamp
     double ICameraClamp.ClampX(double cameraX, double zoom, double windowWidth)
         => ClampX(cameraX, zoom, windowWidth);
 
-    public void SetAnalysis(PageAnalysis analysis, HashSet<int> navigable)
+    public void SetAnalysis(PageAnalysis analysis, IReadOnlySet<int> navigable)
     {
         // If re-applying the same analysis (e.g. config change that didn't affect
         // navigable classes), preserve the current navigation position.
@@ -530,7 +530,7 @@ public sealed partial class RailNav : ICameraClamp
     }
 
 
-    public void UpdateConfig(AppConfig config)
+    public void UpdateConfig(CoreSettings config)
     {
         _config = config;
         // If autoscroll is running, apply the updated speed immediately so

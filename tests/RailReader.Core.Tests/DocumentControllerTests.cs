@@ -13,7 +13,7 @@ public class DocumentControllerTests : IDisposable
     {
         _pdfPath = TestFixtures.GetTestPdfPath();
         var config = new AppConfig();
-        _controller = new DocumentController(config, new SynchronousThreadMarshaller(),
+        _controller = new DocumentController(config.ToCoreSettings(), config, AnnotationService.Default, new SynchronousThreadMarshaller(),
             TestFixtures.CreatePdfFactory());
         // Don't initialize worker (requires ONNX model) — test navigation without analysis
     }

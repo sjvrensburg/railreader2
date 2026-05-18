@@ -207,7 +207,7 @@ public partial class MainWindow : Window
 
     private void SetupRadialMenu(MainWindowViewModel vm)
     {
-        RadialMenuControl.Scale = vm.Config.UiFontScale;
+        RadialMenuControl.Scale = vm.AppConfig.UiFontScale;
 
         vm.CopyToClipboard = async text =>
         {
@@ -312,7 +312,7 @@ public partial class MainWindow : Window
         // Persist config when toolbar hides (deferred save for slider changes)
         if (wasVisible && !shouldShow)
         {
-            Vm?.Config.Save();
+            Vm?.AppConfig.Save();
             RailToolBar.SetJumpMode(false);
         }
         else if (shouldShow && Vm is { } v)
@@ -407,11 +407,11 @@ public partial class MainWindow : Window
             Camera: BuildCamera(tab),
             ScrollSpeed: (float)(tab?.Rail.ScrollSpeed ?? 0),
             ZoomSpeed: (float)(tab?.Camera.ZoomSpeed ?? 0),
-            MotionBlur: vm.Config.MotionBlur,
-            MotionBlurIntensity: (float)vm.Config.MotionBlurIntensity,
+            MotionBlur: vm.AppConfig.MotionBlur,
+            MotionBlurIntensity: (float)vm.AppConfig.MotionBlurIntensity,
             LineFocusBlur: tab?.LineFocusBlur ?? false,
-            LineFocusIntensity: (float)vm.Config.LineFocusBlurIntensity,
-            LinePadding: (float)vm.Config.LinePadding,
+            LineFocusIntensity: (float)vm.AppConfig.LineFocusBlurIntensity,
+            LinePadding: (float)vm.AppConfig.LinePadding,
             LineY: lineY,
             LineH: lineH,
             Effect: vm.Controller.ActiveColourEffect,
@@ -443,9 +443,9 @@ public partial class MainWindow : Window
             Effect: vm.Controller.ActiveColourEffect,
             LineFocusBlur: tab?.LineFocusBlur ?? false,
             LineHighlightEnabled: tab?.LineHighlightEnabled ?? true,
-            LinePadding: (float)vm.Config.LinePadding,
-            Tint: vm.Config.LineHighlightTint,
-            TintOpacity: (float)vm.Config.LineHighlightOpacity);
+            LinePadding: (float)vm.AppConfig.LinePadding,
+            Tint: vm.AppConfig.LineHighlightTint,
+            TintOpacity: (float)vm.AppConfig.LineHighlightOpacity);
     }
 
     private static AnnotationRenderState BuildAnnotationState(MainWindowViewModel vm, TabViewModel? tab)

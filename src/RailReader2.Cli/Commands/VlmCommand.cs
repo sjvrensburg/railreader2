@@ -71,7 +71,7 @@ public static class VlmCommand
             && !Enum.TryParse<VlmService.PromptStyle>(promptStyleStr, ignoreCase: true, out promptStyle))
             return Program.Fail($"Invalid --prompt-style: {promptStyleStr} (expected: instruction, ocr)");
 
-        var baseCfg = VlmEndpointConfig.FromAppConfigWithOverrides(
+        var baseCfg = Shared.BuildVlmEndpoint(
             endpointOverride, modelOverride, apiKeyOverride);
 
         var eqCfg = Override(baseCfg, eqEndpoint, eqModel, eqApiKey);

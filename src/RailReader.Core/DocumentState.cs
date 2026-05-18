@@ -11,6 +11,7 @@ public sealed class DocumentState : IDisposable
 {
     private readonly IPdfService _pdf;
     private readonly IPdfTextService _pdfText;
+    private readonly IPdfLinkService _pdfLink;
     private readonly IThreadMarshaller _marshaller;
     private readonly ILogger _logger;
     private readonly CancellationTokenSource _cts = new();
@@ -166,14 +167,15 @@ public sealed class DocumentState : IDisposable
     // Small pre-scaled thumbnail used by the minimap (≤200×280 px).
     public IRenderedPage? MinimapPage { get; private set; }
 
-    public DocumentState(string filePath, IPdfService pdf, IPdfTextService pdfText,
-        AppConfig config, IThreadMarshaller marshaller, ILogger? logger = null)
+    public DocumentState(string filePath, IPdfService pdf, IPdfTextService pdfText, IPdfLinkService pdfLink,
+        CoreSettings config, IThreadMarshaller marshaller, ILogger? logger = null)
     {
         _marshaller = marshaller;
         _logger = logger ?? NullLogger.Instance;
         FilePath = filePath;
         _pdf = pdf;
         _pdfText = pdfText;
+        _pdfLink = pdfLink;
         PageCount = _pdf.PageCount;
         _title = Path.GetFileName(filePath);
         _colourEffect = config.ColourEffect;
@@ -380,7 +382,7 @@ public sealed class DocumentState : IDisposable
         return false;
     }
 
-    public void SubmitAnalysis(AnalysisWorker? worker, HashSet<int> navigableClasses)
+    public void SubmitAnalysis(AnalysisWorker? worker, IReadOnlySet<int> navigableClasses)
     {
         if (_analysisCache.TryGetValue(CurrentPage, out var cached))
         {
@@ -430,13 +432,13 @@ public sealed class DocumentState : IDisposable
         }, ct);
     }
 
-    public void ReapplyNavigableClasses(HashSet<int> navigableClasses)
+    public void ReapplyNavigableClasses(IReadOnlySet<int> navigableClasses)
     {
         if (_analysisCache.TryGetValue(CurrentPage, out var cached))
             Rail.SetAnalysis(cached, navigableClasses);
     }
 
-    private void ApplyAnalysis(PageAnalysis analysis, HashSet<int> navigableClasses)
+    private void ApplyAnalysis(PageAnalysis analysis, IReadOnlySet<int> navigableClasses)
     {
         Rail.SetAnalysis(analysis, navigableClasses);
         PendingRailSetup = false;
@@ -528,7 +530,7 @@ public sealed class DocumentState : IDisposable
         }
     }
 
-    public bool GoToPage(int page, AnalysisWorker? worker, HashSet<int> navigableClasses, double windowWidth, double windowHeight)
+    public bool GoToPage(int page, AnalysisWorker? worker, IReadOnlySet<int> navigableClasses, double windowWidth, double windowHeight)
     {
         page = Math.Clamp(page, 0, PageCount - 1);
         if (page == CurrentPage) return true;
@@ -820,7 +822,7 @@ public sealed class DocumentState : IDisposable
         _marshaller.AssertUIThread();
         if (_linkCache.TryGetValue(pageIndex, out var cached))
             return cached;
-        var links = PdfLinkService.ExtractPageLinks(_pdf.PdfBytes, pageIndex);
+        var links = _pdfLink.ExtractPageLinks(_pdf.PdfBytes, pageIndex);
         _linkCache[pageIndex] = links;
         return links;
     }

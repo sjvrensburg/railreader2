@@ -188,9 +188,9 @@ public partial class RailToolBar : UserControl
         if (e.Property == RangeBase.ValueProperty && ViewModel is { } vm && _speedSlider is not null)
         {
             if (_jumpMode)
-                vm.Config.JumpPercentage = _speedSlider.Value;
+                vm.AppConfig.JumpPercentage = _speedSlider.Value;
             else
-                vm.Config.ScrollSpeedMax = _speedSlider.Value;
+                vm.AppConfig.ScrollSpeedMax = _speedSlider.Value;
             vm.OnSliderChanged();
         }
     }
@@ -199,7 +199,7 @@ public partial class RailToolBar : UserControl
     {
         if (e.Property == RangeBase.ValueProperty && ViewModel is { } vm && _blurSlider is not null)
         {
-            vm.Config.MotionBlurIntensity = _blurSlider.Value;
+            vm.AppConfig.MotionBlurIntensity = _blurSlider.Value;
             vm.OnSliderChanged();
         }
     }
@@ -226,7 +226,7 @@ public partial class RailToolBar : UserControl
         if (_speedSlider is null || _speedLabel is null || ViewModel is not { } vm) return;
 
         _speedLabel.Text = jumpMode ? "Jmp" : "Spd";
-        _speedSlider.Value = jumpMode ? vm.Config.JumpPercentage : vm.Config.ScrollSpeedMax;
+        _speedSlider.Value = jumpMode ? vm.AppConfig.JumpPercentage : vm.AppConfig.ScrollSpeedMax;
         ToolTip.SetTip(_speedSlider, jumpMode
             ? "Jump distance % ([ / ] keys)"
             : "Scroll speed ([ / ] keys)");
@@ -239,9 +239,9 @@ public partial class RailToolBar : UserControl
     {
         if (ViewModel is not { } vm) return;
         if (_speedSlider is not null)
-            _speedSlider.Value = _jumpMode ? vm.Config.JumpPercentage : vm.Config.ScrollSpeedMax;
+            _speedSlider.Value = _jumpMode ? vm.AppConfig.JumpPercentage : vm.AppConfig.ScrollSpeedMax;
         if (_blurSlider is not null)
-            _blurSlider.Value = vm.Config.MotionBlurIntensity;
+            _blurSlider.Value = vm.AppConfig.MotionBlurIntensity;
     }
 
     /// <summary>Adjust scroll speed by a delta. Used by keyboard shortcuts.</summary>

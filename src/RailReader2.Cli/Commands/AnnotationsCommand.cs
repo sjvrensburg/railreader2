@@ -27,7 +27,7 @@ public static class AnnotationsCommand
         if (format is not "json" and not "pdf")
             return Program.Fail($"Unknown format '{format}'. Valid options: json, pdf");
 
-        var annotations = AnnotationService.Load(pdfPath);
+        var annotations = AnnotationService.Default.Load(pdfPath);
         if (annotations == null)
         {
             Console.Error.WriteLine("No annotations found for this document.");
