@@ -78,7 +78,7 @@ public sealed partial class MainWindowViewModel
 
     private async Task SendBlockToVlm(DocumentState doc, LayoutBlock block, BlockAction action)
     {
-        if (string.IsNullOrWhiteSpace(Config.VlmEndpoint))
+        if (string.IsNullOrWhiteSpace(AppConfig.VlmEndpoint))
         {
             ShowStatusToast("VLM not configured \u2014 check Settings");
             return;
@@ -101,8 +101,8 @@ public sealed partial class MainWindowViewModel
         }
 
         var result = await VlmService.DescribeBlockAsync(
-            pngBytes, action, VlmEndpointConfig.FromAppConfig(Config),
-            structuredOutput: Config.VlmStructuredOutput);
+            pngBytes, action, VlmEndpointConfig.FromAppConfig(AppConfig),
+            structuredOutput: AppConfig.VlmStructuredOutput);
 
         if (result.Error is not null)
         {

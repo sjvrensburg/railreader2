@@ -8,13 +8,13 @@ namespace RailReader.Core.Services;
 /// Extracts clickable link regions from PDF pages via PDFium P/Invoke.
 /// Returns links in page-point space (origin top-left, Y-down).
 /// </summary>
-internal static class PdfLinkService
+public sealed class PdfLinkService : IPdfLinkService
 {
     internal static ILogger Logger { get; set; } = NullLogger.Instance;
 
     private static readonly List<PdfLink> s_empty = [];
 
-    public static List<PdfLink> ExtractPageLinks(byte[] pdfBytes, int pageIndex)
+    public List<PdfLink> ExtractPageLinks(byte[] pdfBytes, int pageIndex)
     {
         lock (PdfiumGate.Lock)
         {

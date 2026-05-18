@@ -1,3 +1,4 @@
+using RailReader.Core.Models;
 using RailReader.Core.Services;
 
 namespace RailReader.Core;
@@ -8,12 +9,14 @@ namespace RailReader.Core;
 /// </summary>
 internal sealed class AutoScrollController
 {
-    private readonly AppConfig _config;
+    private CoreSettings _config;
 
-    public AutoScrollController(AppConfig config)
+    public AutoScrollController(CoreSettings config)
     {
         _config = config;
     }
+
+    public void UpdateConfig(CoreSettings config) => _config = config;
 
     /// <summary>Whether auto-scroll is currently active.</summary>
     public bool AutoScrollActive

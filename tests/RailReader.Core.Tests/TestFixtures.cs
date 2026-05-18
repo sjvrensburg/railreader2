@@ -43,7 +43,7 @@ public static class TestFixtures
     /// Configures a DocumentState for rail mode testing: injects synthetic analysis,
     /// sets zoom above threshold, and activates rail navigation.
     /// </summary>
-    public static void SetupRailMode(DocumentState doc, AppConfig config,
+    public static void SetupRailMode(DocumentState doc, CoreSettings config,
         double vpWidth = 800, double vpHeight = 600)
     {
         var analysis = new PageAnalysis();

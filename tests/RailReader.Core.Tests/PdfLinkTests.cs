@@ -15,7 +15,7 @@ public class PdfLinkTests
         var pdfPath = TestFixtures.GetTestPdfPath();
 
         var state = new DocumentState(pdfPath, factory.CreatePdfService(pdfPath),
-            factory.CreatePdfTextService(), config, marshaller);
+            factory.CreatePdfTextService(), factory.CreatePdfLinkService(), config.ToCoreSettings(), marshaller);
         state.LoadPageBitmap();
 
         // Inject a synthetic link into the cache
@@ -65,7 +65,7 @@ public class PdfLinkTests
         var pdfPath = TestFixtures.GetTestPdfPath();
 
         var state = new DocumentState(pdfPath, factory.CreatePdfService(pdfPath),
-            factory.CreatePdfTextService(), config, marshaller);
+            factory.CreatePdfTextService(), factory.CreatePdfLinkService(), config.ToCoreSettings(), marshaller);
         state.LoadPageBitmap();
 
         // First call extracts (test PDF likely has no links)

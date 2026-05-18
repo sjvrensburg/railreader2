@@ -132,7 +132,9 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     [ObservableProperty] private bool _jumpMode;
     partial void OnJumpModeChanged(bool value) => _controller.JumpMode = value;
 
-    public AppConfig Config => _controller.Config;
+    /// <summary>The mutable, file-backed config. UI binds to this; Core sees only an immutable snapshot via <see cref="CoreSettings"/>.</summary>
+    public AppConfig AppConfig => _appConfig;
+    private readonly AppConfig _appConfig;
     public ColourEffectShaders ColourEffects { get; }
     public DocumentController Controller => _controller;
 
@@ -144,12 +146,18 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
     public MainWindowViewModel(AppConfig config, ILogger? logger = null)
     {
+        _appConfig = config;
         _logger = logger ?? AppConfig.Logger;
         ColourEffects = new ColourEffectShaders(_logger);
-        _controller = new DocumentController(config, new AvaloniaThreadMarshaller(),
-            new RailReader.Renderer.Skia.SkiaPdfServiceFactory(), _logger);
-        try { _controller.InitializeWorker(); }
-        catch (FileNotFoundException) { /* ONNX model not found — layout analysis disabled */ }
+        _controller = new DocumentController(config.ToCoreSettings(), config, AnnotationService.Default,
+            new AvaloniaThreadMarshaller(), new RailReader.Renderer.Skia.SkiaPdfServiceFactory(), _logger);
+        var modelPath = DocumentController.FindModelPath();
+        if (modelPath != null)
+        {
+            _logger.Debug($"[ONNX] Starting worker with model: {modelPath}");
+            try { _controller.InitializeWorker(() => new LayoutAnalyzer(modelPath)); }
+            catch (Exception ex) { _logger.Error("[ONNX] Worker init failed", ex); }
+        }
         _controller.StateChanged += OnControllerStateChanged;
         _controller.StatusMessage += ShowStatusToast;
         SetupPollTimer();
@@ -312,31 +320,32 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
     public void SetDarkMode(bool dark)
     {
-        Config.DarkMode = dark;
-        Config.Save();
+        AppConfig.DarkMode = dark;
+        AppConfig.Save();
         Avalonia.Application.Current!.RequestedThemeVariant =
             dark ? Avalonia.Styling.ThemeVariant.Dark : Avalonia.Styling.ThemeVariant.Light;
     }
 
     public void OnConfigChanged()
     {
-        _controller.OnConfigChanged();
+        _controller.OnConfigChanged(_appConfig.ToCoreSettings());
+        _appConfig.Save();
         ApplyFontScale();
         InvalidateAll();
         OnPropertyChanged(nameof(ActiveTab));
     }
 
-    public void OnSliderChanged() => _controller.OnSliderChanged();
+    public void OnSliderChanged() => _controller.OnSliderChanged(_appConfig.ToCoreSettings());
 
     private const double BaseFontSize = 14.0;
 
     private void ApplyFontScale()
     {
         if (_window is not null)
-            _window.FontSize = BaseFontSize * Config.UiFontScale;
+            _window.FontSize = BaseFontSize * AppConfig.UiFontScale;
     }
 
-    public double CurrentFontSize => BaseFontSize * Config.UiFontScale;
+    public double CurrentFontSize => BaseFontSize * AppConfig.UiFontScale;
 
     public void SetViewportSize(double w, double h) => _controller.SetViewportSize(w, h);
 

@@ -28,7 +28,8 @@ internal sealed class Program
         AnnotationService.Logger = logger;
         CleanupService.Logger = logger;
         PdfTextService.Logger = logger;
-        PdfOutlineExtractor.Logger = logger;
+        PdfOutlineService.Logger = logger;
+        PdfLinkService.Logger = logger;
         LayoutAnalyzer.Logger = logger;
         SkiaPdfService.Logger = logger;
 

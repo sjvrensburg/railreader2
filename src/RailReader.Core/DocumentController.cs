@@ -21,7 +21,9 @@ public record struct TickResult(
 /// </summary>
 public sealed partial class DocumentController : IDisposable
 {
-    private readonly AppConfig _config;
+    private CoreSettings _config;
+    private readonly IRecentFilesStore _recentFiles;
+    private readonly IAnnotationStore _annotationStore;
     private readonly IThreadMarshaller _marshaller;
     private readonly IPdfServiceFactory _pdfFactory;
     private readonly ILogger _logger;
@@ -36,7 +38,7 @@ public sealed partial class DocumentController : IDisposable
 
     public List<DocumentState> Documents { get; } = [];
     public int ActiveDocumentIndex { get; set; }
-    public AppConfig Config => _config;
+    public CoreSettings Config => _config;
     public ColourEffect ActiveColourEffect => ActiveDocument?.ColourEffect ?? _config.ColourEffect;
     public float ActiveColourIntensity => (float)_config.ColourEffectIntensity;
     public AnalysisWorker? Worker => _worker;
@@ -72,17 +74,20 @@ public sealed partial class DocumentController : IDisposable
     /// </summary>
     public Action<string>? StatusMessage;
 
-    public DocumentController(AppConfig config, IThreadMarshaller marshaller, IPdfServiceFactory pdfFactory,
-        ILogger? logger = null)
+    public DocumentController(CoreSettings config, IRecentFilesStore recentFiles,
+        IAnnotationStore annotationStore, IThreadMarshaller marshaller,
+        IPdfServiceFactory pdfFactory, ILogger? logger = null)
     {
         _config = config;
+        _recentFiles = recentFiles;
+        _annotationStore = annotationStore;
         _marshaller = marshaller;
         _pdfFactory = pdfFactory;
         _logger = logger ?? NullLogger.Instance;
         _zoom = new ZoomAnimationController();
         _autoScroll = new AutoScrollController(config);
         _autoScroll.StateChanged = name => StateChanged?.Invoke(name);
-        _annotationManager = new AnnotationFileManager(marshaller);
+        _annotationManager = new AnnotationFileManager(annotationStore, marshaller);
         _annotationManager.OnSaveFailure = msg => StatusMessage?.Invoke(msg);
         Annotations = new AnnotationInteractionHandler();
         Search = new SearchService(
@@ -92,17 +97,14 @@ public sealed partial class DocumentController : IDisposable
     }
 
     /// <summary>
-    /// Initialize the ONNX analysis worker. Must be called before opening documents.
+    /// Initialize the analysis worker with a factory for the platform's layout
+    /// analyzer (e.g. ONNX Runtime on desktop). Must be called before opening
+    /// documents.
     /// </summary>
-    public void InitializeWorker()
+    public void InitializeWorker(Func<ILayoutAnalyzer> analyzerFactory)
     {
-        var modelPath = FindModelPath()
-            ?? throw new FileNotFoundException(
-                "ONNX model not found (PP-DocLayoutV3.onnx). Run ./scripts/download-model.sh");
-
-        _logger.Debug($"[ONNX] Starting worker with model: {modelPath}");
-        _worker = new AnalysisWorker(modelPath, _marshaller, _logger);
-        _logger.Debug("[ONNX] Worker started (ONNX session loading in background)");
+        _worker = new AnalysisWorker(analyzerFactory, _marshaller, _logger);
+        _logger.Debug("[Analysis] Worker started (analyzer loading in background)");
     }
 
     public void SetViewportSize(double w, double h)
@@ -120,7 +122,7 @@ public sealed partial class DocumentController : IDisposable
     /// </summary>
     public DocumentState CreateDocument(string path)
         => new(path, _pdfFactory.CreatePdfService(path), _pdfFactory.CreatePdfTextService(),
-            _config, _marshaller, _logger);
+            _pdfFactory.CreatePdfLinkService(), _config, _marshaller, _logger);
 
     /// <summary>
     /// Adds a document to the tab list, restores reading position, and submits analysis.
@@ -130,7 +132,7 @@ public sealed partial class DocumentController : IDisposable
     {
         var (ww, wh) = GetViewportSize();
 
-        var saved = _config.GetReadingPosition(state.FilePath);
+        var saved = _recentFiles.GetReadingPosition(state.FilePath);
         bool restoredPage = saved is not null && saved.Page > 0;
         if (restoredPage)
             state.GoToPage(Math.Clamp(saved!.Page, 0, state.PageCount - 1), _worker, _config.NavigableClasses, ww, wh);
@@ -141,7 +143,7 @@ public sealed partial class DocumentController : IDisposable
         state.UpdateRailZoom(ww, wh);
 
         Documents.Add(state);
-        _config.AddRecentFile(state.FilePath);
+        _recentFiles.AddRecentFile(state.FilePath);
         ActiveDocumentIndex = Documents.Count - 1;
 
         // GoToPage already submitted analysis for the restored page;
@@ -155,7 +157,7 @@ public sealed partial class DocumentController : IDisposable
     {
         if (index < 0 || index >= Documents.Count) return;
         var doc = Documents[index];
-        _config.SaveReadingPosition(doc.FilePath, doc.CurrentPage,
+        _recentFiles.SaveReadingPosition(doc.FilePath, doc.CurrentPage,
             doc.Camera.Zoom, doc.Camera.OffsetX, doc.Camera.OffsetY, doc.ColourEffect);
 
         Documents.RemoveAt(index);
@@ -199,7 +201,7 @@ public sealed partial class DocumentController : IDisposable
     public void SaveAllReadingPositions()
     {
         foreach (var doc in Documents)
-            _config.SaveReadingPosition(doc.FilePath, doc.CurrentPage,
+            _recentFiles.SaveReadingPosition(doc.FilePath, doc.CurrentPage,
                 doc.Camera.Zoom, doc.Camera.OffsetX, doc.Camera.OffsetY, doc.ColourEffect);
         _annotationManager.FlushAll();
     }
@@ -456,13 +458,6 @@ public sealed partial class DocumentController : IDisposable
             doc.ColourEffect = effect;
     }
 
-    public void SetGlobalColourEffect(ColourEffect effect)
-    {
-        _config.ColourEffect = effect;
-        _config.Save();
-        SetColourEffect(effect);
-    }
-
     public ColourEffect CycleColourEffect()
     {
         var values = Enum.GetValues<ColourEffect>();
@@ -475,18 +470,30 @@ public sealed partial class DocumentController : IDisposable
 
     // --- Config ---
 
-    public void OnConfigChanged()
+    /// <summary>
+    /// Apply a new settings snapshot. The caller (UI shell) is responsible for
+    /// persisting the underlying config file — Core has no filesystem awareness.
+    /// </summary>
+    public void OnConfigChanged(CoreSettings newConfig)
     {
+        _config = newConfig;
+        _autoScroll.UpdateConfig(newConfig);
         foreach (var doc in Documents)
         {
             doc.Rail.UpdateConfig(_config);
             doc.ReapplyNavigableClasses(_config.NavigableClasses);
         }
-        _config.Save();
     }
 
-    public void OnSliderChanged()
+    /// <summary>
+    /// Apply a new settings snapshot for incremental slider drag events.
+    /// Like <see cref="OnConfigChanged"/> but skips reapplying analysis-derived
+    /// state (navigable classes) because slider drags don't change them.
+    /// </summary>
+    public void OnSliderChanged(CoreSettings newConfig)
     {
+        _config = newConfig;
+        _autoScroll.UpdateConfig(newConfig);
         foreach (var doc in Documents)
             doc.Rail.UpdateConfig(_config);
     }

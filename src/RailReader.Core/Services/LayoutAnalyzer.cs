@@ -6,7 +6,7 @@ using RailReader.Core.Models;
 
 namespace RailReader.Core.Services;
 
-public sealed class LayoutAnalyzer : IDisposable
+public sealed class LayoutAnalyzer : ILayoutAnalyzer
 {
     internal static ILogger Logger { get; set; } = NullLogger.Instance;
 

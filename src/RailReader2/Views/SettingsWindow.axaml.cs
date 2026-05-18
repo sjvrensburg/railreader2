@@ -38,7 +38,7 @@ public partial class SettingsWindow : Window
     private void LoadFromConfig()
     {
         if (Vm is not { } vm) return;
-        var c = vm.Config;
+        var c = vm.AppConfig;
         FontScale.Value = (decimal)c.UiFontScale;
         DarkModeCheck.IsChecked = c.DarkMode;
         MotionBlurCheck.IsChecked = c.MotionBlur;
@@ -70,10 +70,10 @@ public partial class SettingsWindow : Window
         LineHighlightOpacitySlider.Value = c.LineHighlightOpacity;
 
         BuildClassCheckboxes(_classItems, c.NavigableClasses,
-            set => { vm.Config.NavigableClasses = set; vm.OnConfigChanged(); },
+            set => { vm.AppConfig.NavigableClasses = set; vm.OnConfigChanged(); },
             NavigableClassesList);
         BuildClassCheckboxes(_centeringClassItems, c.CenteringClasses,
-            set => { vm.Config.CenteringClasses = set; vm.OnConfigChanged(); },
+            set => { vm.AppConfig.CenteringClasses = set; vm.OnConfigChanged(); },
             CenteringClassesList);
 
         VlmEndpoint.Text = c.VlmEndpoint ?? "";
@@ -85,7 +85,7 @@ public partial class SettingsWindow : Window
     private void SaveToConfig()
     {
         if (Vm is not { } vm || _loading) return;
-        var c = vm.Config;
+        var c = vm.AppConfig;
         c.UiFontScale = (float)(FontScale.Value ?? 1.0m);
         c.RailZoomThreshold = (double)(ZoomThreshold.Value ?? 3.0m);
         c.SnapDurationMs = (double)(SnapDuration.Value ?? 300m);
@@ -139,14 +139,14 @@ public partial class SettingsWindow : Window
     private void OnMotionBlurChanged(object? sender, RoutedEventArgs e)
     {
         if (Vm is not { } vm || _loading) return;
-        vm.Config.MotionBlur = MotionBlurCheck.IsChecked == true;
+        vm.AppConfig.MotionBlur = MotionBlurCheck.IsChecked == true;
         vm.OnConfigChanged();
     }
 
     private void OnSliderChanged(Avalonia.AvaloniaPropertyChangedEventArgs e, Action<AppConfig> apply)
     {
         if (e.Property.Name != "Value" || Vm is not { } vm || _loading) return;
-        apply(vm.Config);
+        apply(vm.AppConfig);
         vm.OnConfigChanged();
     }
 
@@ -156,7 +156,7 @@ public partial class SettingsWindow : Window
     private void OnPixelSnappingChanged(object? sender, RoutedEventArgs e)
     {
         if (Vm is not { } vm || _loading) return;
-        vm.Config.PixelSnapping = PixelSnappingCheck.IsChecked == true;
+        vm.AppConfig.PixelSnapping = PixelSnappingCheck.IsChecked == true;
         vm.OnConfigChanged();
     }
 
@@ -164,7 +164,7 @@ public partial class SettingsWindow : Window
     {
         if (Vm is not { } vm || _loading) return;
         bool value = LineFocusBlurCheck.IsChecked == true;
-        vm.Config.LineFocusBlur = value; // update default for new documents
+        vm.AppConfig.LineFocusBlur = value; // update default for new documents
         if (vm.ActiveTab is { } tab) tab.LineFocusBlur = value;
         vm.OnConfigChanged();
     }
@@ -173,7 +173,7 @@ public partial class SettingsWindow : Window
     {
         if (Vm is not { } vm || _loading) return;
         bool value = MarginCroppingCheck.IsChecked == true;
-        vm.Config.MarginCropping = value;
+        vm.AppConfig.MarginCropping = value;
         vm.ApplyMarginCropping(value);
         vm.OnConfigChanged();
     }
@@ -188,7 +188,7 @@ public partial class SettingsWindow : Window
     {
         if (Vm is not { } vm || _loading) return;
         bool value = LineHighlightCheck.IsChecked == true;
-        vm.Config.LineHighlightEnabled = value;
+        vm.AppConfig.LineHighlightEnabled = value;
         if (vm.ActiveTab is { } tab) tab.LineHighlightEnabled = value;
         vm.OnConfigChanged();
     }
@@ -196,7 +196,7 @@ public partial class SettingsWindow : Window
     private void OnLineHighlightTintChanged(object? sender, SelectionChangedEventArgs e)
     {
         if (Vm is not { } vm || _loading) return;
-        vm.Config.LineHighlightTint = (LineHighlightTint)LineHighlightTintCombo.SelectedIndex;
+        vm.AppConfig.LineHighlightTint = (LineHighlightTint)LineHighlightTintCombo.SelectedIndex;
         vm.OnConfigChanged();
     }
 
@@ -206,7 +206,7 @@ public partial class SettingsWindow : Window
     private void OnAutoScrollTriggerChanged(object? sender, RoutedEventArgs e)
     {
         if (Vm is not { } vm || _loading) return;
-        vm.Config.AutoScrollTriggerEnabled = AutoScrollTriggerCheck.IsChecked == true;
+        vm.AppConfig.AutoScrollTriggerEnabled = AutoScrollTriggerCheck.IsChecked == true;
         vm.OnConfigChanged();
     }
 
@@ -214,7 +214,9 @@ public partial class SettingsWindow : Window
     private void OnEffectChanged(object? sender, SelectionChangedEventArgs e)
     {
         if (Vm is not { } vm || _loading) return;
-        vm.Controller.SetGlobalColourEffect((ColourEffect)EffectCombo.SelectedIndex);
+        var effect = (ColourEffect)EffectCombo.SelectedIndex;
+        vm.AppConfig.ColourEffect = effect;
+        vm.Controller.SetColourEffect(effect);
         SaveToConfig();
     }
     private void OnIntensityChanged(object? sender, Avalonia.AvaloniaPropertyChangedEventArgs e)
@@ -227,48 +229,49 @@ public partial class SettingsWindow : Window
     {
         if (Vm is not { } vm) return;
         var defaults = new AppConfig();
-        vm.Config.RailZoomThreshold = defaults.RailZoomThreshold;
-        vm.Config.SnapDurationMs = defaults.SnapDurationMs;
-        vm.Config.ScrollSpeedStart = defaults.ScrollSpeedStart;
-        vm.Config.ScrollSpeedMax = defaults.ScrollSpeedMax;
-        vm.Config.ScrollRampTime = defaults.ScrollRampTime;
-        vm.Config.AnalysisLookaheadPages = defaults.AnalysisLookaheadPages;
-        vm.Config.UiFontScale = defaults.UiFontScale;
+        vm.AppConfig.RailZoomThreshold = defaults.RailZoomThreshold;
+        vm.AppConfig.SnapDurationMs = defaults.SnapDurationMs;
+        vm.AppConfig.ScrollSpeedStart = defaults.ScrollSpeedStart;
+        vm.AppConfig.ScrollSpeedMax = defaults.ScrollSpeedMax;
+        vm.AppConfig.ScrollRampTime = defaults.ScrollRampTime;
+        vm.AppConfig.AnalysisLookaheadPages = defaults.AnalysisLookaheadPages;
+        vm.AppConfig.UiFontScale = defaults.UiFontScale;
         vm.SetDarkMode(defaults.DarkMode);
-        vm.Controller.SetGlobalColourEffect(defaults.ColourEffect);
-        vm.Config.ColourEffectIntensity = defaults.ColourEffectIntensity;
-        vm.Config.MotionBlur = defaults.MotionBlur;
-        vm.Config.MotionBlurIntensity = defaults.MotionBlurIntensity;
-        vm.Config.NavigableClasses = LayoutConstants.DefaultNavigableClasses();
-        vm.Config.CenteringClasses = LayoutConstants.DefaultCenteringClasses();
-        vm.Config.PixelSnapping = defaults.PixelSnapping;
-        vm.Config.MarginCropping = defaults.MarginCropping;
-        vm.Config.MinimapWidth = defaults.MinimapWidth;
-        vm.Config.MinimapHeight = defaults.MinimapHeight;
-        vm.Config.MinimapMarginRight = defaults.MinimapMarginRight;
-        vm.Config.MinimapMarginBottom = defaults.MinimapMarginBottom;
-        vm.Config.LineFocusBlur = defaults.LineFocusBlur;
-        vm.Config.LineFocusBlurIntensity = defaults.LineFocusBlurIntensity;
+        vm.AppConfig.ColourEffect = defaults.ColourEffect;
+        vm.Controller.SetColourEffect(defaults.ColourEffect);
+        vm.AppConfig.ColourEffectIntensity = defaults.ColourEffectIntensity;
+        vm.AppConfig.MotionBlur = defaults.MotionBlur;
+        vm.AppConfig.MotionBlurIntensity = defaults.MotionBlurIntensity;
+        vm.AppConfig.NavigableClasses = LayoutConstants.DefaultNavigableClasses();
+        vm.AppConfig.CenteringClasses = LayoutConstants.DefaultCenteringClasses();
+        vm.AppConfig.PixelSnapping = defaults.PixelSnapping;
+        vm.AppConfig.MarginCropping = defaults.MarginCropping;
+        vm.AppConfig.MinimapWidth = defaults.MinimapWidth;
+        vm.AppConfig.MinimapHeight = defaults.MinimapHeight;
+        vm.AppConfig.MinimapMarginRight = defaults.MinimapMarginRight;
+        vm.AppConfig.MinimapMarginBottom = defaults.MinimapMarginBottom;
+        vm.AppConfig.LineFocusBlur = defaults.LineFocusBlur;
+        vm.AppConfig.LineFocusBlurIntensity = defaults.LineFocusBlurIntensity;
         if (vm.ActiveTab is { } resetTab)
         {
             resetTab.LineFocusBlur = defaults.LineFocusBlur;
             resetTab.LineHighlightEnabled = defaults.LineHighlightEnabled;
             resetTab.MarginCropping = defaults.MarginCropping;
         }
-        vm.Config.AutoScrollLinePauseMs = defaults.AutoScrollLinePauseMs;
-        vm.Config.AutoScrollBlockPauseMs = defaults.AutoScrollBlockPauseMs;
-        vm.Config.AutoScrollEquationPauseMs = defaults.AutoScrollEquationPauseMs;
-        vm.Config.AutoScrollHeaderPauseMs = defaults.AutoScrollHeaderPauseMs;
-        vm.Config.AutoScrollTriggerEnabled = defaults.AutoScrollTriggerEnabled;
-        vm.Config.AutoScrollTriggerDelayMs = defaults.AutoScrollTriggerDelayMs;
-        vm.Config.JumpPercentage = defaults.JumpPercentage;
-        vm.Config.LineHighlightEnabled = defaults.LineHighlightEnabled;
-        vm.Config.LineHighlightTint = defaults.LineHighlightTint;
-        vm.Config.LineHighlightOpacity = defaults.LineHighlightOpacity;
-        vm.Config.VlmEndpoint = defaults.VlmEndpoint;
-        vm.Config.VlmModel = defaults.VlmModel;
-        vm.Config.VlmApiKey = defaults.VlmApiKey;
-        vm.Config.VlmStructuredOutput = defaults.VlmStructuredOutput;
+        vm.AppConfig.AutoScrollLinePauseMs = defaults.AutoScrollLinePauseMs;
+        vm.AppConfig.AutoScrollBlockPauseMs = defaults.AutoScrollBlockPauseMs;
+        vm.AppConfig.AutoScrollEquationPauseMs = defaults.AutoScrollEquationPauseMs;
+        vm.AppConfig.AutoScrollHeaderPauseMs = defaults.AutoScrollHeaderPauseMs;
+        vm.AppConfig.AutoScrollTriggerEnabled = defaults.AutoScrollTriggerEnabled;
+        vm.AppConfig.AutoScrollTriggerDelayMs = defaults.AutoScrollTriggerDelayMs;
+        vm.AppConfig.JumpPercentage = defaults.JumpPercentage;
+        vm.AppConfig.LineHighlightEnabled = defaults.LineHighlightEnabled;
+        vm.AppConfig.LineHighlightTint = defaults.LineHighlightTint;
+        vm.AppConfig.LineHighlightOpacity = defaults.LineHighlightOpacity;
+        vm.AppConfig.VlmEndpoint = defaults.VlmEndpoint;
+        vm.AppConfig.VlmModel = defaults.VlmModel;
+        vm.AppConfig.VlmApiKey = defaults.VlmApiKey;
+        vm.AppConfig.VlmStructuredOutput = defaults.VlmStructuredOutput;
         _loading = true;
         LoadFromConfig();
         _loading = false;
@@ -282,7 +285,7 @@ public partial class SettingsWindow : Window
     private async void OnTestVlmConnection(object? sender, RoutedEventArgs e)
     {
         SaveToConfig();
-        var config = Vm?.Config;
+        var config = Vm?.AppConfig;
         if (config is null) return;
 
         if (string.IsNullOrWhiteSpace(config.VlmEndpoint))
@@ -295,7 +298,7 @@ public partial class SettingsWindow : Window
         TestVlmButton.IsEnabled = false;
         try
         {
-            var result = await VlmService.TestConnectionAsync(config);
+            var result = await VlmService.TestConnectionAsync(config.ToCoreSettings());
             VlmTestResult.Text = result ?? "Connection successful!";
         }
         catch (Exception ex)

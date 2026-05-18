@@ -17,7 +17,8 @@ static class Program
         AnnotationService.Logger = logger;
         LayoutAnalyzer.Logger = logger;
         PdfTextService.Logger = logger;
-        PdfOutlineExtractor.Logger = logger;
+        PdfOutlineService.Logger = logger;
+        PdfLinkService.Logger = logger;
 
         var factory = new SkiaPdfServiceFactory();
 

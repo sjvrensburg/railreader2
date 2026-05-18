@@ -17,10 +17,10 @@ public class AutoScrollControllerTests : IDisposable
         _config = new AppConfig();
         var factory = TestFixtures.CreatePdfFactory();
         _doc = new DocumentState(_pdfPath, factory.CreatePdfService(_pdfPath),
-            factory.CreatePdfTextService(), _config, new SynchronousThreadMarshaller());
+            factory.CreatePdfTextService(), factory.CreatePdfLinkService(), _config.ToCoreSettings(), new SynchronousThreadMarshaller());
         _doc.LoadPageBitmap();
         _doc.CenterPage(800, 600);
-        _autoScroll = new AutoScrollController(_config);
+        _autoScroll = new AutoScrollController(_config.ToCoreSettings());
 
         // Set up rail mode so auto-scroll can activate
         SetupRailMode();
@@ -31,7 +31,7 @@ public class AutoScrollControllerTests : IDisposable
         _doc.Dispose();
     }
 
-    private void SetupRailMode() => TestFixtures.SetupRailMode(_doc, _config);
+    private void SetupRailMode() => TestFixtures.SetupRailMode(_doc, _config.ToCoreSettings());
 
     [Fact]
     public void ToggleAutoScroll_Activates()

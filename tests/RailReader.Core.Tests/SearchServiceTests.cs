@@ -17,7 +17,7 @@ public class SearchServiceTests : IDisposable
         var factory = TestFixtures.CreatePdfFactory();
         _pdfPath = TestFixtures.GetTestPdfPath();
         _state = new DocumentState(_pdfPath, factory.CreatePdfService(_pdfPath),
-            factory.CreatePdfTextService(), config, new SynchronousThreadMarshaller());
+            factory.CreatePdfTextService(), factory.CreatePdfLinkService(), config.ToCoreSettings(), new SynchronousThreadMarshaller());
         _state.LoadPageBitmap();
 
         _search = new SearchService(

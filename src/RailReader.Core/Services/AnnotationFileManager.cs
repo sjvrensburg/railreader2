@@ -11,6 +11,7 @@ using RailReader.Core.Models;
 /// </summary>
 public sealed class AnnotationFileManager : IDisposable
 {
+    private readonly IAnnotationStore _store;
     private readonly IThreadMarshaller _marshaller;
     private readonly Dictionary<string, SharedEntry> _entries = new(StringComparer.OrdinalIgnoreCase);
     private readonly object _lock = new();
@@ -22,8 +23,9 @@ public sealed class AnnotationFileManager : IDisposable
     /// </summary>
     public Action<string>? OnSaveFailure { get; set; }
 
-    public AnnotationFileManager(IThreadMarshaller marshaller)
+    public AnnotationFileManager(IAnnotationStore store, IThreadMarshaller marshaller)
     {
+        _store = store;
         _marshaller = marshaller;
     }
 
@@ -43,7 +45,7 @@ public sealed class AnnotationFileManager : IDisposable
                 return entry.Annotations;
             }
 
-            var annotations = AnnotationService.Load(pdfPath) ?? new AnnotationFile
+            var annotations = _store.Load(pdfPath) ?? new AnnotationFile
             {
                 SourcePdf = Path.GetFileName(pdfPath),
                 SourcePdfPath = key,
@@ -137,8 +139,8 @@ public sealed class AnnotationFileManager : IDisposable
             || entry.Annotations.Bookmarks.Count > 0;
 
         bool ok = hasContent
-            ? AnnotationService.Save(entry.PdfPath, entry.Annotations)
-            : AnnotationService.Delete(entry.PdfPath);
+            ? _store.Save(entry.PdfPath, entry.Annotations)
+            : _store.Delete(entry.PdfPath);
 
         if (ok)
             entry.Dirty = false;

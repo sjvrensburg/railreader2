@@ -13,7 +13,7 @@ public class MarginCroppingTests : IDisposable
     public MarginCroppingTests()
     {
         _pdfPath = TestFixtures.GetTestPdfPath();
-        _controller = new DocumentController(new AppConfig(),
+        _controller = new DocumentController(new AppConfig().ToCoreSettings(), new AppConfig(), AnnotationService.Default,
             new SynchronousThreadMarshaller(), TestFixtures.CreatePdfFactory());
     }
 

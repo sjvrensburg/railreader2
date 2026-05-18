@@ -16,6 +16,9 @@ public record VlmEndpointConfig(string? Endpoint, string? Model, string? ApiKey)
     public static VlmEndpointConfig FromAppConfig(AppConfig config) =>
         new(config.VlmEndpoint, config.VlmModel, config.VlmApiKey);
 
+    public static VlmEndpointConfig FromCoreSettings(CoreSettings settings) =>
+        new(settings.VlmEndpoint, settings.VlmModel, settings.VlmApiKey);
+
     /// <summary>
     /// Resolves a VLM endpoint from CLI overrides, AppConfig, and OPENAI_API_KEY env var.
     /// Precedence: explicit override > AppConfig > $OPENAI_API_KEY.
@@ -174,17 +177,17 @@ public static class VlmService
     /// Tests the VLM connection by sending a simple text-only request.
     /// Returns null on success, or an error message on failure.
     /// </summary>
-    public static async Task<string?> TestConnectionAsync(AppConfig config, CancellationToken ct = default)
+    public static async Task<string?> TestConnectionAsync(CoreSettings settings, CancellationToken ct = default)
     {
-        if (string.IsNullOrWhiteSpace(config.VlmEndpoint))
+        if (string.IsNullOrWhiteSpace(settings.VlmEndpoint))
             return "Enter an endpoint URL first";
 
-        if (string.IsNullOrWhiteSpace(config.VlmModel))
+        if (string.IsNullOrWhiteSpace(settings.VlmModel))
             return "Enter a model name first";
 
         try
         {
-            var client = CreateClient(VlmEndpointConfig.FromAppConfig(config));
+            var client = CreateClient(VlmEndpointConfig.FromCoreSettings(settings));
 
             var messages = new List<ChatMessage>
             {
