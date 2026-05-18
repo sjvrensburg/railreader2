@@ -1,9 +1,5 @@
 <Solution>
   <Folder Name="/src/">
-    <Project Path="src/RailReader.Core/RailReader.Core.csproj" />
-    <Project Path="src/RailReader.Core.Pdfium/RailReader.Core.Pdfium.csproj" />
-    <Project Path="src/RailReader.Core.Analysis/RailReader.Core.Analysis.csproj" />
-    <Project Path="src/RailReader.Renderer.Skia/RailReader.Renderer.Skia.csproj" />
     <Project Path="src/RailReader2/RailReader2.csproj" />
     <Project Path="src/RailReader2.Cli/RailReader2.Cli.csproj" />
     <Project Path="src/RailReader.Export/RailReader.Export.csproj" />

@@ -24,14 +24,7 @@ internal sealed class Program
         PdfiumResolver.Initialize();
 
         var logger = new ConsoleLogger();
-        AppConfig.Logger = logger;
-        AnnotationService.Logger = logger;
-        CleanupService.Logger = logger;
-        PdfTextService.Logger = logger;
-        PdfOutlineService.Logger = logger;
-        PdfLinkService.Logger = logger;
-        LayoutAnalyzer.Logger = logger;
-        SkiaPdfService.Logger = logger;
+        RailReaderLogging.Logger = logger;
 
         // Log unhandled exceptions so crash info survives in session.log
         AppDomain.CurrentDomain.UnhandledException += (_, e) =>

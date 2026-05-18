@@ -11,14 +11,9 @@ static class Program
         if (args.Length == 0 || args[0] is "--help" or "-h")
             return PrintHelp();
 
-        // Bootstrap: set static loggers (internals visible to this project)
+        // Bootstrap: set the central logger (services read from RailReaderLogging.Logger)
         var logger = new ConsoleLogger();
-        SkiaPdfService.Logger = logger;
-        AnnotationService.Logger = logger;
-        LayoutAnalyzer.Logger = logger;
-        PdfTextService.Logger = logger;
-        PdfOutlineService.Logger = logger;
-        PdfLinkService.Logger = logger;
+        RailReaderLogging.Logger = logger;
 
         var factory = new SkiaPdfServiceFactory();
 

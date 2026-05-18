@@ -147,7 +147,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     public MainWindowViewModel(AppConfig config, ILogger? logger = null)
     {
         _appConfig = config;
-        _logger = logger ?? AppConfig.Logger;
+        _logger = logger ?? RailReaderLogging.Logger;
         ColourEffects = new ColourEffectShaders(_logger);
         _controller = new DocumentController(config.ToCoreSettings(), config, AnnotationService.Default,
             new AvaloniaThreadMarshaller(), new RailReader.Renderer.Skia.SkiaPdfServiceFactory(), _logger);
