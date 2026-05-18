@@ -323,22 +323,16 @@ Rail reading parameters are editable via the Settings panel (gear icon in menu b
 
 ## Architecture
 
-The codebase is split into a rendering-agnostic core library, a shared SkiaSharp renderer, a thin Avalonia UI shell, and headless tests:
+The portable core (models, controllers, rail navigation, line detection, search, annotations, the SkiaSharp renderer) lives in the separate [RailReaderCore](https://github.com/sjvrensburg/RailReaderCore) repository and is consumed here as NuGet packages: `RailReader.Core`, `RailReader.Core.Pdfium`, `RailReader.Core.Analysis`, `RailReader.Renderer.Skia`. This repository contains the desktop application shell, the headless CLI, the Markdown export pipeline, and their tests:
 
 ```
 RailReader2.slnx              # Default solution
-├── src/RailReader.Core/        # Business logic (zero Avalonia, zero SkiaSharp)
-├── src/RailReader.Renderer.Skia/ # SkiaSharp rendering (implements Core interfaces)
-├── src/RailReader.Export/      # Markdown export pipeline (references Core + Renderer.Skia)
 ├── src/RailReader2/            # Thin Avalonia UI shell
-├── src/RailReader2.Cli/        # Headless CLI (references Core + Renderer.Skia + Export)
-├── tests/RailReader.Core.Tests/  # xUnit headless tests for Core
+├── src/RailReader2.Cli/        # Headless CLI
+├── src/RailReader.Export/      # Markdown export pipeline
+├── tests/RailReader.Core.Tests/  # xUnit headless tests against the Core packages
 └── tests/RailReader.Export.Tests/ # xUnit tests for Export
 ```
-
-**RailReader.Core** contains `DocumentController` (the headless orchestration facade), `DocumentState` (per-document state), all Models and Services. It has no rendering-library dependency — PDF rendering is abstracted behind `IPdfService`/`IPdfTextService` interfaces. The test project uses it directly.
-
-**RailReader.Renderer.Skia** implements Core's rendering interfaces using PDFium and SkiaSharp. It also contains all Skia drawing code (annotations, overlays, shaders, screenshot compositing).
 
 ## Command-line interface
 

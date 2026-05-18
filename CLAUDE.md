@@ -50,52 +50,15 @@ dotnet publish src/RailReader2 -c Release -r win-x64 --self-contained     # Wind
 ## Architecture
 
 ```
-RailReader2.slnx              # Default: app + core + renderer + export + CLI + tests
-├── src/RailReader.Core/          # Portable, UI-free abstractions: models, controllers, interfaces (no PDFium, no ONNX, no filesystem)
-├── src/RailReader.Core.Pdfium/   # Desktop PDFium impls of IPdfTextService/IPdfLinkService/IPdfOutlineService + filesystem-backed AppConfig/AnnotationService/CleanupService + ConsoleLogger + LayoutModelLocator
-├── src/RailReader.Core.Analysis/ # ONNX-backed ILayoutAnalyzer impl (LayoutAnalyzer)
-├── src/RailReader.Renderer.Skia/ # SkiaSharp rendering layer (depends on Core + Core.Pdfium)
-├── src/RailReader.Export/        # Markdown export pipeline (depends on Core + Core.Pdfium + Core.Analysis + Renderer.Skia, zero Avalonia)
-├── src/RailReader2/              # Thin Avalonia UI shell (depends on Core + Core.Pdfium + Core.Analysis + Renderer.Skia)
-├── src/RailReader2.Cli/          # Headless CLI tool (depends on all of the above, zero Avalonia)
-├── tests/RailReader.Core.Tests/  # xUnit headless tests against Core + Core.Pdfium
+RailReader2.slnx                  # Default: app + CLI + export + tests
+├── src/RailReader2/              # Thin Avalonia UI shell
+├── src/RailReader2.Cli/          # Headless CLI tool (zero Avalonia)
+├── src/RailReader.Export/        # Markdown export pipeline (zero Avalonia)
+├── tests/RailReader.Core.Tests/  # xUnit headless tests
 └── tests/RailReader.Export.Tests/ # xUnit tests for Export
 ```
 
-### RailReader.Core (portable library — the future NuGet)
-
-Zero Avalonia / SkiaSharp / PDFium / ONNX / filesystem dependencies. This is the portable core that Lite (web) and any future mobile app share with desktop. Key files:
-
-- `DocumentController.cs` — headless controller facade (orchestration, animation tick loop, viewport). Delegates zoom animation to `ZoomAnimationController.cs`, auto-scroll to `AutoScrollController.cs`, annotation interaction to `AnnotationInteractionHandler.cs`, search to `Services/SearchService.cs`. Takes `CoreSettings`, `IRecentFilesStore`, `IAnnotationStore`, `IPdfServiceFactory`.
-- `DocumentState.cs` — per-document state (PDF via `IPdfService`, camera, rail nav, analysis cache, annotations, bookmarks)
-- `Models/CoreSettings.cs` — immutable record of runtime tuning values consumed by Core (the platform builds it from its own config persistence)
-- `Models/` — data models (Annotations, BookmarkEntry, Camera, LayoutBlock, RectF, ColorRGBA, PdfLink, etc.)
-- `Services/AnalysisWorker.cs` — background inference thread (`Channel<T>` queue). Takes a `Func<ILayoutAnalyzer>` factory; the platform supplies the concrete analyzer.
-- `Services/RailNav.cs` — rail navigation state machine (snap, scroll, clamp, auto-scroll, jump mode)
-- `Services/I*.cs` — all abstractions: `IPdfService`, `IPdfTextService`, `IPdfLinkService`, `IPdfOutlineService`, `IPdfServiceFactory`, `IAnnotationStore`, `IRecentFilesStore`, `ILayoutAnalyzer`, `IMarkdownExportService`
-- `Services/AnnotationFileManager.cs` — reference-counted shared `AnnotationFile` instances per PDF path. Takes `IAnnotationStore` for IO.
-- `Services/AnnotationGeometry.cs` — pure-geometry annotation hit testing, bounds computation
-- `AnnotationInteractionHandler.cs` — annotation tool input handling (drag, resize, text notes)
-- `Services/SearchService.cs` — full-text search with regex/case sensitivity, result grouping by page
-- `Services/VlmService.cs` — OpenAI-compatible vision-API client (Core's only NuGet dep beyond ORT is the OpenAI SDK)
-- `ILogger.cs` — logging abstraction (`ILogger`, `NullLogger`)
-
-### RailReader.Core.Pdfium (desktop PDFium + filesystem impls)
-
-The desktop-only implementations of Core's interfaces. Moves with the platform; not present on web.
-
-- `PdfTextService.cs` / `PdfLinkService.cs` / `PdfOutlineService.cs` — PDFium P/Invoke implementations of the Core interfaces
-- `PdfiumNative.cs` / `PdfiumGate.cs` / `PdfiumResolver.cs` — P/Invoke decls, serialization lock, native library resolver
-- `AppConfig.cs` — file-backed mutable config (`~/.config/railreader2/config.json`), implements `IRecentFilesStore`, exposes `ToCoreSettings()`
-- `AnnotationService.cs` — file IO for annotations, implements `IAnnotationStore`. Static `MergeInto` etc. stay here as pure helpers.
-- `CleanupService.cs` — removes stale logs, cache files, orphaned annotation files
-- `ConsoleLogger.cs` — file-backed `ILogger` writing to `session.log`
-- `LayoutModelLocator.cs` — probes well-known disk paths for `PP-DocLayoutV3.onnx`
-- `RailReaderJsonContext.cs` — source-generated `JsonSerializerContext` for `AppConfig` + `AnnotationFile`
-
-### RailReader.Core.Analysis (ONNX-backed inference)
-
-- `LayoutAnalyzer.cs` — implements `ILayoutAnalyzer` via `Microsoft.ML.OnnxRuntime` + PP-DocLayoutV3
+The portable core — `RailReader.Core`, `RailReader.Core.Pdfium`, `RailReader.Core.Analysis`, `RailReader.Renderer.Skia` — lives in the separate [RailReaderCore](https://github.com/sjvrensburg/RailReaderCore) repository and is consumed here as NuGet packages. All references in this document to types like `DocumentController`, `DocumentState`, `AppConfig`, `AnnotationService`, `LayoutAnalyzer`, `SkiaPdfService`, `OverlayRenderer`, `RailReaderLogging`, etc. resolve through those packages. Logger bootstrap goes via `RailReaderLogging.Logger = new ConsoleLogger();` once at startup; the per-service Logger setters that previously existed are gone.
 
 ### RailReader2 (Avalonia UI shell)
 
@@ -109,19 +72,6 @@ Thin wrapper delegating all logic to `DocumentController`/`DocumentState` in Cor
 - `Controls/RadialMenu.cs` — Skia-rendered three-ring radial context menu (tools → thickness → colours) with Font Awesome icons
 
 **AXAML bindings**: `AvaloniaUseCompiledBindingsByDefault` is enabled — all bindings are compiled by default. Use `{x:Bind}`-style compiled bindings in AXAML files.
-
-### RailReader.Renderer.Skia (SkiaSharp rendering)
-
-SkiaSharp rendering and PDF rasterisation. Implements `IPdfService` (rasterisation) and provides the `SkiaPdfServiceFactory` that the UI/CLI inject into Core. The factory hands out Core.Pdfium implementations of the text/link/outline interfaces.
-
-- `SkiaPdfService.cs` / `SkiaPdfServiceFactory.cs` — PDFium-backed rasterisation + factory
-- `SkiaRenderedPage.cs` — `IRenderedPage` wrapping `SKBitmap`
-- `AnnotationRenderer.cs` — Skia annotation drawing (highlight, freehand, text note, rectangle) with z-order sorting
-- `OverlayRenderer.cs` — rail overlay drawing (dim, block outline, line highlight)
-- `ScreenshotCompositor.cs` — multi-layer composition to `SKBitmap`
-- `ColourEffectShaders.cs` — SkSL shader compilation (HighContrast, HighVisibility, Amber, Invert)
-- `AnnotationExportService.cs` — annotation export to PDF via `SKDocument`
-- `SkiaConversions.cs` — `ColorRGBA`↔`SKColor`, `RectF`↔`SKRect` conversion helpers
 
 ### Tests
 
@@ -151,7 +101,7 @@ Structured PDF-to-Markdown export library. Zero Avalonia deps — references Cor
 
 ### Cross-Project Internals
 
-Core uses `InternalsVisibleTo` to expose internals to `RailReader.Core.Tests`, `RailReader.Renderer.Skia`, `RailReader2`, `RailReader2.Cli`, `RailReader.Export`, and `RailReader.Export.Tests`. Renderer.Skia also exposes internals to `RailReader2`, `RailReader2.Cli`, `RailReader.Export`, and `RailReader.Export.Tests`. Export exposes internals to `RailReader.Export.Tests`. This allows the thin UI shell, CLI, and export library to access internal types without making them public.
+The four upstream packages declare `InternalsVisibleTo` for `RailReader2`, `RailReader2.Cli`, `RailReader.Export`, and `RailReader.Export.Tests` (plus their own dev siblings). This lets the consumers in this repo access internal types without making them part of the upstream public surface. Export exposes internals to `RailReader.Export.Tests`. If a referenced upstream symbol stops resolving after a package bump, check whether it was made non-internal or moved — the friend-assembly grant only covers `internal`, not `private`.
 
 ## Key Concepts
 
