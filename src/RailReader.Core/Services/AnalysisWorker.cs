@@ -6,7 +6,8 @@ namespace RailReader.Core.Services;
 
 public sealed record AnalysisRequest(
     string FilePath, int Page, byte[] RgbBytes,
-    int PxW, int PxH, double PageW, double PageH);
+    int PxW, int PxH, double PageW, double PageH,
+    IReadOnlyList<CharBox>? CharBoxes = null);
 
 public sealed record AnalysisResult(
     string FilePath, int Page, PageAnalysis Analysis);
@@ -67,7 +68,8 @@ public sealed class AnalysisWorker : IDisposable
             {
                 _logger.Debug($"[Worker] Running ONNX for {Path.GetFileName(request.FilePath)} page {request.Page}...");
                 var analysis = analyzer.RunAnalysis(
-                    request.RgbBytes, request.PxW, request.PxH, request.PageW, request.PageH, ct);
+                    request.RgbBytes, request.PxW, request.PxH, request.PageW, request.PageH,
+                    request.CharBoxes, ct);
                 _logger.Debug($"[Worker] Page {request.Page}: {analysis.Blocks.Count} blocks detected");
 
                 await _resultChannel.Writer.WriteAsync(

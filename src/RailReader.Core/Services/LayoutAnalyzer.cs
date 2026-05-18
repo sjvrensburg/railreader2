@@ -68,7 +68,7 @@ public sealed class LayoutAnalyzer : IDisposable
     }
 
     public PageAnalysis RunAnalysis(byte[] rgbBytes, int pxW, int pxH, double pageW, double pageH,
-        CancellationToken ct = default)
+        IReadOnlyList<CharBox>? charBoxes = null, CancellationToken ct = default)
     {
         int target = LayoutConstants.InputSize;
 
@@ -101,7 +101,7 @@ public sealed class LayoutAnalyzer : IDisposable
         var rawBlocks = ExtractDetections(results, pxW, pxH, mapScaleX, mapScaleY);
         if (rawBlocks is null)
             return new PageAnalysis { Blocks = [], PageWidth = pageW, PageHeight = pageH };
-        PostProcessBlocks(rawBlocks, rgbBytes, pxW, pxH, mapScaleX, mapScaleY);
+        PostProcessBlocks(rawBlocks, rgbBytes, pxW, pxH, mapScaleX, mapScaleY, charBoxes);
 
         return new PageAnalysis
         {
@@ -188,7 +188,7 @@ public sealed class LayoutAnalyzer : IDisposable
 
     private static void PostProcessBlocks(
         List<LayoutBlock> rawBlocks, byte[] rgbBytes, int pxW, int pxH,
-        float mapScaleX, float mapScaleY)
+        float mapScaleX, float mapScaleY, IReadOnlyList<CharBox>? charBoxes)
     {
         Nms(rawBlocks, LayoutConstants.NmsIouThreshold);
         SuppressNestedBlocks(rawBlocks);
@@ -202,7 +202,7 @@ public sealed class LayoutAnalyzer : IDisposable
             rawBlocks[i].Order = i;
 
         ResolveVerticalOverlaps(rawBlocks);
-        DetectLinesForBlocks(rawBlocks, rgbBytes, pxW, pxH, mapScaleX, mapScaleY);
+        DetectLinesForBlocks(rawBlocks, rgbBytes, pxW, pxH, mapScaleX, mapScaleY, charBoxes);
     }
 
     private static float[] PreprocessImage(byte[] rgbBytes, int origW, int origH, int target, ref float[]? buffer)
@@ -357,143 +357,13 @@ public sealed class LayoutAnalyzer : IDisposable
         }
     }
 
-    internal static float[] ComputeRowDensities(byte[] rgbBytes, int imgW, int cropX, int cropY, int cropW, int cropH)
-    {
-        var profile = new float[cropH];
-        for (int row = 0; row < cropH; row++)
-        {
-            int darkCount = 0;
-            for (int col = 0; col < cropW; col++)
-            {
-                int pixelIdx = ((cropY + row) * imgW + (cropX + col)) * 3;
-                if (pixelIdx + 2 < rgbBytes.Length)
-                {
-                    float r = rgbBytes[pixelIdx];
-                    float g = rgbBytes[pixelIdx + 1];
-                    float b = rgbBytes[pixelIdx + 2];
-                    float lum = r * 0.299f + g * 0.587f + b * 0.114f;
-                    if (lum < LayoutConstants.DarkLuminanceThreshold)
-                        darkCount++;
-                }
-            }
-            profile[row] = (float)darkCount / cropW;
-        }
-
-        // Smooth with radius-1 moving average
-        var smoothed = new float[cropH];
-        for (int r = 0; r < cropH; r++)
-        {
-            int start = Math.Max(r - 1, 0);
-            int end = Math.Min(r + 2, cropH);
-            float sum = 0;
-            for (int k = start; k < end; k++) sum += profile[k];
-            smoothed[r] = sum / (end - start);
-        }
-        return smoothed;
-    }
-
-    /// <summary>
-    /// Detects line runs using adaptive density thresholding with recovery for short lines.
-    /// The primary pass uses a density-fraction threshold (15% of average) which reliably
-    /// segments dense text. A second recovery pass scans any uncovered regions at the top
-    /// and bottom of the block with a low absolute threshold to catch short lines (e.g. the
-    /// last few words of a paragraph) that fall below the density-fraction threshold.
-    /// </summary>
-    internal static List<(int Start, int Height)> FindLineRuns(float[] densities)
-    {
-        // Primary pass: density-fraction threshold — works well for dense text
-        var nonZero = densities.Where(v => v > 0.005f).ToArray();
-        float threshold = nonZero.Length == 0
-            ? 0.005f
-            : Math.Max(nonZero.Average() * LayoutConstants.DensityThresholdFraction, 0.005f);
-
-        var runs = FindRunsAboveThreshold(densities, threshold);
-
-        if (runs.Count == 0) return runs;
-
-        // Recovery pass: check for uncovered regions at top and bottom of the block.
-        // If the first/last detected line is far from the block edge, re-scan that
-        // region with a low absolute threshold to catch short lines.
-        int medianHeight = runs.Select(r => r.Height).OrderBy(h => h).ElementAt(runs.Count / 2);
-        float recoveryThreshold = 0.005f;
-
-        // Top recovery: region before the first detected line
-        int firstLineStart = runs[0].Start;
-        if (firstLineStart > medianHeight / 2)
-        {
-            var topRuns = FindRunsAboveThreshold(densities[..firstLineStart], recoveryThreshold);
-            runs.InsertRange(0, topRuns);
-        }
-
-        // Bottom recovery: region after the last detected line
-        var lastRun = runs[^1];
-        int lastLineEnd = lastRun.Start + lastRun.Height;
-        int remaining = densities.Length - lastLineEnd;
-        if (remaining > medianHeight / 2)
-        {
-            var bottomRuns = FindRunsAboveThreshold(densities[lastLineEnd..], recoveryThreshold);
-            // Offset the recovered runs to block-relative coordinates
-            runs.AddRange(bottomRuns.Select(r => (r.Start + lastLineEnd, r.Height)));
-        }
-
-        return runs;
-    }
-
-    private static List<(int Start, int Height)> FindRunsAboveThreshold(float[] densities, float threshold)
-    {
-        var runs = new List<(int Start, int Height)>();
-        int? runStart = null;
-
-        for (int r = 0; r < densities.Length; r++)
-        {
-            if (densities[r] > threshold)
-            {
-                runStart ??= r;
-            }
-            else if (runStart is not null)
-            {
-                int runH = r - runStart.Value;
-                if (runH >= LayoutConstants.MinLineHeightPx)
-                    runs.Add((runStart.Value, runH));
-                runStart = null;
-            }
-        }
-        if (runStart is not null)
-        {
-            int runH = densities.Length - runStart.Value;
-            if (runH >= LayoutConstants.MinLineHeightPx)
-                runs.Add((runStart.Value, runH));
-        }
-        return runs;
-    }
-
     private static void DetectLinesForBlocks(
-        List<LayoutBlock> blocks, byte[] rgbBytes, int imgW, int imgH, float scaleX, float scaleY)
+        List<LayoutBlock> blocks, byte[] rgbBytes, int imgW, int imgH,
+        float scaleX, float scaleY, IReadOnlyList<CharBox>? charBoxes)
     {
         foreach (var block in blocks)
         {
-            int pxX = Math.Min((int)Math.Round(block.BBox.X / scaleX), imgW - 1);
-            int pxY = Math.Min((int)Math.Round(block.BBox.Y / scaleY), imgH - 1);
-            int pxW = Math.Min((int)Math.Round(block.BBox.W / scaleX), imgW - pxX);
-            int pxH = Math.Min((int)Math.Round(block.BBox.H / scaleY), imgH - pxY);
-
-            if (pxW == 0 || pxH == 0)
-            {
-                block.Lines.Add(new LineInfo(block.BBox.Y + block.BBox.H / 2, block.BBox.H));
-                continue;
-            }
-
-            var densities = ComputeRowDensities(rgbBytes, imgW, pxX, pxY, pxW, pxH);
-            var runs = FindLineRuns(densities);
-
-            block.Lines = runs
-                .Select(run =>
-                {
-                    float centerYPx = run.Start + run.Height / 2.0f;
-                    return new LineInfo(block.BBox.Y + centerYPx * scaleY, run.Height * scaleY);
-                })
-                .ToList();
-
+            block.Lines = LineDetector.DetectLines(block, charBoxes, rgbBytes, imgW, imgH, scaleX, scaleY);
             if (block.Lines.Count == 0)
                 block.Lines.Add(new LineInfo(block.BBox.Y + block.BBox.H / 2, block.BBox.H));
         }

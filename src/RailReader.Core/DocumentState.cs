@@ -412,11 +412,13 @@ public sealed class DocumentState : IDisposable
             {
                 ct.ThrowIfCancellationRequested();
                 var (rgb, pxW, pxH) = _pdf.RenderPagePixmap(page, LayoutConstants.InputSize);
-                _logger.Debug($"[SubmitAnalysis] Page {page}: pixmap ready {pxW}x{pxH}, submitting...");
+                var pageText = _pdfText.ExtractPageText(_pdf.PdfBytes, page);
+                _logger.Debug($"[SubmitAnalysis] Page {page}: pixmap ready {pxW}x{pxH}, {pageText.CharBoxes.Count} chars, submitting...");
                 _marshaller.Post(() =>
                 {
                     if (IsDisposed || CurrentPage != page) return;
-                    worker.Submit(new AnalysisRequest(filePath, page, rgb, pxW, pxH, pageW, pageH));
+                    _textCache[page] = pageText;
+                    worker.Submit(new AnalysisRequest(filePath, page, rgb, pxW, pxH, pageW, pageH, pageText.CharBoxes));
                 });
             }
             catch (OperationCanceledException) { }
@@ -472,10 +474,14 @@ public sealed class DocumentState : IDisposable
                 {
                     ct.ThrowIfCancellationRequested();
                     var (rgb, pxW, pxH) = _pdf.RenderPagePixmap(page, LayoutConstants.InputSize);
+                    var pageText = _pdfText.ExtractPageText(_pdf.PdfBytes, page);
                     _marshaller.Post(() =>
                     {
                         if (!IsDisposed)
-                            worker.Submit(new AnalysisRequest(filePath, page, rgb, pxW, pxH, pageW, pageH));
+                        {
+                            _textCache[page] = pageText;
+                            worker.Submit(new AnalysisRequest(filePath, page, rgb, pxW, pxH, pageW, pageH, pageText.CharBoxes));
+                        }
                     });
                 }
                 catch (OperationCanceledException) { }
@@ -511,7 +517,8 @@ public sealed class DocumentState : IDisposable
         {
             var (pageW, pageH) = _pdf.GetPageSize(page);
             var (rgb, pxW, pxH) = _pdf.RenderPagePixmap(page, LayoutConstants.InputSize);
-            worker.Submit(new AnalysisRequest(FilePath, page, rgb, pxW, pxH, pageW, pageH));
+            var pageText = GetOrExtractText(page);
+            worker.Submit(new AnalysisRequest(FilePath, page, rgb, pxW, pxH, pageW, pageH, pageText.CharBoxes));
             return true;
         }
         catch (Exception ex)

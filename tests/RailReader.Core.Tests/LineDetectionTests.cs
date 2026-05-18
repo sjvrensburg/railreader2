@@ -31,7 +31,7 @@ public class LineDetectionTests
     public void DetectsAllFullWidthLines()
     {
         var profile = MakeDensityProfile(5, lineHeightPx: 10, gapPx: 6, density: 0.3f);
-        var runs = LayoutAnalyzer.FindLineRuns(profile);
+        var runs = LineDetector.FindLineRuns(profile);
         Assert.Equal(5, runs.Count);
     }
 
@@ -40,7 +40,7 @@ public class LineDetectionTests
     {
         // 14 lines of dense text — should detect all lines, not merge into fewer
         var profile = MakeDensityProfile(14, lineHeightPx: 10, gapPx: 4, density: 0.35f);
-        var runs = LayoutAnalyzer.FindLineRuns(profile);
+        var runs = LineDetector.FindLineRuns(profile);
         Assert.Equal(14, runs.Count);
     }
 
@@ -51,7 +51,7 @@ public class LineDetectionTests
         // Primary pass misses it (0.02 < 0.3*0.15=0.045), recovery pass catches it
         var profile = MakeDensityProfile(6, lineHeightPx: 10, gapPx: 6, density: 0.3f,
             lineDensities: new() { [5] = 0.02f });
-        var runs = LayoutAnalyzer.FindLineRuns(profile);
+        var runs = LineDetector.FindLineRuns(profile);
         Assert.Equal(6, runs.Count);
     }
 
@@ -61,7 +61,7 @@ public class LineDetectionTests
         // Short leading line + 5 full lines
         var profile = MakeDensityProfile(6, lineHeightPx: 10, gapPx: 6, density: 0.3f,
             lineDensities: new() { [0] = 0.02f });
-        var runs = LayoutAnalyzer.FindLineRuns(profile);
+        var runs = LineDetector.FindLineRuns(profile);
         Assert.Equal(6, runs.Count);
     }
 
@@ -73,7 +73,7 @@ public class LineDetectionTests
         // short lines are rare in typeset text.
         var profile = MakeDensityProfile(5, lineHeightPx: 10, gapPx: 6, density: 0.3f,
             lineDensities: new() { [2] = 0.02f });
-        var runs = LayoutAnalyzer.FindLineRuns(profile);
+        var runs = LineDetector.FindLineRuns(profile);
         Assert.Equal(4, runs.Count); // line #2 missed, acceptable
     }
 
@@ -88,7 +88,7 @@ public class LineDetectionTests
         // Line at rows 22-29
         for (int i = 22; i < 30; i++) profile[i] = 0.3f;
 
-        var runs = LayoutAnalyzer.FindLineRuns(profile);
+        var runs = LineDetector.FindLineRuns(profile);
         Assert.Equal(2, runs.Count);
     }
 
@@ -96,7 +96,7 @@ public class LineDetectionTests
     public void EmptyProfileReturnsNoLines()
     {
         var profile = new float[50];
-        var runs = LayoutAnalyzer.FindLineRuns(profile);
+        var runs = LineDetector.FindLineRuns(profile);
         Assert.Empty(runs);
     }
 
@@ -107,7 +107,7 @@ public class LineDetectionTests
         // uses 0.005 fallback threshold since no non-zero rows exceed it
         var profile = new float[20];
         for (int i = 5; i < 15; i++) profile[i] = 0.015f;
-        var runs = LayoutAnalyzer.FindLineRuns(profile);
+        var runs = LineDetector.FindLineRuns(profile);
         Assert.Single(runs);
     }
 }

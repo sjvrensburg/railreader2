@@ -78,16 +78,18 @@ public static class AnnotationsCommand
                     Height = (float)ph
                 };
 
+                PageText? pageText = null;
+                if ((includeText || includeBlocks) && textService != null)
+                    pageText = textService.ExtractPageText(pdf2.PdfBytes, pageIdx);
+
                 PageAnalysis? analysis = null;
                 if (includeBlocks && analyzer != null)
                 {
                     var (rgbBytes, pxW, pxH) = pdf2.RenderPagePixmap(pageIdx, 800);
-                    analysis = analyzer.RunAnalysis(rgbBytes, pxW, pxH, pw, ph);
+                    analysis = analyzer.RunAnalysis(rgbBytes, pxW, pxH, pw, ph, pageText?.CharBoxes);
                 }
 
-                PageText? pageText = null;
-                if (includeText && textService != null)
-                    pageText = textService.ExtractPageText(pdf2.PdfBytes, pageIdx);
+                if (!includeText) pageText = null;
 
                 foreach (var ann in pageAnnotations)
                 {
