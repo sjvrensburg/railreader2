@@ -26,7 +26,7 @@ jobs:
             -o "models/$MODEL_NAME" "$MODEL_URL"
 
       - name: Upload model artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: onnx-model
           path: models/${{ env.MODEL_NAME }}
@@ -46,7 +46,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y fuse libfuse2
 
       - name: Download model artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: onnx-model
           path: models/
@@ -85,7 +85,7 @@ jobs:
           ARCH=x86_64 ./appimagetool AppDir railreader2-linux-x86_64.AppImage
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: linux-appimage
           path: railreader2-linux-x86_64.AppImage
@@ -105,7 +105,7 @@ jobs:
         run: choco install innosetup -y
 
       - name: Download model artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: onnx-model
           path: models/
@@ -127,7 +127,7 @@ jobs:
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DAPP_VERSION="$version" installer\railreader2.iss
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: windows-setup
           path: installer/output/railreader2-setup-x64.exe
@@ -144,7 +144,7 @@ jobs:
           dotnet-version: "10.0.x"
 
       - name: Download model artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: onnx-model
           path: models/
@@ -181,7 +181,7 @@ jobs:
           & $makeappx.FullName pack /d publish\msix /p railreader2-win-x64.msix /o
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: windows-msix
           path: railreader2-win-x64.msix
@@ -198,7 +198,7 @@ jobs:
           dotnet-version: "10.0.x"
 
       - name: Download model artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: onnx-model
           path: models
@@ -215,7 +215,7 @@ jobs:
           tar czf ../railreader2-cli-linux-x64.tar.gz RailReader2.Cli *.so models/
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: linux-cli
           path: railreader2-cli-linux-x64.tar.gz
@@ -232,7 +232,7 @@ jobs:
           dotnet-version: "10.0.x"
 
       - name: Download model artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: onnx-model
           path: models
@@ -247,7 +247,7 @@ jobs:
           Compress-Archive -Path publish-cli\RailReader2.Cli.exe, publish-cli\*.dll, publish-cli\models -DestinationPath railreader2-cli-win-x64.zip
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: windows-cli
           path: railreader2-cli-win-x64.zip
@@ -257,7 +257,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           merge-multiple: true
 
