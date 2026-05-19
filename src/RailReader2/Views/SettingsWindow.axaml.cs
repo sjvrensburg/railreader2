@@ -4,6 +4,7 @@ using Avalonia.Interactivity;
 using CommunityToolkit.Mvvm.ComponentModel;
 using RailReader.Core.Models;
 using RailReader.Core.Services;
+using RailReader.Core.Vlm.OpenAI;
 using RailReader2.ViewModels;
 
 namespace RailReader2.Views;
@@ -298,7 +299,8 @@ public partial class SettingsWindow : Window
         TestVlmButton.IsEnabled = false;
         try
         {
-            var result = await VlmService.TestConnectionAsync(config.ToCoreSettings());
+            IVlmService vlm = new OpenAIVlmClient();
+            var result = await vlm.TestConnectionAsync(VlmEndpointConfig.FromCoreSettings(config.ToCoreSettings()));
             VlmTestResult.Text = result ?? "Connection successful!";
         }
         catch (Exception ex)

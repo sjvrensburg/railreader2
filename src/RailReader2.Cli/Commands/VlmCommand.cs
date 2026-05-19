@@ -3,6 +3,7 @@ using System.Text.RegularExpressions;
 using RailReader.Core;
 using RailReader.Core.Models;
 using RailReader.Core.Services;
+using RailReader.Core.Vlm.OpenAI;
 using RailReader.Renderer.Skia;
 
 namespace RailReader.Cli.Commands;
@@ -144,6 +145,7 @@ public static class VlmCommand
         var results = new List<VlmBlockResult>(prepared.Count);
         if (!dryRun)
         {
+            IVlmService vlm = new OpenAIVlmClient();
             using var gate = new SemaphoreSlim(concurrency);
             var tasks = new List<Task<VlmBlockResult>>(prepared.Count);
             int done = 0;
@@ -165,7 +167,7 @@ public static class VlmCommand
                         else if (string.IsNullOrWhiteSpace(classCfg.Endpoint))
                             result = new VlmService.VlmResult(null, $"No endpoint configured for {action}");
                         else
-                            result = await VlmService.DescribeBlockAsync(
+                            result = await vlm.DescribeBlockAsync(
                                 p.Png, action, classCfg, promptStyle, structuredOutput: !noStructured);
 
                         if (!noHtmlToMd && action == VlmService.BlockAction.Markdown

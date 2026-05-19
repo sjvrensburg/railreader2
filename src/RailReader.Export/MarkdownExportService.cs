@@ -2,6 +2,7 @@ using System.Text;
 using RailReader.Core;
 using RailReader.Core.Models;
 using RailReader.Core.Services;
+using RailReader.Core.Vlm.OpenAI;
 using RailReader.Renderer.Skia;
 
 namespace RailReader.Export;
@@ -182,6 +183,7 @@ public sealed class MarkdownExportService : IMarkdownExportService
 
         if (vlmTargets.Count == 0) return;
 
+        IVlmService vlm = new OpenAIVlmClient();
         var bboxes = vlmTargets.Select(t => t.Block.BBox).ToList();
         List<byte[]?> pngs;
         try
@@ -231,7 +233,7 @@ public sealed class MarkdownExportService : IMarkdownExportService
                     }
                     else
                     {
-                        result = await VlmService.DescribeBlockAsync(
+                        result = await vlm.DescribeBlockAsync(
                             png, action, vlmEndpoint,
                             options.VlmPromptStyle,
                             options.VlmStructuredOutput, ct);
