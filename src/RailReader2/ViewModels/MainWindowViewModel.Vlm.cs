@@ -1,6 +1,7 @@
 using RailReader.Core;
 using RailReader.Core.Models;
 using RailReader.Core.Services;
+using RailReader.Core.Vlm.OpenAI;
 using RailReader.Renderer.Skia;
 
 using static RailReader.Core.Services.VlmService;
@@ -100,7 +101,8 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        var result = await VlmService.DescribeBlockAsync(
+        IVlmService vlm = new OpenAIVlmClient();
+        var result = await vlm.DescribeBlockAsync(
             pngBytes, action, VlmEndpointConfig.FromCoreSettings(AppConfig.ToCoreSettings()),
             structuredOutput: AppConfig.VlmStructuredOutput);
 
