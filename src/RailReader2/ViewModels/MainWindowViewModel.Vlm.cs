@@ -22,7 +22,7 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        var action = DefaultActionForBlock(block.ClassId);
+        var action = DefaultActionForBlock(block.Role);
         await SendBlockToVlm(doc, block, action);
     }
 
@@ -70,12 +70,8 @@ public sealed partial class MainWindowViewModel
 
     public Func<byte[], Task>? CopyImageToClipboard { get; set; }
 
-    private static BlockAction DefaultActionForBlock(int classId)
-    {
-        if (LayoutConstants.TableClasses.Contains(classId)) return BlockAction.Markdown;
-        if (LayoutConstants.FigureClasses.Contains(classId)) return BlockAction.Description;
-        return BlockAction.LaTeX;
-    }
+    private static BlockAction DefaultActionForBlock(BlockRole role) =>
+        VlmService.GetBlockAction(role) ?? BlockAction.LaTeX;
 
     private async Task SendBlockToVlm(DocumentState doc, LayoutBlock block, BlockAction action)
     {

@@ -214,33 +214,66 @@
                         <TextBlock Text="Number of pages to pre-analyse ahead of the current page."
                                    TextWrapping="Wrap" Opacity="0.5" />
 
-                        <TextBlock Text="Navigable Block Types" FontWeight="Bold" Margin="0,12,0,0" />
+                        <TextBlock Text="Navigable Block Roles" FontWeight="Bold" Margin="0,12,0,0" />
                         <Separator />
-                        <TextBlock Text="Select which layout block types are navigable in rail mode:"
+                        <TextBlock Text="Rail mode will navigate through the semantic roles you check below. Roles are model-independent — they work the same whether you use the bundled PP-DocLayoutV3 model or a custom one."
                                    TextWrapping="Wrap" Opacity="0.7" />
-                        <ItemsControl Name="NavigableClassesList">
+                        <ItemsControl Name="NavigableRolesList">
                             <ItemsControl.ItemTemplate>
-                                <DataTemplate x:DataType="v:NavigableClassItem">
-                                    <CheckBox Content="{Binding Name}"
+                                <DataTemplate x:DataType="v:NavigableRoleItem">
+                                    <CheckBox Content="{Binding Label}"
                                               IsChecked="{Binding IsChecked}"
                                               Margin="0,1" />
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
 
-                        <TextBlock Text="Centered Block Types" FontWeight="Bold" Margin="0,12,0,0" />
+                        <TextBlock Text="Centered Block Roles" FontWeight="Bold" Margin="0,12,0,0" />
                         <Separator />
-                        <TextBlock Text="Select which block types are horizontally centered when narrower than the viewport:"
+                        <TextBlock Text="Roles to horizontally center when narrower than the viewport (headings are usually left-aligned):"
                                    TextWrapping="Wrap" Opacity="0.7" />
-                        <ItemsControl Name="CenteringClassesList">
+                        <ItemsControl Name="CenteringRolesList">
                             <ItemsControl.ItemTemplate>
-                                <DataTemplate x:DataType="v:NavigableClassItem">
-                                    <CheckBox Content="{Binding Name}"
+                                <DataTemplate x:DataType="v:NavigableRoleItem">
+                                    <CheckBox Content="{Binding Label}"
                                               IsChecked="{Binding IsChecked}"
                                               Margin="0,1" />
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
+
+                        <TextBlock Text="Custom Layout Model" FontWeight="Bold" Margin="0,16,0,0" />
+                        <Separator />
+                        <TextBlock TextWrapping="Wrap" Opacity="0.7"
+                                   Text="Optionally replace the bundled PP-DocLayoutV3 model with your own ONNX. The model must follow the same I/O contract (im_shape/image/scale_factor inputs, [N, 6+] detection tensor). Pair it with a JSON file that maps each model class id to a BlockRole." />
+                        <CheckBox Name="CustomModelEnabled" Content="Use custom layout model"
+                                  IsCheckedChanged="OnCustomModelEnabledChanged" Margin="0,4,0,4" />
+                        <Grid ColumnDefinitions="*,8,Auto" RowDefinitions="Auto,4,Auto">
+                            <TextBox Grid.Row="0" Grid.Column="0" Name="CustomModelPath"
+                                     Watermark="Path to .onnx file" IsReadOnly="True" />
+                            <Button  Grid.Row="0" Grid.Column="2" Content="Browse…"
+                                     Click="OnBrowseCustomModel" />
+                            <TextBox Grid.Row="2" Grid.Column="0" Name="CustomModelMappingPath"
+                                     Watermark="Path to class-mapping .json" IsReadOnly="True" />
+                            <Button  Grid.Row="2" Grid.Column="2" Content="Browse…"
+                                     Click="OnBrowseCustomModelMapping" />
+                        </Grid>
+                        <TextBlock Name="CustomModelStatus" TextWrapping="Wrap" Opacity="0.7" FontSize="11"
+                                   Margin="0,6,0,0" />
+                        <Expander Header="Example mapping JSON" Margin="0,6,0,0">
+                            <TextBlock FontFamily="Consolas, Menlo, monospace" FontSize="11" TextWrapping="Wrap"
+                                       xml:space="preserve">{
+  "name": "DocLayout-YOLO custom",
+  "input_size": 1024,
+  "provides_reading_order": false,
+  "classes": [
+    { "id": 0, "name": "title",      "role": "Title" },
+    { "id": 1, "name": "plain_text", "role": "Text" },
+    { "id": 2, "name": "figure",     "role": "Figure" },
+    { "id": 3, "name": "table",      "role": "Table" }
+  ]
+}</TextBlock>
+                        </Expander>
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>

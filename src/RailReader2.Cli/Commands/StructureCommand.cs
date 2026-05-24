@@ -2,6 +2,7 @@ using System.Text.Json;
 using RailReader.Core;
 using RailReader.Core.Models;
 using RailReader.Core.Services;
+using RailReader.Export;
 using RailReader.Renderer.Skia;
 
 namespace RailReader.Cli.Commands;
@@ -58,8 +59,9 @@ public static class StructureCommand
 
                 if (analyze && analyzer != null)
                 {
-                    var (rgbBytes, pxW, pxH) = pdf.RenderPagePixmap(pageIdx, 800);
-                    analysis = analyzer.RunAnalysis(rgbBytes, pxW, pxH, pw, ph, pageText?.CharBoxes);
+                    var (rgbBytes, pxW, pxH) = pdf.RenderPagePixmap(pageIdx, analyzer.Capabilities.InputSize);
+                    analysis = LayoutAnalysisPipeline.RunWithPixmap(
+                        analyzer, rgbBytes, pxW, pxH, pw, ph, pageText?.CharBoxes);
                 }
 
                 if (!includeText) pageText = null;
@@ -75,14 +77,16 @@ public static class StructureCommand
 
                     if (analysis != null)
                     {
+                        var classTable = analyzer!.Capabilities.Classes;
                         pageOutput.Blocks = analysis.Blocks.Select(b =>
                         {
                             var block = new StructureBlock
                             {
-                                Class = b.ClassId < LayoutConstants.LayoutClasses.Length
-                                    ? LayoutConstants.LayoutClasses[b.ClassId]
+                                Class = b.ClassId >= 0 && b.ClassId < classTable.Count
+                                    ? classTable[b.ClassId].Name
                                     : $"class_{b.ClassId}",
                                 ClassId = b.ClassId,
+                                Role = b.Role.ToString(),
                                 BBox = new BBoxOutput(b.BBox.X, b.BBox.Y, b.BBox.W, b.BBox.H),
                                 Confidence = b.Confidence,
                                 ReadingOrder = b.Order,
@@ -156,6 +160,7 @@ public class StructureBlock
 {
     public string Class { get; set; } = "";
     public int ClassId { get; set; }
+    public string Role { get; set; } = "";
     public BBoxOutput BBox { get; set; } = new();
     public float Confidence { get; set; }
     public int ReadingOrder { get; set; }

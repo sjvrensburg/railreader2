@@ -12,7 +12,7 @@ public class AppConfigTests
         Assert.Equal(3.0, config.RailZoomThreshold);
         Assert.Equal(300.0, config.SnapDurationMs);
         Assert.True(config.PixelSnapping);
-        Assert.NotEmpty(config.NavigableClasses);
+        Assert.NotEmpty(config.NavigableRoles);
         Assert.Equal(180, config.MinimapWidth);
         Assert.Equal(240, config.MinimapHeight);
         Assert.Equal(10, config.MinimapMarginRight);

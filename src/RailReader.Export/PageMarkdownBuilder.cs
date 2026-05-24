@@ -30,11 +30,11 @@ public static class PageMarkdownBuilder
 
         for (int i = 0; i < blocks.Count; i++)
         {
-            var className = LayoutConstants.GetClassName(blocks[i].ClassId);
+            var role = blocks[i].Role;
             var vlm = vlmResults?.GetValueOrDefault(i);
             blockTexts.TryGetValue(i, out var text);
 
-            var blockMd = RenderBlock(className, i, text, headingLevels, vlm, figurePaths);
+            var blockMd = RenderBlock(role, i, text, headingLevels, vlm, figurePaths);
             if (blockMd != null)
             {
                 if (sb.Length > 0)
@@ -132,24 +132,22 @@ public static class PageMarkdownBuilder
     }
 
     private static string? RenderBlock(
-        string className,
+        BlockRole role,
         int blockIndex,
         string? text,
         IReadOnlyDictionary<int, int> headingLevels,
         VlmBlockResult? vlm,
         IReadOnlyDictionary<int, string>? figurePaths)
     {
-        return className switch
+        return role switch
         {
-            "doc_title" or "paragraph_title" => RenderHeading(blockIndex, text, headingLevels),
-            "text" or "abstract" or "content" or "reference" or "reference_content"
-                or "footnote" or "aside_text" or "vertical_text" => RenderTextBlock(text),
-            "display_formula" or "inline_formula" or "algorithm" => RenderEquation(vlm, text),
-            "formula_number" => null,
-            "table" => RenderTable(vlm, text),
-            "image" or "chart" or "footer_image" or "header_image" => RenderFigure(blockIndex, vlm, figurePaths),
-            "figure_title" => RenderFigureTitle(text),
-            "header" or "footer" or "number" or "seal" => null,
+            BlockRole.Title or BlockRole.Heading => RenderHeading(blockIndex, text, headingLevels),
+            BlockRole.Text or BlockRole.Aside or BlockRole.Reference or BlockRole.Footnote => RenderTextBlock(text),
+            BlockRole.DisplayMath or BlockRole.InlineMath or BlockRole.Algorithm => RenderEquation(vlm, text),
+            BlockRole.Table => RenderTable(vlm, text),
+            BlockRole.Figure or BlockRole.Chart => RenderFigure(blockIndex, vlm, figurePaths),
+            BlockRole.Caption => RenderFigureTitle(text),
+            BlockRole.Header or BlockRole.Footer or BlockRole.PageNumber or BlockRole.Decoration => null,
             _ => RenderTextBlock(text),
         };
     }

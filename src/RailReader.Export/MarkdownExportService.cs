@@ -100,9 +100,10 @@ public sealed class MarkdownExportService : IMarkdownExportService
     {
         var (pageW, pageH) = pdf.GetPageSize(pageIdx);
 
-        var (rgbBytes, pxW, pxH) = pdf.RenderPagePixmap(pageIdx, LayoutConstants.InputSize);
+        var (rgbBytes, pxW, pxH) = pdf.RenderPagePixmap(pageIdx, analyzer.Capabilities.InputSize);
         var pageText = new PdfTextService().ExtractPageText(pdf.PdfBytes, pageIdx);
-        var analysis = analyzer.RunAnalysis(rgbBytes, pxW, pxH, pageW, pageH, pageText.CharBoxes, ct);
+        var analysis = LayoutAnalysisPipeline.RunWithPixmap(
+            analyzer, rgbBytes, pxW, pxH, pageW, pageH, pageText.CharBoxes, resolver: null, ct);
         var blocks = analysis.Blocks;
 
         if (blocks.Count == 0)
@@ -176,7 +177,7 @@ public sealed class MarkdownExportService : IMarkdownExportService
         var vlmTargets = new List<(int Index, LayoutBlock Block, VlmService.BlockAction Action)>();
         for (int i = 0; i < blocks.Count; i++)
         {
-            var action = VlmService.GetBlockAction(blocks[i].ClassId);
+            var action = VlmService.GetBlockAction(blocks[i].Role);
             if (action == null) continue;
             vlmTargets.Add((i, blocks[i], action.Value));
         }

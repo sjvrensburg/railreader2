@@ -1,26 +1,53 @@
 using System.Collections.ObjectModel;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using Avalonia.Platform.Storage;
 using CommunityToolkit.Mvvm.ComponentModel;
 using RailReader.Core.Models;
 using RailReader.Core.Services;
 using RailReader.Core.Vlm.OpenAI;
+using RailReader2.Services;
 using RailReader2.ViewModels;
 
 namespace RailReader2.Views;
 
-public partial class NavigableClassItem : ObservableObject
+public partial class NavigableRoleItem : ObservableObject
 {
     [ObservableProperty] private bool _isChecked;
-    public string Name { get; init; } = "";
-    public int ClassId { get; init; }
+    public string Label { get; init; } = "";
+    public BlockRole Role { get; init; }
 }
 
 public partial class SettingsWindow : Window
 {
     private bool _loading = true;
-    private readonly ObservableCollection<NavigableClassItem> _classItems = [];
-    private readonly ObservableCollection<NavigableClassItem> _centeringClassItems = [];
+    private readonly ObservableCollection<NavigableRoleItem> _roleItems = [];
+    private readonly ObservableCollection<NavigableRoleItem> _centeringRoleItems = [];
+    private CustomLayoutModelConfig _customModel = new();
+
+    /// <summary>
+    /// Roles offered in the settings UI. Excludes <see cref="BlockRole.Unknown"/>
+    /// (sentinel; never user-selected) and roles that aren't meaningful to
+    /// navigate — page furniture (<see cref="BlockRole.Header"/>,
+    /// <see cref="BlockRole.Footer"/>, <see cref="BlockRole.PageNumber"/>,
+    /// <see cref="BlockRole.Decoration"/>). Order is reading-comfort
+    /// importance.
+    /// </summary>
+    private static readonly (BlockRole Role, string Label)[] s_userVisibleRoles =
+    [
+        (BlockRole.Text,        "Paragraph text"),
+        (BlockRole.Title,       "Document title"),
+        (BlockRole.Heading,     "Section heading"),
+        (BlockRole.Caption,     "Figure / table caption"),
+        (BlockRole.Aside,       "Aside / sidebar"),
+        (BlockRole.DisplayMath, "Display equation"),
+        (BlockRole.Algorithm,   "Algorithm / pseudocode"),
+        (BlockRole.Table,       "Table"),
+        (BlockRole.Figure,      "Figure / image"),
+        (BlockRole.Chart,       "Chart / graph"),
+        (BlockRole.Footnote,    "Footnote"),
+        (BlockRole.Reference,   "Reference / bibliography"),
+    ];
 
     public SettingsWindow()
     {
@@ -70,17 +97,23 @@ public partial class SettingsWindow : Window
         LineHighlightTintCombo.SelectedIndex = (int)c.LineHighlightTint;
         LineHighlightOpacitySlider.Value = c.LineHighlightOpacity;
 
-        BuildClassCheckboxes(_classItems, c.NavigableClasses,
-            set => { vm.AppConfig.NavigableClasses = set; vm.OnConfigChanged(); },
-            NavigableClassesList);
-        BuildClassCheckboxes(_centeringClassItems, c.CenteringClasses,
-            set => { vm.AppConfig.CenteringClasses = set; vm.OnConfigChanged(); },
-            CenteringClassesList);
+        BuildRoleCheckboxes(_roleItems, c.NavigableRoles,
+            set => { vm.AppConfig.NavigableRoles = set; vm.OnConfigChanged(); },
+            NavigableRolesList);
+        BuildRoleCheckboxes(_centeringRoleItems, c.CenteringRoles,
+            set => { vm.AppConfig.CenteringRoles = set; vm.OnConfigChanged(); },
+            CenteringRolesList);
 
         VlmEndpoint.Text = c.VlmEndpoint ?? "";
         VlmModelName.Text = c.VlmModel ?? "";
         VlmApiKey.Text = c.VlmApiKey ?? "";
         VlmStructuredOutput.IsChecked = c.VlmStructuredOutput;
+
+        _customModel = CustomLayoutModelConfig.Load();
+        CustomModelEnabled.IsChecked = _customModel.Enabled;
+        CustomModelPath.Text = _customModel.ModelPath ?? "";
+        CustomModelMappingPath.Text = _customModel.MappingPath ?? "";
+        UpdateCustomModelStatus();
     }
 
     private void SaveToConfig()
@@ -108,23 +141,23 @@ public partial class SettingsWindow : Window
         vm.OnConfigChanged();
     }
 
-    private void BuildClassCheckboxes(
-        ObservableCollection<NavigableClassItem> items, HashSet<int> activeSet,
-        Action<HashSet<int>> onChanged, ItemsControl target)
+    private void BuildRoleCheckboxes(
+        ObservableCollection<NavigableRoleItem> items, IReadOnlySet<BlockRole> activeSet,
+        Action<HashSet<BlockRole>> onChanged, ItemsControl target)
     {
         items.Clear();
-        for (int i = 0; i < LayoutConstants.LayoutClasses.Length; i++)
+        foreach (var (role, label) in s_userVisibleRoles)
         {
-            var item = new NavigableClassItem
+            var item = new NavigableRoleItem
             {
-                Name = LayoutConstants.LayoutClasses[i],
-                ClassId = i,
-                IsChecked = activeSet.Contains(i),
+                Label = label,
+                Role = role,
+                IsChecked = activeSet.Contains(role),
             };
             item.PropertyChanged += (_, args) =>
             {
-                if (args.PropertyName == nameof(NavigableClassItem.IsChecked) && !_loading && Vm is not null)
-                    onChanged(items.Where(x => x.IsChecked).Select(x => x.ClassId).ToHashSet());
+                if (args.PropertyName == nameof(NavigableRoleItem.IsChecked) && !_loading && Vm is not null)
+                    onChanged(items.Where(x => x.IsChecked).Select(x => x.Role).ToHashSet());
             };
             items.Add(item);
         }
@@ -243,8 +276,8 @@ public partial class SettingsWindow : Window
         vm.AppConfig.ColourEffectIntensity = defaults.ColourEffectIntensity;
         vm.AppConfig.MotionBlur = defaults.MotionBlur;
         vm.AppConfig.MotionBlurIntensity = defaults.MotionBlurIntensity;
-        vm.AppConfig.NavigableClasses = LayoutConstants.DefaultNavigableClasses();
-        vm.AppConfig.CenteringClasses = LayoutConstants.DefaultCenteringClasses();
+        vm.AppConfig.NavigableRoles = new HashSet<BlockRole>(DefaultRoleSets.Navigable);
+        vm.AppConfig.CenteringRoles = new HashSet<BlockRole>(DefaultRoleSets.Centering);
         vm.AppConfig.PixelSnapping = defaults.PixelSnapping;
         vm.AppConfig.MarginCropping = defaults.MarginCropping;
         vm.AppConfig.MinimapWidth = defaults.MinimapWidth;
@@ -282,6 +315,85 @@ public partial class SettingsWindow : Window
     private void OnVlmTextChanged(object? sender, TextChangedEventArgs e) => SaveToConfig();
 
     private void OnVlmCheckChanged(object? sender, RoutedEventArgs e) => SaveToConfig();
+
+    // --- Custom layout model ---
+
+    private void OnCustomModelEnabledChanged(object? sender, RoutedEventArgs e)
+    {
+        if (_loading) return;
+        _customModel.Enabled = CustomModelEnabled.IsChecked == true;
+        _customModel.Save();
+        UpdateCustomModelStatus();
+    }
+
+    private async void OnBrowseCustomModel(object? sender, RoutedEventArgs e)
+    {
+        var path = await PickFile("Select ONNX model", "ONNX", new[] { "onnx" });
+        if (path == null) return;
+        CustomModelPath.Text = path;
+        _customModel.ModelPath = path;
+        _customModel.Save();
+        UpdateCustomModelStatus();
+    }
+
+    private async void OnBrowseCustomModelMapping(object? sender, RoutedEventArgs e)
+    {
+        var path = await PickFile("Select class-mapping JSON", "JSON", new[] { "json" });
+        if (path == null) return;
+        CustomModelMappingPath.Text = path;
+        _customModel.MappingPath = path;
+        _customModel.Save();
+        UpdateCustomModelStatus();
+    }
+
+    private async Task<string?> PickFile(string title, string typeLabel, string[] extensions)
+    {
+        var sp = StorageProvider;
+        if (sp == null) return null;
+        var picks = await sp.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = title,
+            AllowMultiple = false,
+            FileTypeFilter = new[]
+            {
+                new FilePickerFileType(typeLabel) { Patterns = extensions.Select(x => "*." + x).ToArray() },
+            },
+        });
+        if (picks.Count == 0) return null;
+        return picks[0].TryGetLocalPath();
+    }
+
+    private void UpdateCustomModelStatus()
+    {
+        if (!_customModel.Enabled)
+        {
+            CustomModelStatus.Text = "Using bundled PP-DocLayoutV3.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_customModel.ModelPath) || string.IsNullOrWhiteSpace(_customModel.MappingPath))
+        {
+            CustomModelStatus.Text = "Select both an ONNX file and a class-mapping JSON file.";
+            return;
+        }
+
+        if (!File.Exists(_customModel.ModelPath))
+        {
+            CustomModelStatus.Text = $"ONNX file not found: {_customModel.ModelPath}";
+            return;
+        }
+
+        var (caps, error) = CustomLayoutModelLoader.LoadCapabilities(_customModel.MappingPath);
+        if (error != null)
+        {
+            CustomModelStatus.Text = $"Mapping invalid: {error}";
+            return;
+        }
+
+        CustomModelStatus.Text = $"OK — {caps!.Classes.Count} classes, input size {caps.InputSize}px. Restart RailReader2 to apply.";
+    }
+
+    // --- VLM ---
 
     private async void OnTestVlmConnection(object? sender, RoutedEventArgs e)
     {

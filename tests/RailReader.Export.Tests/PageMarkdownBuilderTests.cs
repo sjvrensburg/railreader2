@@ -12,7 +12,7 @@ public class PageMarkdownBuilderTests
     {
         var blocks = new List<LayoutBlock>
         {
-            MakeBlock(LayoutConstants.ClassDocTitle, 0),
+            MakeBlock(BlockRole.Title, 0),
         };
         var headingLevels = new Dictionary<int, int> { [0] = 1 };
         var blockTexts = new Dictionary<int, string> { [0] = "Introduction" };
@@ -27,7 +27,7 @@ public class PageMarkdownBuilderTests
     {
         var blocks = new List<LayoutBlock>
         {
-            MakeBlock(22, 0), // text class
+            MakeBlock(BlockRole.Text, 0), // text class
         };
         var blockTexts = new Dictionary<int, string> { [0] = "Some paragraph text here." };
 
@@ -42,7 +42,7 @@ public class PageMarkdownBuilderTests
     {
         var blocks = new List<LayoutBlock>
         {
-            MakeBlock(LayoutConstants.ClassDisplayFormula, 0),
+            MakeBlock(BlockRole.DisplayMath, 0),
         };
         var vlm = new Dictionary<int, PageMarkdownBuilder.VlmBlockResult>
         {
@@ -59,7 +59,7 @@ public class PageMarkdownBuilderTests
     {
         var blocks = new List<LayoutBlock>
         {
-            MakeBlock(LayoutConstants.ClassDisplayFormula, 0),
+            MakeBlock(BlockRole.DisplayMath, 0),
         };
 
         var md = PageMarkdownBuilder.Build(blocks, new Dictionary<int, int>(), new Dictionary<int, string>(), null, null);
@@ -72,7 +72,7 @@ public class PageMarkdownBuilderTests
     {
         var blocks = new List<LayoutBlock>
         {
-            MakeBlock(LayoutConstants.ClassDisplayFormula, 0),
+            MakeBlock(BlockRole.DisplayMath, 0),
         };
         var blockTexts = new Dictionary<int, string> { [0] = "x + y = z" };
 
@@ -86,7 +86,7 @@ public class PageMarkdownBuilderTests
     {
         var blocks = new List<LayoutBlock>
         {
-            MakeBlock(LayoutConstants.ClassTable, 0),
+            MakeBlock(BlockRole.Table, 0),
         };
         var tableMarkdown = "| A | B |\n| --- | --- |\n| 1 | 2 |";
         var vlm = new Dictionary<int, PageMarkdownBuilder.VlmBlockResult>
@@ -104,7 +104,7 @@ public class PageMarkdownBuilderTests
     {
         var blocks = new List<LayoutBlock>
         {
-            MakeBlock(LayoutConstants.ClassTable, 0),
+            MakeBlock(BlockRole.Table, 0),
         };
         var blockTexts = new Dictionary<int, string> { [0] = "A B\n1 2" };
 
@@ -119,7 +119,7 @@ public class PageMarkdownBuilderTests
     {
         var blocks = new List<LayoutBlock>
         {
-            MakeBlock(LayoutConstants.ClassImage, 0),
+            MakeBlock(BlockRole.Figure, 0),
         };
         var vlm = new Dictionary<int, PageMarkdownBuilder.VlmBlockResult>
         {
@@ -140,7 +140,7 @@ public class PageMarkdownBuilderTests
     {
         var blocks = new List<LayoutBlock>
         {
-            MakeBlock(LayoutConstants.ClassImage, 0),
+            MakeBlock(BlockRole.Figure, 0),
         };
         var vlm = new Dictionary<int, PageMarkdownBuilder.VlmBlockResult>
         {
@@ -157,7 +157,7 @@ public class PageMarkdownBuilderTests
     {
         var blocks = new List<LayoutBlock>
         {
-            MakeBlock(7, 0), // figure_title
+            MakeBlock(BlockRole.Caption, 0), // figure_title
         };
         var blockTexts = new Dictionary<int, string> { [0] = "Figure 3: Results overview" };
 
@@ -171,10 +171,10 @@ public class PageMarkdownBuilderTests
     {
         var blocks = new List<LayoutBlock>
         {
-            MakeBlock(12, 0), // header
-            MakeBlock(8, 1),  // footer
-            MakeBlock(16, 2), // number
-            MakeBlock(20, 3), // seal
+            MakeBlock(BlockRole.Header, 0),
+            MakeBlock(BlockRole.Footer, 1),
+            MakeBlock(BlockRole.PageNumber, 2),
+            MakeBlock(BlockRole.Decoration, 3), // seal → decoration
         };
 
         var md = PageMarkdownBuilder.Build(blocks, new Dictionary<int, int>(), new Dictionary<int, string>(), null, null);
@@ -187,8 +187,8 @@ public class PageMarkdownBuilderTests
     {
         var blocks = new List<LayoutBlock>
         {
-            MakeBlock(LayoutConstants.ClassDocTitle, 0, 0, 0, 100, 20),
-            MakeBlock(22, 1, 0, 30, 100, 20), // text
+            MakeBlock(BlockRole.Title, 0, 0, 0, 100, 20),
+            MakeBlock(BlockRole.Text, 1, 0, 30, 100, 20), // text
         };
         var headingLevels = new Dictionary<int, int> { [0] = 1 };
         var blockTexts = new Dictionary<int, string>
@@ -286,12 +286,12 @@ public class PageMarkdownBuilderTests
         Assert.Contains("> **Note:** My note", md);
     }
 
-    private static LayoutBlock MakeBlock(int classId, int order,
+    private static LayoutBlock MakeBlock(BlockRole role, int order,
         float x = 0, float y = 0, float w = 100, float h = 20)
     {
         return new LayoutBlock
         {
-            ClassId = classId,
+            Role = role,
             Order = order,
             Confidence = 0.9f,
             BBox = new BBox(x, y, w, h),
