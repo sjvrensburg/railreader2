@@ -58,13 +58,13 @@ RailReader2.slnx                  # Default: app + CLI + export + tests
 └── tests/RailReader.Export.Tests/ # xUnit tests for Export
 ```
 
-The portable core — `RailReader.Core`, `RailReader.Core.Pdfium`, `RailReader.Core.Analysis`, `RailReader.Renderer.Skia` — lives in the separate [RailReaderCore](https://github.com/sjvrensburg/RailReaderCore) repository and is consumed here as NuGet packages. All references in this document to types like `DocumentController`, `DocumentState`, `AppConfig`, `AnnotationService`, `LayoutAnalyzer`, `SkiaPdfService`, `OverlayRenderer`, `RailReaderLogging`, etc. resolve through those packages. Logger bootstrap goes via `RailReaderLogging.Logger = new ConsoleLogger();` once at startup; the per-service Logger setters that previously existed are gone.
+The portable core — `RailReader.Core`, `RailReader.Core.Pdfium`, `RailReader.Core.Analysis`, `RailReader.Renderer.Skia`, `RailReader.Core.Vlm.OpenAI` — lives in the separate [RailReaderCore](https://github.com/sjvrensburg/RailReaderCore) repository and is consumed here as NuGet packages. All references in this document to types like `DocumentController`, `DocumentState`, `AppConfig`, `AnnotationService`, `LayoutAnalyzer`, `SkiaPdfService`, `OverlayRenderer`, `RailReaderLogging`, etc. resolve through those packages. Logger bootstrap goes via `RailReaderLogging.Logger = new ConsoleLogger();` once at startup; the per-service Logger setters that previously existed are gone.
 
 ### RailReader2 (Avalonia UI shell)
 
 Thin wrapper delegating all logic to `DocumentController`/`DocumentState` in Core.
 
-- `ViewModels/MainWindowViewModel.cs` — thin wrapper handling Avalonia-specific concerns (file dialogs, clipboard, invalidation)
+- `ViewModels/MainWindowViewModel.cs` (+ `.Annotations.cs` / `.Documents.cs` / `.Navigation.cs` / `.Search.cs` / `.Vlm.cs` partials) — thin wrapper handling Avalonia-specific concerns (file dialogs, clipboard, invalidation)
 - `ViewModels/TabViewModel.cs` — `[ObservableProperty]` wrapper for `DocumentState` binding
 - `Views/MainWindow.axaml.cs` — keyboard shortcuts, state builders for composition layers, animation frame scheduling
 - `Views/CompositionLayerControl.cs` — generic base class for `CompositionCustomVisual`-backed layers (manages visual lifecycle, state/message dispatch)
@@ -101,7 +101,7 @@ Structured PDF-to-Markdown export library. Zero Avalonia deps — references Cor
 
 ### Cross-Project Internals
 
-The four upstream packages declare `InternalsVisibleTo` for `RailReader2`, `RailReader2.Cli`, `RailReader.Export`, and `RailReader.Export.Tests` (plus their own dev siblings). This lets the consumers in this repo access internal types without making them part of the upstream public surface. Export exposes internals to `RailReader.Export.Tests`. If a referenced upstream symbol stops resolving after a package bump, check whether it was made non-internal or moved — the friend-assembly grant only covers `internal`, not `private`.
+The upstream packages declare `InternalsVisibleTo` for `RailReader2`, `RailReader2.Cli`, `RailReader.Export`, and `RailReader.Export.Tests` (plus their own dev siblings). This lets the consumers in this repo access internal types without making them part of the upstream public surface. Export exposes internals to `RailReader.Export.Tests`. If a referenced upstream symbol stops resolving after a package bump, check whether it was made non-internal or moved — the friend-assembly grant only covers `internal`, not `private`.
 
 ## Key Concepts
 
