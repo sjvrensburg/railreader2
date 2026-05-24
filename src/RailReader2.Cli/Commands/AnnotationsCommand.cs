@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 using RailReader.Core;
 using RailReader.Core.Models;
 using RailReader.Core.Services;
+using RailReader.Export;
 using RailReader.Renderer.Skia;
 
 namespace RailReader.Cli.Commands;
@@ -85,8 +86,9 @@ public static class AnnotationsCommand
                 PageAnalysis? analysis = null;
                 if (includeBlocks && analyzer != null)
                 {
-                    var (rgbBytes, pxW, pxH) = pdf2.RenderPagePixmap(pageIdx, 800);
-                    analysis = analyzer.RunAnalysis(rgbBytes, pxW, pxH, pw, ph, pageText?.CharBoxes);
+                    var (rgbBytes, pxW, pxH) = pdf2.RenderPagePixmap(pageIdx, analyzer.Capabilities.InputSize);
+                    analysis = LayoutAnalysisPipeline.RunWithPixmap(
+                        analyzer, rgbBytes, pxW, pxH, pw, ph, pageText?.CharBoxes);
                 }
 
                 if (!includeText) pageText = null;
@@ -101,16 +103,18 @@ public static class AnnotationsCommand
 
                     if (includeBlocks && analysis != null && annBounds is { } blockRect)
                     {
+                        var classTable = analyzer!.Capabilities.Classes;
                         foreach (var block in analysis.Blocks)
                         {
                             if (Overlaps(blockRect, block.BBox))
                             {
                                 var blockOutput = new AnnotationBlockOutput
                                 {
-                                    Class = block.ClassId < LayoutConstants.LayoutClasses.Length
-                                        ? LayoutConstants.LayoutClasses[block.ClassId]
+                                    Class = block.ClassId >= 0 && block.ClassId < classTable.Count
+                                        ? classTable[block.ClassId].Name
                                         : $"class_{block.ClassId}",
                                     ClassId = block.ClassId,
+                                    Role = block.Role.ToString(),
                                     BBox = new BBoxOutput(block.BBox.X, block.BBox.Y, block.BBox.W, block.BBox.H),
                                     Confidence = block.Confidence
                                 };
@@ -220,8 +224,7 @@ public static class AnnotationsCommand
         float bestDist = float.MaxValue;
         foreach (var block in analysis.Blocks)
         {
-            if (block.ClassId == LayoutConstants.ClassParagraphTitle
-                || block.ClassId == LayoutConstants.ClassDocTitle)
+            if (block.Role is BlockRole.Title or BlockRole.Heading)
             {
                 float blockBottom = block.BBox.Y + block.BBox.H;
                 if (blockBottom <= annRect.Top)
@@ -240,8 +243,7 @@ public static class AnnotationsCommand
         {
             return new HeadingOutput
             {
-                Title = LayoutConstants.LayoutClasses.Length > bestBlock.ClassId
-                    ? LayoutConstants.LayoutClasses[bestBlock.ClassId] : $"class_{bestBlock.ClassId}",
+                Title = bestBlock.Role.ToString(),
                 Source = "layout",
                 Page = pageIdx
             };
@@ -340,6 +342,7 @@ public class AnnotationBlockOutput
 {
     public string Class { get; set; } = "";
     public int ClassId { get; set; }
+    public string Role { get; set; } = "";
     public BBoxOutput BBox { get; set; } = new();
     public float Confidence { get; set; }
     public string? Text { get; set; }

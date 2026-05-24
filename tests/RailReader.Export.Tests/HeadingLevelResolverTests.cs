@@ -12,7 +12,7 @@ public class HeadingLevelResolverTests
     {
         var blocks = new List<LayoutBlock>
         {
-            MakeBlock(LayoutConstants.ClassDocTitle, 0),
+            MakeBlock(BlockRole.Title, 0),
         };
         var pageText = new PageText("Introduction", []);
 
@@ -27,7 +27,7 @@ public class HeadingLevelResolverTests
     {
         var blocks = new List<LayoutBlock>
         {
-            MakeBlock(LayoutConstants.ClassParagraphTitle, 0),
+            MakeBlock(BlockRole.Heading, 0),
         };
 
         var result = HeadingLevelResolver.Resolve(blocks, null, [], 0);
@@ -41,7 +41,7 @@ public class HeadingLevelResolverTests
     {
         var blocks = new List<LayoutBlock>
         {
-            MakeBlock(LayoutConstants.ClassDocTitle, 0, 10, 10, 200, 30),
+            MakeBlock(BlockRole.Title, 0, 10, 10, 200, 30),
         };
         var pageText = MakePageText("Chapter 3: Methods", 10, 10, 200, 30);
 
@@ -69,7 +69,7 @@ public class HeadingLevelResolverTests
     {
         var blocks = new List<LayoutBlock>
         {
-            MakeBlock(LayoutConstants.ClassParagraphTitle, 0, 10, 10, 200, 30),
+            MakeBlock(BlockRole.Heading, 0, 10, 10, 200, 30),
         };
         var pageText = MakePageText("3.1 Data Collection", 10, 10, 200, 30);
 
@@ -96,9 +96,9 @@ public class HeadingLevelResolverTests
     {
         var blocks = new List<LayoutBlock>
         {
-            MakeBlock(22, 0), // text
-            MakeBlock(LayoutConstants.ClassDocTitle, 1),
-            MakeBlock(21, 2), // table
+            MakeBlock(BlockRole.Text, 0), // text
+            MakeBlock(BlockRole.Title, 1),
+            MakeBlock(BlockRole.Table, 2), // table
         };
 
         var result = HeadingLevelResolver.Resolve(blocks, null, [], 0);
@@ -112,7 +112,7 @@ public class HeadingLevelResolverTests
     {
         var blocks = new List<LayoutBlock>
         {
-            MakeBlock(LayoutConstants.ClassParagraphTitle, 0, 10, 10, 200, 30),
+            MakeBlock(BlockRole.Heading, 0, 10, 10, 200, 30),
         };
         var pageText = MakePageText("Deep Section", 10, 10, 200, 30);
 
@@ -139,7 +139,7 @@ public class HeadingLevelResolverTests
     {
         var blocks = new List<LayoutBlock>
         {
-            MakeBlock(LayoutConstants.ClassParagraphTitle, 0, 10, 10, 200, 30),
+            MakeBlock(BlockRole.Heading, 0, 10, 10, 200, 30),
         };
         // Slight OCR-style difference
         var pageText = MakePageText("3.1 Data Collectio", 10, 10, 200, 30);
@@ -199,12 +199,12 @@ public class HeadingLevelResolverTests
         Assert.Equal(1, HeadingLevelResolver.LevenshteinDistance("kitten", "sitten"));
     }
 
-    private static LayoutBlock MakeBlock(int classId, int order,
+    private static LayoutBlock MakeBlock(BlockRole role, int order,
         float x = 0, float y = 0, float w = 100, float h = 20)
     {
         return new LayoutBlock
         {
-            ClassId = classId,
+            Role = role,
             Order = order,
             Confidence = 0.9f,
             BBox = new BBox(x, y, w, h),

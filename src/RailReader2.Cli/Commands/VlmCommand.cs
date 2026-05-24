@@ -4,6 +4,7 @@ using RailReader.Core;
 using RailReader.Core.Models;
 using RailReader.Core.Services;
 using RailReader.Core.Vlm.OpenAI;
+using RailReader.Export;
 using RailReader.Renderer.Skia;
 
 namespace RailReader.Cli.Commands;
@@ -63,8 +64,8 @@ public static class VlmCommand
         if (minConfStr != null && float.TryParse(minConfStr, out var mc))
             minConfidence = Math.Clamp(mc, 0f, 1f);
 
-        var wantedClasses = ResolveClasses(classesOpt, all);
-        if (wantedClasses.Count == 0)
+        var wantedRoles = ResolveRoles(classesOpt, all);
+        if (wantedRoles.Count == 0)
             return Program.Fail("No classes selected. Use --classes equation,table,figure or --all.");
 
         var promptStyle = VlmService.PromptStyle.Instruction;
@@ -91,7 +92,7 @@ public static class VlmCommand
             return Program.Fail("VLM endpoint not configured. Use --endpoint or set it in Settings, or pass --dump-crops for a dry run.");
 
         var (targets, buildErr) = BuildTargets(pdf, pageRange, singlePageStr, singleBlockStr,
-            fromStructure, wantedClasses, minConfidence);
+            fromStructure, wantedRoles, minConfidence);
         if (buildErr != null) return Program.Fail(buildErr);
 
         if (targets!.Count == 0)
@@ -136,7 +137,7 @@ public static class VlmCommand
 
                 if (png != null && dumpCrops != null)
                 {
-                    var cropName = $"page{t.Page + 1:D4}_block{t.BlockIdx:D2}_{LayoutConstants.LayoutClasses[t.Block.ClassId]}.png";
+                    var cropName = $"page{t.Page + 1:D4}_block{t.BlockIdx:D2}_{t.Block.Role}.png";
                     File.WriteAllBytes(Path.Combine(dumpCrops, cropName), png);
                 }
             }
@@ -158,7 +159,7 @@ public static class VlmCommand
                     await gate.WaitAsync();
                     try
                     {
-                        var action = GetAction(p.Target.Block.ClassId);
+                        var action = GetAction(p.Target.Block.Role);
                         var classCfg = PickConfig(action, eqCfg, tblCfg, figCfg);
 
                         VlmService.VlmResult result;
@@ -178,7 +179,7 @@ public static class VlmCommand
                         }
 
                         var cur = Interlocked.Increment(ref done);
-                        Console.Error.WriteLine($"  [{cur}/{total}] page {p.Target.Page + 1} block {p.Target.BlockIdx} ({LayoutConstants.LayoutClasses[p.Target.Block.ClassId]}) — {(result.Error ?? "ok")}");
+                        Console.Error.WriteLine($"  [{cur}/{total}] page {p.Target.Page + 1} block {p.Target.BlockIdx} ({p.Target.Block.Role}) — {(result.Error ?? "ok")}");
 
                         return BuildResult(p.Target, action, result, classCfg.Model);
                     }
@@ -196,7 +197,7 @@ public static class VlmCommand
         {
             foreach (var p in prepared)
             {
-                var action = GetAction(p.Target.Block.ClassId);
+                var action = GetAction(p.Target.Block.Role);
                 results.Add(BuildResult(p.Target, action,
                     new VlmService.VlmResult(null, p.Png == null ? "Failed to render crop" : "dry run"),
                     PickConfig(action, eqCfg, tblCfg, figCfg).Model));
@@ -221,7 +222,7 @@ public static class VlmCommand
 
     static (List<Target>? Targets, string? Error) BuildTargets(
         IPdfService pdf, string? pageRange, string? singlePageStr, string? singleBlockStr,
-        string? fromStructure, HashSet<int> wantedClasses, float minConfidence)
+        string? fromStructure, HashSet<BlockRole> wantedRoles, float minConfidence)
     {
         int? singlePage = null, singleBlock = null;
         if (singlePageStr != null)
@@ -278,13 +279,15 @@ public static class VlmCommand
                 for (int i = 0; i < sp.Blocks.Count; i++)
                 {
                     var sb = sp.Blocks[i];
-                    if (!wantedClasses.Contains(sb.ClassId)) continue;
+                    var role = ParseRole(sb.Role);
+                    if (!wantedRoles.Contains(role)) continue;
                     if (sb.Confidence < minConfidence) continue;
                     if (singleBlock.HasValue && i != singleBlock.Value) continue;
 
                     var lb = new LayoutBlock
                     {
                         BBox = new BBox(sb.BBox.X, sb.BBox.Y, sb.BBox.W, sb.BBox.H),
+                        Role = role,
                         ClassId = sb.ClassId,
                         Confidence = sb.Confidence,
                         Order = sb.ReadingOrder,
@@ -304,13 +307,14 @@ public static class VlmCommand
         {
             Console.Error.WriteLine($"  Analyzing page {pageIdx + 1}/{pdf.PageCount}...");
             var (pw, ph) = pdf.GetPageSize(pageIdx);
-            var (rgbBytes, pxW, pxH) = pdf.RenderPagePixmap(pageIdx, 800);
-            var analysis = analyzer.RunAnalysis(rgbBytes, pxW, pxH, pw, ph);
+            var (rgbBytes, pxW, pxH) = pdf.RenderPagePixmap(pageIdx, analyzer.Capabilities.InputSize);
+            var analysis = LayoutAnalysisPipeline.RunWithPixmap(
+                analyzer, rgbBytes, pxW, pxH, pw, ph, charBoxes: null);
 
             for (int i = 0; i < analysis.Blocks.Count; i++)
             {
                 var b = analysis.Blocks[i];
-                if (!wantedClasses.Contains(b.ClassId)) continue;
+                if (!wantedRoles.Contains(b.Role)) continue;
                 if (b.Confidence < minConfidence) continue;
                 if (singleBlock.HasValue && i != singleBlock.Value) continue;
 
@@ -320,24 +324,49 @@ public static class VlmCommand
         return (result, null);
     }
 
-    static HashSet<int> ResolveClasses(string? classesOpt, bool all)
+    /// <summary>
+    /// Translates the legacy <c>--classes equation,table,figure</c> CLI option
+    /// to the corresponding <see cref="BlockRole"/> set. The role enum is the
+    /// new canonical vocabulary; the categorical names are kept here for CLI
+    /// backwards compatibility.
+    /// </summary>
+    static HashSet<BlockRole> ResolveRoles(string? classesOpt, bool all)
     {
-        var set = new HashSet<int>();
+        var set = new HashSet<BlockRole>();
         var tokens = classesOpt?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Select(t => t.ToLowerInvariant()).ToHashSet() ?? [];
 
         if (all || tokens.Contains("equation"))
-            set.UnionWith(LayoutConstants.EquationClasses);
+        {
+            set.Add(BlockRole.DisplayMath);
+            set.Add(BlockRole.InlineMath);
+            set.Add(BlockRole.Algorithm);
+        }
         if (all || tokens.Contains("table"))
-            set.UnionWith(LayoutConstants.TableClasses);
+            set.Add(BlockRole.Table);
         if (all || tokens.Contains("figure"))
-            set.UnionWith(LayoutConstants.FigureClasses);
+        {
+            set.Add(BlockRole.Figure);
+            set.Add(BlockRole.Chart);
+        }
+
+        // Allow raw role names for power users (e.g. "--classes Caption,Aside").
+        foreach (var tok in tokens)
+        {
+            if (Enum.TryParse<BlockRole>(tok, ignoreCase: true, out var role))
+                set.Add(role);
+        }
 
         return set;
     }
 
-    static VlmService.BlockAction GetAction(int classId) =>
-        VlmService.GetBlockAction(classId) ?? VlmService.BlockAction.LaTeX;
+    static BlockRole ParseRole(string? name) =>
+        !string.IsNullOrEmpty(name) && Enum.TryParse<BlockRole>(name, ignoreCase: false, out var role)
+            ? role
+            : BlockRole.Unknown;
+
+    static VlmService.BlockAction GetAction(BlockRole role) =>
+        VlmService.GetBlockAction(role) ?? VlmService.BlockAction.LaTeX;
 
     static VlmBlockResult BuildResult(Target t, VlmService.BlockAction action,
         VlmService.VlmResult result, string? model)
@@ -346,7 +375,7 @@ public static class VlmCommand
         {
             Page = t.Page,
             Index = t.BlockIdx,
-            Class = LayoutConstants.LayoutClasses[t.Block.ClassId],
+            Role = t.Block.Role.ToString(),
             ClassId = t.Block.ClassId,
             BBox = new BBoxOutput(t.Block.BBox.X, t.Block.BBox.Y, t.Block.BBox.W, t.Block.BBox.H),
             Confidence = t.Block.Confidence,
@@ -501,7 +530,7 @@ public class VlmBlockResult
 {
     public int Page { get; set; }
     public int Index { get; set; }
-    public string Class { get; set; } = "";
+    public string Role { get; set; } = "";
     public int ClassId { get; set; }
     public BBoxOutput BBox { get; set; } = new();
     public float Confidence { get; set; }

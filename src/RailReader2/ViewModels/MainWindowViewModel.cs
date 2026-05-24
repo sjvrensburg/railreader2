@@ -8,6 +8,7 @@ using RailReader.Core;
 using RailReader.Core.Models;
 using RailReader.Core.Services;
 using RailReader.Renderer.Skia;
+using RailReader2.Services;
 
 namespace RailReader2.ViewModels;
 
@@ -151,13 +152,18 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         ColourEffects = new ColourEffectShaders(_logger);
         _controller = new DocumentController(config.ToCoreSettings(), config, AnnotationService.Default,
             new AvaloniaThreadMarshaller(), new RailReader.Renderer.Skia.SkiaPdfServiceFactory(), _logger);
-        var modelPath = LayoutModelLocator.FindModelPath();
-        if (modelPath != null)
+        try
         {
-            _logger.Debug($"[ONNX] Starting worker with model: {modelPath}");
-            try { _controller.InitializeWorker(() => new LayoutAnalyzer(modelPath)); }
-            catch (Exception ex) { _logger.Error("[ONNX] Worker init failed", ex); }
+            var (modelPath, capabilities) = CustomLayoutModelLoader.ResolveModel(config, _logger);
+            if (modelPath != null && capabilities != null)
+            {
+                _logger.Debug($"[ONNX] Starting worker with model: {modelPath}");
+                _controller.InitializeWorker(
+                    capabilities,
+                    () => new LayoutAnalyzer(modelPath, capabilities));
+            }
         }
+        catch (Exception ex) { _logger.Error("[ONNX] Worker init failed", ex); }
         _controller.StateChanged += OnControllerStateChanged;
         _controller.StatusMessage += ShowStatusToast;
         SetupPollTimer();

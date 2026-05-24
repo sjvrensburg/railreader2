@@ -19,7 +19,7 @@ public class LineDetectorTests
     /// </summary>
     private static (LayoutBlock Block, List<CharBox> Chars) MakeLines(
         int lineCount, int charsPerLine, float charHeight = 10f, float lineGap = 4f,
-        float left = 100f, float top = 100f, int classId = 22 /* text */)
+        float left = 100f, float top = 100f, BlockRole role = BlockRole.Text)
     {
         var chars = new List<CharBox>();
         int idx = 0;
@@ -39,7 +39,7 @@ public class LineDetectorTests
         var block = new LayoutBlock
         {
             BBox = new BBox(left - 2f, top - 2f, width, height + 4f),
-            ClassId = classId,
+            Role = role,
             Confidence = 0.9f,
         };
         return (block, chars);
@@ -145,7 +145,7 @@ public class LineDetectorTests
         // therefore must NOT collapse to one atomic line — char clustering
         // should expose the individual lines.
         var (block, chars) = MakeLines(lineCount: 4, charsPerLine: 8);
-        block.ClassId = LayoutConstants.ClassDisplayFormula;
+        block.Role = BlockRole.DisplayMath;
 
         var lines = LineDetector.DetectLines(block, chars, rgbBytes: [], imgW: 0, imgH: 0, scaleX: 1, scaleY: 1);
         Assert.Equal(4, lines.Count);
@@ -155,7 +155,7 @@ public class LineDetectorTests
     public void AtomicClass_Table_CollapsesToOneLine()
     {
         var (block, chars) = MakeLines(lineCount: 6, charsPerLine: 10);
-        block.ClassId = LayoutConstants.ClassTable;
+        block.Role = BlockRole.Table;
 
         var lines = LineDetector.DetectLines(block, chars, [], 0, 0, 1, 1);
         Assert.Single(lines);
@@ -165,7 +165,7 @@ public class LineDetectorTests
     public void AtomicClass_Image_CollapsesToOneLine()
     {
         var (block, chars) = MakeLines(lineCount: 3, charsPerLine: 5);
-        block.ClassId = LayoutConstants.ClassImage;
+        block.Role = BlockRole.Figure;
 
         var lines = LineDetector.DetectLines(block, chars, [], 0, 0, 1, 1);
         Assert.Single(lines);
@@ -209,7 +209,7 @@ public class LineDetectorTests
         var block = new LayoutBlock
         {
             BBox = new BBox(0, 0, imgW, imgH),
-            ClassId = 22, // text
+            Role = BlockRole.Text,
         };
 
         var lines = LineDetector.DetectLines(block, null, rgb, imgW, imgH, scaleX: 1f, scaleY: 1f);

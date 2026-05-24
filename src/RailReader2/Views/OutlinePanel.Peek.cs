@@ -141,11 +141,10 @@ public partial class OutlinePanel
     {
         foreach (var entry in entries)
         {
-            var className = LayoutConstants.LayoutClasses[entry.ClassId];
             list.Add(new PeekEntryViewModel
             {
                 Label = category,
-                PageDisplay = $"Page {entry.PageIndex + 1} \u2014 {className}",
+                PageDisplay = $"Page {entry.PageIndex + 1} \u2014 {entry.Role}",
                 Entry = entry,
             });
         }
@@ -157,7 +156,7 @@ public partial class OutlinePanel
         {
             int cacheKey = vm.Entry.PageIndex * 10000 + vm.Entry.BlockIndex;
 
-            if (PeekIndexBuilder.EquationClasses.Contains(vm.Entry.ClassId))
+            if (vm.Entry.Role == BlockRole.DisplayMath)
             {
                 if (!_textCache.TryGetValue(cacheKey, out var cachedText))
                 {

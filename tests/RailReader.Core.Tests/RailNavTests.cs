@@ -14,10 +14,10 @@ public class RailNavTests
     private const double WindowHeight = 600;
     private const double Zoom = 4.0; // above default RailZoomThreshold of 3.0
 
-    // Class IDs
-    private const int TextClass = 22;
-    private const int ImageClass = 14;
-    private const int HeaderClass = 12;
+    // Block roles
+    private const BlockRole TextRole = BlockRole.Text;
+    private const BlockRole ImageRole = BlockRole.Figure;
+    private const BlockRole HeaderRole = BlockRole.Header;
 
     public RailNavTests()
     {
@@ -31,10 +31,10 @@ public class RailNavTests
 
     /// <summary>
     /// Creates a PageAnalysis with the given number of blocks, each containing
-    /// the specified number of lines. Blocks are 468pt wide text blocks (ClassId 22)
-    /// stacked vertically with 20pt gaps. Each block's lines are evenly spaced.
+    /// the specified number of lines. Blocks are 468pt wide text blocks stacked
+    /// vertically with 20pt gaps. Each block's lines are evenly spaced.
     /// </summary>
-    private static PageAnalysis CreateAnalysis(int blockCount, int linesPerBlock, int classId = TextClass)
+    private static PageAnalysis CreateAnalysis(int blockCount, int linesPerBlock, BlockRole role = TextRole)
     {
         var blocks = new List<LayoutBlock>();
         float yOffset = 72f; // top margin
@@ -55,7 +55,7 @@ public class RailNavTests
             blocks.Add(new LayoutBlock
             {
                 BBox = new BBox(xOffset, yOffset, blockWidth, blockHeight),
-                ClassId = classId,
+                Role = role,
                 Confidence = 0.95f,
                 Order = b,
                 Lines = lines,
@@ -73,21 +73,21 @@ public class RailNavTests
     }
 
     /// <summary>
-    /// Creates an analysis with blocks of mixed class IDs.
-    /// Alternates between the given class IDs for each block.
+    /// Creates an analysis with blocks of mixed roles. Alternates between the
+    /// given roles for each block.
     /// </summary>
-    private static PageAnalysis CreateMixedAnalysis(int blockCount, int linesPerBlock, params int[] classIds)
+    private static PageAnalysis CreateMixedAnalysis(int blockCount, int linesPerBlock, params BlockRole[] roles)
     {
         var analysis = CreateAnalysis(blockCount, linesPerBlock);
         for (int i = 0; i < analysis.Blocks.Count; i++)
-            analysis.Blocks[i].ClassId = classIds[i % classIds.Length];
+            analysis.Blocks[i].Role = roles[i % roles.Length];
         return analysis;
     }
 
     private void ActivateWithAnalysis(int blockCount, int linesPerBlock)
     {
         var analysis = CreateAnalysis(blockCount, linesPerBlock);
-        _nav.SetAnalysis(analysis, new HashSet<int> { TextClass });
+        _nav.SetAnalysis(analysis, new HashSet<BlockRole> { TextRole });
         _nav.Active = true;
     }
 
@@ -190,7 +190,7 @@ public class RailNavTests
     public void NextLine_WhenInactive_NoStateChange()
     {
         var analysis = CreateAnalysis(1, 3);
-        _nav.SetAnalysis(analysis, new HashSet<int> { TextClass });
+        _nav.SetAnalysis(analysis, new HashSet<BlockRole> { TextRole });
         _nav.Active = false; // explicitly inactive
 
         var result = _nav.NextLine();
@@ -206,8 +206,8 @@ public class RailNavTests
     public void SetAnalysis_FiltersNavigableBlocks()
     {
         // 4 blocks: text, image, text, header — only text (22) is navigable
-        var analysis = CreateMixedAnalysis(4, 2, TextClass, ImageClass, TextClass, HeaderClass);
-        var navigable = new HashSet<int> { TextClass };
+        var analysis = CreateMixedAnalysis(4, 2, TextRole, ImageRole, TextRole, HeaderRole);
+        var navigable = new HashSet<BlockRole> { TextRole };
 
         _nav.SetAnalysis(analysis, navigable);
 
@@ -226,7 +226,7 @@ public class RailNavTests
 
         // Set a NEW analysis (different object) — should reset
         var newAnalysis = CreateAnalysis(2, 4);
-        _nav.SetAnalysis(newAnalysis, new HashSet<int> { TextClass });
+        _nav.SetAnalysis(newAnalysis, new HashSet<BlockRole> { TextRole });
 
         Assert.Equal(0, _nav.CurrentBlock);
         Assert.Equal(0, _nav.CurrentLine);
@@ -236,7 +236,7 @@ public class RailNavTests
     public void HasAnalysis_TrueWithBlocks()
     {
         var analysis = CreateAnalysis(2, 3);
-        _nav.SetAnalysis(analysis, new HashSet<int> { TextClass });
+        _nav.SetAnalysis(analysis, new HashSet<BlockRole> { TextRole });
 
         Assert.True(_nav.HasAnalysis);
     }
@@ -245,8 +245,8 @@ public class RailNavTests
     public void SetAnalysis_EmptyBlocks_HasAnalysisFalse()
     {
         // All blocks are images — none match the navigable set
-        var analysis = CreateAnalysis(3, 2, ImageClass);
-        _nav.SetAnalysis(analysis, new HashSet<int> { TextClass });
+        var analysis = CreateAnalysis(3, 2, ImageRole);
+        _nav.SetAnalysis(analysis, new HashSet<BlockRole> { TextRole });
 
         Assert.False(_nav.HasAnalysis);
         Assert.Equal(0, _nav.NavigableCount);
@@ -288,7 +288,7 @@ public class RailNavTests
     public void StartSnap_WhenInactive_NoEffect()
     {
         var analysis = CreateAnalysis(1, 3);
-        _nav.SetAnalysis(analysis, new HashSet<int> { TextClass });
+        _nav.SetAnalysis(analysis, new HashSet<BlockRole> { TextRole });
         _nav.Active = false;
 
         double cx = 100, cy = 200;
@@ -528,7 +528,7 @@ public class RailNavTests
     public void UpdateZoom_ActivatesAboveThreshold()
     {
         var analysis = CreateAnalysis(1, 3);
-        _nav.SetAnalysis(analysis, new HashSet<int> { TextClass });
+        _nav.SetAnalysis(analysis, new HashSet<BlockRole> { TextRole });
         Assert.False(_nav.Active);
 
         // Zoom above threshold (default 3.0)
@@ -541,7 +541,7 @@ public class RailNavTests
     public void UpdateZoom_DeactivatesBelowThreshold()
     {
         var analysis = CreateAnalysis(1, 3);
-        _nav.SetAnalysis(analysis, new HashSet<int> { TextClass });
+        _nav.SetAnalysis(analysis, new HashSet<BlockRole> { TextRole });
 
         // First activate
         _nav.UpdateZoom(4.0, 0, 0, WindowWidth, WindowHeight);

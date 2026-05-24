@@ -56,9 +56,8 @@ public static class HeadingLevelResolver
 
         for (int i = 0; i < blocks.Count; i++)
         {
-            var className = LayoutConstants.GetClassName(blocks[i].ClassId);
-
-            if (className is not ("doc_title" or "paragraph_title"))
+            var role = blocks[i].Role;
+            if (role is not (BlockRole.Title or BlockRole.Heading))
                 continue;
 
             blockTexts.TryGetValue(i, out var blockText);
@@ -70,7 +69,7 @@ public static class HeadingLevelResolver
             if (matchedDepth.HasValue)
                 result[i] = Math.Clamp(matchedDepth.Value, 1, 6);
             else
-                result[i] = className == "doc_title" ? 1 : 2;
+                result[i] = role == BlockRole.Title ? 1 : 2;
         }
 
         return result;

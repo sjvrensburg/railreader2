@@ -3,7 +3,7 @@
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
-    <Version>3.12.1.0</Version>
+    <Version>3.13.0.0</Version>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -31,11 +31,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="RailReader.Core" Version="0.2.0" />
-    <PackageReference Include="RailReader.Core.Pdfium" Version="0.2.0" />
-    <PackageReference Include="RailReader.Core.Analysis" Version="0.2.0" />
-    <PackageReference Include="RailReader.Renderer.Skia" Version="0.2.0" />
-    <PackageReference Include="RailReader.Core.Vlm.OpenAI" Version="0.2.0" />
+    <PackageReference Include="RailReader.Core" Version="0.3.1" />
+    <PackageReference Include="RailReader.Core.Pdfium" Version="0.3.1" />
+    <PackageReference Include="RailReader.Core.Analysis" Version="0.3.1" />
+    <PackageReference Include="RailReader.Renderer.Skia" Version="0.3.1" />
+    <PackageReference Include="RailReader.Core.Vlm.OpenAI" Version="0.3.1" />
   </ItemGroup>
 
 </Project>
