@@ -440,6 +440,7 @@ public partial class MainWindow : Window
             CurrentLine: currentLine,
             DebugOverlay: tab?.DebugOverlay ?? false,
             DebugAnalysis: debugAnalysis,
+            DebugModelLabel: vm.ActiveLayoutModelName,
             Effect: vm.Controller.ActiveColourEffect,
             LineFocusBlur: tab?.LineFocusBlur ?? false,
             LineHighlightEnabled: tab?.LineHighlightEnabled ?? true,

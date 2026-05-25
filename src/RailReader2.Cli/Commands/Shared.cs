@@ -55,12 +55,28 @@ internal static class Shared
     }
 
     /// <summary>
-    /// Creates a LayoutAnalyzer if the ONNX model is available.
-    /// Returns null and prints a warning if the model is not found.
+    /// Creates the layout analyzer chosen by the user's config (PP-DocLayoutV3
+    /// by default, Heron if selected and present), if the corresponding ONNX
+    /// model is available. Returns null and prints a warning otherwise.
     /// </summary>
-    internal static LayoutAnalyzer? CreateAnalyzer(bool requested)
+    internal static ILayoutAnalyzer? CreateAnalyzer(bool requested)
     {
         if (!requested) return null;
+
+        var choice = LayoutModelChoice.LoadChoice();
+
+        if (choice == LayoutModelChoice.Builtin.Heron)
+        {
+            var heronPath = LayoutModelChoice.FindHeronModelPath();
+            if (heronPath != null)
+            {
+                return new HeronLayoutAnalyzer(heronPath, RailReader.Core.Analysis.DoclingHeronRoles.Capabilities);
+            }
+            Console.Error.WriteLine($"Warning: Docling Heron model not found ({LayoutModelChoice.HeronFileName}).");
+            Console.Error.WriteLine("  See docs/heron-layout-model.md for download instructions.");
+            Console.Error.WriteLine("  Falling back to PP-DocLayoutV3.");
+            // fall through to PP
+        }
 
         var modelPath = LayoutModelLocator.FindModelPath();
         if (modelPath == null)
@@ -69,7 +85,7 @@ internal static class Shared
             Console.Error.WriteLine("  Download the model with: ./scripts/download-model.sh");
             return null;
         }
-        return new LayoutAnalyzer(modelPath);
+        return new LayoutAnalyzer(modelPath, RailReader.Core.Analysis.PPDocLayoutV3Roles.Capabilities);
     }
 }
 

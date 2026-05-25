@@ -650,9 +650,11 @@ Press `Ctrl+,` or use the menu to open Settings. Changes take effect immediately
 - **Block Pause:** Pause duration at block/page boundaries (ms, 0 to disable).
 
 ### Advanced
-- **Navigable Block Types:** Choose which PP-DocLayoutV3 block types are navigable in rail mode.
+- **Layout Model:** Choose between PP-DocLayoutV3 (default, bundled) and Docling Heron (opt-in, ~164 MB, downloaded separately). See the [Heron layout model guide](heron-layout-model.md) for installation instructions and trade-offs.
+- **Navigable Block Types:** Choose which block types are navigable in rail mode. Roles are model-independent.
 - **Centered Block Types:** Choose which block types are horizontally centered when they are narrower than the viewport. By default, headings (paragraph_title, doc_title) are excluded so they stay left-aligned with surrounding text, while formulae and body text are centered.
 - **Analysis Lookahead:** Number of pages to pre-analyze ahead (0 to disable).
+- **Custom Layout Model:** Optionally replace the built-in model with your own ONNX (PP-style I/O contract) + class-mapping JSON.
 
 ### Config file
 

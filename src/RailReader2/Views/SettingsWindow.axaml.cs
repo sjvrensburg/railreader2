@@ -114,7 +114,56 @@ public partial class SettingsWindow : Window
         CustomModelPath.Text = _customModel.ModelPath ?? "";
         CustomModelMappingPath.Text = _customModel.MappingPath ?? "";
         UpdateCustomModelStatus();
+        PopulateBuiltinAnalyzerCombo();
     }
+
+    /// <summary>
+    /// Populates the analyzer dropdown. The Heron option is shown either way,
+    /// but if no Heron .onnx is found on any probe path we surface that in the
+    /// status line below the combo and roll back the selection to PP if the
+    /// user tries to pick it (a properly-disabled item would silently swallow
+    /// the click and confuse users).
+    /// </summary>
+    private void PopulateBuiltinAnalyzerCombo()
+    {
+        var items = new List<BuiltinAnalyzerItem>
+        {
+            new(BuiltinAnalyzer.PpDocLayoutV3, "PP-DocLayoutV3 (default, bundled)"),
+            new(BuiltinAnalyzer.Heron,         "Docling Heron"),
+        };
+        BuiltinAnalyzerCombo.ItemsSource = items;
+        BuiltinAnalyzerCombo.DisplayMemberBinding = new Avalonia.Data.Binding(nameof(BuiltinAnalyzerItem.Label));
+        BuiltinAnalyzerCombo.SelectedIndex = (int)_customModel.BuiltinAnalyzer;
+        UpdateBuiltinAnalyzerStatus();
+    }
+
+    private void UpdateBuiltinAnalyzerStatus()
+    {
+        if (_customModel.BuiltinAnalyzer == BuiltinAnalyzer.Heron)
+        {
+            var heron = HeronModelLocator.FindModelPath();
+            BuiltinAnalyzerStatus.Text = heron != null
+                ? $"Heron model: {heron}  Restart to apply."
+                : $"Heron model not found ({HeronModelLocator.FileName}). See docs/heron-layout-model.md to download it; the app will fall back to PP-DocLayoutV3 until then.";
+        }
+        else
+        {
+            BuiltinAnalyzerStatus.Text = "Using PP-DocLayoutV3.";
+        }
+    }
+
+    private void OnBuiltinAnalyzerChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (_loading) return;
+        if (BuiltinAnalyzerCombo.SelectedItem is BuiltinAnalyzerItem item)
+        {
+            _customModel.BuiltinAnalyzer = item.Value;
+            _customModel.Save();
+            UpdateBuiltinAnalyzerStatus();
+        }
+    }
+
+    private sealed record BuiltinAnalyzerItem(BuiltinAnalyzer Value, string Label);
 
     private void SaveToConfig()
     {

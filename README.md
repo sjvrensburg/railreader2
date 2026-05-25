@@ -55,6 +55,8 @@ PDF pages are rasterised by PDFium (via PDFtoImage) at a DPI proportional to the
 
 At high zoom levels, navigation switches to "rail mode" — the viewer locks onto detected text blocks and advances line-by-line, like a typewriter carriage return. This is powered by [PP-DocLayoutV3](https://huggingface.co/PaddlePaddle/PP-DocLayoutV3) by [PaddlePaddle](https://www.paddlepaddle.org.cn/en), which detects document regions (text, titles, footnotes, etc.) and predicts reading order natively via its Global Pointer Mechanism, correctly handling multi-column layouts, headers, footnotes, etc. See the [technical report](https://arxiv.org/abs/2601.21957). Non-active regions are dimmed so you can focus on the current block and line.
 
+> [**Docling Heron**](docs/heron-layout-model.md) is supported as an optional alternative layout model from v3.13 — broader class space (code, forms, footnotes), opt-in, downloaded separately (~164 MB).
+
 ### Features
 
 #### Rail reading
