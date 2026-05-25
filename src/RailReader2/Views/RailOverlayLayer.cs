@@ -18,6 +18,7 @@ internal sealed record RailOverlayRenderState(
     LineInfo CurrentLine,
     bool DebugOverlay,
     PageAnalysis? DebugAnalysis,
+    string? DebugModelLabel,
     ColourEffect Effect,
     bool LineFocusBlur,
     bool LineHighlightEnabled,
@@ -84,6 +85,42 @@ internal sealed class RailOverlayVisualHandler : CompositionCustomVisualHandler
                 OverlayRenderer.GetDebugTextPaint());
         }
 
+        if (state.DebugOverlay && state.DebugModelLabel is { Length: > 0 } modelLabel)
+        {
+            DrawModelBadge(canvas, modelLabel);
+        }
+
         canvas.Restore();
+    }
+
+    /// <summary>
+    /// Renders a small "Model: <name>" badge in the top-left of the page so
+    /// users can tell at a glance which layout analyzer they're looking at.
+    /// Reuses the same Skia primitives the rest of the debug overlay uses
+    /// (so the badge inherits any future restyling). Drawn inside the camera
+    /// transform, in page coordinates — pinned to (8, 8) in page space.
+    /// </summary>
+    private static void DrawModelBadge(SKCanvas canvas, string label)
+    {
+        var text = $"Model: {label}";
+        var font = OverlayRenderer.GetDebugFont();
+        var textPaint = OverlayRenderer.GetDebugTextPaint();
+        var bgPaint = OverlayRenderer.GetDebugBgPaint();
+
+        var width = font.MeasureText(text);
+        var metrics = font.Metrics;
+        var lineHeight = metrics.Descent - metrics.Ascent;
+
+        const float padX = 6f, padY = 3f;
+        const float originX = 8f, originY = 8f;
+
+        var bgRect = new SKRect(
+            originX,
+            originY,
+            originX + width + 2 * padX,
+            originY + lineHeight + 2 * padY);
+
+        canvas.DrawRect(bgRect, bgPaint);
+        canvas.DrawText(text, originX + padX, originY + padY - metrics.Ascent, font, textPaint);
     }
 }

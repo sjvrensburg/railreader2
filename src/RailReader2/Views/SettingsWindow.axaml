@@ -242,10 +242,23 @@
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
 
+                        <TextBlock Text="Layout Model" FontWeight="Bold" Margin="0,16,0,0" />
+                        <Separator />
+                        <TextBlock TextWrapping="Wrap" Opacity="0.7"
+                                   Text="PP-DocLayoutV3 is bundled with all release packages. Docling Heron is an alternative model with a broader class space (17 classes including code, forms, footnotes) but is heavier (~164 MB) and must be downloaded separately." />
+                        <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto" Margin="0,4,0,0">
+                            <TextBlock Grid.Column="0" Text="Model:" VerticalAlignment="Center" />
+                            <ComboBox Grid.Column="2" Name="BuiltinAnalyzerCombo"
+                                      Width="240" HorizontalAlignment="Left"
+                                      SelectionChanged="OnBuiltinAnalyzerChanged" />
+                        </Grid>
+                        <TextBlock Name="BuiltinAnalyzerStatus" TextWrapping="Wrap" Opacity="0.7" FontSize="11"
+                                   Margin="0,2,0,0" />
+
                         <TextBlock Text="Custom Layout Model" FontWeight="Bold" Margin="0,16,0,0" />
                         <Separator />
                         <TextBlock TextWrapping="Wrap" Opacity="0.7"
-                                   Text="Optionally replace the bundled PP-DocLayoutV3 model with your own ONNX. The model must follow the same I/O contract (im_shape/image/scale_factor inputs, [N, 6+] detection tensor). Pair it with a JSON file that maps each model class id to a BlockRole." />
+                                   Text="Optionally replace the built-in model with your own ONNX. The model must follow PP-DocLayoutV3's I/O contract (im_shape/image/scale_factor inputs, [N, 6+] detection tensor). Pair it with a JSON file that maps each model class id to a BlockRole. When enabled, this takes precedence over the model selected above." />
                         <CheckBox Name="CustomModelEnabled" Content="Use custom layout model"
                                   IsCheckedChanged="OnCustomModelEnabledChanged" Margin="0,4,0,4" />
                         <Grid ColumnDefinitions="*,8,Auto" RowDefinitions="Auto,4,Auto">

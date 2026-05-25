@@ -142,6 +142,14 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     public TabViewModel? ActiveTab =>
         ActiveTabIndex >= 0 && ActiveTabIndex < Tabs.Count ? Tabs[ActiveTabIndex] : null;
 
+    /// <summary>
+    /// Human-readable name of the layout-detection model loaded at startup
+    /// (e.g. "PP-DocLayoutV3", "Docling Heron", "Custom: foo.onnx"). Null if
+    /// the analyzer failed to initialise (layout-less mode). Shown in the
+    /// debug overlay so users can tell at a glance which model is active.
+    /// </summary>
+    public string? ActiveLayoutModelName { get; private set; }
+
     /// <summary>Path to the current session log file, or null if file logging unavailable.</summary>
     public string? LogFilePath => _logger.LogFilePath;
 
@@ -154,13 +162,12 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             new AvaloniaThreadMarshaller(), new RailReader.Renderer.Skia.SkiaPdfServiceFactory(), _logger);
         try
         {
-            var (modelPath, capabilities) = CustomLayoutModelLoader.ResolveModel(config, _logger);
-            if (modelPath != null && capabilities != null)
+            var resolution = CustomLayoutModelLoader.ResolveModel(config, _logger);
+            if (resolution.ModelPath != null && resolution.Capabilities != null && resolution.Factory != null)
             {
-                _logger.Debug($"[ONNX] Starting worker with model: {modelPath}");
-                _controller.InitializeWorker(
-                    capabilities,
-                    () => new LayoutAnalyzer(modelPath, capabilities));
+                _logger.Debug($"[ONNX] Starting worker with model: {resolution.ModelPath}");
+                _controller.InitializeWorker(resolution.Capabilities, resolution.Factory);
+                ActiveLayoutModelName = resolution.DisplayName;
             }
         }
         catch (Exception ex) { _logger.Error("[ONNX] Worker init failed", ex); }

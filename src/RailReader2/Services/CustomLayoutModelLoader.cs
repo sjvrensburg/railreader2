@@ -7,18 +7,33 @@ namespace RailReader2.Services;
 
 /// <summary>
 /// Resolves which layout-detection model the analysis worker should load at
-/// startup. If <see cref="CustomLayoutModelConfig.Enabled"/> is set and both
-/// the model + mapping files parse cleanly, returns the user's custom model
-/// with the mapped <see cref="LayoutModelCapabilities"/>. Otherwise falls
-/// back to the bundled PP-DocLayoutV3 model located via
-/// <see cref="LayoutModelLocator"/>.
+/// startup, plus how to construct the analyzer for it.
+///
+/// Precedence:
+/// <list type="number">
+///   <item>User-supplied custom model (PP-style I/O contract) if
+///         <see cref="CustomLayoutModelConfig.Enabled"/> and both files resolve.</item>
+///   <item>The <see cref="BuiltinAnalyzer"/> named in the config (defaults to
+///         PP-DocLayoutV3). If Heron is selected but the .onnx file is not
+///         found at any <see cref="HeronModelLocator"/> probe path, falls back
+///         to PP-DocLayoutV3 with a warning rather than dropping into
+///         layout-less mode.</item>
+///   <item>Layout-less mode (analyzer not initialised) only when *no* model
+///         file can be located.</item>
+/// </list>
 /// </summary>
 public static class CustomLayoutModelLoader
 {
-    public static (string? ModelPath, LayoutModelCapabilities? Capabilities) ResolveModel(
-        AppConfig appConfig, ILogger logger)
+    public readonly record struct Resolution(
+        string? ModelPath,
+        LayoutModelCapabilities? Capabilities,
+        Func<ILayoutAnalyzer>? Factory,
+        string? DisplayName);
+
+    public static Resolution ResolveModel(AppConfig appConfig, ILogger logger)
     {
         var custom = CustomLayoutModelConfig.Load();
+
         if (custom.Enabled
             && !string.IsNullOrWhiteSpace(custom.ModelPath)
             && !string.IsNullOrWhiteSpace(custom.MappingPath))
@@ -40,18 +55,45 @@ public static class CustomLayoutModelLoader
                 }
                 else
                 {
-                    return (custom.ModelPath, caps);
+                    var customPath = custom.ModelPath!;
+                    var customCaps = caps!;
+                    var customName = $"Custom: {Path.GetFileName(customPath)}";
+                    return new Resolution(customPath, customCaps,
+                        () => new LayoutAnalyzer(customPath, customCaps),
+                        customName);
                 }
             }
+        }
+
+        return ResolveBuiltin(custom.BuiltinAnalyzer, logger);
+    }
+
+    private static Resolution ResolveBuiltin(BuiltinAnalyzer choice, ILogger logger)
+    {
+        if (choice == BuiltinAnalyzer.Heron)
+        {
+            var heronPath = HeronModelLocator.FindModelPath();
+            if (heronPath != null)
+            {
+                var heronCaps = RailReader.Core.Analysis.DoclingHeronRoles.Capabilities;
+                return new Resolution(heronPath, heronCaps,
+                    () => new HeronLayoutAnalyzer(heronPath, heronCaps),
+                    "Docling Heron");
+            }
+            logger.Warn($"[ONNX] Docling Heron model not found ({HeronModelLocator.FileName}) — falling back to PP-DocLayoutV3. See docs/heron-layout-model.md.");
+            // fall through to PP
         }
 
         var bundled = LayoutModelLocator.FindModelPath();
         if (bundled == null)
         {
             logger.Warn("[ONNX] Bundled PP-DocLayoutV3 model not found.");
-            return (null, null);
+            return new Resolution(null, null, null, null);
         }
-        return (bundled, RailReader.Core.Analysis.PPDocLayoutV3Roles.Capabilities);
+        var ppCaps = RailReader.Core.Analysis.PPDocLayoutV3Roles.Capabilities;
+        return new Resolution(bundled, ppCaps,
+            () => new LayoutAnalyzer(bundled, ppCaps),
+            "PP-DocLayoutV3");
     }
 
     /// <summary>

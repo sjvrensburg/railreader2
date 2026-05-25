@@ -7,6 +7,22 @@ using RailReader.Core.Services;
 namespace RailReader2.Services;
 
 /// <summary>
+/// One of the analyzer implementations shipped with the app. The custom-model
+/// path is selected separately via <see cref="CustomLayoutModelConfig.Enabled"/>
+/// and takes precedence when active. Serialised as a string in
+/// <c>custom_layout_model.json</c> so the user-facing docs can reference
+/// readable names (<c>"PpDocLayoutV3"</c> / <c>"Heron"</c>).
+/// </summary>
+[JsonConverter(typeof(JsonStringEnumConverter<BuiltinAnalyzer>))]
+public enum BuiltinAnalyzer
+{
+    /// <summary>Bundled with all release packages. Default.</summary>
+    PpDocLayoutV3 = 0,
+    /// <summary>Docling Heron (RT-DETRv2). Must be downloaded separately — see docs/heron-layout-model.md.</summary>
+    Heron = 1,
+}
+
+/// <summary>
 /// User-supplied layout-detection model. Lives alongside <c>config.json</c>
 /// in railreader2's config dir as <c>custom_layout_model.json</c>. Kept
 /// separate from the upstream <see cref="AppConfig"/> so the Core package
@@ -14,14 +30,16 @@ namespace RailReader2.Services;
 ///
 /// When <see cref="Enabled"/> is true and both files resolve, startup loads
 /// the user's ONNX with the role mapping defined in
-/// <see cref="MappingPath"/>. Otherwise the analyzer falls back to the
-/// bundled PP-DocLayoutV3 model.
+/// <see cref="MappingPath"/>. Otherwise the analyzer named in
+/// <see cref="BuiltinAnalyzer"/> is loaded (defaulting to PP-DocLayoutV3).
 /// </summary>
 public sealed class CustomLayoutModelConfig
 {
     public bool Enabled { get; set; }
     public string? ModelPath { get; set; }
     public string? MappingPath { get; set; }
+    /// <summary>Which shipped analyzer to use when the custom model is disabled or unavailable.</summary>
+    public BuiltinAnalyzer BuiltinAnalyzer { get; set; } = BuiltinAnalyzer.PpDocLayoutV3;
 
     public static string Path => System.IO.Path.Combine(AppConfig.ConfigDir, "custom_layout_model.json");
 
