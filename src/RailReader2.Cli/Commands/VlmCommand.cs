@@ -49,29 +49,16 @@ public static class VlmCommand
         var noHtmlToMd = Program.HasFlag(args, "no-html-to-md");
         var noStructured = Program.HasFlag(args, "no-structured-output");
 
-        int dpi = 300;
-        if (dpiStr != null && int.TryParse(dpiStr, out var d))
-        {
-            dpi = Math.Clamp(d, 72, 1200);
-            if (d != dpi) Console.Error.WriteLine($"Warning: DPI clamped to {dpi} (valid range: 72-1200)");
-        }
-
-        int concurrency = 1;
-        if (concurrencyStr != null && int.TryParse(concurrencyStr, out var c))
-            concurrency = Math.Max(1, c);
-
-        float minConfidence = 0f;
-        if (minConfStr != null && float.TryParse(minConfStr, out var mc))
-            minConfidence = Math.Clamp(mc, 0f, 1f);
+        int dpi = Shared.ParseClampedInt(dpiStr, 72, 1200, 300, "DPI");
+        int concurrency = Shared.ParsePositiveInt(concurrencyStr, 1);
+        float minConfidence = Shared.ParseClampedFloat(minConfStr, 0f, 1f, 0f, "min-confidence");
 
         var wantedRoles = ResolveRoles(classesOpt, all);
         if (wantedRoles.Count == 0)
             return Program.Fail("No classes selected. Use --classes equation,table,figure or --all.");
 
-        var promptStyle = VlmService.PromptStyle.Instruction;
-        if (promptStyleStr != null
-            && !Enum.TryParse<VlmService.PromptStyle>(promptStyleStr, ignoreCase: true, out promptStyle))
-            return Program.Fail($"Invalid --prompt-style: {promptStyleStr} (expected: instruction, ocr)");
+        var (promptStyle, promptErr) = Shared.ParsePromptStyle(promptStyleStr);
+        if (promptErr != null) return Program.Fail(promptErr);
 
         var baseCfg = Shared.BuildVlmEndpoint(
             endpointOverride, modelOverride, apiKeyOverride);
@@ -453,21 +440,8 @@ public static class VlmCommand
         return sb.ToString().TrimEnd();
     }
 
-    static void WriteJson(VlmOutput output, string? outputPath)
-    {
-        var json = JsonSerializer.Serialize(output, CliJsonContext.Default.VlmOutput);
-        if (outputPath != null)
-        {
-            var dir = Path.GetDirectoryName(outputPath);
-            if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
-            File.WriteAllText(outputPath, json);
-            Console.Error.WriteLine($"VLM results written to {Path.GetFullPath(outputPath)}");
-        }
-        else
-        {
-            Console.WriteLine(json);
-        }
-    }
+    static void WriteJson(VlmOutput output, string? outputPath) =>
+        Shared.WriteJsonOutput(output, outputPath, CliJsonContext.Default.VlmOutput, "VLM results");
 
     static void PrintHelp()
     {

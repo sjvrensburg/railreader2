@@ -1,4 +1,3 @@
-using System.Text.Json;
 using RailReader.Core;
 using RailReader.Core.Models;
 using RailReader.Core.Services;
@@ -109,20 +108,7 @@ public static class StructureCommand
             }
         }
 
-        var json = JsonSerializer.Serialize(result, CliJsonContext.Default.StructureOutput);
-
-        if (outputPath != null)
-        {
-            var dir = Path.GetDirectoryName(outputPath);
-            if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
-            File.WriteAllText(outputPath, json);
-            Console.Error.WriteLine($"Structure written to {Path.GetFullPath(outputPath)}");
-        }
-        else
-        {
-            Console.WriteLine(json);
-        }
-
+        Shared.WriteJsonOutput(result, outputPath, CliJsonContext.Default.StructureOutput, "Structure");
         return failed > 0 ? 1 : 0;
     }
 

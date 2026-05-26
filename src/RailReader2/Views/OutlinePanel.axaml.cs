@@ -50,17 +50,7 @@ public partial class OutlinePanel : UserControl
 
     protected override void OnUnloaded(RoutedEventArgs e)
     {
-        // Clean up DataContext subscriptions
-        if (_vm is not null)
-        {
-            _vm.PropertyChanged -= OnVmPropertyChanged;
-            _vm.SearchRequested -= OnSearchRequested;
-        }
-        if (_watchedTab is not null)
-        {
-            _watchedTab.PropertyChanged -= OnTabPropertyChanged;
-            _watchedTab = null;
-        }
+        DetachVmSubscriptions();
         _vm = null;
 
         // Dispose the debounce timer
@@ -84,18 +74,27 @@ public partial class OutlinePanel : UserControl
         base.OnUnloaded(e);
     }
 
-    private void OnDataContextChanged(object? sender, EventArgs e)
+    /// <summary>
+    /// Unhooks any active subscriptions on <c>_vm</c> and <c>_watchedTab</c>. Leaves
+    /// <c>_vm</c> in place (caller decides whether to null it out or rebind).
+    /// </summary>
+    private void DetachVmSubscriptions()
     {
         if (_vm is not null)
         {
             _vm.PropertyChanged -= OnVmPropertyChanged;
             _vm.SearchRequested -= OnSearchRequested;
-            if (_watchedTab is not null)
-            {
-                _watchedTab.PropertyChanged -= OnTabPropertyChanged;
-                _watchedTab = null;
-            }
         }
+        if (_watchedTab is not null)
+        {
+            _watchedTab.PropertyChanged -= OnTabPropertyChanged;
+            _watchedTab = null;
+        }
+    }
+
+    private void OnDataContextChanged(object? sender, EventArgs e)
+    {
+        DetachVmSubscriptions();
 
         _vm = DataContext as MainWindowViewModel;
 

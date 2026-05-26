@@ -146,20 +146,7 @@ public static class AnnotationsCommand
             Page = b.Page
         }).ToList();
 
-        var json = JsonSerializer.Serialize(result, CliJsonContext.Default.AnnotationExportOutput);
-
-        if (outputPath != null)
-        {
-            var dir = Path.GetDirectoryName(outputPath);
-            if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
-            File.WriteAllText(outputPath, json);
-            Console.Error.WriteLine($"Annotations written to {Path.GetFullPath(outputPath)}");
-        }
-        else
-        {
-            Console.WriteLine(json);
-        }
-
+        Shared.WriteJsonOutput(result, outputPath, CliJsonContext.Default.AnnotationExportOutput, "Annotations");
         return failed > 0 ? 1 : 0;
     }
 

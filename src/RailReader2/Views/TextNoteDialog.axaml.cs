@@ -1,5 +1,4 @@
 using Avalonia.Controls;
-using Avalonia.Input;
 using Avalonia.Interactivity;
 
 namespace RailReader2.Views;
@@ -9,8 +8,9 @@ public partial class TextNoteDialog : Window
     public TextNoteDialog()
     {
         InitializeComponent();
-        Opened += (_, _) => NoteTextBox.Focus();
-        KeyDown += OnKeyDown;
+        DialogKeyboard.FocusOnOpen(this, NoteTextBox);
+        // No Enter handler — the note box is multiline.
+        DialogKeyboard.EnableEscEnterClose<string?>(this, cancelResult: null, confirmResult: null);
     }
 
     public TextNoteDialog(string existingText) : this()
@@ -21,11 +21,4 @@ public partial class TextNoteDialog : Window
     private void OnOkClick(object? sender, RoutedEventArgs e) => Close(NoteTextBox.Text);
 
     private void OnCancelClick(object? sender, RoutedEventArgs e) => Close(null as string);
-
-    private void OnKeyDown(object? sender, KeyEventArgs e)
-    {
-        if (e.Key != Key.Escape) return;
-        Close(null as string);
-        e.Handled = true;
-    }
 }

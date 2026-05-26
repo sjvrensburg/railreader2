@@ -24,18 +24,8 @@ public static class RenderCommand
         var withAnnotations = Program.HasFlag(args, "annotations");
         var outputDir = Program.GetOption(args, "output-dir") ?? "screenshots";
 
-        int dpi = 300;
-        if (dpiStr != null && int.TryParse(dpiStr, out var d))
-        {
-            dpi = Math.Clamp(d, 72, 1200);
-            if (d != dpi) Console.Error.WriteLine($"Warning: DPI clamped to {dpi} (valid range: 72-1200)");
-        }
-        float intensity = 1.0f;
-        if (intensityStr != null && float.TryParse(intensityStr, out var f))
-        {
-            intensity = Math.Clamp(f, 0f, 2f);
-            if (f != intensity) Console.Error.WriteLine($"Warning: Intensity clamped to {intensity:F1} (valid range: 0-2)");
-        }
+        int dpi = Shared.ParseClampedInt(dpiStr, 72, 1200, 300, "DPI");
+        float intensity = Shared.ParseClampedFloat(intensityStr, 0f, 2f, 1.0f, "Intensity");
         var effect = ParseEffect(effectName);
 
         var (pages, rangeError) = PageRangeParser.Parse(pageRange, pdf.PageCount);
