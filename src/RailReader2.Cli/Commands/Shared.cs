@@ -56,8 +56,9 @@ internal static class Shared
 
     /// <summary>
     /// Creates the layout analyzer chosen by the user's config (PP-DocLayoutV3
-    /// by default, Heron if selected and present), if the corresponding ONNX
-    /// model is available. Returns null and prints a warning otherwise.
+    /// by default, Heron or PP-DocLayout-S if selected and present), if the
+    /// corresponding ONNX model is available. Returns null and prints a warning
+    /// otherwise.
     /// </summary>
     internal static ILayoutAnalyzer? CreateAnalyzer(bool requested)
     {
@@ -74,6 +75,18 @@ internal static class Shared
             }
             Console.Error.WriteLine($"Warning: Docling Heron model not found ({LayoutModelChoice.HeronFileName}).");
             Console.Error.WriteLine("  See docs/heron-layout-model.md for download instructions.");
+            Console.Error.WriteLine("  Falling back to PP-DocLayoutV3.");
+            // fall through to PP
+        }
+        else if (choice == LayoutModelChoice.Builtin.PpDocLayoutS)
+        {
+            var ppsPath = LayoutModelChoice.FindPpsModelPath();
+            if (ppsPath != null)
+            {
+                return new PPDocLayoutSLayoutAnalyzer(ppsPath, RailReader.Core.Analysis.PPDocLayoutSRoles.Capabilities);
+            }
+            Console.Error.WriteLine($"Warning: PP-DocLayout-S model not found ({LayoutModelChoice.PpsFileName}).");
+            Console.Error.WriteLine("  See docs/pp-doclayout-s.md for download instructions.");
             Console.Error.WriteLine("  Falling back to PP-DocLayoutV3.");
             // fall through to PP
         }
