@@ -35,10 +35,10 @@ jobs:
     needs: download-model
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: "10.0.x"
 
@@ -46,7 +46,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y fuse libfuse2
 
       - name: Download model artifact
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: onnx-model
           path: models/
@@ -65,12 +65,24 @@ jobs:
           cp -r publish/* AppDir/usr/bin/
           cp models/$MODEL_NAME AppDir/models/
 
-          # Desktop file and icon
-          mkdir -p AppDir/usr/share/applications AppDir/usr/share/icons/hicolor/256x256/apps
-          cp assets/railreader2.desktop AppDir/usr/share/applications/
-          cp assets/railreader2.png AppDir/usr/share/icons/hicolor/256x256/apps/
-          cp assets/railreader2.desktop AppDir/
-          cp assets/railreader2.png AppDir/
+          # AppStream reverse-DNS app-id. Everything in the AppDir (.desktop, icon,
+          # metainfo) is named after it so appstreamcli's strict checks
+          # (cid-desktopapp-is-not-rdns, metainfo-filename-cid-mismatch) pass.
+          # Source files in assets/ keep their short names so README and the
+          # Windows installer don't have to change.
+          APP_ID="io.github.sjvrensburg.RailReader2"
+
+          mkdir -p AppDir/usr/share/applications AppDir/usr/share/icons/hicolor/256x256/apps AppDir/usr/share/metainfo
+          # Rewrite the desktop file's Icon= to match the new icon basename.
+          sed "s/^Icon=.*/Icon=${APP_ID}/" assets/railreader2.desktop > "AppDir/usr/share/applications/${APP_ID}.desktop"
+          cp assets/railreader2.png "AppDir/usr/share/icons/hicolor/256x256/apps/${APP_ID}.png"
+          # Install metainfo under both .appdata.xml (appimagetool looks for the legacy
+          # name) and .metainfo.xml (modern AppStream convention).
+          cp assets/railreader2.metainfo.xml "AppDir/usr/share/metainfo/${APP_ID}.appdata.xml"
+          cp assets/railreader2.metainfo.xml "AppDir/usr/share/metainfo/${APP_ID}.metainfo.xml"
+          # Top-level copies are what appimagetool embeds into the AppImage runtime.
+          cp "AppDir/usr/share/applications/${APP_ID}.desktop" "AppDir/${APP_ID}.desktop"
+          cp "AppDir/usr/share/icons/hicolor/256x256/apps/${APP_ID}.png" "AppDir/${APP_ID}.png"
 
           # AppRun entry point
           cat > AppDir/AppRun <<'EOF'
@@ -94,10 +106,10 @@ jobs:
     needs: download-model
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: "10.0.x"
 
@@ -105,7 +117,7 @@ jobs:
         run: choco install innosetup -y
 
       - name: Download model artifact
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: onnx-model
           path: models/
@@ -136,15 +148,15 @@ jobs:
     needs: download-model
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: "10.0.x"
 
       - name: Download model artifact
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: onnx-model
           path: models/
@@ -190,15 +202,15 @@ jobs:
     needs: download-model
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: "10.0.x"
 
       - name: Download model artifact
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: onnx-model
           path: models
@@ -224,15 +236,15 @@ jobs:
     needs: download-model
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: "10.0.x"
 
       - name: Download model artifact
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: onnx-model
           path: models
@@ -257,12 +269,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           merge-multiple: true
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           generate_release_notes: true
           make_latest: true
