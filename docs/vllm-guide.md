@@ -18,7 +18,7 @@ OpenAI's models produce the most reliable LaTeX and Markdown output, especially 
 | Field    | Value                        |
 |----------|------------------------------|
 | Endpoint | `https://api.openai.com/v1`  |
-| Model    | `gpt-4.1-mini`               |
+| Model    | `gpt-5.4-nano-2026-03-17`               |
 | API Key  | your API key                 |
 
 3. Click **Test Connection** to verify, then close Settings.
@@ -28,10 +28,10 @@ OpenAI's models produce the most reliable LaTeX and Markdown output, especially 
 | Model          | Quality   | Speed  | Cost       |
 |----------------|-----------|--------|------------|
 | `gpt-4.1`      | Best      | Slower | ~$0.01/image |
-| `gpt-4.1-mini` | Very good | Fast   | ~$0.001/image |
+| `gpt-5.4-nano-2026-03-17` | Very good | Fast   | ~$0.001/image |
 | `gpt-4o`       | Good      | Fast   | ~$0.005/image |
 
-`gpt-4.1-mini` is the best starting point — fast, cheap, and accurate enough for most equations and tables.
+`gpt-5.4-nano-2026-03-17` is the best starting point — fast, cheap, and accurate enough for most equations and tables.
 
 > **Privacy note:** cloud APIs send cropped block images to external servers. For sensitive documents, use a local model instead.
 
@@ -141,7 +141,7 @@ For bulk workflows (entire papers, directory of PDFs, pipeline integration) the 
 ```bash
 # Transcribe every equation and table to JSON
 railreader2-cli vlm paper.pdf --classes equation,table \
-    --endpoint https://api.openai.com/v1 --model gpt-4o-mini \
+    --endpoint https://api.openai.com/v1 --model gpt-5.4-nano-2026-03-17 \
     --output transcriptions.json
 ```
 

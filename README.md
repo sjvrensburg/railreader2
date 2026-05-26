@@ -100,7 +100,7 @@ At high zoom levels, navigation switches to "rail mode" — the viewer locks ont
 - **Interactive minimap** — click or drag inside to navigate. Drag the top-edge grip to move; drag the inner corner to resize. Switches to the primary's high-DPI bitmap when enlarged so it stays crisp. Position and size persist
 - **On-screen nav buttons** — ◀/▶ buttons in the status bar for mouse-only page navigation
 - **Search** — full-text search in a sidebar panel with results grouped by page, text snippets with highlighted match terms, regex and case sensitivity toggles, and match highlighting on the page (Ctrl+F)
-- **Copy as LaTeX** — send any detected equation, table, or figure to a Vision Language Model and copy the result to clipboard. Equations → LaTeX, tables → Markdown, figures → description. Access via `Ctrl+L` (current block), `Ctrl+right-click` (context menu), or Edit menu. Works with cloud APIs (OpenAI `gpt-4.1-mini` recommended) or local models ([Ollama](https://ollama.com), [vLLM](docs/vllm-guide.md)). Configure in Settings > VLM. See the [VLM setup guide](docs/vllm-guide.md) for all options
+- **Copy as LaTeX** — send any detected equation, table, or figure to a Vision Language Model and copy the result to clipboard. Equations → LaTeX, tables → Markdown, figures → description. Access via `Ctrl+L` (current block), `Ctrl+right-click` (context menu), or Edit menu. Works with cloud APIs (OpenAI `gpt-5.4-nano-2026-03-17` recommended) or local models ([Ollama](https://ollama.com), [vLLM](docs/vllm-guide.md)). Configure in Settings > VLM. See the [VLM setup guide](docs/vllm-guide.md) for all options
 
 #### Annotations & text
 
@@ -197,7 +197,7 @@ railreader2-cli annotations paper.pdf --include-text --output annotations.json
 
 # Transcribe every equation and table to LaTeX/Markdown via a vision LLM
 railreader2-cli vlm paper.pdf --classes equation,table \
-    --endpoint https://api.openai.com/v1 --model gpt-4o-mini \
+    --endpoint https://api.openai.com/v1 --model gpt-5.4-nano-2026-03-17 \
     --output transcriptions.json
 
 # Export PDF to structured Markdown (headings, LaTeX, tables, figures, annotations)
@@ -354,7 +354,7 @@ railreader2-cli annotations paper.pdf --include-text --include-blocks --pages 1-
 railreader2-cli export paper.pdf --pages 1-20 --output paper.md
 
 # Export with VLM transcription for equations and tables
-railreader2-cli export paper.pdf --endpoint https://api.openai.com/v1 --model gpt-4o-mini --output paper.md
+railreader2-cli export paper.pdf --endpoint https://api.openai.com/v1 --model gpt-5.4-nano-2026-03-17 --output paper.md
 ```
 
 The CLI uses the ONNX layout model from the GUI installation. If the GUI isn't installed, download the model with `./scripts/download-model.sh`.

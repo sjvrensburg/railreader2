@@ -15,6 +15,10 @@ models/*.onnx
 config.json
 TODO.md
 
+# Marketing drafts and assets — not part of the public repo
+marketing/
+debug.log
+
 # Installer build artifacts
 installer/output/
 installer/icon.ico

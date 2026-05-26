@@ -408,7 +408,7 @@ Some local or OCR-specialised models (LightOnOCR, certain older Ollama builds) d
 
 ### Recommended models
 
-- **Cloud (OpenAI):** `gpt-4.1-mini` — best accuracy for equations and tables. Requires an API key from [platform.openai.com](https://platform.openai.com). Note: sends cropped block images to external servers.
+- **Cloud (OpenAI):** `gpt-5.4-nano-2026-03-17` — best accuracy for equations and tables. Requires an API key from [platform.openai.com](https://platform.openai.com). Note: sends cropped block images to external servers.
 - **Local (Ollama):** `qwen2.5-vl:7b` — good general-purpose vision model, no data leaves your machine
 - **Local (vLLM + LightOnOCR):** `lightonai/LightOnOCR-2-1B` — specialised OCR model, fast local inference
 
@@ -545,7 +545,7 @@ Per-class overrides allow routing different block types to different backends (e
 ```bash
 # Transcribe every equation and table in a paper to LaTeX/Markdown
 railreader2-cli vlm paper.pdf --classes equation,table \
-    --endpoint https://api.openai.com/v1 --model gpt-4o-mini \
+    --endpoint https://api.openai.com/v1 --model gpt-5.4-nano-2026-03-17 \
     --output transcriptions.json
 
 # Dry run — dump the detected crops without calling any API
@@ -554,7 +554,7 @@ railreader2-cli vlm paper.pdf --all --dump-crops ./crops/
 # Mixed routing: local Ollama for equations, OpenAI for figures
 railreader2-cli vlm paper.pdf --classes equation,figure \
     --equation-endpoint http://localhost:11434/v1 --equation-model qwen2.5-vl:7b \
-    --figure-endpoint https://api.openai.com/v1 --figure-model gpt-4o-mini \
+    --figure-endpoint https://api.openai.com/v1 --figure-model gpt-5.4-nano-2026-03-17 \
     --output rich.json
 
 # Reuse a pre-computed structure JSON (skip ONNX)
@@ -605,7 +605,7 @@ railreader2-cli export paper.pdf --no-vlm --output paper.md
 
 # Full fidelity with VLM (LaTeX equations, Markdown tables, figure descriptions)
 railreader2-cli export paper.pdf \
-    --endpoint https://api.openai.com/v1 --model gpt-4o-mini \
+    --endpoint https://api.openai.com/v1 --model gpt-5.4-nano-2026-03-17 \
     --output paper.md
 
 # Export with figure images saved to disk

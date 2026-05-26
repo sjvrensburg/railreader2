@@ -150,7 +150,6 @@ Key fields: `rail_zoom_threshold`, `snap_duration_ms`, `scroll_speed_start/max`,
 - `PdfiumResolver.Initialize()` must be called before any PDFium P/Invoke — registers a `DllImportResolver` that maps "pdfium" to the correct platform-specific native library (pdfium.dll / libpdfium.so / libpdfium.dylib). Called in the GUI entry point
 - ONNX runtime pre-loading in `LayoutAnalyzer` static constructor handles Linux (.so) and macOS (.dylib); Windows uses OnnxRuntime's own resolver
 - SkiaSharp 3.x explicitly overrides Avalonia 11's bundled 2.88 — required for `SKRuntimeEffect.CreateColorFilter()`
-- TODO.md is a legacy Rust file — disregard it
 - DISTRIBUTION.md documents the release process for all channels (GitHub, Microsoft Store)
 - `scripts/` contains a single helper: `download-model.sh` (PP-DocLayoutV3 ONNX download)
 - `CleanupService.RunCleanup()` runs at startup and via Help menu (removes cache, temp, old logs)
