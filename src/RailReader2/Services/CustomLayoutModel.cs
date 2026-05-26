@@ -11,7 +11,7 @@ namespace RailReader2.Services;
 /// path is selected separately via <see cref="CustomLayoutModelConfig.Enabled"/>
 /// and takes precedence when active. Serialised as a string in
 /// <c>custom_layout_model.json</c> so the user-facing docs can reference
-/// readable names (<c>"PpDocLayoutV3"</c> / <c>"Heron"</c>).
+/// readable names (<c>"PpDocLayoutV3"</c> / <c>"PpDocLayoutS"</c> / <c>"Heron"</c>).
 /// </summary>
 [JsonConverter(typeof(JsonStringEnumConverter<BuiltinAnalyzer>))]
 public enum BuiltinAnalyzer
@@ -20,6 +20,8 @@ public enum BuiltinAnalyzer
     PpDocLayoutV3 = 0,
     /// <summary>Docling Heron (RT-DETRv2). Must be downloaded separately — see docs/heron-layout-model.md.</summary>
     Heron = 1,
+    /// <summary>PP-DocLayout-S (PicoDet/GFL, ~4.7 MB). Lightweight detector intended for low-resource targets. Must be downloaded separately — see docs/pp-doclayout-s.md.</summary>
+    PpDocLayoutS = 2,
 }
 
 /// <summary>

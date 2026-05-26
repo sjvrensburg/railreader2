@@ -16,9 +16,10 @@ namespace RailReader.Cli.Commands;
 /// </summary>
 internal static partial class LayoutModelChoice
 {
-    internal enum Builtin { PpDocLayoutV3 = 0, Heron = 1 }
+    internal enum Builtin { PpDocLayoutV3 = 0, Heron = 1, PpDocLayoutS = 2 }
 
     internal const string HeronFileName = "docling-layout-heron.onnx";
+    internal const string PpsFileName = "pp_doclayout_s.onnx";
 
     /// <summary>Returns the user's analyzer choice, or PP-DocLayoutV3 if no config / parse error.</summary>
     internal static Builtin LoadChoice()
@@ -38,35 +39,40 @@ internal static partial class LayoutModelChoice
     }
 
     /// <summary>Probe locations for the Heron model, in priority order.</summary>
-    internal static string? FindHeronModelPath()
+    internal static string? FindHeronModelPath() => FindModelPath(HeronFileName);
+
+    /// <summary>Probe locations for the PP-DocLayout-S model, in priority order.</summary>
+    internal static string? FindPpsModelPath() => FindModelPath(PpsFileName);
+
+    private static string? FindModelPath(string fileName)
     {
-        foreach (var p in HeronProbePaths())
+        foreach (var p in ProbePaths(fileName))
             if (File.Exists(p)) return p;
         return null;
     }
 
-    private static IEnumerable<string> HeronProbePaths()
+    private static IEnumerable<string> ProbePaths(string fileName)
     {
-        yield return Path.Combine(AppContext.BaseDirectory, "models", HeronFileName);
+        yield return Path.Combine(AppContext.BaseDirectory, "models", fileName);
 
         var appDir = Environment.GetEnvironmentVariable("APPDIR");
         if (!string.IsNullOrEmpty(appDir))
-            yield return Path.Combine(appDir, "models", HeronFileName);
+            yield return Path.Combine(appDir, "models", fileName);
 
-        yield return Path.Combine(AppConfig.ConfigDir, "models", HeronFileName);
+        yield return Path.Combine(AppConfig.ConfigDir, "models", fileName);
 
         var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
         if (!string.IsNullOrEmpty(localAppData))
-            yield return Path.Combine(localAppData, "railreader2", "models", HeronFileName);
+            yield return Path.Combine(localAppData, "railreader2", "models", fileName);
 
-        yield return Path.Combine(Directory.GetCurrentDirectory(), "models", HeronFileName);
+        yield return Path.Combine(Directory.GetCurrentDirectory(), "models", fileName);
 
         var cwd = Directory.GetCurrentDirectory();
         for (int up = 1; up <= 3; up++)
         {
             var parent = Directory.GetParent(cwd)?.FullName;
             if (parent is null) break;
-            yield return Path.Combine(parent, "models", HeronFileName);
+            yield return Path.Combine(parent, "models", fileName);
             cwd = parent;
         }
     }

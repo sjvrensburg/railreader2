@@ -14,10 +14,10 @@ namespace RailReader2.Services;
 ///   <item>User-supplied custom model (PP-style I/O contract) if
 ///         <see cref="CustomLayoutModelConfig.Enabled"/> and both files resolve.</item>
 ///   <item>The <see cref="BuiltinAnalyzer"/> named in the config (defaults to
-///         PP-DocLayoutV3). If Heron is selected but the .onnx file is not
-///         found at any <see cref="HeronModelLocator"/> probe path, falls back
-///         to PP-DocLayoutV3 with a warning rather than dropping into
-///         layout-less mode.</item>
+///         PP-DocLayoutV3). If Heron or PP-DocLayout-S is selected but its
+///         .onnx file is not found at any locator probe path, falls back to
+///         PP-DocLayoutV3 with a warning rather than dropping into layout-less
+///         mode.</item>
 ///   <item>Layout-less mode (analyzer not initialised) only when *no* model
 ///         file can be located.</item>
 /// </list>
@@ -81,6 +81,19 @@ public static class CustomLayoutModelLoader
                     "Docling Heron");
             }
             logger.Warn($"[ONNX] Docling Heron model not found ({HeronModelLocator.FileName}) — falling back to PP-DocLayoutV3. See docs/heron-layout-model.md.");
+            // fall through to PP
+        }
+        else if (choice == BuiltinAnalyzer.PpDocLayoutS)
+        {
+            var ppsPath = PPDocLayoutSModelLocator.FindModelPath();
+            if (ppsPath != null)
+            {
+                var ppsCaps = RailReader.Core.Analysis.PPDocLayoutSRoles.Capabilities;
+                return new Resolution(ppsPath, ppsCaps,
+                    () => new PPDocLayoutSLayoutAnalyzer(ppsPath, ppsCaps),
+                    "PP-DocLayout-S");
+            }
+            logger.Warn($"[ONNX] PP-DocLayout-S model not found ({PPDocLayoutSModelLocator.FileName}) — falling back to PP-DocLayoutV3. See docs/pp-doclayout-s.md.");
             // fall through to PP
         }
 

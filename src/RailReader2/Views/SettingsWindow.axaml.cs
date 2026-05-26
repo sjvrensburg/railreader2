@@ -118,37 +118,50 @@ public partial class SettingsWindow : Window
     }
 
     /// <summary>
-    /// Populates the analyzer dropdown. The Heron option is shown either way,
-    /// but if no Heron .onnx is found on any probe path we surface that in the
-    /// status line below the combo and roll back the selection to PP if the
-    /// user tries to pick it (a properly-disabled item would silently swallow
-    /// the click and confuse users).
+    /// Populates the analyzer dropdown. The Heron and PP-DocLayout-S options
+    /// are shown either way, but if the corresponding .onnx isn't found on any
+    /// probe path we surface that in the status line below the combo. The
+    /// loader falls back to PP-DocLayoutV3 with a warning rather than refusing
+    /// to start.
     /// </summary>
     private void PopulateBuiltinAnalyzerCombo()
     {
         var items = new List<BuiltinAnalyzerItem>
         {
             new(BuiltinAnalyzer.PpDocLayoutV3, "PP-DocLayoutV3 (default, bundled)"),
+            new(BuiltinAnalyzer.PpDocLayoutS,  "PP-DocLayout-S (lightweight)"),
             new(BuiltinAnalyzer.Heron,         "Docling Heron"),
         };
         BuiltinAnalyzerCombo.ItemsSource = items;
         BuiltinAnalyzerCombo.DisplayMemberBinding = new Avalonia.Data.Binding(nameof(BuiltinAnalyzerItem.Label));
-        BuiltinAnalyzerCombo.SelectedIndex = (int)_customModel.BuiltinAnalyzer;
+        BuiltinAnalyzerCombo.SelectedIndex = items.FindIndex(it => it.Value == _customModel.BuiltinAnalyzer);
+        if (BuiltinAnalyzerCombo.SelectedIndex < 0) BuiltinAnalyzerCombo.SelectedIndex = 0;
         UpdateBuiltinAnalyzerStatus();
     }
 
     private void UpdateBuiltinAnalyzerStatus()
     {
-        if (_customModel.BuiltinAnalyzer == BuiltinAnalyzer.Heron)
+        switch (_customModel.BuiltinAnalyzer)
         {
-            var heron = HeronModelLocator.FindModelPath();
-            BuiltinAnalyzerStatus.Text = heron != null
-                ? $"Heron model: {heron}  Restart to apply."
-                : $"Heron model not found ({HeronModelLocator.FileName}). See docs/heron-layout-model.md to download it; the app will fall back to PP-DocLayoutV3 until then.";
-        }
-        else
-        {
-            BuiltinAnalyzerStatus.Text = "Using PP-DocLayoutV3.";
+            case BuiltinAnalyzer.Heron:
+                {
+                    var heron = HeronModelLocator.FindModelPath();
+                    BuiltinAnalyzerStatus.Text = heron != null
+                        ? $"Heron model: {heron}  Restart to apply."
+                        : $"Heron model not found ({HeronModelLocator.FileName}). See docs/heron-layout-model.md to download it; the app will fall back to PP-DocLayoutV3 until then.";
+                    break;
+                }
+            case BuiltinAnalyzer.PpDocLayoutS:
+                {
+                    var pps = PPDocLayoutSModelLocator.FindModelPath();
+                    BuiltinAnalyzerStatus.Text = pps != null
+                        ? $"PP-DocLayout-S model: {pps}  Restart to apply."
+                        : $"PP-DocLayout-S model not found ({PPDocLayoutSModelLocator.FileName}). See docs/pp-doclayout-s.md to download it; the app will fall back to PP-DocLayoutV3 until then.";
+                    break;
+                }
+            default:
+                BuiltinAnalyzerStatus.Text = "Using PP-DocLayoutV3.";
+                break;
         }
     }
 
