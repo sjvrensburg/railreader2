@@ -28,14 +28,10 @@ public static class ExportCommand
         var noPageBreaks = Program.HasFlag(args, "no-page-breaks");
         var noStructured = Program.HasFlag(args, "no-structured-output");
 
-        int concurrency = 2;
-        if (concurrencyStr != null && int.TryParse(concurrencyStr, out var c))
-            concurrency = Math.Max(1, c);
+        int concurrency = Shared.ParsePositiveInt(concurrencyStr, 2);
 
-        var promptStyle = VlmService.PromptStyle.Instruction;
-        if (promptStyleStr != null
-            && !Enum.TryParse<VlmService.PromptStyle>(promptStyleStr, ignoreCase: true, out promptStyle))
-            return Program.Fail($"Invalid --prompt-style: {promptStyleStr} (expected: instruction, ocr)");
+        var (promptStyle, promptErr) = Shared.ParsePromptStyle(promptStyleStr);
+        if (promptErr != null) return Program.Fail(promptErr);
 
         VlmEndpointConfig? vlmEndpoint = null;
         if (!noVlm)

@@ -49,15 +49,13 @@ public partial class TabBarView : UserControl
     }
 
     private MainWindowViewModel? _vm;
-    private System.Collections.Specialized.NotifyCollectionChangedEventHandler? _collectionHandler;
+
     private void WireViewModel()
     {
-        // Unsubscribe from old VM
         if (_vm is not null)
         {
             _vm.PropertyChanged -= OnVmPropertyChanged;
-            if (_collectionHandler is not null)
-                _vm.Tabs.CollectionChanged -= _collectionHandler;
+            _vm.Tabs.CollectionChanged -= OnTabsCollectionChanged;
         }
 
         _vm = DataContext as MainWindowViewModel;
@@ -65,11 +63,13 @@ public partial class TabBarView : UserControl
         if (_vm is not null)
         {
             _vm.PropertyChanged += OnVmPropertyChanged;
-            _collectionHandler = (_, _) => RebuildTabs();
-            _vm.Tabs.CollectionChanged += _collectionHandler;
+            _vm.Tabs.CollectionChanged += OnTabsCollectionChanged;
             RebuildTabs();
         }
     }
+
+    private void OnTabsCollectionChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+        => RebuildTabs();
 
     private void OnVmPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {

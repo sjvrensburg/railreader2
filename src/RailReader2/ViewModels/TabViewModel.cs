@@ -22,7 +22,6 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
     [ObservableProperty] private double _pageHeight;
     [ObservableProperty] private bool _debugOverlay;
     [ObservableProperty] private bool _pendingRailSetup;
-    [ObservableProperty] private ColourEffect _colourEffect;
     [ObservableProperty] private bool _lineFocusBlur;
     [ObservableProperty] private bool _lineHighlightEnabled = true;
     [ObservableProperty] private bool _marginCropping;
@@ -116,7 +115,6 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
         _pageHeight = state.PageHeight;
         _debugOverlay = state.DebugOverlay;
         _pendingRailSetup = state.PendingRailSetup;
-        _colourEffect = state.ColourEffect;
         _lineFocusBlur = state.LineFocusBlur;
         _lineHighlightEnabled = state.LineHighlightEnabled;
         _marginCropping = state.MarginCropping;
@@ -133,7 +131,6 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
             case nameof(PageHeight): PageHeight = State.PageHeight; break;
             case nameof(DebugOverlay): DebugOverlay = State.DebugOverlay; break;
             case nameof(PendingRailSetup): PendingRailSetup = State.PendingRailSetup; break;
-            case nameof(ColourEffect): ColourEffect = State.ColourEffect; break;
             case nameof(LineFocusBlur): LineFocusBlur = State.LineFocusBlur; break;
             case nameof(LineHighlightEnabled): LineHighlightEnabled = State.LineHighlightEnabled; break;
             case nameof(MarginCropping): MarginCropping = State.MarginCropping; break;
@@ -147,7 +144,6 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
     partial void OnPageHeightChanged(double value) => State.PageHeight = value;
     partial void OnDebugOverlayChanged(bool value) => State.DebugOverlay = value;
     partial void OnPendingRailSetupChanged(bool value) => State.PendingRailSetup = value;
-    partial void OnColourEffectChanged(ColourEffect value) => State.ColourEffect = value;
     partial void OnLineFocusBlurChanged(bool value) => State.LineFocusBlur = value;
     partial void OnLineHighlightEnabledChanged(bool value) => State.LineHighlightEnabled = value;
     partial void OnMarginCroppingChanged(bool value) => State.MarginCropping = value;

@@ -50,6 +50,4 @@ public sealed partial class MainWindowViewModel
         _controller.Search.GoToMatch(matchIndex);
         InvalidateAfterNavigation();
     }
-
-    public void UpdateCurrentPageMatches() => _controller.Search.UpdateCurrentPageMatches();
 }

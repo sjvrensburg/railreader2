@@ -1,8 +1,10 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 using RailReader.Core;
 using RailReader.Core.Models;
 using RailReader.Core.Services;
+using RailReader.Core.Vlm.OpenAI;
 
 namespace RailReader.Cli.Commands;
 
@@ -15,6 +17,78 @@ internal static class Shared
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
         TypeInfoResolver = CliJsonContext.Default,
     };
+
+    /// <summary>
+    /// Parses an integer CLI option, clamps it to [<paramref name="min"/>, <paramref name="max"/>],
+    /// and prints a warning if the value was clamped. Returns <paramref name="default"/> when the
+    /// option is absent or unparseable.
+    /// </summary>
+    internal static int ParseClampedInt(string? raw, int min, int max, int @default, string optionName)
+    {
+        if (raw == null || !int.TryParse(raw, out var v)) return @default;
+        var clamped = Math.Clamp(v, min, max);
+        if (v != clamped)
+            Console.Error.WriteLine($"Warning: {optionName} clamped to {clamped} (valid range: {min}-{max})");
+        return clamped;
+    }
+
+    /// <summary>
+    /// Parses a float CLI option, clamps it to [<paramref name="min"/>, <paramref name="max"/>],
+    /// and prints a warning if the value was clamped. Returns <paramref name="default"/> when the
+    /// option is absent or unparseable.
+    /// </summary>
+    internal static float ParseClampedFloat(string? raw, float min, float max, float @default, string optionName)
+    {
+        if (raw == null || !float.TryParse(raw, out var v)) return @default;
+        var clamped = Math.Clamp(v, min, max);
+        if (v != clamped)
+            Console.Error.WriteLine($"Warning: {optionName} clamped to {clamped:F1} (valid range: {min}-{max})");
+        return clamped;
+    }
+
+    /// <summary>
+    /// Parses a positive-integer CLI option (concurrency, count). Returns <paramref name="default"/>
+    /// when absent or unparseable; floors to <paramref name="min"/> otherwise.
+    /// </summary>
+    internal static int ParsePositiveInt(string? raw, int @default, int min = 1)
+    {
+        if (raw == null || !int.TryParse(raw, out var v)) return @default;
+        return Math.Max(min, v);
+    }
+
+    /// <summary>
+    /// Parses the <c>--prompt-style</c> option. Returns a (style, error) tuple; the error is
+    /// populated when the value can't be parsed so the caller can <c>return Program.Fail(err)</c>.
+    /// </summary>
+    internal static (VlmService.PromptStyle Style, string? Error) ParsePromptStyle(string? raw)
+    {
+        var style = VlmService.PromptStyle.Instruction;
+        if (raw != null && !Enum.TryParse<VlmService.PromptStyle>(raw, ignoreCase: true, out style))
+            return (style, $"Invalid --prompt-style: {raw} (expected: instruction, ocr)");
+        return (style, null);
+    }
+
+    /// <summary>
+    /// Writes a JSON-serialised <paramref name="output"/> to <paramref name="outputPath"/>
+    /// (creating the directory if needed), or to stdout when the path is null. Prints
+    /// "<paramref name="label"/> written to ..." on stderr when writing to a file.
+    /// </summary>
+    internal static void WriteJsonOutput<T>(T output, string? outputPath, JsonTypeInfo<T> typeInfo, string label)
+    {
+        var json = JsonSerializer.Serialize(output, typeInfo);
+
+        if (outputPath != null)
+        {
+            var dir = Path.GetDirectoryName(outputPath);
+            if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+            File.WriteAllText(outputPath, json);
+            Console.Error.WriteLine($"{label} written to {Path.GetFullPath(outputPath)}");
+        }
+        else
+        {
+            Console.WriteLine(json);
+        }
+    }
 
     /// <summary>
     /// Resolves a VLM endpoint configuration from CLI overrides, the persisted
