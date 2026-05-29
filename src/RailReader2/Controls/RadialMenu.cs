@@ -320,6 +320,9 @@ public class RadialMenu : Control
         [ThreadStatic] private static SKFont? s_labelFont;
         [ThreadStatic] private static SKPaint? s_iconPaint;
         [ThreadStatic] private static SKFont? s_iconFont;
+        // Reusable wedge path — rewound between wedges/arcs instead of reallocating
+        // per segment on every hover-driven redraw.
+        [ThreadStatic] private static SKPath? s_wedgePath;
 
         public RadialMenuDrawOp(Rect bounds, List<Segment> segments,
             double innerR, double outerR, int hovered, bool hoverCentre,
@@ -434,7 +437,8 @@ public class RadialMenu : Control
                     else
                         fillPaint.Color = new SKColor(52, 52, 56, 220);
 
-                    using var wedgePath = new SKPath();
+                    var wedgePath = s_wedgePath ??= new SKPath();
+                    wedgePath.Rewind();
                     var outerRect = new SKRect(cx - outerR, cy - outerR, cx + outerR, cy + outerR);
                     var innerRect = new SKRect(cx - innerR, cy - innerR, cx + innerR, cy + innerR);
                     wedgePath.ArcTo(outerRect, startA, segAngle, true);
@@ -536,7 +540,8 @@ public class RadialMenu : Control
             float bandInner = (float)innerEdge + 2 * _scale;
             float bandOuter = (float)ringRadius + 2 * _scale;
 
-            using var path = new SKPath();
+            var path = s_wedgePath ??= new SKPath();
+            path.Rewind();
             var outerRect = new SKRect(cx - bandOuter, cy - bandOuter, cx + bandOuter, cy + bandOuter);
             var innerRect = new SKRect(cx - bandInner, cy - bandInner, cx + bandInner, cy + bandInner);
             path.ArcTo(outerRect, startA, segAngleDeg, true);

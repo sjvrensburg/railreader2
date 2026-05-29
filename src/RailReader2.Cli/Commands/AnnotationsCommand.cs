@@ -93,6 +93,10 @@ public static class AnnotationsCommand
 
                 if (!includeText) pageText = null;
 
+                // The nearest outline heading depends only on the page, not the
+                // individual annotation — compute it once instead of per annotation.
+                var pageOutlineHeading = FindNearestOutlineHeading(pdf2.Outline, pageIdx);
+
                 foreach (var ann in pageAnnotations)
                 {
                     var annOutput = SerializeAnnotation(ann);
@@ -127,7 +131,7 @@ public static class AnnotationsCommand
                         }
                     }
 
-                    annOutput.NearestHeading = FindNearestHeading(annBounds, pageIdx, pdf2.Outline, analysis);
+                    annOutput.NearestHeading = FindNearestHeading(annBounds, pageIdx, pageOutlineHeading, analysis);
                     pageOutput.Annotations.Add(annOutput);
                 }
 
@@ -197,13 +201,12 @@ public static class AnnotationsCommand
     }
 
     static HeadingOutput? FindNearestHeading(RectF? annBounds, int pageIdx,
-        List<OutlineEntry> outline, PageAnalysis? analysis)
+        HeadingOutput? pageOutlineHeading, PageAnalysis? analysis)
     {
         if (annBounds is not { } annRect) return null;
 
-        var bestOutline = FindNearestOutlineHeading(outline, pageIdx);
-        if (bestOutline != null)
-            return bestOutline;
+        if (pageOutlineHeading != null)
+            return pageOutlineHeading;
 
         if (analysis == null) return null;
 

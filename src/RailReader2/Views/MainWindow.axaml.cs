@@ -18,6 +18,20 @@ public partial class MainWindow : Window
     private SKImage? _lastMinimapImage;
     private MainWindowViewModel? _subscribedVm;
 
+    // Cache for the z-ordered annotation list. The sort only changes when the
+    // page's annotation set changes (add/remove); pan/zoom frames reuse it.
+    private int _annoSortPage = -1;
+    private object? _annoSortSource;
+    private int _annoSortCount = -1;
+    private List<Annotation>? _annoSortResult;
+
+    // Cache for the active search-match local index. Only changes on match
+    // navigation or page change, not while the camera moves.
+    private int _searchIdxPage = -1;
+    private int _searchIdxActive = int.MinValue;
+    private object? _searchIdxMatches;
+    private int _searchIdxResult = -1;
+
     // Fullscreen hover reveal: show threshold < hide threshold for hysteresis
     private const double FullScreenShowThreshold = 5.0;
     private const double FullScreenHideThreshold = 60.0;
@@ -449,16 +463,34 @@ public partial class MainWindow : Window
             TintOpacity: (float)vm.AppConfig.LineHighlightOpacity);
     }
 
-    private static AnnotationRenderState BuildAnnotationState(MainWindowViewModel vm, TabViewModel? tab)
+    private AnnotationRenderState BuildAnnotationState(MainWindowViewModel vm, TabViewModel? tab)
     {
         List<Annotation>? pageAnnotations = null;
         if (tab is not null)
             tab.Annotations.Pages.TryGetValue(tab.CurrentPage, out pageAnnotations);
 
         // Pre-sort by z-order on the UI thread so the compositor doesn't need LINQ.
-        var sorted = pageAnnotations is { Count: > 1 }
-            ? AnnotationRenderer.SortByZOrder(pageAnnotations)
-            : pageAnnotations;
+        // Cache the result: z-order only changes when the page's annotation set
+        // changes, so pan/zoom frames (which re-send camera every tick) reuse it.
+        List<Annotation>? sorted;
+        if (pageAnnotations is not { Count: > 1 })
+        {
+            sorted = pageAnnotations;
+        }
+        else if (ReferenceEquals(pageAnnotations, _annoSortSource)
+            && pageAnnotations.Count == _annoSortCount
+            && tab!.CurrentPage == _annoSortPage)
+        {
+            sorted = _annoSortResult;
+        }
+        else
+        {
+            sorted = AnnotationRenderer.SortByZOrder(pageAnnotations);
+            _annoSortSource = pageAnnotations;
+            _annoSortCount = pageAnnotations.Count;
+            _annoSortPage = tab!.CurrentPage;
+            _annoSortResult = sorted;
+        }
 
         return new AnnotationRenderState(
             Camera: BuildCamera(tab),
@@ -473,8 +505,25 @@ public partial class MainWindow : Window
         var matches = vm.CurrentPageSearchMatches;
         int activeLocalIndex = -1;
         if (matches is { Count: > 0 } && tab is not null)
-            activeLocalIndex = OverlayRenderer.ComputeActiveLocalIndex(
-                vm.SearchMatches, matches, vm.ActiveMatchIndex, tab.CurrentPage);
+        {
+            // The active local index only changes on match navigation or page
+            // change — not while the camera moves. Cache across camera-only frames.
+            if (ReferenceEquals(matches, _searchIdxMatches)
+                && vm.ActiveMatchIndex == _searchIdxActive
+                && tab.CurrentPage == _searchIdxPage)
+            {
+                activeLocalIndex = _searchIdxResult;
+            }
+            else
+            {
+                activeLocalIndex = OverlayRenderer.ComputeActiveLocalIndex(
+                    vm.SearchMatches, matches, vm.ActiveMatchIndex, tab.CurrentPage);
+                _searchIdxMatches = matches;
+                _searchIdxActive = vm.ActiveMatchIndex;
+                _searchIdxPage = tab.CurrentPage;
+                _searchIdxResult = activeLocalIndex;
+            }
+        }
 
         // Compute viewport in page space for search highlight culling.
         var camera = BuildCamera(tab);

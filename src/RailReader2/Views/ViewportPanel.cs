@@ -22,6 +22,12 @@ public class ViewportPanel : Panel
     // Track the last tool so we only update cursor when it changes
     private AnnotationTool _lastCursorTool = AnnotationTool.None;
 
+    // Last position at which a link hover hit-test ran. Pointer moves arrive at
+    // ~60–125Hz; gating the hit-test on a small movement delta avoids running it
+    // (a per-page link scan) on every event without a perceptible cursor lag.
+    private Point _lastLinkHitTestPos = new(double.NegativeInfinity, double.NegativeInfinity);
+    private const double LinkHitTestMinMoveSq = 9.0; // 3px squared
+
     public ViewportPanel()
     {
         ClipToBounds = true;
@@ -135,9 +141,15 @@ public class ViewportPanel : Panel
             if (!ViewModel.IsAnnotating)
             {
                 var pos = e.GetPosition(this);
-                var (pageX, pageY) = ScreenToPage(pos);
-                bool overLink = ViewModel.IsOverLink(pageX, pageY);
-                UpdateLinkCursor(overLink);
+                double mdx = pos.X - _lastLinkHitTestPos.X;
+                double mdy = pos.Y - _lastLinkHitTestPos.Y;
+                if (mdx * mdx + mdy * mdy >= LinkHitTestMinMoveSq)
+                {
+                    _lastLinkHitTestPos = pos;
+                    var (pageX, pageY) = ScreenToPage(pos);
+                    bool overLink = ViewModel.IsOverLink(pageX, pageY);
+                    UpdateLinkCursor(overLink);
+                }
             }
             return;
         }

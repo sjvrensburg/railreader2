@@ -57,11 +57,20 @@ public static class PageMarkdownBuilder
         int pageIndex,
         PageAnnotations? annotations)
     {
-        var sb = new StringBuilder();
+        var pageHeadings = flatOutline.Where(e => e.Page == pageIndex).ToList();
+        return BuildPlainTextForPage(pageText, pageHeadings, annotations);
+    }
 
-        var pageHeadings = flatOutline
-            .Where(e => e.Page == pageIndex)
-            .ToList();
+    /// <summary>
+    /// Builds plain-text Markdown using outline entries already filtered to this page.
+    /// Avoids the per-page outline re-scan that <see cref="BuildPlainText"/> performs.
+    /// </summary>
+    public static string BuildPlainTextForPage(
+        PageText pageText,
+        IReadOnlyList<HeadingLevelResolver.FlatOutlineEntry> pageHeadings,
+        PageAnnotations? annotations)
+    {
+        var sb = new StringBuilder();
 
         foreach (var heading in pageHeadings)
         {
