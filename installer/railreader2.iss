@@ -38,7 +38,7 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 Name: "pdfassoc"; Description: "Associate with .pdf files"; GroupDescription: "File associations:"; Flags: unchecked
 
 [Files]
-; publish/ contains the app + models/PP-DocLayoutV3.onnx (placed there by CI)
+; publish/ contains the app + models/ subdirectory with layout models (placed there by CI)
 Source: "..\publish\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]

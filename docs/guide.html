@@ -749,10 +749,11 @@
 
       <h3>ONNX model</h3>
       <p>
-        The CLI uses the PP-DocLayoutV3 ONNX layout model. If the GUI is installed, the CLI
-        finds the model automatically from the shared cache. If the GUI isn't installed,
-        download the model by running <code>./scripts/download-model.sh</code> from source.
-        The <code>structure</code> command works without the model but skips layout analysis.
+        The CLI uses the Docling Heron-INT8 ONNX layout model by default, with PP-DocLayoutV3
+        available as an alternative. If the GUI is installed, the CLI finds the models automatically
+        from the shared cache. If the GUI isn't installed, download the models by running
+        <code>./scripts/download-model.sh</code> from source. The <code>structure</code> command
+        works without the model but skips layout analysis.
       </p>
 
       <h3>render &mdash; export pages as PNG</h3>
@@ -946,7 +947,12 @@ railreader2-cli export paper.pdf --figure-dir ./figures --output paper.md</code>
 
       <h3>Advanced</h3>
       <ul>
-        <li><strong>Navigable Block Types:</strong> Choose which PP-DocLayoutV3 block types are navigable
+        <li><strong>Layout Model:</strong> Choose between Docling Heron-INT8 (default, bundled, ~66 MB)
+          and PP-DocLayoutV3 (alternative, ~50 MB). See the <a href="heron-layout-model.md">layout model guide</a>
+          for installation and trade-offs.</li>
+        <li><strong>Custom Layout Model:</strong> Optionally replace the built-in model with your own
+          ONNX (PP-style I/O contract) + class-mapping JSON.</li>
+        <li><strong>Navigable Block Types:</strong> Choose which block types are navigable
           in rail mode. Toggling classes doesn't require re-running analysis.</li>
         <li><strong>Centered Block Types:</strong> Choose which block types are horizontally centered
           when they are narrower than the viewport. By default, headings (paragraph_title, doc_title)

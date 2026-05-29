@@ -1,9 +1,9 @@
 # Using PP-DocLayout-S as the Layout Model
 
-RailReader2 ships with **PP-DocLayoutV3** as its bundled layout-detection
-model. You can optionally switch to **PP-DocLayout-S**, a lightweight
-sibling from the same PaddleOCR family — ~10× smaller and the detector
-intended for future low-resource builds.
+RailReader2 ships with **Docling Heron-INT8** as its bundled layout-detection
+model (~66 MB). You can optionally switch to **PP-DocLayout-S**, a lightweight
+sibling from the PaddleOCR family — ~4.7 MB and useful for resource-constrained
+environments.
 
 This guide explains when to switch, how to install PP-S, and how to switch
 back.
@@ -12,21 +12,21 @@ back.
 
 ## Why PP-DocLayout-S?
 
-PP-DocLayoutV3 is the default for good reason: it's accurate on
-academic-style PDFs, ships inside the installer (~50 MB), and emits a
-reading-order signal directly. Most users should leave it alone.
+Docling Heron-INT8 is the default for good reason: it's highly accurate,
+ships bundled (~66 MB), detects a broad class space including code and forms,
+and emits a reading-order signal. Most users should leave it alone.
 
 PP-DocLayout-S's appeal is its **size**:
 
-- **~4.7 MB ONNX** vs. PP-DocLayoutV3's ~50 MB and Heron's ~164 MB.
+- **~4.7 MB ONNX** vs. Heron's ~66 MB and PP-DocLayoutV3's ~50 MB.
 - **Faster on CPU** — PicoDet/GFL is a much smaller backbone than
-  PP-V3's RT-DETR or Heron's RT-DETRv2.
+  Heron's RT-DETRv2 or PP-V3's RT-DETR.
 - **Same 23-class document schema** as PP-V3 (minus the inline-formula and
   vertical-text classes, with `chart_title` and `table_title` first-class).
 
 The trade-offs:
 
-- **Lower recall on small text.** PP-S is genuinely weaker than V3 on
+- **Lower recall on small text.** PP-S is weaker than Heron and V3 on
   bibliography rows, footnotes, and dense small print. The analyzer
   works around this by rasterising at 1920 px on the longest edge and
   downsizing to the model's 480×480 input internally — going straight
@@ -36,7 +36,7 @@ The trade-offs:
 - **Not in the installer.** You must download it separately
   (license: Apache-2.0).
 
-PP-DocLayoutV3 remains the default. PP-S is opt-in, primarily useful if
+Docling Heron-INT8 is the default. PP-S is opt-in, primarily useful if
 you care about startup time and disk footprint and your documents aren't
 small-text-heavy.
 
@@ -128,7 +128,7 @@ take effect.
 1. **File → Settings…** (or `Ctrl+,`).
 2. Open the **Advanced** tab.
 3. Under **Layout Model**, change the dropdown from
-   *PP-DocLayoutV3 (default, bundled)* to *PP-DocLayout-S (lightweight)*.
+   *Docling Heron-INT8 (default, bundled)* to *PP-DocLayout-S (lightweight)*.
 4. The status line below the dropdown tells you whether the file was
    found, and the path it resolved to.
 5. Close the Settings window and restart the app.
@@ -157,8 +157,8 @@ If the file doesn't exist yet, create it with:
 }
 ```
 
-Valid values: `"PpDocLayoutV3"` (default), `"PpDocLayoutS"`, or
-`"Heron"`. The setting is case-sensitive.
+Valid values: `"Heron"` (default), `"PpDocLayoutV3"`, or
+`"PpDocLayoutS"`. The setting is case-sensitive.
 
 > **Note:** If you have a custom layout model enabled (`"enabled": true`
 > with valid `model_path` and `mapping_path`), it takes precedence over
@@ -186,11 +186,11 @@ After restart, open any PDF:
 
 ---
 
-## Switch back to PP-DocLayoutV3
+## Switch back to Heron-INT8
 
 Set the dropdown in **Settings → Advanced → Layout Model** back to
-*PP-DocLayoutV3 (default, bundled)*, or edit `custom_layout_model.json`
-and set `"builtin_analyzer": "PpDocLayoutV3"`. Restart.
+*Docling Heron-INT8 (default, bundled)*, or edit `custom_layout_model.json`
+and set `"builtin_analyzer": "Heron"`. Restart.
 
 You can leave `pp_doclayout_s.onnx` in place — RailReader2 ignores it
 unless you re-enable PP-S. It's only ~4.7 MB, so most users just keep it

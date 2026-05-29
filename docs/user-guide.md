@@ -422,7 +422,7 @@ RailReader2 ships a standalone headless CLI for automated PDF extraction. Downlo
 
 ### ONNX model
 
-The CLI uses the PP-DocLayoutV3 ONNX layout model. If the GUI is installed, the CLI finds the model automatically from the shared cache. If the GUI isn't installed, download the model by running `./scripts/download-model.sh` from source. The `structure` command works without the model but skips layout analysis.
+The CLI uses the Docling Heron-INT8 ONNX layout model by default, with PP-DocLayoutV3 available as an alternative. If the GUI is installed, the CLI finds the models automatically from the shared cache. If the GUI isn't installed, download the models by running `./scripts/download-model.sh` from source. The `structure` command works without the model but skips layout analysis.
 
 ### render — export pages as PNG
 
@@ -650,11 +650,11 @@ Press `Ctrl+,` or use the menu to open Settings. Changes take effect immediately
 - **Block Pause:** Pause duration at block/page boundaries (ms, 0 to disable).
 
 ### Advanced
-- **Layout Model:** Choose between PP-DocLayoutV3 (default, bundled) and Docling Heron (opt-in, ~164 MB, downloaded separately). See the [Heron layout model guide](heron-layout-model.md) for installation instructions and trade-offs.
+- **Layout Model:** Choose between Docling Heron-INT8 (default, bundled, ~66 MB) and PP-DocLayoutV3 (alternative, ~50 MB). See the [Heron layout model guide](heron-layout-model.md) for installation instructions and trade-offs.
+- **Custom Layout Model:** Optionally replace the built-in model with your own ONNX (PP-style I/O contract) + class-mapping JSON.
 - **Navigable Block Types:** Choose which block types are navigable in rail mode. Roles are model-independent.
 - **Centered Block Types:** Choose which block types are horizontally centered when they are narrower than the viewport. By default, headings (paragraph_title, doc_title) are excluded so they stay left-aligned with surrounding text, while formulae and body text are centered.
 - **Analysis Lookahead:** Number of pages to pre-analyze ahead (0 to disable).
-- **Custom Layout Model:** Optionally replace the built-in model with your own ONNX (PP-style I/O contract) + class-mapping JSON.
 
 ### Config file
 

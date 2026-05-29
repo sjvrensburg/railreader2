@@ -118,7 +118,8 @@
       <p>
         RailReader2 solves this with <strong>AI-guided rail reading</strong>:
         a layout analysis model
-        (<a href="https://huggingface.co/PaddlePaddle/PP-DocLayoutV3">PP-DocLayoutV3</a>)
+        (<a href="docs/heron-layout-model.md">Docling Heron-INT8</a> by default,
+        with <a href="https://huggingface.co/PaddlePaddle/PP-DocLayoutV3">PP-DocLayoutV3</a> as an alternative)
         detects text blocks and reading order, then the viewer guides you
         through the document line by line, block by block. It's not a screen
         magnifier &mdash; it's a purpose-built reading environment that
@@ -216,11 +217,11 @@
       <div class="feature">
         <h3>AI Layout Detection</h3>
         <p>
-          <a href="https://huggingface.co/PaddlePaddle/PP-DocLayoutV3">PP-DocLayoutV3</a>
-          by <a href="https://www.paddlepaddle.org.cn/en">PaddlePaddle</a>
-          identifies 23 block types (paragraphs, headings, figures,
-          tables, formulas) and predicts reading order automatically.
-          See the <a href="https://arxiv.org/abs/2601.21957">technical report</a>.
+          <a href="docs/heron-layout-model.md">Docling Heron-INT8</a> detects
+          document regions and predicts reading order. Broader class space supports
+          code, forms, and footnotes. <a href="https://huggingface.co/PaddlePaddle/PP-DocLayoutV3">PP-DocLayoutV3</a>
+          is supported as an alternative model. See the
+          <a href="docs/heron-layout-model.md">layout model guide</a> for details.
         </p>
       </div>
       <div class="feature">

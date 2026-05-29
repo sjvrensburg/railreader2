@@ -6,7 +6,7 @@
 
 <p align="center">
   Desktop PDF viewer optimised for high magnification viewing with AI-guided "rail reading".<br>
-  Built with .NET/Avalonia, PDFtoImage (PDFium) for PDF rasterisation, SkiaSharp for GPU-accelerated rendering, and PP-DocLayoutV3 (ONNX) for layout detection.
+  Built with .NET/Avalonia, PDFtoImage (PDFium) for PDF rasterisation, SkiaSharp for GPU-accelerated rendering, and Docling Heron-INT8 (ONNX) for layout detection.
 </p>
 
 <p align="center">
@@ -53,9 +53,9 @@ PDF pages are rasterised by PDFium (via PDFtoImage) at a DPI proportional to the
 
 ### Rail reading
 
-At high zoom levels, navigation switches to "rail mode" — the viewer locks onto detected text blocks and advances line-by-line, like a typewriter carriage return. This is powered by [PP-DocLayoutV3](https://huggingface.co/PaddlePaddle/PP-DocLayoutV3) by [PaddlePaddle](https://www.paddlepaddle.org.cn/en), which detects document regions (text, titles, footnotes, etc.) and predicts reading order natively via its Global Pointer Mechanism, correctly handling multi-column layouts, headers, footnotes, etc. See the [technical report](https://arxiv.org/abs/2601.21957). Non-active regions are dimmed so you can focus on the current block and line.
+At high zoom levels, navigation switches to "rail mode" — the viewer locks onto detected text blocks and advances line-by-line, like a typewriter carriage return. This is powered by **[Docling Heron-INT8](docs/heron-layout-model.md)**, which detects document regions (text, titles, footnotes, code, forms, etc.) and predicts reading order. Non-active regions are dimmed so you can focus on the current block and line.
 
-> [**Docling Heron**](docs/heron-layout-model.md) is supported as an optional alternative layout model from v3.13 — broader class space (code, forms, footnotes), opt-in, downloaded separately (~164 MB).
+> [**PP-DocLayoutV3**](https://huggingface.co/PaddlePaddle/PP-DocLayoutV3) by [PaddlePaddle](https://www.paddlepaddle.org.cn/en) is supported as an alternative layout model — narrower class space but optimised for traditional academic papers. See the [heron-layout-model guide](docs/heron-layout-model.md) for details and model selection.
 
 ### Features
 
@@ -372,13 +372,13 @@ The CLI's JSON output format is a stable API. The `structure` and `annotations` 
 
 ### ONNX model
 
-Download the PP-DocLayoutV3 model for AI layout analysis:
+Download the layout detection models:
 
 ```bash
 ./scripts/download-model.sh
 ```
 
-The model is placed in `models/PP-DocLayoutV3.onnx`. Without it, a simple fallback layout (horizontal strips) is used.
+This downloads both Docling Heron-INT8 (the bundled default, ~66 MB) and PP-DocLayoutV3 (optional alternative, ~50 MB). Without the models, a simple fallback layout (horizontal strips) is used.
 
 ### Build
 

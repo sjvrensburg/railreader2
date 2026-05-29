@@ -11,7 +11,7 @@
         <TextBlock Text="AI-guided rail reading PDF viewer" HorizontalAlignment="Center" Margin="0,8,0,0" />
         <Separator Margin="0,8" />
         <TextBlock Text="Built with Avalonia, SkiaSharp, ONNX Runtime" HorizontalAlignment="Center" Opacity="0.6" />
-        <TextBlock Text="Layout detection: PP-DocLayoutV3 by PaddlePaddle" HorizontalAlignment="Center" Opacity="0.6" />
+        <TextBlock Text="Layout detection: Docling Heron-INT8 (default) or PP-DocLayoutV3" HorizontalAlignment="Center" Opacity="0.6" />
         <Separator Margin="0,8" />
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="6"
                     x:Name="LogPathPanel" IsVisible="False">
