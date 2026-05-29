@@ -1,19 +1,15 @@
-# Using Docling Heron as the Layout Model
+# Docling Heron Layout Model
 
-RailReader2 ships with **PP-DocLayoutV3** as its bundled layout-detection
-model. Starting with v3.13, you can optionally switch to **Docling Heron**,
-the layout model used by IBM's Docling pipeline.
+RailReader2 uses **Docling Heron (INT8)** as its default layout-detection
+model. Starting with v3.14, Heron replaces PP-DocLayoutV3 as the bundled
+default for new installations.
 
-This guide explains when to switch, how to install Heron, and how to switch
-back if it doesn't suit your documents.
+This guide explains how to install the model, when you might switch to
+PP-DocLayoutV3, and how to switch back if needed.
 
 ---
 
 ## Why Heron?
-
-PP-DocLayoutV3 is the default for good reason: it's accurate on
-academic-style PDFs, small enough to ship inside the installer (~50 MB),
-and fast on CPU. Most users should leave it alone.
 
 Heron's appeal is its **class space**. It was trained on a broader set of
 document elements:
@@ -33,36 +29,33 @@ may give noticeably better detections:
   own class.
 - **Multi-language pages** — Heron's training data is broader.
 
-The trade-offs:
+PP-DocLayoutV3 remains available as an alternative:
 
-- **Larger file** — ~164 MB, vs. ~50 MB for PP-DocLayoutV3.
-- **Not in the installer** — you must download it separately
-  (license: Apache-2.0).
-- **Slightly slower per page** — Heron is an RT-DETRv2 model and has more
-  layers than PP. Exact margin depends on your CPU.
-
-PP-DocLayoutV3 remains the default. Heron is opt-in.
+- **Smaller file** — ~50 MB, vs. ~66 MB for Heron-INT8.
+- **Faster per page** — PP is a lighter model. Exact margin depends on
+  your CPU.
 
 ---
 
 ## Install the Heron model
 
-The model is published on Hugging Face by the Docling project at
-[`docling-project/docling-layout-heron-onnx`](https://huggingface.co/docling-project/docling-layout-heron-onnx).
+The model is published on Hugging Face at
+[`stefanj0/docling-layout-heron-int8-onnx`](https://huggingface.co/stefanj0/docling-layout-heron-int8-onnx)
+(INT8 quantised, ~66 MB).
 
-You need exactly one file: the ONNX weights, renamed to
-`docling-layout-heron.onnx`.
+You need exactly one file: the ONNX weights. The filename must be
+`docling-layout-heron-int8.onnx`.
+
+> **Backward compat:** If you previously downloaded the FP32 model as
+> `docling-layout-heron.onnx`, RailReader2 will still find it. You can
+> continue using the FP32 version, or replace it with the INT8 variant
+> for a smaller download with negligible accuracy loss.
 
 ### Option A: helper script (Linux / macOS, source build)
 
-If you have the [RailReaderCore](https://github.com/sjvrensburg/RailReaderCore)
-repo checked out (or are happy to clone it), the canonical helper script
-does the right thing:
-
 ```bash
-git clone https://github.com/sjvrensburg/RailReaderCore.git
-./RailReaderCore/scripts/download-model.sh heron
-# Produces ./models/docling-layout-heron.onnx
+./scripts/download-model.sh heron
+# Produces ./models/docling-layout-heron-int8.onnx
 ```
 
 Move that file to one of the locations in the **probe order** below.
@@ -70,20 +63,17 @@ Move that file to one of the locations in the **probe order** below.
 ### Option B: direct download (any platform)
 
 ```bash
-curl -L -o docling-layout-heron.onnx \
-  https://huggingface.co/docling-project/docling-layout-heron-onnx/resolve/main/model.onnx
+curl -L -o docling-layout-heron-int8.onnx \
+  https://huggingface.co/stefanj0/docling-layout-heron-int8-onnx/resolve/main/docling-layout-heron-int8.onnx
 ```
 
 On Windows PowerShell:
 
 ```powershell
 Invoke-WebRequest `
-  -Uri "https://huggingface.co/docling-project/docling-layout-heron-onnx/resolve/main/model.onnx" `
-  -OutFile "docling-layout-heron.onnx"
+  -Uri "https://huggingface.co/stefanj0/docling-layout-heron-int8-onnx/resolve/main/docling-layout-heron-int8.onnx" `
+  -OutFile "docling-layout-heron-int8.onnx"
 ```
-
-The filename **must** be exactly `docling-layout-heron.onnx` — that's
-what RailReader2 looks for.
 
 ### Where to put the file
 
@@ -92,55 +82,56 @@ wins**. The recommended location is alongside your existing `config.json`:
 
 | OS      | Recommended path                                                       |
 |---------|------------------------------------------------------------------------|
-| Linux   | `~/.config/railreader2/models/docling-layout-heron.onnx`              |
-| macOS   | `~/Library/Application Support/railreader2/models/docling-layout-heron.onnx` |
-| Windows | `%APPDATA%\railreader2\models\docling-layout-heron.onnx`              |
+| Linux   | `~/.config/railreader2/models/docling-layout-heron-int8.onnx`              |
+| macOS   | `~/Library/Application Support/railreader2/models/docling-layout-heron-int8.onnx` |
+| Windows | `%APPDATA%\railreader2\models\docling-layout-heron-int8.onnx`              |
 
 If the `models/` subdirectory doesn't exist yet, create it:
 
 ```bash
 # Linux
 mkdir -p ~/.config/railreader2/models
-mv docling-layout-heron.onnx ~/.config/railreader2/models/
+mv docling-layout-heron-int8.onnx ~/.config/railreader2/models/
 ```
 
 ```powershell
 # Windows
 New-Item -ItemType Directory -Force -Path "$env:APPDATA\railreader2\models"
-Move-Item docling-layout-heron.onnx "$env:APPDATA\railreader2\models\"
+Move-Item docling-layout-heron-int8.onnx "$env:APPDATA\railreader2\models\"
 ```
 
 Full probe order (checked top-down; first existing file wins):
 
-1. `<install-dir>/models/docling-layout-heron.onnx`
-2. `$APPDIR/models/docling-layout-heron.onnx` (inside an AppImage)
-3. `<config-dir>/models/docling-layout-heron.onnx` *(recommended)*
-4. `<LocalAppData>/railreader2/models/docling-layout-heron.onnx`
-5. `./models/docling-layout-heron.onnx` (current directory)
-6. `../models/docling-layout-heron.onnx`, `../../models/...`, `../../../models/...`
+1. `<install-dir>/models/docling-layout-heron-int8.onnx`
+2. `$APPDIR/models/docling-layout-heron-int8.onnx` (inside an AppImage)
+3. `<config-dir>/models/docling-layout-heron-int8.onnx` *(recommended)*
+4. `<LocalAppData>/railreader2/models/docling-layout-heron-int8.onnx`
+5. `./models/docling-layout-heron-int8.onnx` (current directory)
+6. `../models/docling-layout-heron-int8.onnx`, `../../models/...`, `../../../models/...`
+7. *(fallback)* All of the above with the legacy name `docling-layout-heron.onnx`
 
 ---
 
-## Enable Heron
+## Enable / disable Heron
 
-You have two ways to switch. Both require **restarting RailReader2** to
-take effect.
+Heron is the default for new installations. If you previously used
+PP-DocLayoutV3, you can switch models at any time. Both methods require
+**restarting RailReader2** to take effect.
 
 ### From Settings (recommended)
 
 1. **File → Settings…** (or `Ctrl+,`).
 2. Open the **Advanced** tab.
-3. Under **Layout Model**, change the dropdown from
-   *PP-DocLayoutV3 (default, bundled)* to *Docling Heron*.
+3. Under **Layout Model**, the dropdown shows the active model.
 4. The status line below the dropdown tells you whether the file was
    found, and the path it resolved to.
 5. Close the Settings window and restart the app.
 
 If the status line says *"Heron model not found"*, the file isn't at any
 of the probe paths — re-check the filename (must be exactly
-`docling-layout-heron.onnx`) and the location.
+`docling-layout-heron-int8.onnx` or `docling-layout-heron.onnx`) and the location.
 
-### By editing `config.json`
+### By editing the config file
 
 Useful for headless setups or scripted installs. The config sidecar lives
 at:
@@ -160,19 +151,7 @@ If the file doesn't exist yet, create it with:
 }
 ```
 
-If it already exists (you have a custom layout model configured, for
-example), just add or change the `builtin_analyzer` key:
-
-```json
-{
-  "enabled": false,
-  "model_path": null,
-  "mapping_path": null,
-  "builtin_analyzer": "Heron"
-}
-```
-
-Valid values: `"PpDocLayoutV3"` (default) or `"Heron"`. The setting is
+Valid values: `"Heron"` (default) or `"PpDocLayoutV3"`. The setting is
 case-sensitive.
 
 > **Note:** If you have a custom layout model enabled (`"enabled": true`
@@ -189,7 +168,7 @@ Restart RailReader2 after editing.
 After restart, open any PDF. There are a few quick checks:
 
 1. **Diagnostic log.** *Help → Export Diagnostic Log…* — look for a line
-   mentioning `Starting worker with model: ...docling-layout-heron.onnx`.
+   mentioning `Starting worker with model: ...docling-layout-heron-int8.onnx`.
    You should also see `[Heron ONNX]` debug lines on first inference.
 
 2. **Debug overlay.** Press `Shift+D` to toggle the layout debug
@@ -204,28 +183,29 @@ After restart, open any PDF. There are a few quick checks:
 
 ---
 
-## Switch back to PP-DocLayoutV3
+## Switch to PP-DocLayoutV3
 
-Set the dropdown in **Settings → Advanced → Layout Model** back to
-*PP-DocLayoutV3 (default, bundled)*, or edit `custom_layout_model.json`
+Set the dropdown in **Settings → Advanced → Layout Model** to
+*PP-DocLayoutV3 (bundled)*, or edit `custom_layout_model.json`
 and set `"builtin_analyzer": "PpDocLayoutV3"`. Restart.
 
-You can leave `docling-layout-heron.onnx` in place — RailReader2 ignores
-it unless you re-enable Heron. Delete it if you want to free the ~164 MB.
+You can leave `docling-layout-heron-int8.onnx` in place — RailReader2 ignores
+it unless Heron is the selected model. Delete it if you want to free the ~66 MB.
 
 ---
 
 ## Troubleshooting
 
 **"Heron model not found" appears even though I downloaded it.**
-The filename must be exactly `docling-layout-heron.onnx`. Hugging Face
-gives you `model.onnx` by default — rename it. Also check it landed in
-one of the probe paths above (the *recommended* path is usually
-simplest).
+The filename must be exactly `docling-layout-heron-int8.onnx` (or
+`docling-layout-heron.onnx` for the legacy FP32 variant). Hugging Face
+gives you `docling-layout-heron-int8.onnx` by default — no rename needed.
+Also check it landed in one of the probe paths above (the *recommended*
+path is usually simplest).
 
 **App seems to load PP-DocLayoutV3 even though I picked Heron.**
-RailReader2 falls back to PP if it can't find Heron, rather than dropping
-into layout-less mode. Check the diagnostic log for a line ending in
+RailReader2 falls back to PP-DocLayoutV3 if it can't find Heron, rather than
+dropping into layout-less mode. Check the diagnostic log for a line ending in
 `falling back to PP-DocLayoutV3`. Usually means the file isn't where it
 needs to be — see the previous item.
 
@@ -240,8 +220,8 @@ with the PDF so the maintainers can take a look.
 
 **Inference feels slower with Heron.**
 Heron has more parameters than PP-DocLayoutV3 — expect a per-page slowdown
-on the order of 1.5–2×, depending on your CPU. If this is a problem, stay
-on PP-DocLayoutV3 or only enable Heron for specific documents.
+on the order of 1.5–2×, depending on your CPU. If this is a problem, switch
+to PP-DocLayoutV3 or only enable Heron for specific documents.
 
 **The Settings status line says "found", but the log says "not found".**
 The Settings dialog re-probes on open; the log was written at app

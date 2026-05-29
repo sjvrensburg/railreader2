@@ -18,64 +18,39 @@ internal static partial class LayoutModelChoice
 {
     internal enum Builtin { PpDocLayoutV3 = 0, Heron = 1, PpDocLayoutS = 2 }
 
-    internal const string HeronFileName = "docling-layout-heron.onnx";
+    internal const string HeronFileName = "docling-layout-heron-int8.onnx";
+    private const string HeronLegacyFileName = "docling-layout-heron.onnx";
     internal const string PpsFileName = "pp_doclayout_s.onnx";
 
-    /// <summary>Returns the user's analyzer choice, or PP-DocLayoutV3 if no config / parse error.</summary>
+    /// <summary>Returns the user's analyzer choice, or Heron if no config / parse error.</summary>
     internal static Builtin LoadChoice()
     {
         try
         {
             var path = Path.Combine(AppConfig.ConfigDir, "custom_layout_model.json");
-            if (!File.Exists(path)) return Builtin.PpDocLayoutV3;
+            if (!File.Exists(path)) return Builtin.Heron;
             var json = File.ReadAllText(path);
             var cfg = JsonSerializer.Deserialize(json, LayoutModelChoiceJsonContext.Default.ChoiceDocument);
-            return cfg?.BuiltinAnalyzer ?? Builtin.PpDocLayoutV3;
+            return cfg?.BuiltinAnalyzer ?? Builtin.Heron;
         }
         catch
         {
-            return Builtin.PpDocLayoutV3;
+            return Builtin.Heron;
         }
     }
 
     /// <summary>Probe locations for the Heron model, in priority order.</summary>
-    internal static string? FindHeronModelPath() => FindModelPath(HeronFileName);
+    internal static string? FindHeronModelPath()
+    {
+        var path = LayoutModelLocator.FindModelPath(HeronFileName);
+        if (path != null) return path;
+
+        // Backward compat: probe for the old FP32 filename
+        return LayoutModelLocator.FindModelPath(HeronLegacyFileName);
+    }
 
     /// <summary>Probe locations for the PP-DocLayout-S model, in priority order.</summary>
-    internal static string? FindPpsModelPath() => FindModelPath(PpsFileName);
-
-    private static string? FindModelPath(string fileName)
-    {
-        foreach (var p in ProbePaths(fileName))
-            if (File.Exists(p)) return p;
-        return null;
-    }
-
-    private static IEnumerable<string> ProbePaths(string fileName)
-    {
-        yield return Path.Combine(AppContext.BaseDirectory, "models", fileName);
-
-        var appDir = Environment.GetEnvironmentVariable("APPDIR");
-        if (!string.IsNullOrEmpty(appDir))
-            yield return Path.Combine(appDir, "models", fileName);
-
-        yield return Path.Combine(AppConfig.ConfigDir, "models", fileName);
-
-        var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        if (!string.IsNullOrEmpty(localAppData))
-            yield return Path.Combine(localAppData, "railreader2", "models", fileName);
-
-        yield return Path.Combine(Directory.GetCurrentDirectory(), "models", fileName);
-
-        var cwd = Directory.GetCurrentDirectory();
-        for (int up = 1; up <= 3; up++)
-        {
-            var parent = Directory.GetParent(cwd)?.FullName;
-            if (parent is null) break;
-            yield return Path.Combine(parent, "models", fileName);
-            cwd = parent;
-        }
-    }
+    internal static string? FindPpsModelPath() => LayoutModelLocator.FindModelPath(PpsFileName);
 
     /// <summary>
     /// Subset of the GUI's <c>custom_layout_model.json</c>: only the field
@@ -84,7 +59,7 @@ internal static partial class LayoutModelChoice
     internal sealed class ChoiceDocument
     {
         [JsonConverter(typeof(JsonStringEnumConverter<Builtin>))]
-        public Builtin BuiltinAnalyzer { get; set; } = Builtin.PpDocLayoutV3;
+        public Builtin BuiltinAnalyzer { get; set; } = Builtin.Heron;
     }
 
     [JsonSourceGenerationOptions(

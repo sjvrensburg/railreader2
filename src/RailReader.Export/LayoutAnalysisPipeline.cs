@@ -15,7 +15,7 @@ public static class LayoutAnalysisPipeline
     /// Rasterises the page (at the analyzer's required input size), extracts text,
     /// runs detection, assigns reading order, then post-processes for overlaps + lines.
     /// The resolver defaults to <see cref="ModelOrderResolver"/> when the analyzer
-    /// provides reading order, otherwise <see cref="TopDownReadingOrderResolver"/>.
+    /// provides reading order, otherwise <see cref="XYCutPlusPlusResolver"/>.
     /// </summary>
     public static PageAnalysis Run(
         ILayoutAnalyzer analyzer,
@@ -49,7 +49,7 @@ public static class LayoutAnalysisPipeline
 
         resolver ??= analyzer.Capabilities.ProvidesReadingOrder
             ? new ModelOrderResolver()
-            : new TopDownReadingOrderResolver();
+            : new XYCutPlusPlusResolver();
         resolver.AssignOrder(analysis.Blocks, analysis.PageWidth, analysis.PageHeight);
 
         float mapScaleX = pxW > 0 ? (float)(pageW / pxW) : 1f;

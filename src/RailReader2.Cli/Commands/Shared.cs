@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
 using RailReader.Core;
+using RailReader.Core.Analysis;
 using RailReader.Core.Models;
 using RailReader.Core.Services;
 using RailReader.Core.Vlm.OpenAI;
@@ -145,7 +146,7 @@ internal static class Shared
             var heronPath = LayoutModelChoice.FindHeronModelPath();
             if (heronPath != null)
             {
-                return new HeronLayoutAnalyzer(heronPath, RailReader.Core.Analysis.DoclingHeronRoles.Capabilities);
+                return LayoutAnalyzerFactory.Create(LayoutModelRegistry.HeronInt8, heronPath);
             }
             Console.Error.WriteLine($"Warning: Docling Heron model not found ({LayoutModelChoice.HeronFileName}).");
             Console.Error.WriteLine("  See docs/heron-layout-model.md for download instructions.");
@@ -157,7 +158,7 @@ internal static class Shared
             var ppsPath = LayoutModelChoice.FindPpsModelPath();
             if (ppsPath != null)
             {
-                return new PPDocLayoutSLayoutAnalyzer(ppsPath, RailReader.Core.Analysis.PPDocLayoutSRoles.Capabilities);
+                return LayoutAnalyzerFactory.Create(LayoutModelRegistry.PPDocLayoutS, ppsPath);
             }
             Console.Error.WriteLine($"Warning: PP-DocLayout-S model not found ({LayoutModelChoice.PpsFileName}).");
             Console.Error.WriteLine("  See docs/pp-doclayout-s.md for download instructions.");
@@ -165,14 +166,15 @@ internal static class Shared
             // fall through to PP
         }
 
-        var modelPath = LayoutModelLocator.FindModelPath();
+        var v3Desc = LayoutModelRegistry.PPDocLayoutV3;
+        var modelPath = LayoutModelLocator.FindModelPath(v3Desc);
         if (modelPath == null)
         {
             Console.Error.WriteLine("Warning: ONNX model not found. Skipping layout analysis.");
             Console.Error.WriteLine("  Download the model with: ./scripts/download-model.sh");
             return null;
         }
-        return new LayoutAnalyzer(modelPath, RailReader.Core.Analysis.PPDocLayoutV3Roles.Capabilities);
+        return LayoutAnalyzerFactory.Create(v3Desc, modelPath);
     }
 }
 

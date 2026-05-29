@@ -11,8 +11,8 @@ permissions:
 env:
   DOTNET_NOLOGO: true
   DOTNET_CLI_TELEMETRY_OPTOUT: true
-  MODEL_URL: "https://huggingface.co/alex-dinh/PP-DocLayoutV3-ONNX/resolve/main/PP-DocLayoutV3.onnx"
-  MODEL_NAME: "PP-DocLayoutV3.onnx"
+  MODEL_URL: "https://huggingface.co/stefanj0/docling-layout-heron-int8-onnx/resolve/main/docling-layout-heron-int8.onnx"
+  MODEL_NAME: "docling-layout-heron-int8.onnx"
 
 jobs:
   download-model:

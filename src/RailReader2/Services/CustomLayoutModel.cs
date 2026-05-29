@@ -16,9 +16,9 @@ namespace RailReader2.Services;
 [JsonConverter(typeof(JsonStringEnumConverter<BuiltinAnalyzer>))]
 public enum BuiltinAnalyzer
 {
-    /// <summary>Bundled with all release packages. Default.</summary>
+    /// <summary>Bundled with all release packages as a fallback.</summary>
     PpDocLayoutV3 = 0,
-    /// <summary>Docling Heron (RT-DETRv2). Must be downloaded separately — see docs/heron-layout-model.md.</summary>
+    /// <summary>Docling Heron INT8 (RT-DETRv2). Default model — see docs/heron-layout-model.md.</summary>
     Heron = 1,
     /// <summary>PP-DocLayout-S (PicoDet/GFL, ~4.7 MB). Lightweight detector intended for low-resource targets. Must be downloaded separately — see docs/pp-doclayout-s.md.</summary>
     PpDocLayoutS = 2,
@@ -33,7 +33,7 @@ public enum BuiltinAnalyzer
 /// When <see cref="Enabled"/> is true and both files resolve, startup loads
 /// the user's ONNX with the role mapping defined in
 /// <see cref="MappingPath"/>. Otherwise the analyzer named in
-/// <see cref="BuiltinAnalyzer"/> is loaded (defaulting to PP-DocLayoutV3).
+/// <see cref="BuiltinAnalyzer"/> is loaded (defaulting to Heron).
 /// </summary>
 public sealed class CustomLayoutModelConfig
 {
@@ -41,7 +41,7 @@ public sealed class CustomLayoutModelConfig
     public string? ModelPath { get; set; }
     public string? MappingPath { get; set; }
     /// <summary>Which shipped analyzer to use when the custom model is disabled or unavailable.</summary>
-    public BuiltinAnalyzer BuiltinAnalyzer { get; set; } = BuiltinAnalyzer.PpDocLayoutV3;
+    public BuiltinAnalyzer BuiltinAnalyzer { get; set; } = BuiltinAnalyzer.Heron;
 
     public static string Path => System.IO.Path.Combine(AppConfig.ConfigDir, "custom_layout_model.json");
 

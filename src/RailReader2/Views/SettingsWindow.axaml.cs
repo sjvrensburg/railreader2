@@ -128,9 +128,9 @@ public partial class SettingsWindow : Window
     {
         var items = new List<BuiltinAnalyzerItem>
         {
-            new(BuiltinAnalyzer.PpDocLayoutV3, "PP-DocLayoutV3 (default, bundled)"),
+            new(BuiltinAnalyzer.PpDocLayoutV3, "PP-DocLayoutV3 (bundled)"),
             new(BuiltinAnalyzer.PpDocLayoutS,  "PP-DocLayout-S (lightweight)"),
-            new(BuiltinAnalyzer.Heron,         "Docling Heron"),
+            new(BuiltinAnalyzer.Heron,         "Docling Heron (default)"),
         };
         BuiltinAnalyzerCombo.ItemsSource = items;
         BuiltinAnalyzerCombo.DisplayMemberBinding = new Avalonia.Data.Binding(nameof(BuiltinAnalyzerItem.Label));
@@ -429,7 +429,7 @@ public partial class SettingsWindow : Window
     {
         if (!_customModel.Enabled)
         {
-            CustomModelStatus.Text = "Using bundled PP-DocLayoutV3.";
+            CustomModelStatus.Text = $"Using built-in layout model ({_customModel.BuiltinAnalyzer}).";
             return;
         }
 
