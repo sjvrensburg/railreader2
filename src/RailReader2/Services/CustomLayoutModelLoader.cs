@@ -1,5 +1,6 @@
 using System.Text.Json;
 using RailReader.Core;
+using RailReader.Core.Analysis;
 using RailReader.Core.Models;
 using RailReader.Core.Services;
 
@@ -97,7 +98,10 @@ public static class CustomLayoutModelLoader
             // fall through to PP
         }
 
-        var bundled = LayoutModelLocator.FindModelPath();
+        // LayoutModelLocator default is now Heron-INT8; we explicitly want V3 here
+        // as the final fallback since this path is reached only when Heron/PP-S
+        // were chosen but not found, and the user expects PP-DocLayoutV3.
+        var bundled = LayoutModelLocator.FindModelPath(LayoutModelRegistry.PPDocLayoutV3);
         if (bundled == null)
         {
             logger.Warn("[ONNX] Bundled PP-DocLayoutV3 model not found.");
@@ -105,7 +109,7 @@ public static class CustomLayoutModelLoader
         }
         var ppCaps = RailReader.Core.Analysis.PPDocLayoutV3Roles.Capabilities;
         return new Resolution(bundled, ppCaps,
-            () => new LayoutAnalyzer(bundled, ppCaps),
+            () => LayoutAnalyzerFactory.Create(LayoutModelRegistry.PPDocLayoutV3, bundled),
             "PP-DocLayoutV3");
     }
 

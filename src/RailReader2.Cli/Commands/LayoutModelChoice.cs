@@ -18,23 +18,23 @@ internal static partial class LayoutModelChoice
 {
     internal enum Builtin { PpDocLayoutV3 = 0, Heron = 1, PpDocLayoutS = 2 }
 
-    internal const string HeronFileName = "docling-layout-heron.onnx";
+    internal const string HeronFileName = "docling-layout-heron-int8.onnx";
     internal const string PpsFileName = "pp_doclayout_s.onnx";
 
-    /// <summary>Returns the user's analyzer choice, or PP-DocLayoutV3 if no config / parse error.</summary>
+    /// <summary>Returns the user's analyzer choice, or Heron if no config / parse error.</summary>
     internal static Builtin LoadChoice()
     {
         try
         {
             var path = Path.Combine(AppConfig.ConfigDir, "custom_layout_model.json");
-            if (!File.Exists(path)) return Builtin.PpDocLayoutV3;
+            if (!File.Exists(path)) return Builtin.Heron;
             var json = File.ReadAllText(path);
             var cfg = JsonSerializer.Deserialize(json, LayoutModelChoiceJsonContext.Default.ChoiceDocument);
-            return cfg?.BuiltinAnalyzer ?? Builtin.PpDocLayoutV3;
+            return cfg?.BuiltinAnalyzer ?? Builtin.Heron;
         }
         catch
         {
-            return Builtin.PpDocLayoutV3;
+            return Builtin.Heron;
         }
     }
 
@@ -84,7 +84,7 @@ internal static partial class LayoutModelChoice
     internal sealed class ChoiceDocument
     {
         [JsonConverter(typeof(JsonStringEnumConverter<Builtin>))]
-        public Builtin BuiltinAnalyzer { get; set; } = Builtin.PpDocLayoutV3;
+        public Builtin BuiltinAnalyzer { get; set; } = Builtin.Heron;
     }
 
     [JsonSourceGenerationOptions(

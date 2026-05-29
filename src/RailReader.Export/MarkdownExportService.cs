@@ -1,5 +1,6 @@
 using System.Text;
 using RailReader.Core;
+using RailReader.Core.Analysis;
 using RailReader.Core.Models;
 using RailReader.Core.Services;
 using RailReader.Core.Vlm.OpenAI;
@@ -34,8 +35,10 @@ public sealed class MarkdownExportService : IMarkdownExportService
         if (err != null)
             throw new ArgumentException(err);
 
-        var modelPath = LayoutModelLocator.FindModelPath();
-        using var analyzer = modelPath != null ? new LayoutAnalyzer(modelPath) : null;
+        var modelPath = LayoutModelLocator.FindModelPath(LayoutModelRegistry.PPDocLayoutV3);
+        using var analyzer = modelPath != null
+            ? LayoutAnalyzerFactory.Create(LayoutModelRegistry.PPDocLayoutV3, modelPath)
+            : null;
 
         AnnotationFile? annotationFile = null;
         if (options.IncludeAnnotations)
@@ -91,7 +94,7 @@ public sealed class MarkdownExportService : IMarkdownExportService
     private async Task<string> ExportPageWithLayout(
         IPdfService pdf,
         int pageIdx,
-        LayoutAnalyzer analyzer,
+        ILayoutAnalyzer analyzer,
         IReadOnlyList<HeadingLevelResolver.FlatOutlineEntry> flatOutline,
         VlmEndpointConfig? vlmEndpoint,
         MarkdownExportOptions options,

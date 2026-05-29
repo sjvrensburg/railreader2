@@ -41,7 +41,7 @@ public sealed class CustomLayoutModelConfig
     public string? ModelPath { get; set; }
     public string? MappingPath { get; set; }
     /// <summary>Which shipped analyzer to use when the custom model is disabled or unavailable.</summary>
-    public BuiltinAnalyzer BuiltinAnalyzer { get; set; } = BuiltinAnalyzer.PpDocLayoutV3;
+    public BuiltinAnalyzer BuiltinAnalyzer { get; set; } = BuiltinAnalyzer.Heron;
 
     public static string Path => System.IO.Path.Combine(AppConfig.ConfigDir, "custom_layout_model.json");
 

@@ -7,7 +7,7 @@ namespace RailReader2.Services;
 /// </summary>
 public static class HeronModelLocator
 {
-    public const string FileName = "docling-layout-heron.onnx";
+    public const string FileName = "docling-layout-heron-int8.onnx";
 
     public static string? FindModelPath() => ModelLocator.FindModelPath(FileName);
 }

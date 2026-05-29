@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
 using RailReader.Core;
+using RailReader.Core.Analysis;
 using RailReader.Core.Models;
 using RailReader.Core.Services;
 using RailReader.Core.Vlm.OpenAI;
@@ -165,14 +166,14 @@ internal static class Shared
             // fall through to PP
         }
 
-        var modelPath = LayoutModelLocator.FindModelPath();
+        var modelPath = LayoutModelLocator.FindModelPath(LayoutModelRegistry.PPDocLayoutV3);
         if (modelPath == null)
         {
             Console.Error.WriteLine("Warning: ONNX model not found. Skipping layout analysis.");
             Console.Error.WriteLine("  Download the model with: ./scripts/download-model.sh");
             return null;
         }
-        return new LayoutAnalyzer(modelPath, RailReader.Core.Analysis.PPDocLayoutV3Roles.Capabilities);
+        return LayoutAnalyzerFactory.Create(LayoutModelRegistry.PPDocLayoutV3, modelPath);
     }
 }
 
