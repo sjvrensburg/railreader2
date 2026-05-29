@@ -48,11 +48,24 @@ public static class HeadingLevelResolver
         IReadOnlyList<FlatOutlineEntry> flatOutline,
         int pageIndex)
     {
-        var result = new Dictionary<int, int>();
-
         var pageEntries = flatOutline
             .Where(e => e.Page == pageIndex)
             .ToList();
+        return ResolveForPage(blocks, blockTexts, pageEntries);
+    }
+
+    /// <summary>
+    /// Resolves heading levels using the outline entries already filtered to this
+    /// page. Callers that process many pages should pre-bucket the flat outline via
+    /// <see cref="BucketByPage"/> once and pass the per-page list here, avoiding the
+    /// O(pages × outline) re-scan that <see cref="ResolveWithFlatOutline"/> performs.
+    /// </summary>
+    public static Dictionary<int, int> ResolveForPage(
+        IReadOnlyList<LayoutBlock> blocks,
+        IReadOnlyDictionary<int, string> blockTexts,
+        IReadOnlyList<FlatOutlineEntry> pageEntries)
+    {
+        var result = new Dictionary<int, int>();
 
         for (int i = 0; i < blocks.Count; i++)
         {
@@ -75,13 +88,34 @@ public static class HeadingLevelResolver
         return result;
     }
 
-    public record FlatOutlineEntry(string Title, int? Page, int Depth);
+    public record FlatOutlineEntry(string Title, int? Page, int Depth)
+    {
+        /// <summary>Whitespace-collapsed, lowercased title — computed once for fuzzy matching.</summary>
+        internal string Normalized { get; } = NormalizeForMatch(Title);
+    }
 
     internal static List<FlatOutlineEntry> FlattenOutline(IReadOnlyList<OutlineEntry> entries)
     {
         var result = new List<FlatOutlineEntry>();
         FlattenRecursive(entries, 1, result);
         return result;
+    }
+
+    /// <summary>
+    /// Buckets a flattened outline by page index so per-page heading resolution
+    /// is an O(1) lookup instead of a full re-scan per page.
+    /// </summary>
+    internal static Dictionary<int, List<FlatOutlineEntry>> BucketByPage(IReadOnlyList<FlatOutlineEntry> flatOutline)
+    {
+        var buckets = new Dictionary<int, List<FlatOutlineEntry>>();
+        foreach (var entry in flatOutline)
+        {
+            if (entry.Page is not { } page) continue;
+            if (!buckets.TryGetValue(page, out var list))
+                buckets[page] = list = new List<FlatOutlineEntry>();
+            list.Add(entry);
+        }
+        return buckets;
     }
 
     private static void FlattenRecursive(IReadOnlyList<OutlineEntry> entries, int depth, List<FlatOutlineEntry> result)
@@ -100,22 +134,18 @@ public static class HeadingLevelResolver
         if (string.IsNullOrEmpty(normalized))
             return null;
 
-        // Pre-normalize outline entries to avoid redundant work across both loops
-        var normalizedEntries = new List<(string Norm, int Depth)>(pageEntries.Count);
+        // Outline titles are pre-normalized (lowercased + whitespace-collapsed) on
+        // FlatOutlineEntry, so both sides are already lowercase — use Ordinal.
+
+        // Try exact containment first
         foreach (var entry in pageEntries)
         {
-            var entryNorm = NormalizeForMatch(entry.Title);
-            if (!string.IsNullOrEmpty(entryNorm))
-                normalizedEntries.Add((entryNorm, entry.Depth));
-        }
-
-        // Try exact containment first (case-insensitive)
-        foreach (var (entryNorm, depth) in normalizedEntries)
-        {
-            if (normalized.Contains(entryNorm, StringComparison.OrdinalIgnoreCase) ||
-                entryNorm.Contains(normalized, StringComparison.OrdinalIgnoreCase))
+            var entryNorm = entry.Normalized;
+            if (entryNorm.Length == 0) continue;
+            if (normalized.Contains(entryNorm, StringComparison.Ordinal) ||
+                entryNorm.Contains(normalized, StringComparison.Ordinal))
             {
-                return depth;
+                return entry.Depth;
             }
         }
 
@@ -123,16 +153,24 @@ public static class HeadingLevelResolver
         int? bestDepth = null;
         double bestSimilarity = 0;
 
-        foreach (var (entryNorm, depth) in normalizedEntries)
+        foreach (var entry in pageEntries)
         {
+            var entryNorm = entry.Normalized;
+            if (entryNorm.Length == 0) continue;
+
             int maxLen = Math.Max(normalized.Length, entryNorm.Length);
+            // distance >= |lenA - lenB|, so similarity can only clear 0.8 when the
+            // length gap is within 20% of the longer string. Skip the O(n·m) DP otherwise.
+            if (Math.Abs(normalized.Length - entryNorm.Length) > 0.2 * maxLen)
+                continue;
+
             int distance = LevenshteinDistance(normalized, entryNorm);
             double similarity = 1.0 - (double)distance / maxLen;
 
             if (similarity > 0.8 && similarity > bestSimilarity)
             {
                 bestSimilarity = similarity;
-                bestDepth = depth;
+                bestDepth = entry.Depth;
             }
         }
 
@@ -156,7 +194,7 @@ public static class HeadingLevelResolver
             }
             else
             {
-                chars[len++] = ch;
+                chars[len++] = char.ToLowerInvariant(ch);
                 prevSpace = false;
             }
         }
@@ -179,7 +217,8 @@ public static class HeadingLevelResolver
             for (int j = 1; j <= t.Length; j++)
             {
                 int temp = prev[j];
-                int cost = char.ToLowerInvariant(s[i - 1]) == char.ToLowerInvariant(t[j - 1]) ? 0 : 1;
+                // Inputs are pre-lowercased by NormalizeForMatch; compare directly.
+                int cost = s[i - 1] == t[j - 1] ? 0 : 1;
                 prev[j] = Math.Min(Math.Min(prev[j] + 1, prev[j - 1] + 1), prevDiag + cost);
                 prevDiag = temp;
             }

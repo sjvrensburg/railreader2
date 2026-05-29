@@ -49,8 +49,13 @@ public sealed class MarkdownExportService : IMarkdownExportService
             && !string.IsNullOrWhiteSpace(vlmEndpoint.Endpoint)
             && !string.IsNullOrWhiteSpace(vlmEndpoint.Model);
 
-        // Flatten outline once for the whole document
+        // Flatten + bucket the outline once for the whole document so per-page
+        // heading resolution is an O(1) lookup rather than a full re-scan per page.
         var flatOutline = HeadingLevelResolver.FlattenOutline(pdfService.Outline);
+        var outlineByPage = HeadingLevelResolver.BucketByPage(flatOutline);
+
+        // One text service for the whole document — reused across pages.
+        var textService = new PdfTextService();
 
         bool firstPage = true;
 
@@ -64,17 +69,20 @@ public sealed class MarkdownExportService : IMarkdownExportService
 
             string pageMd;
 
+            var pageEntries = outlineByPage.GetValueOrDefault(pageIdx)
+                ?? (IReadOnlyList<HeadingLevelResolver.FlatOutlineEntry>)[];
+
             if (analyzer != null)
             {
                 pageMd = await ExportPageWithLayout(
-                    pdfService, pageIdx, analyzer, flatOutline,
+                    pdfService, pageIdx, analyzer, textService, pageEntries,
                     vlmAvailable ? vlmEndpoint : null, options,
                     annotationFile, ct);
             }
             else
             {
                 pageMd = ExportPagePlainText(
-                    pdfService, pageIdx, flatOutline, annotationFile, options);
+                    pdfService, pageIdx, textService, pageEntries, annotationFile, options);
             }
 
             if (string.IsNullOrWhiteSpace(pageMd))
@@ -95,7 +103,8 @@ public sealed class MarkdownExportService : IMarkdownExportService
         IPdfService pdf,
         int pageIdx,
         ILayoutAnalyzer analyzer,
-        IReadOnlyList<HeadingLevelResolver.FlatOutlineEntry> flatOutline,
+        PdfTextService textService,
+        IReadOnlyList<HeadingLevelResolver.FlatOutlineEntry> pageEntries,
         VlmEndpointConfig? vlmEndpoint,
         MarkdownExportOptions options,
         AnnotationFile? annotationFile,
@@ -104,13 +113,13 @@ public sealed class MarkdownExportService : IMarkdownExportService
         var (pageW, pageH) = pdf.GetPageSize(pageIdx);
 
         var (rgbBytes, pxW, pxH) = pdf.RenderPagePixmap(pageIdx, analyzer.Capabilities.InputSize);
-        var pageText = new PdfTextService().ExtractPageText(pdf.PdfBytes, pageIdx);
+        var pageText = textService.ExtractPageText(pdf.PdfBytes, pageIdx);
         var analysis = LayoutAnalysisPipeline.RunWithPixmap(
             analyzer, rgbBytes, pxW, pxH, pageW, pageH, pageText.CharBoxes, resolver: null, ct);
         var blocks = analysis.Blocks;
 
         if (blocks.Count == 0)
-            return ExportPagePlainText(pdf, pageIdx, flatOutline, annotationFile, options);
+            return ExportPagePlainText(pdf, pageIdx, textService, pageEntries, annotationFile, options);
 
         // Cache text extraction per block to avoid redundant O(chars) scans
         var blockTexts = new Dictionary<int, string>(blocks.Count);
@@ -121,8 +130,8 @@ public sealed class MarkdownExportService : IMarkdownExportService
                 blockTexts[i] = text;
         }
 
-        var headingLevels = HeadingLevelResolver.ResolveWithFlatOutline(
-            blocks, blockTexts, flatOutline, pageIdx);
+        var headingLevels = HeadingLevelResolver.ResolveForPage(
+            blocks, blockTexts, pageEntries);
 
         var vlmResults = new Dictionary<int, PageMarkdownBuilder.VlmBlockResult>();
         var figurePaths = new Dictionary<int, string>();
@@ -152,17 +161,18 @@ public sealed class MarkdownExportService : IMarkdownExportService
     private string ExportPagePlainText(
         IPdfService pdf,
         int pageIdx,
-        IReadOnlyList<HeadingLevelResolver.FlatOutlineEntry> flatOutline,
+        PdfTextService textService,
+        IReadOnlyList<HeadingLevelResolver.FlatOutlineEntry> pageEntries,
         AnnotationFile? annotationFile,
         MarkdownExportOptions options)
     {
-        var pageText = new PdfTextService().ExtractPageText(pdf.PdfBytes, pageIdx);
+        var pageText = textService.ExtractPageText(pdf.PdfBytes, pageIdx);
         var pageAnnotations = options.IncludeAnnotations
             ? ExtractPageAnnotations(annotationFile, pageIdx)
             : null;
 
-        return PageMarkdownBuilder.BuildPlainText(
-            pageText, flatOutline, pageIdx, pageAnnotations);
+        return PageMarkdownBuilder.BuildPlainTextForPage(
+            pageText, pageEntries, pageAnnotations);
     }
 
     private async Task RunVlmForPage(

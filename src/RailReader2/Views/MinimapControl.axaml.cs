@@ -92,13 +92,18 @@ public partial class MinimapControl : UserControl
     {
         base.Render(context);
         bool dragging = _drag is DragMode.Move or DragMode.Resize;
+        // Resolve the window client size here (UI thread) rather than inside the
+        // composition-thread draw op via Application.Current.
+        var win = TopLevel.GetTopLevel(this);
         context.Custom(new MinimapDrawOperation(
             new Rect(0, 0, Bounds.Width, Bounds.Height),
             this,
             _vm,
             showChrome: _hover || dragging,
             drag: dragging,
-            resizeCorner: ResizeCornerInside()));
+            resizeCorner: ResizeCornerInside(),
+            winW: win?.ClientSize.Width ?? 1200,
+            winH: win?.ClientSize.Height ?? 900));
     }
 
     /// <summary>
@@ -349,6 +354,8 @@ public partial class MinimapControl : UserControl
         private readonly bool _showChrome;
         private readonly bool _drag;
         private readonly Corner _resizeCorner;
+        private readonly double _winW;
+        private readonly double _winH;
 
         // Snapshot for Equals — quantised to avoid per-pixel redraws.
         private readonly SKImage? _thumbImage;
@@ -370,7 +377,8 @@ public partial class MinimapControl : UserControl
             new(SKFilterMode.Linear, SKMipmapMode.Linear);
 
         public MinimapDrawOperation(Rect bounds, MinimapControl control,
-            MainWindowViewModel? vm, bool showChrome, bool drag, Corner resizeCorner)
+            MainWindowViewModel? vm, bool showChrome, bool drag, Corner resizeCorner,
+            double winW, double winH)
         {
             _bounds = bounds;
             _control = control;
@@ -378,6 +386,8 @@ public partial class MinimapControl : UserControl
             _showChrome = showChrome;
             _drag = drag;
             _resizeCorner = resizeCorner;
+            _winW = winW;
+            _winH = winH;
             var tab = vm?.ActiveTab;
             _thumbImage = tab?.MinimapImage;
             _primaryImage = tab?.CachedImage;
@@ -399,7 +409,9 @@ public partial class MinimapControl : UserControl
             && ReferenceEquals(_primaryImage, op._primaryImage)
             && _oxQ == op._oxQ
             && _oyQ == op._oyQ
-            && _zoomQ == op._zoomQ;
+            && _zoomQ == op._zoomQ
+            && _winW == op._winW
+            && _winH == op._winH;
         public bool HitTest(Point p) => _bounds.Contains(p);
 
         public void Render(ImmediateDrawingContext context)
@@ -444,11 +456,10 @@ public partial class MinimapControl : UserControl
                 canvas.DrawImage(drawn, destRect, sampling);
             }
 
-            // Viewport indicator.
-            var window = Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop
-                ? desktop.MainWindow : null;
-            double winW = window?.ClientSize.Width ?? 1200;
-            double winH = window?.ClientSize.Height ?? 900;
+            // Viewport indicator. Window size is captured on the UI thread at op
+            // construction (see MinimapControl.Render), not resolved here.
+            double winW = _winW;
+            double winH = _winH;
             float scale = (float)t.Scale;
 
             var vpRect = SKRect.Create(
