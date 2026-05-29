@@ -245,7 +245,7 @@
                         <TextBlock Text="Layout Model" FontWeight="Bold" Margin="0,16,0,0" />
                         <Separator />
                         <TextBlock TextWrapping="Wrap" Opacity="0.7"
-                                   Text="PP-DocLayoutV3 is bundled with all release packages. Docling Heron is an alternative model with a broader class space (17 classes including code, forms, footnotes) but is heavier (~164 MB) and must be downloaded separately." />
+                                   Text="Docling Heron (INT8, ~66 MB) is the default model with 17 layout classes. PP-DocLayoutV3 (~50 MB) is bundled as a fallback and can be selected instead." />
                         <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto" Margin="0,4,0,0">
                             <TextBlock Grid.Column="0" Text="Model:" VerticalAlignment="Center" />
                             <ComboBox Grid.Column="2" Name="BuiltinAnalyzerCombo"

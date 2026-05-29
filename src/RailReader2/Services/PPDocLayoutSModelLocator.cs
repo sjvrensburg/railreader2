@@ -1,3 +1,5 @@
+using RailReader.Core.Services;
+
 namespace RailReader2.Services;
 
 /// <summary>
@@ -10,5 +12,5 @@ public static class PPDocLayoutSModelLocator
 {
     public const string FileName = "pp_doclayout_s.onnx";
 
-    public static string? FindModelPath() => ModelLocator.FindModelPath(FileName);
+    public static string? FindModelPath() => LayoutModelLocator.FindModelPath(FileName);
 }

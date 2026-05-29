@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**railreader2** is a desktop PDF viewer with AI-guided "rail reading" for high magnification viewing. Built in C# with .NET 10, Avalonia 11 (UI framework), PDFtoImage/PDFium (PDF rasterisation), SkiaSharp 3 (GPU rendering via Avalonia's Skia backend), and PP-DocLayoutV3 (ONNX layout detection).
+**railreader2** is a desktop PDF viewer with AI-guided "rail reading" for high magnification viewing. Built in C# with .NET 10, Avalonia 11 (UI framework), PDFtoImage/PDFium (PDF rasterisation), SkiaSharp 3 (GPU rendering via Avalonia's Skia backend), and Docling Heron INT8 (ONNX layout detection, with PP-DocLayoutV3 as bundled fallback).
 
 ## Build and Development Commands
 
@@ -111,7 +111,7 @@ PDF → PDFium rasterises to `SKBitmap` at zoom-proportional DPI (150–600, cap
 
 ### Layout Analysis
 
-Page bitmap → BGRA-to-RGB → 800x800 rescale → CHW float tensor → PP-DocLayoutV3 ONNX → `[N,7]` tensor `[classId, confidence, xmin, ymin, xmax, ymax, readingOrder]` → confidence filter (0.4) → NMS (IoU 0.5) → sort by reading order → line detection per block. Pixmap prep runs on thread pool; inference on dedicated `AnalysisWorker` thread. Results cached per-tab in `DocumentState.AnalysisCache`.
+Page bitmap → BGRA-to-RGB → 800×800 rescale (PP-DocLayoutV3) or model-specific size (Heron) → CHW float tensor → ONNX inference → post-processing (confidence filter, NMS, reading order) → sort by reading order → line detection per block. Pixmap prep runs on thread pool; inference on dedicated `AnalysisWorker` thread. Results cached per-tab in `DocumentState.AnalysisCache`.
 
 **Background read-ahead**: A dedicated `DispatcherTimer` (500ms) progressively analyses all pages when idle, scanning outward from the current page via `BackgroundAnalysisQueue`. Pauses during rail mode to avoid PDFium contention. Results never evicted from cache. The Figures tab in OutlinePanel (`Ctrl+Shift+I`) uses `PeekIndexBuilder` to surface detected figures, tables, and equations — showing thumbnails for visual blocks and extracted text (via `PageText.ExtractTextInRect`) for equations.
 
@@ -151,7 +151,7 @@ Key fields: `rail_zoom_threshold`, `snap_duration_ms`, `scroll_speed_start/max`,
 - ONNX runtime pre-loading in `LayoutAnalyzer` static constructor handles Linux (.so) and macOS (.dylib); Windows uses OnnxRuntime's own resolver
 - SkiaSharp 3.x explicitly overrides Avalonia 11's bundled 2.88 — required for `SKRuntimeEffect.CreateColorFilter()`
 - DISTRIBUTION.md documents the release process for all channels (GitHub, Microsoft Store)
-- `scripts/` contains a single helper: `download-model.sh` (PP-DocLayoutV3 ONNX download)
+- `scripts/` contains a single helper: `download-model.sh` (downloads Heron-INT8 + PP-DocLayoutV3 ONNX models)
 - `CleanupService.RunCleanup()` runs at startup and via Help menu (removes cache, temp, old logs)
 - `SplashWindow` shows during startup; heavy init deferred via `Dispatcher.Post` at Background priority
 - `window.Opened` can fire before `OnLoaded` wiring — guard against this in startup sequencing
@@ -172,7 +172,7 @@ Releases triggered by pushing a `v*` tag (`.github/workflows/release.yml`).
 - **Linux**: `appimagetool` (not `linuxdeploy` — avoids ELF dependency tracing issues with .NET self-contained). Model at `$APPDIR/models/`.
 - **Windows (Inno Setup)**: `installer/railreader2.iss`. **Gotcha**: `.iss` paths are relative to the `.iss` file's directory, not CWD.
 - **Windows (Microsoft Store)**: MSIX built by CI `build-msix` job (unsigned — Microsoft re-signs during Store review). Manifest at `msix/Package.appxmanifest`, visual assets in `msix/Assets/`. **Gotcha**: Store requires the version's 4th component (revision) to be `0` — CI forces this regardless of the git tag. See `DISTRIBUTION.md` for the Store release workflow.
-- **Model search order** (`FindModelPath()`): `AppContext.BaseDirectory/models/` → `$APPDIR/models/` → `LocalApplicationData/railreader2/models/` → `CWD/models/` → walk-up `../models/`
+- **Model search order** (`FindModelPath()`): `AppContext.BaseDirectory/models/` → `$APPDIR/models/` → `AppConfig.ConfigDir/models/` → `LocalApplicationData/railreader2/models/` → `CWD/models/` → walk-up `../models/`
 
 ## Debugging
 
