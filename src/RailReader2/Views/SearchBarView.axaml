@@ -53,7 +53,7 @@
             MinWidth="380">
         <StackPanel Orientation="Horizontal" Spacing="6">
             <TextBox Name="SearchInput"
-                     Watermark="Find..."
+                     PlaceholderText="Find..."
                      Width="180"
                      FontSize="13" />
             <ToggleButton Name="CaseSensitiveToggle"

@@ -4,7 +4,7 @@
         Width="360" Height="240"
         WindowStartupLocation="CenterScreen"
         CanResize="False"
-        SystemDecorations="None"
+        WindowDecorations="None"
         Background="#F5F5F5"
         TransparencyLevelHint="None">
     <Border CornerRadius="8" ClipToBounds="True">

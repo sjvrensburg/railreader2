@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Input.Platform;
 using RailReader.Core;
 using RailReader.Core.Models;
 using RailReader.Renderer.Skia;
@@ -188,7 +189,7 @@ public partial class MainWindow : Window
                 break;
             case nameof(MainWindowViewModel.IsFullScreen):
                 WindowState = vm.IsFullScreen ? WindowState.FullScreen : WindowState.Normal;
-                SystemDecorations = vm.IsFullScreen ? SystemDecorations.None : SystemDecorations.Full;
+                WindowDecorations = vm.IsFullScreen ? WindowDecorations.None : WindowDecorations.Full;
                 break;
             case nameof(MainWindowViewModel.ShowBookmarkDialog) when vm.ShowBookmarkDialog:
                 vm.ShowBookmarkDialog = false;
@@ -230,18 +231,19 @@ public partial class MainWindow : Window
                 await clipboard.SetTextAsync(text);
         };
 
-        #pragma warning disable CS0618 // DataObject/SetDataObjectAsync are deprecated but the replacement API isn't available yet
         vm.CopyImageToClipboard = async pngBytes =>
         {
             var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
-            if (clipboard is not null)
-            {
-                var data = new DataObject();
-                data.Set("image/png", pngBytes);
-                await clipboard.SetDataObjectAsync(data);
-            }
+            if (clipboard is null || pngBytes is null) return;
+            // Put the image on the clipboard as a real bitmap (DataFormat.Bitmap =
+            // CF_DIB on Windows), which is what Paint/Word/browsers paste. The earlier
+            // port wrote a raw "image/png" platform format that those apps don't read,
+            // so paste silently did nothing. Decode the rendered PNG into an Avalonia
+            // Bitmap and hand it to SetBitmapAsync.
+            using var ms = new System.IO.MemoryStream(pngBytes);
+            var bitmap = new Avalonia.Media.Imaging.Bitmap(ms);
+            await clipboard.SetBitmapAsync(bitmap);
         };
-        #pragma warning restore CS0618
 
         ToolBar.ViewModel = vm;
 
@@ -502,6 +504,10 @@ public partial class MainWindow : Window
 
     private SearchRenderState BuildSearchState(MainWindowViewModel vm, TabViewModel? tab)
     {
+        // Refresh the per-page match cache against the page currently on screen.
+        // SearchService only updates it on match navigation, so scroll/GoToPage page
+        // changes would otherwise leave it showing a previous page's matches.
+        vm.RefreshCurrentPageSearchMatches();
         var matches = vm.CurrentPageSearchMatches;
         int activeLocalIndex = -1;
         if (matches is { Count: > 0 } && tab is not null)

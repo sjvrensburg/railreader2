@@ -11,6 +11,6 @@
             <Button Content="OK" Width="80" Click="OnOkClick" />
             <Button Content="Cancel" Width="80" Click="OnCancelClick" />
         </StackPanel>
-        <TextBox x:Name="NameInput" Watermark="Bookmark name" />
+        <TextBox x:Name="NameInput" PlaceholderText="Bookmark name" />
     </DockPanel>
 </Window>

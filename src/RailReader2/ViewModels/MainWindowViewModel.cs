@@ -265,7 +265,16 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
         var result = _controller.Tick(dt);
 
-        if (result.PageChanged) InvalidatePage();
+        if (result.PageChanged)
+        {
+            // A rail/auto-scroll page cross surfaces only here and calls just
+            // InvalidatePage, so refresh the per-page search and annotation overlays
+            // alongside the page bitmap — otherwise the previous page's rects stay
+            // painted over the new page (e.g. page 7's search highlights on page 1).
+            InvalidatePage();
+            InvalidateSearch();
+            InvalidateAnnotations();
+        }
         if (result.OverlayChanged)
         {
             InvalidateOverlay();
@@ -283,7 +292,13 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
         if (_animationRequested) return;
         _animationRequested = true;
+        // RequestAnimationFrame is deprecated in Avalonia 12 in favour of compositor-based
+        // animation timers, but those callbacks fire on the composition thread. Our per-frame
+        // OnAnimationFrame (Controller.Tick + DocumentState mutation + layer invalidation) must
+        // run on the UI thread, so we keep the UI-thread-synced RequestAnimationFrame here.
+#pragma warning disable CS0618 // Type or member is obsolete
         _window?.RequestAnimationFrame(OnAnimationFrame);
+#pragma warning restore CS0618
     }
 
     public void InvalidateCanvas()
