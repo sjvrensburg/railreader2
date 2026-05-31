@@ -14,6 +14,6 @@
         <TextBox x:Name="NoteTextBox"
                  AcceptsReturn="True"
                  TextWrapping="Wrap"
-                 Watermark="Enter note text..." />
+                 PlaceholderText="Enter note text..." />
     </DockPanel>
 </Window>

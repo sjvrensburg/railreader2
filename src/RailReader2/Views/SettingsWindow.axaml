@@ -263,11 +263,11 @@
                                   IsCheckedChanged="OnCustomModelEnabledChanged" Margin="0,4,0,4" />
                         <Grid ColumnDefinitions="*,8,Auto" RowDefinitions="Auto,4,Auto">
                             <TextBox Grid.Row="0" Grid.Column="0" Name="CustomModelPath"
-                                     Watermark="Path to .onnx file" IsReadOnly="True" />
+                                     PlaceholderText="Path to .onnx file" IsReadOnly="True" />
                             <Button  Grid.Row="0" Grid.Column="2" Content="Browse…"
                                      Click="OnBrowseCustomModel" />
                             <TextBox Grid.Row="2" Grid.Column="0" Name="CustomModelMappingPath"
-                                     Watermark="Path to class-mapping .json" IsReadOnly="True" />
+                                     PlaceholderText="Path to class-mapping .json" IsReadOnly="True" />
                             <Button  Grid.Row="2" Grid.Column="2" Content="Browse…"
                                      Click="OnBrowseCustomModelMapping" />
                         </Grid>
@@ -302,18 +302,18 @@
                         <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto,8,Auto,8,Auto" Margin="0,0,0,8">
                             <TextBlock Grid.Row="0" Grid.Column="0" Text="Endpoint" VerticalAlignment="Center" />
                             <TextBox Grid.Row="0" Grid.Column="2" Name="VlmEndpoint"
-                                     Watermark="http://localhost:11434/v1"
+                                     PlaceholderText="http://localhost:11434/v1"
                                      TextChanged="OnVlmTextChanged" />
 
                             <TextBlock Grid.Row="2" Grid.Column="0" Text="Model" VerticalAlignment="Center" />
                             <TextBox Grid.Row="2" Grid.Column="2" Name="VlmModelName"
-                                     Watermark="smolvlm:latest"
+                                     PlaceholderText="smolvlm:latest"
                                      TextChanged="OnVlmTextChanged" />
 
                             <TextBlock Grid.Row="4" Grid.Column="0" Text="API Key" VerticalAlignment="Center" />
                             <TextBox Grid.Row="4" Grid.Column="2" Name="VlmApiKey"
                                      PasswordChar="*"
-                                     Watermark="Leave blank if not required"
+                                     PlaceholderText="Leave blank if not required"
                                      TextChanged="OnVlmTextChanged" />
                         </Grid>
 

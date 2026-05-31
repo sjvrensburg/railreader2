@@ -488,7 +488,10 @@ public partial class OutlinePanel : UserControl
         if (token.IsCancellationRequested) return;
 
         _vm.Controller.Search.FinalizeSearch(doc, allMatches);
-        _vm.InvalidateSearchLayer();
+        // FinalizeSearch auto-navigates the document to the first match's page, so we
+        // need a full invalidation (page bitmap + camera + overlays), not just the
+        // search layer — otherwise the new page's highlights paint over the old page.
+        _vm.InvalidateAfterSearch();
         BuildResultGroups();
         UpdateMatchDisplay();
     }

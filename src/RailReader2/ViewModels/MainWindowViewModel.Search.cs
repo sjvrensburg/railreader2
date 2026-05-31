@@ -33,6 +33,26 @@ public sealed partial class MainWindowViewModel
 
     public void InvalidateSearchLayer() => InvalidateSearch();
 
+    /// <summary>
+    /// Full invalidation after a search completes. FinalizeSearch auto-navigates the
+    /// document to the first match's page (via SearchService.NavigateToActiveMatch),
+    /// so the page bitmap, camera and search overlay must all refresh together — just
+    /// like NextMatch/GoToMatch do through InvalidateAfterNavigation. Doing only
+    /// InvalidateSearch here updated the highlight layer to the new page's rects while
+    /// the page image still showed the page the user was on, so (e.g.) page 7's
+    /// highlights were painted over page 1.
+    /// </summary>
+    public void InvalidateAfterSearch() => InvalidateAfterNavigation();
+
+    /// <summary>
+    /// Recomputes which search matches belong to the currently displayed page.
+    /// SearchService caches this (CurrentPageSearchMatches) and only refreshes it on
+    /// match navigation — NOT on scroll/rail page changes. BuildSearchState calls this
+    /// before reading the cache so the highlight rects always track the page on screen.
+    /// </summary>
+    public void RefreshCurrentPageSearchMatches()
+        => _controller.Search.UpdateCurrentPageMatches();
+
     public void NextMatch()
     {
         _controller.Search.NextMatch();
