@@ -115,16 +115,6 @@ public partial class MainWindow : Window
             var tab = vm.ActiveTab;
             var state = BuildPageState(vm, tab);
             PageLayer.UpdateState(state);
-            // Search highlights and annotations are per-page overlays. Their
-            // composition visuals retain the last drawn rects until they receive a
-            // fresh state snapshot. A page change that refreshes the page bitmap but
-            // not these overlays leaves the previous page's rects painted over the
-            // new page (e.g. page 7's search highlights appearing on page 1). Since
-            // these overlays are inherently tied to the page bitmap, rebuild them
-            // here whenever the page image is rebuilt so a stale overlay can never
-            // outlive its page.
-            SearchLayer.UpdateState(BuildSearchState(vm, tab));
-            AnnotationLayer.UpdateState(BuildAnnotationState(vm, tab));
             if (!ReferenceEquals(state.Image, _lastMinimapImage))
             {
                 _lastMinimapImage = state.Image;

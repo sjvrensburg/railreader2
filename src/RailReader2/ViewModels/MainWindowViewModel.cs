@@ -265,10 +265,16 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
         var result = _controller.Tick(dt);
 
-        // InvalidatePage also rebuilds the per-page search/annotation overlays, so a
-        // scroll-driven page change here can never leave them showing the previous
-        // page's rects (e.g. page 7's search highlights painted over page 1).
-        if (result.PageChanged) InvalidatePage();
+        if (result.PageChanged)
+        {
+            // A rail/auto-scroll page cross surfaces only here and calls just
+            // InvalidatePage, so refresh the per-page search and annotation overlays
+            // alongside the page bitmap — otherwise the previous page's rects stay
+            // painted over the new page (e.g. page 7's search highlights on page 1).
+            InvalidatePage();
+            InvalidateSearch();
+            InvalidateAnnotations();
+        }
         if (result.OverlayChanged)
         {
             InvalidateOverlay();
