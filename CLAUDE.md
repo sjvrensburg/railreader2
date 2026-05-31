@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**railreader2** is a desktop PDF viewer with AI-guided "rail reading" for high magnification viewing. Built in C# with .NET 10, Avalonia 12 (UI framework), PDFtoImage/PDFium (PDF rasterisation), SkiaSharp 3 (GPU rendering via Avalonia's Skia backend), and Docling Heron INT8 (ONNX layout detection, with PP-DocLayoutV3 as bundled fallback).
+**railreader2** is a desktop PDF viewer with AI-guided "rail reading" for high magnification viewing. Built in C# with .NET 10, Avalonia 12 (UI framework), PDFtoImage/PDFium (PDF rasterisation), SkiaSharp 3 (GPU rendering via Avalonia's Skia backend), and ONNX layout detection (Docling Heron INT8 bundled by default, PP-DocLayoutV3 or PP-S available as alternatives).
 
 ## Build and Development Commands
 
@@ -111,7 +111,7 @@ PDF → PDFium rasterises to `SKBitmap` at zoom-proportional DPI (150–600, cap
 
 ### Layout Analysis
 
-Page bitmap → BGRA-to-RGB → 800×800 rescale (PP-DocLayoutV3) or model-specific size (Heron) → CHW float tensor → ONNX inference → post-processing (confidence filter, NMS, reading order) → sort by reading order → line detection per block. Pixmap prep runs on thread pool; inference on dedicated `AnalysisWorker` thread. Results cached per-tab in `DocumentState.AnalysisCache`.
+Page bitmap → BGRA-to-RGB → 800×800 rescale (PP-DocLayoutV3) or model-specific size (Heron/PP-S) → CHW float tensor → ONNX inference → post-processing (confidence filter, NMS) → reading order determination (native for PP-DocLayoutV3, XY-Cut++ for Heron/PP-S) → sort by reading order → line detection per block. Pixmap prep runs on thread pool; inference on dedicated `AnalysisWorker` thread. Results cached per-tab in `DocumentState.AnalysisCache`.
 
 **Background read-ahead**: A dedicated `DispatcherTimer` (500ms) progressively analyses all pages when idle, scanning outward from the current page via `BackgroundAnalysisQueue`. Pauses during rail mode to avoid PDFium contention. Results never evicted from cache. The Figures tab in OutlinePanel (`Ctrl+Shift+I`) uses `PeekIndexBuilder` to surface detected figures, tables, and equations — showing thumbnails for visual blocks and extracted text (via `PageText.ExtractTextInRect`) for equations.
 
@@ -145,7 +145,7 @@ Key fields: `rail_zoom_threshold`, `snap_duration_ms`, `scroll_speed_start/max`,
 
 ## Key Development Notes
 
-- ONNX model outputs `[N, 7]` tensors with reading order as the 7th column (Global Pointer Mechanism)
+- PP-DocLayoutV3 outputs `[N, 7]` tensors with reading order as the 7th column (Global Pointer Mechanism). Heron and PP-S output `[N, 6]` without reading order; reading order is determined post-inference via XY-Cut++
 - `PdfOutlineExtractor` uses direct PDFium P/Invoke (`FPDF_*`/`FPDFBookmark_*`) since PDFtoImage doesn't expose bookmarks
 - `PdfiumResolver.Initialize()` must be called before any PDFium P/Invoke — registers a `DllImportResolver` that maps "pdfium" to the correct platform-specific native library (pdfium.dll / libpdfium.so / libpdfium.dylib). Called in the GUI entry point
 - ONNX runtime pre-loading in `LayoutAnalyzer` static constructor handles Linux (.so) and macOS (.dylib); Windows uses OnnxRuntime's own resolver

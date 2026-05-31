@@ -217,10 +217,11 @@
       <div class="feature">
         <h3>AI Layout Detection</h3>
         <p>
-          <a href="docs/heron-layout-model.md">Docling Heron-INT8</a> detects
-          document regions and predicts reading order. Broader class space supports
-          code, forms, and footnotes. <a href="https://huggingface.co/PaddlePaddle/PP-DocLayoutV3">PP-DocLayoutV3</a>
-          is supported as an alternative model. See the
+          <a href="docs/heron-layout-model.md">Docling Heron-INT8</a> (default) or
+          <a href="https://huggingface.co/PaddlePaddle/PP-DocLayoutV3">PP-DocLayoutV3</a>
+          detect document regions. PP-DocLayoutV3 includes native reading order;
+          Heron uses the XY-Cut++ algorithm for reading order. Heron has broader
+          class space supporting code, forms, and footnotes. See the
           <a href="docs/heron-layout-model.md">layout model guide</a> for details.
         </p>
       </div>
