@@ -50,7 +50,7 @@ public static class LayoutAnalysisPipeline
         resolver ??= analyzer.Capabilities.ProvidesReadingOrder
             ? new ModelOrderResolver()
             : new XYCutPlusPlusResolver();
-        resolver.AssignOrder(analysis.Blocks, analysis.PageWidth, analysis.PageHeight);
+        resolver.AssignOrder(analysis.Blocks, analysis.PageWidth, analysis.PageHeight, charBoxes);
 
         float mapScaleX = pxW > 0 ? (float)(pageW / pxW) : 1f;
         float mapScaleY = pxH > 0 ? (float)(pageH / pxH) : 1f;
