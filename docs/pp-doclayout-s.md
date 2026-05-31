@@ -13,8 +13,9 @@ back.
 ## Why PP-DocLayout-S?
 
 Docling Heron-INT8 is the default for good reason: it's highly accurate,
-ships bundled (~66 MB), detects a broad class space including code and forms,
-and emits a reading-order signal. Most users should leave it alone.
+ships bundled (~66 MB), and detects a broad class space including code and forms.
+Reading order is determined via the XY-Cut++ algorithm. Most users should leave
+it alone.
 
 PP-DocLayout-S's appeal is its **size**:
 

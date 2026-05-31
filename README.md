@@ -53,9 +53,7 @@ PDF pages are rasterised by PDFium (via PDFtoImage) at a DPI proportional to the
 
 ### Rail reading
 
-At high zoom levels, navigation switches to "rail mode" — the viewer locks onto detected text blocks and advances line-by-line, like a typewriter carriage return. This is powered by **[Docling Heron-INT8](docs/heron-layout-model.md)**, which detects document regions (text, titles, footnotes, code, forms, etc.) and predicts reading order. Non-active regions are dimmed so you can focus on the current block and line.
-
-> [**PP-DocLayoutV3**](https://huggingface.co/PaddlePaddle/PP-DocLayoutV3) by [PaddlePaddle](https://www.paddlepaddle.org.cn/en) is supported as an alternative layout model — narrower class space but optimised for traditional academic papers. See the [heron-layout-model guide](docs/heron-layout-model.md) for details and model selection.
+At high zoom levels, navigation switches to "rail mode" — the viewer locks onto detected text blocks and advances line-by-line, like a typewriter carriage return. This is powered by ONNX layout detection models: **[Docling Heron-INT8](docs/heron-layout-model.md)** (default, detects document regions with broad class coverage) or **[PP-DocLayoutV3](https://huggingface.co/PaddlePaddle/PP-DocLayoutV3)** (alternative, optimised for academic papers and includes native reading order). When using Heron or PP-S, reading order is determined via the XY-Cut++ algorithm. Non-active regions are dimmed so you can focus on the current block and line. See the [layout model guide](docs/heron-layout-model.md) for details and model selection.
 
 ### Features
 

@@ -31,6 +31,9 @@ may give noticeably better detections:
 
 PP-DocLayoutV3 remains available as an alternative:
 
+- **Native reading order** — PP-DocLayoutV3 includes reading order in its
+  model output. Heron does not; RailReader2 determines reading order via
+  the XY-Cut++ algorithm instead.
 - **Smaller file** — ~50 MB, vs. ~66 MB for Heron-INT8.
 - **Faster per page** — PP is a lighter model. Exact margin depends on
   your CPU.
