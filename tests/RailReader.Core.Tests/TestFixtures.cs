@@ -53,7 +53,7 @@ public static class TestFixtures
             Confidence = 0.9f, Order = 0,
         };
         for (int i = 0; i < 5; i++)
-            block.Lines.Add(new LineInfo(72 + i * 20, 16));
+            block.Lines.Add(new LineInfo(72 + i * 20, 16, 72, 468));
         analysis.Blocks.Add(block);
         doc.SetAnalysis(doc.CurrentPage, analysis);
         doc.Rail.SetAnalysis(analysis, config.NavigableRoles);
