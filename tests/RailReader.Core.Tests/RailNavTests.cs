@@ -49,7 +49,7 @@ public class RailNavTests
             var lines = new List<LineInfo>();
             for (int l = 0; l < linesPerBlock; l++)
             {
-                lines.Add(new LineInfo(yOffset + l * lineHeight, lineHeight));
+                lines.Add(new LineInfo(yOffset + l * lineHeight, lineHeight, xOffset, blockWidth));
             }
 
             blocks.Add(new LayoutBlock
