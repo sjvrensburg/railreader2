@@ -30,3 +30,16 @@ installer/icon.ico
 
 # PDFs for experiment
 experiments/PDFs/
+
+# Large ML experiment artifacts (models, checkpoints, datasets, caches, venvs).
+# These are scratch outputs, not source — keep .py/.md, ignore the bulk so a
+# stray `git add` can't drag a >100MB file into a push (GitHub rejects >100MB).
+experiments/**/*.onnx
+experiments/**/*.pt
+experiments/**/*.pth
+experiments/**/*.pkl
+experiments/**/*.bib
+experiments/**/runs/
+experiments/**/__pycache__/
+experiments/**/*.pyc
+experiments/**/.venv/
