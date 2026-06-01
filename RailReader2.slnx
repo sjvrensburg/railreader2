@@ -5,7 +5,6 @@
     <Project Path="src/RailReader.Export/RailReader.Export.csproj" />
   </Folder>
   <Folder Name="/tests/">
-    <Project Path="tests/RailReader.Core.Tests/RailReader.Core.Tests.csproj" />
     <Project Path="tests/RailReader.Export.Tests/RailReader.Export.Tests.csproj" />
   </Folder>
 </Solution>
