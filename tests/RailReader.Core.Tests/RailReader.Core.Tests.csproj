@@ -17,10 +17,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="RailReader.Core" Version="0.10.1" />
-    <PackageReference Include="RailReader.Core.Pdfium" Version="0.10.1" />
-    <PackageReference Include="RailReader.Core.Analysis" Version="0.10.1" />
-    <PackageReference Include="RailReader.Renderer.Skia" Version="0.10.1" />
+    <PackageReference Include="RailReader.Core" Version="0.11.0" />
+    <PackageReference Include="RailReader.Core.Pdfium" Version="0.11.0" />
+    <PackageReference Include="RailReader.Core.Analysis" Version="0.11.0" />
+    <PackageReference Include="RailReader.Renderer.Skia" Version="0.11.0" />
   </ItemGroup>
 
 </Project>
