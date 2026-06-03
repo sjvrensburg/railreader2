@@ -114,7 +114,7 @@ public partial class OutlinePanel
             PeekProgress.Text = $"{index.ScannedPages} of {index.TotalPages} pages scanned";
 
         var entries = new List<PeekEntryViewModel>();
-        int filter = CategoryFilter.SelectedIndex;
+        int filter = Math.Max(0, CategoryFilter.SelectedIndex);
         bool showFigures = filter == 0 || filter == 1;
         bool showTables = filter == 0 || filter == 2;
         bool showEquations = filter == 0 || filter == 3;
@@ -217,7 +217,10 @@ public partial class OutlinePanel
                 if (!_textCache.TryGetValue(cacheKey, out var cachedText))
                 {
                     cachedText = ExtractEntryText(doc, vm.Entry);
-                    _textCache[cacheKey] = cachedText;
+                    // Only cache non-empty results; empty text for evicted pages
+                    // should be re-extracted when the page is re-analyzed.
+                    if (!string.IsNullOrEmpty(cachedText))
+                        _textCache[cacheKey] = cachedText;
                 }
                 vm.ExtractedText = cachedText;
                 continue;
@@ -323,6 +326,8 @@ public partial class OutlinePanel
         if (_vm is null) return;
         if (sender is not Button { DataContext: PeekEntryViewModel entry }) return;
         _vm.GoToPage(entry.Entry.PageIndex);
+        if (_vm.IsScanAllActive)
+            _vm.ShowStatusToast("Navigation unavailable during scan");
     }
 
     // --- Scan All ---
@@ -363,7 +368,5 @@ public partial class OutlinePanel
     {
         if (e.PropertyName == nameof(MainWindowViewModel.ScanAllProgress))
             ScanAllProgressText.Text = _vm?.ScanAllProgress;
-        else if (e.PropertyName == nameof(MainWindowViewModel.IsScanAllActive) && _vm?.IsScanAllActive == false)
-            OnScanAllStateChanged();
     }
 }

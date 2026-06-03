@@ -458,6 +458,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
     public void CancelScanAll()
     {
+        if (!IsScanAllActive) return;
         StopScanAllTimer();
 
         // Keep whatever we've scanned so far, store per-tab

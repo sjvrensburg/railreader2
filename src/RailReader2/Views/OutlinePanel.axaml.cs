@@ -83,6 +83,7 @@ public partial class OutlinePanel : UserControl
         if (_vm is not null)
         {
             _vm.PropertyChanged -= OnVmPropertyChanged;
+            _vm.PropertyChanged -= OnVmScanProgressChanged;
             _vm.SearchRequested -= OnSearchRequested;
         }
         if (_watchedTab is not null)

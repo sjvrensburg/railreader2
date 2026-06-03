@@ -207,7 +207,7 @@ public class ViewportPanel : Panel
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
     {
         base.OnPointerReleased(e);
-        if (ViewModel?.IsScanAllActive == true) return;
+        if (ViewModel?.IsScanAllActive == true) { _dragging = false; _browseAnnotationDrag = false; return; }
         if (_dragging && ViewModel is not null)
         {
             var pos = e.GetPosition(this);
