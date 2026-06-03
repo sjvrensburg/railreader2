@@ -31,7 +31,7 @@
             <!-- Outline Panel (resizable via GridSplitter) -->
             <v:OutlinePanel Name="OutlinePanel" Grid.Column="0"
                             DataContext="{Binding}"
-                            MinWidth="120" MaxWidth="600"
+                            MinWidth="200" MaxWidth="600"
                             IsVisible="{Binding ShowOutline}" />
 
             <!-- Drag handle to resize sidebar -->
@@ -92,6 +92,28 @@
                                FontSize="18"
                                Foreground="White"
                                IsVisible="{Binding !Tabs.Count}" />
+
+                    <!-- Scan All overlay: faded viewport + opaque progress card -->
+                    <Border IsVisible="{Binding IsScanAllActive}"
+                            Background="#50000000"
+                            IsHitTestVisible="True">
+                        <Border HorizontalAlignment="Center" VerticalAlignment="Center"
+                                Background="{DynamicResource SystemControlBackgroundAltHighBrush}"
+                                CornerRadius="8" Padding="24,16"
+                                BoxShadow="0 2 8 0 #40000000">
+                            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8">
+                                <ProgressBar IsIndeterminate="True"
+                                             Width="180" Height="4"
+                                             Foreground="{DynamicResource SystemControlHighlightAccentBrush}" />
+                                <TextBlock Text="{Binding ScanAllProgress}"
+                                           FontSize="14" FontWeight="SemiBold"
+                                           HorizontalAlignment="Center" />
+                                <TextBlock Text="Press Escape to cancel"
+                                           Opacity="0.6" FontSize="11"
+                                           HorizontalAlignment="Center" />
+                            </StackPanel>
+                        </Border>
+                    </Border>
                 </Panel>
             </DockPanel>
         </Grid>

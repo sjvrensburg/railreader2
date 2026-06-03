@@ -26,6 +26,7 @@ public sealed partial class MainWindowViewModel
 
     public async Task OpenDocument(string path)
     {
+        if (IsScanAllActive) return;
         try
         {
             _logger.Debug($"[OpenDocument] Opening: {path}");
@@ -104,6 +105,7 @@ public sealed partial class MainWindowViewModel
     [RelayCommand]
     public void CloseTab(int index)
     {
+        if (IsScanAllActive) return;
         if (index < 0 || index >= Tabs.Count) return;
         var tab = Tabs[index];
         _controller.CloseDocument(_controller.Documents.IndexOf(tab.State));
@@ -127,6 +129,7 @@ public sealed partial class MainWindowViewModel
     [RelayCommand]
     public void SelectTab(int index)
     {
+        if (IsScanAllActive) return;
         if (index >= 0 && index < Tabs.Count)
         {
             if (ActiveTab is { } oldTab)
@@ -147,6 +150,7 @@ public sealed partial class MainWindowViewModel
 
     public void MoveTab(int fromIndex, int toIndex)
     {
+        if (IsScanAllActive) return;
         if (fromIndex == toIndex) return;
         if (fromIndex < 0 || fromIndex >= Tabs.Count) return;
         if (toIndex < 0 || toIndex >= Tabs.Count) return;

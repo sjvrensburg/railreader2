@@ -11,18 +11,21 @@ public sealed partial class MainWindowViewModel
 
     public void NavigateToBookmark(int index)
     {
+        if (IsScanAllActive) return;
         _controller.NavigateToBookmark(index);
         InvalidateAfterNavigation();
     }
 
     public void NavigateBack()
     {
+        if (IsScanAllActive) return;
         _controller.NavigateBack();
         InvalidateAfterNavigation();
     }
 
     public void NavigateForward()
     {
+        if (IsScanAllActive) return;
         _controller.NavigateForward();
         InvalidateAfterNavigation();
     }
@@ -62,11 +65,8 @@ public sealed partial class MainWindowViewModel
 
     public void HandleArrowRight(bool shortJump = false)
     {
+        if (IsScanAllActive) return;
         _controller.HandleArrowRight(shortJump);
-        // In rail mode, the animation loop drives all camera updates via Tick().
-        // Key repeats only keep StartScroll alive (a no-op when direction unchanged).
-        // Calling InvalidateCamera here would redundantly update the MatrixTransform
-        // at key-repeat rate (~30-40 Hz) on top of the animation frame updates.
         if (ActiveTab?.Rail.Active != true)
             InvalidateCamera();
         RequestAnimationFrame();
@@ -74,6 +74,7 @@ public sealed partial class MainWindowViewModel
 
     public void HandleArrowLeft(bool shortJump = false)
     {
+        if (IsScanAllActive) return;
         _controller.HandleArrowLeft(shortJump);
         if (ActiveTab?.Rail.Active != true)
             InvalidateCamera();
@@ -91,6 +92,7 @@ public sealed partial class MainWindowViewModel
 
     public void HandleClick(double canvasX, double canvasY)
     {
+        if (IsScanAllActive) return;
         var (handled, link) = _controller.HandleClick(canvasX, canvasY);
         if (link is UriDestination uriDest)
         {

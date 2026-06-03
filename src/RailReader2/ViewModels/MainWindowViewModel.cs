@@ -60,6 +60,18 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     [ObservableProperty] private double _radialMenuX;
     [ObservableProperty] private double _radialMenuY;
 
+    // --- Scan All (whole-document figure discovery) ---
+    [ObservableProperty] private bool _isScanAllActive;
+    [ObservableProperty] private string _scanAllProgress = "";
+    private DispatcherTimer? _scanAllTimer;
+    private int _scanAllOriginalWindowPages;
+    private int _scanAllLastScanned;
+    private int _scanAllStallTicks;
+    // ~30s of stalled progress (no page completed) before we give up — long
+    // enough to ride out a slow page on a weak CPU, short enough to recover
+    // from a wedged analysis worker without locking the UI indefinitely.
+    private const int ScanAllStallTickLimit = 600;
+
     /// <summary>True when the tab bar should be visible (not fullscreen, or hovering at top edge).</summary>
     public bool IsTabBarVisible => !IsFullScreen || ShowFullScreenHeader;
 
@@ -365,6 +377,185 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
     public void OnSliderChanged() => _controller.OnSliderChanged(_appConfig.ToCoreSettings());
 
+    // --- Scan All ---
+
+    /// <summary>True when Scan All can be started (document open, not already scanning).</summary>
+    public bool CanStartScanAll => !IsScanAllActive && ActiveTab is not null;
+
+    [RelayCommand(CanExecute = nameof(CanStartScanAll))]
+    public void StartScanAll()
+    {
+        var doc = _controller.ActiveDocument;
+        if (doc is null || IsScanAllActive) return;
+
+        // Already fully scanned?
+        if (doc.AnalysisCache.Count >= doc.PageCount)
+        {
+            ShowStatusToast("All pages already scanned");
+            return;
+        }
+
+        IsScanAllActive = true;
+        if (ActiveTab is { } tab) tab.FullScanPeekIndex = null;
+        _scanAllOriginalWindowPages = _appConfig.BackgroundAnalysisWindowPages;
+        _scanAllLastScanned = doc.AnalysisCache.Count;
+        _scanAllStallTicks = 0;
+
+        // Expand to whole-document sweep and re-centre the queue from page 0
+        _appConfig.BackgroundAnalysisWindowPages = 0;
+        _controller.OnConfigChanged(_appConfig.ToCoreSettings());
+
+        // Reset background queue to start from page 0
+        doc.QueueLookahead(0);
+
+        // Fast scan timer: polls results + submits next page at ~20 Hz
+        _scanAllTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
+        _scanAllTimer.Tick += OnScanAllTick;
+        _scanAllTimer.Start();
+
+        ScanAllProgress = $"Scanning… 0 of {doc.PageCount} pages";
+        StartScanAllCommand.NotifyCanExecuteChanged();
+    }
+
+    private void OnScanAllTick(object? sender, EventArgs e)
+    {
+        var doc = _controller.ActiveDocument;
+        if (doc is null) { CancelScanAll(); return; }
+
+        // Poll any completed analysis results
+        _controller.PollAnalysisResults();
+
+        // Submit next page if worker is idle
+        bool workerIdle = _controller.Worker is { IsIdle: true };
+        if (workerIdle)
+            _controller.TrySubmitBackgroundReadAhead();
+
+        int scanned = doc.AnalysisCache.Count;
+        int total = doc.PageCount;
+        ScanAllProgress = $"Scanning… {scanned} of {total} pages";
+
+        // Normal completion: every page analyzed.
+        if (scanned >= total) { CompleteScanAll(); return; }
+
+        // The queue is drained and the worker is idle, yet some pages are still
+        // missing from the cache (e.g. they failed to render/analyze and were
+        // dropped — the queue cursor never re-offers them). No further results
+        // will ever arrive, so finish with what we have instead of spinning.
+        if (workerIdle && !doc.HasPendingBackgroundWork) { CompleteScanAll(); return; }
+
+        // Stall watchdog: if no page has completed for a sustained period — e.g.
+        // the analysis worker thread faulted and is wedged (IsIdle stuck false,
+        // queue never drains) — give up gracefully rather than locking the modal
+        // overlay forever (only Escape would otherwise dismiss it).
+        if (scanned > _scanAllLastScanned)
+        {
+            _scanAllLastScanned = scanned;
+            _scanAllStallTicks = 0;
+        }
+        else if (++_scanAllStallTicks >= ScanAllStallTickLimit)
+        {
+            _logger.Error($"[ScanAll] Stalled at {scanned} of {total} pages — aborting sweep.");
+            CompleteScanAll();
+        }
+    }
+
+    private void CompleteScanAll() => TeardownScanAll(completed: true);
+
+    public void CancelScanAll()
+    {
+        if (!IsScanAllActive) return;
+        TeardownScanAll(completed: false);
+    }
+
+    /// <summary>
+    /// Shared teardown for both completion and cancellation: stops the timer,
+    /// persists the figure index, restores the analysis window, and clears state.
+    /// On completion (not cancellation) it also trims distant page caches and
+    /// reports a result toast.
+    /// </summary>
+    private void TeardownScanAll(bool completed)
+    {
+        var doc = _controller.ActiveDocument;
+
+        StopScanAllTimer();
+
+        // Capture counts before trimming so the toast reflects the sweep result.
+        int scanned = doc?.AnalysisCache.Count ?? 0;
+        int total = doc?.PageCount ?? 0;
+
+        // Build the full figure index from whatever was scanned, store per-tab.
+        if (doc is not null && ActiveTab is { } tab)
+            tab.FullScanPeekIndex = PeekIndexBuilder.Build(doc.AnalysisCache, doc.PageCount);
+
+        // Restore the analysis window the user had before the sweep.
+        _appConfig.BackgroundAnalysisWindowPages = _scanAllOriginalWindowPages;
+        _controller.OnConfigChanged(_appConfig.ToCoreSettings());
+
+        // On completion, trim distant page caches so the whole-document sweep
+        // doesn't leave every page resident. Figure data survives on the tab.
+        // Removed pages are re-analyzed on demand when navigated to.
+        if (completed && doc is not null)
+            TrimDistantAnalysisCache(doc);
+
+        IsScanAllActive = false;
+        ScanAllProgress = "";
+        StartScanAllCommand.NotifyCanExecuteChanged();
+
+        if (completed)
+            ShowStatusToast(scanned >= total
+                ? "Scan complete"
+                : $"Scan finished — {scanned} of {total} pages (some could not be analysed)");
+    }
+
+    private void StopScanAllTimer()
+    {
+        if (_scanAllTimer is not null)
+        {
+            _scanAllTimer.Stop();
+            _scanAllTimer.Tick -= OnScanAllTick;
+            _scanAllTimer = null;
+        }
+    }
+
+    /// <summary>
+    /// Removes analysis cache entries for pages outside the normal analysis window
+    /// around the current page. The per-tab <see cref="TabViewModel.FullScanPeekIndex"/>
+    /// preserves the figure/equation/table data. Removed pages will be re-analyzed
+    /// on demand when the user navigates near them.
+    /// </summary>
+    private void TrimDistantAnalysisCache(DocumentState doc)
+    {
+        int window = _scanAllOriginalWindowPages;
+        if (window <= 0) return; // whole-document mode: don't trim
+
+        int center = doc.CurrentPage;
+        int lo = Math.Max(0, center - window);
+        int hi = Math.Min(doc.PageCount - 1, center + window);
+
+        // Downcast from IReadOnlyDictionary to Dictionary to remove entries.
+        // The runtime type is Dictionary<int, PageAnalysis> (DocumentState._analysisCache).
+        // If a future Core version wraps the cache, log it loudly rather than
+        // silently skipping the trim — otherwise a whole-document sweep would
+        // leave every page's analysis resident with no visible symptom.
+        if (doc.AnalysisCache is not Dictionary<int, PageAnalysis> mutable)
+        {
+            _logger.Error(
+                $"[ScanAll] AnalysisCache is {doc.AnalysisCache.GetType().Name}, not a mutable " +
+                "Dictionary — cannot trim distant pages; analysis memory will not be reclaimed.");
+            return;
+        }
+
+        var keysToRemove = new List<int>();
+        foreach (var kvp in mutable)
+        {
+            if (kvp.Key < lo || kvp.Key > hi)
+                keysToRemove.Add(kvp.Key);
+        }
+
+        foreach (var key in keysToRemove)
+            mutable.Remove(key);
+    }
+
     private const double BaseFontSize = 14.0;
 
     private void ApplyFontScale()
@@ -384,6 +575,11 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     /// </summary>
     private void Dispatch(Action action, Action? invalidate = null, bool animate = false)
     {
+        // Scan All is modal: every navigation/camera action routed through Dispatch
+        // is suppressed for the scan's duration. Entry points that don't go through
+        // Dispatch (NavigateBack/Forward, arrow Left/Right, HandleClick) carry their
+        // own IsScanAllActive guard.
+        if (IsScanAllActive) return;
         action();
         invalidate?.Invoke();
         if (animate) RequestAnimationFrame();

@@ -25,6 +25,13 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
     [ObservableProperty] private bool _lineFocusBlur;
     [ObservableProperty] private bool _lineHighlightEnabled = true;
     [ObservableProperty] private bool _marginCropping;
+
+    /// <summary>
+    /// Full-scan figure index from a completed Scan All operation. Persists per-document
+    /// so switching tabs doesn't lose the data. Null until a scan is performed.
+    /// </summary>
+    public PeekIndex? FullScanPeekIndex { get; set; }
+
     /// <summary>Whether the side panel (outline/bookmarks/search) is visible for this tab.</summary>
     public bool ShowSidePanel { get; set; }
 

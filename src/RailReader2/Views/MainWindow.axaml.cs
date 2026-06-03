@@ -182,6 +182,10 @@ public partial class MainWindow : Window
                 break;
             case nameof(MainWindowViewModel.ShowSettings) when vm.ShowSettings:
                 vm.ShowSettings = false;
+                // Scan All temporarily overrides BackgroundAnalysisWindowPages and
+                // restores the captured value on teardown; editing settings mid-scan
+                // would be silently reverted, so suppress the dialog while scanning.
+                if (vm.IsScanAllActive) break;
                 await new SettingsWindow { DataContext = vm, FontSize = vm.CurrentFontSize }.ShowDialog(this);
                 break;
             case nameof(MainWindowViewModel.ActiveTool):
@@ -555,6 +559,18 @@ public partial class MainWindow : Window
     protected override void OnKeyDown(KeyEventArgs e)
     {
         if (Vm is not { } vm) { base.OnKeyDown(e); return; }
+
+        // During Scan All, only Escape is allowed (to cancel the scan).
+        // All other keyboard input is suppressed.
+        if (vm.IsScanAllActive)
+        {
+            if (e.Key == Key.Escape)
+            {
+                vm.CancelScanAll();
+                e.Handled = true;
+            }
+            return;
+        }
 
         if (e.KeyModifiers.HasFlag(KeyModifiers.Control) && HandleCtrlShortcut(vm, e))
             { RailToolBar.SyncState(); return; }
