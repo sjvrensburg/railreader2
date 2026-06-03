@@ -204,14 +204,24 @@
                     <StackPanel Spacing="8" Margin="16">
                         <TextBlock Text="Document Analysis" FontWeight="Bold" />
                         <Separator />
-                        <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto">
-                            <TextBlock Grid.Column="0" Text="Lookahead pages:" VerticalAlignment="Center" />
-                            <NumericUpDown Grid.Column="2" Name="Lookahead" Value="2"
+                        <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto,4,Auto,4,Auto">
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Lookahead pages:" VerticalAlignment="Center" />
+                            <NumericUpDown Grid.Row="0" Grid.Column="2" Name="Lookahead" Value="2"
                                            Minimum="0" Maximum="10" Increment="1"
                                            FormatString="F0" Width="130" HorizontalAlignment="Left"
                                            ValueChanged="OnSettingChanged" />
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Background analysis range:" VerticalAlignment="Center" />
+                            <NumericUpDown Grid.Row="2" Grid.Column="2" Name="AnalysisWindow" Value="12"
+                                           Minimum="0" Maximum="50" Increment="1"
+                                           FormatString="F0" Width="130" HorizontalAlignment="Left"
+                                           ValueChanged="OnSettingChanged" />
+                            <TextBlock Grid.Row="4" Grid.Column="0" Text="Page cache range:" VerticalAlignment="Center" />
+                            <NumericUpDown Grid.Row="4" Grid.Column="2" Name="PageCacheRadius" Value="24"
+                                           Minimum="0" Maximum="100" Increment="1"
+                                           FormatString="F0" Width="130" HorizontalAlignment="Left"
+                                           ValueChanged="OnSettingChanged" />
                         </Grid>
-                        <TextBlock Text="Number of pages to pre-analyse ahead of the current page."
+                        <TextBlock Text="Lookahead: pages pre-analysed ahead of the current page. Background analysis range: pages analysed either side of the current page (higher = more pre-analysis, more CPU; 0 = whole document). Page cache range: pages of text kept in memory (lower = less RAM on large documents; 0 = no eviction)."
                                    TextWrapping="Wrap" Opacity="0.5" />
 
                         <TextBlock Text="Navigable Block Roles" FontWeight="Bold" Margin="0,12,0,0" />

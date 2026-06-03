@@ -77,6 +77,8 @@ public partial class SettingsWindow : Window
         ScrollMax.Value = (decimal)c.ScrollSpeedMax;
         RampTime.Value = (decimal)c.ScrollRampTime;
         Lookahead.Value = c.AnalysisLookaheadPages;
+        AnalysisWindow.Value = c.BackgroundAnalysisWindowPages;
+        PageCacheRadius.Value = c.PageCacheRadius;
         EffectCombo.SelectedIndex = (int)c.ColourEffect;
         IntensitySlider.Value = c.ColourEffectIntensity;
         PixelSnappingCheck.IsChecked = c.PixelSnapping;
@@ -189,6 +191,8 @@ public partial class SettingsWindow : Window
         c.ScrollSpeedMax = (double)(ScrollMax.Value ?? 50m);
         c.ScrollRampTime = (double)(RampTime.Value ?? 1.5m);
         c.AnalysisLookaheadPages = (int)(Lookahead.Value ?? 2m);
+        c.BackgroundAnalysisWindowPages = (int)(AnalysisWindow.Value ?? 12m);
+        c.PageCacheRadius = (int)(PageCacheRadius.Value ?? 24m);
         c.ColourEffectIntensity = IntensitySlider.Value;
         c.AutoScrollLinePauseMs = (double)(AutoScrollLinePause.Value ?? 400m);
         c.AutoScrollBlockPauseMs = (double)(AutoScrollBlockPause.Value ?? 600m);
@@ -331,6 +335,8 @@ public partial class SettingsWindow : Window
         vm.AppConfig.ScrollSpeedMax = defaults.ScrollSpeedMax;
         vm.AppConfig.ScrollRampTime = defaults.ScrollRampTime;
         vm.AppConfig.AnalysisLookaheadPages = defaults.AnalysisLookaheadPages;
+        vm.AppConfig.BackgroundAnalysisWindowPages = defaults.BackgroundAnalysisWindowPages;
+        vm.AppConfig.PageCacheRadius = defaults.PageCacheRadius;
         vm.AppConfig.UiFontScale = defaults.UiFontScale;
         vm.SetDarkMode(defaults.DarkMode);
         vm.AppConfig.ColourEffect = defaults.ColourEffect;
