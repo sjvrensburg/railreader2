@@ -27,6 +27,7 @@ public sealed partial class MainWindowViewModel
 
     public void ExecuteSearch(string query, bool caseSensitive, bool useRegex)
     {
+        if (IsScanAllActive) return;
         _controller.Search.ExecuteSearch(query, caseSensitive, useRegex);
         InvalidateSearch();
     }
@@ -55,18 +56,21 @@ public sealed partial class MainWindowViewModel
 
     public void NextMatch()
     {
+        if (IsScanAllActive) return;
         _controller.Search.NextMatch();
         InvalidateAfterNavigation();
     }
 
     public void PreviousMatch()
     {
+        if (IsScanAllActive) return;
         _controller.Search.PreviousMatch();
         InvalidateAfterNavigation();
     }
 
     public void GoToMatch(int matchIndex)
     {
+        if (IsScanAllActive) return;
         _controller.Search.GoToMatch(matchIndex);
         InvalidateAfterNavigation();
     }

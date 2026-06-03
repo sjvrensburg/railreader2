@@ -182,6 +182,10 @@ public partial class MainWindow : Window
                 break;
             case nameof(MainWindowViewModel.ShowSettings) when vm.ShowSettings:
                 vm.ShowSettings = false;
+                // Scan All temporarily overrides BackgroundAnalysisWindowPages and
+                // restores the captured value on teardown; editing settings mid-scan
+                // would be silently reverted, so suppress the dialog while scanning.
+                if (vm.IsScanAllActive) break;
                 await new SettingsWindow { DataContext = vm, FontSize = vm.CurrentFontSize }.ShowDialog(this);
                 break;
             case nameof(MainWindowViewModel.ActiveTool):

@@ -32,60 +32,36 @@ public sealed partial class MainWindowViewModel
 
     [RelayCommand]
     public void GoToPage(int page)
-    {
-        if (IsScanAllActive) return;
-        Dispatch(() => _controller.GoToPage(page), InvalidateAfterNavigation);
-    }
+        => Dispatch(() => _controller.GoToPage(page), InvalidateAfterNavigation);
 
     [RelayCommand]
     public void FitPage()
-    {
-        if (IsScanAllActive) return;
-        Dispatch(_controller.FitPage, InvalidateCameraAndTab);
-    }
+        => Dispatch(_controller.FitPage, InvalidateCameraAndTab);
 
     [RelayCommand]
     public void FitWidth()
-    {
-        if (IsScanAllActive) return;
-        Dispatch(_controller.FitWidth, InvalidateCameraAndTab);
-    }
+        => Dispatch(_controller.FitWidth, InvalidateCameraAndTab);
 
     // --- Camera ---
 
     public void HandleZoom(double scrollDelta, double cursorX, double cursorY, bool ctrlHeld)
-    {
-        if (IsScanAllActive) return;
-        Dispatch(() => _controller.HandleZoom(scrollDelta, cursorX, cursorY, ctrlHeld), InvalidateCameraAndTab, animate: true);
-    }
+        => Dispatch(() => _controller.HandleZoom(scrollDelta, cursorX, cursorY, ctrlHeld), InvalidateCameraAndTab, animate: true);
 
     public void HandlePan(double dx, double dy, bool ctrlHeld = false)
-    {
-        if (IsScanAllActive) return;
-        Dispatch(() => _controller.HandlePan(dx, dy, ctrlHeld), InvalidateCameraAndTab);
-    }
+        => Dispatch(() => _controller.HandlePan(dx, dy, ctrlHeld), InvalidateCameraAndTab);
 
     public void HandleZoomKey(bool zoomIn)
-    {
-        if (IsScanAllActive) return;
-        Dispatch(() => _controller.HandleZoomKey(zoomIn), InvalidateCameraAndTab, animate: true);
-    }
+        => Dispatch(() => _controller.HandleZoomKey(zoomIn), InvalidateCameraAndTab, animate: true);
 
     public void HandleResetZoom() => FitPage();
 
     // --- Rail navigation ---
 
     public void HandleArrowDown()
-    {
-        if (IsScanAllActive) return;
-        Dispatch(_controller.HandleArrowDown, InvalidateNavigation);
-    }
+        => Dispatch(_controller.HandleArrowDown, InvalidateNavigation);
 
     public void HandleArrowUp()
-    {
-        if (IsScanAllActive) return;
-        Dispatch(_controller.HandleArrowUp, InvalidateNavigation);
-    }
+        => Dispatch(_controller.HandleArrowUp, InvalidateNavigation);
 
     public void HandleArrowRight(bool shortJump = false)
     {
@@ -106,22 +82,13 @@ public sealed partial class MainWindowViewModel
     }
 
     public void HandleLineHome()
-    {
-        if (IsScanAllActive) return;
-        Dispatch(_controller.HandleLineHome, InvalidateCameraAndTab);
-    }
+        => Dispatch(_controller.HandleLineHome, InvalidateCameraAndTab);
 
     public void HandleLineEnd()
-    {
-        if (IsScanAllActive) return;
-        Dispatch(_controller.HandleLineEnd, InvalidateCameraAndTab);
-    }
+        => Dispatch(_controller.HandleLineEnd, InvalidateCameraAndTab);
 
     public void HandleArrowRelease(bool isHorizontal)
-    {
-        if (IsScanAllActive) return;
-        Dispatch(() => _controller.HandleArrowRelease(isHorizontal), animate: true);
-    }
+        => Dispatch(() => _controller.HandleArrowRelease(isHorizontal), animate: true);
 
     public void HandleClick(double canvasX, double canvasY)
     {

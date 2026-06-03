@@ -35,8 +35,7 @@ public partial class OutlinePanel
     private readonly Dictionary<int, SKBitmap?> _pageThumbCache = [];
     private readonly Dictionary<int, string?> _textCache = [];
     private bool _peekDirty;
-    private int _lastPeekEntryCount;
-    private int _lastPeekScannedPages;
+    private int _lastPeekSignature;
 
     private void SubscribePeekUpdates()
     {
@@ -137,17 +136,32 @@ public partial class OutlinePanel
             return cmp != 0 ? cmp : a.Entry.BlockIndex.CompareTo(b.Entry.BlockIndex);
         });
 
-        // Only rebuild the visual tree if entries changed — replacing
-        // ItemsSource mid-click destroys the button the user pressed.
-        int totalEntries = entries.Count;
-        int scannedOrIndexed = fullScan?.TotalPages ?? index.ScannedPages;
-        if (totalEntries != _lastPeekEntryCount || scannedOrIndexed != _lastPeekScannedPages)
+        // Only rebuild the visual tree if entries actually changed — replacing
+        // ItemsSource mid-click destroys the button the user pressed. A content
+        // signature (page + block + role of every entry) is used rather than a
+        // bare count so that a same-count-but-different-content re-analysis
+        // (e.g. a block reclassified at the same index) still triggers a rebuild.
+        int signature = ComputePeekSignature(entries);
+        if (signature != _lastPeekSignature)
         {
-            _lastPeekEntryCount = totalEntries;
-            _lastPeekScannedPages = scannedOrIndexed;
+            _lastPeekSignature = signature;
             GenerateThumbnails(entries, doc);
             PeekEntryList.ItemsSource = entries;
         }
+    }
+
+    /// <summary>Order-sensitive hash of the entry list's identifying fields.</summary>
+    private static int ComputePeekSignature(List<PeekEntryViewModel> entries)
+    {
+        var hash = new HashCode();
+        hash.Add(entries.Count);
+        foreach (var e in entries)
+        {
+            hash.Add(e.Entry.PageIndex);
+            hash.Add(e.Entry.BlockIndex);
+            hash.Add(e.Entry.Role);
+        }
+        return hash.ToHashCode();
     }
 
     /// <summary>
@@ -158,39 +172,25 @@ public partial class OutlinePanel
     private void AddFullScanSupplement(List<PeekEntryViewModel> entries, PeekIndex fullScan,
         DocumentState doc, bool showFigures, bool showTables, bool showEquations)
     {
-        // Build a set of (pageIndex, blockIndex) pairs already present from live data
-        var liveKeys = new HashSet<(int Page, int Block)>();
-        foreach (var e in entries)
-            liveKeys.Add((e.Entry.PageIndex, e.Entry.BlockIndex));
-
-        // For pages not in the live analysis cache, add full-scan entries
+        // Live entries already cover every page present in the analysis cache
+        // (the live index is built solely from AnalysisCache), so supplement only
+        // with full-scan entries on pages NOT in the live cache. That single
+        // page-membership check fully deduplicates against the live entries.
         if (showFigures)
-            AddSupplement(entries, fullScan.Figures, "Figure", doc, liveKeys);
+            AddEntries(entries, FilterUncached(fullScan.Figures, doc), "Figure");
         if (showTables)
-            AddSupplement(entries, fullScan.Tables, "Table", doc, liveKeys);
+            AddEntries(entries, FilterUncached(fullScan.Tables, doc), "Table");
         if (showEquations)
-            AddSupplement(entries, fullScan.Equations, "Equation", doc, liveKeys);
+            AddEntries(entries, FilterUncached(fullScan.Equations, doc), "Equation");
     }
 
-    private static void AddSupplement(List<PeekEntryViewModel> entries, IReadOnlyList<PeekEntry> scanEntries,
-        string category, DocumentState doc, HashSet<(int Page, int Block)> liveKeys)
+    private static List<PeekEntry> FilterUncached(IReadOnlyList<PeekEntry> scanEntries, DocumentState doc)
     {
+        var result = new List<PeekEntry>();
         foreach (var entry in scanEntries)
-        {
-            // Skip pages that are in the live analysis cache (they're already included)
-            if (doc.AnalysisCache.ContainsKey(entry.PageIndex))
-                continue;
-            // Dedup: skip if this exact entry was already added from live data
-            if (liveKeys.Contains((entry.PageIndex, entry.BlockIndex)))
-                continue;
-
-            entries.Add(new PeekEntryViewModel
-            {
-                Label = category,
-                PageDisplay = $"Page {entry.PageIndex + 1} — {entry.Role}",
-                Entry = entry,
-            });
-        }
+            if (!doc.AnalysisCache.ContainsKey(entry.PageIndex))
+                result.Add(entry);
+        return result;
     }
 
     private static void AddEntries(List<PeekEntryViewModel> list, IReadOnlyList<PeekEntry> entries, string category)
@@ -308,8 +308,7 @@ public partial class OutlinePanel
             bmp?.Dispose();
         _thumbnailCache.Clear();
         _textCache.Clear();
-        _lastPeekEntryCount = 0;
-        _lastPeekScannedPages = 0;
+        _lastPeekSignature = 0;
 
         foreach (var bmp in _pageThumbCache.Values)
             bmp?.Dispose();
