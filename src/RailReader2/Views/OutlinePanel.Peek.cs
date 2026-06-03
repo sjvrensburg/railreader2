@@ -6,6 +6,7 @@ using RailReader.Core;
 using RailReader.Core.Models;
 using RailReader.Core.Services;
 using RailReader.Renderer.Skia;
+using RailReader2.ViewModels;
 using SkiaSharp;
 
 namespace RailReader2.Views;
@@ -100,7 +101,12 @@ public partial class OutlinePanel
         }
 
         var index = PeekIndexBuilder.Build(doc.AnalysisCache, doc.PageCount);
-        if (index.ScannedPages >= index.TotalPages)
+        var fullScan = _vm?.ActiveTab?.FullScanPeekIndex;
+
+        // Progress text: if we have a full-scan index, report coverage from that
+        if (fullScan is not null)
+            PeekProgress.Text = $"All {doc.PageCount} pages indexed ({fullScan.Figures.Count + fullScan.Tables.Count + fullScan.Equations.Count} entries)";
+        else if (index.ScannedPages >= index.TotalPages)
             PeekProgress.Text = $"All {index.TotalPages} pages scanned";
         else if (doc.Rail.Active)
             PeekProgress.Text = $"{index.ScannedPages} of {index.TotalPages} pages scanned (paused in rail mode)";
@@ -108,16 +114,22 @@ public partial class OutlinePanel
             PeekProgress.Text = $"{index.ScannedPages} of {index.TotalPages} pages scanned";
 
         var entries = new List<PeekEntryViewModel>();
-        bool showFigures = ShowFiguresToggle.IsChecked == true;
-        bool showTables = ShowTablesToggle.IsChecked == true;
-        bool showEquations = ShowEquationsToggle.IsChecked == true;
+        int filter = CategoryFilter.SelectedIndex;
+        bool showFigures = filter == 0 || filter == 1;
+        bool showTables = filter == 0 || filter == 2;
+        bool showEquations = filter == 0 || filter == 3;
 
+        // Live data from current analysis cache
         if (showFigures)
             AddEntries(entries, index.Figures, "Figure");
         if (showTables)
             AddEntries(entries, index.Tables, "Table");
         if (showEquations)
             AddEntries(entries, index.Equations, "Equation");
+
+        // Supplement with full-scan entries for pages not in the live cache
+        if (fullScan is not null)
+            AddFullScanSupplement(entries, fullScan, doc, showFigures, showTables, showEquations);
 
         entries.Sort((a, b) =>
         {
@@ -128,12 +140,56 @@ public partial class OutlinePanel
         // Only rebuild the visual tree if entries changed — replacing
         // ItemsSource mid-click destroys the button the user pressed.
         int totalEntries = entries.Count;
-        if (totalEntries != _lastPeekEntryCount || index.ScannedPages != _lastPeekScannedPages)
+        int scannedOrIndexed = fullScan?.TotalPages ?? index.ScannedPages;
+        if (totalEntries != _lastPeekEntryCount || scannedOrIndexed != _lastPeekScannedPages)
         {
             _lastPeekEntryCount = totalEntries;
-            _lastPeekScannedPages = index.ScannedPages;
+            _lastPeekScannedPages = scannedOrIndexed;
             GenerateThumbnails(entries, doc);
             PeekEntryList.ItemsSource = entries;
+        }
+    }
+
+    /// <summary>
+    /// Adds entries from the full-scan index for pages not already covered
+    /// by live analysis data. This ensures figures from distant (evicted)
+    /// pages remain visible in the Figures pane.
+    /// </summary>
+    private void AddFullScanSupplement(List<PeekEntryViewModel> entries, PeekIndex fullScan,
+        DocumentState doc, bool showFigures, bool showTables, bool showEquations)
+    {
+        // Build a set of (pageIndex, blockIndex) pairs already present from live data
+        var liveKeys = new HashSet<(int Page, int Block)>();
+        foreach (var e in entries)
+            liveKeys.Add((e.Entry.PageIndex, e.Entry.BlockIndex));
+
+        // For pages not in the live analysis cache, add full-scan entries
+        if (showFigures)
+            AddSupplement(entries, fullScan.Figures, "Figure", doc, liveKeys);
+        if (showTables)
+            AddSupplement(entries, fullScan.Tables, "Table", doc, liveKeys);
+        if (showEquations)
+            AddSupplement(entries, fullScan.Equations, "Equation", doc, liveKeys);
+    }
+
+    private static void AddSupplement(List<PeekEntryViewModel> entries, IReadOnlyList<PeekEntry> scanEntries,
+        string category, DocumentState doc, HashSet<(int Page, int Block)> liveKeys)
+    {
+        foreach (var entry in scanEntries)
+        {
+            // Skip pages that are in the live analysis cache (they're already included)
+            if (doc.AnalysisCache.ContainsKey(entry.PageIndex))
+                continue;
+            // Dedup: skip if this exact entry was already added from live data
+            if (liveKeys.Contains((entry.PageIndex, entry.BlockIndex)))
+                continue;
+
+            entries.Add(new PeekEntryViewModel
+            {
+                Label = category,
+                PageDisplay = $"Page {entry.PageIndex + 1} — {entry.Role}",
+                Entry = entry,
+            });
         }
     }
 
@@ -257,9 +313,9 @@ public partial class OutlinePanel
         _pageThumbCache.Clear();
     }
 
-    private void OnPeekFilterChanged(object? sender, RoutedEventArgs e)
+    private void OnPeekFilterChanged(object? sender, SelectionChangedEventArgs e)
     {
-        RefreshPeekIndex();
+        if (_vm is not null) RefreshPeekIndex();
     }
 
     private void OnPeekEntryClick(object? sender, RoutedEventArgs e)
@@ -267,5 +323,47 @@ public partial class OutlinePanel
         if (_vm is null) return;
         if (sender is not Button { DataContext: PeekEntryViewModel entry }) return;
         _vm.GoToPage(entry.Entry.PageIndex);
+    }
+
+    // --- Scan All ---
+
+    private void OnScanAllClick(object? sender, RoutedEventArgs e)
+    {
+        if (_vm is null) return;
+        _vm.StartScanAllCommand.Execute(null);
+    }
+
+    private void OnScanAllCancelClick(object? sender, RoutedEventArgs e)
+    {
+        _vm?.CancelScanAll();
+    }
+
+    private void OnScanAllStateChanged()
+    {
+        if (_vm is null) return;
+
+        bool active = _vm.IsScanAllActive;
+        ScanAllBanner.IsVisible = active;
+        ScanAllButton.IsEnabled = !active;
+
+        if (active)
+        {
+            // Subscribe to progress updates
+            _vm.PropertyChanged += OnVmScanProgressChanged;
+            ScanAllProgressText.Text = _vm.ScanAllProgress;
+        }
+        else
+        {
+            _vm.PropertyChanged -= OnVmScanProgressChanged;
+            RefreshPeekIndex();
+        }
+    }
+
+    private void OnVmScanProgressChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(MainWindowViewModel.ScanAllProgress))
+            ScanAllProgressText.Text = _vm?.ScanAllProgress;
+        else if (e.PropertyName == nameof(MainWindowViewModel.IsScanAllActive) && _vm?.IsScanAllActive == false)
+            OnScanAllStateChanged();
     }
 }

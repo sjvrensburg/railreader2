@@ -60,6 +60,12 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     [ObservableProperty] private double _radialMenuX;
     [ObservableProperty] private double _radialMenuY;
 
+    // --- Scan All (whole-document figure discovery) ---
+    [ObservableProperty] private bool _isScanAllActive;
+    [ObservableProperty] private string _scanAllProgress = "";
+    private DispatcherTimer? _scanAllTimer;
+    private int _scanAllOriginalWindowPages;
+
     /// <summary>True when the tab bar should be visible (not fullscreen, or hovering at top edge).</summary>
     public bool IsTabBarVisible => !IsFullScreen || ShowFullScreenHeader;
 
@@ -364,6 +370,149 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     }
 
     public void OnSliderChanged() => _controller.OnSliderChanged(_appConfig.ToCoreSettings());
+
+    // --- Scan All ---
+
+    /// <summary>True when Scan All can be started (document open, not already scanning).</summary>
+    public bool CanStartScanAll => !IsScanAllActive && ActiveTab is not null;
+
+    [RelayCommand(CanExecute = nameof(CanStartScanAll))]
+    public void StartScanAll()
+    {
+        var doc = _controller.ActiveDocument;
+        if (doc is null || IsScanAllActive) return;
+
+        // Already fully scanned?
+        if (doc.AnalysisCache.Count >= doc.PageCount)
+        {
+            ShowStatusToast("All pages already scanned");
+            return;
+        }
+
+        IsScanAllActive = true;
+        if (ActiveTab is { } tab) tab.FullScanPeekIndex = null;
+        _scanAllOriginalWindowPages = _appConfig.BackgroundAnalysisWindowPages;
+
+        // Expand to whole-document sweep and re-centre the queue from page 0
+        _appConfig.BackgroundAnalysisWindowPages = 0;
+        _controller.OnConfigChanged(_appConfig.ToCoreSettings());
+
+        // Reset background queue to start from page 0
+        doc.QueueLookahead(0);
+
+        // Fast scan timer: polls results + submits next page at ~20 Hz
+        _scanAllTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
+        _scanAllTimer.Tick += OnScanAllTick;
+        _scanAllTimer.Start();
+
+        ScanAllProgress = $"Scanning… 0 of {doc.PageCount} pages";
+        StartScanAllCommand.NotifyCanExecuteChanged();
+    }
+
+    private void OnScanAllTick(object? sender, EventArgs e)
+    {
+        var doc = _controller.ActiveDocument;
+        if (doc is null) { CancelScanAll(); return; }
+
+        // Poll any completed analysis results
+        _controller.PollAnalysisResults();
+
+        // Submit next page if worker is idle
+        if (_controller.Worker is { IsIdle: true })
+            _controller.TrySubmitBackgroundReadAhead();
+
+        int scanned = doc.AnalysisCache.Count;
+        int total = doc.PageCount;
+        ScanAllProgress = $"Scanning… {scanned} of {total} pages";
+
+        if (scanned >= total)
+            CompleteScanAll();
+    }
+
+    private void CompleteScanAll()
+    {
+        var doc = _controller.ActiveDocument;
+
+        StopScanAllTimer();
+
+        // Build the full figure index before trimming, store per-tab
+        if (doc is not null && ActiveTab is { } tab)
+            tab.FullScanPeekIndex = PeekIndexBuilder.Build(doc.AnalysisCache, doc.PageCount);
+
+        // Restore analysis window and trim distant page caches
+        _appConfig.BackgroundAnalysisWindowPages = _scanAllOriginalWindowPages;
+        _controller.OnConfigChanged(_appConfig.ToCoreSettings());
+
+        // Trim analysis cache: keep full data only for pages within the
+        // normal window. Remove distant pages so they get re-analyzed
+        // on demand when navigated to. Figure data survives on the tab.
+        if (doc is not null)
+            TrimDistantAnalysisCache(doc);
+
+        IsScanAllActive = false;
+        ScanAllProgress = "";
+        StartScanAllCommand.NotifyCanExecuteChanged();
+
+        ShowStatusToast("Scan complete");
+    }
+
+    public void CancelScanAll()
+    {
+        StopScanAllTimer();
+
+        // Keep whatever we've scanned so far, store per-tab
+        var doc = _controller.ActiveDocument;
+        if (doc is not null && ActiveTab is { } tab)
+            tab.FullScanPeekIndex = PeekIndexBuilder.Build(doc.AnalysisCache, doc.PageCount);
+
+        _appConfig.BackgroundAnalysisWindowPages = _scanAllOriginalWindowPages;
+        _controller.OnConfigChanged(_appConfig.ToCoreSettings());
+
+        IsScanAllActive = false;
+        ScanAllProgress = "";
+        StartScanAllCommand.NotifyCanExecuteChanged();
+    }
+
+    private void StopScanAllTimer()
+    {
+        if (_scanAllTimer is not null)
+        {
+            _scanAllTimer.Stop();
+            _scanAllTimer.Tick -= OnScanAllTick;
+            _scanAllTimer = null;
+        }
+    }
+
+    /// <summary>
+    /// Removes analysis cache entries for pages outside the normal analysis window
+    /// around the current page. The per-tab <see cref="TabViewModel.FullScanPeekIndex"/>
+    /// preserves the figure/equation/table data. Removed pages will be re-analyzed
+    /// on demand when the user navigates near them.
+    /// </summary>
+    private void TrimDistantAnalysisCache(DocumentState doc)
+    {
+        int window = _scanAllOriginalWindowPages;
+        if (window <= 0) return; // whole-document mode: don't trim
+
+        int center = doc.CurrentPage;
+        int lo = Math.Max(0, center - window);
+        int hi = Math.Min(doc.PageCount - 1, center + window);
+
+        // Downcast from IReadOnlyDictionary to Dictionary to remove entries.
+        // The runtime type is Dictionary<int, PageAnalysis> (DocumentState._analysisCache).
+        if (doc.AnalysisCache is not Dictionary<int, PageAnalysis> mutable)
+            return;
+
+        var keysToRemove = new List<int>();
+        foreach (var kvp in mutable)
+        {
+            if (kvp.Key < lo || kvp.Key > hi)
+                keysToRemove.Add(kvp.Key);
+        }
+
+        foreach (var key in keysToRemove)
+            mutable.Remove(key);
+    }
 
     private const double BaseFontSize = 14.0;
 

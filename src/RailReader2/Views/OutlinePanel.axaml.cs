@@ -138,6 +138,10 @@ public partial class OutlinePanel : UserControl
                 if (IsFiguresTabActive) RefreshPeekIndex();
             }
         }
+        else if (args.PropertyName == nameof(MainWindowViewModel.IsScanAllActive))
+        {
+            OnScanAllStateChanged();
+        }
     }
 
     private TabViewModel? _watchedTab;

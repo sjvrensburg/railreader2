@@ -556,6 +556,18 @@ public partial class MainWindow : Window
     {
         if (Vm is not { } vm) { base.OnKeyDown(e); return; }
 
+        // During Scan All, only Escape is allowed (to cancel the scan).
+        // All other keyboard input is suppressed.
+        if (vm.IsScanAllActive)
+        {
+            if (e.Key == Key.Escape)
+            {
+                vm.CancelScanAll();
+                e.Handled = true;
+            }
+            return;
+        }
+
         if (e.KeyModifiers.HasFlag(KeyModifiers.Control) && HandleCtrlShortcut(vm, e))
             { RailToolBar.SyncState(); return; }
 

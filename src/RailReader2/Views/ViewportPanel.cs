@@ -60,7 +60,7 @@ public class ViewportPanel : Panel
     protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
     {
         base.OnPointerWheelChanged(e);
-        if (ViewModel is null) return;
+        if (ViewModel is null || ViewModel.IsScanAllActive) return;
 
         double scrollY = e.Delta.Y * 30.0;
         var pos = e.GetPosition(this);
@@ -73,6 +73,8 @@ public class ViewportPanel : Panel
     {
         base.OnPointerPressed(e);
         Focus();
+
+        if (ViewModel?.IsScanAllActive == true) return;
 
         var point = e.GetCurrentPoint(this);
 
@@ -133,7 +135,7 @@ public class ViewportPanel : Panel
     protected override void OnPointerMoved(PointerEventArgs e)
     {
         base.OnPointerMoved(e);
-        if (ViewModel is null) return;
+        if (ViewModel is null || ViewModel.IsScanAllActive) return;
 
         if (!_dragging)
         {
@@ -205,6 +207,7 @@ public class ViewportPanel : Panel
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
     {
         base.OnPointerReleased(e);
+        if (ViewModel?.IsScanAllActive == true) return;
         if (_dragging && ViewModel is not null)
         {
             var pos = e.GetPosition(this);

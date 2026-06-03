@@ -11,62 +11,86 @@ public sealed partial class MainWindowViewModel
 
     public void NavigateToBookmark(int index)
     {
+        if (IsScanAllActive) return;
         _controller.NavigateToBookmark(index);
         InvalidateAfterNavigation();
     }
 
     public void NavigateBack()
     {
+        if (IsScanAllActive) return;
         _controller.NavigateBack();
         InvalidateAfterNavigation();
     }
 
     public void NavigateForward()
     {
+        if (IsScanAllActive) return;
         _controller.NavigateForward();
         InvalidateAfterNavigation();
     }
 
     [RelayCommand]
     public void GoToPage(int page)
-        => Dispatch(() => _controller.GoToPage(page), InvalidateAfterNavigation);
+    {
+        if (IsScanAllActive) return;
+        Dispatch(() => _controller.GoToPage(page), InvalidateAfterNavigation);
+    }
 
     [RelayCommand]
     public void FitPage()
-        => Dispatch(_controller.FitPage, InvalidateCameraAndTab);
+    {
+        if (IsScanAllActive) return;
+        Dispatch(_controller.FitPage, InvalidateCameraAndTab);
+    }
 
     [RelayCommand]
     public void FitWidth()
-        => Dispatch(_controller.FitWidth, InvalidateCameraAndTab);
+    {
+        if (IsScanAllActive) return;
+        Dispatch(_controller.FitWidth, InvalidateCameraAndTab);
+    }
 
     // --- Camera ---
 
     public void HandleZoom(double scrollDelta, double cursorX, double cursorY, bool ctrlHeld)
-        => Dispatch(() => _controller.HandleZoom(scrollDelta, cursorX, cursorY, ctrlHeld), InvalidateCameraAndTab, animate: true);
+    {
+        if (IsScanAllActive) return;
+        Dispatch(() => _controller.HandleZoom(scrollDelta, cursorX, cursorY, ctrlHeld), InvalidateCameraAndTab, animate: true);
+    }
 
     public void HandlePan(double dx, double dy, bool ctrlHeld = false)
-        => Dispatch(() => _controller.HandlePan(dx, dy, ctrlHeld), InvalidateCameraAndTab);
+    {
+        if (IsScanAllActive) return;
+        Dispatch(() => _controller.HandlePan(dx, dy, ctrlHeld), InvalidateCameraAndTab);
+    }
 
     public void HandleZoomKey(bool zoomIn)
-        => Dispatch(() => _controller.HandleZoomKey(zoomIn), InvalidateCameraAndTab, animate: true);
+    {
+        if (IsScanAllActive) return;
+        Dispatch(() => _controller.HandleZoomKey(zoomIn), InvalidateCameraAndTab, animate: true);
+    }
 
     public void HandleResetZoom() => FitPage();
 
     // --- Rail navigation ---
 
     public void HandleArrowDown()
-        => Dispatch(_controller.HandleArrowDown, InvalidateNavigation);
+    {
+        if (IsScanAllActive) return;
+        Dispatch(_controller.HandleArrowDown, InvalidateNavigation);
+    }
 
     public void HandleArrowUp()
-        => Dispatch(_controller.HandleArrowUp, InvalidateNavigation);
+    {
+        if (IsScanAllActive) return;
+        Dispatch(_controller.HandleArrowUp, InvalidateNavigation);
+    }
 
     public void HandleArrowRight(bool shortJump = false)
     {
+        if (IsScanAllActive) return;
         _controller.HandleArrowRight(shortJump);
-        // In rail mode, the animation loop drives all camera updates via Tick().
-        // Key repeats only keep StartScroll alive (a no-op when direction unchanged).
-        // Calling InvalidateCamera here would redundantly update the MatrixTransform
-        // at key-repeat rate (~30-40 Hz) on top of the animation frame updates.
         if (ActiveTab?.Rail.Active != true)
             InvalidateCamera();
         RequestAnimationFrame();
@@ -74,6 +98,7 @@ public sealed partial class MainWindowViewModel
 
     public void HandleArrowLeft(bool shortJump = false)
     {
+        if (IsScanAllActive) return;
         _controller.HandleArrowLeft(shortJump);
         if (ActiveTab?.Rail.Active != true)
             InvalidateCamera();
@@ -81,16 +106,26 @@ public sealed partial class MainWindowViewModel
     }
 
     public void HandleLineHome()
-        => Dispatch(_controller.HandleLineHome, InvalidateCameraAndTab);
+    {
+        if (IsScanAllActive) return;
+        Dispatch(_controller.HandleLineHome, InvalidateCameraAndTab);
+    }
 
     public void HandleLineEnd()
-        => Dispatch(_controller.HandleLineEnd, InvalidateCameraAndTab);
+    {
+        if (IsScanAllActive) return;
+        Dispatch(_controller.HandleLineEnd, InvalidateCameraAndTab);
+    }
 
     public void HandleArrowRelease(bool isHorizontal)
-        => Dispatch(() => _controller.HandleArrowRelease(isHorizontal), animate: true);
+    {
+        if (IsScanAllActive) return;
+        Dispatch(() => _controller.HandleArrowRelease(isHorizontal), animate: true);
+    }
 
     public void HandleClick(double canvasX, double canvasY)
     {
+        if (IsScanAllActive) return;
         var (handled, link) = _controller.HandleClick(canvasX, canvasY);
         if (link is UriDestination uriDest)
         {
