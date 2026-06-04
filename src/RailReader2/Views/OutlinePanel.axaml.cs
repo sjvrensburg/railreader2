@@ -85,6 +85,7 @@ public partial class OutlinePanel : UserControl
             _vm.PropertyChanged -= OnVmPropertyChanged;
             _vm.PropertyChanged -= OnVmScanProgressChanged;
             _vm.SearchRequested -= OnSearchRequested;
+            _vm.PaneRequested -= OnPaneRequested;
             _vm.AnnotationsMutated -= OnAnnotationsMutated;
         }
         if (_watchedTab is not null)
@@ -104,12 +105,25 @@ public partial class OutlinePanel : UserControl
         {
             _vm.PropertyChanged += OnVmPropertyChanged;
             _vm.SearchRequested += OnSearchRequested;
+            _vm.PaneRequested += OnPaneRequested;
             _vm.AnnotationsMutated += OnAnnotationsMutated;
             WatchActiveTabPage();
             UpdateOutlineSource();
             SyncOutlineToPage();
             UpdateBookmarkSource();
             SubscribePeekUpdates();
+        }
+    }
+
+    private void OnPaneRequested(SidePane pane)
+    {
+        switch (pane)
+        {
+            case SidePane.Outline: SwitchToOutlineTab(); break;
+            case SidePane.Bookmarks: SwitchToBookmarksTab(); break;
+            case SidePane.Index: SwitchToFiguresTab(); break;
+            case SidePane.Search: SwitchToSearchTab(); break;
+            case SidePane.Comments: SwitchToCommentsTab(); break;
         }
     }
 

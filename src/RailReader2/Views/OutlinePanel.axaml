@@ -3,17 +3,23 @@
              xmlns:vm="using:RailReader2.ViewModels"
              xmlns:m="using:RailReader.Core.Models"
              xmlns:v="using:RailReader2.Views"
+             xmlns:c="using:RailReader2.Controls"
+             xmlns:a="using:Avalonia.Automation"
              x:Class="RailReader2.Views.OutlinePanel"
              x:DataType="vm:MainWindowViewModel">
     <DockPanel>
         <!-- Close button at the top -->
         <Button DockPanel.Dock="Top"
-                Content="&#x2715; Close"
                 HorizontalAlignment="Right"
                 Padding="8,2"
                 Margin="4,2"
                 Opacity="0.7"
-                Click="OnClosePanelClick" />
+                Click="OnClosePanelClick">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+                <c:Icon Data="{StaticResource IconClose}" />
+                <TextBlock Text="Close" VerticalAlignment="Center" />
+            </StackPanel>
+        </Button>
 
         <TabControl Name="PaneTabs">
         <!-- Outline tab -->
@@ -41,13 +47,17 @@
                     <StackPanel>
                         <!-- Back to previous location -->
                         <Button Name="BackButton"
-                                Content="&#x2190; Back to previous location"
                                 IsVisible="False"
                                 HorizontalAlignment="Stretch"
                                 HorizontalContentAlignment="Left"
                                 Margin="4,0,4,4" Padding="8,6"
                                 FontStyle="Italic" Opacity="0.8"
-                                Click="OnBackClick" />
+                                Click="OnBackClick">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <c:Icon Data="{StaticResource IconBack}" />
+                                <TextBlock Text="Back to previous location" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
                         <!-- Use ItemsControl instead of ListBox to avoid SelectionChanged issues -->
                         <ItemsControl Name="BookmarkList">
                             <ItemsControl.ItemTemplate>
@@ -171,13 +181,15 @@
                 <StackPanel DockPanel.Dock="Top" Margin="4">
                     <DockPanel>
                         <Button DockPanel.Dock="Right"
-                                Content="&#x2715;"
                                 ToolTip.Tip="Clear Search (Esc)"
+                                a:AutomationProperties.Name="Clear search"
                                 Width="26" Height="26"
                                 HorizontalContentAlignment="Center"
                                 VerticalContentAlignment="Center"
                                 Padding="0" Margin="4,0,0,0"
-                                Click="OnClearSearchClick" />
+                                Click="OnClearSearchClick">
+                            <c:Icon Data="{StaticResource IconClose}" />
+                        </Button>
                         <TextBox Name="SearchInput" PlaceholderText="Find..." />
                     </DockPanel>
                     <StackPanel Orientation="Horizontal" Spacing="4" Margin="0,4,0,0">
@@ -201,21 +213,25 @@
                                    Opacity="0.7"
                                    Margin="4,0" />
                         <Button Name="PrevMatchBtn"
-                                Content="&#x25B2;"
                                 ToolTip.Tip="Previous Match"
+                                a:AutomationProperties.Name="Previous match"
                                 Width="26" Height="26"
                                 HorizontalContentAlignment="Center"
                                 VerticalContentAlignment="Center"
                                 Padding="0"
-                                Click="OnPrevMatchClick" />
+                                Click="OnPrevMatchClick">
+                            <c:Icon Data="{StaticResource IconChevronUp}" />
+                        </Button>
                         <Button Name="NextMatchBtn"
-                                Content="&#x25BC;"
                                 ToolTip.Tip="Next Match"
+                                a:AutomationProperties.Name="Next match"
                                 Width="26" Height="26"
                                 HorizontalContentAlignment="Center"
                                 VerticalContentAlignment="Center"
                                 Padding="0"
-                                Click="OnNextMatchClick" />
+                                Click="OnNextMatchClick">
+                            <c:Icon Data="{StaticResource IconChevronDown}" />
+                        </Button>
                     </StackPanel>
                 </StackPanel>
 

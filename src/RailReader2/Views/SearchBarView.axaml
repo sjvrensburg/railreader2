@@ -1,6 +1,8 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:RailReader2.ViewModels"
+             xmlns:c="using:RailReader2.Controls"
+             xmlns:a="using:Avalonia.Automation"
              x:Class="RailReader2.Views.SearchBarView"
              x:DataType="vm:MainWindowViewModel">
     <UserControl.Styles>
@@ -82,31 +84,34 @@
                        Margin="4,0" />
             <Button Name="PrevButton"
                     Classes="searchBtn"
-                    Content="&#x25B2;"
                     ToolTip.Tip="Previous Match (Shift+Enter)"
+                    a:AutomationProperties.Name="Previous match"
                     Width="28" Height="28"
-                    FontSize="11"
                     HorizontalContentAlignment="Center"
                     VerticalContentAlignment="Center"
-                    Padding="0" />
+                    Padding="0">
+                <c:Icon Data="{StaticResource IconChevronUp}" />
+            </Button>
             <Button Name="NextButton"
                     Classes="searchBtn"
-                    Content="&#x25BC;"
                     ToolTip.Tip="Next Match (Enter)"
+                    a:AutomationProperties.Name="Next match"
                     Width="28" Height="28"
-                    FontSize="11"
                     HorizontalContentAlignment="Center"
                     VerticalContentAlignment="Center"
-                    Padding="0" />
+                    Padding="0">
+                <c:Icon Data="{StaticResource IconChevronDown}" />
+            </Button>
             <Button Name="CloseButton"
                     Classes="searchBtn"
-                    Content="&#x2715;"
                     ToolTip.Tip="Close (Escape)"
+                    a:AutomationProperties.Name="Close search"
                     Width="28" Height="28"
-                    FontSize="11"
                     HorizontalContentAlignment="Center"
                     VerticalContentAlignment="Center"
-                    Padding="0" />
+                    Padding="0">
+                <c:Icon Data="{StaticResource IconClose}" />
+            </Button>
         </StackPanel>
     </Border>
 </UserControl>

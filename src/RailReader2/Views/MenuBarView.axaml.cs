@@ -72,6 +72,17 @@ public partial class MenuBarView : UserControl
 
     private void OnToggleOutline(object? s, RoutedEventArgs e)
     { if (Vm is { } vm) vm.ShowOutline = !vm.ShowOutline; }
+
+    // Side-panel pane navigation (View > Side Panel) — shows the panel and switches tab.
+    private void OnShowOutlinePane(object? s, RoutedEventArgs e) => Vm?.ShowPane(SidePane.Outline);
+    private void OnShowBookmarksPane(object? s, RoutedEventArgs e) => Vm?.ShowPane(SidePane.Bookmarks);
+    private void OnShowIndexPane(object? s, RoutedEventArgs e) => Vm?.ShowPane(SidePane.Index);
+    private void OnShowCommentsPane(object? s, RoutedEventArgs e) => Vm?.ShowPane(SidePane.Comments);
+    private void OnShowSearchPane(object? s, RoutedEventArgs e)
+    { if (Vm is { } vm) { vm.ShowOutline = true; vm.OpenSearch(); } }
+    private void OnHidePanel(object? s, RoutedEventArgs e)
+    { if (Vm is { } vm) vm.ShowOutline = false; }
+
     private void OnToggleMinimap(object? s, RoutedEventArgs e)
     { if (Vm is { } vm) vm.ShowMinimap = !vm.ShowMinimap; }
     private void OnToggleFullscreen(object? s, RoutedEventArgs e)

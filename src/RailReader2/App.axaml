@@ -3,7 +3,11 @@
              x:Class="RailReader2.App"
              RequestedThemeVariant="Default">
     <Application.Resources>
-        <FontFamily x:Key="FaFont">avares://RailReader2/Assets/fa-solid-900.ttf#Font Awesome 6 Free Solid</FontFamily>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceInclude Source="avares://RailReader2/Assets/Icons.axaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
     </Application.Resources>
     <Application.Styles>
         <FluentTheme />
