@@ -55,10 +55,34 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     [ObservableProperty] private bool _isFullScreen;
     [ObservableProperty] private bool _showFullScreenHeader;
     [ObservableProperty] private bool _showFullScreenFooter;
-    [ObservableProperty] private bool _isRadialMenuOpen;
     [ObservableProperty] private bool _showBookmarkDialog;
-    [ObservableProperty] private double _radialMenuX;
-    [ObservableProperty] private double _radialMenuY;
+
+    /// <summary>
+    /// When true, the annotation toolbar's tool section is shown and annotation
+    /// editing gestures are active. Text selection/copy remain available outside
+    /// this mode. Toggled via the toolbar, the right-click menu, Ctrl+E, the Edit
+    /// menu, or implicitly by picking an annotation tool (keys 1–5).
+    /// </summary>
+    [ObservableProperty] private bool _isAnnotationMode;
+
+    partial void OnIsAnnotationModeChanged(bool value)
+    {
+        if (!value)
+        {
+            // Leaving annotation mode: drop any active tool and selected annotation
+            // so the viewport returns to plain browse/pan. Entering preserves any
+            // current text selection so markup can be applied immediately.
+            SetAnnotationTool(AnnotationTool.None);
+            SelectedAnnotation = null;
+            OnPropertyChanged(nameof(SelectedAnnotation));
+            InvalidateAnnotations();
+        }
+    }
+
+    /// <summary>Raised after any annotation content mutation (add/edit/delete/undo/
+    /// import/review-state) so views like the Comments panel can refresh.</summary>
+    public event Action? AnnotationsMutated;
+    internal void NotifyAnnotationsMutated() => AnnotationsMutated?.Invoke();
 
     // --- Scan All (whole-document figure discovery) ---
     [ObservableProperty] private bool _isScanAllActive;

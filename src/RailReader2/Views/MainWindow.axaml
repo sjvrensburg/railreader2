@@ -2,7 +2,6 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:RailReader2.ViewModels"
         xmlns:v="using:RailReader2.Views"
-        xmlns:c="using:RailReader2.Controls"
         x:Class="RailReader2.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Title="railreader2"
@@ -68,21 +67,13 @@
                     <v:MinimapControl Name="Minimap"
                                       IsVisible="{Binding ShowMinimap}" />
 
-                    <!-- Toolbar overlay (Browse/Select/Copy) -->
+                    <!-- Annotation toolbar overlay (always-on Browse/Select/Copy + Annotate,
+                         expanding to the tool set when annotation mode is active) -->
                     <v:ToolBarView Name="ToolBar"
                                    VerticalAlignment="Top"
                                    HorizontalAlignment="Left"
                                    Margin="16,4,0,0"
                                    IsVisible="{Binding Tabs.Count}" />
-
-                    <!-- Radial annotation menu (screen-space overlay) -->
-                    <Canvas Name="RadialMenuCanvas"
-                            IsHitTestVisible="{Binding IsRadialMenuOpen}"
-                            IsVisible="{Binding IsRadialMenuOpen}">
-                        <c:RadialMenu Name="RadialMenuControl"
-                                      Canvas.Left="{Binding RadialMenuX}"
-                                      Canvas.Top="{Binding RadialMenuY}" />
-                    </Canvas>
 
                     <!-- Welcome text when no document open -->
                     <TextBlock Name="WelcomeText"

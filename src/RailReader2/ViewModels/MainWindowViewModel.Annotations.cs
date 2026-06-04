@@ -1,5 +1,6 @@
 using Avalonia.Platform.Storage;
 using CommunityToolkit.Mvvm.Input;
+using RailReader.Core;
 using RailReader.Core.Models;
 using RailReader.Core.Services;
 using RailReader.Renderer.Skia;
@@ -7,32 +8,83 @@ using RailReader2.Views;
 
 namespace RailReader2.ViewModels;
 
-// Annotations: radial menu, tools, pointer handlers, browse mode, undo/redo, export/import
+// Annotations: mode, tools, markup, pointer handlers, browse mode, undo/redo, review state, export/import
 public sealed partial class MainWindowViewModel
 {
-    public void OpenRadialMenu(double screenX, double screenY)
-    {
-        double menuSize = 210 * AppConfig.UiFontScale;
-        RadialMenuX = screenX - menuSize / 2;
-        RadialMenuY = screenY - menuSize / 2;
-        IsRadialMenuOpen = true;
-    }
-
-    public void CloseRadialMenu() => IsRadialMenuOpen = false;
+    public void ToggleAnnotationMode() => IsAnnotationMode = !IsAnnotationMode;
 
     public void SetAnnotationTool(AnnotationTool tool)
     {
+        // Picking a real annotation tool implies annotation mode; Browse/TextSelect do not.
+        if (tool is not AnnotationTool.None and not AnnotationTool.TextSelect)
+            IsAnnotationMode = true;
+
         _controller.Annotations.SetAnnotationTool(tool);
 
         if (tool != AnnotationTool.TextSelect)
         {
             OnPropertyChanged(nameof(SelectedText));
+            OnPropertyChanged(nameof(TextSelectionRects));
             InvalidateAnnotations();
         }
 
-        CloseRadialMenu();
         OnPropertyChanged(nameof(IsAnnotating));
         OnPropertyChanged(nameof(ActiveTool));
+    }
+
+    /// <summary>Sets a comment's review state (Accepted/Rejected/etc.) as an undoable
+    /// edit. Core writes /State to the PDF on save; the undo action is railreader2-side.</summary>
+    public void SetReviewState(Annotation ann, ReviewState newState)
+    {
+        if (_controller.ActiveDocument is not { } doc) return;
+        if (ann.State == newState) return;
+
+        var action = new ChangeReviewStateAction(ann, ann.State, newState);
+        ann.State = newState;
+        ann.ModifiedUtc = DateTimeOffset.UtcNow;
+        doc.PushUndoAction(action);
+
+        OnPropertyChanged(nameof(SelectedAnnotation));
+        NotifyAnnotationsMutated();
+        InvalidateAnnotations();
+    }
+
+    /// <summary>Navigate to a comment: jump to its page, select it, and recenter on it.</summary>
+    public void NavigateToAnnotation(int page, Annotation ann)
+    {
+        if (IsScanAllActive) return;
+        GoToPage(page);
+        SelectedAnnotation = ann;
+        ScrollToAnnotation(ann);
+        OnPropertyChanged(nameof(SelectedAnnotation));
+        InvalidateAnnotations();
+    }
+
+    /// <summary>Center the view on an annotation. In rail mode the rail owns the camera,
+    /// so drive the rail to the block and snap horizontally (mirrors search navigation);
+    /// otherwise recenter the camera directly.</summary>
+    public void ScrollToAnnotation(Annotation ann)
+    {
+        if (_controller.ActiveDocument is not { } doc) return;
+        if (AnnotationGeometry.GetAnnotationBounds(ann) is not { } b) return;
+
+        var (ww, wh) = _controller.GetViewportSize();
+        double centerX = (b.Left + b.Right) / 2.0;
+        double centerY = (b.Top + b.Bottom) / 2.0;
+
+        if (doc.Rail.Active && doc.Rail.HasAnalysis)
+        {
+            doc.Rail.FindBlockNearPoint(centerX, centerY);
+            doc.Rail.StartSnapToPoint(doc.Camera.OffsetX, doc.Camera.OffsetY, doc.Camera.Zoom, ww, wh, centerX);
+            RequestAnimationFrame();
+        }
+        else
+        {
+            doc.Camera.OffsetX = ww / 2.0 - centerX * doc.Camera.Zoom;
+            doc.Camera.OffsetY = wh / 2.0 - centerY * doc.Camera.Zoom;
+            doc.ClampCamera(ww, wh);
+        }
+        InvalidateCameraAndTab();
     }
 
     public void CancelAnnotationTool()
@@ -74,7 +126,32 @@ public sealed partial class MainWindowViewModel
     public void HandleAnnotationPointerUp(double pageX, double pageY)
     {
         if (_controller.Annotations.HandleAnnotationPointerUp(_controller.ActiveDocument, pageX, pageY))
+        {
             InvalidateAnnotations();
+            NotifyAnnotationsMutated();
+        }
+
+        // FreeText tool: Core finalised a box and is waiting for the UI to supply its text.
+        if (_controller.Annotations.PendingFreeText is not null)
+            FireAndForget(CompletePendingFreeText(), nameof(CompletePendingFreeText));
+    }
+
+    private async Task CompletePendingFreeText()
+    {
+        if (_window is null) { _controller.Annotations.CancelPendingFreeText(); return; }
+
+        var dialog = new TextNoteDialog { FontSize = CurrentFontSize };
+        var result = await dialog.ShowDialog<string?>(_window);
+        if (string.IsNullOrEmpty(result))
+        {
+            _controller.Annotations.CancelPendingFreeText();
+        }
+        else
+        {
+            _controller.Annotations.CommitPendingFreeText(_controller.ActiveDocument, result);
+            NotifyAnnotationsMutated();
+        }
+        InvalidateAnnotations();
     }
 
     private async Task CreateTextNote(float pageX, float pageY)
@@ -86,6 +163,7 @@ public sealed partial class MainWindowViewModel
 
         _controller.Annotations.CompleteTextNote(_controller.ActiveDocument, pageX, pageY, result);
         InvalidateAnnotations();
+        NotifyAnnotationsMutated();
     }
 
     private async Task EditTextNote(TextNoteAnnotation note)
@@ -97,6 +175,7 @@ public sealed partial class MainWindowViewModel
 
         _controller.Annotations.CompleteTextNoteEdit(_controller.ActiveDocument, note, result);
         InvalidateAnnotations();
+        NotifyAnnotationsMutated();
     }
 
     // --- Browse-mode annotation interaction ---
@@ -149,7 +228,6 @@ public sealed partial class MainWindowViewModel
     public void CopySelectedText()
     {
         _controller.Annotations.CopySelectedText();
-        CloseRadialMenu();
     }
 
     public void DeleteSelectedAnnotation()
@@ -158,6 +236,7 @@ public sealed partial class MainWindowViewModel
         {
             OnPropertyChanged(nameof(SelectedAnnotation));
             InvalidateAnnotations();
+            NotifyAnnotationsMutated();
         }
     }
 
@@ -165,12 +244,14 @@ public sealed partial class MainWindowViewModel
     {
         _controller.Annotations.UndoAnnotation(_controller.ActiveDocument);
         InvalidateAnnotations();
+        NotifyAnnotationsMutated();
     }
 
     public void RedoAnnotation()
     {
         _controller.Annotations.RedoAnnotation(_controller.ActiveDocument);
         InvalidateAnnotations();
+        NotifyAnnotationsMutated();
     }
 
     [RelayCommand]
@@ -262,6 +343,7 @@ public sealed partial class MainWindowViewModel
             int added = AnnotationService.MergeInto(tab.State.Annotations, imported);
             tab.State.MarkAnnotationsDirty();
             InvalidateAnnotations();
+            NotifyAnnotationsMutated();
             ShowStatusToast(added > 0
                 ? $"Imported {added} annotation(s) from {Path.GetFileName(inputPath)}"
                 : "No new annotations found in file");

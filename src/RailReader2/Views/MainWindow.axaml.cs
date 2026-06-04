@@ -5,7 +5,6 @@ using Avalonia.Input.Platform;
 using RailReader.Core;
 using RailReader.Core.Models;
 using RailReader.Renderer.Skia;
-using RailReader2.Controls;
 using RailReader2.ViewModels;
 using SkiaSharp;
 
@@ -68,7 +67,7 @@ public partial class MainWindow : Window
             Viewport.SizeChanged += OnViewportSizeChanged;
 
             UpdateLayerBindings(vm.ActiveTab);
-            SetupRadialMenu(vm);
+            SetupClipboardAndToolBar(vm);
             RailToolBar.ViewModel = vm;
             RailToolBar.SyncFromConfig();
 
@@ -224,10 +223,8 @@ public partial class MainWindow : Window
         }
     }
 
-    private void SetupRadialMenu(MainWindowViewModel vm)
+    private void SetupClipboardAndToolBar(MainWindowViewModel vm)
     {
-        RadialMenuControl.Scale = vm.AppConfig.UiFontScale;
-
         vm.CopyToClipboard = async text =>
         {
             var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
@@ -250,68 +247,6 @@ public partial class MainWindow : Window
         };
 
         ToolBar.ViewModel = vm;
-
-        var highlightColors = BuildColorOptions(vm, AnnotationTool.Highlight, AnnotationInteractionHandler.HighlightColors, 0);
-        var penColors = BuildColorOptions(vm, AnnotationTool.Pen, AnnotationInteractionHandler.PenColors, 1);
-        var rectColors = BuildColorOptions(vm, AnnotationTool.Rectangle, AnnotationInteractionHandler.RectColors, 3);
-        var penThickness = BuildThicknessOptions(vm, AnnotationTool.Pen, 1);
-        var rectThickness = BuildThicknessOptions(vm, AnnotationTool.Rectangle, 3);
-
-        var segments = new List<RadialMenu.Segment>
-        {
-            new("Highlight", RadialMenu.IconChars.Highlighter,
-                () => vm.SetAnnotationTool(AnnotationTool.Highlight),
-                highlightColors, vm.Controller.Annotations.GetAnnotationColorIndex(AnnotationTool.Highlight)),
-            new("Pen", RadialMenu.IconChars.Pen,
-                () => vm.SetAnnotationTool(AnnotationTool.Pen),
-                penColors, vm.Controller.Annotations.GetAnnotationColorIndex(AnnotationTool.Pen),
-                penThickness, vm.Controller.Annotations.GetThicknessIndex(AnnotationTool.Pen)),
-            new("Text", RadialMenu.IconChars.TextHeight,
-                () => vm.SetAnnotationTool(AnnotationTool.TextNote)),
-            new("Rect", RadialMenu.IconChars.Square,
-                () => vm.SetAnnotationTool(AnnotationTool.Rectangle),
-                rectColors, vm.Controller.Annotations.GetAnnotationColorIndex(AnnotationTool.Rectangle),
-                rectThickness, vm.Controller.Annotations.GetThicknessIndex(AnnotationTool.Rectangle)),
-            new("Eraser", RadialMenu.IconChars.Eraser,
-                () => vm.SetAnnotationTool(AnnotationTool.Eraser)),
-        };
-        RadialMenuControl.SetSegments(segments, onClose: () => vm.CloseRadialMenu());
-    }
-
-    private List<RadialMenu.ColorOption> BuildColorOptions(
-        MainWindowViewModel vm, AnnotationTool tool,
-        (string Color, float Opacity)[] palette, int segmentIndex)
-    {
-        var options = new List<RadialMenu.ColorOption>(palette.Length);
-        for (int i = 0; i < palette.Length; i++)
-        {
-            int idx = i;
-            var (color, opacity) = palette[i];
-            options.Add(new RadialMenu.ColorOption(color, opacity, () =>
-            {
-                vm.Controller.Annotations.SetAnnotationColorIndex(tool, idx);
-                vm.SetAnnotationTool(tool);
-                RadialMenuControl.UpdateSegmentColorIndex(segmentIndex, idx);
-            }));
-        }
-        return options;
-    }
-
-    private List<RadialMenu.ThicknessOption> BuildThicknessOptions(
-        MainWindowViewModel vm, AnnotationTool tool, int segmentIndex)
-    {
-        var presets = AnnotationInteractionHandler.ThicknessPresets;
-        var options = new List<RadialMenu.ThicknessOption>(presets.Length);
-        for (int i = 0; i < presets.Length; i++)
-        {
-            int idx = i;
-            options.Add(new RadialMenu.ThicknessOption(presets[i], () =>
-            {
-                vm.Controller.Annotations.SetThicknessIndex(tool, idx);
-                RadialMenuControl.UpdateSegmentThicknessIndex(segmentIndex, idx);
-            }));
-        }
-        return options;
     }
 
     private void UpdateLayerBindings(TabViewModel? tab)
@@ -646,6 +581,8 @@ public partial class MainWindow : Window
                 e.Handled = true; return true;
             case Key.G:
                 vm.ShowGoToPage = true; e.Handled = true; return true;
+            case Key.E:
+                vm.ToggleAnnotationMode(); e.Handled = true; return true;
             case Key.Z when shift:
                 vm.RedoAnnotation(); e.Handled = true; return true;
             case Key.Z:
@@ -790,10 +727,10 @@ public partial class MainWindow : Window
                 vm.StopAutoScroll(); e.Handled = true; return true;
             case Key.Escape when vm.IsFullScreen:
                 vm.IsFullScreen = false; e.Handled = true; return true;
-            case Key.Escape when vm.IsRadialMenuOpen:
-                vm.CloseRadialMenu(); e.Handled = true; return true;
             case Key.Escape when vm.IsAnnotating:
                 vm.CancelAnnotationTool(); e.Handled = true; return true;
+            case Key.Escape when vm.IsAnnotationMode:
+                vm.IsAnnotationMode = false; e.Handled = true; return true;
             case Key.Escape when vm.ShowOutline && OutlinePanel.IsSearchTabActive:
                 vm.CloseSearch();
                 OutlinePanel.SwitchToOutlineTab();
