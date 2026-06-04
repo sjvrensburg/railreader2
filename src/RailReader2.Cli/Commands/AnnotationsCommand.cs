@@ -28,7 +28,7 @@ public static class AnnotationsCommand
         if (format is not "json" and not "pdf")
             return Program.Fail($"Unknown format '{format}'. Valid options: json, pdf");
 
-        var annotations = AnnotationService.Default.Load(pdfPath);
+        var annotations = CompositeAnnotationStore.Default.Load(pdfPath);
         if (annotations == null)
         {
             Console.Error.WriteLine("No annotations found for this document.");
@@ -163,42 +163,68 @@ public static class AnnotationsCommand
 
     static AnnotationOutput SerializeAnnotation(Annotation ann)
     {
-        if (ann is HighlightAnnotation h)
+        // Subtype-specific geometry first; shared metadata is applied below for every subtype.
+        var output = ann switch
         {
-            return new AnnotationOutput
+            // Highlight/Underline/StrikeOut/Squiggly all derive from TextMarkupAnnotation (Rects).
+            TextMarkupAnnotation m => new AnnotationOutput
             {
-                Type = "highlight", Color = ann.Color, Opacity = ann.Opacity,
-                Rects = h.Rects.Select(r => new RectOutput(r.X, r.Y, r.W, r.H)).ToList()
-            };
-        }
-        if (ann is FreehandAnnotation f)
-        {
-            return new AnnotationOutput
+                Type = TextMarkupType(m),
+                Rects = m.Rects.Select(r => new RectOutput(r.X, r.Y, r.W, r.H)).ToList()
+            },
+            FreehandAnnotation f => new AnnotationOutput
             {
-                Type = "freehand", Color = ann.Color, Opacity = ann.Opacity,
+                Type = "freehand",
                 StrokeWidth = f.StrokeWidth,
                 Points = f.Points.Select(p => new PointOutput(p.X, p.Y)).ToList()
-            };
-        }
-        if (ann is TextNoteAnnotation t)
-        {
-            return new AnnotationOutput
+            },
+            TextNoteAnnotation t => new AnnotationOutput
             {
-                Type = "text_note", Color = ann.Color, Opacity = ann.Opacity,
+                Type = "text_note",
                 X = t.X, Y = t.Y, NoteText = t.Text
-            };
-        }
-        if (ann is RectAnnotation r)
-        {
-            return new AnnotationOutput
+            },
+            RectAnnotation r => new AnnotationOutput
             {
-                Type = "rect", Color = ann.Color, Opacity = ann.Opacity,
+                Type = "rect",
                 X = r.X, Y = r.Y, W = r.W, H = r.H,
                 StrokeWidth = r.StrokeWidth, Filled = r.Filled
-            };
-        }
-        return new AnnotationOutput { Type = "unknown", Color = ann.Color, Opacity = ann.Opacity };
+            },
+            // Caret is read-only (PDFium can't create them); FreeText's text lives in Contents.
+            CaretAnnotation c => new AnnotationOutput
+            {
+                Type = "caret",
+                X = c.X, Y = c.Y, W = c.W, H = c.H
+            },
+            FreeTextAnnotation ft => new AnnotationOutput
+            {
+                Type = "free_text",
+                X = ft.X, Y = ft.Y, W = ft.W, H = ft.H
+            },
+            _ => new AnnotationOutput { Type = "unknown" }
+        };
+
+        output.Color = ann.Color;
+        output.Opacity = ann.Opacity;
+        // Round-trip metadata (null fields are omitted via WhenWritingNull).
+        output.Author = ann.Author;
+        output.Contents = ann.Contents;
+        output.Subject = ann.Subject;
+        output.NativeId = ann.NativeId;
+        output.CreatedUtc = ann.CreatedUtc;
+        output.ModifiedUtc = ann.ModifiedUtc;
+        output.State = ann.State == ReviewState.None ? null : ann.State.ToString();
+        output.Source = ann.Source.ToString();
+        output.InReplyTo = ann.InReplyTo;
+        return output;
     }
+
+    static string TextMarkupType(TextMarkupAnnotation m) => m switch
+    {
+        UnderlineAnnotation => "underline",
+        StrikeOutAnnotation => "strikeout",
+        SquigglyAnnotation => "squiggly",
+        _ => "highlight",
+    };
 
     static HeadingOutput? FindNearestHeading(RectF? annBounds, int pageIdx,
         HeadingOutput? pageOutlineHeading, PageAnalysis? analysis)
@@ -308,6 +334,16 @@ public class AnnotationOutput
     [JsonPropertyName("note_text")]
     public string? NoteText { get; set; }
     public string? Text { get; set; }
+    // Native-PDF round-trip metadata (0.17.0). Null fields are omitted.
+    public string? Author { get; set; }
+    public string? Contents { get; set; }
+    public string? Subject { get; set; }
+    public string? NativeId { get; set; }
+    public DateTimeOffset? CreatedUtc { get; set; }
+    public DateTimeOffset? ModifiedUtc { get; set; }
+    public string? State { get; set; }
+    public string? Source { get; set; }
+    public string? InReplyTo { get; set; }
     public List<AnnotationBlockOutput> OverlappingBlocks { get; set; } = [];
     public HeadingOutput? NearestHeading { get; set; }
 }

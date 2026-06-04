@@ -170,7 +170,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         _appConfig = config;
         _logger = logger ?? RailReaderLogging.Logger;
         ColourEffects = new ColourEffectShaders(_logger);
-        _controller = new DocumentController(config.ToCoreSettings(), config, AnnotationService.Default,
+        _controller = new DocumentController(config.ToCoreSettings(), config, CompositeAnnotationStore.Default,
             new AvaloniaThreadMarshaller(), new RailReader.Renderer.Skia.SkiaPdfServiceFactory(), _logger);
         try
         {
@@ -185,6 +185,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         catch (Exception ex) { _logger.Error("[ONNX] Worker init failed", ex); }
         _controller.StateChanged += OnControllerStateChanged;
         _controller.StatusMessage += ShowStatusToast;
+        WireAnnotationStoreSignals();
         SetupPollTimer();
     }
 
@@ -348,6 +349,26 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             Dispatcher.UIThread.Post(() => StatusToast = null),
             null, 1500, Timeout.Infinite);
     }
+
+    // CompositeAnnotationStore.Default is a process-global singleton and its two signals are
+    // settable Action properties (not events) — assign once here. A save can complete off the
+    // UI thread, so marshal before touching the toast. Desktop-only: the CLI/Export hosts only
+    // Load, never Save, so they never raise these.
+    private void WireAnnotationStoreSignals()
+    {
+        CompositeAnnotationStore.Default.OnSidecarFallback = (_, reason) =>
+            Dispatcher.UIThread.Post(() => ShowStatusToast(SidecarFallbackMessage(reason)));
+        CompositeAnnotationStore.Default.OnSidecarMigration = _ =>
+            Dispatcher.UIThread.Post(() => ShowStatusToast(
+                "Your private notes will be written into this PDF the next time it is saved."));
+    }
+
+    private static string SidecarFallbackMessage(SidecarFallbackReason reason) => reason switch
+    {
+        SidecarFallbackReason.ReadOnly => "Annotations stored separately — this PDF is read-only.",
+        SidecarFallbackReason.Signed => "Annotations stored separately — this PDF is signed.",
+        _ => "Annotations stored separately from this PDF.",
+    };
 
     // --- Config ---
 
