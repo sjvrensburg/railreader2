@@ -13,11 +13,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="RailReader.Core" Version="0.18.0" />
-    <PackageReference Include="RailReader.Core.Pdfium" Version="0.18.0" />
-    <PackageReference Include="RailReader.Core.Analysis" Version="0.18.0" />
-    <PackageReference Include="RailReader.Renderer.Skia" Version="0.18.0" />
-    <PackageReference Include="RailReader.Core.Vlm.OpenAI" Version="0.18.0" />
+    <PackageReference Include="RailReader.Core" Version="0.18.1" />
+    <PackageReference Include="RailReader.Core.Pdfium" Version="0.18.1" />
+    <PackageReference Include="RailReader.Core.Analysis" Version="0.18.1" />
+    <PackageReference Include="RailReader.Renderer.Skia" Version="0.18.1" />
+    <PackageReference Include="RailReader.Core.Vlm.OpenAI" Version="0.18.1" />
   </ItemGroup>
 
 </Project>

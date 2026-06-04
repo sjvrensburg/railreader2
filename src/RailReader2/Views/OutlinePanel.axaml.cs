@@ -85,6 +85,7 @@ public partial class OutlinePanel : UserControl
             _vm.PropertyChanged -= OnVmPropertyChanged;
             _vm.PropertyChanged -= OnVmScanProgressChanged;
             _vm.SearchRequested -= OnSearchRequested;
+            _vm.AnnotationsMutated -= OnAnnotationsMutated;
         }
         if (_watchedTab is not null)
         {
@@ -103,6 +104,7 @@ public partial class OutlinePanel : UserControl
         {
             _vm.PropertyChanged += OnVmPropertyChanged;
             _vm.SearchRequested += OnSearchRequested;
+            _vm.AnnotationsMutated += OnAnnotationsMutated;
             WatchActiveTabPage();
             UpdateOutlineSource();
             SyncOutlineToPage();
@@ -138,6 +140,8 @@ public partial class OutlinePanel : UserControl
                 ClearThumbnailCache();
                 if (IsFiguresTabActive) RefreshPeekIndex();
             }
+
+            if (IsCommentsTabActive) RefreshComments();
         }
         else if (args.PropertyName == nameof(MainWindowViewModel.IsScanAllActive))
         {
@@ -231,11 +235,13 @@ public partial class OutlinePanel : UserControl
     public bool IsBookmarksTabActive => PaneTabs.SelectedIndex == 1;
     public bool IsFiguresTabActive => PaneTabs.SelectedIndex == 2;
     public bool IsSearchTabActive => PaneTabs.SelectedIndex == 3;
+    public bool IsCommentsTabActive => PaneTabs.SelectedIndex == 4;
     public bool IsSearchInputFocused => IsSearchTabActive && SearchInput.IsFocused;
 
     public void SwitchToOutlineTab() => PaneTabs.SelectedIndex = 0;
     public void SwitchToBookmarksTab() => PaneTabs.SelectedIndex = 1;
     public void SwitchToFiguresTab() => PaneTabs.SelectedIndex = 2;
+    public void SwitchToCommentsTab() => PaneTabs.SelectedIndex = 4;
 
     public void SwitchToSearchTab()
     {
@@ -359,6 +365,10 @@ public partial class OutlinePanel : UserControl
         {
             SubscribePeekUpdates();
             RefreshPeekIndex();
+        }
+        else if (IsCommentsTabActive)
+        {
+            RefreshComments();
         }
     }
 

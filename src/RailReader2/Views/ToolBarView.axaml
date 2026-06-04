@@ -42,6 +42,14 @@
         <Style Selector="Button.toolBtn:pointerover /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Foreground" Value="#FFFFFF" />
         </Style>
+        <Style Selector="Button.toolBtn:disabled">
+            <Setter Property="Opacity" Value="0.4" />
+        </Style>
+        <Style Selector="Border.toolSep">
+            <Setter Property="Width" Value="1" />
+            <Setter Property="Margin" Value="3,2" />
+            <Setter Property="Background" Value="#555555" />
+        </Style>
     </UserControl.Styles>
 
     <Border Background="#252526"
@@ -50,40 +58,100 @@
             CornerRadius="4"
             Padding="4,4">
         <StackPanel Orientation="Horizontal" Spacing="4">
-            <ToggleButton Name="BrowseButton"
-                          Classes="toolBtn"
-                          ToolTip.Tip="Browse / Pan"
-                          Width="32" Height="28"
-                          HorizontalContentAlignment="Center"
-                          VerticalContentAlignment="Center"
-                          Padding="0">
-                <TextBlock Text="&#xf0b2;"
-                           FontFamily="{StaticResource FaFont}"
-                           FontSize="13" />
+            <!-- Always available (reading + mode toggle) -->
+            <ToggleButton Name="BrowseButton" Classes="toolBtn" ToolTip.Tip="Browse / Pan"
+                          Width="32" Height="28" Padding="0"
+                          HorizontalContentAlignment="Center" VerticalContentAlignment="Center">
+                <TextBlock Text="&#xf0b2;" FontFamily="{StaticResource FaFont}" FontSize="13" />
             </ToggleButton>
-            <ToggleButton Name="SelectButton"
-                          Classes="toolBtn"
-                          ToolTip.Tip="Text Select"
-                          Width="32" Height="28"
-                          HorizontalContentAlignment="Center"
-                          VerticalContentAlignment="Center"
-                          Padding="0">
-                <TextBlock Text="&#xf246;"
-                           FontFamily="{StaticResource FaFont}"
-                           FontSize="13" />
+            <ToggleButton Name="SelectButton" Classes="toolBtn" ToolTip.Tip="Text Select"
+                          Width="32" Height="28" Padding="0"
+                          HorizontalContentAlignment="Center" VerticalContentAlignment="Center">
+                <TextBlock Text="&#xf246;" FontFamily="{StaticResource FaFont}" FontSize="13" />
             </ToggleButton>
-            <Button Name="CopyButton"
-                    Classes="toolBtn"
-                    ToolTip.Tip="Copy Selected Text (Ctrl+C)"
-                    Width="32" Height="28"
-                    HorizontalContentAlignment="Center"
-                    VerticalContentAlignment="Center"
-                    Padding="0"
-                    IsVisible="False">
-                <TextBlock Text="&#xf0c5;"
-                           FontFamily="{StaticResource FaFont}"
-                           FontSize="13" />
+            <Button Name="CopyButton" Classes="toolBtn" ToolTip.Tip="Copy Selected Text (Ctrl+C)"
+                    Width="32" Height="28" Padding="0" IsVisible="False"
+                    HorizontalContentAlignment="Center" VerticalContentAlignment="Center">
+                <TextBlock Text="&#xf0c5;" FontFamily="{StaticResource FaFont}" FontSize="13" />
             </Button>
+
+            <Border Classes="toolSep" />
+
+            <ToggleButton Name="AnnotateButton" Classes="toolBtn" ToolTip.Tip="Annotation Mode (Ctrl+E)"
+                          Width="32" Height="28" Padding="0"
+                          HorizontalContentAlignment="Center" VerticalContentAlignment="Center">
+                <TextBlock Text="&#xf044;" FontFamily="{StaticResource FaFont}" FontSize="13" />
+            </ToggleButton>
+
+            <!-- Mode-gated annotation tools (shown only in annotation mode) -->
+            <StackPanel Name="AnnotationSection" Orientation="Horizontal" Spacing="4" IsVisible="False">
+                <Border Classes="toolSep" />
+
+                <!-- Text-markup tools: pick one, then drag over text to apply (sticky) -->
+                <ToggleButton Name="HighlightButton" Classes="toolBtn" ToolTip.Tip="Highlight (drag over text)"
+                              Width="32" Height="28" Padding="0"
+                              HorizontalContentAlignment="Center" VerticalContentAlignment="Center">
+                    <TextBlock Text="&#xf591;" FontFamily="{StaticResource FaFont}" FontSize="13" />
+                </ToggleButton>
+                <ToggleButton Name="UnderlineButton" Classes="toolBtn" ToolTip.Tip="Underline (drag over text)"
+                              Width="32" Height="28" Padding="0"
+                              HorizontalContentAlignment="Center" VerticalContentAlignment="Center">
+                    <TextBlock Text="&#xf0cd;" FontFamily="{StaticResource FaFont}" FontSize="13" />
+                </ToggleButton>
+                <ToggleButton Name="StrikeButton" Classes="toolBtn" ToolTip.Tip="Strikethrough (drag over text)"
+                              Width="32" Height="28" Padding="0"
+                              HorizontalContentAlignment="Center" VerticalContentAlignment="Center">
+                    <TextBlock Text="&#xf0cc;" FontFamily="{StaticResource FaFont}" FontSize="13" />
+                </ToggleButton>
+                <ToggleButton Name="SquigglyButton" Classes="toolBtn" ToolTip.Tip="Squiggly (drag over text)"
+                              Width="32" Height="28" Padding="0"
+                              HorizontalContentAlignment="Center" VerticalContentAlignment="Center">
+                    <TextBlock Text="&#xf83e;" FontFamily="{StaticResource FaFont}" FontSize="13" />
+                </ToggleButton>
+
+                <Border Classes="toolSep" />
+
+                <!-- Drawing / note tools -->
+                <ToggleButton Name="PenButton" Classes="toolBtn" ToolTip.Tip="Pen"
+                              Width="32" Height="28" Padding="0"
+                              HorizontalContentAlignment="Center" VerticalContentAlignment="Center">
+                    <TextBlock Text="&#xf304;" FontFamily="{StaticResource FaFont}" FontSize="13" />
+                </ToggleButton>
+                <ToggleButton Name="RectButton" Classes="toolBtn" ToolTip.Tip="Rectangle"
+                              Width="32" Height="28" Padding="0"
+                              HorizontalContentAlignment="Center" VerticalContentAlignment="Center">
+                    <TextBlock Text="&#xf0c8;" FontFamily="{StaticResource FaFont}" FontSize="13" />
+                </ToggleButton>
+                <ToggleButton Name="NoteButton" Classes="toolBtn" ToolTip.Tip="Text Note (sticky note)"
+                              Width="32" Height="28" Padding="0"
+                              HorizontalContentAlignment="Center" VerticalContentAlignment="Center">
+                    <TextBlock Text="&#xf249;" FontFamily="{StaticResource FaFont}" FontSize="13" />
+                </ToggleButton>
+                <ToggleButton Name="FreeTextButton" Classes="toolBtn" ToolTip.Tip="Text box (typewriter — drag a box)"
+                              Width="32" Height="28" Padding="0"
+                              HorizontalContentAlignment="Center" VerticalContentAlignment="Center">
+                    <TextBlock Text="&#xf031;" FontFamily="{StaticResource FaFont}" FontSize="13" />
+                </ToggleButton>
+                <ToggleButton Name="EraserButton" Classes="toolBtn" ToolTip.Tip="Eraser"
+                              Width="32" Height="28" Padding="0"
+                              HorizontalContentAlignment="Center" VerticalContentAlignment="Center">
+                    <TextBlock Text="&#xf12d;" FontFamily="{StaticResource FaFont}" FontSize="13" />
+                </ToggleButton>
+
+                <Border Classes="toolSep" />
+
+                <Button Name="ColorButton" Classes="toolBtn" ToolTip.Tip="Colour"
+                        Width="32" Height="28" Padding="0"
+                        HorizontalContentAlignment="Center" VerticalContentAlignment="Center">
+                    <Border Name="ColorSwatch" Width="16" Height="16" CornerRadius="2"
+                            Background="#FFFF00" BorderBrush="#888888" BorderThickness="1" />
+                </Button>
+                <Button Name="ThicknessButton" Classes="toolBtn" ToolTip.Tip="Thickness"
+                        Width="32" Height="28" Padding="0"
+                        HorizontalContentAlignment="Center" VerticalContentAlignment="Center">
+                    <TextBlock Text="&#xf7a4;" FontFamily="{StaticResource FaFont}" FontSize="13" />
+                </Button>
+            </StackPanel>
         </StackPanel>
     </Border>
 </UserControl>

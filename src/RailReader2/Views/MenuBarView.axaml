@@ -25,6 +25,8 @@
             <MenuItem Header="Find _Next" InputGesture="F3" Click="OnFindNext" />
             <MenuItem Header="Find _Previous" InputGesture="Shift+F3" Click="OnFindPrevious" />
             <Separator />
+            <MenuItem Header="Annotation _Mode" InputGesture="Ctrl+E" Click="OnToggleAnnotationMode" />
+            <Separator />
             <MenuItem Header="_Undo" InputGesture="Ctrl+Z" Click="OnUndo" />
             <MenuItem Header="_Redo" InputGesture="Ctrl+Shift+Z" Click="OnRedo" />
             <Separator />

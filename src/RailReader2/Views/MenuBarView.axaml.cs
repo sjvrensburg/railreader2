@@ -113,6 +113,7 @@ public partial class MenuBarView : UserControl
     private void OnShowFind(object? s, RoutedEventArgs e) => Vm?.OpenSearch();
     private void OnFindNext(object? s, RoutedEventArgs e) => Vm?.NextMatch();
     private void OnFindPrevious(object? s, RoutedEventArgs e) => Vm?.PreviousMatch();
+    private void OnToggleAnnotationMode(object? s, RoutedEventArgs e) => Vm?.ToggleAnnotationMode();
     private void OnUndo(object? s, RoutedEventArgs e) => Vm?.UndoAnnotation();
     private void OnRedo(object? s, RoutedEventArgs e) => Vm?.RedoAnnotation();
     private void OnCopyBlockAsLatex(object? s, RoutedEventArgs e)

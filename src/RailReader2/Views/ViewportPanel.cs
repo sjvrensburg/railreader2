@@ -76,19 +76,8 @@ public class ViewportPanel : Panel
 
         var point = e.GetCurrentPoint(this);
 
-        // Ctrl+right-click: block context menu (Copy LaTeX / Markdown / Description / Image)
-        if (point.Properties.IsRightButtonPressed
-            && e.KeyModifiers.HasFlag(KeyModifiers.Control)
-            && ViewModel is { } ctrlVm)
-        {
-            var pos = e.GetPosition(this);
-            var (pageX, pageY) = ScreenToPage(pos);
-            ShowBlockContextMenu(ctrlVm, pageX, pageY);
-            e.Handled = true;
-            return;
-        }
-
-        // Right-click: context menu for text selection, radial menu, or cancel tool
+        // Right-click: text-selection menu, cancel an in-progress tool, or the
+        // viewport context menu (block actions + Annotation Mode toggle).
         if (point.Properties.IsRightButtonPressed && ViewModel is { } vm)
         {
             if (vm.ActiveTool == AnnotationTool.TextSelect && vm.SelectedText is not null)
@@ -101,8 +90,8 @@ public class ViewportPanel : Panel
             }
             else
             {
-                var pos = e.GetPosition(this);
-                vm.OpenRadialMenu(pos.X, pos.Y);
+                var (pageX, pageY) = ScreenToPage(e.GetPosition(this));
+                ShowViewportContextMenu(vm, pageX, pageY);
             }
             e.Handled = true;
             return;
@@ -233,34 +222,38 @@ public class ViewportPanel : Panel
         e.Handled = true;
     }
 
-    private void ShowBlockContextMenu(MainWindowViewModel vm, double pageX, double pageY)
+    private void ShowViewportContextMenu(MainWindowViewModel vm, double pageX, double pageY)
     {
-        var block = vm.FindBlockAt(pageX, pageY);
-        if (block is null)
-        {
-            vm.ShowStatusToast("No block at this position");
-            return;
-        }
-
         var menu = new ContextMenu();
 
-        var latexItem = new MenuItem { Header = "Copy as LaTeX" };
-        latexItem.Click += (_, _) => vm.FireAndForget(vm.CopyBlockWithAction(block, BlockAction.LaTeX), nameof(vm.CopyBlockWithAction));
-        menu.Items.Add(latexItem);
+        // Block actions (Copy as LaTeX / Markdown / Description / Image) when over a detected block.
+        if (vm.FindBlockAt(pageX, pageY) is { } block)
+        {
+            var latexItem = new MenuItem { Header = "Copy as LaTeX" };
+            latexItem.Click += (_, _) => vm.FireAndForget(vm.CopyBlockWithAction(block, BlockAction.LaTeX), nameof(vm.CopyBlockWithAction));
+            menu.Items.Add(latexItem);
 
-        var markdownItem = new MenuItem { Header = "Copy as Markdown" };
-        markdownItem.Click += (_, _) => vm.FireAndForget(vm.CopyBlockWithAction(block, BlockAction.Markdown), nameof(vm.CopyBlockWithAction));
-        menu.Items.Add(markdownItem);
+            var markdownItem = new MenuItem { Header = "Copy as Markdown" };
+            markdownItem.Click += (_, _) => vm.FireAndForget(vm.CopyBlockWithAction(block, BlockAction.Markdown), nameof(vm.CopyBlockWithAction));
+            menu.Items.Add(markdownItem);
 
-        var descItem = new MenuItem { Header = "Copy Description" };
-        descItem.Click += (_, _) => vm.FireAndForget(vm.CopyBlockWithAction(block, BlockAction.Description), nameof(vm.CopyBlockWithAction));
-        menu.Items.Add(descItem);
+            var descItem = new MenuItem { Header = "Copy Description" };
+            descItem.Click += (_, _) => vm.FireAndForget(vm.CopyBlockWithAction(block, BlockAction.Description), nameof(vm.CopyBlockWithAction));
+            menu.Items.Add(descItem);
 
-        menu.Items.Add(new Separator());
+            var imageItem = new MenuItem { Header = "Copy Image" };
+            imageItem.Click += (_, _) => vm.FireAndForget(vm.CopyBlockAsImage(block), nameof(vm.CopyBlockAsImage));
+            menu.Items.Add(imageItem);
 
-        var imageItem = new MenuItem { Header = "Copy Image" };
-        imageItem.Click += (_, _) => vm.FireAndForget(vm.CopyBlockAsImage(block), nameof(vm.CopyBlockAsImage));
-        menu.Items.Add(imageItem);
+            menu.Items.Add(new Separator());
+        }
+
+        var annModeItem = new MenuItem
+        {
+            Header = vm.IsAnnotationMode ? "Exit Annotation Mode" : "Annotation Mode",
+        };
+        annModeItem.Click += (_, _) => vm.ToggleAnnotationMode();
+        menu.Items.Add(annModeItem);
 
         menu.Open(this);
     }
