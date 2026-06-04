@@ -1,0 +1,17 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:RailReader2.ViewModels"
+             xmlns:m="using:RailReader.Core.Models"
+             x:Class="RailReader2.Views.OutlineView"
+             x:DataType="vm:MainWindowViewModel">
+    <ScrollViewer>
+        <TreeView Name="OutlineTree"
+                  SelectionChanged="OnOutlineSelectionChanged">
+            <TreeView.ItemTemplate>
+                <TreeDataTemplate ItemsSource="{Binding Children}" x:DataType="m:OutlineEntry">
+                    <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
+                </TreeDataTemplate>
+            </TreeView.ItemTemplate>
+        </TreeView>
+    </ScrollViewer>
+</UserControl>

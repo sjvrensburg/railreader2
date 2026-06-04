@@ -76,11 +76,9 @@ public partial class MainWindow : Window
         },
         InvalidatePage = () => Document.RenderPage(),
         InvalidateOverlay = () => Document.RenderOverlay(),
-        InvalidateSearch = () =>
-        {
-            Document.RenderSearch();
-            OutlinePanel.OnSearchInvalidated();
-        },
+        // The Search pane refreshes its own "N of M" display via the VM's
+        // SearchInvalidated event; here we only repaint the highlight layer.
+        InvalidateSearch = () => Document.RenderSearch(),
         InvalidateAnnotations = () => Document.RenderAnnotations(),
     };
 
@@ -142,7 +140,7 @@ public partial class MainWindow : Window
                     if (bmName is not null)
                     {
                         bool added = vm.Controller.AddBookmark(bmName);
-                        OutlinePanel.UpdateBookmarkSource();
+                        vm.NotifyBookmarksChanged();
                         vm.ShowStatusToast(added ? $"Bookmark: {bmName}" : $"Updated bookmark: {bmName}");
                     }
                 }
@@ -244,7 +242,7 @@ public partial class MainWindow : Window
 
         // When the search TextBox has focus, let text input keys through.
         // Only intercept non-text keys (F-keys, Escape, PgUp/PgDn, etc.).
-        bool textInputFocused = (vm.ShowOutline && OutlinePanel.IsSearchInputFocused)
+        bool textInputFocused = (vm.ShowOutline && vm.IsSearchInputFocused)
             || StatusBar.IsEditing;
 
         if (!textInputFocused && HandleNavigationKey(vm, e))
@@ -263,33 +261,13 @@ public partial class MainWindow : Window
         switch (e.Key)
         {
             case Key.O when shift:
-                if (vm.ShowOutline && !OutlinePanel.IsBookmarksTabActive
-                    && !OutlinePanel.IsFiguresTabActive
-                    && !OutlinePanel.IsSearchTabActive)
-                    vm.ShowOutline = false;
-                else
-                {
-                    vm.ShowOutline = true;
-                    OutlinePanel.SwitchToOutlineTab();
-                }
+                vm.TogglePane(SidePane.Outline);
                 e.Handled = true; return true;
             case Key.B when shift:
-                if (vm.ShowOutline && OutlinePanel.IsBookmarksTabActive)
-                    vm.ShowOutline = false;
-                else
-                {
-                    vm.ShowOutline = true;
-                    OutlinePanel.SwitchToBookmarksTab();
-                }
+                vm.TogglePane(SidePane.Bookmarks);
                 e.Handled = true; return true;
             case Key.I when shift:
-                if (vm.ShowOutline && OutlinePanel.IsFiguresTabActive)
-                    vm.ShowOutline = false;
-                else
-                {
-                    vm.ShowOutline = true;
-                    OutlinePanel.SwitchToFiguresTab();
-                }
+                vm.TogglePane(SidePane.Index);
                 e.Handled = true; return true;
             case Key.O:
                 _ = vm.OpenFileCommand.ExecuteAsync(null); e.Handled = true; return true;
@@ -362,7 +340,7 @@ public partial class MainWindow : Window
                 vm.ShowBookmarkDialog = true; e.Handled = true; return true;
             case Key.OemTilde:
                 vm.NavigateBack();
-                OutlinePanel.UpdateBookmarkSource();
+                vm.NotifyBookmarksChanged();
                 e.Handled = true; return true;
             case Key.F:
                 vm.ToggleLineFocusBlur(); e.Handled = true; return true;
@@ -456,9 +434,9 @@ public partial class MainWindow : Window
                 vm.CancelAnnotationTool(); e.Handled = true; return true;
             case Key.Escape when vm.IsAnnotationMode:
                 vm.IsAnnotationMode = false; e.Handled = true; return true;
-            case Key.Escape when vm.ShowOutline && OutlinePanel.IsSearchTabActive:
+            case Key.Escape when vm.ShowOutline && vm.ActivePane == SidePane.Search:
                 vm.CloseSearch();
-                OutlinePanel.SwitchToOutlineTab();
+                vm.ActivePane = SidePane.Outline;
                 e.Handled = true; return true;
             default: return false;
         }

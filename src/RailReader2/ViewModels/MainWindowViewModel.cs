@@ -35,6 +35,27 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     [ObservableProperty] private int _activeTabIndex;
     [ObservableProperty] private bool _showOutline;
 
+    /// <summary>Which side pane is currently selected. The side-panel shell binds its
+    /// TabControl selection to this (via <see cref="ActivePaneIndex"/>); the window key
+    /// handler reads/sets it for the pane-toggle shortcuts. Owning this here (rather than
+    /// in the view) decouples the shortcuts from the panel's internal structure and lets
+    /// the panes become independently dockable.</summary>
+    [ObservableProperty] private SidePane _activePane = SidePane.Outline;
+
+    partial void OnActivePaneChanged(SidePane value) => OnPropertyChanged(nameof(ActivePaneIndex));
+
+    /// <summary>Two-way bridge for the side-panel TabControl's <c>SelectedIndex</c>.
+    /// The <see cref="SidePane"/> enum order matches the tab order.</summary>
+    public int ActivePaneIndex
+    {
+        get => (int)ActivePane;
+        set => ActivePane = (SidePane)value;
+    }
+
+    /// <summary>Set by the Search pane while its input box has focus, so the window-level
+    /// key handler lets text keys through instead of treating them as nav shortcuts.</summary>
+    public bool IsSearchInputFocused { get; set; }
+
     /// <summary>
     /// Callback set by the code-behind to read the current sidebar column width
     /// from the grid (which may have been resized via GridSplitter).
@@ -48,17 +69,31 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             tab.ShowSidePanel = value;
     }
 
-    /// <summary>Raised when a specific side pane should be shown (menu/shortcut driven).
-    /// The OutlinePanel handles this by switching to the matching tab.</summary>
-    public event Action<SidePane>? PaneRequested;
-
     /// <summary>Show the side panel and switch it to the given pane (for discoverability
-    /// via the View menu). Mirrors the SearchRequested pattern.</summary>
+    /// via the View menu).</summary>
     public void ShowPane(SidePane pane)
     {
+        ActivePane = pane;
         ShowOutline = true;
-        PaneRequested?.Invoke(pane);
     }
+
+    /// <summary>Toggle a side pane: hide the side panel if it is already the active pane,
+    /// otherwise show the panel and switch to it (keyboard pane shortcuts).</summary>
+    public void TogglePane(SidePane pane)
+    {
+        if (ShowOutline && ActivePane == pane)
+            ShowOutline = false;
+        else
+        {
+            ActivePane = pane;
+            ShowOutline = true;
+        }
+    }
+
+    /// <summary>Raised when bookmarks or navigation-back availability change, so the
+    /// Bookmarks pane can refresh its list and Back button.</summary>
+    public event Action? BookmarksChanged;
+    internal void NotifyBookmarksChanged() => BookmarksChanged?.Invoke();
 
     [ObservableProperty] private bool _showMinimap;
     [ObservableProperty] private bool _showSettings;
@@ -648,7 +683,16 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     private void InvalidateCamera() => _invalidation?.InvalidateCamera?.Invoke();
     private void InvalidatePage() => _invalidation?.InvalidatePage?.Invoke();
     private void InvalidateOverlay() => _invalidation?.InvalidateOverlay?.Invoke();
-    private void InvalidateSearch() => _invalidation?.InvalidateSearch?.Invoke();
+
+    /// <summary>Raised whenever the search layer is invalidated (match navigation, page
+    /// change, results finalised) so the Search pane refreshes its "N of M" display.</summary>
+    public event Action? SearchInvalidated;
+    private void InvalidateSearch()
+    {
+        _invalidation?.InvalidateSearch?.Invoke();
+        SearchInvalidated?.Invoke();
+    }
+
     private void InvalidateAnnotations() => _invalidation?.InvalidateAnnotations?.Invoke();
 
     private void InvalidateAfterNavigation()

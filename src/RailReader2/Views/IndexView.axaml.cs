@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Media.Imaging;
@@ -23,12 +24,15 @@ public class PeekEntryViewModel
 }
 
 /// <summary>
-/// Peek sidebar (Figures tab) — debounced refresh of the figure/table/equation
-/// index, thumbnail rendering, and per-entry text extraction. Split from the
-/// main OutlinePanel partial to keep the figures concern self-contained.
+/// Index pane (figures, tables, equations) — a debounced index of detected visual blocks
+/// with thumbnails (figures/tables) and extracted text (equations), plus the whole-document
+/// "Scan All" sweep. Self-contained: wires its analysis-cache and ViewModel subscriptions on
+/// load and tears them down on unload so it behaves as a lazily-realised tab / dockable tool.
 /// </summary>
-public partial class OutlinePanel
+public partial class IndexView : UserControl
 {
+    private MainWindowViewModel? _vm;
+
     private DispatcherTimer? _peekDebounceTimer;
     private DocumentState? _peekWatchedDoc;
     private readonly Dictionary<int, Bitmap?> _thumbnailCache = [];
@@ -36,6 +40,97 @@ public partial class OutlinePanel
     private readonly Dictionary<int, string?> _textCache = [];
     private bool _peekDirty;
     private int _lastPeekSignature;
+
+    public IndexView()
+    {
+        InitializeComponent();
+    }
+
+    protected override void OnLoaded(RoutedEventArgs e)
+    {
+        base.OnLoaded(e);
+        Attach(DataContext as MainWindowViewModel);
+    }
+
+    protected override void OnUnloaded(RoutedEventArgs e)
+    {
+        Detach();
+        base.OnUnloaded(e);
+    }
+
+    private void Attach(MainWindowViewModel? vm)
+    {
+        Detach();
+        _vm = vm;
+        if (_vm is null) return;
+
+        _vm.PropertyChanged += OnVmPropertyChanged;
+        SubscribePeekUpdates();
+        RefreshPeekIndex();
+        UpdateScanAllBanner();
+    }
+
+    private void Detach()
+    {
+        if (_vm is not null)
+        {
+            _vm.PropertyChanged -= OnVmPropertyChanged;
+            _vm = null;
+        }
+        // Stop reacting to analysis updates while unloaded, but do NOT dispose the rendered
+        // thumbnails: they stay bound to PeekEntryList.ItemsSource (this view instance and its
+        // caches persist across tab switches), and disposing them here would crash the next
+        // layout pass when the tab is shown again. They are disposed on document change instead.
+        if (_peekWatchedDoc is not null)
+        {
+            _peekWatchedDoc.AnalysisCacheUpdated -= OnAnalysisCacheUpdated;
+            _peekWatchedDoc = null;
+        }
+        _peekDebounceTimer?.Stop();
+    }
+
+    private void OnVmPropertyChanged(object? sender, PropertyChangedEventArgs args)
+    {
+        switch (args.PropertyName)
+        {
+            case nameof(MainWindowViewModel.ActiveTab):
+                // Only reset peek state when the actual document changes (tab switch),
+                // not on every page navigation within the same document.
+                var newDoc = _vm?.Controller.ActiveDocument;
+                if (newDoc != _peekWatchedDoc)
+                {
+                    SubscribePeekUpdates();
+                    // Unbind before disposing the previous document's thumbnails so no live
+                    // Image references a disposed bitmap during the next layout pass.
+                    PeekEntryList.ItemsSource = null;
+                    ClearThumbnailCache();
+                    RefreshPeekIndex();
+                }
+                break;
+            case nameof(MainWindowViewModel.IsScanAllActive):
+                UpdateScanAllBanner();
+                // After the sweep completes or is cancelled, surface the final index.
+                if (_vm?.IsScanAllActive == false)
+                    RefreshPeekIndex();
+                break;
+            case nameof(MainWindowViewModel.ScanAllProgress):
+                if (_vm?.IsScanAllActive == true)
+                    ScanAllProgressText.Text = _vm.ScanAllProgress;
+                break;
+        }
+    }
+
+    private void UpdateScanAllBanner()
+    {
+        if (_vm is null) return;
+        bool active = _vm.IsScanAllActive;
+        ScanAllBanner.IsVisible = active;
+        ScanAllButton.IsEnabled = !active;
+        if (active)
+            ScanAllProgressText.Text = _vm.ScanAllProgress;
+    }
+
+    // --- Peek index ---
 
     private void SubscribePeekUpdates()
     {
@@ -51,21 +146,10 @@ public partial class OutlinePanel
             _peekWatchedDoc.AnalysisCacheUpdated += OnAnalysisCacheUpdated;
     }
 
-    private void UnsubscribePeekUpdates()
-    {
-        if (_peekWatchedDoc is not null)
-        {
-            _peekWatchedDoc.AnalysisCacheUpdated -= OnAnalysisCacheUpdated;
-            _peekWatchedDoc = null;
-        }
-        _peekDebounceTimer?.Stop();
-        ClearThumbnailCache();
-    }
-
     private void OnAnalysisCacheUpdated()
     {
-        if (!IsFiguresTabActive) return;
-
+        // Only fires while this view is loaded (subscription is torn down on unload),
+        // so no active-tab guard is needed.
         _peekDirty = true;
 
         if (_peekDebounceTimer is null)
@@ -200,7 +284,7 @@ public partial class OutlinePanel
             list.Add(new PeekEntryViewModel
             {
                 Label = category,
-                PageDisplay = $"Page {entry.PageIndex + 1} \u2014 {entry.Role}",
+                PageDisplay = $"Page {entry.PageIndex + 1} — {entry.Role}",
                 Entry = entry,
             });
         }
@@ -340,32 +424,5 @@ public partial class OutlinePanel
     private void OnScanAllCancelClick(object? sender, RoutedEventArgs e)
     {
         _vm?.CancelScanAll();
-    }
-
-    private void OnScanAllStateChanged()
-    {
-        if (_vm is null) return;
-
-        bool active = _vm.IsScanAllActive;
-        ScanAllBanner.IsVisible = active;
-        ScanAllButton.IsEnabled = !active;
-
-        if (active)
-        {
-            // Subscribe to progress updates
-            _vm.PropertyChanged += OnVmScanProgressChanged;
-            ScanAllProgressText.Text = _vm.ScanAllProgress;
-        }
-        else
-        {
-            _vm.PropertyChanged -= OnVmScanProgressChanged;
-            RefreshPeekIndex();
-        }
-    }
-
-    private void OnVmScanProgressChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
-    {
-        if (e.PropertyName == nameof(MainWindowViewModel.ScanAllProgress))
-            ScanAllProgressText.Text = _vm?.ScanAllProgress;
     }
 }

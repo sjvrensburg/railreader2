@@ -1,0 +1,102 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:RailReader2.ViewModels"
+             xmlns:v="using:RailReader2.Views"
+             xmlns:c="using:RailReader2.Controls"
+             xmlns:a="using:Avalonia.Automation"
+             x:Class="RailReader2.Views.SearchView"
+             x:DataType="vm:MainWindowViewModel">
+    <DockPanel>
+        <!-- Search input area -->
+        <StackPanel DockPanel.Dock="Top" Margin="4">
+            <DockPanel>
+                <Button DockPanel.Dock="Right"
+                        ToolTip.Tip="Clear Search (Esc)"
+                        a:AutomationProperties.Name="Clear search"
+                        Width="26" Height="26"
+                        HorizontalContentAlignment="Center"
+                        VerticalContentAlignment="Center"
+                        Padding="0" Margin="4,0,0,0"
+                        Click="OnClearSearchClick">
+                    <c:Icon Data="{StaticResource IconClose}" />
+                </Button>
+                <TextBox Name="SearchInput" PlaceholderText="Find..." />
+            </DockPanel>
+            <StackPanel Orientation="Horizontal" Spacing="4" Margin="0,4,0,0">
+                <ToggleButton Name="CaseSensitiveToggle"
+                              Content="Aa"
+                              ToolTip.Tip="Case Sensitive"
+                              Width="32" Height="26"
+                              HorizontalContentAlignment="Center"
+                              VerticalContentAlignment="Center"
+                              Padding="0" />
+                <ToggleButton Name="RegexToggle"
+                              Content=".*"
+                              ToolTip.Tip="Regex"
+                              Width="32" Height="26"
+                              HorizontalContentAlignment="Center"
+                              VerticalContentAlignment="Center"
+                              Padding="0" />
+                <TextBlock Name="SearchMatchCount"
+                           Text=""
+                           VerticalAlignment="Center"
+                           Opacity="0.7"
+                           Margin="4,0" />
+                <Button Name="PrevMatchBtn"
+                        ToolTip.Tip="Previous Match"
+                        a:AutomationProperties.Name="Previous match"
+                        Width="26" Height="26"
+                        HorizontalContentAlignment="Center"
+                        VerticalContentAlignment="Center"
+                        Padding="0"
+                        Click="OnPrevMatchClick">
+                    <c:Icon Data="{StaticResource IconChevronUp}" />
+                </Button>
+                <Button Name="NextMatchBtn"
+                        ToolTip.Tip="Next Match"
+                        a:AutomationProperties.Name="Next match"
+                        Width="26" Height="26"
+                        HorizontalContentAlignment="Center"
+                        VerticalContentAlignment="Center"
+                        Padding="0"
+                        Click="OnNextMatchClick">
+                    <c:Icon Data="{StaticResource IconChevronDown}" />
+                </Button>
+            </StackPanel>
+        </StackPanel>
+
+        <!-- Results grouped by page -->
+        <ScrollViewer Name="SearchResultsScroll">
+            <ItemsControl Name="SearchResultsList">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="v:SearchResultGroup">
+                        <StackPanel Margin="0,2,0,0">
+                            <TextBlock Text="{Binding PageHeader}"
+                                       FontWeight="SemiBold"
+                                       Opacity="0.7"
+                                       Margin="6,4,0,2" />
+                            <ItemsControl ItemsSource="{Binding Items}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="v:SearchResultItem">
+                                        <Button Click="OnSearchResultClick"
+                                                HorizontalAlignment="Stretch"
+                                                HorizontalContentAlignment="Left"
+                                                Margin="2,1" Padding="6,4"
+                                                Tag="{Binding MatchIndex}">
+                                            <TextBlock TextWrapping="Wrap">
+                                                <Run Text="{Binding PreText}" />
+                                                <Run Text="{Binding MatchText}" FontWeight="Bold"
+                                                     Foreground="#C07800" />
+                                                <Run Text="{Binding PostText}" />
+                                            </TextBlock>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+    </DockPanel>
+</UserControl>
