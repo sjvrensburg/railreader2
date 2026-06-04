@@ -36,7 +36,7 @@ public static class RenderCommand
 
         AnnotationFile? annotations = null;
         if (withAnnotations)
-            annotations = AnnotationService.Default.Load(pdfPath);
+            annotations = CompositeAnnotationStore.Default.Load(pdfPath);
 
         using var colourEffects = new ColourEffectShaders(logger);
         var paint = colourEffects.CreatePaint(effect, intensity);

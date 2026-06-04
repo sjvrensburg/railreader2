@@ -42,7 +42,7 @@ public sealed class MarkdownExportService : IMarkdownExportService
 
         AnnotationFile? annotationFile = null;
         if (options.IncludeAnnotations)
-            annotationFile = AnnotationService.Default.Load(pdfPath);
+            annotationFile = CompositeAnnotationStore.Default.Load(pdfPath);
 
         var vlmEndpoint = options.VlmEndpoint;
         bool vlmAvailable = options.EnableVlm && vlmEndpoint != null
