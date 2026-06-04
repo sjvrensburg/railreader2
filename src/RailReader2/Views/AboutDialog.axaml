@@ -1,5 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:c="using:RailReader2.Controls"
+        xmlns:a="using:Avalonia.Automation"
         x:Class="RailReader2.Views.AboutDialog"
         Title="About railreader2"
         Width="420" Height="280"
@@ -19,12 +21,12 @@
             <TextBlock x:Name="LogPathText" Opacity="0.5" VerticalAlignment="Center" FontSize="11" />
             <Button x:Name="CopyLogPathButton"
                     ToolTip.Tip="Copy log file path to clipboard"
+                    a:AutomationProperties.Name="Copy log file path"
                     Click="OnCopyLogPath"
                     Padding="4,2" VerticalAlignment="Center"
                     Background="Transparent" BorderThickness="0"
                     Cursor="Hand">
-                <TextBlock Text="&#xf0c5;" FontFamily="{StaticResource FaFont}" FontSize="12"
-                           Opacity="0.5" />
+                <c:Icon Data="{StaticResource IconCopy}" Opacity="0.5" />
             </Button>
         </StackPanel>
     </StackPanel>

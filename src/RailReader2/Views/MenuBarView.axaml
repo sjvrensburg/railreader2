@@ -39,7 +39,15 @@
             <MenuItem Header="Fit _Width" Command="{Binding FitWidthCommand}" />
             <MenuItem Header="_Reset Zoom" InputGesture="Ctrl+D0" Click="OnResetZoom" />
             <Separator />
-            <MenuItem Header="_Outline" InputGesture="Ctrl+Shift+O" Click="OnToggleOutline" />
+            <MenuItem Header="Side _Panel">
+                <MenuItem Header="_Outline" InputGesture="Ctrl+Shift+O" Click="OnShowOutlinePane" />
+                <MenuItem Header="_Bookmarks" Click="OnShowBookmarksPane" />
+                <MenuItem Header="_Index / Figures" InputGesture="Ctrl+Shift+I" Click="OnShowIndexPane" />
+                <MenuItem Header="_Search" InputGesture="Ctrl+F" Click="OnShowSearchPane" />
+                <MenuItem Header="_Comments" Click="OnShowCommentsPane" />
+                <Separator />
+                <MenuItem Header="_Hide Side Panel" Click="OnHidePanel" />
+            </MenuItem>
             <MenuItem Header="_Minimap" InputGesture="Ctrl+M" Click="OnToggleMinimap" />
             <MenuItem Header="_Fullscreen" InputGesture="F11" Click="OnToggleFullscreen" />
             <Separator />

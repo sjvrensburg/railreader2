@@ -12,6 +12,9 @@ using RailReader2.Services;
 
 namespace RailReader2.ViewModels;
 
+/// <summary>The side-panel tabs, used by ShowPane for menu-driven pane navigation.</summary>
+public enum SidePane { Outline, Bookmarks, Index, Search, Comments }
+
 // Core infrastructure: fields, constructor, animation, invalidation, config, status toast.
 // See partial class files for: Documents, Navigation, Annotations, Search.
 public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
@@ -43,6 +46,18 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         // Keep the active tab's sidebar state in sync
         if (ActiveTab is { } tab)
             tab.ShowSidePanel = value;
+    }
+
+    /// <summary>Raised when a specific side pane should be shown (menu/shortcut driven).
+    /// The OutlinePanel handles this by switching to the matching tab.</summary>
+    public event Action<SidePane>? PaneRequested;
+
+    /// <summary>Show the side panel and switch it to the given pane (for discoverability
+    /// via the View menu). Mirrors the SearchRequested pattern.</summary>
+    public void ShowPane(SidePane pane)
+    {
+        ShowOutline = true;
+        PaneRequested?.Invoke(pane);
     }
 
     [ObservableProperty] private bool _showMinimap;

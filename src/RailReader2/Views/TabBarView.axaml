@@ -1,26 +1,86 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:RailReader2.ViewModels"
+             xmlns:a="using:Avalonia.Automation"
+             xmlns:c="using:RailReader2.Controls"
              x:Class="RailReader2.Views.TabBarView"
              x:DataType="vm:MainWindowViewModel"
              IsVisible="{Binding Tabs.Count}">
+    <UserControl.Styles>
+        <!-- VS Code-style tabs: one cell per tab with a shared background; title + close
+             live inside it. Inactive tabs are dimmed; the active tab gets a top accent
+             line. The close button appears on hover or when the tab is active. -->
+        <Style Selector="Border.tab">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="CornerRadius" Value="5,5,0,0" />
+            <Setter Property="Opacity" Value="0.7" />
+            <Setter Property="Margin" Value="0,0,2,0" />
+        </Style>
+        <Style Selector="Border.tab:pointerover">
+            <Setter Property="Opacity" Value="1" />
+            <Setter Property="Background" Value="{DynamicResource SystemControlHighlightListLowBrush}" />
+        </Style>
+        <Style Selector="Border.tab.active">
+            <Setter Property="Opacity" Value="1" />
+            <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundAltHighBrush}" />
+        </Style>
+
+        <!-- Top accent line for the active tab -->
+        <Style Selector="Border.tabIndicator">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Height" Value="2" />
+            <Setter Property="CornerRadius" Value="1" />
+        </Style>
+        <Style Selector="Border.tab.active Border.tabIndicator">
+            <Setter Property="Background" Value="{DynamicResource SystemControlHighlightAccentBrush}" />
+        </Style>
+
+        <Style Selector="TextBlock.tabTitle">
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        </Style>
+        <Style Selector="Border.tab.active TextBlock.tabTitle">
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+
+        <!-- Integrated close button: hidden until the tab is hovered or active -->
+        <Style Selector="Button.tabClose">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="2" />
+            <Setter Property="CornerRadius" Value="3" />
+            <Setter Property="Opacity" Value="0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+        <Style Selector="Border.tab:pointerover Button.tabClose, Border.tab.active Button.tabClose">
+            <Setter Property="Opacity" Value="1" />
+        </Style>
+        <Style Selector="Button.tabClose:pointerover">
+            <Setter Property="Opacity" Value="1" />
+            <Setter Property="Background" Value="{DynamicResource SystemControlHighlightListLowBrush}" />
+        </Style>
+    </UserControl.Styles>
+
     <Border Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}"
             Padding="4,2">
         <DockPanel>
             <!-- Overflow dropdown (visible when tabs overflow) -->
             <Button Name="OverflowButton" DockPanel.Dock="Right"
-                    Content="&#x25BC;" FontSize="10"
                     Padding="6,4" MinWidth="24" MinHeight="24"
                     VerticalAlignment="Center" Margin="2,0,0,0"
                     CornerRadius="3" IsVisible="False"
                     ToolTip.Tip="All tabs"
-                    Click="OnOverflowClick" />
+                    a:AutomationProperties.Name="All tabs"
+                    Click="OnOverflowClick">
+                <c:Icon Data="{StaticResource IconChevronDown}" />
+            </Button>
             <ScrollViewer Name="TabScroller"
                           HorizontalScrollBarVisibility="Hidden"
                           VerticalScrollBarVisibility="Disabled"
                           Focusable="False"
                           KeyboardNavigation.TabNavigation="None">
-                <StackPanel Name="TabPanel" Orientation="Horizontal" Spacing="2" />
+                <StackPanel Name="TabPanel" Orientation="Horizontal" Spacing="0" />
             </ScrollViewer>
         </DockPanel>
     </Border>

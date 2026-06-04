@@ -76,18 +76,31 @@ public partial class StatusBarView : UserControl
             UpdateStatus();
     }
 
-    private static Button MakeNavButton(string text, EventHandler<RoutedEventArgs> handler, string? tooltip = null)
+    private static Avalonia.Media.Geometry? Geo(string key)
+        => Avalonia.Application.Current?.TryGetResource(key, null, out var g) == true
+            ? g as Avalonia.Media.Geometry
+            : null;
+
+    private static Button MakeNavButton(string iconKey, EventHandler<RoutedEventArgs> handler, string? tooltip = null)
     {
-        var btn = new Button { Content = text, Padding = new Avalonia.Thickness(6, 0), MinWidth = 0 };
+        var btn = new Button
+        {
+            Content = new RailReader2.Controls.Icon { Data = Geo(iconKey) },
+            Padding = new Avalonia.Thickness(6, 0),
+            MinWidth = 0,
+        };
         if (tooltip is not null)
+        {
             ToolTip.SetTip(btn, tooltip);
+            Avalonia.Automation.AutomationProperties.SetName(btn, tooltip);
+        }
         btn.Click += handler;
         return btn;
     }
 
-    private static Button MakeDangerButton(string text, EventHandler<RoutedEventArgs> handler, string? tooltip = null)
+    private static Button MakeDangerButton(string iconKey, EventHandler<RoutedEventArgs> handler, string? tooltip = null)
     {
-        var btn = MakeNavButton(text, handler, tooltip);
+        var btn = MakeNavButton(iconKey, handler, tooltip);
         btn.Foreground = DangerBrush;
         return btn;
     }
@@ -207,7 +220,7 @@ public partial class StatusBarView : UserControl
         }
 
         int zoomPct = (int)Math.Round(tab.Camera.Zoom * 100);
-        StatusPanel.Children.Add(MakeNavButton("\u25c0", (_, _) =>
+        StatusPanel.Children.Add(MakeNavButton("IconChevronLeft", (_, _) =>
         { if (vm?.ActiveTab is { } t) vm.GoToPage(t.CurrentPage - 1); }, "Previous page (PgUp)"));
         _pageLabel = new TextBlock
         {
@@ -218,7 +231,7 @@ public partial class StatusBarView : UserControl
         ToolTip.SetTip(_pageLabel, "Double-click to go to page");
         _pageLabel.DoubleTapped += (_, _) => BeginPageEdit(vm!, tab);
         StatusPanel.Children.Add(_pageLabel);
-        StatusPanel.Children.Add(MakeNavButton("\u25b6", (_, _) =>
+        StatusPanel.Children.Add(MakeNavButton("IconChevronRight", (_, _) =>
         { if (vm?.ActiveTab is { } t) vm.GoToPage(t.CurrentPage + 1); }, "Next page (PgDn)"));
         AddSeparator();
         _zoomLabel = new TextBlock { Text = $"Zoom: {zoomPct}%" };
@@ -251,14 +264,14 @@ public partial class StatusBarView : UserControl
             {
                 AddSeparator();
                 StatusPanel.Children.Add(MakeBoldLabel("Auto-Scroll", AutoScrollBrush));
-                StatusPanel.Children.Add(MakeDangerButton("\u23f8", (_, _) => vm.StopAutoScroll(), "Stop auto-scroll (P)"));
+                StatusPanel.Children.Add(MakeDangerButton("IconPause", (_, _) => vm.StopAutoScroll(), "Stop auto-scroll (P)"));
             }
 
             if (vm is { JumpMode: true })
             {
                 AddSeparator();
                 StatusPanel.Children.Add(MakeBoldLabel("Jump", AmberBrush));
-                StatusPanel.Children.Add(MakeDangerButton("\u2715", (_, _) => vm.JumpMode = false, "Exit jump mode (J)"));
+                StatusPanel.Children.Add(MakeDangerButton("IconClose", (_, _) => vm.JumpMode = false, "Exit jump mode (J)"));
             }
         }
 
@@ -276,7 +289,7 @@ public partial class StatusBarView : UserControl
                 _ => "Annotating",
             };
             StatusPanel.Children.Add(MakeBoldLabel($"{toolName} Tool", AmberBrush));
-            StatusPanel.Children.Add(MakeDangerButton("\u2715", (_, _) => vm.CancelAnnotationTool(), "Cancel tool (Escape)"));
+            StatusPanel.Children.Add(MakeDangerButton("IconClose", (_, _) => vm.CancelAnnotationTool(), "Cancel tool (Escape)"));
         }
 
         if (vm?.StatusToast is { } toast)
