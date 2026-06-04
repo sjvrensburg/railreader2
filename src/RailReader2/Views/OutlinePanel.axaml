@@ -5,6 +5,18 @@
              xmlns:c="using:RailReader2.Controls"
              x:Class="RailReader2.Views.OutlinePanel"
              x:DataType="vm:MainWindowViewModel">
+    <UserControl.Styles>
+        <!-- Accordion sections: full-width header, the open section's content fills its row. -->
+        <Style Selector="Expander.accordion">
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="VerticalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="VerticalContentAlignment" Value="Stretch" />
+            <Setter Property="CornerRadius" Value="0" />
+            <Setter Property="Margin" Value="0,0,0,1" />
+        </Style>
+    </UserControl.Styles>
+
     <DockPanel>
         <!-- Close button at the top -->
         <Button DockPanel.Dock="Top"
@@ -19,15 +31,25 @@
             </StackPanel>
         </Button>
 
-        <!-- Each tab hosts a self-contained pane view. The selected tab is bound to the
-             ViewModel's ActivePane so menu/keyboard pane navigation and (later) docking
-             drive the same state. The SidePane enum order matches the tab order. -->
-        <TabControl Name="PaneTabs" SelectedIndex="{Binding ActivePaneIndex, Mode=TwoWay}">
-            <TabItem Header="Outline"><v:OutlineView /></TabItem>
-            <TabItem Header="Bookmarks"><v:BookmarksView /></TabItem>
-            <TabItem Header="Index"><v:IndexView /></TabItem>
-            <TabItem Header="Search"><v:SearchView /></TabItem>
-            <TabItem Header="Comments"><v:CommentsView /></TabItem>
-        </TabControl>
+        <!-- Single-open accordion: exactly one section is expanded at a time and fills the
+             panel (its row is starred in code-behind; the rest are header-height). The open
+             section tracks the ViewModel's ActivePane, so menu/keyboard shortcuts drive it. -->
+        <Grid Name="Accordion" RowDefinitions="*,Auto,Auto,Auto,Auto">
+            <Expander Grid.Row="0" Name="OutlineExpander" Classes="accordion" Header="Outline">
+                <v:OutlineView />
+            </Expander>
+            <Expander Grid.Row="1" Name="BookmarksExpander" Classes="accordion" Header="Bookmarks">
+                <v:BookmarksView />
+            </Expander>
+            <Expander Grid.Row="2" Name="IndexExpander" Classes="accordion" Header="Index">
+                <v:IndexView />
+            </Expander>
+            <Expander Grid.Row="3" Name="SearchExpander" Classes="accordion" Header="Search">
+                <v:SearchView />
+            </Expander>
+            <Expander Grid.Row="4" Name="CommentsExpander" Classes="accordion" Header="Comments">
+                <v:CommentsView />
+            </Expander>
+        </Grid>
     </DockPanel>
 </UserControl>
