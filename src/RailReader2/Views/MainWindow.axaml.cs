@@ -12,25 +12,7 @@ namespace RailReader2.Views;
 
 public partial class MainWindow : Window
 {
-    private double _lastMinimapOx;
-    private double _lastMinimapOy;
-    private double _lastMinimapZoom;
-    private SKImage? _lastMinimapImage;
     private MainWindowViewModel? _subscribedVm;
-
-    // Cache for the z-ordered annotation list. The sort only changes when the
-    // page's annotation set changes (add/remove); pan/zoom frames reuse it.
-    private int _annoSortPage = -1;
-    private object? _annoSortSource;
-    private int _annoSortCount = -1;
-    private List<Annotation>? _annoSortResult;
-
-    // Cache for the active search-match local index. Only changes on match
-    // navigation or page change, not while the camera moves.
-    private int _searchIdxPage = -1;
-    private int _searchIdxActive = int.MinValue;
-    private object? _searchIdxMatches;
-    private int _searchIdxResult = -1;
 
     // Fullscreen hover reveal: show threshold < hide threshold for hysteresis
     private const double FullScreenShowThreshold = 5.0;
@@ -55,18 +37,11 @@ public partial class MainWindow : Window
         base.OnLoaded(e);
         if (Vm is { } vm)
         {
-            Viewport.ViewModel = vm;
-            Minimap.ViewModel = vm;
-
+            // The DocumentView owns the viewport wiring, viewport-size sync, and the
+            // initial (incl. window.Opened-early-tab) render for the active tab.
+            Document.Initialize(vm, vm.ActiveTab);
             vm.SetInvalidation(BuildInvalidationCallbacks(vm));
 
-            // Keep ViewModel's viewport size in sync with the actual drawable area.
-            // SizeChanged fires during the initial layout pass (before window.Opened),
-            // so OpenDocument will already see correct dimensions when it runs.
-            vm.SetViewportSize(Viewport.Bounds.Width, Viewport.Bounds.Height);
-            Viewport.SizeChanged += OnViewportSizeChanged;
-
-            UpdateLayerBindings(vm.ActiveTab);
             SetupClipboardAndToolBar(vm);
             RailToolBar.ViewModel = vm;
             RailToolBar.SyncFromConfig();
@@ -77,18 +52,6 @@ public partial class MainWindow : Window
                 return w.Value > 0 ? w.Value : 220;
             };
             UpdateSidebarColumnWidth(vm.ShowOutline);
-
-            // window.Opened (which calls OpenDocument) can fire before OnLoaded
-            // finishes wiring _invalidation. If a tab is already present, the
-            // camera state was never sent and CenterPage used the wrong viewport size.
-            // Re-center and push fresh state to all layers now that layout is complete.
-            if (vm.ActiveTab is { } earlyTab && Viewport.Bounds.Width > 0)
-            {
-                earlyTab.CenterPage(Viewport.Bounds.Width, Viewport.Bounds.Height);
-                earlyTab.UpdateRailZoom(Viewport.Bounds.Width, Viewport.Bounds.Height);
-                UpdatePagePanelSize(earlyTab);
-                UpdateLayerBindings(earlyTab);
-            }
 
             _subscribedVm = vm;
             vm.PropertyChanged += OnVmPropertyChanged;
@@ -103,32 +66,22 @@ public partial class MainWindow : Window
     /// </summary>
     private InvalidationCallbacks BuildInvalidationCallbacks(MainWindowViewModel vm) => new()
     {
+        // Layer rendering is delegated to the DocumentView (which owns the layers and
+        // builds state for its tab); cross-cutting chrome (status bar, search panel)
+        // stays here.
         InvalidateCamera = () =>
         {
-            UpdatePagePanelSize(vm.ActiveTab);
+            Document.RenderCamera();
             StatusBar.UpdateZoom();
-            UpdateAllLayers(vm, vm.ActiveTab);
         },
-        InvalidatePage = () =>
-        {
-            var tab = vm.ActiveTab;
-            var state = BuildPageState(vm, tab);
-            PageLayer.UpdateState(state);
-            if (!ReferenceEquals(state.Image, _lastMinimapImage))
-            {
-                _lastMinimapImage = state.Image;
-                Minimap.InvalidateVisual();
-            }
-        },
-        InvalidateOverlay = () =>
-            OverlayLayer.UpdateState(BuildOverlayState(vm, vm.ActiveTab)),
+        InvalidatePage = () => Document.RenderPage(),
+        InvalidateOverlay = () => Document.RenderOverlay(),
         InvalidateSearch = () =>
         {
-            SearchLayer.UpdateState(BuildSearchState(vm, vm.ActiveTab));
+            Document.RenderSearch();
             OutlinePanel.OnSearchInvalidated();
         },
-        InvalidateAnnotations = () =>
-            AnnotationLayer.UpdateState(BuildAnnotationState(vm, vm.ActiveTab)),
+        InvalidateAnnotations = () => Document.RenderAnnotations(),
     };
 
     protected override void OnUnloaded(Avalonia.Interactivity.RoutedEventArgs e)
@@ -136,23 +89,10 @@ public partial class MainWindow : Window
         if (_subscribedVm is { } vm)
         {
             vm.PropertyChanged -= OnVmPropertyChanged;
-            Viewport.SizeChanged -= OnViewportSizeChanged;
+            Document.Teardown();
             _subscribedVm = null;
         }
         base.OnUnloaded(e);
-    }
-
-    private void OnViewportSizeChanged(object? sender, SizeChangedEventArgs e)
-    {
-        if (Vm is not { } vm) return;
-        vm.SetViewportSize(Viewport.Bounds.Width, Viewport.Bounds.Height);
-        if (vm.ActiveTab is { } tab)
-        {
-            var (ww, wh) = (Viewport.Bounds.Width, Viewport.Bounds.Height);
-            tab.ClampCamera(ww, wh);
-            UpdatePagePanelSize(tab);
-            UpdateAllLayers(vm, tab);
-        }
     }
 
     private async void OnVmPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs args)
@@ -161,10 +101,8 @@ public partial class MainWindow : Window
         switch (args.PropertyName)
         {
             case nameof(MainWindowViewModel.ActiveTab):
-                UpdateLayerBindings(vm.ActiveTab);
-                UpdatePagePanelSize(vm.ActiveTab);
+                Document.SetTab(vm.ActiveTab);
                 UpdateRailToolBarVisibility();
-                Minimap.InvalidateVisual();
                 break;
             case nameof(MainWindowViewModel.ShowOutline):
                 UpdateSidebarColumnWidth(vm.ShowOutline);
@@ -188,7 +126,7 @@ public partial class MainWindow : Window
                 await new SettingsWindow { DataContext = vm, FontSize = vm.CurrentFontSize }.ShowDialog(this);
                 break;
             case nameof(MainWindowViewModel.ActiveTool):
-                Viewport.UpdateAnnotationCursor();
+                Document.UpdateAnnotationCursor();
                 break;
             case nameof(MainWindowViewModel.IsFullScreen):
                 WindowState = vm.IsFullScreen ? WindowState.FullScreen : WindowState.Normal;
@@ -245,17 +183,6 @@ public partial class MainWindow : Window
             var bitmap = new Avalonia.Media.Imaging.Bitmap(ms);
             await clipboard.SetBitmapAsync(bitmap);
         };
-
-        ToolBar.ViewModel = vm;
-    }
-
-    private void UpdateLayerBindings(TabViewModel? tab)
-    {
-        if (Vm is not { } vm) return;
-        UpdateAllLayers(vm, tab);
-
-        if (tab is not null)
-            tab.OnDpiRenderComplete = () => vm.RequestAnimationFrame();
     }
 
     private void UpdateRailToolBarVisibility()
@@ -282,208 +209,6 @@ public partial class MainWindow : Window
         var col = MainGrid.ColumnDefinitions[0];
         double width = Vm?.ActiveTab?.SidePanelWidth ?? 220;
         col.Width = showOutline ? new GridLength(width) : new GridLength(0);
-    }
-
-    /// <summary>
-    /// Updates PagePanel dimensions (used by the minimap and scrollbar calculations)
-    /// and conditionally invalidates the minimap when the viewport position changes
-    /// enough to be visible at its small display size.
-    /// The camera transform itself is now applied inside each layer's Skia canvas.
-    /// </summary>
-    private void UpdatePagePanelSize(TabViewModel? tab)
-    {
-        if (tab is null)
-        {
-            PagePanel.Width = 0;
-            PagePanel.Height = 0;
-            return;
-        }
-
-        PagePanel.Width = tab.PageWidth;
-        PagePanel.Height = tab.PageHeight;
-
-        // The minimap is ≤200×280px — sub-pixel viewport indicator movement is
-        // invisible. Use thresholds large enough to skip redraws during smooth
-        // scrolling frames where the visual change is imperceptible.
-        if (Math.Abs(tab.Camera.OffsetX - _lastMinimapOx) > 24.0 ||
-            Math.Abs(tab.Camera.OffsetY - _lastMinimapOy) > 24.0 ||
-            Math.Abs(tab.Camera.Zoom - _lastMinimapZoom) > 0.02)
-        {
-            _lastMinimapOx = tab.Camera.OffsetX;
-            _lastMinimapOy = tab.Camera.OffsetY;
-            _lastMinimapZoom = tab.Camera.Zoom;
-            Minimap.InvalidateVisual();
-        }
-    }
-
-    /// <summary>
-    /// Sends fresh state to all four composition layer handlers.
-    /// </summary>
-    private void UpdateAllLayers(MainWindowViewModel vm, TabViewModel? tab)
-    {
-        PageLayer.UpdateState(BuildPageState(vm, tab));
-        OverlayLayer.UpdateState(BuildOverlayState(vm, tab));
-        SearchLayer.UpdateState(BuildSearchState(vm, tab));
-        AnnotationLayer.UpdateState(BuildAnnotationState(vm, tab));
-    }
-
-    // ── State builders ─────────────────────────────────────────────────────────
-
-    private static SKMatrix BuildCamera(TabViewModel? tab)
-    {
-        if (tab is null) return SKMatrix.Identity;
-        float zoom = (float)tab.Camera.Zoom;
-        return SKMatrix.CreateScaleTranslation(
-            zoom, zoom, (float)tab.Camera.OffsetX, (float)tab.Camera.OffsetY);
-    }
-
-    private PdfPageRenderState BuildPageState(MainWindowViewModel vm, TabViewModel? tab)
-    {
-        float lineY = 0, lineH = 0;
-        if (tab?.Rail is { Active: true, NavigableCount: > 0 })
-        {
-            var line = tab.Rail.CurrentLineInfo;
-            lineY = line.Y;
-            lineH = line.Height;
-        }
-        var (image, retired) = tab?.GetCachedImage() ?? (null, null);
-        if (retired is not null)
-        {
-            // Send the retired image to the composition thread for safe disposal.
-            // If the layer is detached (visual gone), the message is silently dropped,
-            // so dispose immediately on the UI thread as a fallback.
-            if (!PageLayer.TrySendMessage(new RetireImage(retired)))
-                retired.Dispose();
-        }
-        return new PdfPageRenderState(
-            Image: image,
-            PageW: (float)(tab?.PageWidth ?? 0),
-            PageH: (float)(tab?.PageHeight ?? 0),
-            Camera: BuildCamera(tab),
-            ScrollSpeed: (float)(tab?.Rail.ScrollSpeed ?? 0),
-            ZoomSpeed: (float)(tab?.Camera.ZoomSpeed ?? 0),
-            MotionBlur: vm.AppConfig.MotionBlur,
-            MotionBlurIntensity: (float)vm.AppConfig.MotionBlurIntensity,
-            LineFocusBlur: tab?.LineFocusBlur ?? false,
-            LineFocusIntensity: (float)vm.AppConfig.LineFocusBlurIntensity,
-            LinePadding: (float)vm.AppConfig.LinePadding,
-            LineY: lineY,
-            LineH: lineH,
-            Effect: vm.Controller.ActiveColourEffect,
-            EffectIntensity: vm.Controller.ActiveColourIntensity,
-            Effects: vm.ColourEffects);
-    }
-
-    private static RailOverlayRenderState BuildOverlayState(MainWindowViewModel vm, TabViewModel? tab)
-    {
-        LayoutBlock? currentBlock = null;
-        LineInfo currentLine = default;
-        if (tab?.Rail is { Active: true, HasAnalysis: true } rail && rail.NavigableCount > 0)
-        {
-            currentBlock = rail.CurrentNavigableBlock;
-            currentLine = rail.CurrentLineInfo;
-        }
-        PageAnalysis? debugAnalysis = null;
-        if (tab?.DebugOverlay == true)
-            tab.AnalysisCache.TryGetValue(tab.CurrentPage, out debugAnalysis);
-
-        return new RailOverlayRenderState(
-            Camera: BuildCamera(tab),
-            PageW: (float)(tab?.PageWidth ?? 0),
-            PageH: (float)(tab?.PageHeight ?? 0),
-            CurrentBlock: currentBlock,
-            CurrentLine: currentLine,
-            DebugOverlay: tab?.DebugOverlay ?? false,
-            DebugAnalysis: debugAnalysis,
-            DebugModelLabel: vm.ActiveLayoutModelName,
-            Effect: vm.Controller.ActiveColourEffect,
-            LineFocusBlur: tab?.LineFocusBlur ?? false,
-            LineHighlightEnabled: tab?.LineHighlightEnabled ?? true,
-            LinePadding: (float)vm.AppConfig.LinePadding,
-            Tint: vm.AppConfig.LineHighlightTint,
-            TintOpacity: (float)vm.AppConfig.LineHighlightOpacity);
-    }
-
-    private AnnotationRenderState BuildAnnotationState(MainWindowViewModel vm, TabViewModel? tab)
-    {
-        List<Annotation>? pageAnnotations = null;
-        if (tab is not null)
-            tab.Annotations.Pages.TryGetValue(tab.CurrentPage, out pageAnnotations);
-
-        // Pre-sort by z-order on the UI thread so the compositor doesn't need LINQ.
-        // Cache the result: z-order only changes when the page's annotation set
-        // changes, so pan/zoom frames (which re-send camera every tick) reuse it.
-        List<Annotation>? sorted;
-        if (pageAnnotations is not { Count: > 1 })
-        {
-            sorted = pageAnnotations;
-        }
-        else if (ReferenceEquals(pageAnnotations, _annoSortSource)
-            && pageAnnotations.Count == _annoSortCount
-            && tab!.CurrentPage == _annoSortPage)
-        {
-            sorted = _annoSortResult;
-        }
-        else
-        {
-            sorted = AnnotationRenderer.SortByZOrder(pageAnnotations);
-            _annoSortSource = pageAnnotations;
-            _annoSortCount = pageAnnotations.Count;
-            _annoSortPage = tab!.CurrentPage;
-            _annoSortResult = sorted;
-        }
-
-        return new AnnotationRenderState(
-            Camera: BuildCamera(tab),
-            PageAnnotations: sorted,
-            SelectedAnnotation: vm.SelectedAnnotation,
-            PreviewAnnotation: vm.PreviewAnnotation,
-            TextSelectionRects: vm.TextSelectionRects);
-    }
-
-    private SearchRenderState BuildSearchState(MainWindowViewModel vm, TabViewModel? tab)
-    {
-        // Refresh the per-page match cache against the page currently on screen.
-        // SearchService only updates it on match navigation, so scroll/GoToPage page
-        // changes would otherwise leave it showing a previous page's matches.
-        vm.RefreshCurrentPageSearchMatches();
-        var matches = vm.CurrentPageSearchMatches;
-        int activeLocalIndex = -1;
-        if (matches is { Count: > 0 } && tab is not null)
-        {
-            // The active local index only changes on match navigation or page
-            // change — not while the camera moves. Cache across camera-only frames.
-            if (ReferenceEquals(matches, _searchIdxMatches)
-                && vm.ActiveMatchIndex == _searchIdxActive
-                && tab.CurrentPage == _searchIdxPage)
-            {
-                activeLocalIndex = _searchIdxResult;
-            }
-            else
-            {
-                activeLocalIndex = OverlayRenderer.ComputeActiveLocalIndex(
-                    vm.SearchMatches, matches, vm.ActiveMatchIndex, tab.CurrentPage);
-                _searchIdxMatches = matches;
-                _searchIdxActive = vm.ActiveMatchIndex;
-                _searchIdxPage = tab.CurrentPage;
-                _searchIdxResult = activeLocalIndex;
-            }
-        }
-
-        // Compute viewport in page space for search highlight culling.
-        var camera = BuildCamera(tab);
-        SKRect viewport = SKRect.Empty;
-        if (camera.TryInvert(out var inv))
-        {
-            var bounds = Bounds;
-            viewport = inv.MapRect(new SKRect(0, 0, (float)bounds.Width, (float)bounds.Height));
-        }
-
-        return new SearchRenderState(
-            Camera: camera,
-            Matches: matches,
-            ActiveLocalIndex: activeLocalIndex,
-            ViewportInPageSpace: viewport);
     }
 
     /// <summary>
@@ -663,7 +388,7 @@ public partial class MainWindow : Window
                 if (vm.ActiveTab is { } dbgTab)
                 {
                     dbgTab.DebugOverlay = !dbgTab.DebugOverlay;
-                    OverlayLayer.UpdateState(BuildOverlayState(vm, dbgTab));
+                    Document.RenderOverlay();
                 }
                 e.Handled = true; return true;
             case Key.D:
