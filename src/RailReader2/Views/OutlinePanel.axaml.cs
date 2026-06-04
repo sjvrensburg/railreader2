@@ -8,12 +8,12 @@ using RailReader2.ViewModels;
 namespace RailReader2.Views;
 
 /// <summary>
-/// Side panel as a single-open accordion. The five self-contained pane views (Outline,
-/// Bookmarks, Index, Search, Comments) are stacked as Expander sections; exactly one is open
-/// at a time and fills the panel (its grid row is starred, the rest are header-height). The
-/// open section is kept in two-way sync with the ViewModel's <see cref="MainWindowViewModel.ActivePane"/>,
-/// so the View menu and keyboard pane shortcuts drive the same state. Each pane view owns its
-/// own ViewModel wiring.
+/// Side panel as an accordion. The five self-contained pane views (Outline, Bookmarks, Index,
+/// Search, Comments) are stacked as Expander sections. At most one is open at a time: opening a
+/// section collapses the others and that section's grid row is starred so it fills the panel
+/// (collapsed rows are header-height). The open section can also be collapsed, leaving none
+/// open. The open section is synced with the ViewModel's <see cref="MainWindowViewModel.ActivePane"/>
+/// so the View menu and keyboard pane shortcuts drive the same state.
 /// </summary>
 public partial class OutlinePanel : UserControl
 {
@@ -21,7 +21,7 @@ public partial class OutlinePanel : UserControl
     private MainWindowViewModel? _vm;
 
     // Guards the ActivePane <-> Expander.IsExpanded sync against re-entrancy.
-    private bool _applying;
+    private bool _syncing;
 
     public OutlinePanel()
     {
@@ -61,54 +61,66 @@ public partial class OutlinePanel : UserControl
         if (_vm is not null)
         {
             _vm.PropertyChanged += OnVmPropertyChanged;
-            ApplyActivePane(_vm.ActivePane);
+            ExpandOnly(_vm.ActivePane);
         }
     }
 
     private void OnVmPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(MainWindowViewModel.ActivePane) && _vm is not null)
-            ApplyActivePane(_vm.ActivePane);
+        if (e.PropertyName == nameof(MainWindowViewModel.ActivePane) && _vm is not null && !_syncing)
+            ExpandOnly(_vm.ActivePane);
     }
 
     private void OnExpanderPropertyChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
     {
-        if (_applying || _vm is null) return;
+        if (_syncing) return;
         if (e.Property != Expander.IsExpandedProperty || sender is not Expander expander) return;
 
         var section = Array.Find(_sections, s => s.Expander == expander);
         if (section.Expander is null) return;
 
-        if (expander.IsExpanded)
+        _syncing = true;
+        try
         {
-            // User opened this section — make it the active pane (which collapses the rest).
-            _vm.ActivePane = section.Pane;
+            if (expander.IsExpanded)
+            {
+                // Opening a section: collapse the others (single-open) and make it active.
+                foreach (var other in _sections)
+                    if (other.Expander != expander)
+                        other.Expander.IsExpanded = false;
+                if (_vm is not null) _vm.ActivePane = section.Pane;
+            }
+            // Collapsing is allowed — nothing else opens; just refresh the row heights.
+            UpdateRowHeights();
         }
-        else if (_vm.ActivePane == section.Pane)
+        finally
         {
-            // Keep one section always open: re-open the active one if the user collapsed it.
-            _applying = true;
-            expander.IsExpanded = true;
-            _applying = false;
+            _syncing = false;
         }
     }
 
-    private void ApplyActivePane(SidePane active)
+    /// <summary>Expand exactly the given pane's section (collapsing the rest). Used when an
+    /// external ActivePane change (menu / shortcut / search) requests a section.</summary>
+    private void ExpandOnly(SidePane pane)
     {
-        _applying = true;
-        foreach (var (expander, pane, row) in _sections)
+        _syncing = true;
+        try
         {
-            bool isActive = pane == active;
-            expander.IsExpanded = isActive;
+            foreach (var (expander, p, _) in _sections)
+                expander.IsExpanded = p == pane;
+            UpdateRowHeights();
+        }
+        finally
+        {
+            _syncing = false;
+        }
+    }
+
+    /// <summary>The open section's row fills the panel (starred); collapsed rows are header-height.</summary>
+    private void UpdateRowHeights()
+    {
+        foreach (var (expander, _, row) in _sections)
             Accordion.RowDefinitions[row].Height =
-                isActive ? new GridLength(1, GridUnitType.Star) : GridLength.Auto;
-        }
-        _applying = false;
-    }
-
-    private void OnClosePanelClick(object? sender, RoutedEventArgs e)
-    {
-        if (_vm is not null)
-            _vm.ShowOutline = false;
+                expander.IsExpanded ? new GridLength(1, GridUnitType.Star) : GridLength.Auto;
     }
 }
