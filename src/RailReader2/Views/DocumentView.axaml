@@ -5,8 +5,9 @@
              x:Class="RailReader2.Views.DocumentView"
              x:DataType="vm:MainWindowViewModel">
     <Panel>
-        <!-- Layered PDF viewport with compositor-driven camera -->
-        <v:ViewportPanel Name="Viewport">
+        <!-- Layered PDF viewport with compositor-driven camera. Focusable so a pane click can
+             hand keyboard focus to it (nav keys then drive the page, not the pane's list). -->
+        <v:ViewportPanel Name="Viewport" Focusable="True">
             <!-- PagePanel tracks page dimensions for minimap/scrollbar calculations.
                  No RenderTransform: camera is applied inside each layer's Skia canvas. -->
             <Panel Name="CameraPanel">

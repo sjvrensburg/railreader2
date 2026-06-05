@@ -55,8 +55,11 @@ public partial class MainWindow : Window
 
             _subscribedVm = vm;
             vm.PropertyChanged += OnVmPropertyChanged;
+            vm.ViewportFocusRequested += OnViewportFocusRequested;
         }
     }
+
+    private void OnViewportFocusRequested() => Document.FocusViewport();
 
     /// <summary>
     /// Build the granular invalidation callbacks passed to the ViewModel. Each
@@ -87,6 +90,7 @@ public partial class MainWindow : Window
         if (_subscribedVm is { } vm)
         {
             vm.PropertyChanged -= OnVmPropertyChanged;
+            vm.ViewportFocusRequested -= OnViewportFocusRequested;
             Document.Teardown();
             _subscribedVm = null;
         }

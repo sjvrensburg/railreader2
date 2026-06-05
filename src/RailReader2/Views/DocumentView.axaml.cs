@@ -102,6 +102,10 @@ public partial class DocumentView : UserControl
 
     public void UpdateAnnotationCursor() => Viewport.UpdateAnnotationCursor();
 
+    /// <summary>Move keyboard focus to the viewport so nav keys drive the page (used after a
+    /// side pane navigates via a click).</summary>
+    public void FocusViewport() => Viewport.Focus();
+
     // ── Invalidation entry points (called by MainWindow's InvalidationCallbacks) ──
 
     public void RenderCamera()

@@ -85,6 +85,12 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     public event Action? BookmarksChanged;
     internal void NotifyBookmarksChanged() => BookmarksChanged?.Invoke();
 
+    /// <summary>Raised when a side pane navigates the document via a click, so the window can
+    /// move keyboard focus to the viewport — otherwise the pane keeps the focus and subsequent
+    /// arrows/scroll move its list instead of the page.</summary>
+    public event Action? ViewportFocusRequested;
+    public void RequestViewportFocus() => ViewportFocusRequested?.Invoke();
+
     [ObservableProperty] private bool _showMinimap;
     [ObservableProperty] private bool _showSettings;
     [ObservableProperty] private bool _showAbout;

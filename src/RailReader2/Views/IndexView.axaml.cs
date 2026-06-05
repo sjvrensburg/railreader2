@@ -409,6 +409,7 @@ public partial class IndexView : UserControl
         if (_vm is null) return;
         if (sender is not Button { DataContext: PeekEntryViewModel entry }) return;
         _vm.GoToPage(entry.Entry.PageIndex);
+        _vm.RequestViewportFocus();
         if (_vm.IsScanAllActive)
             _vm.ShowStatusToast("Navigation unavailable during scan");
     }

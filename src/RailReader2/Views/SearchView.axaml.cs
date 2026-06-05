@@ -188,6 +188,7 @@ public partial class SearchView : UserControl
         {
             _vm.GoToMatch(matchIndex);
             UpdateMatchDisplay();
+            _vm.RequestViewportFocus();
         }
     }
 

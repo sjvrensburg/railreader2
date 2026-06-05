@@ -1,6 +1,8 @@
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Layout;
+using Avalonia.Threading;
 using RailReader.Core.Models;
 using RailReader2.ViewModels;
 
@@ -18,6 +20,10 @@ public partial class OutlineView : UserControl
     private TabViewModel? _watchedTab;
     private bool _suppressOutlineSelection;
 
+    // True while a pointer press is in progress on the tree, so OnOutlineSelectionChanged can
+    // tell a click apart from a keyboard arrow (only a click hands focus to the viewport).
+    private bool _pointerSelect;
+
     // The accordion realises all panes at once and ActiveTab is raised synthetically on every
     // navigation, so a collapsed/hidden Outline pane would otherwise re-bind the tree and walk
     // the whole outline on every page turn. Defer that work until the pane is shown.
@@ -27,7 +33,13 @@ public partial class OutlineView : UserControl
     {
         InitializeComponent();
         EffectiveViewportChanged += OnViewportChanged;
+        // Tunnel so the flag is set before the tree processes the press and raises selection.
+        OutlineTree.AddHandler(InputElement.PointerPressedEvent, OnTreePointerPressed, RoutingStrategies.Tunnel);
+        OutlineTree.AddHandler(InputElement.PointerReleasedEvent, OnTreePointerReleased, RoutingStrategies.Tunnel);
     }
+
+    private void OnTreePointerPressed(object? sender, PointerPressedEventArgs e) => _pointerSelect = true;
+    private void OnTreePointerReleased(object? sender, PointerReleasedEventArgs e) => _pointerSelect = false;
 
     protected override void OnLoaded(RoutedEventArgs e)
     {
@@ -142,7 +154,13 @@ public partial class OutlineView : UserControl
     {
         if (_suppressOutlineSelection) return;
         if (_vm is { } vm && OutlineTree.SelectedItem is OutlineEntry { Page: { } page })
+        {
             vm.GoToPage(page);
+            // Hand focus to the viewport only for a mouse click (keyboard arrowing of the outline
+            // keeps focus). Deferred so the tree's own focus-on-click settles first.
+            if (_pointerSelect)
+                Dispatcher.UIThread.Post(vm.RequestViewportFocus);
+        }
     }
 
     /// <summary>

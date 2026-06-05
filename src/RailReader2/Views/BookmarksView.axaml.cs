@@ -99,6 +99,7 @@ public partial class BookmarksView : UserControl
         if (_vm is not { } vm) return;
         vm.NavigateBack();
         UpdateBackButton();
+        vm.RequestViewportFocus();
     }
 
     private void OnBookmarkClick(object? sender, RoutedEventArgs e)
@@ -114,6 +115,7 @@ public partial class BookmarksView : UserControl
 
         vm.NavigateToBookmark(index);
         UpdateBackButton();
+        vm.RequestViewportFocus();
     }
 
     private async void OnAddBookmarkClick(object? sender, RoutedEventArgs e)

@@ -176,7 +176,10 @@ public partial class CommentsView : UserControl
     private void OnCommentEntryClick(object? sender, RoutedEventArgs e)
     {
         if (sender is Button { DataContext: CommentEntryViewModel entry } && _vm is not null)
+        {
             _vm.NavigateToAnnotation(entry.PageIndex, entry.Annotation);
+            _vm.RequestViewportFocus();
+        }
     }
 
     private void OnCommentStateChanged(object? sender, SelectionChangedEventArgs e)
