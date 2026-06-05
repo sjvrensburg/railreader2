@@ -13,6 +13,7 @@ namespace RailReader2.Views;
 public partial class BookmarksView : PaneRefreshView
 {
     private MainWindowViewModel? _vm;
+    private TabViewModel? _watchedTab;
 
     public BookmarksView()
     {
@@ -39,6 +40,7 @@ public partial class BookmarksView : PaneRefreshView
 
         _vm.PropertyChanged += OnVmPropertyChanged;
         _vm.BookmarksChanged += RefreshIfVisible;
+        _watchedTab = _vm.ActiveTab;
         RefreshIfVisible();
     }
 
@@ -48,12 +50,24 @@ public partial class BookmarksView : PaneRefreshView
         _vm.PropertyChanged -= OnVmPropertyChanged;
         _vm.BookmarksChanged -= RefreshIfVisible;
         _vm = null;
+        _watchedTab = null;
     }
 
     private void OnVmPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs args)
     {
-        if (args.PropertyName == nameof(MainWindowViewModel.ActiveTab))
+        if (args.PropertyName != nameof(MainWindowViewModel.ActiveTab)) return;
+        // ActiveTab is raised synthetically on every navigation; only rebuild the list on a real
+        // tab switch (bookmarks otherwise change via BookmarksChanged). The cheap back-button
+        // state still tracks every navigation.
+        if (_vm?.ActiveTab != _watchedTab)
+        {
+            _watchedTab = _vm?.ActiveTab;
             RefreshIfVisible();
+        }
+        else
+        {
+            UpdateBackButton();
+        }
     }
 
     protected override void Refresh() => UpdateBookmarkSource();

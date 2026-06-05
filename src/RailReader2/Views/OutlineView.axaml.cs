@@ -73,7 +73,10 @@ public partial class OutlineView : PaneRefreshView
 
     private void OnVmPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs args)
     {
-        if (args.PropertyName == nameof(MainWindowViewModel.ActiveTab))
+        // ActiveTab is raised synthetically on every navigation (per animation frame during rail
+        // scroll), but the outline binding only changes on a real tab switch — the highlight
+        // follows CurrentPage via OnTabPropertyChanged. Skip the re-bind/tree-walk otherwise.
+        if (args.PropertyName == nameof(MainWindowViewModel.ActiveTab) && _vm?.ActiveTab != _watchedTab)
         {
             WatchActiveTabPage();
             RefreshIfVisible();

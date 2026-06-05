@@ -61,6 +61,7 @@ public sealed class CommentEntryViewModel
 public partial class CommentsView : PaneRefreshView
 {
     private MainWindowViewModel? _vm;
+    private TabViewModel? _watchedTab;
     private bool _suppressCommentsRefresh;
 
     public CommentsView()
@@ -88,6 +89,7 @@ public partial class CommentsView : PaneRefreshView
 
         _vm.PropertyChanged += OnVmPropertyChanged;
         _vm.AnnotationsMutated += OnAnnotationsMutated;
+        _watchedTab = _vm.ActiveTab;
         RefreshIfVisible();
     }
 
@@ -97,12 +99,18 @@ public partial class CommentsView : PaneRefreshView
         _vm.PropertyChanged -= OnVmPropertyChanged;
         _vm.AnnotationsMutated -= OnAnnotationsMutated;
         _vm = null;
+        _watchedTab = null;
     }
 
     private void OnVmPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs args)
     {
-        if (args.PropertyName == nameof(MainWindowViewModel.ActiveTab))
+        // ActiveTab is raised synthetically on every navigation; the comment list depends only on
+        // the document and AnnotationsMutated, so rebuild only on a real tab switch.
+        if (args.PropertyName == nameof(MainWindowViewModel.ActiveTab) && _vm?.ActiveTab != _watchedTab)
+        {
+            _watchedTab = _vm?.ActiveTab;
             RefreshIfVisible();
+        }
     }
 
     private void RefreshComments()
