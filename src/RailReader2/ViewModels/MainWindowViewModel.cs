@@ -89,7 +89,17 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     /// move keyboard focus to the viewport — otherwise the pane keeps the focus and subsequent
     /// arrows/scroll move its list instead of the page.</summary>
     public event Action? ViewportFocusRequested;
-    public void RequestViewportFocus() => ViewportFocusRequested?.Invoke();
+
+    /// <summary>Called when a side pane navigates the document via a click. A discrete jump
+    /// shouldn't inherit continuous-scroll momentum from an arrow key that's still held (in rail
+    /// mode that briefly fought the new position), so reset the held arrow input first, then ask
+    /// the window to focus the viewport.</summary>
+    public void RequestViewportFocus()
+    {
+        _controller.HandleArrowRelease(true);
+        _controller.ClearPageEdgeHold();
+        ViewportFocusRequested?.Invoke();
+    }
 
     [ObservableProperty] private bool _showMinimap;
     [ObservableProperty] private bool _showSettings;
