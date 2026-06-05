@@ -66,10 +66,12 @@ Thin wrapper delegating all logic to `DocumentController`/`DocumentState` in Cor
 
 - `ViewModels/MainWindowViewModel.cs` (+ `.Annotations.cs` / `.Documents.cs` / `.Navigation.cs` / `.Search.cs` / `.Vlm.cs` partials) — thin wrapper handling Avalonia-specific concerns (file dialogs, clipboard, invalidation)
 - `ViewModels/TabViewModel.cs` — `[ObservableProperty]` wrapper for `DocumentState` binding
-- `Views/MainWindow.axaml.cs` — keyboard shortcuts, state builders for composition layers, animation frame scheduling
+- `Views/MainWindow.axaml.cs` — window chrome + keyboard shortcuts; wires `InvalidationCallbacks` to `DocumentView`, which owns the composition layers and builds their per-tab state
+- `Views/DocumentView.axaml(.cs)` — the layered viewport (extracted from MainWindow): the four composition layers + minimap + `ToolBarView`, per-tab state-building, and layer invalidation
 - `Views/CompositionLayerControl.cs` — generic base class for `CompositionCustomVisual`-backed layers (manages visual lifecycle, state/message dispatch)
-- `Views/` — layers (PdfPageLayer, RailOverlayLayer, AnnotationLayer, SearchHighlightLayer), dialogs (ConfirmUrlDialog, BookmarkNameDialog, etc.), panels (OutlinePanel with Outline/Bookmarks/Figures/Search tabs)
-- `Controls/RadialMenu.cs` — Skia-rendered three-ring radial context menu (tools → thickness → colours) with Font Awesome icons
+- `Views/` — composition layers (PdfPageLayer, RailOverlayLayer, AnnotationLayer, SearchHighlightLayer), `ToolBarView` (annotation toolbar), `StatusBarView`/`MenuBarView`/`TabBarView`, dialogs (ConfirmUrlDialog, BookmarkNameDialog, …), and `OutlinePanel` — a single-open accordion with five self-contained sub-views: `OutlineView`/`BookmarksView`/`IndexView` (figures, tables, equations)/`SearchView`/`CommentsView`
+- `Controls/Icon.cs` + `Assets/Icons.axaml` — Lucide icons as native Avalonia vector geometry (decorative, theme-aware, scales with the UI font-scale); no icon font — add one by converting a Lucide SVG to a `StreamGeometry`
+- `Views/DocumentViewportAutomationPeer.cs` — publishes the GPU viewport's live state (page/zoom/rail mode/current-line text) to the platform accessibility/automation tree (AT-SPI on Linux, UIA on Windows)
 
 **AXAML bindings**: `AvaloniaUseCompiledBindingsByDefault` is enabled — all bindings are compiled by default. Use `{x:Bind}`-style compiled bindings in AXAML files.
 
@@ -113,7 +115,7 @@ PDF → PDFium rasterises to `SKBitmap` at zoom-proportional DPI (150–600, cap
 
 Page bitmap → BGRA-to-RGB → 800×800 rescale (PP-DocLayoutV3) or model-specific size (Heron/PP-S) → CHW float tensor → ONNX inference → post-processing (confidence filter, NMS) → reading order determination (native for PP-DocLayoutV3, XY-Cut++ for Heron/PP-S) → sort by reading order → line detection per block. Pixmap prep runs on thread pool; inference on dedicated `AnalysisWorker` thread. Results cached per-tab in `DocumentState.AnalysisCache`.
 
-**Background read-ahead**: A dedicated `DispatcherTimer` (500ms) progressively analyses all pages when idle, scanning outward from the current page via `BackgroundAnalysisQueue`. Pauses during rail mode to avoid PDFium contention. Results never evicted from cache. The Figures tab in OutlinePanel (`Ctrl+Shift+I`) uses `PeekIndexBuilder` to surface detected figures, tables, and equations — showing thumbnails for visual blocks and extracted text (via `PageText.ExtractTextInRect`) for equations.
+**Background read-ahead**: A dedicated `DispatcherTimer` (500ms) progressively analyses all pages when idle, scanning outward from the current page via `BackgroundAnalysisQueue`. Pauses during rail mode to avoid PDFium contention. Results never evicted from cache. The Index section of the OutlinePanel accordion (`Ctrl+Shift+I`) uses `PeekIndexBuilder` to surface detected figures, tables, and equations — showing thumbnails for visual blocks and extracted text (via `PageText.ExtractTextInRect`) for equations.
 
 **VLM integration (Copy as LaTeX)**: `VlmService` in Core sends block crops to any OpenAI-compatible vision API (Ollama, cloud, etc.) via the `OpenAI` NuGet package. `BlockCropRenderer` in Renderer.Skia renders block regions as PNG at 300 DPI with 5% padding. Three access paths: `Ctrl+L` (current rail block), `Ctrl+right-click` (any block), Edit menu. Adapts prompt by block type: equations → LaTeX, tables → Markdown, figures → description. Configured via `AppConfig.VlmEndpoint`/`VlmModel`/`VlmApiKey` (Settings > VLM tab).
 
@@ -129,7 +131,11 @@ Activates above `rail_zoom_threshold` when analysis is available. Locks to detec
 
 ### Annotations
 
-Five tools (Highlight, Pen, Rectangle, TextNote, Eraser) via right-click radial menu. Three-ring radial menu: inner ring for tool selection, middle ring for stroke thickness (thin/normal/thick — Pen and Rectangle), outer ring for colour selection (Highlight, Pen, Rectangle). Thickness selection keeps the menu open for colour picking; colour selection or clicking outside closes the menu and activates the tool. Annotations render in z-order: highlights below freehand and rectangles, text notes on top (stable sort preserves creation order within each tier). Select/move/resize in browse mode. Per-tab undo/redo stacks. Stored internally in `ConfigDir/annotations/<hash>.json`, keyed by SHA256 hash of the PDF's full path. Legacy sidecar files (alongside the PDF) are loaded as a migration fallback but never written to. `AnnotationFileManager` provides reference-counted shared `AnnotationFile` instances — multiple tabs opening the same PDF share a single in-memory object, eliminating last-writer-wins data loss. Auto-save is per-file (one debounced timer per unique PDF, not per tab). Export to PDF via `AnnotationExportService`. Export/import as JSON for sharing between users — `AnnotationService.MergeInto()` appends imported annotations per page and deduplicates bookmarks. Named bookmarks also stored in the annotation file. `AnnotationService` handles file-level persistence; `AnnotationFileManager` manages shared lifetimes; `AnnotationService.CleanOrphaned()` removes annotation files whose source PDFs no longer exist.
+Authoring happens in an explicit **annotation mode** (toggle via `ToolBarView`, `Ctrl+E`, the Edit menu, right-click, or tool keys 1–5). The always-on `ToolBarView` carries Browse / Text-Select; in annotation mode it expands to the tools: text-markup (Highlight, Underline, StrikeOut, Squiggly — drag over text, sticky) plus Pen, Rectangle, TextNote, FreeText (drag a box → dialog), and Eraser. A colour/thickness flyout applies to the palette tools (Highlight/Pen/Rectangle). Plain right-click over a detected block gives the block actions (Copy as LaTeX/Markdown/Description/Image) + an Annotation-Mode item.
+
+Annotations render in z-order (highlights below freehand/rectangles, text notes on top; stable sort within each tier). Select/move/resize in browse mode; per-tab undo/redo stacks. The `CommentsView` accordion section lists all annotations (author/body/date + a reviewer-vs-you source badge); clicking one navigates + selects with a rail-aware recenter.
+
+**Storage** goes through Core's `CompositeAnnotationStore`: an annotation lives either **in the PDF** (`Source.InPdf` — native PDF annotations read/written via RailReaderCore) or in an app-managed sidecar at `ConfigDir/annotations/<sha256-of-path>.json` (legacy PDF-adjacent sidecars are migrated, never written back). `AnnotationFileManager` shares one reference-counted in-memory file per PDF across tabs (no last-writer-wins loss); auto-save is one debounced timer per unique PDF. Export to a flattened/annotated PDF via `AnnotationExportService`; export/import JSON (`MergeInto()` appends per page, dedups bookmarks). Named bookmarks live in the same file; `CleanOrphaned()` removes files whose source PDFs are gone.
 
 ### Colour Effects
 
@@ -149,12 +155,13 @@ Key fields: `rail_zoom_threshold`, `snap_duration_ms`, `scroll_speed_start/max`,
 - `PdfOutlineExtractor` uses direct PDFium P/Invoke (`FPDF_*`/`FPDFBookmark_*`) since PDFtoImage doesn't expose bookmarks
 - `PdfiumResolver.Initialize()` must be called before any PDFium P/Invoke — registers a `DllImportResolver` that maps "pdfium" to the correct platform-specific native library (pdfium.dll / libpdfium.so / libpdfium.dylib). Called in the GUI entry point
 - ONNX runtime pre-loading in `LayoutAnalyzer` static constructor handles Linux (.so) and macOS (.dylib); Windows uses OnnxRuntime's own resolver
-- SkiaSharp 3.x explicitly overrides Avalonia 11's bundled 2.88 — required for `SKRuntimeEffect.CreateColorFilter()`
+- SkiaSharp 3.x explicitly overrides Avalonia's bundled SkiaSharp 2.88 — required for `SKRuntimeEffect.CreateColorFilter()`
 - DISTRIBUTION.md documents the release process for all channels (GitHub, Microsoft Store)
 - `scripts/` contains a single helper: `download-model.sh` (downloads Heron-INT8 + PP-DocLayoutV3 ONNX models)
 - `CleanupService.RunCleanup()` runs at startup and via Help menu (removes cache, temp, old logs)
 - `SplashWindow` shows during startup; heavy init deferred via `Dispatcher.Post` at Background priority
 - `window.Opened` can fire before `OnLoaded` wiring — guard against this in startup sequencing
+- Accessibility/automation: `DocumentViewportAutomationPeer` (on `ViewportPanel`) exposes viewport state to AT-SPI/UIA; chrome carries `AutomationProperties.Name`/`AutomationId`. Inert with no a11y client connected. Avalonia's AT-SPI backend ignores `AutomationProperties.LiveSetting` (Windows/UIA only) — Linux line-advance announcements come from the peer raising `NameProperty`
 
 ## Thread Safety
 
