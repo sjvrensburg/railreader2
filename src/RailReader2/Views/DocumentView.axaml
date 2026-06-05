@@ -2,12 +2,16 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:RailReader2.ViewModels"
              xmlns:v="using:RailReader2.Views"
+             xmlns:a="using:Avalonia.Automation"
              x:Class="RailReader2.Views.DocumentView"
              x:DataType="vm:MainWindowViewModel">
     <Panel>
         <!-- Layered PDF viewport with compositor-driven camera. Focusable so a pane click can
-             hand keyboard focus to it (nav keys then drive the page, not the pane's list). -->
-        <v:ViewportPanel Name="Viewport" Focusable="True">
+             hand keyboard focus to it (nav keys then drive the page, not the pane's list).
+             AutomationId gives automation a stable handle; the accessible name and live state
+             (page / zoom / rail line text) come from DocumentViewportAutomationPeer. -->
+        <v:ViewportPanel Name="Viewport" Focusable="True"
+                         a:AutomationProperties.AutomationId="DocumentViewport">
             <!-- PagePanel tracks page dimensions for minimap/scrollbar calculations.
                  No RenderTransform: camera is applied inside each layer's Skia canvas. -->
             <Panel Name="CameraPanel">

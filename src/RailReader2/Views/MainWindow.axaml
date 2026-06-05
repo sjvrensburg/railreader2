@@ -27,7 +27,8 @@
                           IsChecked="{Binding ShowOutline, Mode=TwoWay}"
                           VerticalAlignment="Center" Margin="4,0,2,0"
                           ToolTip.Tip="Toggle side panel"
-                          a:AutomationProperties.Name="Toggle side panel">
+                          a:AutomationProperties.Name="Toggle side panel"
+                          a:AutomationProperties.AutomationId="SidebarToggle">
                 <c:Icon Data="{StaticResource IconPanelLeft}" />
             </ToggleButton>
             <v:TabBarView Name="TabBar" DataContext="{Binding}" />

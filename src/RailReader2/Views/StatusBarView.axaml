@@ -1,11 +1,18 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:RailReader2.ViewModels"
+             xmlns:a="using:Avalonia.Automation"
              x:Class="RailReader2.Views.StatusBarView"
              x:DataType="vm:MainWindowViewModel">
     <Border Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}"
             Padding="8,4">
-        <StackPanel Orientation="Horizontal" Spacing="16" Name="StatusPanel">
+        <!-- Polite live region for status changes (page / zoom / rail block+line / mode).
+             NOTE: only Avalonia's UIA backend (Windows) honours LiveSetting; the AT-SPI backend
+             (Linux) does not map it, so on Linux the spoken announcements come from
+             DocumentViewportAutomationPeer raising a property-change instead. Kept for the UIA benefit. -->
+        <StackPanel Orientation="Horizontal" Spacing="16" Name="StatusPanel"
+                    a:AutomationProperties.LiveSetting="Polite"
+                    a:AutomationProperties.Name="Status">
             <!-- Content is set in code-behind based on active tab -->
         </StackPanel>
     </Border>

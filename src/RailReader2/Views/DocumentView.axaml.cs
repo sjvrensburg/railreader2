@@ -127,9 +127,14 @@ public partial class DocumentView : UserControl
             _lastMinimapImage = state.Image;
             Minimap.InvalidateVisual();
         }
+        Viewport.NotifyAccessibilityStateChanged(); // page change → announce
     }
 
-    public void RenderOverlay() => OverlayLayer.UpdateState(BuildOverlayState(_tab));
+    public void RenderOverlay()
+    {
+        OverlayLayer.UpdateState(BuildOverlayState(_tab));
+        Viewport.NotifyAccessibilityStateChanged(); // rail line / mode change → announce
+    }
     public void RenderSearch() => SearchLayer.UpdateState(BuildSearchState(_tab));
     public void RenderAnnotations() => AnnotationLayer.UpdateState(BuildAnnotationState(_tab));
 
