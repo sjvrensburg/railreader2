@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <NoWarn>CA1416</NoWarn>
+    <AssemblyName>RailReader2.RenderHarness.Headless</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Avalonia.Headless" Version="12.0.4" />
+    <!-- Real Skia drawing so captured frames contain actual pixels, not the
+         no-op headless drawing backend. -->
+    <PackageReference Include="Avalonia.Skia" Version="12.0.4" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Update="screenshots.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Reference the real GUI so we render the genuine MainWindow / panels /
+         composition layers, not a reconstruction. -->
+    <ProjectReference Include="../../RailReader2/RailReader2.csproj" />
+  </ItemGroup>
+</Project>

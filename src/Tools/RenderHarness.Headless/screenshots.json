@@ -1,0 +1,43 @@
+{
+  "outputDir": "docs/img",
+  "width": 1280,
+  "height": 800,
+  "theme": "dark",
+
+  "shots": [
+    {
+      "name": "sidebar-navigation-active",
+      "pdf": "experiments/PDFs/Foundation Models for Time Series Analysis -- A Tutorial and Survey.pdf",
+      "page": 1,
+      "zoom": 0,
+      "sidebar": "outline",
+      "tool": "none"
+    },
+    {
+      "name": "highlight-tool-active",
+      "pdf": "experiments/PDFs/Foundation Models for Time Series Analysis -- A Tutorial and Survey.pdf",
+      "page": 1,
+      "zoom": 1.5,
+      "sidebar": "none",
+      "tool": "highlight"
+    },
+    {
+      "name": "rail-mode-reading",
+      "pdf": "experiments/PDFs/Foundation Models for Time Series Analysis -- A Tutorial and Survey.pdf",
+      "page": 4,
+      "zoom": 4.0,
+      "sidebar": "none",
+      "tool": "none",
+      "requireAnalysis": true
+    },
+    {
+      "name": "figures-panel",
+      "pdf": "experiments/PDFs/Foundation Models for Time Series Analysis -- A Tutorial and Survey.pdf",
+      "page": 2,
+      "zoom": 0,
+      "sidebar": "figures",
+      "tool": "none",
+      "requireAnalysis": true
+    }
+  ]
+}
