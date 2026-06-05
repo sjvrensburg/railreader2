@@ -46,6 +46,18 @@ public sealed partial class MainWindowViewModel
         InvalidateSearch();
     }
 
+    /// <summary>Raised when search is cleared from outside the Search pane (e.g. the window-level
+    /// Escape handler), so the pane resets its input box and results list.</summary>
+    public event Action? SearchCleared;
+
+    /// <summary>Close the search and clear the Search pane's input/results — used by entry points
+    /// that don't own the search box (so the query doesn't linger stale for next time).</summary>
+    public void ClearSearch()
+    {
+        CloseSearch();
+        SearchCleared?.Invoke();
+    }
+
     public void ExecuteSearch(string query, bool caseSensitive, bool useRegex)
     {
         if (IsScanAllActive) return;

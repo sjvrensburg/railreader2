@@ -68,6 +68,7 @@ public partial class SearchView : UserControl
 
         _vm.SearchInvalidated += UpdateMatchDisplay;
         _vm.SearchActivated += HandleSearchActivation;
+        _vm.SearchCleared += ClearSearchUi;
         UpdateMatchDisplay();
         HandleSearchActivation();
     }
@@ -79,6 +80,7 @@ public partial class SearchView : UserControl
             _vm.IsSearchInputFocused = false;
             _vm.SearchInvalidated -= UpdateMatchDisplay;
             _vm.SearchActivated -= HandleSearchActivation;
+            _vm.SearchCleared -= ClearSearchUi;
             _vm = null;
         }
         _debounceTimer?.Stop();
@@ -145,11 +147,7 @@ public partial class SearchView : UserControl
                 e.Handled = true;
                 break;
             case Key.Escape:
-                _vm?.CloseSearch();
-                _vm?.InvalidateSearchLayer();
-                SearchInput.Text = "";
-                SearchResultsList.ItemsSource = null;
-                SearchMatchCount.Text = "";
+                _vm?.ClearSearch();
                 e.Handled = true;
                 break;
         }
@@ -157,8 +155,13 @@ public partial class SearchView : UserControl
 
     private void OnClearSearchClick(object? sender, RoutedEventArgs e)
     {
-        _vm?.CloseSearch();
-        _vm?.InvalidateSearchLayer();
+        _vm?.ClearSearch();
+    }
+
+    /// <summary>Reset the input box and results list. Invoked locally and via the ViewModel's
+    /// <see cref="MainWindowViewModel.SearchCleared"/> (so window-level Escape clears the box too).</summary>
+    private void ClearSearchUi()
+    {
         SearchInput.Text = "";
         SearchResultsList.ItemsSource = null;
         SearchMatchCount.Text = "";

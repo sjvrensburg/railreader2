@@ -1,6 +1,7 @@
 using System.Linq;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using Avalonia.Layout;
 using Avalonia.Media;
 using RailReader.Core.Models;
 using RailReader2.ViewModels;
@@ -63,9 +64,15 @@ public partial class CommentsView : UserControl
     private MainWindowViewModel? _vm;
     private bool _suppressCommentsRefresh;
 
+    // The accordion realises all panes at once and ActiveTab/AnnotationsMutated fire on every
+    // navigation/edit, so a collapsed/hidden Comments pane would otherwise rebuild its whole
+    // list constantly. Defer refreshes that arrive off-screen until the pane is shown.
+    private bool _refreshPending;
+
     public CommentsView()
     {
         InitializeComponent();
+        EffectiveViewportChanged += OnViewportChanged;
     }
 
     protected override void OnLoaded(RoutedEventArgs e)
@@ -88,7 +95,7 @@ public partial class CommentsView : UserControl
 
         _vm.PropertyChanged += OnVmPropertyChanged;
         _vm.AnnotationsMutated += OnAnnotationsMutated;
-        RefreshComments();
+        RefreshIfVisible();
     }
 
     private void Detach()
@@ -102,7 +109,7 @@ public partial class CommentsView : UserControl
     private void OnVmPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs args)
     {
         if (args.PropertyName == nameof(MainWindowViewModel.ActiveTab))
-            RefreshComments();
+            RefreshIfVisible();
     }
 
     private void RefreshComments()
@@ -139,7 +146,24 @@ public partial class CommentsView : UserControl
         // edited row's ComboBox already shows the new value, so skip the full rebuild to
         // avoid tearing down the visual tree (flicker / lost focus) mid-SelectionChanged.
         if (_suppressCommentsRefresh) return;
-        RefreshComments();
+        RefreshIfVisible();
+    }
+
+    /// <summary>Rebuild the list now if the pane is visible, otherwise defer until it is.</summary>
+    private void RefreshIfVisible()
+    {
+        if (IsEffectivelyVisible) { RefreshComments(); _refreshPending = false; }
+        else _refreshPending = true;
+    }
+
+    // Fired when the pane's visible region changes; flush a deferred refresh once it's visible.
+    private void OnViewportChanged(object? sender, EffectiveViewportChangedEventArgs e)
+    {
+        if (IsEffectivelyVisible && _refreshPending)
+        {
+            _refreshPending = false;
+            RefreshComments();
+        }
     }
 
     private void OnCommentFilterChanged(object? sender, SelectionChangedEventArgs e)

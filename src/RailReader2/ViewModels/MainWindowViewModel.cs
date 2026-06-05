@@ -35,22 +35,12 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     [ObservableProperty] private int _activeTabIndex;
     [ObservableProperty] private bool _showOutline;
 
-    /// <summary>Which side pane is currently selected. The side-panel shell binds its
-    /// TabControl selection to this (via <see cref="ActivePaneIndex"/>); the window key
-    /// handler reads/sets it for the pane-toggle shortcuts. Owning this here (rather than
-    /// in the view) decouples the shortcuts from the panel's internal structure and lets
-    /// the panes become independently dockable.</summary>
-    [ObservableProperty] private SidePane _activePane = SidePane.Outline;
-
-    partial void OnActivePaneChanged(SidePane value) => OnPropertyChanged(nameof(ActivePaneIndex));
-
-    /// <summary>Two-way bridge for the side-panel TabControl's <c>SelectedIndex</c>.
-    /// The <see cref="SidePane"/> enum order matches the tab order.</summary>
-    public int ActivePaneIndex
-    {
-        get => (int)ActivePane;
-        set => ActivePane = (SidePane)value;
-    }
+    /// <summary>Which side-panel section is currently expanded in the accordion, or null when
+    /// every section is collapsed. The window key handler reads/sets it for the pane shortcuts,
+    /// and the accordion keeps it in two-way sync with the open Expander. Null is meaningful:
+    /// collapsing the open section clears it, so a later request for the same pane registers as
+    /// a change and re-expands it.</summary>
+    [ObservableProperty] private SidePane? _activePane = SidePane.Outline;
 
     /// <summary>Set by the Search pane while its input box has focus, so the window-level
     /// key handler lets text keys through instead of treating them as nav shortcuts.</summary>

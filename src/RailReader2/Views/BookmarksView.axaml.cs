@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using Avalonia.Layout;
 using Avalonia.VisualTree;
 using RailReader.Core.Models;
 using RailReader2.ViewModels;
@@ -15,9 +16,15 @@ public partial class BookmarksView : UserControl
 {
     private MainWindowViewModel? _vm;
 
+    // All five pane views are realised at once in the accordion, and ActiveTab is raised
+    // synthetically on every navigation, so a collapsed/hidden pane would otherwise rebuild
+    // its list on every page turn. Defer refreshes that arrive off-screen until it is shown.
+    private bool _refreshPending;
+
     public BookmarksView()
     {
         InitializeComponent();
+        EffectiveViewportChanged += OnViewportChanged;
     }
 
     protected override void OnLoaded(RoutedEventArgs e)
@@ -39,22 +46,40 @@ public partial class BookmarksView : UserControl
         if (_vm is null) return;
 
         _vm.PropertyChanged += OnVmPropertyChanged;
-        _vm.BookmarksChanged += UpdateBookmarkSource;
-        UpdateBookmarkSource();
+        _vm.BookmarksChanged += RefreshIfVisible;
+        RefreshIfVisible();
     }
 
     private void Detach()
     {
         if (_vm is null) return;
         _vm.PropertyChanged -= OnVmPropertyChanged;
-        _vm.BookmarksChanged -= UpdateBookmarkSource;
+        _vm.BookmarksChanged -= RefreshIfVisible;
         _vm = null;
     }
 
     private void OnVmPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs args)
     {
         if (args.PropertyName == nameof(MainWindowViewModel.ActiveTab))
+            RefreshIfVisible();
+    }
+
+    /// <summary>Rebuild the list now if the pane is visible, otherwise defer until it is.</summary>
+    private void RefreshIfVisible()
+    {
+        if (IsEffectivelyVisible) { UpdateBookmarkSource(); _refreshPending = false; }
+        else _refreshPending = true;
+    }
+
+    // Fired when the pane's visible region changes (panel shown/hidden, section expand/collapse);
+    // flush a deferred refresh once it becomes visible.
+    private void OnViewportChanged(object? sender, EffectiveViewportChangedEventArgs e)
+    {
+        if (IsEffectivelyVisible && _refreshPending)
+        {
+            _refreshPending = false;
             UpdateBookmarkSource();
+        }
     }
 
     private void UpdateBookmarkSource()

@@ -344,6 +344,9 @@ public sealed partial class MainWindowViewModel
             tab.State.MarkAnnotationsDirty();
             InvalidateAnnotations();
             NotifyAnnotationsMutated();
+            // MergeInto also appends imported bookmarks; the Bookmarks pane only listens to
+            // BookmarksChanged, so signal it explicitly or imported bookmarks won't appear.
+            NotifyBookmarksChanged();
             ShowStatusToast(added > 0
                 ? $"Imported {added} annotation(s) from {Path.GetFileName(inputPath)}"
                 : "No new annotations found in file");

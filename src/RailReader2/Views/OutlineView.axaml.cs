@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using Avalonia.Layout;
 using RailReader.Core.Models;
 using RailReader2.ViewModels;
 
@@ -17,9 +18,15 @@ public partial class OutlineView : UserControl
     private TabViewModel? _watchedTab;
     private bool _suppressOutlineSelection;
 
+    // The accordion realises all panes at once and ActiveTab is raised synthetically on every
+    // navigation, so a collapsed/hidden Outline pane would otherwise re-bind the tree and walk
+    // the whole outline on every page turn. Defer that work until the pane is shown.
+    private bool _refreshPending;
+
     public OutlineView()
     {
         InitializeComponent();
+        EffectiveViewportChanged += OnViewportChanged;
     }
 
     protected override void OnLoaded(RoutedEventArgs e)
@@ -42,8 +49,7 @@ public partial class OutlineView : UserControl
 
         _vm.PropertyChanged += OnVmPropertyChanged;
         WatchActiveTabPage();
-        UpdateOutlineSource();
-        SyncOutlineToPage();
+        RefreshIfVisible();
     }
 
     private void Detach()
@@ -65,6 +71,24 @@ public partial class OutlineView : UserControl
         if (args.PropertyName == nameof(MainWindowViewModel.ActiveTab))
         {
             WatchActiveTabPage();
+            RefreshIfVisible();
+        }
+    }
+
+    /// <summary>Re-bind the tree and sync the highlight to the current page if the pane is
+    /// visible, otherwise defer until it is shown.</summary>
+    private void RefreshIfVisible()
+    {
+        if (IsEffectivelyVisible) { UpdateOutlineSource(); SyncOutlineToPage(); _refreshPending = false; }
+        else _refreshPending = true;
+    }
+
+    // Fired when the pane's visible region changes; flush a deferred refresh once it's visible.
+    private void OnViewportChanged(object? sender, EffectiveViewportChangedEventArgs e)
+    {
+        if (IsEffectivelyVisible && _refreshPending)
+        {
+            _refreshPending = false;
             UpdateOutlineSource();
             SyncOutlineToPage();
         }
@@ -84,7 +108,7 @@ public partial class OutlineView : UserControl
     private void OnTabPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs args)
     {
         if (args.PropertyName == nameof(TabViewModel.CurrentPage))
-            SyncOutlineToPage();
+            RefreshIfVisible();
     }
 
     private void UpdateOutlineSource()

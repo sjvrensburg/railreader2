@@ -240,9 +240,10 @@ public partial class MainWindow : Window
             if (e.Key == Key.Right) { vm.NavigateForward(); e.Handled = true; return; }
         }
 
-        // When the search TextBox has focus, let text input keys through.
-        // Only intercept non-text keys (F-keys, Escape, PgUp/PgDn, etc.).
-        bool textInputFocused = (vm.ShowOutline && vm.IsSearchInputFocused)
+        // When the search TextBox has focus, let text input keys through. Also require the
+        // Search section to actually be the open pane, so a stale focus flag (Search collapsed
+        // while the box held focus) can't keep swallowing nav keys.
+        bool textInputFocused = (vm.ShowOutline && vm.IsSearchInputFocused && vm.ActivePane == SidePane.Search)
             || StatusBar.IsEditing;
 
         if (!textInputFocused && HandleNavigationKey(vm, e))
@@ -435,7 +436,7 @@ public partial class MainWindow : Window
             case Key.Escape when vm.IsAnnotationMode:
                 vm.IsAnnotationMode = false; e.Handled = true; return true;
             case Key.Escape when vm.ShowOutline && vm.ActivePane == SidePane.Search:
-                vm.CloseSearch();
+                vm.ClearSearch();
                 vm.ActivePane = SidePane.Outline;
                 e.Handled = true; return true;
             default: return false;

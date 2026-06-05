@@ -90,7 +90,13 @@ public partial class OutlinePanel : UserControl
                         other.Expander.IsExpanded = false;
                 if (_vm is not null) _vm.ActivePane = section.Pane;
             }
-            // Collapsing is allowed — nothing else opens; just refresh the row heights.
+            else if (_vm is not null && _vm.ActivePane == section.Pane)
+            {
+                // Collapsing the open section: no section is open now, so clear ActivePane.
+                // Keeping it stale would make a later request for this same pane (menu / shortcut
+                // / Ctrl+F) a no-op set that never re-expands it.
+                _vm.ActivePane = null;
+            }
             UpdateRowHeights();
         }
         finally
@@ -99,9 +105,10 @@ public partial class OutlinePanel : UserControl
         }
     }
 
-    /// <summary>Expand exactly the given pane's section (collapsing the rest). Used when an
-    /// external ActivePane change (menu / shortcut / search) requests a section.</summary>
-    private void ExpandOnly(SidePane pane)
+    /// <summary>Expand exactly the given pane's section (collapsing the rest), or collapse all
+    /// when <paramref name="pane"/> is null. Used when an external ActivePane change (menu /
+    /// shortcut / search) requests a section.</summary>
+    private void ExpandOnly(SidePane? pane)
     {
         _syncing = true;
         try
