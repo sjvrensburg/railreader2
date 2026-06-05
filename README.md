@@ -49,7 +49,7 @@ RailReader2 was built with [Claude Code](https://docs.anthropic.com/en/docs/clau
 
 ## How it works
 
-PDF pages are rasterised by PDFium (via PDFtoImage) at a DPI proportional to the current zoom level (150–600 DPI). The resulting bitmap is uploaded to the GPU as an `SKImage` and drawn on an Avalonia Skia canvas via `ICustomDrawOperation`. Camera pan and zoom are applied as a compositor-level `MatrixTransform` — the bitmap only re-renders when the DPI tier changes, not on every pan/zoom frame.
+PDF pages are rasterised by PDFium (via PDFtoImage) at a DPI proportional to the current zoom level (150–600 DPI). The resulting bitmap is uploaded to the GPU as a mipmapped `SKImage` and drawn on Avalonia's composition thread via a `CompositionCustomVisual`. Camera pan and zoom are applied atomically inside the Skia draw call (not via an Avalonia `MatrixTransform`), which keeps panning jitter-free across platforms; the bitmap only re-renders when the DPI tier changes, not on every pan/zoom frame.
 
 ### Rail reading
 
@@ -93,17 +93,20 @@ At high zoom levels, navigation switches to "rail mode" — the viewer locks ont
 
 - **Multi-tab support** — open multiple PDFs with independent per-tab state. Right-click a tab to duplicate or close
 - **Tab bar overflow** — tabs shrink with ellipsis when many are open. Horizontal mouse wheel scrolls the tab bar. Overflow dropdown button lists all tabs
-- **Outline, bookmarks, and figures panel** — tabbed sidebar with table of contents (Ctrl+Shift+O), named bookmarks (Ctrl+Shift+B), and a figures/tables/equations browser (Ctrl+Shift+I) with thumbnails and extracted equation text
-- **Named bookmarks** — bookmark any page with a custom name (B key or + button in the bookmarks pane). Navigate to bookmarks with a single click. Rename and delete inline. "Back to previous location" button for quick return after jumping. Bookmarks persist in the annotation sidecar file
+- **Side panel (accordion)** — a single-open accordion: opening one section collapses the others, and the open section fills the panel. Sections are **Outline** (table of contents, Ctrl+Shift+O), **Bookmarks** (named bookmarks, Ctrl+Shift+B), **Index** (figures/tables/equations browser with thumbnails and extracted equation text, Ctrl+Shift+I), **Search** (full-document text search, Ctrl+F), and **Comments** (a list of annotation notes and in-PDF reviewer comments). Toggle the whole panel with the sidebar button at the left of the tab strip
+- **Whole-document figure scan** — the Index section's **Scan All** button sweeps every page for figures, tables, and equations (beyond the background lookahead), building a complete browsable index with thumbnails
+- **Focus follows navigation** — clicking an entry in any side-panel section (an outline heading, search result, bookmark, or figure) moves keyboard focus back to the page, so scrolling immediately drives the document rather than the list
+- **Named bookmarks** — bookmark any page with a custom name (B key or + button in the Bookmarks section). Navigate to bookmarks with a single click. Rename and delete inline. "Back to previous location" button for quick return after jumping. Bookmarks persist in the document's annotation store (keyed by the PDF's path)
 - **Interactive minimap** — click or drag inside to navigate. Drag the top-edge grip to move; drag the inner corner to resize. Switches to the primary's high-DPI bitmap when enlarged so it stays crisp. Position and size persist
 - **On-screen nav buttons** — ◀/▶ buttons in the status bar for mouse-only page navigation
-- **Search** — full-text search in a sidebar panel with results grouped by page, text snippets with highlighted match terms, regex and case sensitivity toggles, and match highlighting on the page (Ctrl+F)
+- **Search** — full-document text search in the side panel's Search section, with results grouped by page, text snippets with highlighted match terms, regex and case sensitivity toggles, and match highlighting on the page (Ctrl+F)
 - **Copy as LaTeX** — send any detected equation, table, or figure to a Vision Language Model and copy the result to clipboard. Equations → LaTeX, tables → Markdown, figures → description. Access via `Ctrl+L` (current block), `Ctrl+right-click` (context menu), or Edit menu. Works with cloud APIs (OpenAI `gpt-5.4-nano-2026-03-17` recommended) or local models ([Ollama](https://ollama.com), [vLLM](docs/vllm-guide.md)). Configure in Settings > VLM. See the [VLM setup guide](docs/vllm-guide.md) for all options
 
 #### Annotations & text
 
 - **PDF links** — click internal cross-references (citations, figure refs, TOC entries) to navigate to the exact target position, or external URLs to open in the browser with a confirmation prompt. Back/forward history with `Alt+Left`/`Alt+Right`. Hand cursor on hover
 - **Annotations** — highlight, freehand pen, rectangles, text notes, and eraser via a three-ring radial menu (right-click): tool selection (inner), stroke thickness — thin/normal/thick (middle, for pen and rectangle), and colour picker (outer). Colour options: highlight (yellow/green/pink), pen (red/blue/black), rectangle (blue/red/black). Annotations render in z-order: highlights below strokes and rectangles, text notes on top. Collapsible popup notes with folded-corner icon. Select, move, and resize annotations in browse mode. Delete selected annotations with the Delete key.
+- **Comments pane** — the side panel's Comments section lists every annotation note and imported / in-PDF reviewer comment across the document; click an entry to jump to it, filter by source (all / reviewer / yours), and change a reviewer comment's review state inline
 - **Text selection** — select and copy text from PDF pages via the toolbar
 - **Toolbar** — floating Browse/Text Select/Copy toolbar for quick mode switching
 - **Annotation export** — export PDFs with embedded annotations (File → Export with Annotations)
@@ -126,6 +129,7 @@ At high zoom levels, navigation switches to "rail mode" — the viewer locks ont
 #### General
 
 - **Menu bar** — File, View, Navigation, Help menus with keyboard shortcuts
+- **Vector icons** — the toolbar, radial menu, and panel controls use crisp Lucide SVG icons that inherit the theme text colour and scale with the UI font-size setting
 - **Settings panel** — live-editable rail reading parameters with persistence
 - **Tabbed settings** — organised settings panel with Appearance, Rail Reading, Auto-Scroll, and Advanced tabs
 - **Keyboard shortcuts dialog** — press F1 or Help → Keyboard Shortcuts for a complete reference
@@ -238,10 +242,11 @@ Run `railreader2-cli --help` or `railreader2-cli <command> --help` for all optio
 | [ / ] | Adjust scroll speed or jump distance (rail mode) |
 | Shift+[ / Shift+] | Adjust blur intensity (rail mode) |
 | D (shift) | Toggle debug overlay (shows detected blocks) |
-| Ctrl+Shift+B | Toggle bookmarks pane |
-| Ctrl+Shift+I | Toggle figures panel |
+| Ctrl+Shift+O | Open Outline section |
+| Ctrl+Shift+B | Open Bookmarks section |
+| Ctrl+Shift+I | Open Index section (figures / tables / equations) |
 | Ctrl+L | Copy current block as LaTeX / Markdown / description (VLM) |
-| Ctrl+F | Open search panel |
+| Ctrl+F | Open Search section |
 | F3 / Shift+F3 | Next / previous search match |
 | Right-click | Open annotation radial menu |
 | Ctrl+Z / Ctrl+Y | Undo / redo annotation |

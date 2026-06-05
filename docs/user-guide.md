@@ -18,13 +18,12 @@ Everything you need to know to get the most out of railreader2.
 10. [PDF Links](#pdf-links)
 11. [Text Selection](#text-selection)
 12. [Bookmarks](#bookmarks)
-13. [Figures Panel](#figures-panel)
+13. [Index Pane](#index-pane)
 14. [Copy as LaTeX (VLM)](#copy-as-latex-vlm)
 15. [CLI Tool](#cli-tool)
 16. [Settings](#settings)
 17. [Troubleshooting](#troubleshooting)
 18. [Keyboard Shortcuts](#keyboard-shortcuts)
-19. [Removed Features](#removed-features)
 
 ---
 
@@ -83,7 +82,9 @@ Press `Ctrl+M` to toggle the **minimap** — a page thumbnail in the corner. Cli
 
 When you enlarge the minimap past its thumbnail resolution, it transparently switches to rendering from the primary view's high-DPI page bitmap so the enlarged thumbnail stays crisp.
 
-Press `Ctrl+Shift+O` to open the **outline panel** (table of contents). Click entries to jump to sections. Press `Ctrl+Shift+B` to open the **bookmarks panel** — see [Bookmarks](#bookmarks). Press `Ctrl+Shift+I` to open the **figures panel** — a browsable index of all detected figures, tables, and equations in the document. See [Figures Panel](#figures-panel).
+The **side panel** is a single-open accordion with five sections — **Outline**, **Bookmarks**, **Index**, **Search**, and **Comments**. Opening one section collapses the others, so the open section always fills the panel. Toggle the whole panel with the **sidebar button** (the panel icon at the left of the tab strip), or jump straight to a section: `Ctrl+Shift+O` opens **Outline** (table of contents — click entries to jump to sections), `Ctrl+Shift+B` opens **Bookmarks** (see [Bookmarks](#bookmarks)), `Ctrl+Shift+I` opens the **Index** pane (a browsable index of all detected figures, tables, and equations — see [Index Pane](#index-pane)), and `Ctrl+F` opens **Search**.
+
+When you click an entry in any section — an outline heading, a search result, a bookmark, a figure — keyboard focus moves to the page, so scrolling immediately drives the document rather than the list. (In the Outline, arrow keys still browse the tree; only a mouse click hands focus to the page.)
 
 ### Multi-tab
 
@@ -93,7 +94,7 @@ Open multiple PDFs in tabs with `Ctrl+O`. Each tab has independent zoom, positio
 - **Duplicate Tab** — opens the same PDF in a new tab
 - **Close Tab** — closes the tab
 
-**Tab bar overflow:** When many tabs are open, they shrink with ellipsis text. Use the mouse wheel to scroll the tab bar horizontally, or click the **▼** dropdown to see all tabs and jump to one.
+**Tab bar overflow:** When many tabs are open, they shrink with ellipsis text. Use the mouse wheel to scroll the tab bar horizontally, or click the overflow button (a downward chevron) at the end of the tab bar to see all tabs and jump to one.
 
 Switching tabs automatically exits any active annotation mode to prevent accidental edits on the wrong document.
 
@@ -223,7 +224,7 @@ Each effect has adjustable intensity (0.0 to 1.0). Rail mode overlay colours aut
 
 ## Search
 
-Press `Ctrl+F` to open the search panel in the sidebar. The search tab sits alongside the Outline and Bookmarks tabs. Type your query — results appear automatically after a brief debounce.
+Press `Ctrl+F` to open the **Search** section of the side panel (one of the accordion sections, alongside Outline, Bookmarks, Index, and Comments). Type your query — results appear automatically after a brief debounce. Clicking a result jumps to the match and hands keyboard focus back to the page.
 
 ![Search highlights](img/search_highlights.png)
 *Search results — matches grouped by page in the sidebar, highlighted on the page in yellow with the active match in orange*
@@ -302,6 +303,15 @@ Use **File > Export Annotations as JSON** to save all annotations and bookmarks 
 
 Use **File > Import Annotations...** to import annotations from a JSON file. Imported annotations are merged with any existing annotations on the active document — your annotations are preserved, and the imported ones are added alongside them. Duplicate bookmarks (same name and page) are skipped.
 
+### Comments pane
+
+The side panel's **Comments** section gathers every text note and reviewer comment in the document into one scrollable list, so you can read or jump between them without scrolling the pages.
+
+- **Sources:** your own text-note annotations and **in-PDF reviewer comments** — comments authored in other PDF tools (Acrobat, Preview, etc.) and embedded in the file — are shown together.
+- **Filter:** use the **All / Reviewer / Yours** filter at the top to narrow the list by source.
+- **Jump:** click any entry to navigate to its page; focus returns to the page so you can keep scrolling.
+- **Review state:** for in-PDF reviewer comments, you can change the review state inline from the list.
+
 ---
 
 ## PDF Links
@@ -344,7 +354,7 @@ Press `B` to bookmark the current page, or click **+ Add Bookmark** in the bookm
 
 ### Managing bookmarks
 
-Press `Ctrl+Shift+B` to open the bookmarks panel (a tab alongside the outline panel). Each bookmark shows its name and page number.
+Press `Ctrl+Shift+B` to open the **Bookmarks** section of the side panel. Each bookmark shows its name and page number.
 
 - **Navigate:** Click a bookmark to jump to that page (zoom resets to fit the page).
 - **Rename:** Click the **Rename** button on a bookmark to change its name.
@@ -361,13 +371,17 @@ Bookmarks are stored in the same annotation file as highlights, notes, and other
 
 ---
 
-## Figures Panel
+## Index Pane
 
-Press `Ctrl+Shift+I` to open the **figures panel** — a browsable index of all figures, tables, and equations detected by the layout analysis model. The panel sits alongside the Outline, Bookmarks, and Search tabs in the sidebar.
+Press `Ctrl+Shift+I` to open the **Index** pane — a browsable index of all figures, tables, and equations detected by the layout analysis model. It is one of the side-panel accordion sections (alongside Outline, Bookmarks, Search, and Comments).
 
 ### How it works
 
-RailReader2 progressively analyses all pages in the background when idle. As pages are scanned, detected figures, tables, and equations appear in the panel. A progress indicator shows how many pages have been scanned (e.g., "12 of 20 pages scanned"). Background scanning pauses automatically during rail mode to avoid interfering with reading.
+RailReader2 progressively analyses all pages in the background when idle. As pages are scanned, detected figures, tables, and equations appear in the pane. A progress indicator shows how many pages have been scanned (e.g., "12 of 20 pages scanned"). Background scanning pauses automatically during rail mode to avoid interfering with reading.
+
+### Scan All
+
+Background analysis only reaches pages near where you have been reading. To index the **entire** document at once, click **Scan All** at the top of the pane — it sweeps every page for figures, tables, and equations and reports progress as it goes. The result is kept with the document, so switching tabs and back does not lose it. Use this when you want a complete figure index immediately rather than waiting for the background pass.
 
 ### Browsing entries
 
@@ -376,7 +390,7 @@ Each entry shows:
 - **Figures and tables** — a thumbnail crop of the detected region
 - **Equations** — the extracted text content from the PDF text layer (e.g., Unicode math symbols)
 
-Use the **Figures**, **Tables**, and **Equations** toggle buttons at the top to filter by category. Click any entry to navigate directly to that page.
+Use the **Figures**, **Tables**, and **Equations** toggle buttons at the top to filter by category. Click any entry to navigate to that page (focus returns to the page so you can scroll straight away).
 
 ---
 
@@ -693,9 +707,9 @@ The log is overwritten at the start of each session. Old `.log` files are automa
 | `Ctrl+,` | Settings |
 | `Ctrl+M` | Toggle minimap |
 | `Ctrl+Shift+M` | Toggle margin cropping |
-| `Ctrl+Shift+O` | Toggle outline panel |
-| `Ctrl+Shift+B` | Toggle bookmarks panel |
-| `Ctrl+Shift+I` | Toggle figures panel |
+| `Ctrl+Shift+O` | Open Outline section |
+| `Ctrl+Shift+B` | Open Bookmarks section |
+| `Ctrl+Shift+I` | Open Index section (figures / tables / equations) |
 | `Ctrl+G` | Go to page |
 | `F1` | Keyboard shortcuts dialog |
 | `F11` | Toggle fullscreen |
