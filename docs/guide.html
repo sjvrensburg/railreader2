@@ -31,7 +31,7 @@
         "description": "Complete user guide for railreader2 — a desktop PDF viewer with AI-guided rail reading. Covers rail mode, auto-scroll, jump mode, colour effects, annotations, search, bookmarks, and all keyboard shortcuts.",
         "url": "https://sjvrensburg.github.io/railreader2/guide.html",
         "datePublished": "2026-02-26",
-        "dateModified": "2026-03-20",
+        "dateModified": "2026-06-05",
         "author": {
           "@type": "Person",
           "name": "Stéfan Janse van Rensburg"
@@ -84,6 +84,7 @@
         <a href="#search">Search</a>
         <a href="#annotations">Annotations</a>
         <a href="#cli-tool">CLI</a>
+        <a href="#icons">Icons</a>
         <a href="#shortcuts">Shortcuts</a>
         <a href="https://github.com/sjvrensburg/railreader2">GitHub</a>
       </nav>
@@ -112,11 +113,13 @@
         <li><a href="#pdf-links">PDF Links</a></li>
         <li><a href="#text-selection">Text Selection</a></li>
         <li><a href="#bookmarks">Bookmarks</a></li>
-        <li><a href="#figures-panel">Figures Panel</a></li>
+        <li><a href="#figures-panel">Index Pane</a></li>
+        <li><a href="#comments">Comments</a></li>
         <li><a href="#vlm">Copy as LaTeX (VLM)</a></li>
         <li><a href="#cli-tool">CLI Tool</a></li>
         <li><a href="#settings">Settings</a></li>
         <li><a href="#troubleshooting">Troubleshooting</a></li>
+        <li><a href="#icons">Controls &amp; Icons</a></li>
         <li><a href="#shortcuts">Keyboard Shortcuts</a></li>
       </ol>
     </nav>
@@ -213,12 +216,24 @@
         high-DPI page bitmap so it stays crisp.
       </p>
       <p>
-        Press <code>Ctrl+Shift+O</code> to open the <strong>outline panel</strong> (table of contents).
-        Click entries to jump to sections. Press <code>Ctrl+Shift+B</code> to open the
-        <strong>bookmarks panel</strong> &mdash; see <a href="#bookmarks">Bookmarks</a>.
-        Press <code>Ctrl+Shift+I</code> to open the <strong>figures panel</strong> &mdash;
-        a browsable index of all detected figures, tables, and equations with
-        thumbnails and extracted text. See <a href="#figures-panel">Figures Panel</a>.
+        The <strong>side panel</strong> is a single-open accordion with five sections &mdash;
+        <strong>Outline</strong>, <strong>Bookmarks</strong>, <strong>Index</strong>,
+        <strong>Search</strong>, and <strong>Comments</strong>. Opening one section collapses the
+        others, so the open section fills the panel. Toggle the whole panel with the
+        <strong>sidebar button</strong>
+        <svg class="ricon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5,3 H19 A2,2 0 0 1 21,5 V19 A2,2 0 0 1 19,21 H5 A2,2 0 0 1 3,19 V5 A2,2 0 0 1 5,3 Z M0 0 M9,3 V21"/></svg>
+        at the left of the tab strip, or jump straight to a section: <code>Ctrl+Shift+O</code> opens
+        <strong>Outline</strong> (table of contents &mdash; click entries to jump to sections),
+        <code>Ctrl+Shift+B</code> opens <strong>Bookmarks</strong> (see <a href="#bookmarks">Bookmarks</a>),
+        <code>Ctrl+Shift+I</code> opens the <strong>Index</strong> pane (figures, tables, and equations
+        &mdash; see <a href="#figures-panel">Index Pane</a>), and <code>Ctrl+F</code> opens
+        <strong>Search</strong>.
+      </p>
+      <p>
+        When you click an entry in any section &mdash; an outline heading, a search result, a
+        bookmark, a figure &mdash; keyboard focus moves to the page, so scrolling immediately drives
+        the document rather than the list. (In the Outline, arrow keys still browse the tree; only a
+        mouse click hands focus to the page.)
       </p>
 
       <h3>Multi-tab</h3>
@@ -450,8 +465,9 @@
     <section class="guide-section" id="search">
       <h2>Search</h2>
       <p>
-        Press <code>Ctrl+F</code> to open the search panel in the sidebar. The search tab sits alongside
-        the Outline, Bookmarks, and Figures tabs. Type your query &mdash; results appear automatically after a brief debounce.
+        Press <code>Ctrl+F</code> to open the <strong>Search</strong> section of the side panel (one of the
+        accordion sections, alongside Outline, Bookmarks, Index, and Comments). Type your query &mdash; results
+        appear automatically after a brief debounce; clicking a result jumps to the match and hands keyboard focus back to the page.
       </p>
 
       <figure class="guide-screenshot">
@@ -639,7 +655,7 @@
 
       <h3>Managing bookmarks</h3>
       <p>
-        Press <code>Ctrl+Shift+B</code> to open the bookmarks panel (a tab alongside the outline panel).
+        Press <code>Ctrl+Shift+B</code> to open the <strong>Bookmarks</strong> section of the side panel.
         Each bookmark shows its name and page number.
       </p>
       <ul>
@@ -663,22 +679,30 @@
       </p>
     </section>
 
-    <!-- Figures Panel -->
+    <!-- Index Pane -->
     <section class="guide-section" id="figures-panel">
-      <h2>Figures Panel</h2>
+      <h2>Index Pane</h2>
       <p>
-        Press <code>Ctrl+Shift+I</code> to open the <strong>figures panel</strong> &mdash;
+        Press <code>Ctrl+Shift+I</code> to open the <strong>Index</strong> pane &mdash;
         a browsable index of all figures, tables, and equations detected by the layout analysis model.
-        The panel sits alongside the Outline, Bookmarks, and Search tabs in the sidebar.
+        It is one of the side-panel accordion sections (alongside Outline, Bookmarks, Search, and Comments).
       </p>
 
       <h3>Background scanning</h3>
       <p>
         RailReader2 progressively analyses all pages in the background when idle.
-        As pages are scanned, detected figures, tables, and equations appear in the panel.
+        As pages are scanned, detected figures, tables, and equations appear in the pane.
         A progress indicator shows how many pages have been scanned
         (e.g., &ldquo;12 of 20 pages scanned&rdquo;). Background scanning pauses automatically
         during rail mode to avoid interfering with reading.
+      </p>
+
+      <h3>Scan All</h3>
+      <p>
+        Background analysis only reaches pages near where you have been reading. To index the
+        <strong>entire</strong> document at once, click <strong>Scan All</strong> at the top of the
+        pane &mdash; it sweeps every page for figures, tables, and equations and reports progress as
+        it goes. The result is kept with the document, so switching tabs and back does not lose it.
       </p>
 
       <h3>Browsing entries</h3>
@@ -686,9 +710,29 @@
         Each entry shows a thumbnail crop for figures and tables, or extracted text content
         for equations (Unicode math symbols from the PDF text layer).
         Use the <strong>Figures</strong>, <strong>Tables</strong>, and <strong>Equations</strong>
-        toggle buttons at the top to filter by category. Click any entry to navigate directly
-        to that page.
+        toggle buttons at the top to filter by category. Click any entry to navigate to that page.
       </p>
+    </section>
+
+    <!-- Comments -->
+    <section class="guide-section" id="comments">
+      <h2>Comments</h2>
+      <p>
+        The side panel's <strong>Comments</strong> section gathers every text note and reviewer
+        comment in the document into one scrollable list, so you can read or jump between them
+        without scrolling the pages.
+      </p>
+      <ul>
+        <li><strong>Sources:</strong> your own text-note annotations and <strong>in-PDF reviewer
+          comments</strong> &mdash; comments authored in other PDF tools (Acrobat, Preview, &hellip;)
+          and embedded in the file &mdash; appear together.</li>
+        <li><strong>Filter:</strong> use the <strong>All / Reviewer / Yours</strong> filter at the top
+          to narrow the list by source.</li>
+        <li><strong>Jump:</strong> click an entry to navigate to its page; focus returns to the page
+          so you can keep scrolling.</li>
+        <li><strong>Review state:</strong> for in-PDF reviewer comments, you can change the review
+          state inline from the list.</li>
+      </ul>
     </section>
 
     <!-- VLM -->
@@ -722,7 +766,7 @@
 
       <h3>Recommended models</h3>
       <ul>
-        <li><strong>Cloud (OpenAI):</strong> <code>gpt-4.1-mini</code> &mdash;
+        <li><strong>Cloud (OpenAI):</strong> <code>gpt-5.4-nano-2026-03-17</code> &mdash;
             best accuracy for equations and tables. Requires an API key. Note: sends images to external servers.</li>
         <li><strong>Local (Ollama):</strong> <code>qwen2.5-vl:7b</code> &mdash;
             good general-purpose vision model, no data leaves your machine</li>
@@ -855,13 +899,13 @@ railreader2-cli annotations paper.pdf --format pdf --output paper.annotated.pdf<
       </table>
       <pre><code># Transcribe every equation and table in a paper to LaTeX/Markdown
 railreader2-cli vlm paper.pdf --classes equation,table \
-    --endpoint https://api.openai.com/v1 --model gpt-4o-mini \
+    --endpoint https://api.openai.com/v1 --model gpt-5.4-nano-2026-03-17 \
     --output transcriptions.json
 
 # Mixed routing: local Ollama for equations, OpenAI for figures
 railreader2-cli vlm paper.pdf --classes equation,figure \
     --equation-endpoint http://localhost:11434/v1 --equation-model qwen2.5-vl:7b \
-    --figure-endpoint https://api.openai.com/v1 --figure-model gpt-4o-mini \
+    --figure-endpoint https://api.openai.com/v1 --figure-model gpt-5.4-nano-2026-03-17 \
     --output rich.json
 
 # Reuse a pre-computed structure JSON (skip ONNX)
@@ -898,7 +942,7 @@ railreader2-cli export paper.pdf --no-vlm --output paper.md
 
 # Full fidelity with VLM (LaTeX equations, Markdown tables, figure descriptions)
 railreader2-cli export paper.pdf \
-    --endpoint https://api.openai.com/v1 --model gpt-4o-mini \
+    --endpoint https://api.openai.com/v1 --model gpt-5.4-nano-2026-03-17 \
     --output paper.md
 
 # Export with figure images saved to disk
@@ -993,6 +1037,46 @@ railreader2-cli export paper.pdf --figure-dir ./figures --output paper.md</code>
       </p>
     </section>
 
+    <!-- Controls & Icons -->
+    <section class="guide-section" id="icons">
+      <h2>Controls &amp; Icons</h2>
+      <p>
+        The toolbar, the right-click annotation menu, and the panel controls use a set of crisp
+        Lucide vector icons that inherit the theme text colour and scale with the UI font size.
+        Here is what each one does.
+      </p>
+      <table class="shortcuts-table icon-ref">
+        <thead class="sr-only">
+          <tr><th scope="col">Icon</th><th scope="col">Name</th><th scope="col">Action</th></tr>
+        </thead>
+        <tbody>
+          <tr><th colspan="3" scope="rowgroup">Toolbar</th></tr>
+          <tr><td><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 11V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2 M0 0 M14 10V4a2 2 0 0 0-2-2a2 2 0 0 0-2 2v2 M0 0 M10 10.5V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2v8 M0 0 M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg></td><td>Browse / Pan</td><td>Pan the page and click to navigate &mdash; the default mode</td></tr>
+          <tr><td><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 22h-1a4 4 0 0 1-4-4V6a4 4 0 0 1 4-4h1 M0 0 M7 22h1a4 4 0 0 0 4-4 M0 0 M7 2h1a4 4 0 0 1 4 4"/></svg></td><td>Text Select</td><td>Select text on the page to copy</td></tr>
+          <tr><td><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10,8 H20 A2,2 0 0 1 22,10 V20 A2,2 0 0 1 20,22 H10 A2,2 0 0 1 8,20 V10 A2,2 0 0 1 10,8 Z M0 0 M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></td><td>Copy</td><td>Copy the selected text (<code>Ctrl+C</code>)</td></tr>
+          <tr><td><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7 M0 0 M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z"/></svg></td><td>Annotate</td><td>Enter annotation mode (<code>Ctrl+E</code>)</td></tr>
+        </tbody>
+        <tbody>
+          <tr><th colspan="3" scope="rowgroup">Annotation tools (right-click radial menu)</th></tr>
+          <tr><td><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 11-6 6v3h9l3-3 M0 0 m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"/></svg></td><td>Highlight</td><td>Highlight text (yellow / green / pink)</td></tr>
+          <tr><td><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/></svg></td><td>Pen</td><td>Freehand drawing (red / blue / black)</td></tr>
+          <tr><td><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5,3 H19 A2,2 0 0 1 21,5 V19 A2,2 0 0 1 19,21 H5 A2,2 0 0 1 3,19 V5 A2,2 0 0 1 5,3 Z"/></svg></td><td>Rectangle</td><td>Draw a rectangle outline</td></tr>
+          <tr><td><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 9a2.4 2.4 0 0 0-.706-1.706l-3.588-3.588A2.4 2.4 0 0 0 15 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2z M0 0 M15 3v5a1 1 0 0 0 1 1h5"/></svg></td><td>Text note</td><td>Drop a collapsible popup note</td></tr>
+          <tr><td><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 21H8a2 2 0 0 1-1.42-.587l-3.994-3.999a2 2 0 0 1 0-2.828l10-10a2 2 0 0 1 2.829 0l5.999 6a2 2 0 0 1 0 2.828L12.834 21 M0 0 m5.082 11.09 8.828 8.828"/></svg></td><td>Eraser</td><td>Erase annotations under the cursor</td></tr>
+          <tr><td><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 21h8 M0 0 m15 5 4 4 M0 0 M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/></svg></td><td>Thickness</td><td>Stroke thickness for the pen and rectangle (thin / normal / thick)</td></tr>
+        </tbody>
+        <tbody>
+          <tr><th colspan="3" scope="rowgroup">Panel &amp; navigation</th></tr>
+          <tr><td><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5,3 H19 A2,2 0 0 1 21,5 V19 A2,2 0 0 1 19,21 H5 A2,2 0 0 1 3,19 V5 A2,2 0 0 1 5,3 Z M0 0 M9,3 V21"/></svg></td><td>Sidebar</td><td>Show or hide the side panel (left of the tab strip)</td></tr>
+          <tr><td><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14 M0 0 M12 5v14"/></svg></td><td>Add bookmark</td><td>Bookmark the current page (Bookmarks section)</td></tr>
+          <tr><td><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 19-7-7 7-7 M0 0 M19 12H5"/></svg></td><td>Back</td><td>Return to your previous location after a jump</td></tr>
+          <tr><td><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15,3 H18 A1,1 0 0 1 19,4 V20 A1,1 0 0 1 18,21 H15 A1,1 0 0 1 14,20 V4 A1,1 0 0 1 15,3 Z M0 0 M6,3 H9 A1,1 0 0 1 10,4 V20 A1,1 0 0 1 9,21 H6 A1,1 0 0 1 5,20 V4 A1,1 0 0 1 6,3 Z"/></svg></td><td>Pause</td><td>Pause auto-scroll (rail toolbar)</td></tr>
+          <tr><td><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18 M0 0 m6 6 12 12"/></svg></td><td>Clear / Close</td><td>Clear the search, or close a popup note</td></tr>
+          <tr><td><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></td><td>Overflow</td><td>List all open tabs when the tab bar is full</td></tr>
+        </tbody>
+      </table>
+    </section>
+
     <!-- 12. Keyboard Shortcuts -->
     <section class="guide-section" id="shortcuts">
       <h2>Keyboard Shortcuts</h2>
@@ -1012,9 +1096,9 @@ railreader2-cli export paper.pdf --figure-dir ./figures --output paper.md</code>
           <tr><td>Ctrl+,</td><td>Settings</td></tr>
           <tr><td>Ctrl+M</td><td>Toggle minimap</td></tr>
           <tr><td>Ctrl+Shift+M</td><td>Toggle margin cropping</td></tr>
-          <tr><td>Ctrl+Shift+O</td><td>Toggle outline panel</td></tr>
-          <tr><td>Ctrl+Shift+B</td><td>Toggle bookmarks panel</td></tr>
-          <tr><td>Ctrl+Shift+I</td><td>Toggle figures panel</td></tr>
+          <tr><td>Ctrl+Shift+O</td><td>Open Outline section</td></tr>
+          <tr><td>Ctrl+Shift+B</td><td>Open Bookmarks section</td></tr>
+          <tr><td>Ctrl+Shift+I</td><td>Open Index section (figures / tables / equations)</td></tr>
           <tr><td>Ctrl+L</td><td>Copy block as LaTeX (VLM)</td></tr>
           <tr><td>Ctrl+G</td><td>Go to page</td></tr>
           <tr><td>F1</td><td>Keyboard shortcuts dialog</td></tr>
