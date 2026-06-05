@@ -35,6 +35,11 @@ public class ViewportPanel : Panel
         Background = new SolidColorBrush(Color.FromRgb(128, 128, 128));
     }
 
+    // Expose the viewport's live state (page / zoom / rail mode / current line text) to the platform
+    // accessibility tree, since the page itself is a GPU canvas the a11y stack can't otherwise see.
+    protected override Avalonia.Automation.Peers.AutomationPeer OnCreateAutomationPeer()
+        => new DocumentViewportAutomationPeer(this);
+
     /// <summary>
     /// Update the cursor to reflect the active annotation tool.
     /// Called when the ActiveTool property changes.

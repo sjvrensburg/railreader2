@@ -2,8 +2,11 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:RailReader2.ViewModels"
              xmlns:v="using:RailReader2.Views"
+             xmlns:a="using:Avalonia.Automation"
              x:Class="RailReader2.Views.OutlinePanel"
-             x:DataType="vm:MainWindowViewModel">
+             x:DataType="vm:MainWindowViewModel"
+             a:AutomationProperties.AutomationId="SidePanel"
+             a:AutomationProperties.Name="Side panel">
     <UserControl.Styles>
         <!-- Accordion sections: full-width header, the open section's content fills its row. -->
         <Style Selector="Expander.accordion">
@@ -21,19 +24,24 @@
          ActivePane, so the View menu and keyboard shortcuts drive it. The panel is shown/hidden
          via the sidebar toggle in the tab strip. -->
     <Grid Name="Accordion" RowDefinitions="*,Auto,Auto,Auto,Auto">
-        <Expander Grid.Row="0" Name="OutlineExpander" Classes="accordion" Header="Outline">
+        <Expander Grid.Row="0" Name="OutlineExpander" Classes="accordion" Header="Outline"
+                  a:AutomationProperties.AutomationId="OutlineSection">
             <v:OutlineView />
         </Expander>
-        <Expander Grid.Row="1" Name="BookmarksExpander" Classes="accordion" Header="Bookmarks">
+        <Expander Grid.Row="1" Name="BookmarksExpander" Classes="accordion" Header="Bookmarks"
+                  a:AutomationProperties.AutomationId="BookmarksSection">
             <v:BookmarksView />
         </Expander>
-        <Expander Grid.Row="2" Name="IndexExpander" Classes="accordion" Header="Index">
+        <Expander Grid.Row="2" Name="IndexExpander" Classes="accordion" Header="Index"
+                  a:AutomationProperties.AutomationId="IndexSection">
             <v:IndexView />
         </Expander>
-        <Expander Grid.Row="3" Name="SearchExpander" Classes="accordion" Header="Search">
+        <Expander Grid.Row="3" Name="SearchExpander" Classes="accordion" Header="Search"
+                  a:AutomationProperties.AutomationId="SearchSection">
             <v:SearchView />
         </Expander>
-        <Expander Grid.Row="4" Name="CommentsExpander" Classes="accordion" Header="Comments">
+        <Expander Grid.Row="4" Name="CommentsExpander" Classes="accordion" Header="Comments"
+                  a:AutomationProperties.AutomationId="CommentsSection">
             <v:CommentsView />
         </Expander>
     </Grid>
