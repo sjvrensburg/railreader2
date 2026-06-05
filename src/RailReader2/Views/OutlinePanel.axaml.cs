@@ -1,576 +1,135 @@
+using System;
+using System.ComponentModel;
+using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Input;
 using Avalonia.Interactivity;
-using Avalonia.Media.Imaging;
-using Avalonia.Threading;
-using Avalonia.VisualTree;
-using RailReader.Core;
-using RailReader.Core.Models;
-using RailReader.Core.Services;
-using RailReader.Renderer.Skia;
 using RailReader2.ViewModels;
-using SkiaSharp;
 
 namespace RailReader2.Views;
 
-public class SearchResultGroup
-{
-    public string PageHeader { get; init; } = "";
-    public int PageIndex { get; init; }
-    public List<SearchResultItem> Items { get; init; } = [];
-}
-
-public class SearchResultItem
-{
-    public int MatchIndex { get; init; }
-    public string PreText { get; init; } = "";
-    public string MatchText { get; init; } = "";
-    public string PostText { get; init; } = "";
-}
-
-
+/// <summary>
+/// Side panel as an accordion. The five self-contained pane views (Outline, Bookmarks, Index,
+/// Search, Comments) are stacked as Expander sections. At most one is open at a time: opening a
+/// section collapses the others and that section's grid row is starred so it fills the panel
+/// (collapsed rows are header-height). The open section can also be collapsed, leaving none
+/// open. The open section is synced with the ViewModel's <see cref="MainWindowViewModel.ActivePane"/>
+/// so the View menu and keyboard pane shortcuts drive the same state.
+/// </summary>
 public partial class OutlinePanel : UserControl
 {
+    // The SidePane enum order matches the accordion's grid-row order, so a section's row is just
+    // (int)Pane — no need to track it separately.
+    private readonly (Expander Expander, SidePane Pane)[] _sections;
     private MainWindowViewModel? _vm;
-    private DispatcherTimer? _debounceTimer;
-    private CancellationTokenSource? _searchCts;
-    private bool _suppressOutlineSelection;
+
+    // Guards the ActivePane <-> Expander.IsExpanded sync against re-entrancy.
+    private bool _syncing;
 
     public OutlinePanel()
     {
         InitializeComponent();
-        DataContextChanged += OnDataContextChanged;
 
-        SearchInput.TextChanged += OnSearchTextChanged;
-        SearchInput.KeyDown += OnSearchKeyDown;
-        CaseSensitiveToggle.IsCheckedChanged += OnSearchOptionChanged;
-        RegexToggle.IsCheckedChanged += OnSearchOptionChanged;
-        PaneTabs.SelectionChanged += OnPaneTabChanged;
+        _sections =
+        [
+            (OutlineExpander, SidePane.Outline),
+            (BookmarksExpander, SidePane.Bookmarks),
+            (IndexExpander, SidePane.Index),
+            (SearchExpander, SidePane.Search),
+            (CommentsExpander, SidePane.Comments),
+        ];
+        foreach (var section in _sections)
+            section.Expander.PropertyChanged += OnExpanderPropertyChanged;
+
+        DataContextChanged += OnDataContextChanged;
     }
 
     protected override void OnUnloaded(RoutedEventArgs e)
     {
-        DetachVmSubscriptions();
-        _vm = null;
-
-        // Dispose the debounce timer
-        _debounceTimer?.Stop();
-        _debounceTimer = null;
-
-        _searchCts?.Cancel();
-        _searchCts?.Dispose();
-        _searchCts = null;
-
-        UnsubscribePeekUpdates();
-
-        // Unsubscribe constructor-level subscriptions
-        DataContextChanged -= OnDataContextChanged;
-        SearchInput.TextChanged -= OnSearchTextChanged;
-        SearchInput.KeyDown -= OnSearchKeyDown;
-        CaseSensitiveToggle.IsCheckedChanged -= OnSearchOptionChanged;
-        RegexToggle.IsCheckedChanged -= OnSearchOptionChanged;
-        PaneTabs.SelectionChanged -= OnPaneTabChanged;
-
-        base.OnUnloaded(e);
-    }
-
-    /// <summary>
-    /// Unhooks any active subscriptions on <c>_vm</c> and <c>_watchedTab</c>. Leaves
-    /// <c>_vm</c> in place (caller decides whether to null it out or rebind).
-    /// </summary>
-    private void DetachVmSubscriptions()
-    {
         if (_vm is not null)
         {
             _vm.PropertyChanged -= OnVmPropertyChanged;
-            _vm.PropertyChanged -= OnVmScanProgressChanged;
-            _vm.SearchRequested -= OnSearchRequested;
-            _vm.PaneRequested -= OnPaneRequested;
-            _vm.AnnotationsMutated -= OnAnnotationsMutated;
+            _vm = null;
         }
-        if (_watchedTab is not null)
-        {
-            _watchedTab.PropertyChanged -= OnTabPropertyChanged;
-            _watchedTab = null;
-        }
+        base.OnUnloaded(e);
     }
 
     private void OnDataContextChanged(object? sender, EventArgs e)
     {
-        DetachVmSubscriptions();
+        if (_vm is not null)
+            _vm.PropertyChanged -= OnVmPropertyChanged;
 
         _vm = DataContext as MainWindowViewModel;
 
         if (_vm is not null)
         {
             _vm.PropertyChanged += OnVmPropertyChanged;
-            _vm.SearchRequested += OnSearchRequested;
-            _vm.PaneRequested += OnPaneRequested;
-            _vm.AnnotationsMutated += OnAnnotationsMutated;
-            WatchActiveTabPage();
-            UpdateOutlineSource();
-            SyncOutlineToPage();
-            UpdateBookmarkSource();
-            SubscribePeekUpdates();
+            ExpandOnly(_vm.ActivePane);
         }
     }
 
-    private void OnPaneRequested(SidePane pane)
+    private void OnVmPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        switch (pane)
-        {
-            case SidePane.Outline: SwitchToOutlineTab(); break;
-            case SidePane.Bookmarks: SwitchToBookmarksTab(); break;
-            case SidePane.Index: SwitchToFiguresTab(); break;
-            case SidePane.Search: SwitchToSearchTab(); break;
-            case SidePane.Comments: SwitchToCommentsTab(); break;
-        }
+        if (e.PropertyName == nameof(MainWindowViewModel.ActivePane) && _vm is not null && !_syncing)
+            ExpandOnly(_vm.ActivePane);
     }
 
-    private void OnSearchRequested(string? prefill)
+    private void OnExpanderPropertyChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
     {
-        SwitchToSearchTab();
-        if (prefill is not null)
-            SearchInput.Text = prefill;
-        // Delay focus so the tab switch completes first
-        Dispatcher.UIThread.Post(FocusSearch, DispatcherPriority.Input);
-    }
+        if (_syncing) return;
+        if (e.Property != Expander.IsExpandedProperty || sender is not Expander expander) return;
 
-    private void OnVmPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs args)
-    {
-        if (args.PropertyName == nameof(MainWindowViewModel.ActiveTab))
-        {
-            WatchActiveTabPage();
-            UpdateOutlineSource();
-            SyncOutlineToPage();
-            UpdateBookmarkSource();
+        var section = Array.Find(_sections, s => s.Expander == expander);
+        if (section.Expander is null) return;
 
-            // Only reset peek state when the actual document changes (tab switch),
-            // not on every page navigation within the same document.
-            var newDoc = _vm?.Controller.ActiveDocument;
-            if (newDoc != _peekWatchedDoc)
-            {
-                SubscribePeekUpdates();
-                ClearThumbnailCache();
-                if (IsFiguresTabActive) RefreshPeekIndex();
-            }
-
-            if (IsCommentsTabActive) RefreshComments();
-        }
-        else if (args.PropertyName == nameof(MainWindowViewModel.IsScanAllActive))
-        {
-            OnScanAllStateChanged();
-        }
-    }
-
-    private TabViewModel? _watchedTab;
-
-    private void WatchActiveTabPage()
-    {
-        if (_watchedTab is not null)
-            _watchedTab.PropertyChanged -= OnTabPropertyChanged;
-
-        _watchedTab = _vm?.ActiveTab;
-
-        if (_watchedTab is not null)
-            _watchedTab.PropertyChanged += OnTabPropertyChanged;
-    }
-
-    private void OnTabPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs args)
-    {
-        if (args.PropertyName == nameof(TabViewModel.CurrentPage))
-            SyncOutlineToPage();
-    }
-
-    private void SyncOutlineToPage()
-    {
-        if (_vm?.ActiveTab is not { } tab) return;
-        var outline = tab.Outline;
-        if (outline is null || outline.Count == 0) return;
-
-        int currentPage = tab.CurrentPage;
-        var best = FindEntryForPage(outline, currentPage);
-
-        if (OutlineTree.SelectedItem == best) return;
-
-        _suppressOutlineSelection = true;
+        _syncing = true;
         try
         {
-            OutlineTree.SelectedItem = best;
+            if (expander.IsExpanded)
+            {
+                // Opening a section: collapse the others (single-open) and make it active.
+                foreach (var other in _sections)
+                    if (other.Expander != expander)
+                        other.Expander.IsExpanded = false;
+                if (_vm is not null) _vm.ActivePane = section.Pane;
+            }
+            else if (_vm is not null && _vm.ActivePane == section.Pane)
+            {
+                // Collapsing the open section: no section is open now, so clear ActivePane.
+                // Keeping it stale would make a later request for this same pane (menu / shortcut
+                // / Ctrl+F) a no-op set that never re-expands it.
+                _vm.ActivePane = null;
+            }
+            UpdateRowHeights();
         }
         finally
         {
-            _suppressOutlineSelection = false;
+            _syncing = false;
         }
     }
 
-    /// <summary>
-    /// Find the outline entry whose page is closest to but not past the current page.
-    /// Walks the tree depth-first, returning the last entry with Page &lt;= currentPage.
-    /// </summary>
-    private static OutlineEntry? FindEntryForPage(List<OutlineEntry> entries, int currentPage)
+    /// <summary>Expand exactly the given pane's section (collapsing the rest), or collapse all
+    /// when <paramref name="pane"/> is null. Used when an external ActivePane change (menu /
+    /// shortcut / search) requests a section.</summary>
+    private void ExpandOnly(SidePane? pane)
     {
-        OutlineEntry? best = null;
-        FindEntryForPageRecursive(entries, currentPage, ref best);
-        return best;
-    }
-
-    private static void FindEntryForPageRecursive(List<OutlineEntry> entries, int currentPage, ref OutlineEntry? best)
-    {
-        foreach (var entry in entries)
+        _syncing = true;
+        try
         {
-            if (entry.Page is { } p && p <= currentPage)
-            {
-                if (best is null || p >= best.Page!.Value)
-                    best = entry;
-            }
-            if (entry.Children.Count > 0)
-                FindEntryForPageRecursive(entry.Children, currentPage, ref best);
+            foreach (var (expander, p) in _sections)
+                expander.IsExpanded = p == pane;
+            UpdateRowHeights();
         }
-    }
-
-    private void UpdateOutlineSource()
-    {
-        OutlineTree.ItemsSource = _vm?.ActiveTab?.Outline;
-    }
-
-    public void UpdateBookmarkSource()
-    {
-        var bookmarks = _vm?.ActiveTab?.Annotations.Bookmarks;
-        BookmarkList.ItemsSource = bookmarks is not null ? new List<BookmarkEntry>(bookmarks) : null;
-        UpdateBackButton();
-    }
-
-    private void UpdateBackButton()
-    {
-        BackButton.IsVisible = _vm?.Controller.CanGoBack == true;
-    }
-
-    public bool IsBookmarksTabActive => PaneTabs.SelectedIndex == 1;
-    public bool IsFiguresTabActive => PaneTabs.SelectedIndex == 2;
-    public bool IsSearchTabActive => PaneTabs.SelectedIndex == 3;
-    public bool IsCommentsTabActive => PaneTabs.SelectedIndex == 4;
-    public bool IsSearchInputFocused => IsSearchTabActive && SearchInput.IsFocused;
-
-    public void SwitchToOutlineTab() => PaneTabs.SelectedIndex = 0;
-    public void SwitchToBookmarksTab() => PaneTabs.SelectedIndex = 1;
-    public void SwitchToFiguresTab() => PaneTabs.SelectedIndex = 2;
-    public void SwitchToCommentsTab() => PaneTabs.SelectedIndex = 4;
-
-    public void SwitchToSearchTab()
-    {
-        PaneTabs.SelectedIndex = 3;
-    }
-
-    public void FocusSearch()
-    {
-        SearchInput.Focus();
-        SearchInput.SelectAll();
-    }
-
-    /// <summary>
-    /// Called externally when search state changes (e.g. F3 next/prev match).
-    /// </summary>
-    public void OnSearchInvalidated() => UpdateMatchDisplay();
-
-    private void OnClosePanelClick(object? sender, RoutedEventArgs e)
-    {
-        if (_vm is not null)
-            _vm.ShowOutline = false;
-    }
-
-    // --- Outline events ---
-
-    private void OnOutlineSelectionChanged(object? sender, SelectionChangedEventArgs e)
-    {
-        if (_suppressOutlineSelection) return;
-        if (_vm is { } vm && OutlineTree.SelectedItem is OutlineEntry { Page: { } page })
-            vm.GoToPage(page);
-    }
-
-    // --- Bookmark events ---
-
-    private void OnBackClick(object? sender, RoutedEventArgs e)
-    {
-        if (_vm is not { } vm) return;
-        vm.NavigateBack();
-        UpdateBackButton();
-    }
-
-    private void OnBookmarkClick(object? sender, RoutedEventArgs e)
-    {
-        if (_vm is not { } vm) return;
-        if (sender is not Button { DataContext: BookmarkEntry bm }) return;
-
-        var bookmarks = vm.ActiveTab?.Annotations.Bookmarks;
-        if (bookmarks is null) return;
-
-        int index = bookmarks.IndexOf(bm);
-        if (index < 0) return;
-
-        vm.NavigateToBookmark(index);
-        UpdateBackButton();
-    }
-
-    private async void OnAddBookmarkClick(object? sender, RoutedEventArgs e)
-    {
-        if (_vm is not { } vm || vm.ActiveTab is not { } tab) return;
-
-        if (TopLevel.GetTopLevel(this) is not Window window) return;
-
-        var dialog = new BookmarkNameDialog(tab.CurrentPage + 1) { FontSize = vm.CurrentFontSize };
-        var name = await dialog.ShowDialog<string?>(window);
-        if (name is not null)
+        finally
         {
-            bool added = vm.Controller.AddBookmark(name);
-            UpdateBookmarkSource();
-            vm.ShowStatusToast(added ? $"Bookmark: {name}" : $"Updated bookmark: {name}");
+            _syncing = false;
         }
     }
 
-    private void OnDeleteBookmarkClick(object? sender, RoutedEventArgs e)
+    /// <summary>The open section's row fills the panel (starred); collapsed rows are header-height.</summary>
+    private void UpdateRowHeights()
     {
-        e.Handled = true;
-        if (_vm is not { } vm) return;
-        if (ResolveBookmarkIndex(sender) is not (var bm, var index)) return;
-
-        vm.Controller.RemoveBookmark(index);
-        UpdateBookmarkSource();
-    }
-
-    private async void OnRenameBookmarkClick(object? sender, RoutedEventArgs e)
-    {
-        e.Handled = true;
-        if (_vm is not { } vm) return;
-        if (ResolveBookmarkIndex(sender) is not (var bm, var index)) return;
-        if (TopLevel.GetTopLevel(this) is not Window window) return;
-
-        var dialog = new BookmarkNameDialog(bm.Page + 1) { FontSize = vm.CurrentFontSize };
-        dialog.SetName(bm.Name);
-        var newName = await dialog.ShowDialog<string?>(window);
-        if (newName is not null)
-        {
-            vm.Controller.RenameBookmark(index, newName);
-            UpdateBookmarkSource();
-        }
-    }
-
-    private (BookmarkEntry Entry, int Index)? ResolveBookmarkIndex(object? sender)
-    {
-        if (sender is not Button btn) return null;
-        var bookmarks = _vm?.ActiveTab?.Annotations.Bookmarks;
-        if (bookmarks is null) return null;
-
-        BookmarkEntry? bm = null;
-        for (var v = btn.GetVisualParent(); v is not null; v = v.GetVisualParent())
-        {
-            if (v is Button { DataContext: BookmarkEntry entry }) { bm = entry; break; }
-            if (v is ItemsControl) break;
-        }
-        if (bm is null) return null;
-
-        int index = bookmarks.IndexOf(bm);
-        return index >= 0 ? (bm, index) : null;
-    }
-
-    private void OnPaneTabChanged(object? sender, SelectionChangedEventArgs e)
-    {
-        if (IsFiguresTabActive)
-        {
-            SubscribePeekUpdates();
-            RefreshPeekIndex();
-        }
-        else if (IsCommentsTabActive)
-        {
-            RefreshComments();
-        }
-    }
-
-
-    // --- Search events ---
-
-    private void OnSearchTextChanged(object? sender, TextChangedEventArgs e)
-    {
-        if (_debounceTimer is null)
-        {
-            _debounceTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(200) };
-            _debounceTimer.Tick += (_, _) =>
-            {
-                _debounceTimer.Stop();
-                RunSearch();
-            };
-        }
-        _debounceTimer.Stop();
-        _debounceTimer.Start();
-    }
-
-    private void OnSearchOptionChanged(object? sender, RoutedEventArgs e) => RunSearch();
-
-    private void OnSearchKeyDown(object? sender, KeyEventArgs e)
-    {
-        switch (e.Key)
-        {
-            case Key.Enter when e.KeyModifiers.HasFlag(KeyModifiers.Shift):
-                OnPrevMatchClick(null, e);
-                e.Handled = true;
-                break;
-            case Key.Enter:
-                OnNextMatchClick(null, e);
-                e.Handled = true;
-                break;
-            case Key.Escape:
-                _vm?.CloseSearch();
-                _vm?.InvalidateSearchLayer();
-                SearchInput.Text = "";
-                SearchResultsList.ItemsSource = null;
-                SearchMatchCount.Text = "";
-                e.Handled = true;
-                break;
-        }
-    }
-
-    private void OnClearSearchClick(object? sender, RoutedEventArgs e)
-    {
-        _vm?.CloseSearch();
-        _vm?.InvalidateSearchLayer();
-        SearchInput.Text = "";
-        SearchResultsList.ItemsSource = null;
-        SearchMatchCount.Text = "";
-    }
-
-    private void OnPrevMatchClick(object? sender, RoutedEventArgs e)
-    {
-        if (_vm is null) return;
-        _vm.PreviousMatch();
-        UpdateMatchDisplay();
-    }
-
-    private void OnNextMatchClick(object? sender, RoutedEventArgs e)
-    {
-        if (_vm is null) return;
-        _vm.NextMatch();
-        UpdateMatchDisplay();
-    }
-
-    private void OnSearchResultClick(object? sender, RoutedEventArgs e)
-    {
-        if (_vm is null) return;
-        if (sender is Button { Tag: int matchIndex })
-        {
-            _vm.GoToMatch(matchIndex);
-            UpdateMatchDisplay();
-        }
-    }
-
-    private async void RunSearch()
-    {
-        if (_vm is null) return;
-        string query = SearchInput.Text ?? "";
-
-        // Cancel and dispose any in-progress search
-        _searchCts?.Cancel();
-        _searchCts?.Dispose();
-        _searchCts = new CancellationTokenSource();
-        var token = _searchCts.Token;
-
-        // Require minimum 2 characters (or any length for regex)
-        bool useRegex = RegexToggle.IsChecked == true;
-        if (query.Length < 2 && !useRegex)
-        {
-            _vm.CloseSearch();
-            SearchResultsList.ItemsSource = null;
-            SearchMatchCount.Text = query.Length > 0 ? "Type to search..." : "";
-            return;
-        }
-
-        bool caseSensitive = CaseSensitiveToggle.IsChecked == true;
-        var doc = _vm.Controller.ActiveDocument;
-        if (doc is null) return;
-
-        var (regex, comparison, regexError) = SearchService.PrepareSearchParams(query, caseSensitive, useRegex);
-        if (useRegex && regex is null)
-        {
-            SearchMatchCount.Text = regexError ?? "Invalid regex";
-            SearchResultsList.ItemsSource = null;
-            return;
-        }
-
-        // Clear previous results
-        _vm.Controller.Search.CloseSearch();
-        _vm.InvalidateSearchLayer();
-        SearchMatchCount.Text = "Searching...";
-
-        var allMatches = new List<SearchMatch>();
-        const int batchSize = 20;
-
-        for (int page = 0; page < doc.PageCount; page++)
-        {
-            if (token.IsCancellationRequested) return;
-
-            SearchService.SearchPage(doc, page, query, regex, comparison, allMatches);
-
-            // Yield to UI every batch to stay responsive
-            if (page % batchSize == batchSize - 1)
-                await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Background);
-        }
-
-        if (token.IsCancellationRequested) return;
-
-        _vm.Controller.Search.FinalizeSearch(doc, allMatches);
-        // FinalizeSearch auto-navigates the document to the first match's page, so we
-        // need a full invalidation (page bitmap + camera + overlays), not just the
-        // search layer — otherwise the new page's highlights paint over the old page.
-        _vm.InvalidateAfterSearch();
-        BuildResultGroups();
-        UpdateMatchDisplay();
-    }
-
-    private void BuildResultGroups()
-    {
-        if (_vm is null) { SearchResultsList.ItemsSource = null; return; }
-
-        var matches = _vm.SearchMatches;
-        if (matches.Count == 0)
-        {
-            SearchResultsList.ItemsSource = null;
-            return;
-        }
-
-        var groups = new List<SearchResultGroup>();
-        var currentGroup = (SearchResultGroup?)null;
-
-        for (int i = 0; i < matches.Count; i++)
-        {
-            var m = matches[i];
-            if (currentGroup is null || currentGroup.PageIndex != m.PageIndex)
-            {
-                currentGroup = new SearchResultGroup
-                {
-                    PageHeader = $"Page {m.PageIndex + 1}",
-                    PageIndex = m.PageIndex,
-                    Items = [],
-                };
-                groups.Add(currentGroup);
-            }
-
-            var (pre, match, post) = _vm.Controller.Search.GetMatchSnippet(m);
-            currentGroup.Items.Add(new SearchResultItem
-            {
-                MatchIndex = i,
-                PreText = pre,
-                MatchText = match,
-                PostText = post,
-            });
-        }
-
-        SearchResultsList.ItemsSource = groups;
-    }
-
-    private void UpdateMatchDisplay()
-    {
-        if (_vm is null) return;
-        int total = _vm.SearchMatches.Count;
-        int current = total > 0 ? _vm.ActiveMatchIndex + 1 : 0;
-        SearchMatchCount.Text = total > 0 ? $"{current} of {total}" : "";
+        foreach (var (expander, pane) in _sections)
+            Accordion.RowDefinitions[(int)pane].Height =
+                expander.IsExpanded ? new GridLength(1, GridUnitType.Star) : GridLength.Auto;
     }
 }

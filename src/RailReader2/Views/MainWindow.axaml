@@ -2,6 +2,8 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:RailReader2.ViewModels"
         xmlns:v="using:RailReader2.Views"
+        xmlns:c="using:RailReader2.Controls"
+        xmlns:a="using:Avalonia.Automation"
         x:Class="RailReader2.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Title="railreader2"
@@ -17,9 +19,19 @@
         <v:MenuBarView DockPanel.Dock="Top" DataContext="{Binding}"
                        IsVisible="{Binding !IsFullScreen}" />
 
-        <!-- Tab Bar (visible in windowed mode, or on hover at top edge in fullscreen) -->
-        <v:TabBarView Name="TabBar" DockPanel.Dock="Top" DataContext="{Binding}"
-                      IsVisible="{Binding IsTabBarVisible}" />
+        <!-- Tab strip with a leading sidebar toggle (shows/hides the side panel and reflects
+             its state). Visible in windowed mode, or on hover at the top edge in fullscreen. -->
+        <DockPanel DockPanel.Dock="Top" IsVisible="{Binding IsTabBarVisible}"
+                   Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}">
+            <ToggleButton Name="SidebarToggle" Classes="toolBtn borderless" DockPanel.Dock="Left"
+                          IsChecked="{Binding ShowOutline, Mode=TwoWay}"
+                          VerticalAlignment="Center" Margin="4,0,2,0"
+                          ToolTip.Tip="Toggle side panel"
+                          a:AutomationProperties.Name="Toggle side panel">
+                <c:Icon Data="{StaticResource IconPanelLeft}" />
+            </ToggleButton>
+            <v:TabBarView Name="TabBar" DataContext="{Binding}" />
+        </DockPanel>
 
         <!-- Status Bar (visible in windowed mode, or on hover at bottom edge in fullscreen) -->
         <v:StatusBarView x:Name="StatusBar" DockPanel.Dock="Bottom" DataContext="{Binding}"
@@ -46,36 +58,12 @@
                                IsVisible="False" />
 
                 <Panel>
-                    <!-- Layered PDF viewport with compositor-driven camera -->
-                    <v:ViewportPanel Name="Viewport">
-                        <!-- PagePanel tracks page dimensions for minimap/scrollbar calculations.
-                             No RenderTransform: camera is applied inside each layer's Skia canvas. -->
-                        <Panel Name="CameraPanel">
-                            <Panel Name="PagePanel"
-                                   HorizontalAlignment="Left"
-                                   VerticalAlignment="Top" />
-                        </Panel>
-                        <!-- Rendering layers fill the full viewport; each applies the camera
-                             transform inside its CompositionCustomVisual handler. -->
-                        <v:PdfPageLayer Name="PageLayer" />
-                        <v:SearchHighlightLayer Name="SearchLayer" />
-                        <v:AnnotationLayer Name="AnnotationLayer" />
-                        <v:RailOverlayLayer Name="OverlayLayer" />
-                    </v:ViewportPanel>
+                    <!-- Self-contained PDF viewport (layers + minimap + annotation toolbar
+                         + scan-all). Always present (and thus always sized), like the old
+                         viewport; renders empty when no document is open. -->
+                    <v:DocumentView Name="Document" />
 
-                    <!-- Minimap overlay -->
-                    <v:MinimapControl Name="Minimap"
-                                      IsVisible="{Binding ShowMinimap}" />
-
-                    <!-- Annotation toolbar overlay (always-on Browse/Select/Copy + Annotate,
-                         expanding to the tool set when annotation mode is active) -->
-                    <v:ToolBarView Name="ToolBar"
-                                   VerticalAlignment="Top"
-                                   HorizontalAlignment="Left"
-                                   Margin="16,4,0,0"
-                                   IsVisible="{Binding Tabs.Count}" />
-
-                    <!-- Welcome text when no document open -->
+                    <!-- Welcome text overlay when no document open -->
                     <TextBlock Name="WelcomeText"
                                Text="Open a PDF file (Ctrl+O)"
                                HorizontalAlignment="Center"
@@ -83,28 +71,6 @@
                                FontSize="18"
                                Foreground="White"
                                IsVisible="{Binding !Tabs.Count}" />
-
-                    <!-- Scan All overlay: faded viewport + opaque progress card -->
-                    <Border IsVisible="{Binding IsScanAllActive}"
-                            Background="#50000000"
-                            IsHitTestVisible="True">
-                        <Border HorizontalAlignment="Center" VerticalAlignment="Center"
-                                Background="{DynamicResource SystemControlBackgroundAltHighBrush}"
-                                CornerRadius="8" Padding="24,16"
-                                BoxShadow="0 2 8 0 #40000000">
-                            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8">
-                                <ProgressBar IsIndeterminate="True"
-                                             Width="180" Height="4"
-                                             Foreground="{DynamicResource SystemControlHighlightAccentBrush}" />
-                                <TextBlock Text="{Binding ScanAllProgress}"
-                                           FontSize="14" FontWeight="SemiBold"
-                                           HorizontalAlignment="Center" />
-                                <TextBlock Text="Press Escape to cancel"
-                                           Opacity="0.6" FontSize="11"
-                                           HorizontalAlignment="Center" />
-                            </StackPanel>
-                        </Border>
-                    </Border>
                 </Panel>
             </DockPanel>
         </Grid>

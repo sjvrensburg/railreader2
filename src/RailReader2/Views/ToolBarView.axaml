@@ -4,33 +4,8 @@
              xmlns:c="using:RailReader2.Controls"
              x:Class="RailReader2.Views.ToolBarView">
     <UserControl.Styles>
-        <!-- Theme-aware compact tool buttons. Icons inherit Foreground (the theme text
-             colour), so they adapt to light/dark; active tools use the accent. Buttons
-             auto-size to the (FontSize-scaled) icon, so the toolbar grows with the UI. -->
-        <Style Selector="ToggleButton.toolBtn, Button.toolBtn">
-            <Setter Property="Background" Value="Transparent" />
-            <Setter Property="BorderBrush" Value="{DynamicResource SystemControlForegroundBaseMediumLowBrush}" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="4" />
-            <Setter Property="Padding" Value="8,6" />
-            <Setter Property="HorizontalContentAlignment" Value="Center" />
-            <Setter Property="VerticalContentAlignment" Value="Center" />
-        </Style>
-        <Style Selector="ToggleButton.toolBtn:pointerover, Button.toolBtn:pointerover">
-            <Setter Property="Background" Value="{DynamicResource SystemControlHighlightListLowBrush}" />
-        </Style>
-        <Style Selector="ToggleButton.toolBtn:checked">
-            <Setter Property="Background" Value="{DynamicResource SystemControlHighlightAccentBrush}" />
-            <Setter Property="BorderBrush" Value="{DynamicResource SystemControlHighlightAccentBrush}" />
-            <Setter Property="Foreground" Value="White" />
-        </Style>
-        <Style Selector="ToggleButton.toolBtn:checked:pointerover">
-            <Setter Property="Background" Value="{DynamicResource SystemControlHighlightAccentBrush}" />
-            <Setter Property="Foreground" Value="White" />
-        </Style>
-        <Style Selector="Button.toolBtn:disabled">
-            <Setter Property="Opacity" Value="0.4" />
-        </Style>
+        <!-- The flat tool-button look (ToggleButton/Button.toolBtn) lives in App.axaml so the
+             sidebar toggle can share it. Icons auto-size to the FontSize-scaled glyph. -->
         <Style Selector="Border.toolSep">
             <Setter Property="Width" Value="1" />
             <Setter Property="Margin" Value="3,2" />

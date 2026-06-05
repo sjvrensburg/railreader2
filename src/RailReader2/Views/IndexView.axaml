@@ -1,0 +1,87 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:RailReader2.ViewModels"
+             xmlns:v="using:RailReader2.Views"
+             x:Class="RailReader2.Views.IndexView"
+             x:DataType="vm:MainWindowViewModel">
+    <DockPanel>
+        <!-- Category filter + Scan All button -->
+        <DockPanel DockPanel.Dock="Top" Margin="4,4,4,0">
+            <Button Name="ScanAllButton" Content="Scan All"
+                    DockPanel.Dock="Right"
+                    Click="OnScanAllClick"
+                    Height="26" Padding="8,0"
+                    VerticalAlignment="Center"
+                    VerticalContentAlignment="Center" />
+            <ComboBox Name="CategoryFilter"
+                      SelectedIndex="0"
+                      HorizontalAlignment="Stretch"
+                      VerticalAlignment="Center"
+                      SelectionChanged="OnPeekFilterChanged">
+                <ComboBoxItem Content="All types" />
+                <ComboBoxItem Content="Figures" />
+                <ComboBoxItem Content="Tables" />
+                <ComboBoxItem Content="Equations" />
+            </ComboBox>
+        </DockPanel>
+
+        <!-- Scan All progress banner -->
+        <Border Name="ScanAllBanner" DockPanel.Dock="Top"
+                Background="{DynamicResource SystemControlHighlightListLowBrush}"
+                Padding="8,6" IsVisible="False">
+            <StackPanel Spacing="4">
+                <ProgressBar Name="ScanAllProgressBar"
+                             IsIndeterminate="True"
+                             Minimum="0" Maximum="100"
+                             Height="4" />
+                <TextBlock Name="ScanAllProgressText"
+                           Text="Scanning…"
+                           FontWeight="SemiBold" FontSize="12" />
+                <Button Name="ScanAllCancelButton" Content="Cancel"
+                        Click="OnScanAllCancelClick"
+                        FontSize="11" Padding="8,3"
+                        HorizontalAlignment="Left" />
+            </StackPanel>
+        </Border>
+
+        <!-- Progress indicator -->
+        <TextBlock Name="PeekProgress" DockPanel.Dock="Top"
+                   Margin="6,2" Opacity="0.6" />
+
+        <!-- Scrollable list of entries -->
+        <ScrollViewer>
+            <ItemsControl Name="PeekEntryList">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="v:PeekEntryViewModel">
+                        <Button Click="OnPeekEntryClick"
+                                HorizontalAlignment="Stretch"
+                                HorizontalContentAlignment="Stretch"
+                                Margin="2,1" Padding="4">
+                            <DockPanel>
+                                <!-- Thumbnail for figures/tables -->
+                                <Image DockPanel.Dock="Left" Width="80" Height="60"
+                                       Stretch="Uniform"
+                                       Source="{Binding Thumbnail}"
+                                       IsVisible="{Binding HasThumbnail}"
+                                       Margin="0,0,8,0" />
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding Label}" FontWeight="SemiBold"
+                                               TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Text="{Binding PageDisplay}" Opacity="0.6" />
+                                    <!-- Extracted text for equations -->
+                                    <TextBlock Text="{Binding ExtractedText}"
+                                               IsVisible="{Binding HasExtractedText}"
+                                               Opacity="0.8"
+                                               TextWrapping="Wrap"
+                                               MaxLines="3"
+                                               TextTrimming="CharacterEllipsis"
+                                               Margin="0,2,0,0" />
+                                </StackPanel>
+                            </DockPanel>
+                        </Button>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+    </DockPanel>
+</UserControl>

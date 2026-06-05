@@ -35,6 +35,17 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     [ObservableProperty] private int _activeTabIndex;
     [ObservableProperty] private bool _showOutline;
 
+    /// <summary>Which side-panel section is currently expanded in the accordion, or null when
+    /// every section is collapsed. The window key handler reads/sets it for the pane shortcuts,
+    /// and the accordion keeps it in two-way sync with the open Expander. Null is meaningful:
+    /// collapsing the open section clears it, so a later request for the same pane registers as
+    /// a change and re-expands it.</summary>
+    [ObservableProperty] private SidePane? _activePane = SidePane.Outline;
+
+    /// <summary>Set by the Search pane while its input box has focus, so the window-level
+    /// key handler lets text keys through instead of treating them as nav shortcuts.</summary>
+    public bool IsSearchInputFocused { get; set; }
+
     /// <summary>
     /// Callback set by the code-behind to read the current sidebar column width
     /// from the grid (which may have been resized via GridSplitter).
@@ -48,16 +59,46 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             tab.ShowSidePanel = value;
     }
 
-    /// <summary>Raised when a specific side pane should be shown (menu/shortcut driven).
-    /// The OutlinePanel handles this by switching to the matching tab.</summary>
-    public event Action<SidePane>? PaneRequested;
-
     /// <summary>Show the side panel and switch it to the given pane (for discoverability
-    /// via the View menu). Mirrors the SearchRequested pattern.</summary>
+    /// via the View menu).</summary>
     public void ShowPane(SidePane pane)
     {
+        ActivePane = pane;
         ShowOutline = true;
-        PaneRequested?.Invoke(pane);
+    }
+
+    /// <summary>Toggle a side pane: hide the side panel if it is already the active pane,
+    /// otherwise show the panel and switch to it (keyboard pane shortcuts).</summary>
+    public void TogglePane(SidePane pane)
+    {
+        if (ShowOutline && ActivePane == pane)
+            ShowOutline = false;
+        else
+        {
+            ActivePane = pane;
+            ShowOutline = true;
+        }
+    }
+
+    /// <summary>Raised when bookmarks or navigation-back availability change, so the
+    /// Bookmarks pane can refresh its list and Back button.</summary>
+    public event Action? BookmarksChanged;
+    internal void NotifyBookmarksChanged() => BookmarksChanged?.Invoke();
+
+    /// <summary>Raised when a side pane navigates the document via a click, so the window can
+    /// move keyboard focus to the viewport — otherwise the pane keeps the focus and subsequent
+    /// arrows/scroll move its list instead of the page.</summary>
+    public event Action? ViewportFocusRequested;
+
+    /// <summary>Called when a side pane navigates the document via a click. A discrete jump
+    /// shouldn't inherit continuous-scroll momentum from an arrow key that's still held (in rail
+    /// mode that briefly fought the new position), so reset the held arrow input first, then ask
+    /// the window to focus the viewport.</summary>
+    public void RequestViewportFocus()
+    {
+        _controller.HandleArrowRelease(true);
+        _controller.ClearPageEdgeHold();
+        ViewportFocusRequested?.Invoke();
     }
 
     [ObservableProperty] private bool _showMinimap;
@@ -648,7 +689,16 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     private void InvalidateCamera() => _invalidation?.InvalidateCamera?.Invoke();
     private void InvalidatePage() => _invalidation?.InvalidatePage?.Invoke();
     private void InvalidateOverlay() => _invalidation?.InvalidateOverlay?.Invoke();
-    private void InvalidateSearch() => _invalidation?.InvalidateSearch?.Invoke();
+
+    /// <summary>Raised whenever the search layer is invalidated (match navigation, page
+    /// change, results finalised) so the Search pane refreshes its "N of M" display.</summary>
+    public event Action? SearchInvalidated;
+    private void InvalidateSearch()
+    {
+        _invalidation?.InvalidateSearch?.Invoke();
+        SearchInvalidated?.Invoke();
+    }
+
     private void InvalidateAnnotations() => _invalidation?.InvalidateAnnotations?.Invoke();
 
     private void InvalidateAfterNavigation()

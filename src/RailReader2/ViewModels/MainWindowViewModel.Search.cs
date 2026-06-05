@@ -3,7 +3,25 @@ namespace RailReader2.ViewModels;
 // Search: find, match navigation
 public sealed partial class MainWindowViewModel
 {
-    public event Action<string?>? SearchRequested;
+    // Pending activation state, consumed by the Search pane on load / on SearchActivated.
+    // Held as VM state (not just an event arg) so the request survives until a lazily
+    // loaded Search pane attaches — the pane may not exist yet when Ctrl+F is pressed.
+    private string? _pendingSearchPrefill;
+    private bool _searchFocusPending;
+
+    /// <summary>Raised when search is requested (Ctrl+F / menu / search-selection) so an
+    /// already-loaded Search pane applies the pending prefill/focus immediately.</summary>
+    public event Action? SearchActivated;
+
+    /// <summary>Consume the pending search activation: the prefill text to apply (null = leave
+    /// the box unchanged) and whether the input should be focused. One-shot.</summary>
+    public (string? Prefill, bool Focus) ConsumeSearchActivation()
+    {
+        var result = (_pendingSearchPrefill, _searchFocusPending);
+        _pendingSearchPrefill = null;
+        _searchFocusPending = false;
+        return result;
+    }
 
     public void OpenSearch() => RequestSearch(null);
 
@@ -15,14 +33,29 @@ public sealed partial class MainWindowViewModel
 
     private void RequestSearch(string? prefill)
     {
+        _pendingSearchPrefill = prefill;
+        _searchFocusPending = true;
+        ActivePane = SidePane.Search;
         ShowOutline = true;
-        SearchRequested?.Invoke(prefill);
+        SearchActivated?.Invoke();
     }
 
     public void CloseSearch()
     {
         _controller.Search.CloseSearch();
         InvalidateSearch();
+    }
+
+    /// <summary>Raised when search is cleared from outside the Search pane (e.g. the window-level
+    /// Escape handler), so the pane resets its input box and results list.</summary>
+    public event Action? SearchCleared;
+
+    /// <summary>Close the search and clear the Search pane's input/results — used by entry points
+    /// that don't own the search box (so the query doesn't linger stale for next time).</summary>
+    public void ClearSearch()
+    {
+        CloseSearch();
+        SearchCleared?.Invoke();
     }
 
     public void ExecuteSearch(string query, bool caseSensitive, bool useRegex)

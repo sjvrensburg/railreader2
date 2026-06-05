@@ -1,345 +1,40 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:RailReader2.ViewModels"
-             xmlns:m="using:RailReader.Core.Models"
              xmlns:v="using:RailReader2.Views"
-             xmlns:c="using:RailReader2.Controls"
-             xmlns:a="using:Avalonia.Automation"
              x:Class="RailReader2.Views.OutlinePanel"
              x:DataType="vm:MainWindowViewModel">
-    <DockPanel>
-        <!-- Close button at the top -->
-        <Button DockPanel.Dock="Top"
-                HorizontalAlignment="Right"
-                Padding="8,2"
-                Margin="4,2"
-                Opacity="0.7"
-                Click="OnClosePanelClick">
-            <StackPanel Orientation="Horizontal" Spacing="6">
-                <c:Icon Data="{StaticResource IconClose}" />
-                <TextBlock Text="Close" VerticalAlignment="Center" />
-            </StackPanel>
-        </Button>
+    <UserControl.Styles>
+        <!-- Accordion sections: full-width header, the open section's content fills its row. -->
+        <Style Selector="Expander.accordion">
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="VerticalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="VerticalContentAlignment" Value="Stretch" />
+            <Setter Property="CornerRadius" Value="0" />
+            <Setter Property="Margin" Value="0,0,0,1" />
+        </Style>
+    </UserControl.Styles>
 
-        <TabControl Name="PaneTabs">
-        <!-- Outline tab -->
-        <TabItem Header="Outline">
-            <ScrollViewer>
-                <TreeView Name="OutlineTree"
-                          SelectionChanged="OnOutlineSelectionChanged">
-                    <TreeView.ItemTemplate>
-                        <TreeDataTemplate ItemsSource="{Binding Children}" x:DataType="m:OutlineEntry">
-                            <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
-                        </TreeDataTemplate>
-                    </TreeView.ItemTemplate>
-                </TreeView>
-            </ScrollViewer>
-        </TabItem>
-
-        <!-- Bookmarks tab -->
-        <TabItem Header="Bookmarks">
-            <DockPanel>
-                <Button Name="AddBookmarkButton" DockPanel.Dock="Top"
-                        Content="+ Add Bookmark" Margin="4"
-                        HorizontalAlignment="Stretch"
-                        Click="OnAddBookmarkClick" />
-                <ScrollViewer>
-                    <StackPanel>
-                        <!-- Back to previous location -->
-                        <Button Name="BackButton"
-                                IsVisible="False"
-                                HorizontalAlignment="Stretch"
-                                HorizontalContentAlignment="Left"
-                                Margin="4,0,4,4" Padding="8,6"
-                                FontStyle="Italic" Opacity="0.8"
-                                Click="OnBackClick">
-                            <StackPanel Orientation="Horizontal" Spacing="6">
-                                <c:Icon Data="{StaticResource IconBack}" />
-                                <TextBlock Text="Back to previous location" VerticalAlignment="Center" />
-                            </StackPanel>
-                        </Button>
-                        <!-- Use ItemsControl instead of ListBox to avoid SelectionChanged issues -->
-                        <ItemsControl Name="BookmarkList">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate x:DataType="m:BookmarkEntry">
-                                    <Button Click="OnBookmarkClick"
-                                            HorizontalAlignment="Stretch"
-                                            HorizontalContentAlignment="Stretch"
-                                            Margin="2,1" Padding="6,4">
-                                        <DockPanel>
-                                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="4">
-                                                <Button Content="Rename"                                                        Padding="6,3"
-                                                        ToolTip.Tip="Rename bookmark"
-                                                        Click="OnRenameBookmarkClick" />
-                                                <Button Content="Delete"                                                        Padding="6,3"
-                                                        ToolTip.Tip="Delete bookmark"
-                                                        Click="OnDeleteBookmarkClick" />
-                                            </StackPanel>
-                                            <StackPanel Orientation="Vertical">
-                                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold"
-                                                           TextTrimming="CharacterEllipsis" />
-                                                <TextBlock Text="{Binding PageDisplay}" FontSize="11" Opacity="0.6" />
-                                            </StackPanel>
-                                        </DockPanel>
-                                    </Button>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </StackPanel>
-                </ScrollViewer>
-            </DockPanel>
-        </TabItem>
-
-        <!-- Index tab (figures, tables, equations) -->
-        <TabItem Header="Index">
-            <DockPanel>
-                <!-- Category filter + Scan All button -->
-                <DockPanel DockPanel.Dock="Top" Margin="4,4,4,0">
-                    <Button Name="ScanAllButton" Content="Scan All"
-                            DockPanel.Dock="Right"
-                            Click="OnScanAllClick"
-                            Height="26" Padding="8,0"
-                            VerticalAlignment="Center"
-                            VerticalContentAlignment="Center" />
-                    <ComboBox Name="CategoryFilter"
-                              SelectedIndex="0"
-                              HorizontalAlignment="Stretch"
-                              VerticalAlignment="Center"
-                              SelectionChanged="OnPeekFilterChanged">
-                        <ComboBoxItem Content="All types" />
-                        <ComboBoxItem Content="Figures" />
-                        <ComboBoxItem Content="Tables" />
-                        <ComboBoxItem Content="Equations" />
-                    </ComboBox>
-                </DockPanel>
-
-                <!-- Scan All progress banner -->
-                <Border Name="ScanAllBanner" DockPanel.Dock="Top"
-                        Background="{DynamicResource SystemControlHighlightListLowBrush}"
-                        Padding="8,6" IsVisible="False">
-                    <StackPanel Spacing="4">
-                        <ProgressBar Name="ScanAllProgressBar"
-                                     IsIndeterminate="True"
-                                     Minimum="0" Maximum="100"
-                                     Height="4" />
-                        <TextBlock Name="ScanAllProgressText"
-                                   Text="Scanning…"
-                                   FontWeight="SemiBold" FontSize="12" />
-                        <Button Name="ScanAllCancelButton" Content="Cancel"
-                                Click="OnScanAllCancelClick"
-                                FontSize="11" Padding="8,3"
-                                HorizontalAlignment="Left" />
-                    </StackPanel>
-                </Border>
-
-                <!-- Progress indicator -->
-                <TextBlock Name="PeekProgress" DockPanel.Dock="Top"
-                           Margin="6,2" Opacity="0.6" />
-
-                <!-- Scrollable list of entries -->
-                <ScrollViewer>
-                    <ItemsControl Name="PeekEntryList">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="v:PeekEntryViewModel">
-                                <Button Click="OnPeekEntryClick"
-                                        HorizontalAlignment="Stretch"
-                                        HorizontalContentAlignment="Stretch"
-                                        Margin="2,1" Padding="4">
-                                    <DockPanel>
-                                        <!-- Thumbnail for figures/tables -->
-                                        <Image DockPanel.Dock="Left" Width="80" Height="60"
-                                               Stretch="Uniform"
-                                               Source="{Binding Thumbnail}"
-                                               IsVisible="{Binding HasThumbnail}"
-                                               Margin="0,0,8,0" />
-                                        <StackPanel VerticalAlignment="Center">
-                                            <TextBlock Text="{Binding Label}" FontWeight="SemiBold"
-                                                       TextTrimming="CharacterEllipsis" />
-                                            <TextBlock Text="{Binding PageDisplay}" Opacity="0.6" />
-                                            <!-- Extracted text for equations -->
-                                            <TextBlock Text="{Binding ExtractedText}"
-                                                       IsVisible="{Binding HasExtractedText}"
-                                                       Opacity="0.8"
-                                                       TextWrapping="Wrap"
-                                                       MaxLines="3"
-                                                       TextTrimming="CharacterEllipsis"
-                                                       Margin="0,2,0,0" />
-                                        </StackPanel>
-                                    </DockPanel>
-                                </Button>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </ScrollViewer>
-            </DockPanel>
-        </TabItem>
-
-        <!-- Search tab -->
-        <TabItem Header="Search">
-            <DockPanel>
-                <!-- Search input area -->
-                <StackPanel DockPanel.Dock="Top" Margin="4">
-                    <DockPanel>
-                        <Button DockPanel.Dock="Right"
-                                ToolTip.Tip="Clear Search (Esc)"
-                                a:AutomationProperties.Name="Clear search"
-                                Width="26" Height="26"
-                                HorizontalContentAlignment="Center"
-                                VerticalContentAlignment="Center"
-                                Padding="0" Margin="4,0,0,0"
-                                Click="OnClearSearchClick">
-                            <c:Icon Data="{StaticResource IconClose}" />
-                        </Button>
-                        <TextBox Name="SearchInput" PlaceholderText="Find..." />
-                    </DockPanel>
-                    <StackPanel Orientation="Horizontal" Spacing="4" Margin="0,4,0,0">
-                        <ToggleButton Name="CaseSensitiveToggle"
-                                      Content="Aa"
-                                      ToolTip.Tip="Case Sensitive"
-                                      Width="32" Height="26"
-                                      HorizontalContentAlignment="Center"
-                                      VerticalContentAlignment="Center"
-                                      Padding="0" />
-                        <ToggleButton Name="RegexToggle"
-                                      Content=".*"
-                                      ToolTip.Tip="Regex"
-                                      Width="32" Height="26"
-                                      HorizontalContentAlignment="Center"
-                                      VerticalContentAlignment="Center"
-                                      Padding="0" />
-                        <TextBlock Name="SearchMatchCount"
-                                   Text=""
-                                   VerticalAlignment="Center"
-                                   Opacity="0.7"
-                                   Margin="4,0" />
-                        <Button Name="PrevMatchBtn"
-                                ToolTip.Tip="Previous Match"
-                                a:AutomationProperties.Name="Previous match"
-                                Width="26" Height="26"
-                                HorizontalContentAlignment="Center"
-                                VerticalContentAlignment="Center"
-                                Padding="0"
-                                Click="OnPrevMatchClick">
-                            <c:Icon Data="{StaticResource IconChevronUp}" />
-                        </Button>
-                        <Button Name="NextMatchBtn"
-                                ToolTip.Tip="Next Match"
-                                a:AutomationProperties.Name="Next match"
-                                Width="26" Height="26"
-                                HorizontalContentAlignment="Center"
-                                VerticalContentAlignment="Center"
-                                Padding="0"
-                                Click="OnNextMatchClick">
-                            <c:Icon Data="{StaticResource IconChevronDown}" />
-                        </Button>
-                    </StackPanel>
-                </StackPanel>
-
-                <!-- Results grouped by page -->
-                <ScrollViewer Name="SearchResultsScroll">
-                    <ItemsControl Name="SearchResultsList">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="v:SearchResultGroup">
-                                <StackPanel Margin="0,2,0,0">
-                                    <TextBlock Text="{Binding PageHeader}"
-                                               FontWeight="SemiBold"
-                                               Opacity="0.7"
-                                               Margin="6,4,0,2" />
-                                    <ItemsControl ItemsSource="{Binding Items}">
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate x:DataType="v:SearchResultItem">
-                                                <Button Click="OnSearchResultClick"
-                                                        HorizontalAlignment="Stretch"
-                                                        HorizontalContentAlignment="Left"
-                                                        Margin="2,1" Padding="6,4"
-                                                        Tag="{Binding MatchIndex}">
-                                                    <TextBlock TextWrapping="Wrap">
-                                                        <Run Text="{Binding PreText}" />
-                                                        <Run Text="{Binding MatchText}" FontWeight="Bold"
-                                                             Foreground="#C07800" />
-                                                        <Run Text="{Binding PostText}" />
-                                                    </TextBlock>
-                                                </Button>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-                                </StackPanel>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </ScrollViewer>
-            </DockPanel>
-        </TabItem>
-
-        <!-- Comments tab (native + authored annotations with metadata + review state) -->
-        <TabItem Header="Comments">
-            <DockPanel>
-                <ComboBox Name="CommentFilter" DockPanel.Dock="Top"
-                          Margin="4" SelectedIndex="0"
-                          HorizontalAlignment="Stretch"
-                          SelectionChanged="OnCommentFilterChanged">
-                    <ComboBoxItem Content="All comments" />
-                    <ComboBoxItem Content="Reviewer" />
-                    <ComboBoxItem Content="Yours" />
-                </ComboBox>
-
-                <TextBlock Name="CommentEmptyLabel" DockPanel.Dock="Top"
-                           Text="No comments in this document."
-                           Opacity="0.6" Margin="8" IsVisible="False" />
-
-                <ScrollViewer>
-                    <ItemsControl Name="CommentEntryList">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="v:CommentEntryViewModel">
-                                <Button Click="OnCommentEntryClick"
-                                        HorizontalAlignment="Stretch"
-                                        HorizontalContentAlignment="Stretch"
-                                        Margin="2,1" Padding="6,4">
-                                    <StackPanel Spacing="2">
-                                        <DockPanel>
-                                            <Border DockPanel.Dock="Right"
-                                                    Background="{Binding BadgeBackground}"
-                                                    CornerRadius="3" Padding="5,1"
-                                                    VerticalAlignment="Center">
-                                                <TextBlock Text="{Binding SourceBadge}"
-                                                           FontSize="10" Foreground="White" />
-                                            </Border>
-                                            <TextBlock Text="{Binding TypeLabel}" FontWeight="SemiBold"
-                                                       TextTrimming="CharacterEllipsis" />
-                                        </DockPanel>
-                                        <DockPanel>
-                                            <TextBlock DockPanel.Dock="Right" Text="{Binding DateDisplay}"
-                                                       FontSize="10" Opacity="0.6" VerticalAlignment="Center" />
-                                            <TextBlock Text="{Binding Author}" FontSize="11" Opacity="0.8"
-                                                       TextTrimming="CharacterEllipsis" />
-                                        </DockPanel>
-                                        <TextBlock Text="{Binding Body}"
-                                                   IsVisible="{Binding HasBody}"
-                                                   TextWrapping="Wrap" MaxLines="3"
-                                                   TextTrimming="CharacterEllipsis"
-                                                   Opacity="0.9" Margin="0,1,0,0" />
-                                        <DockPanel Margin="0,1,0,0">
-                                            <TextBlock DockPanel.Dock="Left" Text="Status:"
-                                                       VerticalAlignment="Center" FontSize="10"
-                                                       Opacity="0.6" Margin="0,0,4,0" />
-                                            <ComboBox ItemsSource="{Binding StateOptions}"
-                                                      SelectedItem="{Binding State, Mode=OneWay}"
-                                                      FontSize="11" MinHeight="24" Padding="6,0"
-                                                      HorizontalAlignment="Left"
-                                                      SelectionChanged="OnCommentStateChanged" />
-                                            <TextBlock Text="{Binding PageDisplay}" DockPanel.Dock="Right"
-                                                       FontSize="10" Opacity="0.5"
-                                                       VerticalAlignment="Center"
-                                                       HorizontalAlignment="Right" />
-                                        </DockPanel>
-                                    </StackPanel>
-                                </Button>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </ScrollViewer>
-            </DockPanel>
-        </TabItem>
-    </TabControl>
-    </DockPanel>
+    <!-- At most one section is expanded at a time and fills the panel (its row is starred in
+         code-behind; the rest are header-height). The open section tracks the ViewModel's
+         ActivePane, so the View menu and keyboard shortcuts drive it. The panel is shown/hidden
+         via the sidebar toggle in the tab strip. -->
+    <Grid Name="Accordion" RowDefinitions="*,Auto,Auto,Auto,Auto">
+        <Expander Grid.Row="0" Name="OutlineExpander" Classes="accordion" Header="Outline">
+            <v:OutlineView />
+        </Expander>
+        <Expander Grid.Row="1" Name="BookmarksExpander" Classes="accordion" Header="Bookmarks">
+            <v:BookmarksView />
+        </Expander>
+        <Expander Grid.Row="2" Name="IndexExpander" Classes="accordion" Header="Index">
+            <v:IndexView />
+        </Expander>
+        <Expander Grid.Row="3" Name="SearchExpander" Classes="accordion" Header="Search">
+            <v:SearchView />
+        </Expander>
+        <Expander Grid.Row="4" Name="CommentsExpander" Classes="accordion" Header="Comments">
+            <v:CommentsView />
+        </Expander>
+    </Grid>
 </UserControl>

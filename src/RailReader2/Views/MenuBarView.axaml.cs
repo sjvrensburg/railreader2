@@ -63,8 +63,16 @@ public partial class MenuBarView : UserControl
     }
 
     private void OnCloseTab(object? s, RoutedEventArgs e) => Vm?.CloseTab(Vm.ActiveTabIndex);
-    private void OnQuit(object? s, RoutedEventArgs e) =>
-        (VisualRoot as Window)?.Close();
+
+    private void OnQuit(object? s, RoutedEventArgs e)
+    {
+        // VisualRoot resolves to null when invoked from the menu popup, so close the main
+        // window via the application lifetime instead (mirrors what Ctrl+Q does).
+        if (Avalonia.Application.Current?.ApplicationLifetime
+            is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop
+            && desktop.MainWindow is { } window)
+            window.Close();
+    }
 
     private void OnZoomIn(object? s, RoutedEventArgs e) => Vm?.HandleZoomKey(true);
     private void OnZoomOut(object? s, RoutedEventArgs e) => Vm?.HandleZoomKey(false);
