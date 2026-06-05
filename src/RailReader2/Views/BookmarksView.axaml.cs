@@ -1,7 +1,5 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
-using Avalonia.Layout;
-using Avalonia.VisualTree;
 using RailReader.Core.Models;
 using RailReader2.ViewModels;
 
@@ -12,19 +10,13 @@ namespace RailReader2.Views;
 /// location" jump. Refreshes from the ViewModel's <see cref="MainWindowViewModel.BookmarksChanged"/>
 /// signal and on document switch.
 /// </summary>
-public partial class BookmarksView : UserControl
+public partial class BookmarksView : PaneRefreshView
 {
     private MainWindowViewModel? _vm;
-
-    // All five pane views are realised at once in the accordion, and ActiveTab is raised
-    // synthetically on every navigation, so a collapsed/hidden pane would otherwise rebuild
-    // its list on every page turn. Defer refreshes that arrive off-screen until it is shown.
-    private bool _refreshPending;
 
     public BookmarksView()
     {
         InitializeComponent();
-        EffectiveViewportChanged += OnViewportChanged;
     }
 
     protected override void OnLoaded(RoutedEventArgs e)
@@ -64,23 +56,7 @@ public partial class BookmarksView : UserControl
             RefreshIfVisible();
     }
 
-    /// <summary>Rebuild the list now if the pane is visible, otherwise defer until it is.</summary>
-    private void RefreshIfVisible()
-    {
-        if (IsEffectivelyVisible) { UpdateBookmarkSource(); _refreshPending = false; }
-        else _refreshPending = true;
-    }
-
-    // Fired when the pane's visible region changes (panel shown/hidden, section expand/collapse);
-    // flush a deferred refresh once it becomes visible.
-    private void OnViewportChanged(object? sender, EffectiveViewportChangedEventArgs e)
-    {
-        if (IsEffectivelyVisible && _refreshPending)
-        {
-            _refreshPending = false;
-            UpdateBookmarkSource();
-        }
-    }
+    protected override void Refresh() => UpdateBookmarkSource();
 
     private void UpdateBookmarkSource()
     {
@@ -163,17 +139,11 @@ public partial class BookmarksView : UserControl
 
     private (BookmarkEntry Entry, int Index)? ResolveBookmarkIndex(object? sender)
     {
-        if (sender is not Button btn) return null;
+        // The Rename/Delete buttons live inside the row DataTemplate, so they inherit the row's
+        // BookmarkEntry DataContext directly — no visual-tree walk needed.
+        if (sender is not Button { DataContext: BookmarkEntry bm }) return null;
         var bookmarks = _vm?.ActiveTab?.Annotations.Bookmarks;
         if (bookmarks is null) return null;
-
-        BookmarkEntry? bm = null;
-        for (var v = btn.GetVisualParent(); v is not null; v = v.GetVisualParent())
-        {
-            if (v is Button { DataContext: BookmarkEntry entry }) { bm = entry; break; }
-            if (v is ItemsControl) break;
-        }
-        if (bm is null) return null;
 
         int index = bookmarks.IndexOf(bm);
         return index >= 0 ? (bm, index) : null;

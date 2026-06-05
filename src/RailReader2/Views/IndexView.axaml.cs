@@ -1,7 +1,6 @@
 using System.ComponentModel;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
-using Avalonia.Layout;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using RailReader.Core;
@@ -30,7 +29,7 @@ public class PeekEntryViewModel
 /// "Scan All" sweep. Self-contained: wires its analysis-cache and ViewModel subscriptions on
 /// load and tears them down on unload so it behaves as a lazily-realised tab / dockable tool.
 /// </summary>
-public partial class IndexView : UserControl
+public partial class IndexView : PaneRefreshView
 {
     private MainWindowViewModel? _vm;
 
@@ -42,33 +41,14 @@ public partial class IndexView : UserControl
     private bool _peekDirty;
     private int _lastPeekSignature;
 
-    // Defer thumbnail-rendering refreshes that arrive while the pane is collapsed/hidden (the
-    // accordion keeps this view loaded), flushing once it becomes visible.
-    private bool _refreshPending;
-
     public IndexView()
     {
         InitializeComponent();
-        EffectiveViewportChanged += OnViewportChanged;
     }
 
-    /// <summary>Rebuild the index now if the pane is visible, otherwise defer until it is. The
-    /// rebuild renders figure/table thumbnails via PDFium on the UI thread, so doing it for a
-    /// hidden pane during background analysis hitches the UI for no visible benefit.</summary>
-    private void RefreshPeekIfVisible()
-    {
-        if (IsEffectivelyVisible) { RefreshPeekIndex(); _refreshPending = false; }
-        else _refreshPending = true;
-    }
-
-    private void OnViewportChanged(object? sender, EffectiveViewportChangedEventArgs e)
-    {
-        if (IsEffectivelyVisible && _refreshPending)
-        {
-            _refreshPending = false;
-            RefreshPeekIndex();
-        }
-    }
+    // The rebuild renders figure/table thumbnails via PDFium on the UI thread, so deferring it
+    // for a hidden pane during background analysis avoids hitching the UI for no visible benefit.
+    protected override void Refresh() => RefreshPeekIndex();
 
     protected override void OnLoaded(RoutedEventArgs e)
     {
@@ -90,7 +70,7 @@ public partial class IndexView : UserControl
 
         _vm.PropertyChanged += OnVmPropertyChanged;
         SubscribePeekUpdates();
-        RefreshPeekIfVisible();
+        RefreshIfVisible();
         UpdateScanAllBanner();
     }
 
@@ -128,14 +108,14 @@ public partial class IndexView : UserControl
                     // Image references a disposed bitmap during the next layout pass.
                     PeekEntryList.ItemsSource = null;
                     ClearThumbnailCache();
-                    RefreshPeekIfVisible();
+                    RefreshIfVisible();
                 }
                 break;
             case nameof(MainWindowViewModel.IsScanAllActive):
                 UpdateScanAllBanner();
                 // After the sweep completes or is cancelled, surface the final index.
                 if (_vm?.IsScanAllActive == false)
-                    RefreshPeekIfVisible();
+                    RefreshIfVisible();
                 break;
             case nameof(MainWindowViewModel.ScanAllProgress):
                 if (_vm?.IsScanAllActive == true)
@@ -175,7 +155,7 @@ public partial class IndexView : UserControl
         // In the accordion this view stays loaded even when its section is collapsed, so guard on
         // visibility: rendering thumbnails (PDFium, UI thread) for a hidden pane on every
         // background-analysis tick is the perf regression we're avoiding. Defer instead.
-        if (!IsEffectivelyVisible) { _refreshPending = true; return; }
+        if (!IsEffectivelyVisible) { DeferRefresh(); return; }
 
         _peekDirty = true;
 
@@ -187,7 +167,7 @@ public partial class IndexView : UserControl
                 if (_peekDirty)
                 {
                     _peekDirty = false;
-                    RefreshPeekIfVisible();
+                    RefreshIfVisible();
                 }
                 else
                 {

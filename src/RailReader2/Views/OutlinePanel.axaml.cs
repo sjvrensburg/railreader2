@@ -17,7 +17,9 @@ namespace RailReader2.Views;
 /// </summary>
 public partial class OutlinePanel : UserControl
 {
-    private readonly (Expander Expander, SidePane Pane, int Row)[] _sections;
+    // The SidePane enum order matches the accordion's grid-row order, so a section's row is just
+    // (int)Pane — no need to track it separately.
+    private readonly (Expander Expander, SidePane Pane)[] _sections;
     private MainWindowViewModel? _vm;
 
     // Guards the ActivePane <-> Expander.IsExpanded sync against re-entrancy.
@@ -29,11 +31,11 @@ public partial class OutlinePanel : UserControl
 
         _sections =
         [
-            (OutlineExpander, SidePane.Outline, 0),
-            (BookmarksExpander, SidePane.Bookmarks, 1),
-            (IndexExpander, SidePane.Index, 2),
-            (SearchExpander, SidePane.Search, 3),
-            (CommentsExpander, SidePane.Comments, 4),
+            (OutlineExpander, SidePane.Outline),
+            (BookmarksExpander, SidePane.Bookmarks),
+            (IndexExpander, SidePane.Index),
+            (SearchExpander, SidePane.Search),
+            (CommentsExpander, SidePane.Comments),
         ];
         foreach (var section in _sections)
             section.Expander.PropertyChanged += OnExpanderPropertyChanged;
@@ -113,7 +115,7 @@ public partial class OutlinePanel : UserControl
         _syncing = true;
         try
         {
-            foreach (var (expander, p, _) in _sections)
+            foreach (var (expander, p) in _sections)
                 expander.IsExpanded = p == pane;
             UpdateRowHeights();
         }
@@ -126,8 +128,8 @@ public partial class OutlinePanel : UserControl
     /// <summary>The open section's row fills the panel (starred); collapsed rows are header-height.</summary>
     private void UpdateRowHeights()
     {
-        foreach (var (expander, _, row) in _sections)
-            Accordion.RowDefinitions[row].Height =
+        foreach (var (expander, pane) in _sections)
+            Accordion.RowDefinitions[(int)pane].Height =
                 expander.IsExpanded ? new GridLength(1, GridUnitType.Star) : GridLength.Auto;
     }
 }

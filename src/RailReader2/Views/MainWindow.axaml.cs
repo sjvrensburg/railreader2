@@ -4,9 +4,7 @@ using Avalonia.Input;
 using Avalonia.Input.Platform;
 using RailReader.Core;
 using RailReader.Core.Models;
-using RailReader.Renderer.Skia;
 using RailReader2.ViewModels;
-using SkiaSharp;
 
 namespace RailReader2.Views;
 

@@ -1,7 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
-using Avalonia.Layout;
 using Avalonia.Threading;
 using RailReader.Core.Models;
 using RailReader2.ViewModels;
@@ -14,7 +13,7 @@ namespace RailReader2.Views;
 /// ViewModel subscriptions on load and tears them down on unload so it behaves correctly
 /// as a lazily-realised tab / dockable tool.
 /// </summary>
-public partial class OutlineView : UserControl
+public partial class OutlineView : PaneRefreshView
 {
     private MainWindowViewModel? _vm;
     private TabViewModel? _watchedTab;
@@ -24,15 +23,9 @@ public partial class OutlineView : UserControl
     // tell a click apart from a keyboard arrow (only a click hands focus to the viewport).
     private bool _pointerSelect;
 
-    // The accordion realises all panes at once and ActiveTab is raised synthetically on every
-    // navigation, so a collapsed/hidden Outline pane would otherwise re-bind the tree and walk
-    // the whole outline on every page turn. Defer that work until the pane is shown.
-    private bool _refreshPending;
-
     public OutlineView()
     {
         InitializeComponent();
-        EffectiveViewportChanged += OnViewportChanged;
         // Tunnel so the flag is set before the tree processes the press and raises selection.
         OutlineTree.AddHandler(InputElement.PointerPressedEvent, OnTreePointerPressed, RoutingStrategies.Tunnel);
         OutlineTree.AddHandler(InputElement.PointerReleasedEvent, OnTreePointerReleased, RoutingStrategies.Tunnel);
@@ -87,23 +80,11 @@ public partial class OutlineView : UserControl
         }
     }
 
-    /// <summary>Re-bind the tree and sync the highlight to the current page if the pane is
-    /// visible, otherwise defer until it is shown.</summary>
-    private void RefreshIfVisible()
+    // Re-bind the tree and sync the highlight to the current page (deferred while hidden).
+    protected override void Refresh()
     {
-        if (IsEffectivelyVisible) { UpdateOutlineSource(); SyncOutlineToPage(); _refreshPending = false; }
-        else _refreshPending = true;
-    }
-
-    // Fired when the pane's visible region changes; flush a deferred refresh once it's visible.
-    private void OnViewportChanged(object? sender, EffectiveViewportChangedEventArgs e)
-    {
-        if (IsEffectivelyVisible && _refreshPending)
-        {
-            _refreshPending = false;
-            UpdateOutlineSource();
-            SyncOutlineToPage();
-        }
+        UpdateOutlineSource();
+        SyncOutlineToPage();
     }
 
     private void WatchActiveTabPage()

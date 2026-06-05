@@ -1,7 +1,6 @@
 using System.Linq;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
-using Avalonia.Layout;
 using Avalonia.Media;
 using RailReader.Core.Models;
 using RailReader2.ViewModels;
@@ -59,20 +58,14 @@ public sealed class CommentEntryViewModel
 /// has no annotation-changed event) and on document switch. Self-contained: wires its
 /// subscriptions on load and tears them down on unload.
 /// </summary>
-public partial class CommentsView : UserControl
+public partial class CommentsView : PaneRefreshView
 {
     private MainWindowViewModel? _vm;
     private bool _suppressCommentsRefresh;
 
-    // The accordion realises all panes at once and ActiveTab/AnnotationsMutated fire on every
-    // navigation/edit, so a collapsed/hidden Comments pane would otherwise rebuild its whole
-    // list constantly. Defer refreshes that arrive off-screen until the pane is shown.
-    private bool _refreshPending;
-
     public CommentsView()
     {
         InitializeComponent();
-        EffectiveViewportChanged += OnViewportChanged;
     }
 
     protected override void OnLoaded(RoutedEventArgs e)
@@ -149,22 +142,7 @@ public partial class CommentsView : UserControl
         RefreshIfVisible();
     }
 
-    /// <summary>Rebuild the list now if the pane is visible, otherwise defer until it is.</summary>
-    private void RefreshIfVisible()
-    {
-        if (IsEffectivelyVisible) { RefreshComments(); _refreshPending = false; }
-        else _refreshPending = true;
-    }
-
-    // Fired when the pane's visible region changes; flush a deferred refresh once it's visible.
-    private void OnViewportChanged(object? sender, EffectiveViewportChangedEventArgs e)
-    {
-        if (IsEffectivelyVisible && _refreshPending)
-        {
-            _refreshPending = false;
-            RefreshComments();
-        }
-    }
+    protected override void Refresh() => RefreshComments();
 
     private void OnCommentFilterChanged(object? sender, SelectionChangedEventArgs e)
     {
