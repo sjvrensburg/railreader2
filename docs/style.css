@@ -711,3 +711,22 @@ pre code {
     max-width: 100%;
   }
 }
+
+/* ── Inline Lucide icons (stroked, inherit text colour and size) ── */
+.ricon {
+  width: 1.05em;
+  height: 1.05em;
+  vertical-align: -0.18em;
+  display: inline-block;
+}
+
+/* Controls & icons reference table (reuses .shortcuts-table styling) */
+.icon-ref td:first-child {
+  text-align: center;
+  width: 2.5em;
+}
+.icon-ref td:first-child svg {
+  width: 1.5em;
+  height: 1.5em;
+  vertical-align: middle;
+}
