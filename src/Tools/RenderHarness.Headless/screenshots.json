@@ -1,43 +1,83 @@
 {
+  // The canonical set of README / website screenshots. Regenerate them with:
+  //   dotnet run --project src/Tools/RenderHarness.Headless -c Release
+  // (writes straight into docs/img/, overwriting the committed images).
+  //
+  // Design notes:
+  //   - UI scaled to 1.33 (annotations shot 1.66 to show off the UI scaling).
+  //   - Zoomed-in / rail shots use 575% with the active line ~1/3 down the viewport;
+  //     the three rail shots share one position/active line (page-aware reset + advance).
+  // Attention shots run consecutively (warm analysis cache); the CoGenT search is last.
   "outputDir": "docs/img",
-  "width": 1280,
-  "height": 800,
+  "width": 1440,
+  "height": 960,
   "theme": "dark",
+  "uiScale": 1.33,
 
   "shots": [
     {
-      "name": "sidebar-navigation-active",
-      "pdf": "experiments/PDFs/Foundation Models for Time Series Analysis -- A Tutorial and Survey.pdf",
-      "page": 1,
-      "zoom": 0,
-      "sidebar": "outline",
-      "tool": "none"
+      "name": "full_page_view_no_analysis",
+      "pdf": "experiments/PDFs/Attention_is_all_you_need.pdf",
+      "page": 1, "zoom": 0,
+      "theme": "light", "width": 1150, "height": 1480,
+      "sidebar": "none"
     },
     {
-      "name": "highlight-tool-active",
-      "pdf": "experiments/PDFs/Foundation Models for Time Series Analysis -- A Tutorial and Survey.pdf",
-      "page": 1,
-      "zoom": 1.5,
+      "name": "full_page_view_with_analysis",
+      "pdf": "experiments/PDFs/Attention_is_all_you_need.pdf",
+      "page": 1, "zoom": 0,
+      "theme": "dark", "width": 1150, "height": 1480,
       "sidebar": "none",
-      "tool": "highlight"
+      "debugOverlay": true, "requireAnalysis": true
     },
     {
-      "name": "rail-mode-reading",
-      "pdf": "experiments/PDFs/Foundation Models for Time Series Analysis -- A Tutorial and Survey.pdf",
-      "page": 4,
-      "zoom": 4.0,
+      "name": "colour_effects",
+      "pdf": "experiments/PDFs/Attention_is_all_you_need.pdf",
+      "page": 1, "zoom": 0,
+      "theme": "light", "width": 1150, "height": 1480,
       "sidebar": "none",
-      "tool": "none",
+      "colourEffect": "amber"
+    },
+    {
+      "name": "rail_mode",
+      "pdf": "experiments/PDFs/Attention_is_all_you_need.pdf",
+      "page": 2, "zoom": 5.75,
+      "theme": "dark", "width": 1440, "height": 980,
+      "sidebar": "none",
+      "lineHighlight": true, "railLineFraction": 0.33, "railAdvanceLines": 7, "requireAnalysis": true
+    },
+    {
+      "name": "line_focus_blur",
+      "pdf": "experiments/PDFs/Attention_is_all_you_need.pdf",
+      "page": 2, "zoom": 5.75,
+      "theme": "dark", "width": 1440, "height": 980,
+      "sidebar": "none",
+      "lineFocusBlur": true, "railLineFraction": 0.33, "railAdvanceLines": 7, "requireAnalysis": true
+    },
+    {
+      "name": "colour_effect_high_contrast",
+      "pdf": "experiments/PDFs/Attention_is_all_you_need.pdf",
+      "page": 2, "zoom": 5.75,
+      "theme": "dark", "width": 1440, "height": 980,
+      "sidebar": "none",
+      "colourEffect": "highContrast", "lineHighlight": true,
+      "railLineFraction": 0.33, "railAdvanceLines": 7, "requireAnalysis": true
+    },
+    {
+      "name": "annotations",
+      "pdf": "experiments/PDFs/Attention_is_all_you_need.pdf",
+      "page": 1, "zoom": 2.5,
+      "theme": "light", "uiScale": 1.66, "width": 1500, "height": 1040,
+      "sidebar": "none",
+      "annotate": true, "annotationMode": true, "tool": "highlight",
       "requireAnalysis": true
     },
     {
-      "name": "figures-panel",
-      "pdf": "experiments/PDFs/Foundation Models for Time Series Analysis -- A Tutorial and Survey.pdf",
-      "page": 2,
-      "zoom": 0,
-      "sidebar": "figures",
-      "tool": "none",
-      "requireAnalysis": true
+      "name": "search_highlights",
+      "pdf": "experiments/PDFs/CoGenT.pdf",
+      "page": 1, "zoom": 5.75,
+      "theme": "light", "width": 1600, "height": 1000,
+      "search": "ECG", "railLineFraction": 0.33
     }
   ]
 }
