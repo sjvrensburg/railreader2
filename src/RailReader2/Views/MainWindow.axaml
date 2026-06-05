@@ -14,30 +14,6 @@
         <vm:MainWindowViewModel />
     </Design.DataContext>
 
-    <Window.Styles>
-        <!-- Sidebar toggle in the tab strip: flat icon button, accent-filled when the panel
-             is shown (mirrors the annotation toolbar's active-tool look). -->
-        <Style Selector="ToggleButton.sidebarToggle">
-            <Setter Property="Background" Value="Transparent" />
-            <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="CornerRadius" Value="4" />
-            <Setter Property="Padding" Value="7" />
-            <Setter Property="HorizontalContentAlignment" Value="Center" />
-            <Setter Property="VerticalContentAlignment" Value="Center" />
-        </Style>
-        <Style Selector="ToggleButton.sidebarToggle:pointerover">
-            <Setter Property="Background" Value="{DynamicResource SystemControlHighlightListLowBrush}" />
-        </Style>
-        <Style Selector="ToggleButton.sidebarToggle:checked">
-            <Setter Property="Background" Value="{DynamicResource SystemControlHighlightAccentBrush}" />
-            <Setter Property="Foreground" Value="White" />
-        </Style>
-        <Style Selector="ToggleButton.sidebarToggle:checked:pointerover">
-            <Setter Property="Background" Value="{DynamicResource SystemControlHighlightAccentBrush}" />
-            <Setter Property="Foreground" Value="White" />
-        </Style>
-    </Window.Styles>
-
     <DockPanel>
         <!-- Menu Bar -->
         <v:MenuBarView DockPanel.Dock="Top" DataContext="{Binding}"
@@ -47,7 +23,7 @@
              its state). Visible in windowed mode, or on hover at the top edge in fullscreen. -->
         <DockPanel DockPanel.Dock="Top" IsVisible="{Binding IsTabBarVisible}"
                    Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}">
-            <ToggleButton Name="SidebarToggle" Classes="sidebarToggle" DockPanel.Dock="Left"
+            <ToggleButton Name="SidebarToggle" Classes="toolBtn borderless" DockPanel.Dock="Left"
                           IsChecked="{Binding ShowOutline, Mode=TwoWay}"
                           VerticalAlignment="Center" Margin="4,0,2,0"
                           ToolTip.Tip="Toggle side panel"

@@ -94,6 +94,10 @@ public partial class DocumentView : UserControl
     /// <summary>Switch the rendered tab (active document changed).</summary>
     public void SetTab(TabViewModel? tab)
     {
+        // Stop the outgoing tab driving this view: a late DPI render completing on the old tab
+        // would otherwise call OnDpiRenderComplete and schedule a wasted animation frame.
+        if (_tab is { } prev && !ReferenceEquals(prev, tab))
+            prev.OnDpiRenderComplete = null;
         _tab = tab;
         UpdateLayerBindings(tab);
         UpdatePagePanelSize(tab);

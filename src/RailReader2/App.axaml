@@ -11,5 +11,37 @@
     </Application.Resources>
     <Application.Styles>
         <FluentTheme />
+        <!-- Flat icon toggle/button shared by the annotation toolbar and the sidebar toggle:
+             transparent and theme-aware (icons inherit Foreground so they adapt to light/dark),
+             accent-filled when active. The .borderless modifier drops the outline (sidebar). -->
+        <Style Selector="ToggleButton.toolBtn, Button.toolBtn">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SystemControlForegroundBaseMediumLowBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="Padding" Value="8,6" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <Style Selector="ToggleButton.toolBtn:pointerover, Button.toolBtn:pointerover">
+            <Setter Property="Background" Value="{DynamicResource SystemControlHighlightListLowBrush}" />
+        </Style>
+        <Style Selector="ToggleButton.toolBtn:checked">
+            <Setter Property="Background" Value="{DynamicResource SystemControlHighlightAccentBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SystemControlHighlightAccentBrush}" />
+            <Setter Property="Foreground" Value="White" />
+        </Style>
+        <Style Selector="ToggleButton.toolBtn:checked:pointerover">
+            <Setter Property="Background" Value="{DynamicResource SystemControlHighlightAccentBrush}" />
+            <Setter Property="Foreground" Value="White" />
+        </Style>
+        <Style Selector="Button.toolBtn:disabled">
+            <Setter Property="Opacity" Value="0.4" />
+        </Style>
+        <!-- Borderless variant (sidebar toggle): no outline, slightly tighter padding. -->
+        <Style Selector="ToggleButton.toolBtn.borderless">
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="7" />
+        </Style>
     </Application.Styles>
 </Application>
