@@ -16,7 +16,7 @@ env:
 
 jobs:
   download-model:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Download ONNX model
         run: |
@@ -104,7 +104,7 @@ jobs:
 
   build-windows:
     needs: download-model
-    runs-on: windows-latest
+    runs-on: windows-2025
     steps:
       - uses: actions/checkout@v6
 
@@ -146,7 +146,7 @@ jobs:
 
   build-msix:
     needs: download-model
-    runs-on: windows-latest
+    runs-on: windows-2025
     steps:
       - uses: actions/checkout@v6
 
@@ -234,7 +234,7 @@ jobs:
 
   build-cli-windows:
     needs: download-model
-    runs-on: windows-latest
+    runs-on: windows-2025
     steps:
       - uses: actions/checkout@v6
 
@@ -266,7 +266,7 @@ jobs:
 
   release:
     needs: [build-linux, build-windows, build-cli-linux, build-cli-windows]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Download all artifacts
         uses: actions/download-artifact@v8
