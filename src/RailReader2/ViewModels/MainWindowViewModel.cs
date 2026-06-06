@@ -295,7 +295,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         {
             if (_animationRequested) return;
 
-            var (gotResults, needsAnim) = _controller.PollAnalysisResults();
+            var (gotResults, needsAnim, _) = _controller.PollAnalysisResults();
             var tab = ActiveTab;
             if (tab is not null && !_animationRequested)
                 tab.SubmitPendingLookahead(_controller.Worker);
@@ -317,7 +317,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             if (_controller.Worker is null) return;
 
             // Poll results even if no animation frame is running
-            var (gotResults, _) = _controller.PollAnalysisResults();
+            var (gotResults, _, _) = _controller.PollAnalysisResults();
             if (gotResults)
                 InvalidateOverlay();
 
