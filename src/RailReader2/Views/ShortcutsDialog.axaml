@@ -22,7 +22,7 @@
             </Grid>
 
             <TextBlock Text="Navigation" FontWeight="Bold" />
-            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" Margin="8,0">
+            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" Margin="8,0">
                 <TextBlock Grid.Row="0" Grid.Column="0" Text="PgDn / Space" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
                 <TextBlock Grid.Row="0" Grid.Column="1" Text="Next page / next line in rail mode" Margin="0,2" />
                 <TextBlock Grid.Row="1" Grid.Column="0" Text="PgUp" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
@@ -35,6 +35,14 @@
                 <TextBlock Grid.Row="4" Grid.Column="1" Text="First page" Margin="0,2" />
                 <TextBlock Grid.Row="5" Grid.Column="0" Text="Ctrl+End" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
                 <TextBlock Grid.Row="5" Grid.Column="1" Text="Last page" Margin="0,2" />
+                <TextBlock Grid.Row="6" Grid.Column="0" Text="Ctrl+Shift+H" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="6" Grid.Column="1" Text="Jump to next heading (rail mode; menu for previous)" Margin="0,2" />
+                <TextBlock Grid.Row="7" Grid.Column="0" Text="Ctrl+Shift+G" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="7" Grid.Column="1" Text="Jump to next figure" Margin="0,2" />
+                <TextBlock Grid.Row="8" Grid.Column="0" Text="Ctrl+Shift+T" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="8" Grid.Column="1" Text="Jump to next table" Margin="0,2" />
+                <TextBlock Grid.Row="9" Grid.Column="0" Text="Ctrl+Shift+E" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="9" Grid.Column="1" Text="Jump to next equation" Margin="0,2" />
             </Grid>
 
             <TextBlock Text="View" FontWeight="Bold" />

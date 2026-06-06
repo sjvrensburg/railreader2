@@ -121,6 +121,16 @@ public partial class MenuBarView : UserControl
     private void OnLastPage(object? s, RoutedEventArgs e)
     { if (Vm?.ActiveTab is { } tab) Vm.GoToPage(tab.PageCount - 1); }
 
+    // Semantic rail jumps (next / previous block of a role).
+    private void OnNextHeading(object? s, RoutedEventArgs e) => Vm?.JumpToRole(BlockRole.Heading);
+    private void OnNextFigure(object? s, RoutedEventArgs e) => Vm?.JumpToRole(BlockRole.Figure);
+    private void OnNextTable(object? s, RoutedEventArgs e) => Vm?.JumpToRole(BlockRole.Table);
+    private void OnNextEquation(object? s, RoutedEventArgs e) => Vm?.JumpToRole(BlockRole.DisplayMath);
+    private void OnPrevHeading(object? s, RoutedEventArgs e) => Vm?.JumpToRole(BlockRole.Heading, forward: false);
+    private void OnPrevFigure(object? s, RoutedEventArgs e) => Vm?.JumpToRole(BlockRole.Figure, forward: false);
+    private void OnPrevTable(object? s, RoutedEventArgs e) => Vm?.JumpToRole(BlockRole.Table, forward: false);
+    private void OnPrevEquation(object? s, RoutedEventArgs e) => Vm?.JumpToRole(BlockRole.DisplayMath, forward: false);
+
     private void OnShowSettings(object? s, RoutedEventArgs e)
     { if (Vm is { } vm) vm.ShowSettings = true; }
     private void OnShowShortcuts(object? s, RoutedEventArgs e)

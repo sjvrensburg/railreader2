@@ -138,6 +138,10 @@ public partial class DocumentView : UserControl
     public void RenderSearch() => SearchLayer.UpdateState(BuildSearchState(_tab));
     public void RenderAnnotations() => AnnotationLayer.UpdateState(BuildAnnotationState(_tab));
 
+    /// <summary>Push-based accessibility announce (from Core's PageChanged / ReadingPositionChanged),
+    /// independent of a layer repaint. Cheap no-op when no AT-SPI/UIA client is connected.</summary>
+    public void NotifyAccessibility() => Viewport.NotifyAccessibilityStateChanged();
+
     private void OnViewportSizeChanged(object? sender, SizeChangedEventArgs e)
     {
         if (_shared is null) return;

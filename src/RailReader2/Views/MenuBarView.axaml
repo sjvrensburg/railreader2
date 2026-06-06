@@ -69,6 +69,19 @@
             <Separator />
             <MenuItem Header="_First Page" InputGesture="Ctrl+Home" Click="OnFirstPage" />
             <MenuItem Header="_Last Page" InputGesture="Ctrl+End" Click="OnLastPage" />
+            <Separator />
+            <MenuItem Header="Jump to Ne_xt">
+                <MenuItem Header="_Heading" InputGesture="Ctrl+Shift+H" Click="OnNextHeading" />
+                <MenuItem Header="_Figure" InputGesture="Ctrl+Shift+G" Click="OnNextFigure" />
+                <MenuItem Header="_Table" InputGesture="Ctrl+Shift+T" Click="OnNextTable" />
+                <MenuItem Header="_Equation" InputGesture="Ctrl+Shift+E" Click="OnNextEquation" />
+            </MenuItem>
+            <MenuItem Header="Jump to Pre_vious">
+                <MenuItem Header="_Heading" Click="OnPrevHeading" />
+                <MenuItem Header="_Figure" Click="OnPrevFigure" />
+                <MenuItem Header="_Table" Click="OnPrevTable" />
+                <MenuItem Header="_Equation" Click="OnPrevEquation" />
+            </MenuItem>
         </MenuItem>
         <MenuItem Header="_Help">
             <MenuItem Header="_Keyboard Shortcuts" InputGesture="F1" Click="OnShowShortcuts" />
