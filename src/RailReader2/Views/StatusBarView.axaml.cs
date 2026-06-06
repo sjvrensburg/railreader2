@@ -163,6 +163,46 @@ public partial class StatusBarView : UserControl
         input.SelectAll();
     }
 
+    private void BeginZoomEdit(MainWindowViewModel vm, TabViewModel tab)
+    {
+        if (_zoomLabel is null) return;
+        int idx = StatusPanel.Children.IndexOf(_zoomLabel);
+        if (idx < 0) return;
+
+        var input = new TextBox
+        {
+            Text = ((int)Math.Round(tab.Camera.Zoom * 100)).ToString(),
+            Width = 56,
+            MinHeight = 0,
+            Padding = new Avalonia.Thickness(4, 0),
+            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+        };
+
+        IsEditing = true;
+
+        void Commit()
+        {
+            if (!IsEditing) return;
+            IsEditing = false;
+            // Accept "150", "150%", "150 %".
+            var text = input.Text?.Replace("%", "").Trim();
+            if (double.TryParse(text, out double pct))
+                vm.SetZoomPercent(pct); // clamped to 50–2000% in the VM
+            UpdateStatus();
+        }
+
+        input.KeyDown += (_, e) =>
+        {
+            if (e.Key == Key.Enter) { Commit(); e.Handled = true; }
+            else if (e.Key == Key.Escape) { IsEditing = false; UpdateStatus(); e.Handled = true; }
+        };
+        input.LostFocus += (_, _) => Commit();
+
+        StatusPanel.Children[idx] = input;
+        input.Focus();
+        input.SelectAll();
+    }
+
     private void AddSeparator() =>
         StatusPanel.Children.Add(new TextBlock { Text = "|", Opacity = 0.5 });
 
@@ -233,18 +273,25 @@ public partial class StatusBarView : UserControl
             VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
             Cursor = new Cursor(StandardCursorType.Hand),
         };
-        ToolTip.SetTip(_pageLabel, "Double-click to go to page");
+        ToolTip.SetTip(_pageLabel, "Click to go to page");
         // Spoken form reads cleaner than the compact "3/15"; AutomationId is a stable handle.
         Avalonia.Automation.AutomationProperties.SetName(_pageLabel, $"Page {tab.CurrentPage + 1} of {tab.PageCount}");
         Avalonia.Automation.AutomationProperties.SetAutomationId(_pageLabel, "PageIndicator");
-        _pageLabel.DoubleTapped += (_, _) => BeginPageEdit(vm!, tab);
+        _pageLabel.Tapped += (_, _) => BeginPageEdit(vm!, tab);
         StatusPanel.Children.Add(_pageLabel);
         StatusPanel.Children.Add(MakeNavButton("IconChevronRight", (_, _) =>
         { if (vm?.ActiveTab is { } t) vm.GoToPage(t.CurrentPage + 1); }, "Next page (PgDn)", "NextPage"));
         AddSeparator();
-        _zoomLabel = new TextBlock { Text = $"Zoom: {zoomPct}%" };
+        _zoomLabel = new TextBlock
+        {
+            Text = $"Zoom: {zoomPct}%",
+            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+            Cursor = new Cursor(StandardCursorType.Hand),
+        };
+        ToolTip.SetTip(_zoomLabel, "Click to set zoom");
         Avalonia.Automation.AutomationProperties.SetName(_zoomLabel, $"Zoom {zoomPct} percent");
         Avalonia.Automation.AutomationProperties.SetAutomationId(_zoomLabel, "ZoomIndicator");
+        _zoomLabel.Tapped += (_, _) => BeginZoomEdit(vm!, tab);
         StatusPanel.Children.Add(_zoomLabel);
 
         AddBreadcrumb(tab);

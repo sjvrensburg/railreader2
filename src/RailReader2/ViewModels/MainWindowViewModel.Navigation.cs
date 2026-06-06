@@ -81,6 +81,27 @@ public sealed partial class MainWindowViewModel
 
     public void HandleResetZoom() => FitPage();
 
+    // Mirrors the per-notch scale inside DocumentController.HandleZoom
+    // (newZoom = base * (1 + scrollDelta * 0.003)). Kept in sync manually because Core exposes no
+    // absolute zoom entry point; if Core changes the scale, update this too.
+    private const double ZoomDeltaScale = 0.003;
+
+    /// <summary>Zoom to an absolute percentage, anchored at the viewport centre (used by the status-bar
+    /// zoom editor). Core has only a relative <see cref="HandleZoom"/>, so we invert its formula to
+    /// derive the scroll delta that lands on the requested zoom; the target is clamped to Core's
+    /// 50–2000% range.</summary>
+    public void SetZoomPercent(double percent)
+    {
+        if (ActiveTab is not { } tab) return;
+        double current = tab.Camera.Zoom;
+        if (current <= 0) return;
+        double target = Math.Clamp(percent / 100.0, 0.5, 20.0); // mirrors Core's HandleZoom clamp
+        double delta = ((target / current) - 1.0) / ZoomDeltaScale;
+        var (ww, wh) = _controller.GetViewportSize();
+        Dispatch(() => _controller.HandleZoom(delta, ww / 2.0, wh / 2.0, ctrlHeld: false),
+            InvalidateCameraAndTab, animate: true);
+    }
+
     // --- Rail navigation ---
 
     public void HandleArrowDown()
