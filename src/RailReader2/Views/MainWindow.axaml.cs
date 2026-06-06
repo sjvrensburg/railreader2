@@ -81,6 +81,7 @@ public partial class MainWindow : Window
         // SearchInvalidated event; here we only repaint the highlight layer.
         InvalidateSearch = () => Document.RenderSearch(),
         InvalidateAnnotations = () => Document.RenderAnnotations(),
+        AnnounceAccessibility = () => Document.NotifyAccessibility(),
     };
 
     protected override void OnUnloaded(Avalonia.Interactivity.RoutedEventArgs e)
@@ -272,6 +273,15 @@ public partial class MainWindow : Window
             case Key.I when shift:
                 vm.TogglePane(SidePane.Index);
                 e.Handled = true; return true;
+            // Semantic rail jumps — next block of a role. Backward (previous) is menu-only.
+            case Key.H when shift:
+                vm.JumpToRole(BlockRole.Heading); e.Handled = true; return true;
+            case Key.G when shift:
+                vm.JumpToRole(BlockRole.Figure); e.Handled = true; return true;
+            case Key.T when shift:
+                vm.JumpToRole(BlockRole.Table); e.Handled = true; return true;
+            case Key.E when shift:
+                vm.JumpToRole(BlockRole.DisplayMath); e.Handled = true; return true;
             case Key.O:
                 _ = vm.OpenFileCommand.ExecuteAsync(null); e.Handled = true; return true;
             case Key.W: vm.CloseTab(vm.ActiveTabIndex); e.Handled = true; return true;

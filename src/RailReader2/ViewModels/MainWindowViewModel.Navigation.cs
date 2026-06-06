@@ -9,6 +9,32 @@ public sealed partial class MainWindowViewModel
 {
     // --- Navigation ---
 
+    /// <summary>Jump the rail to the next/previous block of a given semantic role (heading, figure,
+    /// table, equation). Available while rail-reading; surfaces as Navigation-menu items + shortcuts and
+    /// is the AT-SPI-actionable form of "go to next figure" for assistive tech and automation.</summary>
+    public void JumpToRole(BlockRole role, bool forward = true)
+    {
+        if (IsScanAllActive) return;
+        if (ActiveTab?.Rail.Active != true)
+        {
+            ShowStatusToast("Jump by section is available while rail-reading (zoom in)");
+            return;
+        }
+        if (_controller.NavigateToRole(role, forward))
+            InvalidateNavigation();
+        else
+            ShowStatusToast($"No {(forward ? "next" : "previous")} {RoleDisplayName(role)}");
+    }
+
+    private static string RoleDisplayName(BlockRole role) => role switch
+    {
+        BlockRole.Heading => "heading",
+        BlockRole.Figure => "figure",
+        BlockRole.Table => "table",
+        BlockRole.DisplayMath => "equation",
+        _ => "section",
+    };
+
     public void NavigateToBookmark(int index)
     {
         if (IsScanAllActive) return;

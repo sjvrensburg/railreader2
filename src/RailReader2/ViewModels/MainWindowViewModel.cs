@@ -5,6 +5,7 @@ using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using RailReader.Core;
+using RailReader.Core.Commands;
 using RailReader.Core.Models;
 using RailReader.Core.Services;
 using RailReader.Renderer.Skia;
@@ -265,6 +266,12 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         catch (Exception ex) { _logger.Error("[ONNX] Worker init failed", ex); }
         _controller.StateChanged += OnControllerStateChanged;
         _controller.StatusMessage += ShowStatusToast;
+        // Push-based accessibility announcements: Core fires these (on the UI thread) the moment the
+        // page or rail reading position changes — including jumps that don't otherwise repaint the
+        // overlay (e.g. NavigateToRole). The render path still calls NotifyAccessibilityStateChanged
+        // for mode transitions; the peer's signature debounce makes the overlap free.
+        _controller.PageChanged = _ => AnnounceAccessibilityState();
+        _controller.ReadingPositionChanged = _ => AnnounceAccessibilityState();
         WireAnnotationStoreSignals();
         SetupPollTimer();
     }
@@ -285,6 +292,20 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         ApplyFontScale();
     }
     public void SetInvalidation(InvalidationCallbacks callbacks) => _invalidation = callbacks;
+
+    // --- Accessibility / automation queries (consumed by DocumentViewportAutomationPeer) ---
+
+    /// <summary>The current rail reading position (page / block / line + role and extracted text), or
+    /// null when not rail-reading. Role and text are computed in Core, so the a11y peer no longer has to
+    /// hand-roll text extraction. See <see cref="DocumentController.GetReadingPosition"/>.</summary>
+    public ReadingPosition? GetReadingPosition() => _controller.GetReadingPosition();
+
+    /// <summary>Structured layout of a page (block roles, reading order, text previews) for the
+    /// on-demand accessibility/automation read channel. Defaults to the current page; null until the
+    /// page has been analysed. See <see cref="DocumentController.GetPageDescription"/>.</summary>
+    public PageDescription? GetPageDescription(int? page = null) => _controller.GetPageDescription(page: page);
+
+    private void AnnounceAccessibilityState() => _invalidation?.AnnounceAccessibility?.Invoke();
 
     // --- Poll timer & animation ---
 
@@ -742,4 +763,8 @@ public sealed class InvalidationCallbacks
     public Action? InvalidateOverlay { get; init; }
     public Action? InvalidateSearch { get; init; }
     public Action? InvalidateAnnotations { get; init; }
+
+    /// <summary>Tell the document viewport's accessibility peer to re-evaluate and announce its state.
+    /// Driven by Core's PageChanged / ReadingPositionChanged callbacks.</summary>
+    public Action? AnnounceAccessibility { get; init; }
 }
