@@ -71,7 +71,7 @@ Thin wrapper delegating all logic to `DocumentController`/`DocumentState` in Cor
 - `Views/CompositionLayerControl.cs` — generic base class for `CompositionCustomVisual`-backed layers (manages visual lifecycle, state/message dispatch)
 - `Views/` — composition layers (PdfPageLayer, RailOverlayLayer, AnnotationLayer, SearchHighlightLayer), `ToolBarView` (annotation toolbar), `StatusBarView`/`MenuBarView`/`TabBarView`, dialogs (ConfirmUrlDialog, BookmarkNameDialog, …), and `OutlinePanel` — a single-open accordion with five self-contained sub-views: `OutlineView`/`BookmarksView`/`IndexView` (figures, tables, equations)/`SearchView`/`CommentsView`
 - `Controls/Icon.cs` + `Assets/Icons.axaml` — Lucide icons as native Avalonia vector geometry (decorative, theme-aware, scales with the UI font-scale); no icon font — add one by converting a Lucide SVG to a `StreamGeometry`
-- `Views/DocumentViewportAutomationPeer.cs` — publishes the GPU viewport's live state (page/zoom/rail mode/current-line text) to the platform accessibility/automation tree (AT-SPI on Linux, UIA on Windows)
+- `Views/DocumentViewportAutomationPeer.cs` — publishes the GPU viewport's live state (page/zoom/rail mode/current-line text/page outline) to the platform accessibility/automation tree (AT-SPI on Linux, UIA on Windows). Rail role/line text comes from Core's `DocumentController.GetReadingPosition()` and the on-demand page outline from `GetPageDescription()` (no hand-rolled text extraction); announcements are push-driven by Core's `PageChanged`/`ReadingPositionChanged` callbacks (via `InvalidationCallbacks.AnnounceAccessibility`) plus the render path as a backstop
 
 **AXAML bindings**: `AvaloniaUseCompiledBindingsByDefault` is enabled — all bindings are compiled by default. Use `{x:Bind}`-style compiled bindings in AXAML files.
 
@@ -123,7 +123,7 @@ Page bitmap → BGRA-to-RGB → 800×800 rescale (PP-DocLayoutV3) or model-speci
 
 ### Rail Mode
 
-Activates above `rail_zoom_threshold` when analysis is available. Locks to detected text blocks, advances line-by-line with cubic ease-out snap. Key mechanics: hold-to-scroll with quadratic speed ramping, soft asymptotic block edge clamping (`SoftEase`), `VerticalBias` for preserving vertical offset, pixel snapping for text shimmer reduction. Sub-features: auto-scroll (`P`), jump mode (`J`), line focus blur (`F`), line highlight (`H`), named bookmarks (`B`). Free pan (Ctrl+drag) temporarily exits rail mode for unrestricted pan/zoom to inspect images or equations, snapping back on Ctrl release. Zooming in rail mode preserves horizontal scroll position and line screen position rather than snapping to line start.
+Activates above `rail_zoom_threshold` when analysis is available. Locks to detected text blocks, advances line-by-line with cubic ease-out snap. Key mechanics: hold-to-scroll with quadratic speed ramping, soft asymptotic block edge clamping (`SoftEase`), `VerticalBias` for preserving vertical offset, pixel snapping for text shimmer reduction. Sub-features: auto-scroll (`P`), jump mode (`J`), line focus blur (`F`), line highlight (`H`), named bookmarks (`B`), semantic jumps to the next/previous heading·figure·table·equation (`DocumentController.NavigateToRole`, exposed via the Navigation menu's "Jump to Next/Previous" submenus + `Ctrl+Shift+H/G/T/E` for forward). Free pan (Ctrl+drag) temporarily exits rail mode for unrestricted pan/zoom to inspect images or equations, snapping back on Ctrl release. Zooming in rail mode preserves horizontal scroll position and line screen position rather than snapping to line start.
 
 ### Controller/ViewModel Pattern
 
@@ -161,7 +161,7 @@ Key fields: `rail_zoom_threshold`, `snap_duration_ms`, `scroll_speed_start/max`,
 - `CleanupService.RunCleanup()` runs at startup and via Help menu (removes cache, temp, old logs)
 - `SplashWindow` shows during startup; heavy init deferred via `Dispatcher.Post` at Background priority
 - `window.Opened` can fire before `OnLoaded` wiring — guard against this in startup sequencing
-- Accessibility/automation: `DocumentViewportAutomationPeer` (on `ViewportPanel`) exposes viewport state to AT-SPI/UIA; chrome carries `AutomationProperties.Name`/`AutomationId`. Inert with no a11y client connected. Avalonia's AT-SPI backend ignores `AutomationProperties.LiveSetting` (Windows/UIA only) — Linux line-advance announcements come from the peer raising `NameProperty`
+- Accessibility/automation: `DocumentViewportAutomationPeer` (on `ViewportPanel`) exposes viewport state to AT-SPI/UIA; chrome carries `AutomationProperties.Name`/`AutomationId`. Inert with no a11y client connected. Avalonia's AT-SPI backend ignores `AutomationProperties.LiveSetting` (Windows/UIA only) — Linux line-advance announcements come from the peer raising `NameProperty`. The peer reads structured state from RailReaderCore's `RailReader.Core.Commands` API (`GetReadingPosition` for the rail line, `GetPageDescription` for the page outline) and is announced via the `PageChanged`/`ReadingPositionChanged` controller callbacks; all extraction is cached on the UI thread so D-Bus-thread queries only read cached strings. `NavigateToRole` (semantic jumps) is AT-SPI-actionable through its Navigation-menu items
 
 ## Thread Safety
 
