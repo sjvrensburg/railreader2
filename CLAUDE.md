@@ -27,15 +27,18 @@ dotnet run -c Release --project src/RailReader2.Cli -- annotations <pdf> --inclu
 dotnet run -c Release --project src/RailReader2.Cli -- vlm <pdf> --output vlm.json
 dotnet run -c Release --project src/RailReader2.Cli -- export <pdf> --no-vlm --output doc.md
 
-# Run tests (all)
-dotnet test tests/RailReader.Core.Tests
+# Run tests (the only test project in this repo; Core tests live upstream in RailReaderCore)
 dotnet test tests/RailReader.Export.Tests
 
 # Run specific test class
-dotnet test tests/RailReader.Core.Tests --filter "ClassName=RailReader.Core.Tests.CameraTests"
+dotnet test tests/RailReader.Export.Tests --filter "ClassName=RailReader.Export.Tests.HeadingLevelResolverTests"
 
 # Run specific test method
-dotnet test tests/RailReader.Core.Tests --filter "FullyQualifiedName~TestMethodName"
+dotnet test tests/RailReader.Export.Tests --filter "FullyQualifiedName~TestMethodName"
+
+# Regenerate README/website screenshots from the real UI (headless, writes into docs/img/)
+dotnet run --project src/Tools/RenderHarness.Headless -c Release            # all shots
+dotnet run --project src/Tools/RenderHarness.Headless -c Release --only rail_mode
 
 # Publish self-contained release
 dotnet publish src/RailReader2 -c Release -r linux-x64 --self-contained   # Linux
@@ -50,12 +53,12 @@ dotnet publish src/RailReader2 -c Release -r win-x64 --self-contained     # Wind
 ## Architecture
 
 ```
-RailReader2.slnx                  # Default: app + CLI + export + tests
+RailReader2.slnx                  # Default: app + CLI + export + screenshot tool + tests
 ├── src/RailReader2/              # Thin Avalonia UI shell
 ├── src/RailReader2.Cli/          # Headless CLI tool (zero Avalonia)
 ├── src/RailReader.Export/        # Markdown export pipeline (zero Avalonia)
-├── tests/RailReader.Core.Tests/  # xUnit headless tests
-└── tests/RailReader.Export.Tests/ # xUnit tests for Export
+├── src/Tools/RenderHarness.Headless/ # Headless doc-screenshot generator (references the GUI project)
+└── tests/RailReader.Export.Tests/ # xUnit tests for Export (Core tests live upstream)
 ```
 
 The portable core — `RailReader.Core`, `RailReader.Core.Pdfium`, `RailReader.Core.Analysis`, `RailReader.Renderer.Skia`, `RailReader.Core.Vlm.OpenAI` — lives in the separate [RailReaderCore](https://github.com/sjvrensburg/RailReaderCore) repository and is consumed here as NuGet packages. All references in this document to types like `DocumentController`, `DocumentState`, `AppConfig`, `AnnotationService`, `LayoutAnalyzer`, `SkiaPdfService`, `OverlayRenderer`, `RailReaderLogging`, etc. resolve through those packages. Logger bootstrap goes via `RailReaderLogging.Logger = new ConsoleLogger();` once at startup; the per-service Logger setters that previously existed are gone.
@@ -77,9 +80,9 @@ Thin wrapper delegating all logic to `DocumentController`/`DocumentState` in Cor
 
 ### Tests
 
-xUnit tests in `tests/RailReader.Core.Tests/` — DocumentController, Camera, Annotations (including merge), AppConfig, RailNav, SearchService, AnnotationGeometry, ZoomAnimation, AutoScroll. `TestFixtures.cs` generates test PDFs via SkiaSharp (test project references both Core and Renderer.Skia for this reason).
+`tests/RailReader.Export.Tests/` is the only test project in this repo — HeadingLevelResolver (outline matching, depth clamping, Levenshtein), PageMarkdownBuilder (all block types, annotations, plain-text fallback), MarkdownExportService (end-to-end with real PDFs: plain-text fallback, page range, progress reporting, cancellation, page break options). It references both Core and Renderer.Skia (the latter for SkiaSharp-generated test PDFs).
 
-xUnit tests in `tests/RailReader.Export.Tests/` — HeadingLevelResolver (outline matching, depth clamping, Levenshtein), PageMarkdownBuilder (all block types, annotations, plain-text fallback), MarkdownExportService (end-to-end with real PDFs: plain-text fallback, page range, progress reporting, cancellation, page break options).
+Tests for the portable core (DocumentController, Camera, Annotations, AppConfig, RailNav, SearchService, etc.) live in the upstream [RailReaderCore](https://github.com/sjvrensburg/RailReaderCore) repo — the mirrored `RailReader.Core.Tests` project was dropped from this repo once Core moved to NuGet.
 
 ### RailReader2.Cli (Headless CLI)
 
@@ -100,6 +103,10 @@ Structured PDF-to-Markdown export library. Zero Avalonia deps — references Cor
 - `MarkdownExportService.cs` — `IMarkdownExportService` implementation. Orchestrates per-page pipeline: layout analysis → text extraction → heading level resolution → VLM dispatch → annotation extraction → Markdown assembly. Writes to `TextWriter` for flexible output (file, stdout, StringWriter).
 - `HeadingLevelResolver.cs` — Maps `doc_title`/`paragraph_title` blocks to Markdown heading levels (H1–H6) by fuzzy-matching extracted text against the flattened PDF outline tree (case-insensitive containment, then Levenshtein similarity > 80%). Falls back to doc_title → H1, paragraph_title → H2.
 - `PageMarkdownBuilder.cs` — Walks blocks in reading order, renders each to Markdown by class (headings, paragraphs, `$$latex$$`, pipe tables, `![desc](path)`, `*captions*`). Skips page furniture (header/footer/number/seal). Appends highlight blockquotes and text notes from annotations.
+
+### RenderHarness.Headless (documentation screenshots)
+
+`src/Tools/RenderHarness.Headless/` boots the real `App`/`MainWindow`/`MainWindowViewModel` under `Avalonia.Headless` with **real Skia drawing** (`UseHeadlessDrawing = false`) — no X11/Wayland needed — to capture the README/website screenshots faithfully (real menu bar, accordion, composition layers, detected blocks, rail line). It references the GUI project but builds as a separate tool that doesn't ship with the GUI package. Shots are declared in `screenshots.json` and written into `docs/img/`; source PDFs come from `experiments/PDFs/`. PDFium + the ONNX model must be resolvable (run `./scripts/download-model.sh` if rail mode / debug overlay come up empty). See its own README for adding a shot.
 
 ### Cross-Project Internals
 
