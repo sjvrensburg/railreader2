@@ -160,6 +160,12 @@ public sealed class DBusControlServer : IPathMethodHandler, IDisposable
                     ReplyBool(context, _control.SendKey(chord, down, up));
                     break;
                 }
+                case "SetNavigableRoles":
+                {
+                    var reader = req.GetBodyReader();
+                    ReplyBool(context, _control.SetNavigableRoles(reader.ReadString()));
+                    break;
+                }
                 case "FrameRole":
                 {
                     var reader = req.GetBodyReader();
@@ -360,6 +366,10 @@ public sealed class DBusControlServer : IPathMethodHandler, IDisposable
             <arg type="s" name="chord" direction="in"/>
             <arg type="b" name="down" direction="in"/>
             <arg type="b" name="up" direction="in"/>
+            <arg type="b" name="ok" direction="out"/>
+          </method>
+          <method name="SetNavigableRoles">
+            <arg type="s" name="csv" direction="in"/>
             <arg type="b" name="ok" direction="out"/>
           </method>
           <method name="FrameRole">

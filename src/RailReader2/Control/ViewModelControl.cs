@@ -81,6 +81,18 @@ public sealed class ViewModelControl : IRailReaderControl, IDisposable
     public void SetLineFocusBlur(bool on)
         => Dispatcher.UIThread.Invoke(() => _vm.SetLineFocusBlur(on));
 
+    public bool SetNavigableRoles(string csv)
+    {
+        var roles = (csv ?? "")
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .SelectMany(BlockRoleAliases.Resolve)
+            .Distinct()
+            .ToList();
+        if (roles.Count == 0) return false;
+        Dispatcher.UIThread.Invoke(() => _vm.SetNavigableRoles(roles));
+        return true;
+    }
+
     public bool SendKey(string chord, bool down, bool up)
     {
         if (!KeyChord.TryParse(chord, out var key, out var mods)) return false;

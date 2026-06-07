@@ -83,6 +83,17 @@ public sealed partial class MainWindowViewModel
             ToggleLineFocusBlur();
     }
 
+    /// <summary>Restrict which block roles rail mode may stop on, for the current session only
+    /// (applied to the controller WITHOUT persisting to disk, so the user's saved config is
+    /// untouched). Used by the demo runner to e.g. drop captions/footnotes for a clean
+    /// column-to-column hand-off.</summary>
+    public void SetNavigableRoles(IReadOnlyCollection<BlockRole> roles)
+    {
+        _appConfig.NavigableRoles = new HashSet<BlockRole>(roles);
+        _controller.OnConfigChanged(_appConfig.ToCoreSettings()); // re-applies; no Save()
+        InvalidateOverlay();
+    }
+
     /// <summary>Set by the window: drives a synthesized key chord through the real OnKeyDown/OnKeyUp
     /// path, so the control surface can invoke ANY keyboard shortcut. Args: key, modifiers, isDown
     /// (false = key-up, e.g. to end a held rail scroll).</summary>

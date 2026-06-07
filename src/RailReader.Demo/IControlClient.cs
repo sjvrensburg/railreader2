@@ -25,6 +25,9 @@ public interface IControlClient : IAsyncDisposable
     /// <summary>Drive a keyboard shortcut by chord; down/up select press phases (both = tap).</summary>
     Task<bool> SendKeyAsync(string chord, bool down, bool up, CancellationToken ct);
 
+    /// <summary>Restrict rail-navigable block roles for this session (comma-separated tokens).</summary>
+    Task<bool> SetNavigableRolesAsync(string csv, CancellationToken ct);
+
     /// <summary>Frame the occurrence-th block of a role; false if nothing matched (so no animation runs).</summary>
     Task<bool> FrameRoleAsync(string role, int occurrence, double zoom, CancellationToken ct);
 

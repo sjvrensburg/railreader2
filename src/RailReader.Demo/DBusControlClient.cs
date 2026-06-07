@@ -129,6 +129,15 @@ public sealed class DBusControlClient : IControlClient
         return _conn.CallMethodAsync(w.CreateMessage(), static (Message m, object? s) => m.GetBodyReader().ReadBool(), null);
     }
 
+    public Task<bool> SetNavigableRolesAsync(string csv, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        using var w = _conn.GetMessageWriter();
+        w.WriteMethodCallHeader(_busName, ObjectPath, Interface, "SetNavigableRoles", "s", MessageFlags.None);
+        w.WriteString(csv);
+        return _conn.CallMethodAsync(w.CreateMessage(), static (Message m, object? s) => m.GetBodyReader().ReadBool(), null);
+    }
+
     private Task CallBoolArgVoidAsync(string member, bool arg, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();

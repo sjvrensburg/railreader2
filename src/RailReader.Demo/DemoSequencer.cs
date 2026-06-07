@@ -39,6 +39,13 @@ public sealed class DemoSequencer
     {
         bool capturing = recorder is not null && !string.IsNullOrEmpty(script.Output);
 
+        if (!string.IsNullOrWhiteSpace(script.Navigable))
+        {
+            _log.WriteLine($"navigable: {script.Navigable}");
+            if (!await _client.SetNavigableRolesAsync(script.Navigable!, ct).ConfigureAwait(false))
+                _log.WriteLine("  (no roles resolved — left at default)");
+        }
+
         if (script.Fullscreen)
         {
             _log.WriteLine("fullscreen on");

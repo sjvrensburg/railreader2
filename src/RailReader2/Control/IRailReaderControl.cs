@@ -54,6 +54,10 @@ public interface IRailReaderControl
     /// <summary>Set the rail line-focus-blur overlay on/off.</summary>
     void SetLineFocusBlur(bool on);
 
+    /// <summary>Restrict rail-navigable block roles for this session (comma-separated tokens, e.g.
+    /// "text, heading, equation"). Returns false if nothing resolved. Not persisted.</summary>
+    bool SetNavigableRoles(string csv);
+
     /// <summary>Drive a keyboard shortcut by chord (e.g. "c", "f11", "ctrl+shift+h", "right").
     /// <paramref name="down"/>/<paramref name="up"/> select press phases — both for a tap, down-only
     /// to begin a held key (rail scroll), up-only to release it. Returns false on an unparseable

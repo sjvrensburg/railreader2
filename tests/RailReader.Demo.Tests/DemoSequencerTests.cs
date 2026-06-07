@@ -41,6 +41,7 @@ public class DemoSequencerTests
         public Task SetLineHighlightAsync(bool on, CancellationToken ct) { Calls.Add($"highlight:{on}"); return Task.CompletedTask; }
         public Task SetLineFocusBlurAsync(bool on, CancellationToken ct) { Calls.Add($"focusblur:{on}"); return Task.CompletedTask; }
         public Task<bool> SendKeyAsync(string chord, bool down, bool up, CancellationToken ct) { Calls.Add($"key:{chord}:{(down ? "d" : "")}{(up ? "u" : "")}"); return Task.FromResult(true); }
+        public Task<bool> SetNavigableRolesAsync(string csv, CancellationToken ct) { Calls.Add($"navigable:{csv}"); return Task.FromResult(true); }
 
         public Task<bool> FrameRoleAsync(string role, int occurrence, double zoom, CancellationToken ct)
         {
@@ -192,6 +193,24 @@ public class DemoSequencerTests
         Assert.Equal(1, rec.CallsAtStart);               // ...as pre-roll, BEFORE recording started
         Assert.Equal(fake.Calls.Count, rec.CallsAtStop); // stopped after the last verb
         Assert.True(rec.Stopped);
+    }
+
+    [Fact]
+    public async Task Navigable_AppliedBeforeSteps()
+    {
+        var fake = new FakeControlClient();
+        var script = DslParser.Parse("""
+            source: /tmp/x.pdf
+            navigable: text, heading
+            steps:
+              - open
+              - frame_role: { role: text }
+            """);
+        var (seq, _) = Make(fake);
+
+        await seq.RunAsync(script);
+
+        Assert.Equal("navigable:text, heading", fake.Calls[0]); // applied first (pre-roll)
     }
 
     [Fact]

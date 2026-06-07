@@ -22,13 +22,13 @@ namespace RailReader.Demo;
 public static class DslParser
 {
     private static readonly HashSet<string> HeaderKeys =
-        new(StringComparer.OrdinalIgnoreCase) { "demo", "source", "fps", "cursor", "recorder", "output", "fullscreen" };
+        new(StringComparer.OrdinalIgnoreCase) { "demo", "source", "fps", "cursor", "recorder", "output", "fullscreen", "navigable" };
 
     public static DemoScript Parse(string text)
     {
         var lines = SplitLines(text);
 
-        string? name = null, source = null, cursor = null, recorder = null, output = null;
+        string? name = null, source = null, cursor = null, recorder = null, output = null, navigable = null;
         int? fps = null;
         bool fullscreen = false;
         var steps = new List<DemoStep>();
@@ -55,6 +55,7 @@ public static class DslParser
                 case "cursor": cursor = value; break;
                 case "recorder": recorder = value; break;
                 case "output": output = value; break;
+                case "navigable": navigable = value; break;
                 case "fps":
                     if (!int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var f))
                         throw new DslParseException($"fps must be an integer, got '{value}'", no);
@@ -102,7 +103,7 @@ public static class DslParser
             steps.Add(new DemoStep(verb.ToLowerInvariant(), args, wait, no));
         }
 
-        return new DemoScript(name, source, fps, cursor, recorder, output, fullscreen, steps);
+        return new DemoScript(name, source, fps, cursor, recorder, output, fullscreen, navigable, steps);
     }
 
     private static (string verb, Dictionary<string, string> args, string? wait) ParseStepBody(string body, int line)
