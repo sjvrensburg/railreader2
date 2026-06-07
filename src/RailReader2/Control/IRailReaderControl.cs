@@ -42,26 +42,10 @@ public interface IRailReaderControl
 
     // --- Queries (read current state) ---
 
-    /// <summary>Absolute path of the active document, or empty when none is open.</summary>
-    string DocumentPath { get; }
-
-    /// <summary>Page count of the active document, or 0 when none is open.</summary>
-    int PageCount { get; }
-
-    /// <summary>Current 1-based page of the active document, or 0 when none is open.</summary>
-    int CurrentPage { get; }
-
-    /// <summary>Current camera zoom factor (1.0 == 100%).</summary>
-    double Zoom { get; }
-
-    /// <summary>True while an eased camera animation is in flight.</summary>
-    bool IsAnimating { get; }
-
-    /// <summary>Index of the block under the current rail reading position, or -1.</summary>
-    int CurrentBlockIndex { get; }
-
-    /// <summary>Semantic role at the current rail reading position (e.g. "Figure"), or empty.</summary>
-    string CurrentRole { get; }
+    /// <summary>Read all exposed state in one atomic snapshot. A single call keeps the values
+    /// mutually consistent and, for the implementation, lets a multi-property read (e.g. D-Bus
+    /// GetAll) cross to the UI thread once instead of per property.</summary>
+    ControlSnapshot Snapshot();
 
     // --- Events (sync backbone for the runner) ---
 
@@ -75,3 +59,21 @@ public interface IRailReaderControl
     /// <summary>Raised after a document finishes opening (its absolute path).</summary>
     event Action<string>? DocumentOpened;
 }
+
+/// <summary>Immutable snapshot of the control surface's readable state (see
+/// <see cref="IRailReaderControl.Snapshot"/>).</summary>
+/// <param name="DocumentPath">Absolute path of the active document, or "" when none is open.</param>
+/// <param name="PageCount">Page count of the active document, or 0.</param>
+/// <param name="CurrentPage">Current page of the active document, or 0.</param>
+/// <param name="Zoom">Current camera zoom factor (1.0 == 100%).</param>
+/// <param name="IsAnimating">True while an eased camera animation is in flight.</param>
+/// <param name="CurrentBlockIndex">Block index under the current rail reading position, or -1.</param>
+/// <param name="CurrentRole">Semantic role at the current rail reading position, or "".</param>
+public readonly record struct ControlSnapshot(
+    string DocumentPath,
+    int PageCount,
+    int CurrentPage,
+    double Zoom,
+    bool IsAnimating,
+    int CurrentBlockIndex,
+    string CurrentRole);

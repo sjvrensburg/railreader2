@@ -1,5 +1,5 @@
 using Avalonia.Threading;
-using RailReader.Core.Models;
+using RailReader.Core.Services;
 using RailReader2.ViewModels;
 
 namespace RailReader2.ControlBus;
@@ -48,9 +48,17 @@ public sealed class ViewModelControl : IRailReaderControl, IDisposable
 
     public bool FrameRole(string role, int occurrence, double zoom)
     {
-        if (!TryParseRole(role, out var parsed)) return false;
-        return Dispatcher.UIThread.Invoke(
-            () => _vm.SmoothlyFrameRole(parsed, occurrence, ToZoom(zoom)));
+        // Resolve the friendly token to its detector roles (e.g. "figure" → Figure, Chart) via
+        // the shared Core vocabulary, and frame the first role that has a matching block.
+        var roles = BlockRoleAliases.Resolve(role);
+        if (roles.Count == 0) return false;
+        double? z = ToZoom(zoom);
+        return Dispatcher.UIThread.Invoke(() =>
+        {
+            foreach (var r in roles)
+                if (_vm.SmoothlyFrameRole(r, occurrence, z)) return true;
+            return false;
+        });
     }
 
     public bool FrameBlock(int pageBlockIndex, double zoom)
@@ -59,13 +67,19 @@ public sealed class ViewModelControl : IRailReaderControl, IDisposable
 
     // --- Queries ---
 
-    public string DocumentPath => Dispatcher.UIThread.Invoke(() => _vm.GetDocumentInfo()?.FilePath ?? "");
-    public int PageCount => Dispatcher.UIThread.Invoke(() => _vm.GetDocumentInfo()?.PageCount ?? 0);
-    public int CurrentPage => Dispatcher.UIThread.Invoke(() => _vm.GetDocumentInfo()?.CurrentPage ?? 0);
-    public double Zoom => Dispatcher.UIThread.Invoke(() => _vm.GetDocumentInfo()?.Zoom ?? 0.0);
-    public bool IsAnimating => Dispatcher.UIThread.Invoke(() => _vm.IsAnimating);
-    public int CurrentBlockIndex => Dispatcher.UIThread.Invoke(() => _vm.GetReadingPosition()?.BlockIndex ?? -1);
-    public string CurrentRole => Dispatcher.UIThread.Invoke(() => _vm.GetReadingPosition()?.Role.ToString() ?? "");
+    public ControlSnapshot Snapshot() => Dispatcher.UIThread.Invoke(() =>
+    {
+        var info = _vm.GetDocumentInfo();
+        var pos = _vm.GetReadingPosition();
+        return new ControlSnapshot(
+            DocumentPath: info?.FilePath ?? "",
+            PageCount: info?.PageCount ?? 0,
+            CurrentPage: info?.CurrentPage ?? 0,
+            Zoom: info?.Zoom ?? 0.0,
+            IsAnimating: _vm.IsAnimating,
+            CurrentBlockIndex: pos?.BlockIndex ?? -1,
+            CurrentRole: pos?.Role.ToString() ?? "");
+    });
 
     // --- Events ---
 
@@ -84,24 +98,4 @@ public sealed class ViewModelControl : IRailReaderControl, IDisposable
 
     // zoom <= 0 ⇒ auto-fit (null to the Core primitive).
     private static double? ToZoom(double zoom) => zoom > 0 ? zoom : null;
-
-    /// <summary>Map a human role string ("figure", "equation", "heading", …) to a
-    /// <see cref="BlockRole"/>, with the aliases the DSL/CLI accept. Falls back to a
-    /// case-insensitive enum parse.</summary>
-    private static bool TryParseRole(string role, out BlockRole parsed)
-    {
-        switch (role?.Trim().ToLowerInvariant())
-        {
-            case "figure": parsed = BlockRole.Figure; return true;
-            case "table": parsed = BlockRole.Table; return true;
-            case "equation" or "math" or "displaymath" or "display-math":
-                parsed = BlockRole.DisplayMath; return true;
-            case "heading" or "section": parsed = BlockRole.Heading; return true;
-            case "title" or "doctitle" or "doc-title": parsed = BlockRole.Title; return true;
-            case "caption": parsed = BlockRole.Caption; return true;
-            case "text" or "paragraph": parsed = BlockRole.Text; return true;
-            default:
-                return Enum.TryParse(role, ignoreCase: true, out parsed);
-        }
-    }
 }

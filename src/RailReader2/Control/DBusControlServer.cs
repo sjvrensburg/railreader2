@@ -135,10 +135,22 @@ public sealed class DBusControlServer : IPathMethodHandler, IDisposable
 
     // --- org.freedesktop.DBus.Properties ---
 
-    private static readonly string[] PropertyNames =
+    private delegate void VariantWriter(ref MessageWriter w, in ControlSnapshot s);
+
+    /// <summary>One read-only property: its D-Bus name, type signature, and how to write its value
+    /// from a <see cref="ControlSnapshot"/>. This single table is the source of truth for the
+    /// Properties.Get/GetAll handlers AND the introspection XML, so they can't drift.</summary>
+    private sealed record PropertyDef(string Name, string Signature, VariantWriter Write);
+
+    private static readonly PropertyDef[] Properties =
     [
-        "DocumentPath", "PageCount", "CurrentPage", "Zoom",
-        "IsAnimating", "CurrentBlockIndex", "CurrentRole",
+        new("DocumentPath",      "s", (ref MessageWriter w, in ControlSnapshot s) => w.WriteVariantString(s.DocumentPath)),
+        new("PageCount",         "i", (ref MessageWriter w, in ControlSnapshot s) => w.WriteVariantInt32(s.PageCount)),
+        new("CurrentPage",       "i", (ref MessageWriter w, in ControlSnapshot s) => w.WriteVariantInt32(s.CurrentPage)),
+        new("Zoom",              "d", (ref MessageWriter w, in ControlSnapshot s) => w.WriteVariantDouble(s.Zoom)),
+        new("IsAnimating",       "b", (ref MessageWriter w, in ControlSnapshot s) => w.WriteVariantBool(s.IsAnimating)),
+        new("CurrentBlockIndex", "i", (ref MessageWriter w, in ControlSnapshot s) => w.WriteVariantInt32(s.CurrentBlockIndex)),
+        new("CurrentRole",       "s", (ref MessageWriter w, in ControlSnapshot s) => w.WriteVariantString(s.CurrentRole)),
     ];
 
     private void HandleProperties(MethodContext context)
@@ -151,32 +163,32 @@ public sealed class DBusControlServer : IPathMethodHandler, IDisposable
                 var reader = req.GetBodyReader();
                 _ = reader.ReadString();            // interface name (ignored — single interface)
                 string prop = reader.ReadString();
-                // Not a 'using' var: MessageWriter is a struct passed by ref to the writer helper,
-                // which a using-variable forbids — dispose explicitly instead.
-                var w = context.CreateReplyWriter("v");
-                try
+                var def = Array.Find(Properties, p => p.Name == prop);
+                if (def is null)
                 {
-                    if (!WritePropertyVariant(ref w, prop))
-                    {
-                        context.ReplyError("org.freedesktop.DBus.Error.UnknownProperty", prop);
-                        return;
-                    }
-                    context.Reply(w.CreateMessage());
+                    context.ReplyError("org.freedesktop.DBus.Error.UnknownProperty", prop);
+                    break;
                 }
+                var snap = _control.Snapshot();
+                // Not a 'using' var: MessageWriter is a struct passed by ref to the writer
+                // delegate, which a using-variable forbids — dispose explicitly instead.
+                var w = context.CreateReplyWriter("v");
+                try { def.Write(ref w, in snap); context.Reply(w.CreateMessage()); }
                 finally { w.Dispose(); }
                 break;
             }
             case "GetAll":
             {
+                var snap = _control.Snapshot(); // one UI-thread round-trip for all properties
                 var w = context.CreateReplyWriter("a{sv}");
                 try
                 {
                     var dict = w.WriteDictionaryStart();
-                    foreach (var name in PropertyNames)
+                    foreach (var def in Properties)
                     {
                         w.WriteDictionaryEntryStart();
-                        w.WriteString(name);
-                        WritePropertyVariant(ref w, name);
+                        w.WriteString(def.Name);
+                        def.Write(ref w, in snap);
                     }
                     w.WriteDictionaryEnd(dict);
                     context.Reply(w.CreateMessage());
@@ -191,21 +203,6 @@ public sealed class DBusControlServer : IPathMethodHandler, IDisposable
             default:
                 context.ReplyUnknownMethodError();
                 break;
-        }
-    }
-
-    private bool WritePropertyVariant(ref MessageWriter w, string prop)
-    {
-        switch (prop)
-        {
-            case "DocumentPath": w.WriteVariantString(_control.DocumentPath); return true;
-            case "PageCount": w.WriteVariantInt32(_control.PageCount); return true;
-            case "CurrentPage": w.WriteVariantInt32(_control.CurrentPage); return true;
-            case "Zoom": w.WriteVariantDouble(_control.Zoom); return true;
-            case "IsAnimating": w.WriteVariantBool(_control.IsAnimating); return true;
-            case "CurrentBlockIndex": w.WriteVariantInt32(_control.CurrentBlockIndex); return true;
-            case "CurrentRole": w.WriteVariantString(_control.CurrentRole); return true;
-            default: return false;
         }
     }
 
@@ -265,8 +262,9 @@ public sealed class DBusControlServer : IPathMethodHandler, IDisposable
         _connection = null;
     }
 
-    private const string IntrospectXml = """
-        <interface name="org.railreader.Control1">
+    // Methods + signals are static; the <property> lines are generated from the Properties table
+    // above so the introspection XML and the Get/GetAll handlers share one source of truth.
+    private const string MethodsAndSignalsXml = """
           <method name="OpenDocument">
             <arg type="s" name="path" direction="in"/>
             <arg type="b" name="ok" direction="out"/>
@@ -287,13 +285,6 @@ public sealed class DBusControlServer : IPathMethodHandler, IDisposable
             <arg type="d" name="zoom" direction="in"/>
             <arg type="b" name="ok" direction="out"/>
           </method>
-          <property name="DocumentPath" type="s" access="read"/>
-          <property name="PageCount" type="i" access="read"/>
-          <property name="CurrentPage" type="i" access="read"/>
-          <property name="Zoom" type="d" access="read"/>
-          <property name="IsAnimating" type="b" access="read"/>
-          <property name="CurrentBlockIndex" type="i" access="read"/>
-          <property name="CurrentRole" type="s" access="read"/>
           <signal name="Settled"/>
           <signal name="PageChanged">
             <arg type="i" name="page"/>
@@ -301,9 +292,19 @@ public sealed class DBusControlServer : IPathMethodHandler, IDisposable
           <signal name="DocumentOpened">
             <arg type="s" name="path"/>
           </signal>
-        </interface>
         """;
 
-    private static readonly ReadOnlyMemory<byte> IntrospectXmlUtf8 =
-        System.Text.Encoding.UTF8.GetBytes(IntrospectXml);
+    private static readonly ReadOnlyMemory<byte> IntrospectXmlUtf8 = BuildIntrospectXml();
+
+    private static ReadOnlyMemory<byte> BuildIntrospectXml()
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.Append("<interface name=\"").Append(InterfaceName).Append("\">\n");
+        sb.Append(MethodsAndSignalsXml).Append('\n');
+        foreach (var p in Properties)
+            sb.Append("  <property name=\"").Append(p.Name)
+              .Append("\" type=\"").Append(p.Signature).Append("\" access=\"read\"/>\n");
+        sb.Append("</interface>");
+        return System.Text.Encoding.UTF8.GetBytes(sb.ToString());
+    }
 }
