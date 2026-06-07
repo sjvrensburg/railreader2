@@ -1,6 +1,7 @@
 using Avalonia.Input;
 using RailReader.Core.Commands;
 using RailReader.Core.Models;
+using RailReader2.ControlBus;
 
 namespace RailReader2.ViewModels;
 
@@ -106,4 +107,8 @@ public sealed partial class MainWindowViewModel
         KeyInvoker(key, mods, down);
         return true;
     }
+
+    /// <summary>Set when launched with <c>--record-script</c>: captures the session into a demo
+    /// script. The window feeds it key events; <see cref="OpenDocument"/> feeds it opens.</summary>
+    public ScriptRecorder? ScriptRecorder { get; set; }
 }

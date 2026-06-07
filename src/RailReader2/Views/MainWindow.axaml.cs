@@ -235,6 +235,14 @@ public partial class MainWindow : Window
     /// </summary>
     protected override void OnKeyDown(KeyEventArgs e)
     {
+        HandleKeyDown(e);
+        // Record handled shortcuts for the script recorder (after dispatch, so e.Handled is set).
+        if (e.Handled && Vm?.ScriptRecorder is { } rec)
+            rec.RecordKeyDown(e.Key, e.KeyModifiers);
+    }
+
+    private void HandleKeyDown(KeyEventArgs e)
+    {
         if (Vm is not { } vm) { base.OnKeyDown(e); return; }
 
         // During Scan All, only Escape is allowed (to cancel the scan).
@@ -495,6 +503,10 @@ public partial class MainWindow : Window
 
         if (!e.Handled)
             base.OnKeyUp(e);
+
+        // Record the release (regardless of handled) so the recorder can pair down/up into a
+        // tap (key:) or a held key (key_down/key_up, e.g. Right for rail scrolling).
+        Vm?.ScriptRecorder?.RecordKeyUp(e.Key, e.KeyModifiers);
     }
 
     protected override void OnPointerMoved(PointerEventArgs e)

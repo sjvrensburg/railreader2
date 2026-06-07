@@ -70,4 +70,38 @@ public static class KeyChord
         if (t.Length == 1 && t[0] is >= '0' and <= '9') { key = Key.D0 + (t[0] - '0'); return true; }
         return Enum.TryParse(token, ignoreCase: true, out key) && key != Key.None;
     }
+
+    /// <summary>Format a key + modifiers as a chord string that <see cref="TryParse"/> round-trips
+    /// (e.g. "ctrl+shift+h", "f11", "c", "right", "plus"). Used by the script recorder.</summary>
+    public static string Format(Key key, KeyModifiers mods)
+    {
+        var sb = new System.Text.StringBuilder();
+        if (mods.HasFlag(KeyModifiers.Control)) sb.Append("ctrl+");
+        if (mods.HasFlag(KeyModifiers.Shift)) sb.Append("shift+");
+        if (mods.HasFlag(KeyModifiers.Alt)) sb.Append("alt+");
+        if (mods.HasFlag(KeyModifiers.Meta)) sb.Append("meta+");
+        sb.Append(KeyToken(key));
+        return sb.ToString();
+    }
+
+    private static string KeyToken(Key key) => key switch
+    {
+        >= Key.A and <= Key.Z => ((char)('a' + (key - Key.A))).ToString(),
+        >= Key.D0 and <= Key.D9 => ((char)('0' + (key - Key.D0))).ToString(),
+        Key.OemPlus or Key.Add => "plus",
+        Key.OemMinus or Key.Subtract => "minus",
+        Key.OemComma => "comma",
+        Key.OemTilde => "tilde",
+        Key.OemOpenBrackets => "openbracket",
+        Key.OemCloseBrackets => "closebracket",
+        Key.Space => "space",
+        Key.Enter => "enter",
+        Key.Escape => "escape",
+        Key.Back => "backspace",
+        Key.Left => "left",
+        Key.Right => "right",
+        Key.Up => "up",
+        Key.Down => "down",
+        _ => key.ToString().ToLowerInvariant(), // f11, home, pageup, tab, delete, …
+    };
 }
