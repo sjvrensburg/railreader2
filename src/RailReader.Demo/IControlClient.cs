@@ -15,6 +15,12 @@ public interface IControlClient : IAsyncDisposable
     Task FitPageAsync(CancellationToken ct);
     Task FitWidthAsync(CancellationToken ct);
     Task SetFullScreenAsync(bool on, CancellationToken ct);
+    Task SetZoomAsync(double percent, CancellationToken ct);
+    Task<bool> SetColourEffectAsync(string name, CancellationToken ct);
+    Task<bool> NavigateRoleAsync(string role, bool forward, CancellationToken ct);
+    Task<bool> RailAdvanceLineAsync(bool forward, CancellationToken ct);
+    Task SetLineHighlightAsync(bool on, CancellationToken ct);
+    Task SetLineFocusBlurAsync(bool on, CancellationToken ct);
 
     /// <summary>Frame the occurrence-th block of a role; false if nothing matched (so no animation runs).</summary>
     Task<bool> FrameRoleAsync(string role, int occurrence, double zoom, CancellationToken ct);

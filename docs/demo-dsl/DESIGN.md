@@ -180,7 +180,16 @@ behind the same `IScreenRecorder` seam.
     the head of the video. Pacing is done with `hold` dwell; the **zoom stays the faithful native
     180 ms** (decision reaffirmed). GNOME appends its own container ext to the template, so we pass
     a base path and trust the path it returns.
-- **Phase D — pointer + polish.** `cursor: follow` via synthetic pointer; broaden verbs.
+- **Phase D — pointer + polish. ✅ DONE (cursor draw + broadened verbs).** New control verbs +
+  DSL: `set_zoom: <pct>`, `colour_effect: <name>`, `navigate: { role, dir }` (rail role jump),
+  `rail_advance_lines: { count, per_line, dir }` (line-by-line rail reading — the hero feature),
+  `line_highlight: on|off`, `line_focus_blur: on|off` (plus `SetFullScreen` from Phase C). Role
+  strings resolve via Core's shared `BlockRoleAliases`. Cursor: `cursor: show|follow` draws the
+  pointer into the capture, `hidden|park|unset` hides it (GNOME `draw-cursor`). **Not done:** actual
+  pointer *motion* for `park`/`follow` — synthetic pointer control is unreliable on this Wayland
+  setup (see `computer-use-linux-setup`); the keywords are accepted but only toggle drawing.
+  Tests: 26. Validated live: a rail-reading demo (frame text → highlight → 6× line advance → amber)
+  produced a clean ~17s MP4.
 
 ### First step (recommended): Phase A walking skeleton
 `--control-bus` + 3 verbs + `Settled` + 2 properties. Validate by hand with `busctl call`

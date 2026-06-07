@@ -56,7 +56,11 @@ public sealed class DemoSequencer
                 await ExecuteAsync(script, script.Steps[start], ct).ConfigureAwait(false);
                 start++;
             }
-            await recorder!.StartAsync(script.Output!, script.Fps ?? 60, ct).ConfigureAwait(false);
+            // Cursor: only the draw on/off is reliable on Wayland. "show"/"follow" draw the
+            // pointer; "hidden"/"park"/unset hide it. (Pointer *motion* for park/follow isn't
+            // wired — synthetic pointer control is unreliable on this platform.)
+            bool drawCursor = script.Cursor?.Trim().ToLowerInvariant() is "show" or "follow";
+            await recorder!.StartAsync(script.Output!, script.Fps ?? 60, drawCursor, ct).ConfigureAwait(false);
             await _delay(LeadIn, ct).ConfigureAwait(false);
         }
 
@@ -148,6 +152,64 @@ public sealed class DemoSequencer
                 await _delay(dur, ct).ConfigureAwait(false);
                 break;
             }
+            case "set_zoom":
+            {
+                double pct = step.Args.ContainsKey("percent") ? OptDouble(step, "percent", 0) : OptDouble(step, DemoStep.ValueKey, 0);
+                if (pct <= 0) throw new DemoRunException("set_zoom needs a positive percent", step.Line);
+                _log.WriteLine($"set_zoom {pct.ToString(CultureInfo.InvariantCulture)}%");
+                await IssueAndWaitAsync(step, WaitKind.Settled,
+                    () => _client.SetZoomAsync(pct, ct).ContinueWith(_ => (bool?)null, ct), ct);
+                break;
+            }
+            case "colour_effect":
+            case "color_effect":
+            {
+                string name = step.Args.ContainsKey("name") ? Str(step, "name") : Str(step, DemoStep.ValueKey);
+                _log.WriteLine($"colour_effect {name}");
+                if (!await _client.SetColourEffectAsync(name, ct).ConfigureAwait(false))
+                    _log.WriteLine($"  (unknown colour effect '{name}')");
+                break;
+            }
+            case "navigate":
+            {
+                string role = step.Args.ContainsKey("role") ? Str(step, "role") : Str(step, DemoStep.ValueKey);
+                bool forward = !DirIsBackward(step);
+                _log.WriteLine($"navigate {(forward ? "next" : "prev")} {role}");
+                await IssueAndWaitAsync(step, WaitKind.Settled,
+                    async () => await _client.NavigateRoleAsync(role, forward, ct).ConfigureAwait(false), ct);
+                break;
+            }
+            case "rail_advance_lines":
+            {
+                int count = step.Args.ContainsKey("count") ? Int(step, "count") : Int(step, DemoStep.ValueKey);
+                bool forward = !DirIsBackward(step); // dir: up reverses
+                var perLine = step.Args.ContainsKey("per_line")
+                    ? ParseDuration(step.Args["per_line"], step.Line)
+                    : TimeSpan.FromMilliseconds(600);
+                _log.WriteLine($"rail_advance_lines count={count} dir={(forward ? "down" : "up")} per_line={perLine.TotalMilliseconds:0}ms");
+                for (int n = 0; n < count; n++)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    await IssueAsync(WaitKind.Settled, default,
+                        () => _client.RailAdvanceLineAsync(forward, ct).ContinueWith(t => (bool?)t.Result, ct), ct).ConfigureAwait(false);
+                    await _delay(perLine, ct).ConfigureAwait(false);
+                }
+                break;
+            }
+            case "line_highlight":
+            {
+                bool on = Bool(step, DemoStep.ValueKey);
+                _log.WriteLine($"line_highlight {(on ? "on" : "off")}");
+                await _client.SetLineHighlightAsync(on, ct).ConfigureAwait(false);
+                break;
+            }
+            case "line_focus_blur":
+            {
+                bool on = Bool(step, DemoStep.ValueKey);
+                _log.WriteLine($"line_focus_blur {(on ? "on" : "off")}");
+                await _client.SetLineFocusBlurAsync(on, ct).ConfigureAwait(false);
+                break;
+            }
             default:
                 throw new DemoRunException($"unknown verb '{step.Verb}'", step.Line);
         }
@@ -160,7 +222,13 @@ public sealed class DemoSequencer
     private async Task IssueAndWaitAsync(DemoStep step, WaitKind defaultWait, Func<Task<bool?>> issue, CancellationToken ct)
     {
         var (kind, dur) = ResolveWait(step, defaultWait);
+        await IssueAsync(kind, dur, issue, ct).ConfigureAwait(false);
+    }
 
+    /// <summary>Issue a verb then wait per an explicit kind (used directly by loops like
+    /// rail_advance_lines that don't take a per-step <c>wait:</c> override).</summary>
+    private async Task IssueAsync(WaitKind kind, TimeSpan dur, Func<Task<bool?>> issue, CancellationToken ct)
+    {
         var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         Action settled = () => tcs.TrySetResult();
         Action<int> paged = _ => tcs.TrySetResult();
@@ -242,6 +310,17 @@ public sealed class DemoSequencer
     }
 
     private static TimeSpan Duration(DemoStep s, string key) => ParseDuration(Str(s, key), s.Line);
+
+    private static bool Bool(DemoStep s, string key) => Str(s, key).ToLowerInvariant() switch
+    {
+        "on" or "true" or "yes" or "1" => true,
+        "off" or "false" or "no" or "0" => false,
+        var v => throw new DemoRunException($"'{s.Verb}' {key} must be on/off, got '{v}'", s.Line),
+    };
+
+    /// <summary>A step's direction arg ('dir') indicates backward when up/prev/previous/back.</summary>
+    private static bool DirIsBackward(DemoStep s) =>
+        s.Args.TryGetValue("dir", out var d) && d.ToLowerInvariant() is "up" or "prev" or "previous" or "back" or "backward";
 
     /// <summary>Parse "800ms", "2s", "1.5s", or a bare number (milliseconds).</summary>
     internal static TimeSpan ParseDuration(string raw, int line)

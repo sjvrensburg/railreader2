@@ -110,6 +110,47 @@ public sealed class DBusControlServer : IPathMethodHandler, IDisposable
                     ReplyVoid(context);
                     break;
                 }
+                case "SetZoom":
+                {
+                    var reader = req.GetBodyReader();
+                    _control.SetZoom(reader.ReadDouble());
+                    ReplyVoid(context);
+                    break;
+                }
+                case "SetColourEffect":
+                {
+                    var reader = req.GetBodyReader();
+                    ReplyBool(context, _control.SetColourEffect(reader.ReadString()));
+                    break;
+                }
+                case "NavigateRole":
+                {
+                    var reader = req.GetBodyReader();
+                    string role = reader.ReadString();
+                    bool forward = reader.ReadBool();
+                    ReplyBool(context, _control.NavigateRole(role, forward));
+                    break;
+                }
+                case "RailAdvanceLine":
+                {
+                    var reader = req.GetBodyReader();
+                    ReplyBool(context, _control.RailAdvanceLine(reader.ReadBool()));
+                    break;
+                }
+                case "SetLineHighlight":
+                {
+                    var reader = req.GetBodyReader();
+                    _control.SetLineHighlight(reader.ReadBool());
+                    ReplyVoid(context);
+                    break;
+                }
+                case "SetLineFocusBlur":
+                {
+                    var reader = req.GetBodyReader();
+                    _control.SetLineFocusBlur(reader.ReadBool());
+                    ReplyVoid(context);
+                    break;
+                }
                 case "FrameRole":
                 {
                     var reader = req.GetBodyReader();
@@ -282,6 +323,28 @@ public sealed class DBusControlServer : IPathMethodHandler, IDisposable
           <method name="FitPage"/>
           <method name="FitWidth"/>
           <method name="SetFullScreen">
+            <arg type="b" name="on" direction="in"/>
+          </method>
+          <method name="SetZoom">
+            <arg type="d" name="percent" direction="in"/>
+          </method>
+          <method name="SetColourEffect">
+            <arg type="s" name="name" direction="in"/>
+            <arg type="b" name="ok" direction="out"/>
+          </method>
+          <method name="NavigateRole">
+            <arg type="s" name="role" direction="in"/>
+            <arg type="b" name="forward" direction="in"/>
+            <arg type="b" name="ok" direction="out"/>
+          </method>
+          <method name="RailAdvanceLine">
+            <arg type="b" name="forward" direction="in"/>
+            <arg type="b" name="ok" direction="out"/>
+          </method>
+          <method name="SetLineHighlight">
+            <arg type="b" name="on" direction="in"/>
+          </method>
+          <method name="SetLineFocusBlur">
             <arg type="b" name="on" direction="in"/>
           </method>
           <method name="FrameRole">
