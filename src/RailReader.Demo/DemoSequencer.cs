@@ -210,6 +210,15 @@ public sealed class DemoSequencer
                 await _client.SetLineFocusBlurAsync(on, ct).ConfigureAwait(false);
                 break;
             }
+            case "key":
+                await SendKeyAsync(step, down: true, up: true, ct).ConfigureAwait(false);
+                break;
+            case "key_down":
+                await SendKeyAsync(step, down: true, up: false, ct).ConfigureAwait(false);
+                break;
+            case "key_up":
+                await SendKeyAsync(step, down: false, up: true, ct).ConfigureAwait(false);
+                break;
             default:
                 throw new DemoRunException($"unknown verb '{step.Verb}'", step.Line);
         }
@@ -321,6 +330,20 @@ public sealed class DemoSequencer
     /// <summary>A step's direction arg ('dir') indicates backward when up/prev/previous/back.</summary>
     private static bool DirIsBackward(DemoStep s) =>
         s.Args.TryGetValue("dir", out var d) && d.ToLowerInvariant() is "up" or "prev" or "previous" or "back" or "backward";
+
+    /// <summary>Drive a keyboard shortcut (the generic key verbs). Honours a per-step <c>wait:</c>
+    /// override (default none) — add <c>wait: settled</c> for shortcuts that animate.</summary>
+    private async Task SendKeyAsync(DemoStep step, bool down, bool up, CancellationToken ct)
+    {
+        string chord = step.Args.ContainsKey("chord") ? Str(step, "chord") : Str(step, DemoStep.ValueKey);
+        _log.WriteLine($"{step.Verb} {chord}");
+        await IssueAndWaitAsync(step, WaitKind.None, async () =>
+        {
+            if (!await _client.SendKeyAsync(chord, down, up, ct).ConfigureAwait(false))
+                _log.WriteLine($"  (unknown key chord '{chord}')");
+            return (bool?)null;
+        }, ct).ConfigureAwait(false);
+    }
 
     /// <summary>Parse "800ms", "2s", "1.5s", or a bare number (milliseconds).</summary>
     internal static TimeSpan ParseDuration(string raw, int line)

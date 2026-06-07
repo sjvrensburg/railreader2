@@ -54,6 +54,12 @@ public interface IRailReaderControl
     /// <summary>Set the rail line-focus-blur overlay on/off.</summary>
     void SetLineFocusBlur(bool on);
 
+    /// <summary>Drive a keyboard shortcut by chord (e.g. "c", "f11", "ctrl+shift+h", "right").
+    /// <paramref name="down"/>/<paramref name="up"/> select press phases — both for a tap, down-only
+    /// to begin a held key (rail scroll), up-only to release it. Returns false on an unparseable
+    /// chord.</summary>
+    bool SendKey(string chord, bool down, bool up);
+
     /// <summary>Smoothly frame the n-th block of a semantic role (e.g. "figure", "table",
     /// "equation", "heading") using rail's exact framing and the app-native eased zoom.
     /// <paramref name="zoom"/> &lt;= 0 means auto-fit. Returns true if a matching block was framed.</summary>

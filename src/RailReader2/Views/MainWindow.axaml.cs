@@ -51,6 +51,8 @@ public partial class MainWindow : Window
             };
             UpdateSidebarColumnWidth(vm.ShowOutline);
 
+            vm.KeyInvoker = InvokeKey; // let the control surface drive keyboard shortcuts
+
             _subscribedVm = vm;
             vm.PropertyChanged += OnVmPropertyChanged;
             vm.ViewportFocusRequested += OnViewportFocusRequested;
@@ -58,6 +60,20 @@ public partial class MainWindow : Window
     }
 
     private void OnViewportFocusRequested() => Document.FocusViewport();
+
+    /// <summary>Drive a keyboard shortcut programmatically (the demo control surface). Runs the
+    /// same <see cref="OnKeyDown"/>/<see cref="OnKeyUp"/> path real key input uses, so every
+    /// shortcut — including held keys like Right for rail scrolling — is scriptable.</summary>
+    internal void InvokeKey(Key key, KeyModifiers mods, bool down)
+    {
+        var args = new KeyEventArgs
+        {
+            RoutedEvent = down ? InputElement.KeyDownEvent : InputElement.KeyUpEvent,
+            Key = key,
+            KeyModifiers = mods,
+        };
+        if (down) OnKeyDown(args); else OnKeyUp(args);
+    }
 
     /// <summary>
     /// Build the granular invalidation callbacks passed to the ViewModel. Each

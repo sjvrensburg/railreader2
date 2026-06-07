@@ -1,3 +1,4 @@
+using Avalonia.Input;
 using RailReader.Core.Commands;
 using RailReader.Core.Models;
 
@@ -80,5 +81,18 @@ public sealed partial class MainWindowViewModel
     {
         if (_controller.ActiveDocument is { } doc && doc.LineFocusBlur != on)
             ToggleLineFocusBlur();
+    }
+
+    /// <summary>Set by the window: drives a synthesized key chord through the real OnKeyDown/OnKeyUp
+    /// path, so the control surface can invoke ANY keyboard shortcut. Args: key, modifiers, isDown
+    /// (false = key-up, e.g. to end a held rail scroll).</summary>
+    public Action<Key, KeyModifiers, bool>? KeyInvoker { get; set; }
+
+    /// <summary>Invoke a keyboard shortcut programmatically. Returns false if no window is wired.</summary>
+    public bool InvokeKey(Key key, KeyModifiers mods, bool down)
+    {
+        if (KeyInvoker is null) return false;
+        KeyInvoker(key, mods, down);
+        return true;
     }
 }

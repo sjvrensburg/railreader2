@@ -1,0 +1,44 @@
+# RailReader2 "hero" demo — rail reading with sideways scroll + carriage return.
+#
+# Run against a live app:
+#   railreader2 --control-bus &
+#   railreader2-cli demo docs/demo-dsl/examples/hero.demo
+#
+# (Validate a script without a running app with:  railreader2-cli demo <script> --dry-run)
+
+demo: railreader2-hero
+source: ../../../experiments/PDFs/MOMENT.pdf   # adjust to a real PDF path
+fps: 30
+recorder: gnome           # GNOME screencast → H.264 MP4 (omit to skip recording)
+output: ~/Videos/railreader2-hero.mp4
+fullscreen: true          # app fills the screen so the capture is just the app
+cursor: hidden            # don't draw the pointer into the capture
+
+steps:
+  - open
+  - fit_page
+  - hold: 1500ms
+  - goto_page: 2
+  - hold: 1000ms
+
+  # Zoom in HARD so a text line is wider than the viewport — this is what makes the
+  # sideways scroll + carriage return actually happen (low zoom keeps the column on-screen).
+  - frame_role: { role: text, index: 0, zoom: 12 }
+  - hold: 2000ms
+  - key: h                # line highlight on
+  - hold: 1500ms
+
+  # Hold Right to rail-read continuously: the camera sweeps to the end of each line, then the
+  # carriage-return mechanism wraps to the start of the next line. While it scrolls, change the
+  # colour effect and toggle line-focus-blur — the generic `key` verb drives any shortcut.
+  - key_down: right
+  - hold: 4000ms
+  - key: c                # cycle colour effect, mid-scroll
+  - hold: 4000ms
+  - key: f                # toggle line-focus blur, mid-scroll
+  - hold: 4000ms
+  - key_up: right         # stop scrolling
+
+  - hold: 1500ms
+  - fit_page
+  - hold: 1200ms

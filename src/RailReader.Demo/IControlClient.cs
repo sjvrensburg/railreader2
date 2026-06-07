@@ -22,6 +22,9 @@ public interface IControlClient : IAsyncDisposable
     Task SetLineHighlightAsync(bool on, CancellationToken ct);
     Task SetLineFocusBlurAsync(bool on, CancellationToken ct);
 
+    /// <summary>Drive a keyboard shortcut by chord; down/up select press phases (both = tap).</summary>
+    Task<bool> SendKeyAsync(string chord, bool down, bool up, CancellationToken ct);
+
     /// <summary>Frame the occurrence-th block of a role; false if nothing matched (so no animation runs).</summary>
     Task<bool> FrameRoleAsync(string role, int occurrence, double zoom, CancellationToken ct);
 

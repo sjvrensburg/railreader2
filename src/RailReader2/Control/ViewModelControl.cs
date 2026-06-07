@@ -81,6 +81,18 @@ public sealed class ViewModelControl : IRailReaderControl, IDisposable
     public void SetLineFocusBlur(bool on)
         => Dispatcher.UIThread.Invoke(() => _vm.SetLineFocusBlur(on));
 
+    public bool SendKey(string chord, bool down, bool up)
+    {
+        if (!KeyChord.TryParse(chord, out var key, out var mods)) return false;
+        return Dispatcher.UIThread.Invoke(() =>
+        {
+            bool ok = false;
+            if (down) ok = _vm.InvokeKey(key, mods, true);
+            if (up) ok = _vm.InvokeKey(key, mods, false) || ok;
+            return ok; // false only if no window is wired
+        });
+    }
+
     private static bool TryParseEffect(string name, out ColourEffect effect)
     {
         switch (name?.Trim().ToLowerInvariant())

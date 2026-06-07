@@ -118,6 +118,17 @@ public sealed class DBusControlClient : IControlClient
         return _conn.CallMethodAsync(w.CreateMessage(), static (Message m, object? s) => m.GetBodyReader().ReadBool(), null);
     }
 
+    public Task<bool> SendKeyAsync(string chord, bool down, bool up, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        using var w = _conn.GetMessageWriter();
+        w.WriteMethodCallHeader(_busName, ObjectPath, Interface, "SendKey", "sbb", MessageFlags.None);
+        w.WriteString(chord);
+        w.WriteBool(down);
+        w.WriteBool(up);
+        return _conn.CallMethodAsync(w.CreateMessage(), static (Message m, object? s) => m.GetBodyReader().ReadBool(), null);
+    }
+
     private Task CallBoolArgVoidAsync(string member, bool arg, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();

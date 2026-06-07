@@ -151,6 +151,15 @@ public sealed class DBusControlServer : IPathMethodHandler, IDisposable
                     ReplyVoid(context);
                     break;
                 }
+                case "SendKey":
+                {
+                    var reader = req.GetBodyReader();
+                    string chord = reader.ReadString();
+                    bool down = reader.ReadBool();
+                    bool up = reader.ReadBool();
+                    ReplyBool(context, _control.SendKey(chord, down, up));
+                    break;
+                }
                 case "FrameRole":
                 {
                     var reader = req.GetBodyReader();
@@ -346,6 +355,12 @@ public sealed class DBusControlServer : IPathMethodHandler, IDisposable
           </method>
           <method name="SetLineFocusBlur">
             <arg type="b" name="on" direction="in"/>
+          </method>
+          <method name="SendKey">
+            <arg type="s" name="chord" direction="in"/>
+            <arg type="b" name="down" direction="in"/>
+            <arg type="b" name="up" direction="in"/>
+            <arg type="b" name="ok" direction="out"/>
           </method>
           <method name="FrameRole">
             <arg type="s" name="role" direction="in"/>

@@ -40,6 +40,7 @@ public class DemoSequencerTests
         public Task<bool> RailAdvanceLineAsync(bool forward, CancellationToken ct) { Calls.Add($"advance:{forward}"); if (AutoSignal && FrameResult) Settled?.Invoke(); return Task.FromResult(FrameResult); }
         public Task SetLineHighlightAsync(bool on, CancellationToken ct) { Calls.Add($"highlight:{on}"); return Task.CompletedTask; }
         public Task SetLineFocusBlurAsync(bool on, CancellationToken ct) { Calls.Add($"focusblur:{on}"); return Task.CompletedTask; }
+        public Task<bool> SendKeyAsync(string chord, bool down, bool up, CancellationToken ct) { Calls.Add($"key:{chord}:{(down ? "d" : "")}{(up ? "u" : "")}"); return Task.FromResult(true); }
 
         public Task<bool> FrameRoleAsync(string role, int occurrence, double zoom, CancellationToken ct)
         {
@@ -257,6 +258,27 @@ public class DemoSequencerTests
         var (seq, _) = Make(fake);
         await seq.RunAsync(script);
         Assert.Equal(["advance:False"], fake.Calls);
+    }
+
+    [Fact]
+    public async Task KeyVerbs_SendChordWithPhases()
+    {
+        var fake = new FakeControlClient();
+        var script = DslParser.Parse("""
+            steps:
+              - key: c
+              - key_down: right
+              - key: f
+              - key_up: right
+              - key: ctrl+shift+h
+            """);
+        var (seq, _) = Make(fake);
+
+        await seq.RunAsync(script);
+
+        Assert.Equal(
+            ["key:c:du", "key:right:d", "key:f:du", "key:right:u", "key:ctrl+shift+h:du"],
+            fake.Calls);
     }
 
     [Fact]
