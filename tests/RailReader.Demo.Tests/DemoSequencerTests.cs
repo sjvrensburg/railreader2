@@ -51,6 +51,32 @@ public class DemoSequencerTests
         public ValueTask DisposeAsync() => default;
     }
 
+    /// <summary>Records Start/Stop and the call log at those moments so a test can assert the
+    /// capture brackets the whole step sequence.</summary>
+    private sealed class FakeScreenRecorder(List<string> sharedLog) : IScreenRecorder
+    {
+        public string? Output { get; private set; }
+        public int CallsAtStart { get; private set; } = -1;
+        public int CallsAtStop { get; private set; } = -1;
+        public bool Stopped { get; private set; }
+
+        public Task StartAsync(string outputPath, int fps, CancellationToken ct)
+        {
+            Output = outputPath;
+            CallsAtStart = sharedLog.Count;
+            return Task.CompletedTask;
+        }
+
+        public Task<string> StopAsync(CancellationToken ct)
+        {
+            CallsAtStop = sharedLog.Count;
+            Stopped = true;
+            return Task.FromResult(Output ?? "");
+        }
+
+        public ValueTask DisposeAsync() => default;
+    }
+
     private static (DemoSequencer seq, List<TimeSpan> delays) Make(IControlClient client)
     {
         var delays = new List<TimeSpan>();
@@ -131,6 +157,41 @@ public class DemoSequencerTests
 
         Assert.Contains(TimeSpan.FromMilliseconds(500), delays);
         Assert.DoesNotContain(TimeSpan.FromSeconds(10), delays); // no signal timeout for an explicit duration wait
+    }
+
+    [Fact]
+    public async Task Recorder_BracketsTheWholeRun()
+    {
+        var fake = new FakeControlClient();
+        var rec = new FakeScreenRecorder(fake.Calls);
+        var script = DslParser.Parse("""
+            source: /tmp/x.pdf
+            output: /tmp/out.webm
+            steps:
+              - open
+              - goto_page: 2
+              - frame_role: { role: figure }
+            """);
+        var (seq, _) = Make(fake);
+
+        await seq.RunAsync(script, rec);
+
+        Assert.Equal("/tmp/out.webm", rec.Output);     // resolved output handed to the recorder
+        Assert.Equal(0, rec.CallsAtStart);             // started before any verb
+        Assert.Equal(fake.Calls.Count, rec.CallsAtStop); // stopped after the last verb
+        Assert.True(rec.Stopped);
+    }
+
+    [Fact]
+    public async Task Recorder_StoppedEvenIfAStepThrows()
+    {
+        var fake = new FakeControlClient();
+        var rec = new FakeScreenRecorder(fake.Calls);
+        var script = DslParser.Parse("output: /tmp/out.webm\nsteps:\n  - teleport: 1");
+        var (seq, _) = Make(fake);
+
+        await Assert.ThrowsAsync<DemoRunException>(() => seq.RunAsync(script, rec));
+        Assert.True(rec.Stopped); // finally-block stops the capture so the file is finalised
     }
 
     [Fact]

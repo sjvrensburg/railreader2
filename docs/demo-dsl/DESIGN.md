@@ -137,11 +137,16 @@ steps:
 Wait semantics: every motion verb defaults to `wait: settled`; `hold` is wall-clock
 dwell for pacing; blind sleeps are never used to time *motion*, only *dwell*.
 
-## 8. Recording (Phase C)
+## 8. Recording (Phase C — implemented)
 
-GNOME screencast portal at the monitor refresh; frames → `ffmpeg`. Because the sequencer
-cuts on real `Settled` events, captured motion equals the on-screen experience. The
-portal prompts once at session start.
+`GnomeScreenRecorder` drives `org.gnome.Shell.Screencast` (`Screencast`/`StopScreencast`),
+which captures the monitor and encodes H.264 MP4 itself (GNOME ≥50) — no PipeWire, no
+ffmpeg-piping, and no portal picker prompt (better for automation). Because the sequencer
+cuts step motion on real `Settled` events, the continuous capture equals the on-screen
+experience. ffmpeg is invoked only to transcode when the requested `output:` extension
+differs from what GNOME wrote. Records the full screen; window-scoped capture
+(`ScreencastArea`) is a later option. Non-GNOME hosts would swap in an xdg-portal recorder
+behind the same `IScreenRecorder` seam.
 
 ## 9. Phasing
 
@@ -159,7 +164,15 @@ portal prompts once at session start.
   eased animations (and thus `Settled`) only advance while the app window is actively rendering —
   the compositor frame loop drives `RequestAnimationFrame`. That's always true while recording, but
   a backgrounded window can stall mid-animation, so the runner times out per step and continues.
-- **Phase C — recorder.** GNOME portal capture + ffmpeg, event-synced cuts.
+- **Phase C — recorder. ✅ DONE.** `IScreenRecorder` seam + `GnomeScreenRecorder` (uses
+  `org.gnome.Shell.Screencast` directly — promptless, encodes H.264 MP4 natively on GNOME ≥50, no
+  PipeWire) + `NullScreenRecorder`. The sequencer brackets the whole run (`StartAsync` → lead-in →
+  steps → lead-out → `StopAsync`, stop in a `finally` so a thrown/cancelled run still finalises the
+  file). `recorder: portal|gnome|screen` + `output:` in the DSL select it. ffmpeg is only used to
+  transcode when GNOME's container differs from the requested extension (optional). Validated live:
+  the MOMENT demo produced a valid ~6s H.264 MP4 of the real window. (Deviation from the original
+  plan: used the GNOME Shell screencast API, not the xdg ScreenCast portal — simpler, promptless,
+  no ffmpeg-piping; the portal would only be needed for non-GNOME or window-scoped capture.)
 - **Phase D — pointer + polish.** `cursor: follow` via synthetic pointer; broaden verbs.
 
 ### First step (recommended): Phase A walking skeleton

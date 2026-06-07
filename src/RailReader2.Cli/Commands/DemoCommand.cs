@@ -29,12 +29,12 @@ static class DemoCommand
             return Program.Fail($"Parse error: {ex.Message}");
         }
 
-        // Resolve the source PDF relative to the script's own directory.
+        // Resolve the source PDF and output video relative to the script's own directory.
+        var baseDir = Path.GetDirectoryName(Path.GetFullPath(scriptPath)) ?? ".";
         if (script.Source is { Length: > 0 } src && !Path.IsPathRooted(src))
-        {
-            var baseDir = Path.GetDirectoryName(Path.GetFullPath(scriptPath)) ?? ".";
             script = script with { Source = Path.GetFullPath(Path.Combine(baseDir, src)) };
-        }
+        if (script.Output is { Length: > 0 } outp && !Path.IsPathRooted(outp))
+            script = script with { Output = Path.GetFullPath(Path.Combine(baseDir, outp)) };
 
         if (Program.HasFlag(args, "dry-run"))
         {
@@ -42,16 +42,19 @@ static class DemoCommand
             return 0;
         }
 
-        if (script.Recorder is { Length: > 0 } rec)
-            Console.WriteLine($"Note: recorder '{rec}' is not wired yet (Phase C) — running without capture.");
-
         var busName = Program.GetOption(args, "bus-name");
         var timeoutMs = Program.GetOption(args, "settle-timeout");
         var settle = int.TryParse(timeoutMs, out var ms) ? TimeSpan.FromMilliseconds(ms) : TimeSpan.FromSeconds(10);
 
+        var recorder = SelectRecorder(script);
+        if (recorder is null && script.Recorder is { Length: > 0 } rec)
+            return Program.Fail($"unknown recorder '{rec}' (supported: portal, gnome, screen, none)");
+        if (recorder is not null && string.IsNullOrEmpty(script.Output))
+            return Program.Fail("a recorder is set but no 'output:' path was given");
+
         try
         {
-            return RunAsync(script, busName, settle).GetAwaiter().GetResult();
+            return RunAsync(script, busName, settle, recorder ?? new NullScreenRecorder()).GetAwaiter().GetResult();
         }
         catch (DemoRunException ex)
         {
@@ -64,16 +67,26 @@ static class DemoCommand
         }
     }
 
-    private static async Task<int> RunAsync(DemoScript script, string? busName, TimeSpan settle)
+    private static async Task<int> RunAsync(DemoScript script, string? busName, TimeSpan settle, IScreenRecorder recorder)
     {
         using var cts = new CancellationTokenSource();
         Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
 
+        await using var rec = recorder;
         await using var client = await DBusControlClient.CreateAsync(busName);
         var sequencer = new DemoSequencer(client, Console.Out, settleTimeout: settle);
-        await sequencer.RunAsync(script, cts.Token);
+        await sequencer.RunAsync(script, rec, cts.Token);
         return 0;
     }
+
+    /// <summary>Map the script's <c>recorder:</c> to an implementation. Null only when the value is
+    /// unrecognised; an absent setting yields the no-op recorder.</summary>
+    private static IScreenRecorder? SelectRecorder(DemoScript script) => script.Recorder?.ToLowerInvariant() switch
+    {
+        null or "" or "none" => new NullScreenRecorder(),
+        "portal" or "gnome" or "screen" => new GnomeScreenRecorder(Console.Out),
+        _ => null,
+    };
 
     private static void PrintPlan(DemoScript script)
     {

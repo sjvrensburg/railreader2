@@ -30,15 +30,42 @@ public sealed class DemoSequencer
         _settleTimeout = settleTimeout ?? TimeSpan.FromSeconds(10);
     }
 
-    public async Task RunAsync(DemoScript script, CancellationToken ct = default)
+    /// <summary>Run the script. If <paramref name="recorder"/> is given and the script has an
+    /// <c>output:</c>, the whole run is bracketed by a screen capture (with a short lead-in/out so
+    /// the video doesn't start/end exactly on the first/last motion). The capture is continuous;
+    /// fidelity comes from each step cutting on the real <c>Settled</c> signal, not from per-step
+    /// video edits.</summary>
+    public async Task RunAsync(DemoScript script, IScreenRecorder? recorder = null, CancellationToken ct = default)
     {
-        for (int i = 0; i < script.Steps.Count; i++)
+        bool capturing = recorder is not null && !string.IsNullOrEmpty(script.Output);
+        if (capturing)
         {
-            ct.ThrowIfCancellationRequested();
-            await ExecuteAsync(script, script.Steps[i], ct).ConfigureAwait(false);
+            await recorder!.StartAsync(script.Output!, script.Fps ?? 60, ct).ConfigureAwait(false);
+            await _delay(LeadIn, ct).ConfigureAwait(false);
         }
-        _log.WriteLine("Demo complete.");
+        try
+        {
+            for (int i = 0; i < script.Steps.Count; i++)
+            {
+                ct.ThrowIfCancellationRequested();
+                await ExecuteAsync(script, script.Steps[i], ct).ConfigureAwait(false);
+            }
+            _log.WriteLine("Demo complete.");
+        }
+        finally
+        {
+            if (capturing)
+            {
+                // Lead-out is best-effort even on cancellation; use a fresh token so a cancelled
+                // run still flushes the tail and finalises the file.
+                try { await _delay(LeadOut, CancellationToken.None).ConfigureAwait(false); } catch { /* ignore */ }
+                await recorder!.StopAsync(CancellationToken.None).ConfigureAwait(false);
+            }
+        }
     }
+
+    private static readonly TimeSpan LeadIn = TimeSpan.FromMilliseconds(500);
+    private static readonly TimeSpan LeadOut = TimeSpan.FromMilliseconds(800);
 
     private enum WaitKind { None, Settled, PageChanged, Duration }
 
