@@ -189,22 +189,29 @@ command + sync triad before the DSL/recorder exist. Already independently useful
     `FrameRole heading 0` → `true`, `IsAnimating` true→false, `Zoom`→3 (rail framing),
     `CurrentRole`="Heading", and the **`Settled`** signal fired on settle. The real-window +
     reliable-command + event-sync triad is proven.
-  - **Known gap (matches open item #2):** `FrameRole`/`FrameBlock` route through
-    `RailNav.TrySetCurrentByPageIndex`, which returns `false` for roles not in
-    `DefaultRoleSets.Navigable` = {Text, Heading, Title, Caption, DisplayMath, Algorithm,
-    Footnote}. So **`Figure`/`Table`/`Chart` can never be framed** (verified false across MOMENT.pdf
-    pages 3–11); equations/headings/text/captions frame fine. Zooming to a figure/table for a demo
-    needs a Core centred-frame path that frames any block geometrically, bypassing the navigable
-    index (Core: `SmoothlyFrameBlock` gates on `TrySetCurrentByPageIndex` at
-    DocumentController.cs:499). Decide before Phase B whether the DSL needs figure/table framing.
+  - **Figure/Table/Chart framing — RESOLVED in Core** (branch `feat/centred-frame-nonnavigable`,
+    pending a Core release + railreader2 bump). Previously `FrameRole`/`FrameBlock` returned `false`
+    for roles outside `DefaultRoleSets.Navigable` (the rail index can't seat them). Now
+    `SmoothlyFrameBlock` falls back to a **geometric centred frame** for non-navigable blocks: ease
+    zoom-to-fit + centre in the viewport with rail OFF (new `ZoomAnimationController.StartCameraOnly`
+    pure-camera-move mode that skips per-frame `UpdateRailZoom` and the completion snap;
+    `RailNav.Deactivate`; `DocumentState.ComputeCenteredFrame`). Unlike rail framing it does NOT
+    floor at the 3× threshold, so a large figure shows whole below it. New explicit
+    `SmoothlyCenterBlock`/`SmoothlyCenterRole` force geometric centring for any block. The control
+    bus needs **no change** — `FrameRole`/`FrameBlock` already call the Core primitives.
+    Validated end-to-end over `busctl` against a local Core build on MOMENT.pdf: `FrameRole figure`
+    framed figures on pp.3/7 (p7 a large figure at 2.25×, whole) and `FrameRole table` framed a
+    table on p5, each emitting `Settled`. Once Core ships, this lands in railreader2 via the bump.
 - ⬜ Phases B–D: not started.
 
 ## 12. Open items / risks
 
 - Auto-fit floors zoom at the rail threshold (so framing applies) — a very large block
   can't "fit" below threshold; acceptable (rail reading semantics). Revisit if needed.
-- Non-navigable blocks (figures/tables outside NavigableRoles) can't use rail framing —
-  `FrameBlock`/`FrameRole` return false. A separate centred-frame path is a later option.
+- ~~Non-navigable blocks (figures/tables outside NavigableRoles) can't use rail framing.~~
+  RESOLVED: `SmoothlyFrameBlock`/`FrameRole` now fall back to a geometric centred frame for
+  non-navigable blocks; explicit `SmoothlyCenterBlock`/`Role` added (Core branch
+  `feat/centred-frame-nonnavigable`, pending release). See §11.
 - Recorder portal prompt is interactive — fine for manual runs; headless/cron capture
   would need a different path.
 - D-Bus is Linux-only; Windows demos would need the portable-interface swap (designed for).
