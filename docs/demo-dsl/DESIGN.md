@@ -189,9 +189,14 @@ command + sync triad before the DSL/recorder exist. Already independently useful
     `FrameRole heading 0` → `true`, `IsAnimating` true→false, `Zoom`→3 (rail framing),
     `CurrentRole`="Heading", and the **`Settled`** signal fired on settle. The real-window +
     reliable-command + event-sync triad is proven.
-  - **Known (matches open item #2):** `FrameRole figure`/`table` return `false` — those roles
-    aren't in the default `navigable_classes`, so rail framing rejects them. Framing a figure/
-    table for a demo needs the future centred-frame path in Core. Headings/text/equations work.
+  - **Known gap (matches open item #2):** `FrameRole`/`FrameBlock` route through
+    `RailNav.TrySetCurrentByPageIndex`, which returns `false` for roles not in
+    `DefaultRoleSets.Navigable` = {Text, Heading, Title, Caption, DisplayMath, Algorithm,
+    Footnote}. So **`Figure`/`Table`/`Chart` can never be framed** (verified false across MOMENT.pdf
+    pages 3–11); equations/headings/text/captions frame fine. Zooming to a figure/table for a demo
+    needs a Core centred-frame path that frames any block geometrically, bypassing the navigable
+    index (Core: `SmoothlyFrameBlock` gates on `TrySetCurrentByPageIndex` at
+    DocumentController.cs:499). Decide before Phase B whether the DSL needs figure/table framing.
 - ⬜ Phases B–D: not started.
 
 ## 12. Open items / risks
