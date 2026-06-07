@@ -190,6 +190,17 @@ behind the same `IScreenRecorder` seam.
   setup (see `computer-use-linux-setup`); the keywords are accepted but only toggle drawing.
   Tests: 26. Validated live: a rail-reading demo (frame text → highlight → 6× line advance → amber)
   produced a clean ~17s MP4.
+  - **Generic `key` verb (every shortcut scriptable).** `SendKey` drives a parsed chord through the
+    window's real `OnKeyDown`/`OnKeyUp` (`MainWindow.InvokeKey`), so *any* keyboard shortcut is
+    scriptable — now and as new ones are added. DSL: `key: <chord>` (tap, e.g. `key: c`,
+    `key: f11`, `key: ctrl+shift+h`), and `key_down:`/`key_up:` for held keys. This subsumes rail
+    **horizontal** scrolling: `key_down: right` holds the Right arrow so the camera sweeps to the
+    line end and the **carriage-return** wraps to the next line; instant shortcuts (`key: c` colour,
+    `key: f` focus-blur, `key: h` highlight) fire *mid-scroll* because the held scroll runs in the
+    app's own animation loop between the down/up. Add `wait: settled` for shortcuts that animate.
+    Chord parsing (`KeyChord`) lives app-side (it needs Avalonia `Key`); the runner passes strings.
+    See `docs/demo-dsl/examples/hero.demo`. Hero recorded live: zoom 12 → hold Right → scroll +
+    carriage return with colour/blur changing mid-scroll → ~23s MP4.
 
 ### First step (recommended): Phase A walking skeleton
 `--control-bus` + 3 verbs + `Settled` + 2 properties. Validate by hand with `busctl call`

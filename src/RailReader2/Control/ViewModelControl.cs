@@ -53,6 +53,20 @@ public sealed class ViewModelControl : IRailReaderControl, IDisposable
     public void SetZoom(double percent)
         => Dispatcher.UIThread.Invoke(() => _vm.SetZoomPercent(percent));
 
+    public ReadingState GetReadingState() => Dispatcher.UIThread.Invoke(() =>
+    {
+        var info = _vm.GetDocumentInfo();
+        var pos = _vm.GetReadingPosition();
+        return new ReadingState(
+            RailActive: info?.RailActive ?? false,
+            AutoScrollActive: info?.AutoScrollActive ?? false,
+            Page: info?.CurrentPage ?? -1,
+            BlockIndex: pos?.BlockIndex ?? -1,
+            LineIndex: pos?.LineIndex ?? -1,
+            LineCount: pos?.LineCount ?? 0,
+            HorizontalFraction: pos?.HorizontalFraction ?? 0.0);
+    });
+
     public bool SetColourEffect(string name)
     {
         if (!TryParseEffect(name, out var effect)) return false;
@@ -80,6 +94,30 @@ public sealed class ViewModelControl : IRailReaderControl, IDisposable
 
     public void SetLineFocusBlur(bool on)
         => Dispatcher.UIThread.Invoke(() => _vm.SetLineFocusBlur(on));
+
+    public bool SetNavigableRoles(string csv)
+    {
+        var roles = (csv ?? "")
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .SelectMany(BlockRoleAliases.Resolve)
+            .Distinct()
+            .ToList();
+        if (roles.Count == 0) return false;
+        Dispatcher.UIThread.Invoke(() => _vm.SetNavigableRoles(roles));
+        return true;
+    }
+
+    public bool SendKey(string chord, bool down, bool up)
+    {
+        if (!KeyChord.TryParse(chord, out var key, out var mods)) return false;
+        return Dispatcher.UIThread.Invoke(() =>
+        {
+            bool ok = false;
+            if (down) ok = _vm.InvokeKey(key, mods, true);
+            if (up) ok = _vm.InvokeKey(key, mods, false) || ok;
+            return ok; // false only if no window is wired
+        });
+    }
 
     private static bool TryParseEffect(string name, out ColourEffect effect)
     {

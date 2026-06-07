@@ -48,9 +48,16 @@ public partial class App : Application
                 var window = new MainWindow { DataContext = vm };
                 vm.SetWindow(window);
 
+                // Optional session recorder: --record-script <file> / =<file>. Captures the live
+                // session into an editable demo script, written when the window closes.
+                var recordPath = GetRecordScriptPath(args);
+                if (recordPath is not null)
+                    vm.ScriptRecorder = new ScriptRecorder { SavePath = recordPath };
+
                 window.Opened += (_, _) => splash.Close();
                 window.Closing += (_, _) =>
                 {
+                    vm.StopAndSaveRecording(); // writes the script if recording (flag or in-app toggle)
                     _controlServer?.Dispose();
                     _control?.Dispose();
                     vm.Dispose();
@@ -91,6 +98,20 @@ public partial class App : Application
             }
         }
         return false;
+    }
+
+    /// <summary>Path from <c>--record-script &lt;file&gt;</c> or <c>--record-script=&lt;file&gt;</c>, or null.</summary>
+    private static string? GetRecordScriptPath(string[]? args)
+    {
+        if (args is null) return null;
+        for (int i = 0; i < args.Length; i++)
+        {
+            if (args[i].StartsWith("--record-script=", StringComparison.Ordinal))
+                return args[i]["--record-script=".Length..];
+            if (args[i] == "--record-script" && i + 1 < args.Length)
+                return args[i + 1];
+        }
+        return null;
     }
 
     private void StartControlServer(MainWindowViewModel vm, string? busName)

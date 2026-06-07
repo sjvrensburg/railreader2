@@ -54,6 +54,16 @@ public interface IRailReaderControl
     /// <summary>Set the rail line-focus-blur overlay on/off.</summary>
     void SetLineFocusBlur(bool on);
 
+    /// <summary>Restrict rail-navigable block roles for this session (comma-separated tokens, e.g.
+    /// "text, heading, equation"). Returns false if nothing resolved. Not persisted.</summary>
+    bool SetNavigableRoles(string csv);
+
+    /// <summary>Drive a keyboard shortcut by chord (e.g. "c", "f11", "ctrl+shift+h", "right").
+    /// <paramref name="down"/>/<paramref name="up"/> select press phases — both for a tap, down-only
+    /// to begin a held key (rail scroll), up-only to release it. Returns false on an unparseable
+    /// chord.</summary>
+    bool SendKey(string chord, bool down, bool up);
+
     /// <summary>Smoothly frame the n-th block of a semantic role (e.g. "figure", "table",
     /// "equation", "heading") using rail's exact framing and the app-native eased zoom.
     /// <paramref name="zoom"/> &lt;= 0 means auto-fit. Returns true if a matching block was framed.</summary>
@@ -69,6 +79,11 @@ public interface IRailReaderControl
     /// mutually consistent and, for the implementation, lets a multi-property read (e.g. D-Bus
     /// GetAll) cross to the UI thread once instead of per property.</summary>
     ControlSnapshot Snapshot();
+
+    /// <summary>Live rail reading progress — which block/line we're on, lines in the block, and how
+    /// far across the line. Lets the runner sync on real progress (e.g. auto-scroll until the
+    /// column hand-off) instead of guessing hold durations.</summary>
+    ReadingState GetReadingState();
 
     // --- Events (sync backbone for the runner) ---
 
@@ -100,3 +115,21 @@ public readonly record struct ControlSnapshot(
     bool IsAnimating,
     int CurrentBlockIndex,
     string CurrentRole);
+
+/// <summary>Live rail reading progress (see <see cref="IRailReaderControl.GetReadingState"/>).
+/// When not rail-reading, RailActive is false and the indices are -1/0.</summary>
+/// <param name="RailActive">True while rail reading.</param>
+/// <param name="AutoScrollActive">True while auto-scroll is running.</param>
+/// <param name="Page">Current page (or -1).</param>
+/// <param name="BlockIndex">Page block index under the rail (or -1) — changes on a block/column hand-off.</param>
+/// <param name="LineIndex">Current line within the block (or -1).</param>
+/// <param name="LineCount">Lines in the current block (or 0).</param>
+/// <param name="HorizontalFraction">How far across the current line, 0..1 (0 if it fits).</param>
+public readonly record struct ReadingState(
+    bool RailActive,
+    bool AutoScrollActive,
+    int Page,
+    int BlockIndex,
+    int LineIndex,
+    int LineCount,
+    double HorizontalFraction);

@@ -12,6 +12,9 @@ namespace RailReader.Demo;
 /// <param name="Output">Output video path (Phase C).</param>
 /// <param name="Fullscreen">When true, the app is put full-screen for the run so a recording
 /// captures just the app, full-bleed (and restored afterwards).</param>
+/// <param name="Navigable">Optional comma-separated role list that rail mode may stop on (e.g.
+/// "text, heading"); restricts navigable block types for the run — drop "caption"/"footnote" for a
+/// clean column-to-column hand-off. Null leaves the app's configured default.</param>
 /// <param name="Steps">The ordered steps.</param>
 public sealed record DemoScript(
     string? Name,
@@ -21,6 +24,7 @@ public sealed record DemoScript(
     string? Recorder,
     string? Output,
     bool Fullscreen,
+    string? Navigable,
     IReadOnlyList<DemoStep> Steps);
 
 /// <summary>

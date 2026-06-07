@@ -40,6 +40,13 @@ public class DemoSequencerTests
         public Task<bool> RailAdvanceLineAsync(bool forward, CancellationToken ct) { Calls.Add($"advance:{forward}"); if (AutoSignal && FrameResult) Settled?.Invoke(); return Task.FromResult(FrameResult); }
         public Task SetLineHighlightAsync(bool on, CancellationToken ct) { Calls.Add($"highlight:{on}"); return Task.CompletedTask; }
         public Task SetLineFocusBlurAsync(bool on, CancellationToken ct) { Calls.Add($"focusblur:{on}"); return Task.CompletedTask; }
+        public Task<bool> SendKeyAsync(string chord, bool down, bool up, CancellationToken ct) { Calls.Add($"key:{chord}:{(down ? "d" : "")}{(up ? "u" : "")}"); return Task.FromResult(true); }
+        public Task<bool> SetNavigableRolesAsync(string csv, CancellationToken ct) { Calls.Add($"navigable:{csv}"); return Task.FromResult(true); }
+
+        // Simulate reading progress: block index advances on each poll, so an `until: handoff` resolves.
+        public int ReadBlock { get; set; }
+        public Task<ReadingState> GetReadingStateAsync(CancellationToken ct)
+            => Task.FromResult(new ReadingState(true, true, 0, ReadBlock++, 0, 5, 0.0));
 
         public Task<bool> FrameRoleAsync(string role, int occurrence, double zoom, CancellationToken ct)
         {
@@ -194,6 +201,24 @@ public class DemoSequencerTests
     }
 
     [Fact]
+    public async Task Navigable_AppliedBeforeSteps()
+    {
+        var fake = new FakeControlClient();
+        var script = DslParser.Parse("""
+            source: /tmp/x.pdf
+            navigable: text, heading
+            steps:
+              - open
+              - frame_role: { role: text }
+            """);
+        var (seq, _) = Make(fake);
+
+        await seq.RunAsync(script);
+
+        Assert.Equal("navigable:text, heading", fake.Calls[0]); // applied first (pre-roll)
+    }
+
+    [Fact]
     public async Task Fullscreen_TogglesOnBeforeRunAndOffAfter()
     {
         var fake = new FakeControlClient();
@@ -257,6 +282,53 @@ public class DemoSequencerTests
         var (seq, _) = Make(fake);
         await seq.RunAsync(script);
         Assert.Equal(["advance:False"], fake.Calls);
+    }
+
+    [Fact]
+    public async Task KeyVerbs_SendChordWithPhases()
+    {
+        var fake = new FakeControlClient();
+        var script = DslParser.Parse("""
+            steps:
+              - key: c
+              - key_down: right
+              - key: f
+              - key_up: right
+              - key: ctrl+shift+h
+            """);
+        var (seq, _) = Make(fake);
+
+        await seq.RunAsync(script);
+
+        Assert.Equal(
+            ["key:c:du", "key:right:d", "key:f:du", "key:right:u", "key:ctrl+shift+h:du"],
+            fake.Calls);
+    }
+
+    [Fact]
+    public async Task AutoScroll_UntilHandoff_TogglesOnReadsThenOff()
+    {
+        var fake = new FakeControlClient();
+        var script = DslParser.Parse("steps:\n  - auto_scroll: { until: handoff }");
+        var (seq, _) = Make(fake);
+
+        await seq.RunAsync(script);
+
+        // Auto-scroll toggled on (p), then off (p) after the block index changed.
+        Assert.Equal(["key:p:du", "key:p:du"], fake.Calls);
+    }
+
+    [Fact]
+    public async Task AutoScroll_For_IsTimed()
+    {
+        var fake = new FakeControlClient();
+        var script = DslParser.Parse("steps:\n  - auto_scroll: { for: 2s }");
+        var (seq, delays) = Make(fake);
+
+        await seq.RunAsync(script);
+
+        Assert.Equal(["key:p:du", "key:p:du"], fake.Calls);
+        Assert.Contains(TimeSpan.FromSeconds(2), delays); // timed hold, no polling
     }
 
     [Fact]

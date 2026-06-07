@@ -73,6 +73,7 @@ public sealed partial class MainWindowViewModel
             RequestAnimationFrame();
             StartBackgroundAnalysis();
 
+            ScriptRecorder?.RecordOpen(path);
             _logger.Debug("[OpenDocument] Tab added successfully");
         }
         catch (Exception ex)

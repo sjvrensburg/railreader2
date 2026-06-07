@@ -51,6 +51,8 @@ public partial class MainWindow : Window
             };
             UpdateSidebarColumnWidth(vm.ShowOutline);
 
+            vm.KeyInvoker = InvokeKey; // let the control surface drive keyboard shortcuts
+
             _subscribedVm = vm;
             vm.PropertyChanged += OnVmPropertyChanged;
             vm.ViewportFocusRequested += OnViewportFocusRequested;
@@ -58,6 +60,20 @@ public partial class MainWindow : Window
     }
 
     private void OnViewportFocusRequested() => Document.FocusViewport();
+
+    /// <summary>Drive a keyboard shortcut programmatically (the demo control surface). Runs the
+    /// same <see cref="OnKeyDown"/>/<see cref="OnKeyUp"/> path real key input uses, so every
+    /// shortcut — including held keys like Right for rail scrolling — is scriptable.</summary>
+    internal void InvokeKey(Key key, KeyModifiers mods, bool down)
+    {
+        var args = new KeyEventArgs
+        {
+            RoutedEvent = down ? InputElement.KeyDownEvent : InputElement.KeyUpEvent,
+            Key = key,
+            KeyModifiers = mods,
+        };
+        if (down) OnKeyDown(args); else OnKeyUp(args);
+    }
 
     /// <summary>
     /// Build the granular invalidation callbacks passed to the ViewModel. Each
@@ -218,6 +234,22 @@ public partial class MainWindow : Window
     /// Rail navigation keys always take priority when rail mode is active.
     /// </summary>
     protected override void OnKeyDown(KeyEventArgs e)
+    {
+        // Record toggle (Ctrl+Shift+R) is intercepted here so it is never itself recorded.
+        if (e.Key == Key.R && e.KeyModifiers == (KeyModifiers.Control | KeyModifiers.Shift))
+        {
+            Vm?.ToggleScriptRecording();
+            e.Handled = true;
+            return;
+        }
+
+        HandleKeyDown(e);
+        // Record handled shortcuts for the script recorder (after dispatch, so e.Handled is set).
+        if (e.Handled && Vm?.ScriptRecorder is { } rec)
+            rec.RecordKeyDown(e.Key, e.KeyModifiers);
+    }
+
+    private void HandleKeyDown(KeyEventArgs e)
     {
         if (Vm is not { } vm) { base.OnKeyDown(e); return; }
 
@@ -479,6 +511,10 @@ public partial class MainWindow : Window
 
         if (!e.Handled)
             base.OnKeyUp(e);
+
+        // Record the release (regardless of handled) so the recorder can pair down/up into a
+        // tap (key:) or a held key (key_down/key_up, e.g. Right for rail scrolling).
+        Vm?.ScriptRecorder?.RecordKeyUp(e.Key, e.KeyModifiers);
     }
 
     protected override void OnPointerMoved(PointerEventArgs e)

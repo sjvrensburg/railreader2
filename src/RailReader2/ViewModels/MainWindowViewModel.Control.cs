@@ -1,5 +1,7 @@
+using Avalonia.Input;
 using RailReader.Core.Commands;
 using RailReader.Core.Models;
+using RailReader2.ControlBus;
 
 namespace RailReader2.ViewModels;
 
@@ -81,4 +83,78 @@ public sealed partial class MainWindowViewModel
         if (_controller.ActiveDocument is { } doc && doc.LineFocusBlur != on)
             ToggleLineFocusBlur();
     }
+
+    /// <summary>Restrict which block roles rail mode may stop on, for the current session only
+    /// (applied to the controller WITHOUT persisting to disk, so the user's saved config is
+    /// untouched). Used by the demo runner to e.g. drop captions/footnotes for a clean
+    /// column-to-column hand-off.</summary>
+    public void SetNavigableRoles(IReadOnlyCollection<BlockRole> roles)
+    {
+        _appConfig.NavigableRoles = new HashSet<BlockRole>(roles);
+        _controller.OnConfigChanged(_appConfig.ToCoreSettings()); // re-applies; no Save()
+        InvalidateOverlay();
+    }
+
+    /// <summary>Set by the window: drives a synthesized key chord through the real OnKeyDown/OnKeyUp
+    /// path, so the control surface can invoke ANY keyboard shortcut. Args: key, modifiers, isDown
+    /// (false = key-up, e.g. to end a held rail scroll).</summary>
+    public Action<Key, KeyModifiers, bool>? KeyInvoker { get; set; }
+
+    /// <summary>Invoke a keyboard shortcut programmatically. Returns false if no window is wired.</summary>
+    public bool InvokeKey(Key key, KeyModifiers mods, bool down)
+    {
+        if (KeyInvoker is null) return false;
+        KeyInvoker(key, mods, down);
+        return true;
+    }
+
+    /// <summary>Set when launched with <c>--record-script</c> or via the in-app toggle: captures the
+    /// session into a demo script. The window feeds it key events; <see cref="OpenDocument"/> feeds
+    /// it opens.</summary>
+    public ScriptRecorder? ScriptRecorder { get; set; }
+
+    /// <summary>True while a demo session is being recorded (drives any UI indicator).</summary>
+    public bool IsRecordingScript => ScriptRecorder is not null;
+
+    /// <summary>Start/stop recording the session to a demo script (Ctrl+Shift+R). Stopping writes
+    /// the script and toasts the path.</summary>
+    public void ToggleScriptRecording()
+    {
+        if (ScriptRecorder is null)
+            StartScriptRecording(DefaultRecordingPath());
+        else
+            StopAndSaveRecording();
+    }
+
+    public void StartScriptRecording(string savePath)
+    {
+        var rec = new ScriptRecorder { SavePath = savePath };
+        // Seed with the already-open document so the script is self-contained (replay opens it).
+        if (_controller.ActiveDocument?.FilePath is { Length: > 0 } open)
+            rec.RecordOpen(open);
+        ScriptRecorder = rec;
+        OnPropertyChanged(nameof(IsRecordingScript));
+        ShowStatusToast("● Recording demo script…");
+    }
+
+    public void StopAndSaveRecording()
+    {
+        if (ScriptRecorder is not { } rec) return;
+        ScriptRecorder = null;
+        OnPropertyChanged(nameof(IsRecordingScript));
+        try
+        {
+            rec.Save();
+            ShowStatusToast(rec.SavePath is { } p ? $"Saved demo script → {Path.GetFileName(p)}" : "Recording stopped");
+        }
+        catch (Exception ex)
+        {
+            _logger.Error("[record-script] save failed", ex);
+            ShowStatusToast("Failed to save demo script");
+        }
+    }
+
+    private static string DefaultRecordingPath() =>
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            $"railreader2-demo-{DateTime.Now:yyyyMMdd-HHmmss}.demo");
 }
