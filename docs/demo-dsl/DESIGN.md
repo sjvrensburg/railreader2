@@ -149,7 +149,16 @@ portal prompts once at session start.
   `ViewModelControl` + `DBusControlServer` with verbs `OpenDocument`/`GoToPage`/`FitPage`/
   `FitWidth`/`FrameRole`/`FrameBlock`, the `Settled`/`PageChanged`/`DocumentOpened` signals,
   and the 7 read properties. Validated by hand over `busctl`/`gdbus` (see §11).
-- **Phase B — runner + DSL.** `railreader2-cli demo`: parser, sequencer, `IControlClient`.
+- **Phase B — runner + DSL. ✅ DONE.** `railreader2-cli demo <script>` in a new `RailReader.Demo`
+  library: a pure hand-rolled YAML-subset `DslParser` (no external YAML dep → AOT-safe),
+  `DemoSequencer` (wait-on-`Settled` for `frame_*`, `PageChanged` for `goto_page`, wall-clock for
+  `hold`; per-step `wait:` override; per-step timeout fallback), and `IControlClient` with a
+  `DBusControlClient` (Tmds.DBus.Protocol) + a `FakeControlClient` for tests. Verbs: `open`,
+  `goto_page`, `fit_page`, `fit_width`, `frame_role`, `frame_block`, `hold`. `--dry-run` validates a
+  script with no app. Tests: 17 (parser table tests + sequencer vs. fake). **Note discovered in B:**
+  eased animations (and thus `Settled`) only advance while the app window is actively rendering —
+  the compositor frame loop drives `RequestAnimationFrame`. That's always true while recording, but
+  a backgrounded window can stall mid-animation, so the runner times out per step and continues.
 - **Phase C — recorder.** GNOME portal capture + ffmpeg, event-synced cuts.
 - **Phase D — pointer + polish.** `cursor: follow` via synthetic pointer; broaden verbs.
 

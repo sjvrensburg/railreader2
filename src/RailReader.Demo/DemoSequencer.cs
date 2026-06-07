@@ -1,0 +1,216 @@
+using System.Globalization;
+
+namespace RailReader.Demo;
+
+/// <summary>
+/// Executes a <see cref="DemoScript"/> against an <see cref="IControlClient"/>: issues each verb
+/// and waits the right way before the next step. Motion verbs default to waiting on the real
+/// <c>Settled</c> signal (so a cut lands on the actual animation end); <c>goto_page</c> waits on
+/// <c>PageChanged</c>; <c>hold</c> is wall-clock dwell for pacing. Blind sleeps are never used to
+/// time motion — only dwell. Every default can be overridden per step with <c>wait:</c>.
+/// </summary>
+public sealed class DemoSequencer
+{
+    private readonly IControlClient _client;
+    private readonly TextWriter _log;
+    private readonly Func<TimeSpan, CancellationToken, Task> _delay;
+    private readonly TimeSpan _settleTimeout;
+
+    /// <param name="delay">Injectable delay (tests pass a no-op so dwell/timeouts don't sleep).</param>
+    /// <param name="settleTimeout">How long to wait for a signal before giving up and moving on.</param>
+    public DemoSequencer(
+        IControlClient client,
+        TextWriter log,
+        Func<TimeSpan, CancellationToken, Task>? delay = null,
+        TimeSpan? settleTimeout = null)
+    {
+        _client = client;
+        _log = log;
+        _delay = delay ?? Task.Delay;
+        _settleTimeout = settleTimeout ?? TimeSpan.FromSeconds(10);
+    }
+
+    public async Task RunAsync(DemoScript script, CancellationToken ct = default)
+    {
+        for (int i = 0; i < script.Steps.Count; i++)
+        {
+            ct.ThrowIfCancellationRequested();
+            await ExecuteAsync(script, script.Steps[i], ct).ConfigureAwait(false);
+        }
+        _log.WriteLine("Demo complete.");
+    }
+
+    private enum WaitKind { None, Settled, PageChanged, Duration }
+
+    private async Task ExecuteAsync(DemoScript script, DemoStep step, CancellationToken ct)
+    {
+        switch (step.Verb)
+        {
+            case "open":
+            {
+                string path = script.Source
+                    ?? throw new DemoRunException("the 'open' step needs a 'source:' setting", step.Line);
+                _log.WriteLine($"open {path}");
+                bool ok = await _client.OpenDocumentAsync(path, ct).ConfigureAwait(false);
+                if (!ok) throw new DemoRunException($"failed to open '{path}'", step.Line);
+                break;
+            }
+            case "goto_page":
+            {
+                int page = Int(step, DemoStep.ValueKey);
+                _log.WriteLine($"goto_page {page}");
+                await IssueAndWaitAsync(step, WaitKind.PageChanged,
+                    () => _client.GoToPageAsync(page, ct).ContinueWith(_ => (bool?)null, ct), ct);
+                break;
+            }
+            case "fit_page":
+                _log.WriteLine("fit_page");
+                await IssueAndWaitAsync(step, WaitKind.None,
+                    () => _client.FitPageAsync(ct).ContinueWith(_ => (bool?)null, ct), ct);
+                break;
+            case "fit_width":
+                _log.WriteLine("fit_width");
+                await IssueAndWaitAsync(step, WaitKind.None,
+                    () => _client.FitWidthAsync(ct).ContinueWith(_ => (bool?)null, ct), ct);
+                break;
+            case "frame_role":
+            {
+                string role = Str(step, "role");
+                int occ = OptInt(step, "index", 0);
+                double zoom = OptDouble(step, "zoom", 0);
+                _log.WriteLine($"frame_role role={role} index={occ} zoom={(zoom > 0 ? zoom.ToString(CultureInfo.InvariantCulture) : "auto")}");
+                await IssueAndWaitAsync(step, WaitKind.Settled,
+                    async () => await _client.FrameRoleAsync(role, occ, zoom, ct).ConfigureAwait(false), ct);
+                break;
+            }
+            case "frame_block":
+            {
+                if (step.Args.ContainsKey("role"))
+                    throw new DemoRunException("frame_block takes 'index' (a page block index); use frame_role for a role", step.Line);
+                int index = Int(step, "index");
+                double zoom = OptDouble(step, "zoom", 0);
+                _log.WriteLine($"frame_block index={index} zoom={(zoom > 0 ? zoom.ToString(CultureInfo.InvariantCulture) : "auto")}");
+                await IssueAndWaitAsync(step, WaitKind.Settled,
+                    async () => await _client.FrameBlockAsync(index, zoom, ct).ConfigureAwait(false), ct);
+                break;
+            }
+            case "hold":
+            {
+                var dur = Duration(step, DemoStep.ValueKey);
+                _log.WriteLine($"hold {dur.TotalMilliseconds:0}ms");
+                await _delay(dur, ct).ConfigureAwait(false);
+                break;
+            }
+            default:
+                throw new DemoRunException($"unknown verb '{step.Verb}'", step.Line);
+        }
+    }
+
+    /// <summary>Issue a verb then apply its wait. For signal waits the subscription is set up
+    /// BEFORE issuing so a fast signal can't be missed. <paramref name="issue"/> returns
+    /// true/false for verbs that report a match (frame_*) or null for void verbs; a false result
+    /// means nothing animates, so the signal wait is skipped.</summary>
+    private async Task IssueAndWaitAsync(DemoStep step, WaitKind defaultWait, Func<Task<bool?>> issue, CancellationToken ct)
+    {
+        var (kind, dur) = ResolveWait(step, defaultWait);
+
+        var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        Action settled = () => tcs.TrySetResult();
+        Action<int> paged = _ => tcs.TrySetResult();
+        if (kind == WaitKind.Settled) _client.Settled += settled;
+        else if (kind == WaitKind.PageChanged) _client.PageChanged += paged;
+
+        try
+        {
+            bool? ok = await issue().ConfigureAwait(false);
+
+            switch (kind)
+            {
+                case WaitKind.None:
+                    break;
+                case WaitKind.Duration:
+                    await _delay(dur, ct).ConfigureAwait(false);
+                    break;
+                default: // Settled / PageChanged
+                    if (ok == false)
+                    {
+                        _log.WriteLine("  (matched nothing — not waiting)");
+                        break;
+                    }
+                    await WaitSignalOrTimeoutAsync(tcs.Task, kind, ct).ConfigureAwait(false);
+                    break;
+            }
+        }
+        finally
+        {
+            if (kind == WaitKind.Settled) _client.Settled -= settled;
+            else if (kind == WaitKind.PageChanged) _client.PageChanged -= paged;
+        }
+    }
+
+    private async Task WaitSignalOrTimeoutAsync(Task signal, WaitKind kind, CancellationToken ct)
+    {
+        if (signal.IsCompleted) return; // signal already fired during/just after the verb — don't arm a timeout
+        var completed = await Task.WhenAny(signal, _delay(_settleTimeout, ct)).ConfigureAwait(false);
+        if (completed != signal)
+            _log.WriteLine($"  (timed out waiting for {kind} after {_settleTimeout.TotalSeconds:0}s — continuing)");
+    }
+
+    private (WaitKind kind, TimeSpan dur) ResolveWait(DemoStep step, WaitKind defaultWait)
+    {
+        if (step.Wait is null) return (defaultWait, default);
+        return step.Wait.Trim().ToLowerInvariant() switch
+        {
+            "settled" => (WaitKind.Settled, default),
+            "none" => (WaitKind.None, default),
+            "pagechanged" or "page_changed" => (WaitKind.PageChanged, default),
+            var s => (WaitKind.Duration, ParseDuration(s, step.Line)),
+        };
+    }
+
+    // --- arg helpers ---
+
+    private static string Str(DemoStep s, string key) =>
+        s.Args.TryGetValue(key, out var v) && v.Length > 0
+            ? v
+            : throw new DemoRunException($"'{s.Verb}' requires '{key}'", s.Line);
+
+    private static int Int(DemoStep s, string key)
+    {
+        var raw = Str(s, key);
+        return int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var n)
+            ? n
+            : throw new DemoRunException($"'{s.Verb}' {key} must be an integer, got '{raw}'", s.Line);
+    }
+
+    private static int OptInt(DemoStep s, string key, int fallback) =>
+        s.Args.ContainsKey(key) ? Int(s, key) : fallback;
+
+    private static double OptDouble(DemoStep s, string key, double fallback)
+    {
+        if (!s.Args.TryGetValue(key, out var raw)) return fallback;
+        return double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out var d)
+            ? d
+            : throw new DemoRunException($"'{s.Verb}' {key} must be a number, got '{raw}'", s.Line);
+    }
+
+    private static TimeSpan Duration(DemoStep s, string key) => ParseDuration(Str(s, key), s.Line);
+
+    /// <summary>Parse "800ms", "2s", "1.5s", or a bare number (milliseconds).</summary>
+    internal static TimeSpan ParseDuration(string raw, int line)
+    {
+        string t = raw.Trim().ToLowerInvariant();
+        double Num(string n) => double.TryParse(n, NumberStyles.Float, CultureInfo.InvariantCulture, out var d)
+            ? d : throw new DemoRunException($"invalid duration '{raw}'", line);
+        if (t.EndsWith("ms", StringComparison.Ordinal)) return TimeSpan.FromMilliseconds(Num(t[..^2]));
+        if (t.EndsWith('s')) return TimeSpan.FromSeconds(Num(t[..^1]));
+        return TimeSpan.FromMilliseconds(Num(t));
+    }
+}
+
+/// <summary>Thrown when a step can't be executed (bad/missing arg, unknown verb, open failure).</summary>
+public sealed class DemoRunException(string message, int line)
+    : Exception($"line {line}: {message}")
+{
+    public int Line { get; } = line;
+}
