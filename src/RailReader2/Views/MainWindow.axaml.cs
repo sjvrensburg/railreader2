@@ -235,6 +235,14 @@ public partial class MainWindow : Window
     /// </summary>
     protected override void OnKeyDown(KeyEventArgs e)
     {
+        // Record toggle (Ctrl+Shift+R) is intercepted here so it is never itself recorded.
+        if (e.Key == Key.R && e.KeyModifiers == (KeyModifiers.Control | KeyModifiers.Shift))
+        {
+            Vm?.ToggleScriptRecording();
+            e.Handled = true;
+            return;
+        }
+
         HandleKeyDown(e);
         // Record handled shortcuts for the script recorder (after dispatch, so e.Handled is set).
         if (e.Handled && Vm?.ScriptRecorder is { } rec)

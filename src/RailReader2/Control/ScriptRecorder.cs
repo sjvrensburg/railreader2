@@ -18,6 +18,10 @@ public sealed class ScriptRecorder
     private const double MinHoldMs = 120;       // gaps below this aren't worth a hold step
     private const double RoundMs = 100;         // round holds/durations for clean scripts
 
+    /// <summary>Where <see cref="Save()"/> writes — set at launch (--record-script) or by the
+    /// in-app toggle (a timestamped default).</summary>
+    public string? SavePath { get; init; }
+
     private readonly Stopwatch _clock = Stopwatch.StartNew();
     private readonly object _gate = new();
     private readonly List<Entry> _entries = [];
@@ -64,6 +68,12 @@ public sealed class ScriptRecorder
     {
         using var w = new StreamWriter(path);
         WriteTo(w);
+    }
+
+    /// <summary>Save to <see cref="SavePath"/> (no-op if unset).</summary>
+    public void Save()
+    {
+        if (SavePath is { } p) Save(p);
     }
 
     /// <summary>Emit the recorded session as a demo DSL script.</summary>

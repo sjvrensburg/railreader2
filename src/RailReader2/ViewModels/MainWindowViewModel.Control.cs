@@ -108,7 +108,53 @@ public sealed partial class MainWindowViewModel
         return true;
     }
 
-    /// <summary>Set when launched with <c>--record-script</c>: captures the session into a demo
-    /// script. The window feeds it key events; <see cref="OpenDocument"/> feeds it opens.</summary>
+    /// <summary>Set when launched with <c>--record-script</c> or via the in-app toggle: captures the
+    /// session into a demo script. The window feeds it key events; <see cref="OpenDocument"/> feeds
+    /// it opens.</summary>
     public ScriptRecorder? ScriptRecorder { get; set; }
+
+    /// <summary>True while a demo session is being recorded (drives any UI indicator).</summary>
+    public bool IsRecordingScript => ScriptRecorder is not null;
+
+    /// <summary>Start/stop recording the session to a demo script (Ctrl+Shift+R). Stopping writes
+    /// the script and toasts the path.</summary>
+    public void ToggleScriptRecording()
+    {
+        if (ScriptRecorder is null)
+            StartScriptRecording(DefaultRecordingPath());
+        else
+            StopAndSaveRecording();
+    }
+
+    public void StartScriptRecording(string savePath)
+    {
+        var rec = new ScriptRecorder { SavePath = savePath };
+        // Seed with the already-open document so the script is self-contained (replay opens it).
+        if (_controller.ActiveDocument?.FilePath is { Length: > 0 } open)
+            rec.RecordOpen(open);
+        ScriptRecorder = rec;
+        OnPropertyChanged(nameof(IsRecordingScript));
+        ShowStatusToast("● Recording demo script…");
+    }
+
+    public void StopAndSaveRecording()
+    {
+        if (ScriptRecorder is not { } rec) return;
+        ScriptRecorder = null;
+        OnPropertyChanged(nameof(IsRecordingScript));
+        try
+        {
+            rec.Save();
+            ShowStatusToast(rec.SavePath is { } p ? $"Saved demo script → {Path.GetFileName(p)}" : "Recording stopped");
+        }
+        catch (Exception ex)
+        {
+            _logger.Error("[record-script] save failed", ex);
+            ShowStatusToast("Failed to save demo script");
+        }
+    }
+
+    private static string DefaultRecordingPath() =>
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            $"railreader2-demo-{DateTime.Now:yyyyMMdd-HHmmss}.demo");
 }

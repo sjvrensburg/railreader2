@@ -52,13 +52,12 @@ public partial class App : Application
                 // session into an editable demo script, written when the window closes.
                 var recordPath = GetRecordScriptPath(args);
                 if (recordPath is not null)
-                    vm.ScriptRecorder = new ScriptRecorder();
+                    vm.ScriptRecorder = new ScriptRecorder { SavePath = recordPath };
 
                 window.Opened += (_, _) => splash.Close();
                 window.Closing += (_, _) =>
                 {
-                    if (recordPath is not null && vm.ScriptRecorder is { } rec)
-                        TrySaveRecording(rec, recordPath);
+                    vm.StopAndSaveRecording(); // writes the script if recording (flag or in-app toggle)
                     _controlServer?.Dispose();
                     _control?.Dispose();
                     vm.Dispose();
@@ -113,20 +112,6 @@ public partial class App : Application
                 return args[i + 1];
         }
         return null;
-    }
-
-    private static void TrySaveRecording(ScriptRecorder recorder, string path)
-    {
-        var logger = RailReaderLogging.Logger;
-        try
-        {
-            recorder.Save(path);
-            logger.Info($"[record-script] Saved recorded demo to {path}");
-        }
-        catch (Exception ex)
-        {
-            logger.Error($"[record-script] Failed to write {path}", ex);
-        }
     }
 
     private void StartControlServer(MainWindowViewModel vm, string? busName)
