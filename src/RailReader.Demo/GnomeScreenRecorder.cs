@@ -24,7 +24,7 @@ public sealed class GnomeScreenRecorder : IScreenRecorder
 
     public GnomeScreenRecorder(TextWriter log) => _log = log;
 
-    public async Task StartAsync(string outputPath, int fps, CancellationToken ct)
+    public async Task StartAsync(string outputPath, int fps, bool drawCursor, CancellationToken ct)
     {
         _outputPath = Path.GetFullPath(outputPath);
         Directory.CreateDirectory(Path.GetDirectoryName(_outputPath)!);
@@ -50,7 +50,7 @@ public sealed class GnomeScreenRecorder : IScreenRecorder
             w.WriteString(template);
             var dict = w.WriteDictionaryStart();
             w.WriteDictionaryEntryStart(); w.WriteString("framerate"); w.WriteVariantInt32(fps);
-            w.WriteDictionaryEntryStart(); w.WriteString("draw-cursor"); w.WriteVariantBool(false);
+            w.WriteDictionaryEntryStart(); w.WriteString("draw-cursor"); w.WriteVariantBool(drawCursor);
             w.WriteDictionaryEnd(dict);
             msg = w.CreateMessage();
         }

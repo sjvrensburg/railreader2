@@ -47,4 +47,38 @@ public sealed partial class MainWindowViewModel
 
     /// <summary>True while an eased camera animation is in flight.</summary>
     public bool IsAnimating => _controller.IsAnimating;
+
+    // --- Broadened verbs for the control surface (Phase D) ---
+
+    /// <summary>Jump the rail to the next/previous block of a role; returns whether it moved
+    /// (false when not rail-reading or there is no such block in that direction).</summary>
+    public bool NavigateRoleForControl(BlockRole role, bool forward)
+    {
+        if (ActiveTab?.Rail.Active != true) return false;
+        if (!_controller.NavigateToRole(role, forward)) return false;
+        InvalidateNavigation();
+        return true;
+    }
+
+    /// <summary>Advance the rail one line down/up; returns false when not rail-reading.</summary>
+    public bool RailAdvanceLineForControl(bool forward)
+    {
+        if (ActiveTab?.Rail.Active != true) return false;
+        if (forward) HandleArrowDown(); else HandleArrowUp();
+        return true;
+    }
+
+    /// <summary>Set (not toggle) the rail line highlight.</summary>
+    public void SetLineHighlight(bool on)
+    {
+        if (_controller.ActiveDocument is { } doc && doc.LineHighlightEnabled != on)
+            ToggleLineHighlight();
+    }
+
+    /// <summary>Set (not toggle) the rail line focus blur.</summary>
+    public void SetLineFocusBlur(bool on)
+    {
+        if (_controller.ActiveDocument is { } doc && doc.LineFocusBlur != on)
+            ToggleLineFocusBlur();
+    }
 }

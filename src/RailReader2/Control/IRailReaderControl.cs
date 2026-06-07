@@ -35,6 +35,25 @@ public interface IRailReaderControl
     /// Used by the demo runner so a recording captures just the app, full-bleed.</summary>
     void SetFullScreen(bool on);
 
+    /// <summary>Zoom to an absolute percentage (100 == fit), anchored at the viewport centre.</summary>
+    void SetZoom(double percent);
+
+    /// <summary>Apply a colour effect by name (none, high-contrast, high-visibility, amber, invert).
+    /// Returns false for an unknown name.</summary>
+    bool SetColourEffect(string name);
+
+    /// <summary>Jump the rail to the next/previous block of a role; false if nothing moved.</summary>
+    bool NavigateRole(string role, bool forward);
+
+    /// <summary>Advance the rail one line down (or up); false when not rail-reading.</summary>
+    bool RailAdvanceLine(bool forward);
+
+    /// <summary>Set the rail line-highlight overlay on/off.</summary>
+    void SetLineHighlight(bool on);
+
+    /// <summary>Set the rail line-focus-blur overlay on/off.</summary>
+    void SetLineFocusBlur(bool on);
+
     /// <summary>Smoothly frame the n-th block of a semantic role (e.g. "figure", "table",
     /// "equation", "heading") using rail's exact framing and the app-native eased zoom.
     /// <paramref name="zoom"/> &lt;= 0 means auto-fit. Returns true if a matching block was framed.</summary>

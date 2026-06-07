@@ -1,4 +1,5 @@
 using Avalonia.Threading;
+using RailReader.Core.Models;
 using RailReader.Core.Services;
 using RailReader2.ViewModels;
 
@@ -48,6 +49,51 @@ public sealed class ViewModelControl : IRailReaderControl, IDisposable
 
     public void SetFullScreen(bool on)
         => Dispatcher.UIThread.Invoke(() => _vm.IsFullScreen = on);
+
+    public void SetZoom(double percent)
+        => Dispatcher.UIThread.Invoke(() => _vm.SetZoomPercent(percent));
+
+    public bool SetColourEffect(string name)
+    {
+        if (!TryParseEffect(name, out var effect)) return false;
+        Dispatcher.UIThread.Invoke(() => _vm.SetColourEffect(effect));
+        return true;
+    }
+
+    public bool NavigateRole(string role, bool forward)
+    {
+        var roles = BlockRoleAliases.Resolve(role);
+        if (roles.Count == 0) return false;
+        return Dispatcher.UIThread.Invoke(() =>
+        {
+            foreach (var r in roles)
+                if (_vm.NavigateRoleForControl(r, forward)) return true;
+            return false;
+        });
+    }
+
+    public bool RailAdvanceLine(bool forward)
+        => Dispatcher.UIThread.Invoke(() => _vm.RailAdvanceLineForControl(forward));
+
+    public void SetLineHighlight(bool on)
+        => Dispatcher.UIThread.Invoke(() => _vm.SetLineHighlight(on));
+
+    public void SetLineFocusBlur(bool on)
+        => Dispatcher.UIThread.Invoke(() => _vm.SetLineFocusBlur(on));
+
+    private static bool TryParseEffect(string name, out ColourEffect effect)
+    {
+        switch (name?.Trim().ToLowerInvariant())
+        {
+            case "none" or "off": effect = ColourEffect.None; return true;
+            case "highcontrast" or "high-contrast" or "contrast": effect = ColourEffect.HighContrast; return true;
+            case "highvisibility" or "high-visibility" or "visibility": effect = ColourEffect.HighVisibility; return true;
+            case "amber": effect = ColourEffect.Amber; return true;
+            case "invert" or "inverted": effect = ColourEffect.Invert; return true;
+            default:
+                return Enum.TryParse(name, ignoreCase: true, out effect);
+        }
+    }
 
     public bool FrameRole(string role, int occurrence, double zoom)
     {

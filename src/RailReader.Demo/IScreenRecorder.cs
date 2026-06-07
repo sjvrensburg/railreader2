@@ -8,8 +8,9 @@ namespace RailReader.Demo;
 /// </summary>
 public interface IScreenRecorder : IAsyncDisposable
 {
-    /// <summary>Begin capturing to (or toward) <paramref name="outputPath"/> at <paramref name="fps"/>.</summary>
-    Task StartAsync(string outputPath, int fps, CancellationToken ct);
+    /// <summary>Begin capturing to (or toward) <paramref name="outputPath"/> at <paramref name="fps"/>.
+    /// <paramref name="drawCursor"/> controls whether the pointer is drawn into the capture.</summary>
+    Task StartAsync(string outputPath, int fps, bool drawCursor, CancellationToken ct);
 
     /// <summary>Stop capturing; returns the final video path actually written.</summary>
     Task<string> StopAsync(CancellationToken ct);
@@ -18,7 +19,7 @@ public interface IScreenRecorder : IAsyncDisposable
 /// <summary>No-op recorder used when no <c>recorder:</c> is requested (or for dry runs).</summary>
 public sealed class NullScreenRecorder : IScreenRecorder
 {
-    public Task StartAsync(string outputPath, int fps, CancellationToken ct) => Task.CompletedTask;
+    public Task StartAsync(string outputPath, int fps, bool drawCursor, CancellationToken ct) => Task.CompletedTask;
     public Task<string> StopAsync(CancellationToken ct) => Task.FromResult("");
     public ValueTask DisposeAsync() => default;
 }

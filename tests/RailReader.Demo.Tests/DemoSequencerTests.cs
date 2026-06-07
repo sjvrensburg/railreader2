@@ -34,6 +34,12 @@ public class DemoSequencerTests
         public Task FitPageAsync(CancellationToken ct) { Calls.Add("fit_page"); return Task.CompletedTask; }
         public Task FitWidthAsync(CancellationToken ct) { Calls.Add("fit_width"); return Task.CompletedTask; }
         public Task SetFullScreenAsync(bool on, CancellationToken ct) { Calls.Add($"fullscreen:{on}"); return Task.CompletedTask; }
+        public Task SetZoomAsync(double percent, CancellationToken ct) { Calls.Add($"set_zoom:{percent}"); if (AutoSignal) Settled?.Invoke(); return Task.CompletedTask; }
+        public Task<bool> SetColourEffectAsync(string name, CancellationToken ct) { Calls.Add($"colour:{name}"); return Task.FromResult(FrameResult); }
+        public Task<bool> NavigateRoleAsync(string role, bool forward, CancellationToken ct) { Calls.Add($"navigate:{role}:{forward}"); if (AutoSignal && FrameResult) Settled?.Invoke(); return Task.FromResult(FrameResult); }
+        public Task<bool> RailAdvanceLineAsync(bool forward, CancellationToken ct) { Calls.Add($"advance:{forward}"); if (AutoSignal && FrameResult) Settled?.Invoke(); return Task.FromResult(FrameResult); }
+        public Task SetLineHighlightAsync(bool on, CancellationToken ct) { Calls.Add($"highlight:{on}"); return Task.CompletedTask; }
+        public Task SetLineFocusBlurAsync(bool on, CancellationToken ct) { Calls.Add($"focusblur:{on}"); return Task.CompletedTask; }
 
         public Task<bool> FrameRoleAsync(string role, int occurrence, double zoom, CancellationToken ct)
         {
@@ -61,9 +67,12 @@ public class DemoSequencerTests
         public int CallsAtStop { get; private set; } = -1;
         public bool Stopped { get; private set; }
 
-        public Task StartAsync(string outputPath, int fps, CancellationToken ct)
+        public bool DrawCursor { get; private set; }
+
+        public Task StartAsync(string outputPath, int fps, bool drawCursor, CancellationToken ct)
         {
             Output = outputPath;
+            DrawCursor = drawCursor;
             CallsAtStart = sharedLog.Count;
             return Task.CompletedTask;
         }
@@ -214,6 +223,40 @@ public class DemoSequencerTests
 
         await Assert.ThrowsAsync<DemoRunException>(() => seq.RunAsync(script, rec));
         Assert.True(rec.Stopped); // finally-block stops the capture so the file is finalised
+    }
+
+    [Fact]
+    public async Task BroadenedVerbs_IssueExpectedCalls()
+    {
+        var fake = new FakeControlClient();
+        var script = DslParser.Parse("""
+            steps:
+              - set_zoom: 250
+              - colour_effect: amber
+              - navigate: { role: heading, dir: next }
+              - rail_advance_lines: { count: 3, per_line: 100ms }
+              - line_highlight: on
+              - line_focus_blur: off
+            """);
+        var (seq, _) = Make(fake);
+
+        await seq.RunAsync(script);
+
+        Assert.Equal(
+            ["set_zoom:250", "colour:amber", "navigate:heading:True",
+             "advance:True", "advance:True", "advance:True",       // count=3
+             "highlight:True", "focusblur:False"],
+            fake.Calls);
+    }
+
+    [Fact]
+    public async Task RailAdvance_DirUp_GoesBackward()
+    {
+        var fake = new FakeControlClient();
+        var script = DslParser.Parse("steps:\n  - rail_advance_lines: { count: 1, dir: up }");
+        var (seq, _) = Make(fake);
+        await seq.RunAsync(script);
+        Assert.Equal(["advance:False"], fake.Calls);
     }
 
     [Fact]

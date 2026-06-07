@@ -77,12 +77,53 @@ public sealed class DBusControlClient : IControlClient
     public Task FitPageAsync(CancellationToken ct) => CallVoidNoArgsAsync("FitPage", ct);
     public Task FitWidthAsync(CancellationToken ct) => CallVoidNoArgsAsync("FitWidth", ct);
 
-    public Task SetFullScreenAsync(bool on, CancellationToken ct)
+    public Task SetFullScreenAsync(bool on, CancellationToken ct) => CallBoolArgVoidAsync("SetFullScreen", on, ct);
+    public Task SetLineHighlightAsync(bool on, CancellationToken ct) => CallBoolArgVoidAsync("SetLineHighlight", on, ct);
+    public Task SetLineFocusBlurAsync(bool on, CancellationToken ct) => CallBoolArgVoidAsync("SetLineFocusBlur", on, ct);
+
+    public Task SetZoomAsync(double percent, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
         using var w = _conn.GetMessageWriter();
-        w.WriteMethodCallHeader(_busName, ObjectPath, Interface, "SetFullScreen", "b", MessageFlags.None);
-        w.WriteBool(on);
+        w.WriteMethodCallHeader(_busName, ObjectPath, Interface, "SetZoom", "d", MessageFlags.None);
+        w.WriteDouble(percent);
+        return _conn.CallMethodAsync(w.CreateMessage());
+    }
+
+    public Task<bool> SetColourEffectAsync(string name, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        using var w = _conn.GetMessageWriter();
+        w.WriteMethodCallHeader(_busName, ObjectPath, Interface, "SetColourEffect", "s", MessageFlags.None);
+        w.WriteString(name);
+        return _conn.CallMethodAsync(w.CreateMessage(), static (Message m, object? s) => m.GetBodyReader().ReadBool(), null);
+    }
+
+    public Task<bool> NavigateRoleAsync(string role, bool forward, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        using var w = _conn.GetMessageWriter();
+        w.WriteMethodCallHeader(_busName, ObjectPath, Interface, "NavigateRole", "sb", MessageFlags.None);
+        w.WriteString(role);
+        w.WriteBool(forward);
+        return _conn.CallMethodAsync(w.CreateMessage(), static (Message m, object? s) => m.GetBodyReader().ReadBool(), null);
+    }
+
+    public Task<bool> RailAdvanceLineAsync(bool forward, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        using var w = _conn.GetMessageWriter();
+        w.WriteMethodCallHeader(_busName, ObjectPath, Interface, "RailAdvanceLine", "b", MessageFlags.None);
+        w.WriteBool(forward);
+        return _conn.CallMethodAsync(w.CreateMessage(), static (Message m, object? s) => m.GetBodyReader().ReadBool(), null);
+    }
+
+    private Task CallBoolArgVoidAsync(string member, bool arg, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        using var w = _conn.GetMessageWriter();
+        w.WriteMethodCallHeader(_busName, ObjectPath, Interface, member, "b", MessageFlags.None);
+        w.WriteBool(arg);
         return _conn.CallMethodAsync(w.CreateMessage());
     }
 
