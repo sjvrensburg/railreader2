@@ -27,8 +27,17 @@ dotnet run -c Release --project src/RailReader2.Cli -- annotations <pdf> --inclu
 dotnet run -c Release --project src/RailReader2.Cli -- vlm <pdf> --output vlm.json
 dotnet run -c Release --project src/RailReader2.Cli -- export <pdf> --no-vlm --output doc.md
 
-# Run tests (the only test project in this repo; Core tests live upstream in RailReaderCore)
+# Script a running app (launched with --control-bus) through a demo, or validate a script offline
+dotnet run -c Release --project src/RailReader2 -- --control-bus <pdf>       # GUI with the D-Bus control surface
+dotnet run -c Release --project src/RailReader2.Cli -- demo script.demo --dry-run   # parse/validate, no app
+dotnet run -c Release --project src/RailReader2.Cli -- demo script.demo             # drive the live app
+
+# Record a session as a demo script (AutoIt-style): launch with --record-script (or toggle in-app with Ctrl+Shift+R)
+dotnet run -c Release --project src/RailReader2 -- --record-script out.demo <pdf>
+
+# Run tests (Export + Demo are the test projects in this repo; Core tests live upstream in RailReaderCore)
 dotnet test tests/RailReader.Export.Tests
+dotnet test tests/RailReader.Demo.Tests
 
 # Run specific test class
 dotnet test tests/RailReader.Export.Tests --filter "ClassName=RailReader.Export.Tests.HeadingLevelResolverTests"
@@ -53,12 +62,14 @@ dotnet publish src/RailReader2 -c Release -r win-x64 --self-contained     # Wind
 ## Architecture
 
 ```
-RailReader2.slnx                  # Default: app + CLI + export + screenshot tool + tests
-├── src/RailReader2/              # Thin Avalonia UI shell
+RailReader2.slnx                  # Default: app + CLI + export + demo + screenshot tool + tests
+├── src/RailReader2/              # Thin Avalonia UI shell (+ demo control surface, src/RailReader2/Control/)
 ├── src/RailReader2.Cli/          # Headless CLI tool (zero Avalonia)
 ├── src/RailReader.Export/        # Markdown export pipeline (zero Avalonia)
+├── src/RailReader.Demo/          # Demo-DSL runner: parser, sequencer, D-Bus control client, recorder model (zero Avalonia)
 ├── src/Tools/RenderHarness.Headless/ # Headless doc-screenshot generator (references the GUI project)
-└── tests/RailReader.Export.Tests/ # xUnit tests for Export (Core tests live upstream)
+├── tests/RailReader.Export.Tests/ # xUnit tests for Export (Core tests live upstream)
+└── tests/RailReader.Demo.Tests/   # xUnit tests for the demo DSL parser + sequencer (fake control client)
 ```
 
 The portable core — `RailReader.Core`, `RailReader.Core.Pdfium`, `RailReader.Core.Analysis`, `RailReader.Renderer.Skia`, `RailReader.Core.Vlm.OpenAI` — lives in the separate [RailReaderCore](https://github.com/sjvrensburg/RailReaderCore) repository and is consumed here as NuGet packages. All references in this document to types like `DocumentController`, `DocumentState`, `AppConfig`, `AnnotationService`, `LayoutAnalyzer`, `SkiaPdfService`, `OverlayRenderer`, `RailReaderLogging`, etc. resolve through those packages. Logger bootstrap goes via `RailReaderLogging.Logger = new ConsoleLogger();` once at startup; the per-service Logger setters that previously existed are gone.
@@ -67,7 +78,8 @@ The portable core — `RailReader.Core`, `RailReader.Core.Pdfium`, `RailReader.C
 
 Thin wrapper delegating all logic to `DocumentController`/`DocumentState` in Core.
 
-- `ViewModels/MainWindowViewModel.cs` (+ `.Annotations.cs` / `.Documents.cs` / `.Navigation.cs` / `.Search.cs` / `.Vlm.cs` partials) — thin wrapper handling Avalonia-specific concerns (file dialogs, clipboard, invalidation)
+- `ViewModels/MainWindowViewModel.cs` (+ `.Annotations.cs` / `.Documents.cs` / `.Navigation.cs` / `.Search.cs` / `.Vlm.cs` / `.Control.cs` partials) — thin wrapper handling Avalonia-specific concerns (file dialogs, clipboard, invalidation). `.Control.cs` holds the demo control-surface seams (smooth-frame wrappers, `AnimationSettled`/`PageChangedNotification`, `GetReadingState`, `SetNavigableRoles`, `InvokeKey`, `ScriptRecorder`).
+- `Control/` — the demo control surface (see [Demo tooling](#demo-tooling-control-bus--dsl)): `IRailReaderControl`, `ViewModelControl`, `DBusControlServer`, `KeyChord`, `ScriptRecorder`. `MainWindow` records handled keys for the recorder and routes `SendKey` through its real `OnKeyDown`/`OnKeyUp`.
 - `ViewModels/TabViewModel.cs` — `[ObservableProperty]` wrapper for `DocumentState` binding
 - `Views/MainWindow.axaml.cs` — window chrome + keyboard shortcuts; wires `InvalidationCallbacks` to `DocumentView`, which owns the composition layers and builds their per-tab state
 - `Views/DocumentView.axaml(.cs)` — the layered viewport (extracted from MainWindow): the four composition layers + minimap + `ToolBarView`, per-tab state-building, and layer invalidation
@@ -80,19 +92,22 @@ Thin wrapper delegating all logic to `DocumentController`/`DocumentState` in Cor
 
 ### Tests
 
-`tests/RailReader.Export.Tests/` is the only test project in this repo — HeadingLevelResolver (outline matching, depth clamping, Levenshtein), PageMarkdownBuilder (all block types, annotations, plain-text fallback), MarkdownExportService (end-to-end with real PDFs: plain-text fallback, page range, progress reporting, cancellation, page break options). It references both Core and Renderer.Skia (the latter for SkiaSharp-generated test PDFs).
+Two test projects in this repo:
+- `tests/RailReader.Export.Tests/` — HeadingLevelResolver (outline matching, depth clamping, Levenshtein), PageMarkdownBuilder (all block types, annotations, plain-text fallback), MarkdownExportService (end-to-end with real PDFs: plain-text fallback, page range, progress reporting, cancellation, page break options). References both Core and Renderer.Skia (the latter for SkiaSharp-generated test PDFs).
+- `tests/RailReader.Demo.Tests/` — the demo DSL: `DslParser` table tests + `DemoSequencer` driven against a `FakeControlClient` (verb order, wait-on-`Settled`/`PageChanged`, `auto_scroll` until-handoff, recorder bracketing, fullscreen/navigable pre-roll). Pure; no app or bus needed.
 
 Tests for the portable core (DocumentController, Camera, Annotations, AppConfig, RailNav, SearchService, etc.) live in the upstream [RailReaderCore](https://github.com/sjvrensburg/RailReaderCore) repo — the mirrored `RailReader.Core.Tests` project was dropped from this repo once Core moved to NuGet.
 
 ### RailReader2.Cli (Headless CLI)
 
-Separate console binary (`RailReader2.Cli`) for automated extraction. Zero Avalonia deps — references Core + Renderer.Skia + Export. Five commands:
+Separate console binary (`RailReader2.Cli`) for automated extraction. Zero Avalonia deps — references Core + Renderer.Skia + Export + Demo. Six commands:
 
 - `render <pdf>` — Render pages as PNG with optional colour effects (`--effect highcontrast|highvisibility|amber|invert`) and annotation overlay. Uses `IPdfService.RenderPage()` → `SkiaRenderedPage.Bitmap` → `ColourEffectShaders` + `AnnotationRenderer` directly (no `DocumentState`/`DocumentController`).
 - `structure <pdf>` — Extract outline + ONNX layout blocks + per-block text as JSON. Uses `LayoutAnalyzer` directly (no `AnalysisWorker`), `IPdfTextService` for text extraction, `CharBox`↔`BBox` centre-point matching for block text.
 - `annotations <pdf>` — Export annotations as JSON or annotated PDF. Supports `--pages <range>` to filter by page. Rich mode (`--include-text` + `--include-blocks`): correlates annotations with layout blocks via `AnnotationGeometry.GetAnnotationBounds()` → `RectF`↔`BBox` overlap, extracts text under each annotation, finds nearest heading from outline + `paragraph_title`/`doc_title` blocks.
 - `vlm <pdf>` — Transcribe detected equations/tables/figures via an OpenAI-compatible vision API. Outputs LaTeX/Markdown/descriptions as JSON.
 - `export <pdf>` — Export PDF to structured Markdown. Uses `MarkdownExportService` from the Export library. Per-page pipeline: layout analysis → text extraction → heading resolution (outline fuzzy-match) → VLM transcription (equations → LaTeX, tables → pipe tables, figures → descriptions/images) → annotation blockquotes. Graceful degradation: ONNX+VLM → ONNX-only (`[equation]`/`[figure]`/code-block tables) → plain text with outline headings.
+- `demo <script>` — Drive a *running* RailReader2 (launched with `--control-bus`) through a demo script over D-Bus, for faithful demonstration recordings. `--dry-run` parses/validates a script with no app; `--bus-name`/`--settle-timeout` tune the connection. Uses the `RailReader.Demo` library; see [Demo tooling](#demo-tooling-control-bus--dsl).
 
 Shipped as additional artifacts on GitHub Releases (Linux + Windows). ONNX model bundled in `models/` subdirectory within the archive.
 
@@ -103,6 +118,43 @@ Structured PDF-to-Markdown export library. Zero Avalonia deps — references Cor
 - `MarkdownExportService.cs` — `IMarkdownExportService` implementation. Orchestrates per-page pipeline: layout analysis → text extraction → heading level resolution → VLM dispatch → annotation extraction → Markdown assembly. Writes to `TextWriter` for flexible output (file, stdout, StringWriter).
 - `HeadingLevelResolver.cs` — Maps `doc_title`/`paragraph_title` blocks to Markdown heading levels (H1–H6) by fuzzy-matching extracted text against the flattened PDF outline tree (case-insensitive containment, then Levenshtein similarity > 80%). Falls back to doc_title → H1, paragraph_title → H2.
 - `PageMarkdownBuilder.cs` — Walks blocks in reading order, renders each to Markdown by class (headings, paragraphs, `$$latex$$`, pipe tables, `![desc](path)`, `*captions*`). Skips page furniture (header/footer/number/seal). Appends highlight blockquotes and text notes from annotations.
+
+### Demo tooling (control bus + DSL)
+
+For scripting **faithful demonstration videos** of the real GUI (especially smooth zoom + rail
+reading). Design and status: `docs/demo-dsl/DESIGN.md`; example script: `docs/demo-dsl/examples/hero.demo`.
+The invariant: every action animates through the same `MainWindowViewModel` → `DocumentController.Tick`
+→ `RequestAnimationFrame` path real input uses, and the *real on-screen window* is recorded.
+
+- **Control surface** (`src/RailReader2/Control/`, app-side): `IRailReaderControl` (portable, bus-free,
+  testable contract) ← `ViewModelControl` (marshals every verb/query to the UI thread) ← `DBusControlServer`
+  (thin Tmds.DBus.Protocol adapter; modern `DBusConnection`/`DBusAddress`/`IPathMethodHandler`). Started by
+  `--control-bus[=name]` (parsed in `App.axaml.cs`, after `window.Opened`). Serves `org.railreader.Control1`
+  at `/org/railreader/Control`. Verbs: `OpenDocument`, `GoToPage`, `FitPage`/`FitWidth`, `SetFullScreen`,
+  `FrameRole`/`FrameBlock` (smooth eased framing; non-navigable figures/tables fall back to a centred frame),
+  `SetZoom`, `SetColourEffect`, `NavigateRole`, `RailAdvanceLine`, `SetLineHighlight`/`SetLineFocusBlur`,
+  `SetNavigableRoles`, **`SendKey`** (drives any chord through the real `OnKeyDown`/`OnKeyUp` via
+  `MainWindow.InvokeKey` — so every keyboard shortcut is scriptable), `GetReadingState`. Signals: `Settled`
+  (animating→idle edge — the cut/sync backbone), `PageChanged`, `DocumentOpened`. `KeyChord` parses/formats
+  chord strings ("ctrl+shift+h", "f11", "right").
+- **`RailReader.Demo`** library (runner-side, zero Avalonia, AOT-safe; references only Tmds.DBus.Protocol):
+  `DslParser` (pure hand-rolled YAML subset → `DemoScript`), `DemoSequencer` (issues verbs via `IControlClient`,
+  waits on real signals/state — `Settled` for `frame_*`, `PageChanged` for `goto_page`, `auto_scroll: { until:
+  handoff | until_block | until_line | for }` polling `GetReadingState`, `hold` for wall-clock dwell),
+  `IControlClient` + `DBusControlClient` (D-Bus client) + a `FakeControlClient` for tests. DSL verbs include
+  `open`, `goto_page`, `fit_page`/`fit_width`, `frame_role`/`frame_block`, `set_zoom`, `colour_effect`,
+  `navigate`, `rail_advance_lines`, `auto_scroll`, `line_highlight`/`line_focus_blur`, `key`/`key_down`/`key_up`,
+  `hold`; settings: `source`, `fps`, `cursor`, `recorder`, `output`, `fullscreen`, `navigable`.
+- **Recorder** (`src/RailReader2/Control/ScriptRecorder.cs`): AutoIt-style — records a live session (opened doc
+  + handled key shortcuts with timing, pairing down/up into tap `key:` vs held `key_down`/`key_up`) into an
+  editable `.demo` script, replayable via the control bus. Triggered by `--record-script <file>` or the in-app
+  **Ctrl+Shift+R** toggle (intercepted before dispatch so it isn't self-recorded; seeds the open doc; saves to
+  `~/railreader2-demo-<timestamp>.demo`).
+- **Recorder backend** (`GnomeScreenRecorder`): `recorder: gnome` drives `org.gnome.Shell.Screencast` directly
+  (promptless, native H.264 MP4 on GNOME ≥50; no PipeWire). ffmpeg only transcodes when the container differs
+  from the requested `output` extension. **Caveat:** eased animations (and thus `Settled`/scroll) only advance
+  while the window is foreground (the compositor throttles a background window) — true while recording; don't
+  trust `busctl` state-polls of motion when the terminal is foreground.
 
 ### RenderHarness.Headless (documentation screenshots)
 
