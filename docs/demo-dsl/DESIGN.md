@@ -145,9 +145,10 @@ portal prompts once at session start.
 
 ## 9. Phasing
 
-- **Phase A — control server (keystone).** `--control-bus` + `IRailReaderControl` +
-  `ViewModelControl` + `DBusControlServer` with a minimal verb set (`OpenDocument`,
-  `GoToPage`, `FrameRole`) + the `Settled` signal + a few read properties.
+- **Phase A — control server (keystone). ✅ DONE.** `--control-bus` + `IRailReaderControl` +
+  `ViewModelControl` + `DBusControlServer` with verbs `OpenDocument`/`GoToPage`/`FitPage`/
+  `FitWidth`/`FrameRole`/`FrameBlock`, the `Settled`/`PageChanged`/`DocumentOpened` signals,
+  and the 7 read properties. Validated by hand over `busctl`/`gdbus` (see §11).
 - **Phase B — runner + DSL.** `railreader2-cli demo`: parser, sequencer, `IControlClient`.
 - **Phase C — recorder.** GNOME portal capture + ffmpeg, event-synced cuts.
 - **Phase D — pointer + polish.** `cursor: follow` via synthetic pointer; broaden verbs.
@@ -174,7 +175,24 @@ command + sync triad before the DSL/recorder exist. Already independently useful
   `IsAnimating`, `StartTo`, `ComputeSnapTarget`, `TrySetCurrentByPageIndex`,
   `PinCurrentBlockForActivation`, `ComputeBlockFitZoom`) — RailReaderCore **0.20.0**,
   consumed by railreader2 (main).
-- ⬜ Phases A–D: not started.
+- ✅ **Phase A — control server** (branch `feat/control-bus-phase-a`). Files under
+  `src/RailReader2/Control/`: `IRailReaderControl` (contract), `ViewModelControl`
+  (UI-thread-marshalling impl), `DBusControlServer` (Tmds.DBus.Protocol adapter, the modern
+  `DBusConnection`/`DBusAddress`/`IPathMethodHandler` API). VM seams in
+  `MainWindowViewModel.Control.cs` (`SmoothlyFrameBlock`/`SmoothlyFrameRole`/`AnimateCameraTo`
+  wrappers via `Dispatch(animate:true)`) + `AnimationSettled` event (fired on the
+  `StillAnimating` true→false edge in `OnAnimationFrame`) + `PageChangedNotification`. Startup:
+  `--control-bus[=name]` parsed in `App.axaml.cs`, server started after `window.Opened`, disposed
+  on close. `Tmds.DBus.Protocol` referenced explicitly in the csproj.
+  - **Validated 2026-06-07** over `busctl`/`gdbus`: introspection lists all members;
+    `OpenDocument` → `true` + `DocumentOpened` signal; `GoToPage 4` → `PageChanged(4)`;
+    `FrameRole heading 0` → `true`, `IsAnimating` true→false, `Zoom`→3 (rail framing),
+    `CurrentRole`="Heading", and the **`Settled`** signal fired on settle. The real-window +
+    reliable-command + event-sync triad is proven.
+  - **Known (matches open item #2):** `FrameRole figure`/`table` return `false` — those roles
+    aren't in the default `navigable_classes`, so rail framing rejects them. Framing a figure/
+    table for a demo needs the future centred-frame path in Core. Headings/text/equations work.
+- ⬜ Phases B–D: not started.
 
 ## 12. Open items / risks
 

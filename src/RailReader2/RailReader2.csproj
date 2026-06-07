@@ -24,6 +24,9 @@
     <PackageReference Include="Avalonia.Themes.Fluent" Version="12.0.4" />
     <PackageReference Include="Avalonia.Fonts.Inter" Version="12.0.4" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.*" />
+    <!-- Low-level D-Bus for the control-bus surface. Already present transitively (Avalonia
+         AT-SPI), referenced explicitly so the control server doesn't break if that link changes. -->
+    <PackageReference Include="Tmds.DBus.Protocol" Version="0.92.0" />
   </ItemGroup>
 
   <ItemGroup>
