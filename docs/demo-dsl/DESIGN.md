@@ -173,8 +173,9 @@ command + sync triad before the DSL/recorder exist. Already independently useful
 
 - ✅ Core motion primitives (`SmoothlyFrameBlock`/`SmoothlyFrameRole`/`AnimateCameraTo`/
   `IsAnimating`, `StartTo`, `ComputeSnapTarget`, `TrySetCurrentByPageIndex`,
-  `PinCurrentBlockForActivation`, `ComputeBlockFitZoom`) — RailReaderCore **0.20.0**,
-  consumed by railreader2 (main).
+  `PinCurrentBlockForActivation`, `ComputeBlockFitZoom`) — RailReaderCore **0.20.0**.
+- ✅ Centred-frame + shared role vocabulary — RailReaderCore **0.21.0** (released, on NuGet),
+  consumed by railreader2.
 - ✅ **Phase A — control server** (branch `feat/control-bus-phase-a`). Files under
   `src/RailReader2/Control/`: `IRailReaderControl` (contract), `ViewModelControl`
   (UI-thread-marshalling impl), `DBusControlServer` (Tmds.DBus.Protocol adapter, the modern
@@ -189,8 +190,8 @@ command + sync triad before the DSL/recorder exist. Already independently useful
     `FrameRole heading 0` → `true`, `IsAnimating` true→false, `Zoom`→3 (rail framing),
     `CurrentRole`="Heading", and the **`Settled`** signal fired on settle. The real-window +
     reliable-command + event-sync triad is proven.
-  - **Figure/Table/Chart framing — RESOLVED in Core** (branch `feat/centred-frame-nonnavigable`,
-    pending a Core release + railreader2 bump). Previously `FrameRole`/`FrameBlock` returned `false`
+  - **Figure/Table/Chart framing — RESOLVED in Core 0.21.0** (released; railreader2 bumped
+    0.20.0→0.21.0). Previously `FrameRole`/`FrameBlock` returned `false`
     for roles outside `DefaultRoleSets.Navigable` (the rail index can't seat them). Now
     `SmoothlyFrameBlock` falls back to a **geometric centred frame** for non-navigable blocks: ease
     zoom-to-fit + centre in the viewport with rail OFF (new `ZoomAnimationController.StartCameraOnly`
