@@ -33,6 +33,7 @@ public class DemoSequencerTests
 
         public Task FitPageAsync(CancellationToken ct) { Calls.Add("fit_page"); return Task.CompletedTask; }
         public Task FitWidthAsync(CancellationToken ct) { Calls.Add("fit_width"); return Task.CompletedTask; }
+        public Task SetFullScreenAsync(bool on, CancellationToken ct) { Calls.Add($"fullscreen:{on}"); return Task.CompletedTask; }
 
         public Task<bool> FrameRoleAsync(string role, int occurrence, double zoom, CancellationToken ct)
         {
@@ -176,10 +177,31 @@ public class DemoSequencerTests
 
         await seq.RunAsync(script, rec);
 
-        Assert.Equal("/tmp/out.webm", rec.Output);     // resolved output handed to the recorder
-        Assert.Equal(0, rec.CallsAtStart);             // started before any verb
+        Assert.Equal("/tmp/out.webm", rec.Output);       // resolved output handed to the recorder
+        Assert.Equal("open:/tmp/x.pdf", fake.Calls[0]);  // open ran first...
+        Assert.Equal(1, rec.CallsAtStart);               // ...as pre-roll, BEFORE recording started
         Assert.Equal(fake.Calls.Count, rec.CallsAtStop); // stopped after the last verb
         Assert.True(rec.Stopped);
+    }
+
+    [Fact]
+    public async Task Fullscreen_TogglesOnBeforeRunAndOffAfter()
+    {
+        var fake = new FakeControlClient();
+        var script = DslParser.Parse("""
+            source: /tmp/x.pdf
+            fullscreen: true
+            steps:
+              - open
+              - frame_role: { role: figure }
+            """);
+        var (seq, _) = Make(fake);
+
+        await seq.RunAsync(script);
+
+        Assert.Equal("fullscreen:True", fake.Calls[0]);                 // fullscreen on first
+        Assert.Equal("fullscreen:False", fake.Calls[^1]);              // restored last
+        Assert.Equal("open:/tmp/x.pdf", fake.Calls[1]);
     }
 
     [Fact]

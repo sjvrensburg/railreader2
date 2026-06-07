@@ -111,6 +111,20 @@ public class DslParserTests
         Assert.Contains(fragment, ex.Message);
     }
 
+    [Theory]
+    [InlineData("fullscreen: true", true)]
+    [InlineData("fullscreen: yes", true)]
+    [InlineData("fullscreen: false", false)]
+    public void ParsesFullscreenFlag(string line, bool expected)
+    {
+        var s = DslParser.Parse($"{line}\nsteps:\n  - open");
+        Assert.Equal(expected, s.Fullscreen);
+    }
+
+    [Fact]
+    public void FullscreenDefaultsFalse()
+        => Assert.False(DslParser.Parse("steps:\n  - open").Fullscreen);
+
     [Fact]
     public void EmptyStepsListIsAllowed()
     {

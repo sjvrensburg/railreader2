@@ -96,6 +96,7 @@ static class DemoCommand
         if (script.Cursor is { } c) Console.WriteLine($"cursor:   {c}");
         if (script.Recorder is { } r) Console.WriteLine($"recorder: {r}");
         if (script.Output is { } o) Console.WriteLine($"output:   {o}");
+        if (script.Fullscreen) Console.WriteLine("fullscreen: true");
         Console.WriteLine($"steps:    {script.Steps.Count}");
         foreach (var s in script.Steps)
         {

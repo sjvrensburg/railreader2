@@ -22,7 +22,7 @@ namespace RailReader.Demo;
 public static class DslParser
 {
     private static readonly HashSet<string> HeaderKeys =
-        new(StringComparer.OrdinalIgnoreCase) { "demo", "source", "fps", "cursor", "recorder", "output" };
+        new(StringComparer.OrdinalIgnoreCase) { "demo", "source", "fps", "cursor", "recorder", "output", "fullscreen" };
 
     public static DemoScript Parse(string text)
     {
@@ -30,6 +30,7 @@ public static class DslParser
 
         string? name = null, source = null, cursor = null, recorder = null, output = null;
         int? fps = null;
+        bool fullscreen = false;
         var steps = new List<DemoStep>();
 
         int i = 0;
@@ -58,6 +59,14 @@ public static class DslParser
                     if (!int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var f))
                         throw new DslParseException($"fps must be an integer, got '{value}'", no);
                     fps = f;
+                    break;
+                case "fullscreen":
+                    fullscreen = value.ToLowerInvariant() switch
+                    {
+                        "true" or "yes" or "on" or "1" => true,
+                        "false" or "no" or "off" or "0" or "" => false,
+                        _ => throw new DslParseException($"fullscreen must be true/false, got '{value}'", no),
+                    };
                     break;
             }
         }
@@ -93,7 +102,7 @@ public static class DslParser
             steps.Add(new DemoStep(verb.ToLowerInvariant(), args, wait, no));
         }
 
-        return new DemoScript(name, source, fps, cursor, recorder, output, steps);
+        return new DemoScript(name, source, fps, cursor, recorder, output, fullscreen, steps);
     }
 
     private static (string verb, Dictionary<string, string> args, string? wait) ParseStepBody(string body, int line)

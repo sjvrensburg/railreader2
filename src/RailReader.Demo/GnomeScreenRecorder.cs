@@ -27,12 +27,15 @@ public sealed class GnomeScreenRecorder : IScreenRecorder
     public async Task StartAsync(string outputPath, int fps, CancellationToken ct)
     {
         _outputPath = Path.GetFullPath(outputPath);
-        // Ask GNOME to write straight to the requested path. GNOME picks its own encoder/container
-        // (H.264 MP4 on recent versions) and may swap the extension; the actual path it used comes
-        // back from the Screencast call, and we reconcile it with the request in StopAsync.
-        _capturePath = _outputPath;
         Directory.CreateDirectory(Path.GetDirectoryName(_outputPath)!);
-        if (File.Exists(_outputPath)) File.Delete(_outputPath);
+
+        // GNOME appends its own container extension to the template (e.g. "x" → "x.mp4", and
+        // "x.mp4" → "x.mp4.mp4"), so pass a base WITHOUT extension and trust the path it returns.
+        // Clear likely targets first so GNOME doesn't number the file (x-1.mp4).
+        string template = Path.ChangeExtension(_outputPath, null)!; // "dir/name"
+        foreach (var cand in new[] { _outputPath, template + ".mp4", template + ".webm" })
+            if (File.Exists(cand)) File.Delete(cand);
+        _capturePath = template; // provisional; replaced by GNOME's returned path below
 
         var address = DBusAddress.Session
             ?? throw new InvalidOperationException("No D-Bus session bus address.");
@@ -44,7 +47,7 @@ public sealed class GnomeScreenRecorder : IScreenRecorder
         using (var w = _conn.GetMessageWriter())
         {
             w.WriteMethodCallHeader(BusName, ObjectPath, Interface, "Screencast", "sa{sv}", MessageFlags.None);
-            w.WriteString(_capturePath);
+            w.WriteString(template);
             var dict = w.WriteDictionaryStart();
             w.WriteDictionaryEntryStart(); w.WriteString("framerate"); w.WriteVariantInt32(fps);
             w.WriteDictionaryEntryStart(); w.WriteString("draw-cursor"); w.WriteVariantBool(false);

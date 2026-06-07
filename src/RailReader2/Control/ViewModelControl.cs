@@ -46,6 +46,9 @@ public sealed class ViewModelControl : IRailReaderControl, IDisposable
     public void FitWidth()
         => Dispatcher.UIThread.Invoke(_vm.FitWidth);
 
+    public void SetFullScreen(bool on)
+        => Dispatcher.UIThread.Invoke(() => _vm.IsFullScreen = on);
+
     public bool FrameRole(string role, int occurrence, double zoom)
     {
         // Resolve the friendly token to its detector roles (e.g. "figure" → Figure, Chart) via

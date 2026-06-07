@@ -170,9 +170,16 @@ behind the same `IScreenRecorder` seam.
   steps → lead-out → `StopAsync`, stop in a `finally` so a thrown/cancelled run still finalises the
   file). `recorder: portal|gnome|screen` + `output:` in the DSL select it. ffmpeg is only used to
   transcode when GNOME's container differs from the requested extension (optional). Validated live:
-  the MOMENT demo produced a valid ~6s H.264 MP4 of the real window. (Deviation from the original
+  the MOMENT demo produced a valid H.264 MP4 of the fullscreen app. (Deviation from the original
   plan: used the GNOME Shell screencast API, not the xdg ScreenCast portal — simpler, promptless,
   no ffmpeg-piping; the portal would only be needed for non-GNOME or window-scoped capture.)
+  - **Refinements after first review:** `fullscreen: true` (DSL) drives a new `SetFullScreen`
+    control verb so the app fills the screen and the capture is just the app — the robust
+    "window-only" answer on Wayland (a window can't get its global coords for region capture). A
+    leading `open` step is **pre-rolled before recording** so the slow PDF load isn't dead time at
+    the head of the video. Pacing is done with `hold` dwell; the **zoom stays the faithful native
+    180 ms** (decision reaffirmed). GNOME appends its own container ext to the template, so we pass
+    a base path and trust the path it returns.
 - **Phase D — pointer + polish.** `cursor: follow` via synthetic pointer; broaden verbs.
 
 ### First step (recommended): Phase A walking skeleton
