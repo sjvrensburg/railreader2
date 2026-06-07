@@ -53,6 +53,20 @@ public sealed class ViewModelControl : IRailReaderControl, IDisposable
     public void SetZoom(double percent)
         => Dispatcher.UIThread.Invoke(() => _vm.SetZoomPercent(percent));
 
+    public ReadingState GetReadingState() => Dispatcher.UIThread.Invoke(() =>
+    {
+        var info = _vm.GetDocumentInfo();
+        var pos = _vm.GetReadingPosition();
+        return new ReadingState(
+            RailActive: info?.RailActive ?? false,
+            AutoScrollActive: info?.AutoScrollActive ?? false,
+            Page: info?.CurrentPage ?? -1,
+            BlockIndex: pos?.BlockIndex ?? -1,
+            LineIndex: pos?.LineIndex ?? -1,
+            LineCount: pos?.LineCount ?? 0,
+            HorizontalFraction: pos?.HorizontalFraction ?? 0.0);
+    });
+
     public bool SetColourEffect(string name)
     {
         if (!TryParseEffect(name, out var effect)) return false;

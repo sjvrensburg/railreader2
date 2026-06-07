@@ -217,6 +217,9 @@ public sealed class DemoSequencer
                 await _client.SetLineFocusBlurAsync(on, ct).ConfigureAwait(false);
                 break;
             }
+            case "auto_scroll":
+                await AutoScrollAsync(step, ct).ConfigureAwait(false);
+                break;
             case "key":
                 await SendKeyAsync(step, down: true, up: true, ct).ConfigureAwait(false);
                 break;
@@ -337,6 +340,52 @@ public sealed class DemoSequencer
     /// <summary>A step's direction arg ('dir') indicates backward when up/prev/previous/back.</summary>
     private static bool DirIsBackward(DemoStep s) =>
         s.Args.TryGetValue("dir", out var d) && d.ToLowerInvariant() is "up" or "prev" or "previous" or "back" or "backward";
+
+    /// <summary>Toggle auto-scroll on, read until a real condition is met (or a timeout), then off.
+    /// Replaces blind hold-times: <c>until: handoff</c> (block/column changes), <c>until_block: N</c>,
+    /// <c>until_line: N</c>, or <c>for: &lt;duration&gt;</c> (timed). <c>timeout:</c> bounds it (default 30s).</summary>
+    private async Task AutoScrollAsync(DemoStep step, CancellationToken ct)
+    {
+        _log.WriteLine($"auto_scroll {(step.Args.Count == 0 ? "until handoff" : string.Join(" ", step.Args.Select(kv => $"{kv.Key}={kv.Value}")))}");
+        await _client.SendKeyAsync("p", true, true, ct).ConfigureAwait(false); // auto-scroll on
+        try
+        {
+            if (step.Args.TryGetValue("for", out var forStr))
+            {
+                await _delay(ParseDuration(forStr, step.Line), ct).ConfigureAwait(false);
+                return;
+            }
+
+            var timeout = step.Args.TryGetValue("timeout", out var to)
+                ? ParseDuration(to, step.Line) : TimeSpan.FromSeconds(30);
+            var start = await _client.GetReadingStateAsync(ct).ConfigureAwait(false);
+            var done = BuildReadingCondition(step, start);
+
+            var interval = TimeSpan.FromMilliseconds(150);
+            int maxPolls = Math.Max(1, (int)(timeout.TotalMilliseconds / interval.TotalMilliseconds));
+            for (int i = 0; i < maxPolls; i++)
+            {
+                ct.ThrowIfCancellationRequested();
+                if (done(await _client.GetReadingStateAsync(ct).ConfigureAwait(false))) return;
+                await _delay(interval, ct).ConfigureAwait(false);
+            }
+            _log.WriteLine($"  (auto_scroll timed out after {timeout.TotalSeconds:0}s)");
+        }
+        finally
+        {
+            await _client.SendKeyAsync("p", true, true, ct).ConfigureAwait(false); // auto-scroll off
+        }
+    }
+
+    private static Func<ReadingState, bool> BuildReadingCondition(DemoStep step, ReadingState start)
+    {
+        if (step.Args.TryGetValue("until_block", out var b) && int.TryParse(b, out var bn))
+            return s => s.BlockIndex == bn;
+        if (step.Args.TryGetValue("until_line", out var l) && int.TryParse(l, out var ln))
+            return s => s.LineIndex >= ln;
+        // default / "until: handoff" → the seated block changed (line/column hand-off)
+        return s => s.BlockIndex >= 0 && s.BlockIndex != start.BlockIndex;
+    }
 
     /// <summary>Drive a keyboard shortcut (the generic key verbs). Honours a per-step <c>wait:</c>
     /// override (default none) — add <c>wait: settled</c> for shortcuts that animate.</summary>

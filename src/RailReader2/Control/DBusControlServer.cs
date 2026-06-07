@@ -166,6 +166,20 @@ public sealed class DBusControlServer : IPathMethodHandler, IDisposable
                     ReplyBool(context, _control.SetNavigableRoles(reader.ReadString()));
                     break;
                 }
+                case "GetReadingState":
+                {
+                    var s = _control.GetReadingState();
+                    using var w = context.CreateReplyWriter("bbiiiid");
+                    w.WriteBool(s.RailActive);
+                    w.WriteBool(s.AutoScrollActive);
+                    w.WriteInt32(s.Page);
+                    w.WriteInt32(s.BlockIndex);
+                    w.WriteInt32(s.LineIndex);
+                    w.WriteInt32(s.LineCount);
+                    w.WriteDouble(s.HorizontalFraction);
+                    context.Reply(w.CreateMessage());
+                    break;
+                }
                 case "FrameRole":
                 {
                     var reader = req.GetBodyReader();
@@ -371,6 +385,15 @@ public sealed class DBusControlServer : IPathMethodHandler, IDisposable
           <method name="SetNavigableRoles">
             <arg type="s" name="csv" direction="in"/>
             <arg type="b" name="ok" direction="out"/>
+          </method>
+          <method name="GetReadingState">
+            <arg type="b" name="railActive" direction="out"/>
+            <arg type="b" name="autoScrollActive" direction="out"/>
+            <arg type="i" name="page" direction="out"/>
+            <arg type="i" name="blockIndex" direction="out"/>
+            <arg type="i" name="lineIndex" direction="out"/>
+            <arg type="i" name="lineCount" direction="out"/>
+            <arg type="d" name="horizontalFraction" direction="out"/>
           </method>
           <method name="FrameRole">
             <arg type="s" name="role" direction="in"/>

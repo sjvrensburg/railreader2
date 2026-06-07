@@ -138,6 +138,25 @@ public sealed class DBusControlClient : IControlClient
         return _conn.CallMethodAsync(w.CreateMessage(), static (Message m, object? s) => m.GetBodyReader().ReadBool(), null);
     }
 
+    public Task<ReadingState> GetReadingStateAsync(CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        using var w = _conn.GetMessageWriter();
+        w.WriteMethodCallHeader(_busName, ObjectPath, Interface, "GetReadingState", "", MessageFlags.None);
+        return _conn.CallMethodAsync(w.CreateMessage(), static (Message m, object? s) =>
+        {
+            var r = m.GetBodyReader();
+            return new ReadingState(
+                RailActive: r.ReadBool(),
+                AutoScrollActive: r.ReadBool(),
+                Page: r.ReadInt32(),
+                BlockIndex: r.ReadInt32(),
+                LineIndex: r.ReadInt32(),
+                LineCount: r.ReadInt32(),
+                HorizontalFraction: r.ReadDouble());
+        }, null);
+    }
+
     private Task CallBoolArgVoidAsync(string member, bool arg, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();

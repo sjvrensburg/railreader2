@@ -22,17 +22,20 @@ public interface IControlClient : IAsyncDisposable
     Task SetLineHighlightAsync(bool on, CancellationToken ct);
     Task SetLineFocusBlurAsync(bool on, CancellationToken ct);
 
+    /// <summary>Frame the occurrence-th block of a role; false if nothing matched (so no animation runs).</summary>
+    Task<bool> FrameRoleAsync(string role, int occurrence, double zoom, CancellationToken ct);
+
+    /// <summary>Frame a block by page index; false if it couldn't be framed.</summary>
+    Task<bool> FrameBlockAsync(int pageBlockIndex, double zoom, CancellationToken ct);
+
     /// <summary>Drive a keyboard shortcut by chord; down/up select press phases (both = tap).</summary>
     Task<bool> SendKeyAsync(string chord, bool down, bool up, CancellationToken ct);
 
     /// <summary>Restrict rail-navigable block roles for this session (comma-separated tokens).</summary>
     Task<bool> SetNavigableRolesAsync(string csv, CancellationToken ct);
 
-    /// <summary>Frame the occurrence-th block of a role; false if nothing matched (so no animation runs).</summary>
-    Task<bool> FrameRoleAsync(string role, int occurrence, double zoom, CancellationToken ct);
-
-    /// <summary>Frame a block by page index; false if it couldn't be framed.</summary>
-    Task<bool> FrameBlockAsync(int pageBlockIndex, double zoom, CancellationToken ct);
+    /// <summary>Read live rail reading progress, for syncing on real motion (e.g. the column hand-off).</summary>
+    Task<ReadingState> GetReadingStateAsync(CancellationToken ct);
 
     /// <summary>Raised once when an eased camera animation completes (the cut/sync backbone).</summary>
     event Action? Settled;
@@ -43,3 +46,13 @@ public interface IControlClient : IAsyncDisposable
     /// <summary>Raised after a document finishes opening (its path).</summary>
     event Action<string>? DocumentOpened;
 }
+
+/// <summary>Live rail reading progress reported by the app (mirrors the bus GetReadingState).</summary>
+public readonly record struct ReadingState(
+    bool RailActive,
+    bool AutoScrollActive,
+    int Page,
+    int BlockIndex,
+    int LineIndex,
+    int LineCount,
+    double HorizontalFraction);

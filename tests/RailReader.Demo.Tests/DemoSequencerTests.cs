@@ -43,6 +43,11 @@ public class DemoSequencerTests
         public Task<bool> SendKeyAsync(string chord, bool down, bool up, CancellationToken ct) { Calls.Add($"key:{chord}:{(down ? "d" : "")}{(up ? "u" : "")}"); return Task.FromResult(true); }
         public Task<bool> SetNavigableRolesAsync(string csv, CancellationToken ct) { Calls.Add($"navigable:{csv}"); return Task.FromResult(true); }
 
+        // Simulate reading progress: block index advances on each poll, so an `until: handoff` resolves.
+        public int ReadBlock { get; set; }
+        public Task<ReadingState> GetReadingStateAsync(CancellationToken ct)
+            => Task.FromResult(new ReadingState(true, true, 0, ReadBlock++, 0, 5, 0.0));
+
         public Task<bool> FrameRoleAsync(string role, int occurrence, double zoom, CancellationToken ct)
         {
             Calls.Add($"frame_role:{role}:{occurrence}:{zoom}");
@@ -298,6 +303,32 @@ public class DemoSequencerTests
         Assert.Equal(
             ["key:c:du", "key:right:d", "key:f:du", "key:right:u", "key:ctrl+shift+h:du"],
             fake.Calls);
+    }
+
+    [Fact]
+    public async Task AutoScroll_UntilHandoff_TogglesOnReadsThenOff()
+    {
+        var fake = new FakeControlClient();
+        var script = DslParser.Parse("steps:\n  - auto_scroll: { until: handoff }");
+        var (seq, _) = Make(fake);
+
+        await seq.RunAsync(script);
+
+        // Auto-scroll toggled on (p), then off (p) after the block index changed.
+        Assert.Equal(["key:p:du", "key:p:du"], fake.Calls);
+    }
+
+    [Fact]
+    public async Task AutoScroll_For_IsTimed()
+    {
+        var fake = new FakeControlClient();
+        var script = DslParser.Parse("steps:\n  - auto_scroll: { for: 2s }");
+        var (seq, delays) = Make(fake);
+
+        await seq.RunAsync(script);
+
+        Assert.Equal(["key:p:du", "key:p:du"], fake.Calls);
+        Assert.Contains(TimeSpan.FromSeconds(2), delays); // timed hold, no polling
     }
 
     [Fact]
