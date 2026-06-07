@@ -3,7 +3,9 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Avalonia.Styling;
 using Avalonia.Threading;
+using RailReader.Core;
 using RailReader.Core.Services;
+using RailReader2.ControlBus;
 using RailReader2.ViewModels;
 using RailReader2.Views;
 
@@ -11,6 +13,10 @@ namespace RailReader2;
 
 public partial class App : Application
 {
+    // Held for lifetime + disposal when the optional --control-bus server is running.
+    private ViewModelControl? _control;
+    private DBusControlServer? _controlServer;
+
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);
@@ -43,16 +49,62 @@ public partial class App : Application
                 vm.SetWindow(window);
 
                 window.Opened += (_, _) => splash.Close();
-                window.Closing += (_, _) => vm.Dispose();
+                window.Closing += (_, _) =>
+                {
+                    _controlServer?.Dispose();
+                    _control?.Dispose();
+                    vm.Dispose();
+                };
                 desktop.MainWindow = window;
 
-                if (args is { Length: > 0 } && File.Exists(args[0]))
-                    window.Opened += (_, _) => vm.FireAndForget(vm.OpenDocument(args[0]), nameof(vm.OpenDocument));
+                // First non-flag argument that names an existing file is the PDF to open.
+                var docPath = args?.FirstOrDefault(a => !a.StartsWith("--") && File.Exists(a));
+                if (docPath is not null)
+                    window.Opened += (_, _) => vm.FireAndForget(vm.OpenDocument(docPath), nameof(vm.OpenDocument));
+
+                // Optional external control surface: --control-bus or --control-bus=<bus-name>.
+                if (TryGetControlBusName(args, out var busName))
+                    window.Opened += (_, _) => StartControlServer(vm, busName);
 
                 window.Show();
             }, DispatcherPriority.Background);
         }
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    /// <summary>Parse <c>--control-bus</c> / <c>--control-bus=&lt;name&gt;</c> from the command line.
+    /// Returns true when the flag is present; <paramref name="busName"/> is the explicit name or null
+    /// (meaning the default <see cref="DBusControlServer.DefaultBusName"/>).</summary>
+    private static bool TryGetControlBusName(string[]? args, out string? busName)
+    {
+        busName = null;
+        if (args is null) return false;
+        foreach (var arg in args)
+        {
+            if (arg == "--control-bus") return true;
+            if (arg.StartsWith("--control-bus=", StringComparison.Ordinal))
+            {
+                var name = arg["--control-bus=".Length..];
+                busName = string.IsNullOrWhiteSpace(name) ? null : name;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void StartControlServer(MainWindowViewModel vm, string? busName)
+    {
+        var logger = RailReaderLogging.Logger;
+        try
+        {
+            _control = new ViewModelControl(vm);
+            _controlServer = new DBusControlServer(_control, busName, logger);
+            vm.FireAndForget(_controlServer.StartAsync(), nameof(DBusControlServer));
+        }
+        catch (Exception ex)
+        {
+            logger.Error("[control-bus] Failed to start control server", ex);
+        }
     }
 }

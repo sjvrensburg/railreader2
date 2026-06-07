@@ -3,7 +3,7 @@
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
-    <Version>3.26.1.0</Version>
+    <Version>3.27.0.0</Version>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -24,14 +24,17 @@
     <PackageReference Include="Avalonia.Themes.Fluent" Version="12.0.4" />
     <PackageReference Include="Avalonia.Fonts.Inter" Version="12.0.4" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.*" />
+    <!-- Low-level D-Bus for the control-bus surface. Already present transitively (Avalonia
+         AT-SPI), referenced explicitly so the control server doesn't break if that link changes. -->
+    <PackageReference Include="Tmds.DBus.Protocol" Version="0.92.0" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="RailReader.Core" Version="0.20.0" />
-    <PackageReference Include="RailReader.Core.Pdfium" Version="0.20.0" />
-    <PackageReference Include="RailReader.Core.Analysis" Version="0.20.0" />
-    <PackageReference Include="RailReader.Renderer.Skia" Version="0.20.0" />
-    <PackageReference Include="RailReader.Core.Vlm.OpenAI" Version="0.20.0" />
+    <PackageReference Include="RailReader.Core" Version="0.21.0" />
+    <PackageReference Include="RailReader.Core.Pdfium" Version="0.21.0" />
+    <PackageReference Include="RailReader.Core.Analysis" Version="0.21.0" />
+    <PackageReference Include="RailReader.Renderer.Skia" Version="0.21.0" />
+    <PackageReference Include="RailReader.Core.Vlm.OpenAI" Version="0.21.0" />
   </ItemGroup>
 
 </Project>

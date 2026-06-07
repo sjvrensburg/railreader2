@@ -320,29 +320,17 @@ public static class VlmCommand
     static HashSet<BlockRole> ResolveRoles(string? classesOpt, bool all)
     {
         var set = new HashSet<BlockRole>();
-        var tokens = classesOpt?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Select(t => t.ToLowerInvariant()).ToHashSet() ?? [];
+        // "all" means every transcribable class; otherwise resolve the requested tokens. The
+        // friendly vocabulary (figure→{Figure,Chart}, equation→{DisplayMath,InlineMath,Algorithm},
+        // …) plus the raw-enum fallback live in Core's BlockRoleAliases — shared with the GUI/
+        // control bus so the two surfaces can't drift.
+        string[] tokens = all
+            ? ["figure", "equation", "table"]
+            : classesOpt?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                ?? [];
 
-        if (all || tokens.Contains("equation"))
-        {
-            set.Add(BlockRole.DisplayMath);
-            set.Add(BlockRole.InlineMath);
-            set.Add(BlockRole.Algorithm);
-        }
-        if (all || tokens.Contains("table"))
-            set.Add(BlockRole.Table);
-        if (all || tokens.Contains("figure"))
-        {
-            set.Add(BlockRole.Figure);
-            set.Add(BlockRole.Chart);
-        }
-
-        // Allow raw role names for power users (e.g. "--classes Caption,Aside").
         foreach (var tok in tokens)
-        {
-            if (Enum.TryParse<BlockRole>(tok, ignoreCase: true, out var role))
-                set.Add(role);
-        }
+            set.UnionWith(BlockRoleAliases.Resolve(tok));
 
         return set;
     }

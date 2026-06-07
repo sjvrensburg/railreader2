@@ -270,7 +270,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         // page or rail reading position changes — including jumps that don't otherwise repaint the
         // overlay (e.g. NavigateToRole). The render path still calls NotifyAccessibilityStateChanged
         // for mode transitions; the peer's signature debounce makes the overlap free.
-        _controller.PageChanged = _ => AnnounceAccessibilityState();
+        _controller.PageChanged = p => { AnnounceAccessibilityState(); PageChangedNotification?.Invoke(p); };
         _controller.ReadingPositionChanged = _ => AnnounceAccessibilityState();
         WireAnnotationStoreSignals();
         SetupPollTimer();
@@ -396,8 +396,23 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         }
         if (result.AnnotationsChanged) InvalidateAnnotations();
         if (result.CameraChanged) InvalidateCamera();
-        if (result.StillAnimating) RequestAnimationFrame();
+
+        bool stillAnimating = result.StillAnimating;
+        if (stillAnimating) RequestAnimationFrame();
+        // Fire AnimationSettled exactly once on the animating→idle edge. The external
+        // control surface (IRailReaderControl.Settled) uses this as its cut/sync backbone;
+        // an eased verb returns immediately and the runner waits for this signal.
+        else if (_wasAnimating) AnimationSettled?.Invoke();
+        _wasAnimating = stillAnimating;
     }
+
+    /// <summary>True while the most recent animation frame reported StillAnimating, so the
+    /// next idle frame can raise <see cref="AnimationSettled"/> once on the falling edge.</summary>
+    private bool _wasAnimating;
+
+    /// <summary>Raised once when an eased camera animation completes. Drives
+    /// <see cref="ControlBus.IRailReaderControl.Settled"/>; fired on the UI thread.</summary>
+    public event Action? AnimationSettled;
 
     public void RequestAnimationFrame()
     {

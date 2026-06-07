@@ -145,9 +145,10 @@ portal prompts once at session start.
 
 ## 9. Phasing
 
-- **Phase A — control server (keystone).** `--control-bus` + `IRailReaderControl` +
-  `ViewModelControl` + `DBusControlServer` with a minimal verb set (`OpenDocument`,
-  `GoToPage`, `FrameRole`) + the `Settled` signal + a few read properties.
+- **Phase A — control server (keystone). ✅ DONE.** `--control-bus` + `IRailReaderControl` +
+  `ViewModelControl` + `DBusControlServer` with verbs `OpenDocument`/`GoToPage`/`FitPage`/
+  `FitWidth`/`FrameRole`/`FrameBlock`, the `Settled`/`PageChanged`/`DocumentOpened` signals,
+  and the 7 read properties. Validated by hand over `busctl`/`gdbus` (see §11).
 - **Phase B — runner + DSL.** `railreader2-cli demo`: parser, sequencer, `IControlClient`.
 - **Phase C — recorder.** GNOME portal capture + ffmpeg, event-synced cuts.
 - **Phase D — pointer + polish.** `cursor: follow` via synthetic pointer; broaden verbs.
@@ -172,16 +173,46 @@ command + sync triad before the DSL/recorder exist. Already independently useful
 
 - ✅ Core motion primitives (`SmoothlyFrameBlock`/`SmoothlyFrameRole`/`AnimateCameraTo`/
   `IsAnimating`, `StartTo`, `ComputeSnapTarget`, `TrySetCurrentByPageIndex`,
-  `PinCurrentBlockForActivation`, `ComputeBlockFitZoom`) — RailReaderCore **0.20.0**,
-  consumed by railreader2 (main).
-- ⬜ Phases A–D: not started.
+  `PinCurrentBlockForActivation`, `ComputeBlockFitZoom`) — RailReaderCore **0.20.0**.
+- ✅ Centred-frame + shared role vocabulary — RailReaderCore **0.21.0** (released, on NuGet),
+  consumed by railreader2.
+- ✅ **Phase A — control server** (branch `feat/control-bus-phase-a`). Files under
+  `src/RailReader2/Control/`: `IRailReaderControl` (contract), `ViewModelControl`
+  (UI-thread-marshalling impl), `DBusControlServer` (Tmds.DBus.Protocol adapter, the modern
+  `DBusConnection`/`DBusAddress`/`IPathMethodHandler` API). VM seams in
+  `MainWindowViewModel.Control.cs` (`SmoothlyFrameBlock`/`SmoothlyFrameRole`/`AnimateCameraTo`
+  wrappers via `Dispatch(animate:true)`) + `AnimationSettled` event (fired on the
+  `StillAnimating` true→false edge in `OnAnimationFrame`) + `PageChangedNotification`. Startup:
+  `--control-bus[=name]` parsed in `App.axaml.cs`, server started after `window.Opened`, disposed
+  on close. `Tmds.DBus.Protocol` referenced explicitly in the csproj.
+  - **Validated 2026-06-07** over `busctl`/`gdbus`: introspection lists all members;
+    `OpenDocument` → `true` + `DocumentOpened` signal; `GoToPage 4` → `PageChanged(4)`;
+    `FrameRole heading 0` → `true`, `IsAnimating` true→false, `Zoom`→3 (rail framing),
+    `CurrentRole`="Heading", and the **`Settled`** signal fired on settle. The real-window +
+    reliable-command + event-sync triad is proven.
+  - **Figure/Table/Chart framing — RESOLVED in Core 0.21.0** (released; railreader2 bumped
+    0.20.0→0.21.0). Previously `FrameRole`/`FrameBlock` returned `false`
+    for roles outside `DefaultRoleSets.Navigable` (the rail index can't seat them). Now
+    `SmoothlyFrameBlock` falls back to a **geometric centred frame** for non-navigable blocks: ease
+    zoom-to-fit + centre in the viewport with rail OFF (new `ZoomAnimationController.StartCameraOnly`
+    pure-camera-move mode that skips per-frame `UpdateRailZoom` and the completion snap;
+    `RailNav.Deactivate`; `DocumentState.ComputeCenteredFrame`). Unlike rail framing it does NOT
+    floor at the 3× threshold, so a large figure shows whole below it. New explicit
+    `SmoothlyCenterBlock`/`SmoothlyCenterRole` force geometric centring for any block. The control
+    bus needs **no change** — `FrameRole`/`FrameBlock` already call the Core primitives.
+    Validated end-to-end over `busctl` against a local Core build on MOMENT.pdf: `FrameRole figure`
+    framed figures on pp.3/7 (p7 a large figure at 2.25×, whole) and `FrameRole table` framed a
+    table on p5, each emitting `Settled`. Once Core ships, this lands in railreader2 via the bump.
+- ⬜ Phases B–D: not started.
 
 ## 12. Open items / risks
 
 - Auto-fit floors zoom at the rail threshold (so framing applies) — a very large block
   can't "fit" below threshold; acceptable (rail reading semantics). Revisit if needed.
-- Non-navigable blocks (figures/tables outside NavigableRoles) can't use rail framing —
-  `FrameBlock`/`FrameRole` return false. A separate centred-frame path is a later option.
+- ~~Non-navigable blocks (figures/tables outside NavigableRoles) can't use rail framing.~~
+  RESOLVED: `SmoothlyFrameBlock`/`FrameRole` now fall back to a geometric centred frame for
+  non-navigable blocks; explicit `SmoothlyCenterBlock`/`Role` added (Core branch
+  `feat/centred-frame-nonnavigable`, pending release). See §11.
 - Recorder portal prompt is interactive — fine for manual runs; headless/cron capture
   would need a different path.
 - D-Bus is Linux-only; Windows demos would need the portable-interface swap (designed for).
