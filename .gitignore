@@ -43,3 +43,6 @@ experiments/**/runs/
 experiments/**/__pycache__/
 experiments/**/*.pyc
 experiments/**/.venv/
+
+# Local Claude Code agent tooling (machine-specific)
+.claude/skills/
