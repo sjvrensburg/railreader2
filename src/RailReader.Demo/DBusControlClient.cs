@@ -77,6 +77,15 @@ public sealed class DBusControlClient : IControlClient
     public Task FitPageAsync(CancellationToken ct) => CallVoidNoArgsAsync("FitPage", ct);
     public Task FitWidthAsync(CancellationToken ct) => CallVoidNoArgsAsync("FitWidth", ct);
 
+    public Task SetFullScreenAsync(bool on, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        using var w = _conn.GetMessageWriter();
+        w.WriteMethodCallHeader(_busName, ObjectPath, Interface, "SetFullScreen", "b", MessageFlags.None);
+        w.WriteBool(on);
+        return _conn.CallMethodAsync(w.CreateMessage());
+    }
+
     private Task CallVoidNoArgsAsync(string member, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();

@@ -14,6 +14,7 @@ public interface IControlClient : IAsyncDisposable
     Task GoToPageAsync(int page, CancellationToken ct);
     Task FitPageAsync(CancellationToken ct);
     Task FitWidthAsync(CancellationToken ct);
+    Task SetFullScreenAsync(bool on, CancellationToken ct);
 
     /// <summary>Frame the occurrence-th block of a role; false if nothing matched (so no animation runs).</summary>
     Task<bool> FrameRoleAsync(string role, int occurrence, double zoom, CancellationToken ct);

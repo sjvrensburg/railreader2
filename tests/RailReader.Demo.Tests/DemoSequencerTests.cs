@@ -33,6 +33,7 @@ public class DemoSequencerTests
 
         public Task FitPageAsync(CancellationToken ct) { Calls.Add("fit_page"); return Task.CompletedTask; }
         public Task FitWidthAsync(CancellationToken ct) { Calls.Add("fit_width"); return Task.CompletedTask; }
+        public Task SetFullScreenAsync(bool on, CancellationToken ct) { Calls.Add($"fullscreen:{on}"); return Task.CompletedTask; }
 
         public Task<bool> FrameRoleAsync(string role, int occurrence, double zoom, CancellationToken ct)
         {
@@ -46,6 +47,32 @@ public class DemoSequencerTests
             Calls.Add($"frame_block:{index}:{zoom}");
             if (AutoSignal && FrameResult) Settled?.Invoke();
             return Task.FromResult(FrameResult);
+        }
+
+        public ValueTask DisposeAsync() => default;
+    }
+
+    /// <summary>Records Start/Stop and the call log at those moments so a test can assert the
+    /// capture brackets the whole step sequence.</summary>
+    private sealed class FakeScreenRecorder(List<string> sharedLog) : IScreenRecorder
+    {
+        public string? Output { get; private set; }
+        public int CallsAtStart { get; private set; } = -1;
+        public int CallsAtStop { get; private set; } = -1;
+        public bool Stopped { get; private set; }
+
+        public Task StartAsync(string outputPath, int fps, CancellationToken ct)
+        {
+            Output = outputPath;
+            CallsAtStart = sharedLog.Count;
+            return Task.CompletedTask;
+        }
+
+        public Task<string> StopAsync(CancellationToken ct)
+        {
+            CallsAtStop = sharedLog.Count;
+            Stopped = true;
+            return Task.FromResult(Output ?? "");
         }
 
         public ValueTask DisposeAsync() => default;
@@ -131,6 +158,62 @@ public class DemoSequencerTests
 
         Assert.Contains(TimeSpan.FromMilliseconds(500), delays);
         Assert.DoesNotContain(TimeSpan.FromSeconds(10), delays); // no signal timeout for an explicit duration wait
+    }
+
+    [Fact]
+    public async Task Recorder_BracketsTheWholeRun()
+    {
+        var fake = new FakeControlClient();
+        var rec = new FakeScreenRecorder(fake.Calls);
+        var script = DslParser.Parse("""
+            source: /tmp/x.pdf
+            output: /tmp/out.webm
+            steps:
+              - open
+              - goto_page: 2
+              - frame_role: { role: figure }
+            """);
+        var (seq, _) = Make(fake);
+
+        await seq.RunAsync(script, rec);
+
+        Assert.Equal("/tmp/out.webm", rec.Output);       // resolved output handed to the recorder
+        Assert.Equal("open:/tmp/x.pdf", fake.Calls[0]);  // open ran first...
+        Assert.Equal(1, rec.CallsAtStart);               // ...as pre-roll, BEFORE recording started
+        Assert.Equal(fake.Calls.Count, rec.CallsAtStop); // stopped after the last verb
+        Assert.True(rec.Stopped);
+    }
+
+    [Fact]
+    public async Task Fullscreen_TogglesOnBeforeRunAndOffAfter()
+    {
+        var fake = new FakeControlClient();
+        var script = DslParser.Parse("""
+            source: /tmp/x.pdf
+            fullscreen: true
+            steps:
+              - open
+              - frame_role: { role: figure }
+            """);
+        var (seq, _) = Make(fake);
+
+        await seq.RunAsync(script);
+
+        Assert.Equal("fullscreen:True", fake.Calls[0]);                 // fullscreen on first
+        Assert.Equal("fullscreen:False", fake.Calls[^1]);              // restored last
+        Assert.Equal("open:/tmp/x.pdf", fake.Calls[1]);
+    }
+
+    [Fact]
+    public async Task Recorder_StoppedEvenIfAStepThrows()
+    {
+        var fake = new FakeControlClient();
+        var rec = new FakeScreenRecorder(fake.Calls);
+        var script = DslParser.Parse("output: /tmp/out.webm\nsteps:\n  - teleport: 1");
+        var (seq, _) = Make(fake);
+
+        await Assert.ThrowsAsync<DemoRunException>(() => seq.RunAsync(script, rec));
+        Assert.True(rec.Stopped); // finally-block stops the capture so the file is finalised
     }
 
     [Fact]

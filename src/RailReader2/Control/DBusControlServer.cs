@@ -103,6 +103,13 @@ public sealed class DBusControlServer : IPathMethodHandler, IDisposable
                     _control.FitWidth();
                     ReplyVoid(context);
                     break;
+                case "SetFullScreen":
+                {
+                    var reader = req.GetBodyReader();
+                    _control.SetFullScreen(reader.ReadBool());
+                    ReplyVoid(context);
+                    break;
+                }
                 case "FrameRole":
                 {
                     var reader = req.GetBodyReader();
@@ -274,6 +281,9 @@ public sealed class DBusControlServer : IPathMethodHandler, IDisposable
           </method>
           <method name="FitPage"/>
           <method name="FitWidth"/>
+          <method name="SetFullScreen">
+            <arg type="b" name="on" direction="in"/>
+          </method>
           <method name="FrameRole">
             <arg type="s" name="role" direction="in"/>
             <arg type="i" name="occurrence" direction="in"/>

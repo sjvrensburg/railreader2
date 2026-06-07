@@ -10,6 +10,8 @@ namespace RailReader.Demo;
 /// <param name="Cursor">Pointer mode: hidden | park | follow (Phase D; parsed now, applied later).</param>
 /// <param name="Recorder">Recorder backend (Phase C; parsed now, applied later).</param>
 /// <param name="Output">Output video path (Phase C).</param>
+/// <param name="Fullscreen">When true, the app is put full-screen for the run so a recording
+/// captures just the app, full-bleed (and restored afterwards).</param>
 /// <param name="Steps">The ordered steps.</param>
 public sealed record DemoScript(
     string? Name,
@@ -18,6 +20,7 @@ public sealed record DemoScript(
     string? Cursor,
     string? Recorder,
     string? Output,
+    bool Fullscreen,
     IReadOnlyList<DemoStep> Steps);
 
 /// <summary>

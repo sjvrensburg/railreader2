@@ -30,15 +30,62 @@ public sealed class DemoSequencer
         _settleTimeout = settleTimeout ?? TimeSpan.FromSeconds(10);
     }
 
-    public async Task RunAsync(DemoScript script, CancellationToken ct = default)
+    /// <summary>Run the script. If <paramref name="recorder"/> is given and the script has an
+    /// <c>output:</c>, the whole run is bracketed by a screen capture (with a short lead-in/out so
+    /// the video doesn't start/end exactly on the first/last motion). The capture is continuous;
+    /// fidelity comes from each step cutting on the real <c>Settled</c> signal, not from per-step
+    /// video edits.</summary>
+    public async Task RunAsync(DemoScript script, IScreenRecorder? recorder = null, CancellationToken ct = default)
     {
-        for (int i = 0; i < script.Steps.Count; i++)
+        bool capturing = recorder is not null && !string.IsNullOrEmpty(script.Output);
+
+        if (script.Fullscreen)
         {
-            ct.ThrowIfCancellationRequested();
-            await ExecuteAsync(script, script.Steps[i], ct).ConfigureAwait(false);
+            _log.WriteLine("fullscreen on");
+            await _client.SetFullScreenAsync(true, ct).ConfigureAwait(false);
+            await _delay(FullScreenSettle, ct).ConfigureAwait(false); // let the resize/relayout settle
         }
-        _log.WriteLine("Demo complete.");
+
+        int start = 0;
+        if (capturing)
+        {
+            // Pre-roll: run leading 'open' steps BEFORE recording starts so the slow PDF load
+            // (and first-page render) isn't captured as dead time at the head of the video.
+            while (start < script.Steps.Count && script.Steps[start].Verb == "open")
+            {
+                await ExecuteAsync(script, script.Steps[start], ct).ConfigureAwait(false);
+                start++;
+            }
+            await recorder!.StartAsync(script.Output!, script.Fps ?? 60, ct).ConfigureAwait(false);
+            await _delay(LeadIn, ct).ConfigureAwait(false);
+        }
+
+        try
+        {
+            for (int i = start; i < script.Steps.Count; i++)
+            {
+                ct.ThrowIfCancellationRequested();
+                await ExecuteAsync(script, script.Steps[i], ct).ConfigureAwait(false);
+            }
+            _log.WriteLine("Demo complete.");
+        }
+        finally
+        {
+            if (capturing)
+            {
+                // Lead-out + stop are best-effort even on cancellation; use a fresh token so a
+                // cancelled run still flushes the tail and finalises the file.
+                try { await _delay(LeadOut, CancellationToken.None).ConfigureAwait(false); } catch { /* ignore */ }
+                await recorder!.StopAsync(CancellationToken.None).ConfigureAwait(false);
+            }
+            if (script.Fullscreen)
+                try { await _client.SetFullScreenAsync(false, CancellationToken.None).ConfigureAwait(false); } catch { /* ignore */ }
+        }
     }
+
+    private static readonly TimeSpan FullScreenSettle = TimeSpan.FromMilliseconds(600);
+    private static readonly TimeSpan LeadIn = TimeSpan.FromMilliseconds(500);
+    private static readonly TimeSpan LeadOut = TimeSpan.FromMilliseconds(800);
 
     private enum WaitKind { None, Settled, PageChanged, Duration }
 

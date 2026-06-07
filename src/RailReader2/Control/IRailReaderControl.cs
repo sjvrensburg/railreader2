@@ -31,6 +31,10 @@ public interface IRailReaderControl
     /// <summary>Fit the page width to the viewport.</summary>
     void FitWidth();
 
+    /// <summary>Toggle the window's full-screen mode (hides chrome; the viewport fills the screen).
+    /// Used by the demo runner so a recording captures just the app, full-bleed.</summary>
+    void SetFullScreen(bool on);
+
     /// <summary>Smoothly frame the n-th block of a semantic role (e.g. "figure", "table",
     /// "equation", "heading") using rail's exact framing and the app-native eased zoom.
     /// <paramref name="zoom"/> &lt;= 0 means auto-fit. Returns true if a matching block was framed.</summary>
