@@ -399,15 +399,18 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
         bool stillAnimating = result.StillAnimating;
         if (stillAnimating) RequestAnimationFrame();
-        // Fire AnimationSettled exactly once on the animating→idle edge. The external
-        // control surface (IRailReaderControl.Settled) uses this as its cut/sync backbone;
-        // an eased verb returns immediately and the runner waits for this signal.
+        // Fire AnimationSettled exactly once on the animating→idle edge. The external control
+        // surface (IRailReaderControl.Settled) uses this as its cut/sync backbone; an eased verb
+        // returns immediately and the runner waits for this signal. Note: eased animations only
+        // advance while the window is actively rendering (the compositor frame loop drives
+        // RequestAnimationFrame) — which is always true while recording a demo. If the window is
+        // backgrounded the loop can stall mid-animation; the runner's per-step timeout covers that.
         else if (_wasAnimating) AnimationSettled?.Invoke();
         _wasAnimating = stillAnimating;
     }
 
-    /// <summary>True while the most recent animation frame reported StillAnimating, so the
-    /// next idle frame can raise <see cref="AnimationSettled"/> once on the falling edge.</summary>
+    /// <summary>True while the previous animation frame was still animating, so the next idle
+    /// frame raises <see cref="AnimationSettled"/> once on the falling edge.</summary>
     private bool _wasAnimating;
 
     /// <summary>Raised once when an eased camera animation completes. Drives
