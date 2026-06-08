@@ -4,6 +4,7 @@ using Avalonia.Markup.Xaml;
 using Avalonia.Styling;
 using Avalonia.Threading;
 using RailReader.Core;
+using RailReader.Core.Models;
 using RailReader.Core.Services;
 using RailReader2.ControlBus;
 using RailReader2.ViewModels;
@@ -16,6 +17,22 @@ public partial class App : Application
     // Held for lifetime + disposal when the optional --control-bus server is running.
     private ViewModelControl? _control;
     private DBusControlServer? _controlServer;
+
+    /// <summary>The desktop ships <see cref="RenderQuality.High"/> as its baseline, overriding Core's
+    /// <see cref="RenderQuality.Quality"/> default. Kept in sync with the Reset-to-Defaults path in
+    /// <see cref="Views.SettingsWindow"/>.</summary>
+    internal const RenderQuality DefaultRenderQuality = RenderQuality.High;
+
+    /// <summary>True only on a genuine first run — when no config file exists yet. On that first run
+    /// the desktop seeds <see cref="DefaultRenderQuality"/> so the user gets High rather than Core's
+    /// Quality. Any existing config is left untouched (pre-0.24.0 configs simply fall through to Core's
+    /// Quality), so an explicit selection is never clobbered. Keyed on file existence rather than the
+    /// serialized field, so it can't silently re-seed if Core ever renames the persisted property.</summary>
+    private static bool IsFirstRun()
+    {
+        try { return !System.IO.File.Exists(AppConfig.ConfigPath); }
+        catch { return false; } // unreadable path → treat as existing, never re-seed over a possible config
+    }
 
     public override void Initialize()
     {
@@ -39,7 +56,15 @@ public partial class App : Application
                 // Yield once to let the splash paint
                 await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Background);
 
+                // Decide BEFORE Load (which may persist a fresh default file), so we only seed
+                // the desktop render-quality default on a true first run (no config yet).
+                bool seedRenderQuality = IsFirstRun();
                 var config = AppConfig.Load();
+                if (seedRenderQuality)
+                {
+                    config.RenderQuality = DefaultRenderQuality;
+                    config.Save();
+                }
                 Application.Current!.RequestedThemeVariant =
                     config.DarkMode ? ThemeVariant.Dark : ThemeVariant.Light;
                 CleanupService.RunCleanup();

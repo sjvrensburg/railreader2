@@ -81,6 +81,10 @@ public partial class SettingsWindow : Window
         PageCacheRadius.Value = c.PageCacheRadius;
         EffectCombo.SelectedIndex = (int)c.ColourEffect;
         IntensitySlider.Value = c.ColourEffectIntensity;
+        RenderQualityCombo.SelectedIndex = (int)c.RenderQuality;
+        CustomMaxDpi.Value = c.CustomMaxRenderDpi;
+        CustomTierStep.Value = c.CustomRenderTierStep;
+        UpdateCustomRenderPanel(c.RenderQuality);
         PixelSnappingCheck.IsChecked = c.PixelSnapping;
         MarginCroppingCheck.IsChecked = c.MarginCropping;
         LineFocusBlurCheck.IsChecked = c.LineFocusBlur;
@@ -325,6 +329,32 @@ public partial class SettingsWindow : Window
         SaveToConfig();
     }
 
+    // --- Render quality ---
+
+    private void UpdateCustomRenderPanel(RenderQuality quality)
+        => CustomRenderPanel.IsVisible = quality == RenderQuality.Custom;
+
+    private void OnRenderQualityChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (Vm is not { } vm || _loading) return;
+        var quality = (RenderQuality)RenderQualityCombo.SelectedIndex;
+        vm.AppConfig.RenderQuality = quality;
+        UpdateCustomRenderPanel(quality);
+        // OnConfigChanged → ToCoreSettings → controller.OnConfigChanged invalidates the
+        // page cache, so the open page re-rasterises at the new DPI with no restart.
+        vm.OnConfigChanged();
+    }
+
+    private void OnCustomRenderChanged(object? sender, NumericUpDownValueChangedEventArgs e)
+    {
+        if (Vm is not { } vm || _loading) return;
+        // NumericUpDown Minimum/Maximum already constrain entry; clamp defensively so a
+        // mid-edit null or stray value can never push Core below its 150 DPI / step-1 floor.
+        vm.AppConfig.CustomMaxRenderDpi = (int)Math.Clamp(CustomMaxDpi.Value ?? 600m, 150m, 1200m);
+        vm.AppConfig.CustomRenderTierStep = (int)Math.Clamp(CustomTierStep.Value ?? 75m, 1m, 300m);
+        vm.OnConfigChanged();
+    }
+
     private void OnResetDefaults(object? sender, RoutedEventArgs e)
     {
         if (Vm is not { } vm) return;
@@ -342,6 +372,9 @@ public partial class SettingsWindow : Window
         vm.AppConfig.ColourEffect = defaults.ColourEffect;
         vm.Controller.SetColourEffect(defaults.ColourEffect);
         vm.AppConfig.ColourEffectIntensity = defaults.ColourEffectIntensity;
+        vm.AppConfig.RenderQuality = App.DefaultRenderQuality; // desktop ships High, not Core's Quality
+        vm.AppConfig.CustomMaxRenderDpi = defaults.CustomMaxRenderDpi;
+        vm.AppConfig.CustomRenderTierStep = defaults.CustomRenderTierStep;
         vm.AppConfig.MotionBlur = defaults.MotionBlur;
         vm.AppConfig.MotionBlurIntensity = defaults.MotionBlurIntensity;
         vm.AppConfig.NavigableRoles = new HashSet<BlockRole>(DefaultRoleSets.Navigable);

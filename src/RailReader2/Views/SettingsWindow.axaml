@@ -64,6 +64,55 @@
                 </ScrollViewer>
             </TabItem>
 
+            <!-- Rendering Tab -->
+            <TabItem Header="Rendering">
+                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Spacing="8" Margin="16">
+                        <TextBlock Text="Render Quality" FontWeight="Bold" />
+                        <Separator />
+                        <TextBlock TextWrapping="Wrap" FontSize="11" Opacity="0.7"
+                                   Text="Higher presets re-rasterise pages at a greater DPI cap for sharper text and deeper zoom, at the cost of more memory and more frequent re-renders. Changes apply to the open page immediately." />
+                        <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto">
+                            <TextBlock Grid.Column="0" Text="Preset:" VerticalAlignment="Center" />
+                            <ComboBox Grid.Column="2" Name="RenderQualityCombo" Width="260"
+                                      HorizontalAlignment="Left" SelectionChanged="OnRenderQualityChanged">
+                                <ComboBoxItem Content="Ultra — 800 DPI / 50 step"
+                                              ToolTip.Tip="Maximum fidelity, high-resolution output and deep zoom. Highest memory use." />
+                                <ComboBoxItem Content="Quality — 600 DPI / 75 step"
+                                              ToolTip.Tip="High-fidelity baseline." />
+                                <ComboBoxItem Content="High — 525 DPI / 85 step"
+                                              ToolTip.Tip="Default. Crisp text with a lighter memory footprint than Quality." />
+                                <ComboBoxItem Content="Balanced — 450 DPI / 100 step"
+                                              ToolTip.Tip="A middle ground between sharpness and fluidity." />
+                                <ComboBoxItem Content="Medium — 400 DPI / 125 step"
+                                              ToolTip.Tip="Favours responsiveness; softer at deep zoom." />
+                                <ComboBoxItem Content="Performance — 350 DPI / 150 step"
+                                              ToolTip.Tip="Fewer re-rasters, favours fluidity. Lowest memory use." />
+                                <ComboBoxItem Content="Custom…"
+                                              ToolTip.Tip="Set your own max DPI and tier step below." />
+                            </ComboBox>
+                        </Grid>
+                        <Grid Name="CustomRenderPanel" IsVisible="False"
+                              ColumnDefinitions="Auto,8,*" RowDefinitions="Auto,4,Auto,4,Auto">
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Max render DPI:" VerticalAlignment="Center" />
+                            <NumericUpDown Grid.Row="0" Grid.Column="2" Name="CustomMaxDpi"
+                                           Minimum="150" Maximum="1200" Increment="25"
+                                           FormatString="F0" Width="130" HorizontalAlignment="Left"
+                                           ValueChanged="OnCustomRenderChanged" />
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Tier step (DPI):" VerticalAlignment="Center" />
+                            <NumericUpDown Grid.Row="2" Grid.Column="2" Name="CustomTierStep"
+                                           Minimum="1" Maximum="300" Increment="5"
+                                           FormatString="F0" Width="130" HorizontalAlignment="Left"
+                                           ValueChanged="OnCustomRenderChanged" />
+                            <TextBlock Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="3"
+                                       TextWrapping="Wrap" FontSize="11" Opacity="0.7"
+                                       Text="Max DPI is clamped to 150–1200; tier step to ≥ 1. Smaller tier steps render more crisply at intermediate zoom but re-raster more often." />
+                        </Grid>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
             <!-- Rail Reading Tab -->
             <TabItem Header="Rail Reading">
                 <ScrollViewer VerticalScrollBarVisibility="Auto"
