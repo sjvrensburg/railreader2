@@ -28,7 +28,7 @@ public sealed class ScriptRecorder
     private readonly Dictionary<Key, (double down, KeyModifiers mods)> _pressed = [];
     private string? _source;
 
-    private enum Kind { Open, Tap, Hold }
+    private enum Kind { Open, Tap, Hold, Frame }
     private readonly record struct Entry(double Start, double End, Kind Kind, string Text);
 
     /// <summary>Record the document opened (the first becomes the script's <c>source:</c>).</summary>
@@ -61,6 +61,20 @@ public sealed class ScriptRecorder
             string chord = KeyChord.Format(key, d.mods);
             var kind = (up - d.down) >= TapThresholdMs ? Kind.Hold : Kind.Tap;
             _entries.Add(new Entry(d.down, up, kind, chord));
+        }
+    }
+
+    /// <summary>Record a double-click "frame this block" gesture (smooth zoom into rail mode at the
+    /// block's start) as a <c>frame_block</c> step — the mouse-driven way to zoom onto a specific
+    /// block, which the keyboard can't do. <paramref name="blockIndex"/> is the current-page block
+    /// index (Core's <c>analysis.Blocks</c> / <c>SmoothlyFrameBlock</c> index space).</summary>
+    public void RecordFrameBlock(int blockIndex)
+    {
+        lock (_gate)
+        {
+            double t = _clock.Elapsed.TotalMilliseconds;
+            _entries.Add(new Entry(t, t, Kind.Frame,
+                blockIndex.ToString(CultureInfo.InvariantCulture)));
         }
     }
 
@@ -106,6 +120,11 @@ public sealed class ScriptRecorder
                     break;
                 case Kind.Tap:
                     w.WriteLine($"  - key: {e.Text}");
+                    cursor = e.End;
+                    break;
+                case Kind.Frame:
+                    // Auto-fit zoom (no zoom: arg); add e.g. `zoom: 12` when tuning for a hero shot.
+                    w.WriteLine($"  - frame_block: {{ index: {e.Text} }}");
                     cursor = e.End;
                     break;
                 case Kind.Hold:

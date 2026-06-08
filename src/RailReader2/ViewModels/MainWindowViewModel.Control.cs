@@ -18,10 +18,10 @@ public sealed partial class MainWindowViewModel
 
     /// <summary>Smoothly frame a block by index on the current page using rail's exact framing
     /// and the app-native eased zoom. Returns true if the block could be framed.</summary>
-    public bool SmoothlyFrameBlock(int pageBlockIndex, double? zoom = null)
+    public bool SmoothlyFrameBlock(int pageBlockIndex, double? zoom = null, double? durationMs = null)
     {
         bool ok = false;
-        Dispatch(() => ok = _controller.SmoothlyFrameBlock(pageBlockIndex, zoom),
+        Dispatch(() => ok = _controller.SmoothlyFrameBlock(pageBlockIndex, zoom, durationMs),
             InvalidateCameraAndTab, animate: true);
         return ok;
     }
