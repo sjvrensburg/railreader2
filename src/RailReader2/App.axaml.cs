@@ -4,6 +4,7 @@ using Avalonia.Markup.Xaml;
 using Avalonia.Styling;
 using Avalonia.Threading;
 using RailReader.Core;
+using RailReader.Core.Models;
 using RailReader.Core.Services;
 using RailReader2.ControlBus;
 using RailReader2.ViewModels;
@@ -16,6 +17,28 @@ public partial class App : Application
     // Held for lifetime + disposal when the optional --control-bus server is running.
     private ViewModelControl? _control;
     private DBusControlServer? _controlServer;
+
+    /// <summary>The desktop ships <see cref="RenderQuality.High"/> as its baseline, overriding Core's
+    /// <see cref="RenderQuality.Quality"/> default. Kept in sync with the Reset-to-Defaults path in
+    /// <see cref="Views.SettingsWindow"/>.</summary>
+    internal const RenderQuality DefaultRenderQuality = RenderQuality.High;
+
+    /// <summary>True when the on-disk config already records a render-quality choice — i.e. the file
+    /// exists and carries the <c>render_quality</c> key. False for a fresh install or a config written
+    /// before 0.24.0, in which case the desktop seeds <see cref="DefaultRenderQuality"/> so the user
+    /// gets High rather than Core's Quality, without ever clobbering an explicit selection.</summary>
+    private static bool RenderQualityChosen()
+    {
+        try
+        {
+            var path = AppConfig.ConfigPath;
+            if (!System.IO.File.Exists(path)) return false;
+            using var doc = System.Text.Json.JsonDocument.Parse(System.IO.File.ReadAllText(path));
+            return doc.RootElement.ValueKind == System.Text.Json.JsonValueKind.Object
+                && doc.RootElement.TryGetProperty("render_quality", out _);
+        }
+        catch { return false; }
+    }
 
     public override void Initialize()
     {
@@ -39,7 +62,15 @@ public partial class App : Application
                 // Yield once to let the splash paint
                 await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Background);
 
+                // Detect an existing render-quality choice BEFORE Load (which may persist a
+                // fresh default file), so we only seed the desktop default on a true first run.
+                bool seedRenderQuality = !RenderQualityChosen();
                 var config = AppConfig.Load();
+                if (seedRenderQuality)
+                {
+                    config.RenderQuality = DefaultRenderQuality;
+                    config.Save();
+                }
                 Application.Current!.RequestedThemeVariant =
                     config.DarkMode ? ThemeVariant.Dark : ThemeVariant.Light;
                 CleanupService.RunCleanup();

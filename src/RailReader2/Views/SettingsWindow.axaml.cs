@@ -372,7 +372,7 @@ public partial class SettingsWindow : Window
         vm.AppConfig.ColourEffect = defaults.ColourEffect;
         vm.Controller.SetColourEffect(defaults.ColourEffect);
         vm.AppConfig.ColourEffectIntensity = defaults.ColourEffectIntensity;
-        vm.AppConfig.RenderQuality = defaults.RenderQuality;
+        vm.AppConfig.RenderQuality = App.DefaultRenderQuality; // desktop ships High, not Core's Quality
         vm.AppConfig.CustomMaxRenderDpi = defaults.CustomMaxRenderDpi;
         vm.AppConfig.CustomRenderTierStep = defaults.CustomRenderTierStep;
         vm.AppConfig.MotionBlur = defaults.MotionBlur;

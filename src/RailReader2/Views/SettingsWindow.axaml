@@ -60,8 +60,16 @@
                                     Value="1.0" MinWidth="120"
                                     PropertyChanged="OnIntensityChanged" />
                         </Grid>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
 
-                        <TextBlock Text="Render Quality" FontWeight="Bold" Margin="0,12,0,0" />
+            <!-- Rendering Tab -->
+            <TabItem Header="Rendering">
+                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Spacing="8" Margin="16">
+                        <TextBlock Text="Render Quality" FontWeight="Bold" />
                         <Separator />
                         <TextBlock TextWrapping="Wrap" FontSize="11" Opacity="0.7"
                                    Text="Higher presets re-rasterise pages at a greater DPI cap for sharper text and deeper zoom, at the cost of more memory and more frequent re-renders. Changes apply to the open page immediately." />
@@ -72,9 +80,9 @@
                                 <ComboBoxItem Content="Ultra — 800 DPI / 50 step"
                                               ToolTip.Tip="Maximum fidelity, high-resolution output and deep zoom. Highest memory use." />
                                 <ComboBoxItem Content="Quality — 600 DPI / 75 step"
-                                              ToolTip.Tip="Default. High-fidelity baseline." />
+                                              ToolTip.Tip="High-fidelity baseline." />
                                 <ComboBoxItem Content="High — 525 DPI / 85 step"
-                                              ToolTip.Tip="Slightly lighter than Quality." />
+                                              ToolTip.Tip="Default. Crisp text with a lighter memory footprint than Quality." />
                                 <ComboBoxItem Content="Balanced — 450 DPI / 100 step"
                                               ToolTip.Tip="A middle ground between sharpness and fluidity." />
                                 <ComboBoxItem Content="Medium — 400 DPI / 125 step"
