@@ -34,6 +34,8 @@
   --grain-opacity: 0.035;
   --grain-blend: multiply;
   --lightbox-bg: rgba(33, 28, 21, 0.86);
+  --bloom-1: rgba(200, 119, 46, 0.18);
+  --bloom-2: rgba(214, 150, 92, 0.12);
 }
 
 /* ---- Dark theme — paper at night / espresso ---- */
@@ -56,6 +58,8 @@
   --grain-opacity: 0.05;
   --grain-blend: soft-light;
   --lightbox-bg: rgba(12, 9, 6, 0.9);
+  --bloom-1: rgba(224, 149, 74, 0.22);
+  --bloom-2: rgba(224, 149, 74, 0.10);
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -64,6 +68,11 @@ html { scroll-behavior: smooth; }
 
 body {
   background-color: var(--bg);
+  /* Warm gradient atmosphere behind the hero (full-bleed, top of page) */
+  background-image:
+    radial-gradient(42% 32% at 82% 2%, var(--bloom-1), transparent 70%),
+    radial-gradient(38% 26% at 4% 14%, var(--bloom-2), transparent 70%);
+  background-repeat: no-repeat;
   color: var(--fg);
   font-family: var(--font-body);
   font-size: 17px;
@@ -289,10 +298,10 @@ a:hover { color: var(--accent); text-decoration: underline; }
 .hero {
   max-width: var(--max-width);
   margin: 0 auto;
-  padding: 2rem 1.5rem 3.5rem;
+  padding: 2.5rem 1.5rem 4rem;
   display: grid;
-  grid-template-columns: minmax(0, 1.02fr) minmax(0, 0.98fr);
-  gap: 3rem;
+  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+  gap: 3.2rem;
   align-items: center;
 }
 /* Left column: text, threaded by a vertical "reading rail" */
@@ -342,8 +351,9 @@ a:hover { color: var(--accent); text-decoration: underline; }
   align-items: center;
 }
 
-/* Right column: the demo, framed like an app window */
+/* Right column: the product, framed like an app window */
 .hero__media { min-width: 0; }
+.hero__media img { cursor: zoom-in; }
 .frame {
   background: var(--card-bg);
   border: 1px solid var(--card-border);
