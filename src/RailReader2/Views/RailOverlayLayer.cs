@@ -37,6 +37,14 @@ internal sealed class RailOverlayVisualHandler : CompositionCustomVisualHandler
 {
     private RailOverlayRenderState? _state;
 
+    // ColourEffect.GetOverlayPalette() allocates a fresh OverlayPalette (reference type)
+    // each call; this runs on the composition thread every frame while rail-reading
+    // (the camera animates per line advance). Cache by effect — the palette only changes
+    // when the user cycles colour effects (C). Matches the ThreadStatic-cache pattern in
+    // PdfPageVisualHandler.
+    [ThreadStatic] private static OverlayPalette? s_cachedPalette;
+    [ThreadStatic] private static ColourEffect s_cachedPaletteEffect;
+
     public override void OnMessage(object message)
     {
         if (message is RailOverlayRenderState state)
@@ -64,7 +72,12 @@ internal sealed class RailOverlayVisualHandler : CompositionCustomVisualHandler
 
         if (state.CurrentBlock is { } block)
         {
-            var palette = state.Effect.GetOverlayPalette();
+            if (s_cachedPalette is null || s_cachedPaletteEffect != state.Effect)
+            {
+                s_cachedPalette = state.Effect.GetOverlayPalette();
+                s_cachedPaletteEffect = state.Effect;
+            }
+            var palette = s_cachedPalette;
             OverlayRenderer.DrawRailOverlays(
                 canvas, block, state.CurrentLine,
                 state.PageW, state.PageH, palette,
