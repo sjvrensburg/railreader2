@@ -249,130 +249,79 @@
       <div class="feature" data-reveal>
         <h3>Line Highlight Tint</h3>
         <p>
-          Configurable colour tint on the active line in rail mode — Auto,
-          Yellow, Cyan, Green, or None. Auto adapts to the active colour effect.
-          Adjustable opacity for subtle or prominent highlighting.
+          A colour tint on the active line — Auto, Yellow, Cyan, Green, or None, at adjustable opacity. Auto follows the active colour effect.
         </p>
       </div>
       <div class="feature" data-reveal>
         <h3>Auto-Scroll &amp; Speed Control</h3>
         <p>
-          Toggle continuous horizontal scrolling with the P key or the toolbar
-          button. Hold D or Right to boost speed. Pauses briefly at line and block
-          boundaries for eye settling — narrow blocks like equations and
-          headings get proportional dwell time. Scroll speed is zoom-independent,
-          so reading pace stays consistent at any magnification. Adjust speed via
-          the docked slider toolbar, <code>[</code> / <code>]</code> keys
-          (&plusmn;5), or <code>Ctrl+[</code> / <code>]</code> for fine
-          adjustments (&plusmn;1). Auto-scroll and jump mode are mutually exclusive.
+          Continuous horizontal scrolling (<code>P</code>), pausing briefly at line and block edges. Speed is zoom-independent and tunable with <code>[</code> / <code>]</code>; hold <code>D</code> to boost.
         </p>
       </div>
       <div class="feature" data-reveal>
         <h3>Jump Mode &amp; Line Focus</h3>
         <p>
-          Press J or the toolbar button to toggle saccade-style jump navigation
-          — advance by a configurable percentage of the visible width.
-          Enable line focus dim (F button) to smoothly fade non-active lines,
-          reducing peripheral distraction. Toggle the line highlight
-          independently with the H key. All modes have quick-toggle
-          buttons on the rail toolbar.
+          Saccade-style jumps (<code>J</code>) advance by a set fraction of the view. Line-focus dim (<code>F</code>) fades inactive lines; toggle the highlight with <code>H</code>.
         </p>
       </div>
       <div class="feature" data-reveal>
         <h3>Render Quality</h3>
         <p>
-          PDF pages are rasterised by PDFium at a DPI proportional to zoom,
-          up to a configurable render-quality preset (default caps at
-          525&nbsp;DPI; up to 800&nbsp;DPI, or higher with a Custom preset).
-          Pan and zoom are compositor-level transforms — sharp and
-          smooth at any magnification.
+          PDFium rasterises at a DPI proportional to zoom, up to a configurable preset (default 525&nbsp;DPI, up to 800 — or Custom). Pan and zoom stay GPU-smooth and sharp.
         </p>
       </div>
       <div class="feature" data-reveal>
         <h3>Configurable Navigation</h3>
         <p>
-          Choose which block types are navigable in rail mode and which are
-          horizontally centered when narrow. Adjust zoom thresholds, scroll
-          speeds, and snap animation timing. Hold <code>Down</code>/<code>S</code>
-          at the last line of a page to advance to the next page automatically.
-          Settings persist across sessions.
+          Choose which block types are navigable and which centre when narrow; tune zoom thresholds, scroll speed, and snap timing. Settings persist.
         </p>
       </div>
       <div class="feature" data-reveal>
         <h3>Margin Cropping</h3>
         <p>
-          Eliminate wasted whitespace by fitting the viewport to the detected
-          content area instead of the full page. Computed from layout analysis,
-          so it adapts per document and never clips content. Toggle with
-          <code>Ctrl+Shift+M</code>.
+          Fit the viewport to the detected content instead of the full page — no wasted whitespace, computed per document so it never clips. Toggle <code>Ctrl+Shift+M</code>.
         </p>
       </div>
       <div class="feature" data-reveal>
         <h3>Named Bookmarks</h3>
         <p>
-          Bookmark any page with a custom name. Navigate to bookmarks from a
-          dedicated panel tab alongside the outline. "Back to previous location"
-          for quick return after jumping. Bookmarks persist across sessions.
+          Bookmark any page with a name and jump to it from the side panel. "Back to previous location" returns you after a jump. Persists across sessions.
         </p>
       </div>
       <div class="feature" data-reveal>
         <h3>Copy as LaTeX</h3>
         <p>
-          Send any detected equation, table, or figure to a Vision Language
-          Model and copy the result to the clipboard. Equations become LaTeX,
-          tables become Markdown, figures get a description. Works with
-          cloud APIs (OpenAI <code>gpt-5.4-nano-2026-03-17</code> recommended for accuracy)
-          or local models for privacy. See the
-          <a href="https://github.com/sjvrensburg/railreader2/blob/main/docs/vllm-guide.md">setup guide</a>
-          for all options.
+          Send any equation, table, or figure to a vision model — LaTeX, Markdown, or a description, straight to the clipboard. Cloud or local API; see the <a href="https://github.com/sjvrensburg/railreader2/blob/main/docs/vllm-guide.md">setup guide</a>.
         </p>
       </div>
       <div class="feature" data-reveal>
         <h3>Smooth Zoom &amp; Dark Mode</h3>
         <p>
-          All zoom actions animate smoothly over 180ms with cubic ease-out.
-          Rapid scroll inputs accumulate fluidly. Toggle a dark UI theme in
-          Settings for comfortable use in low-light environments.
+          Every zoom animates over 180ms with cubic ease-out, and rapid inputs accumulate fluidly. A dark UI theme is one click away in Settings.
         </p>
       </div>
       <div class="feature" data-reveal>
         <h3>Text Selection &amp; Copy</h3>
         <p>
-          Switch to Text Select mode via the floating toolbar to select and
-          copy text from PDF pages. The toolbar provides Browse, Text Select,
-          and Copy buttons with clear visual feedback for the active mode.
+          Switch to Text Select on the floating toolbar to select and copy text from any page, with clear feedback for the active mode.
         </p>
       </div>
       <div class="feature" data-reveal>
         <h3>Motion Blur</h3>
         <p>
-          Subtle directional blur during horizontal scroll (including
-          auto-scroll) and uniform blur during zoom for perceptual smoothness.
-          Adjustable via <code>Shift+[</code> / <code>]</code> or
-          <code>Ctrl+Shift+[</code> / <code>]</code> for fine control.
-          Configurable intensity via Settings, or disable entirely.
+          Subtle directional blur on scroll and zoom for perceptual smoothness. Adjust with <code>Shift+[</code> / <code>]</code>, or turn it off.
         </p>
       </div>
       <div class="feature" data-reveal>
         <h3>Diagnostic Logging</h3>
         <p>
-          A session log file captures all activity for troubleshooting.
-          Export via <strong>Help &rarr; Export Diagnostic Log</strong>,
-          or copy the log file path from the About dialog to attach to
-          bug reports.
+          Each session writes a log for troubleshooting. Export it from <strong>Help &rarr; Export Diagnostic Log</strong> to attach to a bug report.
         </p>
       </div>
       <div class="feature" data-reveal>
         <h3>Headless Core Library</h3>
         <p>
-          All business logic lives in a rendering-agnostic core library
-          (<code>RailReader.Core</code>) with zero Avalonia or SkiaSharp
-          dependencies. A separate <code>RailReader.Renderer.Skia</code>
-          project implements rendering interfaces. Fully testable —
-          a comprehensive xUnit suite runs without a display server. A standalone
-          <strong>CLI tool</strong> leverages the same core for headless
-          rendering, structure extraction, annotation export, and batch
-          VLM transcription of equations, tables, and figures.
+          All logic lives in a rendering-agnostic <code>RailReader.Core</code> (zero Avalonia/SkiaSharp), fully unit-tested without a display. A standalone <strong>CLI</strong> reuses it for rendering, extraction, and batch VLM transcription.
         </p>
       </div>
     </div>
