@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Story — railreader2</title>
+  <meta name="description" content="Why railreader2 exists — a desktop PDF reader for high-magnification academic reading, built by a statistics lecturer almost entirely with an AI coding agent.">
+  <meta name="author" content="Stéfan Janse van Rensburg">
+  <link rel="canonical" href="https://sjvrensburg.github.io/railreader2/about.html">
+  <link rel="icon" href="img/logo.png" type="image/png">
+  <link rel="sitemap" type="application/xml" href="sitemap.xml">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://sjvrensburg.github.io/railreader2/about.html">
+  <meta property="og:title" content="The Story — railreader2">
+  <meta property="og:description" content="Why railreader2 exists — high-magnification academic reading, built by a statistics lecturer almost entirely with an AI coding agent.">
+  <meta property="og:image" content="https://sjvrensburg.github.io/railreader2/img/rail_mode.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="The Story — railreader2">
+  <meta name="twitter:description" content="Why railreader2 exists — high-magnification academic reading, built almost entirely with an AI coding agent.">
+  <meta name="twitter:image" content="https://sjvrensburg.github.io/railreader2/img/rail_mode.png">
+  <meta name="theme-color" content="#f4eee2">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..600;1,9..144,400..600&family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script>
+    (function () {
+      var stored = localStorage.getItem('rr2-theme');
+      var theme = stored || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+      document.documentElement.setAttribute('data-theme', theme);
+    })();
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "AboutPage",
+        "name": "The Story — railreader2",
+        "url": "https://sjvrensburg.github.io/railreader2/about.html",
+        "about": {
+          "@type": "SoftwareApplication",
+          "name": "railreader2",
+          "url": "https://sjvrensburg.github.io/railreader2/"
+        },
+        "author": { "@type": "Person", "name": "Stéfan Janse van Rensburg" }
+      },
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "railreader2", "item": "https://sjvrensburg.github.io/railreader2/" },
+          { "@type": "ListItem", "position": 2, "name": "The Story", "item": "https://sjvrensburg.github.io/railreader2/about.html" }
+        ]
+      }
+    ]
+  }
+  </script>
+</head>
+<body>
+
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+
+  <!-- Header -->
+  <header class="header">
+    <div class="header__left">
+      <a href="index.html" class="header__logo" style="text-decoration:none;"><img src="img/logo.png" alt="railreader2 icon" width="56" height="30">railreader2</a>
+      <nav>
+        <a href="index.html">Home</a>
+        <a href="index.html#overview">Overview</a>
+        <a href="index.html#features">Features</a>
+        <a href="index.html#getting-started">Get Started</a>
+        <a href="guide.html">User Guide</a>
+        <a href="https://github.com/sjvrensburg/railreader2">GitHub</a>
+      </nav>
+    </div>
+    <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle light/dark mode" title="Toggle light/dark mode">
+      <span id="theme-icon"></span>
+    </button>
+  </header>
+
+  <main id="main-content">
+    <article class="content">
+      <h1>Why I built this</h1>
+      <p class="subtitle">The story behind railreader2.</p>
+
+      <div class="story">
+        <p>
+          I'm a statistics lecturer at Nelson Mandela University in South Africa.
+          I prefer to read academic PDFs at high magnification — it's simply
+          more comfortable for me — but high magnification turns even simple
+          reading into a navigation puzzle. You lose context, scrolling becomes
+          inefficient, and most viewers simply aren't designed for sustained use
+          at 3&times; zoom and above.
+        </p>
+        <p>
+          The problem isn't unique to people with visual impairments. Anyone who
+          works with dense academic documents — papers packed with equations,
+          tables, and multi-column layouts — can benefit from structured, guided
+          navigation at higher zoom levels. Standard PDF viewers just aren't built
+          for this kind of sustained, focused reading.
+        </p>
+        <p>
+          railreader2 solves this with <strong>AI-guided rail reading</strong>: a
+          layout-analysis model
+          (<a href="https://github.com/sjvrensburg/railreader2/blob/main/docs/heron-layout-model.md">Docling Heron-INT8</a>
+          by default, with
+          <a href="https://huggingface.co/PaddlePaddle/PP-DocLayoutV3">PP-DocLayoutV3</a>
+          as an alternative) detects text blocks and reading order, then the viewer
+          guides you through the document line by line, block by block. It's not a
+          screen magnifier — it's a purpose-built reading environment that
+          understands document structure.
+        </p>
+        <p>
+          There's an "AI inception" to the whole project: railreader2 was built
+          almost entirely with
+          <a href="https://docs.anthropic.com/en/docs/claude-code">Claude Code</a>,
+          an AI coding agent. So an AI agent wrote the code for an app that itself
+          leverages an AI vision model to function. It's a small example of how
+          AI-assisted development can bring niche, genuinely needed tools into
+          existence when the traditional software market would never justify
+          building them.
+        </p>
+      </div>
+
+      <div class="note">
+        <strong>A note on accessibility:</strong> railreader2 includes features that
+        help readers with visual impairments — colour filters, line focus, high-contrast
+        modes — but it is designed for <em>comfortable</em> reading at high magnification,
+        not as a full assistive-technology solution. It is not a screen magnifier and may
+        not suit users who need dedicated software with screen-reader integration, cursor
+        tracking, or system-wide magnification.
+      </div>
+
+      <p style="margin-top:2.5rem;">
+        <a href="index.html#getting-started" class="btn btn--primary">Get railreader2</a>
+        &nbsp;&nbsp;<a href="index.html">&larr; Back to home</a>
+      </p>
+    </article>
+  </main>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <p>
+      railreader2 &mdash;
+      <a href="https://github.com/sjvrensburg/railreader2">source</a> &middot;
+      <a href="https://github.com/sjvrensburg/railreader2/releases">releases</a> &middot;
+      <a href="https://apps.microsoft.com/store/detail/9P9J8KZ6RVZP">microsoft store</a> &middot;
+      <a href="privacy.html">privacy</a> &middot;
+      MIT License
+    </p>
+  </footer>
+
+  <script>
+    function applyTheme(theme) {
+      document.documentElement.setAttribute('data-theme', theme);
+      document.getElementById('theme-icon').textContent = theme === 'dark' ? '☀️' : '🌙';
+    }
+    function toggleTheme() {
+      var current = document.documentElement.getAttribute('data-theme');
+      var next = current === 'dark' ? 'light' : 'dark';
+      localStorage.setItem('rr2-theme', next);
+      applyTheme(next);
+    }
+    applyTheme(document.documentElement.getAttribute('data-theme') || 'light');
+  </script>
+</body>
+</html>

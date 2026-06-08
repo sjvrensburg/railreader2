@@ -18,9 +18,18 @@
   <meta name="twitter:title" content="User Guide — railreader2">
   <meta name="twitter:description" content="Complete user guide for railreader2 — AI-guided rail reading, colour effects, annotations, search, and keyboard shortcuts.">
   <meta name="twitter:image" content="https://sjvrensburg.github.io/railreader2/img/rail_mode.png">
+  <meta name="theme-color" content="#f4eee2">
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;600;700&family=Fira+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..600;1,9..144,400..600&family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
+  <script>
+    (function () {
+      var stored = localStorage.getItem('rr2-theme');
+      var theme = stored || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+      document.documentElement.setAttribute('data-theme', theme);
+    })();
+  </script>
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -75,7 +84,7 @@
 
   <header class="header">
     <div class="header__left">
-      <span class="header__logo"><img src="img/logo.png" alt="railreader2 icon" width="59" height="32">railreader2</span>
+      <span class="header__logo"><img src="img/logo.png" alt="railreader2 icon" width="56" height="30">railreader2</span>
       <nav>
         <a href="index.html">Home</a>
         <a href="#getting-started">Getting Started</a>
