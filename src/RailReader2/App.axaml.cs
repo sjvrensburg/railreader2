@@ -23,21 +23,15 @@ public partial class App : Application
     /// <see cref="Views.SettingsWindow"/>.</summary>
     internal const RenderQuality DefaultRenderQuality = RenderQuality.High;
 
-    /// <summary>True when the on-disk config already records a render-quality choice — i.e. the file
-    /// exists and carries the <c>render_quality</c> key. False for a fresh install or a config written
-    /// before 0.24.0, in which case the desktop seeds <see cref="DefaultRenderQuality"/> so the user
-    /// gets High rather than Core's Quality, without ever clobbering an explicit selection.</summary>
-    private static bool RenderQualityChosen()
+    /// <summary>True only on a genuine first run — when no config file exists yet. On that first run
+    /// the desktop seeds <see cref="DefaultRenderQuality"/> so the user gets High rather than Core's
+    /// Quality. Any existing config is left untouched (pre-0.24.0 configs simply fall through to Core's
+    /// Quality), so an explicit selection is never clobbered. Keyed on file existence rather than the
+    /// serialized field, so it can't silently re-seed if Core ever renames the persisted property.</summary>
+    private static bool IsFirstRun()
     {
-        try
-        {
-            var path = AppConfig.ConfigPath;
-            if (!System.IO.File.Exists(path)) return false;
-            using var doc = System.Text.Json.JsonDocument.Parse(System.IO.File.ReadAllText(path));
-            return doc.RootElement.ValueKind == System.Text.Json.JsonValueKind.Object
-                && doc.RootElement.TryGetProperty("render_quality", out _);
-        }
-        catch { return false; }
+        try { return !System.IO.File.Exists(AppConfig.ConfigPath); }
+        catch { return false; } // unreadable path → treat as existing, never re-seed over a possible config
     }
 
     public override void Initialize()
@@ -62,9 +56,9 @@ public partial class App : Application
                 // Yield once to let the splash paint
                 await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Background);
 
-                // Detect an existing render-quality choice BEFORE Load (which may persist a
-                // fresh default file), so we only seed the desktop default on a true first run.
-                bool seedRenderQuality = !RenderQualityChosen();
+                // Decide BEFORE Load (which may persist a fresh default file), so we only seed
+                // the desktop render-quality default on a true first run (no config yet).
+                bool seedRenderQuality = IsFirstRun();
                 var config = AppConfig.Load();
                 if (seedRenderQuality)
                 {
