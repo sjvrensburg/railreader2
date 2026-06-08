@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="light">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -18,9 +18,20 @@
   <meta name="twitter:title" content="railreader2 — AI-Guided Rail Reading PDF Viewer">
   <meta name="twitter:description" content="A desktop PDF viewer that uses deep learning layout analysis to guide high-magnification reading — line by line, block by block.">
   <meta name="twitter:image" content="https://sjvrensburg.github.io/railreader2/img/rail_mode.png">
+  <meta name="theme-color" content="#f4eee2">
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;600;700&family=Fira+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..600;1,9..144,400..600&family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
+  <noscript><style>[data-reveal]{opacity:1 !important;transform:none !important;}</style></noscript>
+  <script>
+    // Apply theme before first paint to avoid a flash of the wrong palette.
+    (function () {
+      var stored = localStorage.getItem('rr2-theme');
+      var theme = stored || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+      document.documentElement.setAttribute('data-theme', theme);
+    })();
+  </script>
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -75,43 +86,53 @@
 
   <!-- Hero -->
   <section class="hero">
-    <h1>AI-guided rail reading for PDFs</h1>
-    <p>
-      A desktop PDF viewer that uses deep learning layout analysis to guide
-      high-magnification reading &mdash; line by line, block by block.
-      Built for comfortable, sustained reading of academic documents.
+    <p class="kicker" data-rise="1">Desktop&nbsp;·&nbsp;Linux &amp; Windows&nbsp;·&nbsp;Free &amp; open source</p>
+    <h1 data-rise="2">Read papers the way they <span class="mark">deserve to be read</span>.</h1>
+    <p data-rise="3">
+      A desktop PDF viewer that uses deep-learning layout analysis to guide
+      high-magnification reading — line by line, block by block. Built for
+      calm, sustained reading of dense academic documents.
     </p>
-    <div class="hero__buttons">
+    <div class="hero__buttons" data-rise="4">
       <a href="https://github.com/sjvrensburg/railreader2/releases/latest" class="btn btn--primary">Download Latest Release</a>
-      <a href="https://apps.microsoft.com/store/detail/9P9J8KZ6RVZP" class="ms-store-badge"><img class="ms-badge-dark" src="https://get.microsoft.com/images/en-us%20dark.svg" alt="Get it from Microsoft" height="48"><img class="ms-badge-light" src="https://get.microsoft.com/images/en-us%20light.svg" alt="Get it from Microsoft" height="48"></a>
+      <a href="https://apps.microsoft.com/store/detail/9P9J8KZ6RVZP" class="ms-store-badge"><img class="ms-badge-dark" src="https://get.microsoft.com/images/en-us%20dark.svg" alt="Get it from Microsoft" height="46"><img class="ms-badge-light" src="https://get.microsoft.com/images/en-us%20light.svg" alt="Get it from Microsoft" height="46"></a>
       <a href="https://github.com/sjvrensburg/railreader2" class="btn btn--has-icon"><svg class="btn__icon" width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg> View Source</a>
     </div>
   </section>
 
-  <!-- Demo GIF -->
-  <section class="demo">
-    <div class="demo__container">
-      <img src="img/RailReader2_Demo.gif" alt="RailReader2 in action &mdash; AI-guided rail reading through an academic PDF at high magnification" width="480" height="270">
-      <p class="demo__caption">Rail mode in action &mdash; navigating an academic paper line by line at high magnification</p>
-    </div>
+  <!-- Demo GIF, framed like the app window -->
+  <section class="demo" data-rise>
+    <figure class="frame">
+      <div class="frame__bar" aria-hidden="true">
+        <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+        <span>railreader2 — rail mode</span>
+      </div>
+      <img src="img/RailReader2_Demo.gif" alt="RailReader2 in action — AI-guided rail reading through an academic PDF at high magnification" width="480" height="270">
+      <figcaption>Rail mode in action — navigating an academic paper line by line at high magnification.</figcaption>
+    </figure>
   </section>
+
+  <div class="rail-divider" role="presentation"></div>
 
   <!-- Why I built this -->
   <section class="section" id="story">
-    <h2>Why I built this</h2>
-    <div class="story">
+    <div class="section__head" data-reveal>
+      <p class="kicker">The story</p>
+      <h2>Why I built this</h2>
+    </div>
+    <div class="story" data-reveal>
       <p>
         I'm a statistics lecturer at Nelson Mandela University in South Africa.
-        I prefer to read academic PDFs at high magnification &mdash; it's simply
-        more comfortable for me &mdash; but high magnification turns even
+        I prefer to read academic PDFs at high magnification — it's simply
+        more comfortable for me — but high magnification turns even
         simple reading into a navigation puzzle. You lose context, scrolling
         becomes inefficient, and most viewers simply aren't designed for
         sustained use at 3&times; zoom and above.
       </p>
       <p>
         The problem isn't unique to people with visual impairments. Anyone who
-        works with dense academic documents &mdash; papers packed with
-        equations, tables, and multi-column layouts &mdash; can benefit from
+        works with dense academic documents — papers packed with
+        equations, tables, and multi-column layouts — can benefit from
         structured, guided navigation at higher zoom levels. Standard PDF
         viewers just aren't built for this kind of sustained, focused reading.
       </p>
@@ -122,7 +143,7 @@
         with <a href="https://huggingface.co/PaddlePaddle/PP-DocLayoutV3">PP-DocLayoutV3</a> as an alternative)
         detects text blocks and reading order, then the viewer guides you
         through the document line by line, block by block. It's not a screen
-        magnifier &mdash; it's a purpose-built reading environment that
+        magnifier — it's a purpose-built reading environment that
         understands document structure.
       </p>
       <p>
@@ -136,7 +157,7 @@
         market would never justify building them.
       </p>
     </div>
-    <div class="note">
+    <div class="note" data-reveal>
       <strong>A note on accessibility:</strong> While RailReader2 includes
       features that can help readers with visual impairments (colour filters,
       line focus, high contrast modes), it is primarily designed for
@@ -148,50 +169,48 @@
     </div>
   </section>
 
+  <div class="rail-divider" role="presentation"></div>
+
   <!-- Screenshots -->
   <section class="section" id="screenshots">
-    <h2>Screenshots</h2>
+    <div class="section__head" data-reveal>
+      <p class="kicker">A look inside</p>
+      <h2>Screenshots</h2>
+      <p>The same paper, read eight different ways — from full-page rendering to focused, line-by-line rail mode.</p>
+    </div>
     <div class="screenshots">
-      <div class="screenshots__row">
-        <figure class="screenshot">
-          <img src="img/full_page_view_no_analysis.png" alt="railreader2 rendering an academic PDF at full page zoom with sharp text and navigation controls visible" loading="lazy" width="1275" height="1649" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}">
-          <figcaption>Full page view &mdash; vector-sharp rendering at any zoom level</figcaption>
-        </figure>
-        <figure class="screenshot">
-          <img src="img/full_page_view_with_analysis.png" alt="railreader2 showing AI layout analysis overlay with detected text blocks, figures, and reading order numbers on an academic PDF" loading="lazy" width="1275" height="1649" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}">
-          <figcaption>Layout analysis &mdash; AI-detected blocks with reading order</figcaption>
-        </figure>
-      </div>
-      <div class="screenshots__row">
-        <figure class="screenshot">
-          <img src="img/rail_mode.png" alt="railreader2 rail mode navigating a text block line by line at high magnification with the current line highlighted" loading="lazy" width="1534" height="1186" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}">
-          <figcaption>Rail mode &mdash; line-by-line reading at high magnification</figcaption>
-        </figure>
-        <figure class="screenshot">
-          <img src="img/line_focus_blur.png" alt="railreader2 line focus dim effect fading non-active lines to reduce distraction during rail reading" loading="lazy" width="1534" height="1186" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}">
-          <figcaption>Line focus dim &mdash; non-active lines faded for focus</figcaption>
-        </figure>
-      </div>
-      <div class="screenshots__row">
-        <figure class="screenshot">
-          <img src="img/search_highlights.png" alt="railreader2 full-text search with sidebar results panel and highlighted matches on the PDF page" loading="lazy" width="1935" height="1229" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}">
-          <figcaption>Search &mdash; sidebar panel with grouped results and page highlights</figcaption>
-        </figure>
-        <figure class="screenshot">
-          <img src="img/annotations.png" alt="railreader2 annotation tools showing highlights, freehand pen marks, rectangles, and text notes on a PDF page" loading="lazy" width="1534" height="1186" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}">
-          <figcaption>Annotations &mdash; highlights, text notes, freehand, and more</figcaption>
-        </figure>
-      </div>
-      <div class="screenshots__row">
-        <figure class="screenshot">
-          <img src="img/colour_effects.png" alt="railreader2 amber colour filter applied to PDF content via GPU-accelerated shader" loading="lazy" width="1275" height="1649" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}">
-          <figcaption>Amber colour filter &mdash; GPU-accelerated, PDF content only</figcaption>
-        </figure>
-        <figure class="screenshot">
-          <img src="img/colour_effect_high_contrast.png" alt="railreader2 high contrast colour effect combined with rail mode for maximum readability" loading="lazy" width="1200" height="900" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}">
-          <figcaption>High contrast + rail &mdash; maximum readability</figcaption>
-        </figure>
-      </div>
+      <figure class="screenshot" data-reveal>
+        <img src="img/full_page_view_no_analysis.png" alt="railreader2 rendering an academic PDF at full page zoom with sharp text and navigation controls visible" loading="lazy" width="1275" height="1649" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}">
+        <figcaption>Full page view — vector-sharp rendering at any zoom level</figcaption>
+      </figure>
+      <figure class="screenshot" data-reveal>
+        <img src="img/full_page_view_with_analysis.png" alt="railreader2 showing AI layout analysis overlay with detected text blocks, figures, and reading order numbers on an academic PDF" loading="lazy" width="1275" height="1649" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}">
+        <figcaption>Layout analysis — AI-detected blocks with reading order</figcaption>
+      </figure>
+      <figure class="screenshot" data-reveal>
+        <img src="img/rail_mode.png" alt="railreader2 rail mode navigating a text block line by line at high magnification with the current line highlighted" loading="lazy" width="1534" height="1186" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}">
+        <figcaption>Rail mode — line-by-line reading at high magnification</figcaption>
+      </figure>
+      <figure class="screenshot" data-reveal>
+        <img src="img/line_focus_blur.png" alt="railreader2 line focus dim effect fading non-active lines to reduce distraction during rail reading" loading="lazy" width="1534" height="1186" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}">
+        <figcaption>Line focus dim — non-active lines faded for focus</figcaption>
+      </figure>
+      <figure class="screenshot" data-reveal>
+        <img src="img/search_highlights.png" alt="railreader2 full-text search with sidebar results panel and highlighted matches on the PDF page" loading="lazy" width="1935" height="1229" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}">
+        <figcaption>Search — sidebar panel with grouped results and page highlights</figcaption>
+      </figure>
+      <figure class="screenshot" data-reveal>
+        <img src="img/annotations.png" alt="railreader2 annotation tools showing highlights, freehand pen marks, rectangles, and text notes on a PDF page" loading="lazy" width="1534" height="1186" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}">
+        <figcaption>Annotations — highlights, text notes, freehand, and more</figcaption>
+      </figure>
+      <figure class="screenshot" data-reveal>
+        <img src="img/colour_effects.png" alt="railreader2 amber colour filter applied to PDF content via GPU-accelerated shader" loading="lazy" width="1275" height="1649" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}">
+        <figcaption>Amber colour filter — GPU-accelerated, PDF content only</figcaption>
+      </figure>
+      <figure class="screenshot" data-reveal>
+        <img src="img/colour_effect_high_contrast.png" alt="railreader2 high contrast colour effect combined with rail mode for maximum readability" loading="lazy" width="1200" height="900" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}">
+        <figcaption>High contrast + rail — maximum readability</figcaption>
+      </figure>
     </div>
   </section>
 
@@ -200,21 +219,27 @@
     <img id="lightbox-img" src="" alt="">
   </div>
 
+  <div class="rail-divider" role="presentation"></div>
+
   <!-- Features -->
   <section class="section" id="features">
-    <h2>Features</h2>
+    <div class="section__head" data-reveal>
+      <p class="kicker">Everything it does</p>
+      <h2>Features</h2>
+      <p>A focused reading environment, not a screen magnifier — built around document structure.</p>
+    </div>
     <div class="features">
-      <div class="feature">
+      <div class="feature" data-reveal>
         <h3>Rail Mode</h3>
         <p>
           Zoom in past the threshold and navigation locks to detected text blocks.
           Advance line by line with arrow keys or WASD. Hold left/right to scroll
           continuously with speed ramping. Hold <code>Ctrl</code> to temporarily
-          free-pan and zoom without rail constraints &mdash; release to snap back.
+          free-pan and zoom without rail constraints — release to snap back.
           Zooming preserves your reading position within the current line.
         </p>
       </div>
-      <div class="feature">
+      <div class="feature" data-reveal>
         <h3>AI Layout Detection</h3>
         <p>
           <a href="docs/heron-layout-model.md">Docling Heron-INT8</a> (default) or
@@ -225,20 +250,20 @@
           <a href="docs/heron-layout-model.md">layout model guide</a> for details.
         </p>
       </div>
-      <div class="feature">
+      <div class="feature" data-reveal>
         <h3>Line Highlight Tint</h3>
         <p>
-          Configurable colour tint on the active line in rail mode &mdash; Auto,
+          Configurable colour tint on the active line in rail mode — Auto,
           Yellow, Cyan, Green, or None. Auto adapts to the active colour effect.
           Adjustable opacity for subtle or prominent highlighting.
         </p>
       </div>
-      <div class="feature">
+      <div class="feature" data-reveal>
         <h3>Auto-Scroll &amp; Speed Control</h3>
         <p>
           Toggle continuous horizontal scrolling with the P key or the toolbar
           button. Hold D or Right to boost speed. Pauses briefly at line and block
-          boundaries for eye settling &mdash; narrow blocks like equations and
+          boundaries for eye settling — narrow blocks like equations and
           headings get proportional dwell time. Scroll speed is zoom-independent,
           so reading pace stays consistent at any magnification. Adjust speed via
           the docked slider toolbar, <code>[</code> / <code>]</code> keys
@@ -246,37 +271,37 @@
           adjustments (&plusmn;1). Auto-scroll and jump mode are mutually exclusive.
         </p>
       </div>
-      <div class="feature">
+      <div class="feature" data-reveal>
         <h3>Jump Mode &amp; Line Focus</h3>
         <p>
           Press J or the toolbar button to toggle saccade-style jump navigation
-          &mdash; advance by a configurable percentage of the visible width.
+          — advance by a configurable percentage of the visible width.
           Enable line focus dim (F button) to smoothly fade non-active lines,
           reducing peripheral distraction. Toggle the line highlight
           independently with the H key. All modes have quick-toggle
           buttons on the rail toolbar.
         </p>
       </div>
-      <div class="feature">
+      <div class="feature" data-reveal>
         <h3>Colour Effects</h3>
         <p>
-          GPU-accelerated colour filters &mdash; amber, high contrast, high
-          visibility, inverted &mdash; with adjustable intensity. Per-document:
+          GPU-accelerated colour filters — amber, high contrast, high
+          visibility, inverted — with adjustable intensity. Per-document:
           each tab keeps its own effect. Press <code>C</code> to cycle through
           effects quickly.
         </p>
       </div>
-      <div class="feature">
-        <h3>High-DPI Rendering</h3>
+      <div class="feature" data-reveal>
+        <h3>Render Quality</h3>
         <p>
           PDF pages are rasterised by PDFium at a DPI proportional to zoom,
           up to a configurable render-quality preset (default caps at
           525&nbsp;DPI; up to 800&nbsp;DPI, or higher with a Custom preset).
-          Pan and zoom are compositor-level transforms &mdash; sharp and
+          Pan and zoom are compositor-level transforms — sharp and
           smooth at any magnification.
         </p>
       </div>
-      <div class="feature">
+      <div class="feature" data-reveal>
         <h3>Configurable Navigation</h3>
         <p>
           Choose which block types are navigable in rail mode and which are
@@ -286,7 +311,7 @@
           Settings persist across sessions.
         </p>
       </div>
-      <div class="feature">
+      <div class="feature" data-reveal>
         <h3>Margin Cropping</h3>
         <p>
           Eliminate wasted whitespace by fitting the viewport to the detected
@@ -295,7 +320,7 @@
           <code>Ctrl+Shift+M</code>.
         </p>
       </div>
-      <div class="feature">
+      <div class="feature" data-reveal>
         <h3>Named Bookmarks</h3>
         <p>
           Bookmark any page with a custom name. Navigate to bookmarks from a
@@ -303,17 +328,17 @@
           for quick return after jumping. Bookmarks persist across sessions.
         </p>
       </div>
-      <div class="feature">
+      <div class="feature" data-reveal>
         <h3>Search</h3>
         <p>
           Full-text search across all pages in a sidebar panel. Results are
           grouped by page with text snippets showing matches in context.
           Click any result to jump to that match. Regex and case-sensitivity
-          toggles. Matches highlighted on the page &mdash; navigate with
+          toggles. Matches highlighted on the page — navigate with
           F3 / Shift+F3 or Enter / Shift+Enter.
         </p>
       </div>
-      <div class="feature">
+      <div class="feature" data-reveal>
         <h3>Copy as LaTeX</h3>
         <p>
           Send any detected equation, table, or figure to a Vision Language
@@ -325,11 +350,11 @@
           for all options.
         </p>
       </div>
-      <div class="feature">
+      <div class="feature" data-reveal>
         <h3>Multi-Tab &amp; Side Panel</h3>
         <p>
           Open multiple PDFs in tabs with independent state. A sidebar button toggles
-          the side panel &mdash; a single-open accordion with <strong>Outline</strong>,
+          the side panel — a single-open accordion with <strong>Outline</strong>,
           <strong>Bookmarks</strong>, <strong>Index</strong> (a browsable index of detected
           figures, tables, and equations, with a Scan&nbsp;All sweep of the whole document),
           <strong>Search</strong>, and <strong>Comments</strong> (annotation notes and in-PDF
@@ -337,7 +362,7 @@
           In fullscreen, the tab bar and status bar auto-hide and reveal on hover at the screen edges.
         </p>
       </div>
-      <div class="feature">
+      <div class="feature" data-reveal>
         <h3>Smooth Zoom &amp; Dark Mode</h3>
         <p>
           All zoom actions animate smoothly over 180ms with cubic ease-out.
@@ -345,10 +370,10 @@
           Settings for comfortable use in low-light environments.
         </p>
       </div>
-      <div class="feature">
+      <div class="feature" data-reveal>
         <h3>Annotations</h3>
         <p>
-          Right-click to open a three-ring radial menu &mdash; tool selection
+          Right-click to open a three-ring radial menu — tool selection
           (inner), stroke thickness with size-varied circles (middle), and
           colour picker (outer). Highlight, freehand pen, rectangles, text
           notes, and eraser. Pen and rectangle tools offer thin, normal, and
@@ -359,7 +384,7 @@
           users via <strong>File &rarr; Import Annotations</strong>.
         </p>
       </div>
-      <div class="feature">
+      <div class="feature" data-reveal>
         <h3>Text Selection &amp; Copy</h3>
         <p>
           Switch to Text Select mode via the floating toolbar to select and
@@ -367,7 +392,7 @@
           and Copy buttons with clear visual feedback for the active mode.
         </p>
       </div>
-      <div class="feature">
+      <div class="feature" data-reveal>
         <h3>Motion Blur</h3>
         <p>
           Subtle directional blur during horizontal scroll (including
@@ -377,7 +402,7 @@
           Configurable intensity via Settings, or disable entirely.
         </p>
       </div>
-      <div class="feature">
+      <div class="feature" data-reveal>
         <h3>Diagnostic Logging</h3>
         <p>
           A session log file captures all activity for troubleshooting.
@@ -386,13 +411,13 @@
           bug reports.
         </p>
       </div>
-      <div class="feature">
+      <div class="feature" data-reveal>
         <h3>Headless Core Library</h3>
         <p>
           All business logic lives in a rendering-agnostic core library
           (<code>RailReader.Core</code>) with zero Avalonia or SkiaSharp
           dependencies. A separate <code>RailReader.Renderer.Skia</code>
-          project implements rendering interfaces. Fully testable &mdash;
+          project implements rendering interfaces. Fully testable —
           a comprehensive xUnit suite runs without a display server. A standalone
           <strong>CLI tool</strong> leverages the same core for headless
           rendering, structure extraction, annotation export, and batch
@@ -402,10 +427,15 @@
     </div>
   </section>
 
+  <div class="rail-divider" role="presentation"></div>
+
   <!-- Getting Started -->
   <section class="section" id="getting-started">
-    <h2>Getting Started</h2>
-    <ol class="steps">
+    <div class="section__head" data-reveal>
+      <p class="kicker">Five minutes</p>
+      <h2>Getting Started</h2>
+    </div>
+    <ol class="steps" data-reveal>
       <li>
         <strong>Windows (Microsoft Store):</strong> Install directly from the
         <a href="https://apps.microsoft.com/store/detail/9P9J8KZ6RVZP">Microsoft Store</a>
@@ -416,7 +446,7 @@
       <li>
         <strong>Windows (standalone) or Linux:</strong> Download the latest release from
         <a href="https://github.com/sjvrensburg/railreader2/releases/latest">GitHub Releases</a>
-        &mdash; an AppImage for Linux or an installer for Windows. The AI layout
+        — an AppImage for Linux or an installer for Windows. The AI layout
         model is included in all packages.
       </li>
       <li>
@@ -439,18 +469,22 @@
         Zoom in to activate rail mode and start reading.
       </li>
     </ol>
-    <p class="note">
+    <p class="note" data-reveal>
       <strong>Advanced:</strong> A standalone <a href="guide.html#cli-tool">headless CLI</a>
       for automated batch extraction is also available from
       <a href="https://github.com/sjvrensburg/railreader2/releases/latest">GitHub Releases</a>.
     </p>
-    </ol>
   </section>
+
+  <div class="rail-divider" role="presentation"></div>
 
   <!-- Keyboard Shortcuts -->
   <section class="section" id="shortcuts">
-    <h2>Keyboard Shortcuts</h2>
-    <table class="shortcuts-table">
+    <div class="section__head" data-reveal>
+      <p class="kicker">At your fingertips</p>
+      <h2>Keyboard Shortcuts</h2>
+    </div>
+    <table class="shortcuts-table" data-reveal>
       <thead class="sr-only">
         <tr>
           <th scope="col">Key</th>
@@ -523,10 +557,12 @@
 
   </main>
 
+  <div class="rail-divider" role="presentation"></div>
+
   <!-- Footer -->
   <footer class="footer">
     <p>
-      railreader2 &mdash;
+      railreader2 —
       <a href="https://github.com/sjvrensburg/railreader2">source</a> &middot;
       <a href="https://github.com/sjvrensburg/railreader2/releases">releases</a> &middot;
       <a href="https://apps.microsoft.com/store/detail/9P9J8KZ6RVZP">microsoft store</a> &middot;
@@ -554,27 +590,37 @@
       if (e.key === 'Escape') closeLightbox();
     });
 
-    // Theme toggle
-    function getPreferredTheme() {
-      var stored = localStorage.getItem('rr2-theme');
-      if (stored) return stored;
-      return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
-    }
-
+    // Theme toggle (initial theme already applied in <head> to avoid flash)
     function applyTheme(theme) {
       document.documentElement.setAttribute('data-theme', theme);
-      document.getElementById('theme-icon').textContent = theme === 'dark' ? '\u2600\uFE0F' : '\uD83C\uDF19';
+      document.getElementById('theme-icon').textContent = theme === 'dark' ? '☀️' : '🌙';
     }
-
     function toggleTheme() {
       var current = document.documentElement.getAttribute('data-theme');
       var next = current === 'dark' ? 'light' : 'dark';
       localStorage.setItem('rr2-theme', next);
       applyTheme(next);
     }
+    applyTheme(document.documentElement.getAttribute('data-theme') || 'light');
 
-    // Apply on load
-    applyTheme(getPreferredTheme());
+    // Scroll-reveal — progressive enhancement, respects reduced motion.
+    (function () {
+      var els = document.querySelectorAll('[data-reveal]');
+      var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (reduce || !('IntersectionObserver' in window)) {
+        els.forEach(function (el) { el.classList.add('reveal-in'); });
+        return;
+      }
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('reveal-in');
+            io.unobserve(entry.target);
+          }
+        });
+      }, { rootMargin: '0px 0px -8% 0px', threshold: 0.08 });
+      els.forEach(function (el) { io.observe(el); });
+    })();
   </script>
 </body>
 </html>
