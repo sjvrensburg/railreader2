@@ -224,6 +224,10 @@ public class ViewportPanel : Panel
                 else
                     ViewModel.HandleBrowsePointerUp((float)pageX, (float)pageY);
             }
+            else if (isClick && _pressClickCount >= 2 && TryFrameBlockAt(pos))
+            {
+                // Double-click on a detected block → smooth zoom into rail mode at its start.
+            }
             else if (isClick)
             {
                 ViewModel.HandleClick(pos.X, pos.Y);
@@ -289,11 +293,32 @@ public class ViewportPanel : Panel
 
     private const double ClickThresholdSq = 25.0; // 5px squared
 
+    // Double-click frame zoom duration (ms) — gentler than the native 180ms zoom.
+    private const double FrameZoomDurationMs = 320.0;
+
     private bool IsClick(Point pos)
     {
         double dx = pos.X - _pressPos.X;
         double dy = pos.Y - _pressPos.Y;
         return dx * dx + dy * dy < ClickThresholdSq;
+    }
+
+    /// <summary>Double-click target: smoothly zoom into rail mode at the start of the detected block
+    /// under <paramref name="screenPos"/> (a centred frame for non-navigable figures/tables — the
+    /// fallback in <c>SmoothlyFrameBlock</c>). The mouse-driven way to zoom onto a specific block,
+    /// which has no keyboard equivalent. Returns false (so the normal click handler runs) when no
+    /// block is there. When a demo recording is active, captures it as a <c>frame_block</c> step.</summary>
+    private bool TryFrameBlockAt(Point screenPos)
+    {
+        if (ViewModel is not { } vm) return false;
+        var (pageX, pageY) = ScreenToPage(screenPos);
+        int index = vm.FindBlockIndexAt(pageX, pageY);
+        if (index < 0) return false;
+        // A gentler ease than the native 180ms zoom — a double-click is a deliberate framing
+        // gesture, so it reads as intentional rather than a snap.
+        if (!vm.SmoothlyFrameBlock(index, durationMs: FrameZoomDurationMs)) return false;
+        vm.ScriptRecorder?.RecordFrameBlock(index);
+        return true;
     }
 
     private (double PageX, double PageY) ScreenToPage(Point screenPos)

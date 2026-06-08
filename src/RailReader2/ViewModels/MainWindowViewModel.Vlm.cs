@@ -43,6 +43,27 @@ public sealed partial class MainWindowViewModel
         return null;
     }
 
+    /// <summary>Page-block index — the value <see cref="SmoothlyFrameBlock"/> takes — of the
+    /// detected block at the given page-space point, or -1 if none. Shares its index space with
+    /// <see cref="FindBlockAt"/> and Core's <c>analysis.Blocks</c>.</summary>
+    public int FindBlockIndexAt(double pageX, double pageY)
+    {
+        var doc = _controller.ActiveDocument;
+        if (doc is null) return -1;
+
+        if (!doc.AnalysisCache.TryGetValue(doc.CurrentPage, out var analysis))
+            return -1;
+
+        for (int i = 0; i < analysis.Blocks.Count; i++)
+        {
+            var b = analysis.Blocks[i];
+            if (pageX >= b.BBox.X && pageX <= b.BBox.X + b.BBox.W
+                && pageY >= b.BBox.Y && pageY <= b.BBox.Y + b.BBox.H)
+                return i;
+        }
+        return -1;
+    }
+
     public async Task CopyBlockWithAction(LayoutBlock block, BlockAction action)
     {
         var doc = _controller.ActiveDocument;
