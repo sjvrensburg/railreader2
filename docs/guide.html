@@ -971,6 +971,18 @@ railreader2-cli export paper.pdf --figure-dir ./figures --output paper.md</code>
         <li><strong>Colour Effect:</strong> Select and configure the active colour filter (applies globally via Settings; use <code>C</code> key for per-tab cycling).</li>
       </ul>
 
+      <h3>Rendering</h3>
+      <ul>
+        <li><strong>Render Quality:</strong> Pick a render-DPI preset &mdash; Ultra (800&nbsp;DPI),
+          Quality (600), High (525, the default), Balanced (450), Medium (400), Performance (350),
+          or Custom. Higher presets re-rasterise pages at a greater DPI cap for sharper text and
+          deeper zoom, at the cost of more memory and more frequent re-renders; lower presets favour
+          fluidity. The change applies to the open page immediately &mdash; no restart.</li>
+        <li><strong>Custom (Max render DPI / Tier step):</strong> When Custom is selected, set your
+          own maximum DPI (150&ndash;1200) and tier step (the DPI granularity at which the page
+          re-rasterises). Values are clamped to the supported range.</li>
+      </ul>
+
       <h3>Rail Reading</h3>
       <ul>
         <li><strong>Zoom Threshold:</strong> Zoom level at which rail mode activates (default 3.0x).</li>
