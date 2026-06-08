@@ -10,11 +10,11 @@
     <PublishAot>true</PublishAot>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="RailReader.Core" Version="0.23.0" />
-    <PackageReference Include="RailReader.Core.Pdfium" Version="0.23.0" />
-    <PackageReference Include="RailReader.Core.Analysis" Version="0.23.0" />
-    <PackageReference Include="RailReader.Renderer.Skia" Version="0.23.0" />
-    <PackageReference Include="RailReader.Core.Vlm.OpenAI" Version="0.23.0" />
+    <PackageReference Include="RailReader.Core" Version="0.24.0" />
+    <PackageReference Include="RailReader.Core.Pdfium" Version="0.24.0" />
+    <PackageReference Include="RailReader.Core.Analysis" Version="0.24.0" />
+    <PackageReference Include="RailReader.Renderer.Skia" Version="0.24.0" />
+    <PackageReference Include="RailReader.Core.Vlm.OpenAI" Version="0.24.0" />
     <ProjectReference Include="../RailReader.Export/RailReader.Export.csproj" />
     <ProjectReference Include="../RailReader.Demo/RailReader.Demo.csproj" />
   </ItemGroup>
