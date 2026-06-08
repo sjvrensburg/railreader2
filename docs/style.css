@@ -477,6 +477,49 @@ a:hover { color: var(--accent); text-decoration: underline; }
 }
 .note strong { color: var(--fg); }
 
+/* ---- Overview / orientation ---- */
+.overview__lead {
+  font-size: clamp(1.18rem, 2.2vw, 1.5rem);
+  line-height: 1.5;
+  letter-spacing: -0.01em;
+  color: var(--fg);
+  max-width: 56ch;
+  margin-bottom: 2.4rem;
+}
+.overview__points {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.6rem;
+  margin-bottom: 2rem;
+}
+.overview__points li {
+  padding-top: 0.9rem;
+  border-top: 2px solid var(--accent);
+  font-size: 0.95rem;
+  line-height: 1.55;
+  color: var(--fg-muted);
+}
+.overview__points strong {
+  display: block;
+  font-weight: 600;
+  color: var(--fg);
+  margin-bottom: 0.3rem;
+}
+
+/* ---- Story hook (teaser linking to the About page) ---- */
+.story-hook {
+  max-width: 48ch;
+  margin: 0 auto;
+  text-align: center;
+  font-family: var(--font-display);
+  font-size: clamp(1.25rem, 2.6vw, 1.7rem);
+  line-height: 1.42;
+  letter-spacing: -0.01em;
+  color: var(--fg);
+}
+.story-hook a { white-space: nowrap; }
+
 /* ---- Screenshots ---- */
 .screenshots {
   display: grid;
@@ -941,6 +984,7 @@ pre code { background: none; border: none; padding: 0; font-size: inherit; }
   .header { align-items: flex-start; }
   .screenshots,
   .features { grid-template-columns: 1fr; }
+  .overview__points { grid-template-columns: 1fr; gap: 1.2rem; }
   .hero__text { padding-left: 1.3rem; }
   .hero__buttons { flex-direction: column; align-items: stretch; }
   .hero__buttons .btn { text-align: center; }

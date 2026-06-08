@@ -68,7 +68,7 @@
     <div class="header__left">
       <span class="header__logo"><img src="img/logo.png" alt="railreader2 icon" width="56" height="30">railreader2</span>
       <nav>
-        <a href="#story">Story</a>
+        <a href="about.html">Story</a>
         <a href="#features">Features</a>
         <a href="#getting-started">Get Started</a>
         <a href="#shortcuts">Shortcuts</a>
@@ -108,59 +108,31 @@
   </section>
 
 
-  <!-- Why I built this -->
-  <section class="section" id="story">
+  <!-- Overview -->
+  <section class="section" id="overview">
     <div class="section__head" data-reveal>
       <span class="folio">01</span>
-      <p class="kicker">The story</p>
-      <h2>Why I built this</h2>
+      <p class="kicker">What it is</p>
+      <h2>A reading room for dense PDFs</h2>
     </div>
-    <div class="story" data-reveal>
-      <p>
-        I'm a statistics lecturer at Nelson Mandela University in South Africa.
-        I prefer to read academic PDFs at high magnification — it's simply
-        more comfortable for me — but high magnification turns even
-        simple reading into a navigation puzzle. You lose context, scrolling
-        becomes inefficient, and most viewers simply aren't designed for
-        sustained use at 3&times; zoom and above.
-      </p>
-      <p>
-        The problem isn't unique to people with visual impairments. Anyone who
-        works with dense academic documents — papers packed with
-        equations, tables, and multi-column layouts — can benefit from
-        structured, guided navigation at higher zoom levels. Standard PDF
-        viewers just aren't built for this kind of sustained, focused reading.
-      </p>
-      <p>
-        RailReader2 solves this with <strong>AI-guided rail reading</strong>:
-        a layout analysis model
-        (<a href="docs/heron-layout-model.md">Docling Heron-INT8</a> by default,
-        with <a href="https://huggingface.co/PaddlePaddle/PP-DocLayoutV3">PP-DocLayoutV3</a> as an alternative)
-        detects text blocks and reading order, then the viewer guides you
-        through the document line by line, block by block. It's not a screen
-        magnifier — it's a purpose-built reading environment that
-        understands document structure.
-      </p>
-      <p>
-        There is an "AI inception" to the whole project: RailReader2 was built
-        almost entirely with
-        <a href="https://docs.anthropic.com/en/docs/claude-code">Claude Code</a>,
-        an AI coding agent. So it is an AI agent that wrote the code for an
-        app that itself leverages an AI vision model to function.
-        It's a small example of how AI-assisted development can bring niche,
-        genuinely needed tools into existence when the traditional software
-        market would never justify building them.
-      </p>
-    </div>
+    <p class="overview__lead" data-reveal>
+      railreader2 is a desktop PDF viewer for reading dense academic documents at
+      high magnification. It uses deep-learning layout analysis to understand each
+      page's structure — text, headings, figures, tables, equations — then guides
+      you through it line by line, block by block.
+    </p>
+    <ul class="overview__points" data-reveal>
+      <li><strong>Built for academic reading</strong> Papers packed with equations, tables, and multi-column layouts, read in comfort at 3&times; zoom and above.</li>
+      <li><strong>Structure-aware, not a magnifier</strong> It understands the document, so navigation follows the text instead of fighting it.</li>
+      <li><strong>Free &amp; open source</strong> Native apps for Linux and Windows, with the AI layout model bundled in.</li>
+    </ul>
     <div class="note" data-reveal>
-      <strong>A note on accessibility:</strong> While RailReader2 includes
-      features that can help readers with visual impairments (colour filters,
-      line focus, high contrast modes), it is primarily designed for
-      <em>comfortable</em> reading at high magnification rather than as a
-      full assistive technology solution. It is not a screen magnifier, and it
-      may not be appropriate for users with severe visual impairments who
-      require dedicated accessibility software with features like screen
-      reader integration, cursor tracking, or system-wide magnification.
+      <strong>A note on accessibility:</strong> railreader2 includes features that
+      help readers with visual impairments — colour filters, line focus, high-contrast
+      modes — but it is designed for <em>comfortable</em> reading at high magnification,
+      not as a full assistive-technology solution. It is not a screen magnifier and may
+      not suit users who need dedicated software with screen-reader integration, cursor
+      tracking, or system-wide magnification.
     </div>
   </section>
 
@@ -327,6 +299,14 @@
     </div>
   </section>
 
+
+  <!-- Story hook → About page -->
+  <section class="section">
+    <p class="story-hook" data-reveal>
+      Built by a statistics lecturer who reads at high magnification — and almost
+      entirely with an AI coding agent. <a href="about.html">Read the story &rarr;</a>
+    </p>
+  </section>
 
   <!-- Getting Started -->
   <section class="section" id="getting-started">
