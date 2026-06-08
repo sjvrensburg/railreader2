@@ -49,7 +49,7 @@ RailReader2 was built with [Claude Code](https://docs.anthropic.com/en/docs/clau
 
 ## How it works
 
-PDF pages are rasterised by PDFium (via PDFtoImage) at a DPI proportional to the current zoom level (150–600 DPI). The resulting bitmap is uploaded to the GPU as a mipmapped `SKImage` and drawn on Avalonia's composition thread via a `CompositionCustomVisual`. Camera pan and zoom are applied atomically inside the Skia draw call (not via an Avalonia `MatrixTransform`), which keeps panning jitter-free across platforms; the bitmap only re-renders when the DPI tier changes, not on every pan/zoom frame.
+PDF pages are rasterised by PDFium (via PDFtoImage) at a DPI proportional to the current zoom level — from a 150 DPI floor up to a cap set by the chosen **render-quality preset** (default *High* caps at 525 DPI; presets range from 350 to 800 DPI, with a Custom option up to 1200). The resulting bitmap is uploaded to the GPU as a mipmapped `SKImage` and drawn on Avalonia's composition thread via a `CompositionCustomVisual`. Camera pan and zoom are applied atomically inside the Skia draw call (not via an Avalonia `MatrixTransform`), which keeps panning jitter-free across platforms; the bitmap only re-renders when the DPI tier changes, not on every pan/zoom frame.
 
 ### Rail reading
 
@@ -84,6 +84,7 @@ At high zoom levels, navigation switches to "rail mode" — the viewer locks ont
 - **Colour effect cycling** — press `C` to cycle through colour effects on the active tab, with a brief status bar toast showing the current effect
 - **Dark mode** — toggle via Settings → Appearance; switches the Avalonia Fluent theme to dark variant
 - **UI font scaling** — adjustable font size via Settings for high-DPI or accessibility use
+- **Render quality** — choose a render-DPI preset in Settings → Rendering (Ultra / Quality / High / Balanced / Medium / Performance, or Custom with your own max-DPI and tier-step). Higher presets re-rasterise at a greater DPI cap for sharper text and deeper zoom; lower ones favour fluidity and lower memory. Changes apply to the open page immediately — no restart. *High* is the default
 - **Smooth zoom** — scroll wheel and +/- key zooms animate over 180ms with cubic ease-out; rapid scrolling accumulates smoothly
 - **Motion blur** — subtle directional blur during horizontal scroll and zoom for perceptual smoothness, with configurable intensity
 - **Fullscreen mode** — F11 hides all chrome for distraction-free reading; Escape exits
@@ -131,7 +132,7 @@ At high zoom levels, navigation switches to "rail mode" — the viewer locks ont
 - **Menu bar** — File, View, Navigation, Help menus with keyboard shortcuts
 - **Vector icons** — the toolbar, radial menu, and panel controls use crisp Lucide SVG icons that inherit the theme text colour and scale with the UI font-size setting
 - **Settings panel** — live-editable rail reading parameters with persistence
-- **Tabbed settings** — organised settings panel with Appearance, Rail Reading, Auto-Scroll, and Advanced tabs
+- **Tabbed settings** — organised settings panel with Appearance, Rendering, Rail Reading, Auto-Scroll, Advanced, and VLM tabs
 - **Keyboard shortcuts dialog** — press F1 or Help → Keyboard Shortcuts for a complete reference
 - **Tooltips** — all interactive controls have descriptive tooltips
 - **Splash screen** — startup splash while ONNX model loads

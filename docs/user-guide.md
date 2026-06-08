@@ -649,6 +649,10 @@ Press `Ctrl+,` or use the menu to open Settings. Changes take effect immediately
 - **Motion Blur:** Toggle and adjust intensity of directional blur during scroll/zoom.
 - **Colour Effect:** Select and configure the active colour filter (applies globally via Settings; use `C` key for per-tab cycling).
 
+### Rendering
+- **Render Quality:** Pick a render-DPI preset — **Ultra** (800 DPI), **Quality** (600), **High** (525, the default), **Balanced** (450), **Medium** (400), **Performance** (350), or **Custom**. Higher presets re-rasterise pages at a greater DPI cap for sharper text and deeper zoom, at the cost of more memory and more frequent re-renders; lower presets favour fluidity. The change applies to the open page immediately — no restart.
+- **Custom (Max render DPI / Tier step):** When **Custom** is selected, set your own maximum DPI (150–1200) and tier step (the DPI granularity at which the page re-rasterises; smaller steps render more crisply at intermediate zoom but re-raster more often). Values are clamped to the supported range.
+
 ### Rail Reading
 - **Zoom Threshold:** Zoom level at which rail mode activates (default 3.0x).
 - **Snap Duration:** Duration of line-snap animations in milliseconds.
