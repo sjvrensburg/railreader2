@@ -34,8 +34,8 @@
   --grain-opacity: 0.035;
   --grain-blend: multiply;
   --lightbox-bg: rgba(33, 28, 21, 0.86);
-  --bloom-1: rgba(200, 119, 46, 0.18);
-  --bloom-2: rgba(214, 150, 92, 0.12);
+  --bloom-1: rgba(200, 119, 46, 0.28);
+  --bloom-2: rgba(214, 150, 92, 0.18);
 }
 
 /* ---- Dark theme — paper at night / espresso ---- */
@@ -58,8 +58,8 @@
   --grain-opacity: 0.05;
   --grain-blend: soft-light;
   --lightbox-bg: rgba(12, 9, 6, 0.9);
-  --bloom-1: rgba(224, 149, 74, 0.22);
-  --bloom-2: rgba(224, 149, 74, 0.10);
+  --bloom-1: rgba(232, 158, 84, 0.42);
+  --bloom-2: rgba(216, 132, 70, 0.24);
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -70,8 +70,8 @@ body {
   background-color: var(--bg);
   /* Warm gradient atmosphere behind the hero (full-bleed, top of page) */
   background-image:
-    radial-gradient(42% 32% at 82% 2%, var(--bloom-1), transparent 70%),
-    radial-gradient(38% 26% at 4% 14%, var(--bloom-2), transparent 70%);
+    radial-gradient(56% 48% at 86% -4%, var(--bloom-1), transparent 66%),
+    radial-gradient(48% 38% at 0% 10%, var(--bloom-2), transparent 68%);
   background-repeat: no-repeat;
   color: var(--fg);
   font-family: var(--font-body);
