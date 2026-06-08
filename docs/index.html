@@ -70,7 +70,6 @@
       <nav>
         <a href="#story">Story</a>
         <a href="#features">Features</a>
-        <a href="#screenshots">Screenshots</a>
         <a href="#getting-started">Get Started</a>
         <a href="#shortcuts">Shortcuts</a>
         <a href="guide.html">User Guide</a>
@@ -166,50 +165,6 @@
   </section>
 
 
-  <!-- Screenshots -->
-  <section class="section" id="screenshots">
-    <div class="section__head" data-reveal>
-      <span class="folio">02</span>
-      <p class="kicker">A look inside</p>
-      <h2>Screenshots</h2>
-      <p>The same paper, read eight different ways — from full-page rendering to focused, line-by-line rail mode.</p>
-    </div>
-    <div class="screenshots">
-      <figure class="screenshot" data-reveal>
-        <img src="img/full_page_view_no_analysis.png" alt="railreader2 rendering an academic PDF at full page zoom with sharp text and navigation controls visible" loading="lazy" width="1275" height="1649" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}">
-        <figcaption>Full page view — vector-sharp rendering at any zoom level</figcaption>
-      </figure>
-      <figure class="screenshot" data-reveal>
-        <img src="img/full_page_view_with_analysis.png" alt="railreader2 showing AI layout analysis overlay with detected text blocks, figures, and reading order numbers on an academic PDF" loading="lazy" width="1275" height="1649" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}">
-        <figcaption>Layout analysis — AI-detected blocks with reading order</figcaption>
-      </figure>
-      <figure class="screenshot" data-reveal>
-        <img src="img/RailReader2_Demo.gif" alt="railreader2 rail mode in motion — advancing line by line through an academic PDF at high magnification" loading="lazy" width="480" height="270" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}">
-        <figcaption>Rail mode in motion — advancing line by line</figcaption>
-      </figure>
-      <figure class="screenshot" data-reveal>
-        <img src="img/line_focus_blur.png" alt="railreader2 line focus dim effect fading non-active lines to reduce distraction during rail reading" loading="lazy" width="1534" height="1186" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}">
-        <figcaption>Line focus dim — non-active lines faded for focus</figcaption>
-      </figure>
-      <figure class="screenshot" data-reveal>
-        <img src="img/search_highlights.png" alt="railreader2 full-text search with sidebar results panel and highlighted matches on the PDF page" loading="lazy" width="1935" height="1229" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}">
-        <figcaption>Search — sidebar panel with grouped results and page highlights</figcaption>
-      </figure>
-      <figure class="screenshot" data-reveal>
-        <img src="img/annotations.png" alt="railreader2 annotation tools showing highlights, freehand pen marks, rectangles, and text notes on a PDF page" loading="lazy" width="1534" height="1186" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}">
-        <figcaption>Annotations — highlights, text notes, freehand, and more</figcaption>
-      </figure>
-      <figure class="screenshot" data-reveal>
-        <img src="img/colour_effects.png" alt="railreader2 amber colour filter applied to PDF content via GPU-accelerated shader" loading="lazy" width="1275" height="1649" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}">
-        <figcaption>Amber colour filter — GPU-accelerated, PDF content only</figcaption>
-      </figure>
-      <figure class="screenshot" data-reveal>
-        <img src="img/colour_effect_high_contrast.png" alt="railreader2 high contrast colour effect combined with rail mode for maximum readability" loading="lazy" width="1200" height="900" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}">
-        <figcaption>High contrast + rail — maximum readability</figcaption>
-      </figure>
-    </div>
-  </section>
-
   <!-- Lightbox -->
   <div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="Screenshot preview" tabindex="-1" onclick="closeLightbox()">
     <img id="lightbox-img" src="" alt="">
@@ -219,33 +174,78 @@
   <!-- Features -->
   <section class="section" id="features">
     <div class="section__head" data-reveal>
-      <span class="folio">03</span>
+      <span class="folio">02</span>
       <p class="kicker">Everything it does</p>
-      <h2>Features</h2>
-      <p>A focused reading environment, not a screen magnifier — built around document structure.</p>
+      <h2>Built around your document</h2>
+      <p>A focused reading environment, not a screen magnifier — every feature works with the page's real structure.</p>
     </div>
+    <div class="feature-rows">
+      <div class="feature-row" data-reveal>
+        <div class="feature-row__text">
+          <p class="feature-row__eyebrow">Layout analysis</p>
+          <h3>It reads the page before you do</h3>
+          <p>Before you navigate a single line, a deep-learning layout model maps the page — text blocks, headings, figures, tables, equations — and works out the reading order. Every other feature is built on that understanding.</p>
+          <p>Docling Heron runs by default; PP-DocLayoutV3 is a drop-in alternative with native reading order.</p>
+        </div>
+        <div class="feature-row__media">
+          <figure class="frame"><img src="img/full_page_view_with_analysis.png" alt="railreader2 showing AI layout analysis — detected text blocks, figures, and reading-order numbers overlaid on an academic page" loading="lazy" width="1150" height="1480" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}"></figure>
+        </div>
+      </div>
+      <div class="feature-row" data-reveal>
+        <div class="feature-row__text">
+          <p class="feature-row__eyebrow">Rail reading</p>
+          <h3>One line at a time</h3>
+          <p>Past your zoom threshold, navigation locks to the detected blocks and advances line by line, like a typewriter carriage return. Optional line-focus dimming fades everything but the current line so your eye never loses its place.</p>
+          <p>Hold Ctrl to free-pan and inspect a figure, then release to snap back exactly where you were.</p>
+        </div>
+        <div class="feature-row__media">
+          <figure class="frame"><img src="img/line_focus_blur.png" alt="railreader2 rail mode with line-focus dimming — the active line stays lit while surrounding lines fade" loading="lazy" width="1440" height="980" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}"></figure>
+        </div>
+      </div>
+      <div class="feature-row" data-reveal>
+        <div class="feature-row__text">
+          <p class="feature-row__eyebrow">Visual comfort</p>
+          <h3>Tuned to your eyes</h3>
+          <p>GPU-accelerated colour filters — amber, high-contrast, high-visibility, invert — applied to the page content only, at any intensity. Each document remembers its own. Press C to cycle.</p>
+        </div>
+        <div class="feature-row__media">
+          <figure class="frame"><img src="img/colour_effects.png" alt="railreader2 amber colour filter applied to a PDF page via a GPU shader" loading="lazy" width="1150" height="1480" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}"></figure>
+        </div>
+      </div>
+      <div class="feature-row" data-reveal>
+        <div class="feature-row__text">
+          <p class="feature-row__eyebrow">Find</p>
+          <h3>Anything, in seconds</h3>
+          <p>Full-text search across every page in the side panel, grouped by page with context snippets and matches highlighted on the page itself. Regex and case-sensitivity toggles; step between hits with F3.</p>
+        </div>
+        <div class="feature-row__media">
+          <figure class="frame"><img src="img/search_highlights.png" alt="railreader2 full-text search with a side panel of grouped results and highlighted matches on the page" loading="lazy" width="1600" height="1000" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}"></figure>
+        </div>
+      </div>
+      <div class="feature-row" data-reveal>
+        <div class="feature-row__text">
+          <p class="feature-row__eyebrow">Mark it up</p>
+          <h3>Highlights, notes, and ink</h3>
+          <p>Highlight, underline, pen, rectangles, and sticky notes from a radial menu — stored as native PDF annotations or an app-managed sidecar. Select, move, resize, undo and redo, then export or import as JSON or a flattened PDF.</p>
+        </div>
+        <div class="feature-row__media">
+          <figure class="frame"><img src="img/annotations.png" alt="railreader2 annotation tools — highlights, freehand pen, rectangles, and text notes on a PDF page" loading="lazy" width="1500" height="1040" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}"></figure>
+        </div>
+      </div>
+      <div class="feature-row" data-reveal>
+        <div class="feature-row__text">
+          <p class="feature-row__eyebrow">Stay organised</p>
+          <h3>Your whole reading list</h3>
+          <p>Open many PDFs in tabs, each with independent state. A single-open accordion gives you the outline, named bookmarks, an index of every figure, table and equation, search, and comments — and hands focus back to the page the moment you navigate.</p>
+        </div>
+        <div class="feature-row__media">
+          <figure class="frame"><img src="img/multiple_tabs.png" alt="railreader2 with multiple PDF tabs open and the side-panel accordion showing the document outline" loading="lazy" width="2048" height="1000" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}"></figure>
+        </div>
+      </div>
+    </div>
+
+    <p class="more-label">Smaller touches, everywhere</p>
     <div class="features">
-      <div class="feature" data-reveal>
-        <h3>Rail Mode</h3>
-        <p>
-          Zoom in past the threshold and navigation locks to detected text blocks.
-          Advance line by line with arrow keys or WASD. Hold left/right to scroll
-          continuously with speed ramping. Hold <code>Ctrl</code> to temporarily
-          free-pan and zoom without rail constraints — release to snap back.
-          Zooming preserves your reading position within the current line.
-        </p>
-      </div>
-      <div class="feature" data-reveal>
-        <h3>AI Layout Detection</h3>
-        <p>
-          <a href="docs/heron-layout-model.md">Docling Heron-INT8</a> (default) or
-          <a href="https://huggingface.co/PaddlePaddle/PP-DocLayoutV3">PP-DocLayoutV3</a>
-          detect document regions. PP-DocLayoutV3 includes native reading order;
-          Heron uses the XY-Cut++ algorithm for reading order. Heron has broader
-          class space supporting code, forms, and footnotes. See the
-          <a href="docs/heron-layout-model.md">layout model guide</a> for details.
-        </p>
-      </div>
       <div class="feature" data-reveal>
         <h3>Line Highlight Tint</h3>
         <p>
@@ -276,15 +276,6 @@
           reducing peripheral distraction. Toggle the line highlight
           independently with the H key. All modes have quick-toggle
           buttons on the rail toolbar.
-        </p>
-      </div>
-      <div class="feature" data-reveal>
-        <h3>Colour Effects</h3>
-        <p>
-          GPU-accelerated colour filters — amber, high contrast, high
-          visibility, inverted — with adjustable intensity. Per-document:
-          each tab keeps its own effect. Press <code>C</code> to cycle through
-          effects quickly.
         </p>
       </div>
       <div class="feature" data-reveal>
@@ -325,16 +316,6 @@
         </p>
       </div>
       <div class="feature" data-reveal>
-        <h3>Search</h3>
-        <p>
-          Full-text search across all pages in a sidebar panel. Results are
-          grouped by page with text snippets showing matches in context.
-          Click any result to jump to that match. Regex and case-sensitivity
-          toggles. Matches highlighted on the page — navigate with
-          F3 / Shift+F3 or Enter / Shift+Enter.
-        </p>
-      </div>
-      <div class="feature" data-reveal>
         <h3>Copy as LaTeX</h3>
         <p>
           Send any detected equation, table, or figure to a Vision Language
@@ -347,37 +328,11 @@
         </p>
       </div>
       <div class="feature" data-reveal>
-        <h3>Multi-Tab &amp; Side Panel</h3>
-        <p>
-          Open multiple PDFs in tabs with independent state. A sidebar button toggles
-          the side panel — a single-open accordion with <strong>Outline</strong>,
-          <strong>Bookmarks</strong>, <strong>Index</strong> (a browsable index of detected
-          figures, tables, and equations, with a Scan&nbsp;All sweep of the whole document),
-          <strong>Search</strong>, and <strong>Comments</strong> (annotation notes and in-PDF
-          reviewer comments). Navigating from any section hands keyboard focus back to the page.
-          In fullscreen, the tab bar and status bar auto-hide and reveal on hover at the screen edges.
-        </p>
-      </div>
-      <div class="feature" data-reveal>
         <h3>Smooth Zoom &amp; Dark Mode</h3>
         <p>
           All zoom actions animate smoothly over 180ms with cubic ease-out.
           Rapid scroll inputs accumulate fluidly. Toggle a dark UI theme in
           Settings for comfortable use in low-light environments.
-        </p>
-      </div>
-      <div class="feature" data-reveal>
-        <h3>Annotations</h3>
-        <p>
-          Right-click to open a three-ring radial menu — tool selection
-          (inner), stroke thickness with size-varied circles (middle), and
-          colour picker (outer). Highlight, freehand pen, rectangles, text
-          notes, and eraser. Pen and rectangle tools offer thin, normal, and
-          thick stroke widths. Colour palettes for highlight, pen, and
-          rectangle. Annotations render in z-order: highlights below strokes,
-          text notes on top. Select, move, and resize in browse mode. Undo/redo
-          for all actions. Export into a new PDF or as JSON. Import from other
-          users via <strong>File &rarr; Import Annotations</strong>.
         </p>
       </div>
       <div class="feature" data-reveal>
@@ -427,7 +382,7 @@
   <!-- Getting Started -->
   <section class="section" id="getting-started">
     <div class="section__head" data-reveal>
-      <span class="folio">04</span>
+      <span class="folio">03</span>
       <p class="kicker">Five minutes</p>
       <h2>Getting Started</h2>
     </div>
@@ -476,7 +431,7 @@
   <!-- Keyboard Shortcuts -->
   <section class="section" id="shortcuts">
     <div class="section__head" data-reveal>
-      <span class="folio">05</span>
+      <span class="folio">04</span>
       <p class="kicker">At your fingertips</p>
       <h2>Keyboard Shortcuts</h2>
     </div>
