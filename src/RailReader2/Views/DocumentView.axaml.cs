@@ -94,9 +94,22 @@ public partial class DocumentView : UserControl
     /// <summary>Switch the rendered tab (active document changed).</summary>
     public void SetTab(TabViewModel? tab)
     {
+        // SetTab is driven by OnPropertyChanged(nameof(ActiveTab)), which also fires once
+        // per OverlayChanged animation frame (rail line advance / auto-scroll) and after
+        // every InvalidateCanvas/OnConfigChanged. In all those same-tab cases the layers
+        // were already repainted (InvalidateOverlay / InvalidateAll) just before, so the
+        // full tab-switch path here — rebuild+resend all four layer states, re-wire the
+        // per-frame DPI closure, and force an *unthrottled* minimap repaint — is pure
+        // per-frame waste. Only the throttled panel/minimap sync is needed on a same-tab call.
+        if (ReferenceEquals(_tab, tab))
+        {
+            UpdatePagePanelSize(tab);
+            return;
+        }
+
         // Stop the outgoing tab driving this view: a late DPI render completing on the old tab
         // would otherwise call OnDpiRenderComplete and schedule a wasted animation frame.
-        if (_tab is { } prev && !ReferenceEquals(prev, tab))
+        if (_tab is { } prev)
             prev.OnDpiRenderComplete = null;
         _tab = tab;
         UpdateLayerBindings(tab);

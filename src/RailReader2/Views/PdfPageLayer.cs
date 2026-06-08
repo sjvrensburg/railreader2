@@ -55,10 +55,18 @@ internal sealed class PdfPageVisualHandler : CompositionCustomVisualHandler
     private const double MinSpeedThreshold = 0.1;
     private const float DimFeatherFraction = 0.08f;
 
+    // Skip the mipmap chain only when the texture is clearly being *magnified* — the
+    // on-screen footprint is at least this factor larger than the source image. That is the
+    // high-magnification reading range (zoom above the DPI cap), where the mip chain is never
+    // sampled and just wastes upload time + ~33% VRAM. Crucially, textures uploaded near 1:1
+    // (or already minified) still get mips, so zooming such a texture back out doesn't
+    // reintroduce texel-hop aliasing during the transient before Core re-rasters at lower DPI.
+    // Defaulting to mips (the !magnified branch) is the quality-safe direction.
+    private const float MipmapSkipMagnifyFactor = 1.25f;
+
     // ThreadStatic caches: one per composition thread (typically one per renderer)
     [ThreadStatic] private static SKImageFilter? s_cachedBlurFilter;
     [ThreadStatic] private static float s_cachedSigmaX, s_cachedSigmaY;
-    [ThreadStatic] private static SKPaint? s_layerPaint;
     [ThreadStatic] private static SKPaint? s_imagePaint;
     [ThreadStatic] private static SKColorFilter? s_cachedEffectFilter;
     [ThreadStatic] private static ColourEffect s_cachedEffectType;
@@ -121,16 +129,20 @@ internal sealed class PdfPageVisualHandler : CompositionCustomVisualHandler
         using var lease = leaseFeature.Lease();
         var canvas = lease.SkCanvas;
 
-        // Upload raster image as GPU texture with mipmaps if possible.
-        // This is the key fix for texel-hop aliasing at low zoom: the mip chain
-        // provides pre-filtered downsampled versions of the image, so sub-pixel
-        // camera movements don't cause different source texels to contribute
-        // to each screen pixel on different frames.
+        // Upload raster image as a GPU texture. A mip chain fixes texel-hop aliasing while the
+        // texture is minified, but it costs upload time and ~33% VRAM and is never sampled while
+        // the texture is magnified (upscaled). Skip it only when this image is clearly being
+        // magnified; build it for near-1:1 and minified uploads so a later zoom-out doesn't
+        // shimmer before Core re-rasters. canvas.TotalMatrix here (before the camera concat
+        // below) carries the compositor's DPI scale; × the camera zoom gives
+        // device-pixels-per-page-unit, which against image.Width tells us magnification.
         var grContext = lease.GrContext;
         if (grContext is not null && !ReferenceEquals(image, _gpuTextureSource))
         {
+            float deviceWidth = state.PageW * canvas.TotalMatrix.ScaleX * state.Camera.ScaleX;
+            bool magnified = deviceWidth > image.Width * MipmapSkipMagnifyFactor;
             _gpuTexture?.Dispose();
-            _gpuTexture = image.ToTextureImage(grContext, mipmapped: true);
+            _gpuTexture = image.ToTextureImage(grContext, mipmapped: !magnified);
             _gpuTextureSource = image;
         }
         var drawImage = _gpuTexture ?? image;
@@ -201,40 +213,31 @@ internal sealed class PdfPageVisualHandler : CompositionCustomVisualHandler
 
         var destRect = SKRect.Create(0, 0, state.PageW, state.PageH);
 
-        // SaveLayer for motion blur: creates an offscreen buffer that the blur
-        // ImageFilter operates on. Only used when blur is active; for
-        // colour-filter-only mode, apply directly to the image paint (cheaper).
-        bool needsBlurLayer = blurFilter is not null;
-        bool perPaintFilter = effectFilter is not null && !needsBlurLayer;
-        if (needsBlurLayer)
-        {
-            s_layerPaint ??= new SKPaint();
-            s_layerPaint.ColorFilter = effectFilter;
-            s_layerPaint.ImageFilter = blurFilter;
-            canvas.SaveLayer(s_layerPaint);
-        }
-
-        if (perPaintFilter)
+        // Apply the colour effect and/or motion blur directly on the DrawImage paint rather
+        // than through canvas.SaveLayer(). A SaveLayer allocates a viewport-sized offscreen
+        // buffer every animation frame — the dominant per-frame GPU cost on large/ultrawide
+        // displays — whereas setting the filters on the image paint lets Skia filter just the
+        // image primitive. Visually identical: one image draw, then the unblurred dim gradient
+        // below (drawn after, with no filters, exactly as the post-Restore draw did before).
+        if (effectFilter is not null || blurFilter is not null)
         {
             s_imagePaint ??= new SKPaint();
             s_imagePaint.ColorFilter = effectFilter;
+            s_imagePaint.ImageFilter = blurFilter;
             var srcRect = SKRect.Create(drawImage.Width, drawImage.Height);
             canvas.DrawImage(drawImage, srcRect, destRect, sampling, s_imagePaint);
+            // Don't let the cached paint retain refs to filters that may be disposed
+            // (effect/intensity or blur sigma change) before the next frame reassigns them.
+            s_imagePaint.ColorFilter = null;
+            s_imagePaint.ImageFilter = null;
         }
         else
         {
             canvas.DrawImage(drawImage, destRect, sampling);
         }
 
-        if (needsBlurLayer)
-        {
-            canvas.Restore(); // merges blur layer — back in camera-transformed space
-            s_layerPaint!.ColorFilter = null;
-            s_layerPaint.ImageFilter = null;
-        }
-
         // Line focus dim: feathered gradient outside the active line.
-        // Drawn after blur restore so it isn't blurred itself.
+        // Drawn after the image (and with its own filter-free paint) so it isn't blurred itself.
         // The colour effect is baked into the dim colour to avoid applying a
         // colour filter to the gradient paint (premultiplied alpha corruption).
         if (state.LineFocusBlur && state.LineFocusIntensity > 0 && state.LineH > 0)
