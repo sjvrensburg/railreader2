@@ -75,11 +75,9 @@ public sealed partial class MainWindowViewModel
     partial void OnPortalHintChanged(string? value) => OnPropertyChanged(nameof(PortalWindowHint));
     partial void OnIsPortalPoppedOutChanged(bool value) => OnPropertyChanged(nameof(ShouldShowPortalWindow));
 
-    // Debounce: id of the saved portal whose target is currently rendered (active source); null while
-    // reading past a pinned target. A re-render only happens on a change of active source.
-    private string? _activePortalKey;
-    // Id of the portal whose crop the tracking preview is actually showing (survives the read-past pin,
-    // unlike _activePortalKey), so delete/rename can find the displayed portal.
+    // Id of the portal whose crop the tracking preview is currently showing (pinned), or null when
+    // nothing is shown. The preview stays on this portal until the reading position reaches a different
+    // portal's source; delete/rename also key off it.
     private string? _displayedPortalId;
     // True when the active portal's target page was not yet analysed at render time, so a forced pass
     // (target page just analysed) should retry instead of being debounced away.
@@ -181,7 +179,6 @@ public sealed partial class MainWindowViewModel
     /// <summary>Clear the saved-portal tracking preview (image, label, hint, debounce/display ids).</summary>
     private void ClearActivePortal()
     {
-        _activePortalKey = null;
         _displayedPortalId = null;
         _portalTargetPending = false;
         SetPortalImage(null);
@@ -209,7 +206,7 @@ public sealed partial class MainWindowViewModel
         if (_controller.ActiveDocument is not { } doc || ActiveTab is not { } tab)
         {
             ClearPortalPeek();
-            if (_displayedPortalId is not null || ActivePortalImage is not null || _activePortalKey is not null)
+            if (_displayedPortalId is not null || ActivePortalImage is not null)
                 ClearActivePortal();
             _portalImageOwner = null;
             _lastEvalReadingBlock = null;
@@ -236,7 +233,6 @@ public sealed partial class MainWindowViewModel
         if (ownerSwitched)
         {
             _portalImageOwner = tab;
-            _activePortalKey = null;
             _displayedPortalId = null;
             _portalTargetPending = false;
             _pendingTargetForLink = null;
@@ -246,7 +242,7 @@ public sealed partial class MainWindowViewModel
         // No portals: clear any tracking image (e.g. last portal deleted, or a stale crop on tab switch).
         if (tab.Portals.Portals.Count == 0)
         {
-            if (_displayedPortalId is not null || ActivePortalImage is not null || _activePortalKey is not null)
+            if (_displayedPortalId is not null || ActivePortalImage is not null)
                 ClearActivePortal();
             return;
         }
@@ -273,25 +269,30 @@ public sealed partial class MainWindowViewModel
             }
         }
 
-        string? key = active?.Id;
-        // Debounce: skip when the active portal is unchanged — unless this is a tab switch, or a forced
-        // pass that needs to retry a target whose page was not analysed when first shown.
-        if (key == _activePortalKey && !ownerSwitched && !(forceRender && _portalTargetPending)) return;
-
-        if (active is null)
+        // Pin-until-different: switch the preview only when the reading position reaches a DIFFERENT
+        // portal's source. The current target otherwise stays up — moving off the source line, leaving
+        // the block, scrolling around — until another portal's source is crossed.
+        if (active is not null && active.Id != _displayedPortalId)
         {
-            // No source active at this reading position → hide the tracking preview (no pin), so the
-            // line threshold has a visible effect: a figure shows from its reference line and clears
-            // once you read above it or leave the source block, rather than lingering for good.
-            if (_displayedPortalId is not null || ActivePortalImage is not null || _activePortalKey is not null)
+            _displayedPortalId = active.Id;
+            ActivePortalLabel = active.Label;
+            RenderPortalTarget(doc, active.Target.Page, ResolveAnchorBlock(doc, active.Target));
+            return;
+        }
+
+        // Nothing pinned (tab switch with no active source on the new tab, or never activated) → clear.
+        if (_displayedPortalId is null)
+        {
+            if (ActivePortalImage is not null || _portalTargetPending || ActivePortalLabel is not null)
                 ClearActivePortal();
             return;
         }
 
-        _activePortalKey = active.Id;
-        _displayedPortalId = active.Id;
-        ActivePortalLabel = active.Label;
-        RenderPortalTarget(doc, active.Target.Page, ResolveAnchorBlock(doc, active.Target));
+        // A target is pinned and unchanged. Retry it only if it was still resolving when first shown and
+        // its page just finished analysing (a forced poll pass).
+        if (forceRender && _portalTargetPending
+            && tab.Portals.Portals.FirstOrDefault(p => p.Id == _displayedPortalId) is { } shown)
+            RenderPortalTarget(doc, shown.Target.Page, ResolveAnchorBlock(doc, shown.Target));
     }
 
     /// <summary>Render a target block crop into <see cref="ActivePortalImage"/>. UI thread only.
@@ -554,8 +555,7 @@ public sealed partial class MainWindowViewModel
         if (ActiveTab is not { } tab) return;
         if (tab.Portals.Portals.RemoveAll(p => p.Id == id) == 0) return;
         tab.Portals.Save(tab.FilePath);
-        // Clear the preview if the deleted portal is the one currently shown — even when it was pinned
-        // (read past, so _activePortalKey is null but _displayedPortalId still names it).
+        // Clear the preview if the deleted portal is the one currently shown (pinned).
         if (_displayedPortalId == id)
             ClearActivePortal();
         NotifyPortalsChanged();

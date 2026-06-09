@@ -90,6 +90,8 @@ Sioyek anchors source/target to raw page coordinates and intersection-tests the 
 
 **Sources are line-precise (targets stay whole-block).** Because authoring always happens in rail mode, the source captures the *line* you're on (`pos.LineIndex`), not just the block, plus the line centre's normalized Y for re-analysis stability. A source matches once the reading line reaches its anchored line (`currentLine ≥ anchoredLine`), and "most-recently-passed line wins", so multiple references in one paragraph (line 2 → Fig 3, line 8 → Fig 4) each take over in turn — impossible with a whole-block source. A target is always whole-block (you show the entire figure/table/equation). Pre-line sidecars (no `line` field, default -1) load and behave as whole-block sources.
 
+**Pin-until-different.** Once a portal's target is shown it stays up — moving off the source line, leaving the block, scrolling around — and only switches when the reading position reaches a *different* portal's source. So the line anchor sets the **switch point** between portals rather than gating visibility moment-to-moment; the target never spontaneously clears (it clears only on tab switch with no active source, deletion of the shown portal, or no document). `MainWindowViewModel.Portals` keys this off a single `_displayedPortalId`.
+
 ### 5.2 Reusable primitives (already in the repo)
 
 | Need | Existing primitive | Location |
