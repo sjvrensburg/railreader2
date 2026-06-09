@@ -1,5 +1,6 @@
 using System.Linq;
 using Avalonia.Media.Imaging;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using RailReader.Core;
 using RailReader.Core.Models;
@@ -44,6 +45,7 @@ public sealed partial class MainWindowViewModel
             _portalPeekImage = value;
             OnPropertyChanged(nameof(PortalPeekImage));
             OnPropertyChanged(nameof(PortalWindowImage));
+            OnPropertyChanged(nameof(PortalWindowLabel));
             OnPropertyChanged(nameof(PortalWindowHint));
             OnPropertyChanged(nameof(ShouldShowPortalWindow));
         }
@@ -73,12 +75,33 @@ public sealed partial class MainWindowViewModel
     partial void OnPortalHintChanged(string? value) => OnPropertyChanged(nameof(PortalWindowHint));
     partial void OnIsPortalPoppedOutChanged(bool value) => OnPropertyChanged(nameof(ShouldShowPortalWindow));
 
-    // Debounce: id of the saved portal rendered into the tracking preview. A re-render only happens on
-    // a change of active source (or forceRender when the target page finishes analysing).
+    // Debounce: id of the saved portal whose target is currently rendered (active source); null while
+    // reading past a pinned target. A re-render only happens on a change of active source.
     private string? _activePortalKey;
+    // Id of the portal whose crop the tracking preview is actually showing (survives the read-past pin,
+    // unlike _activePortalKey), so delete/rename can find the displayed portal.
+    private string? _displayedPortalId;
+    // True when the active portal's target page was not yet analysed at render time, so a forced pass
+    // (target page just analysed) should retry instead of being debounced away.
+    private bool _portalTargetPending;
+    // Reading position (page, block, line) at the last evaluation — lets steady reading on one line
+    // skip the whole match. Includes the line because line-precise sources can change the match as the
+    // reading position advances line-by-line within a block.
+    private (int Page, int Block, int Line)? _lastEvalReadingBlock;
+    // Per-page size cache for the active document (PDFium GetPageSize is an immutable-per-page P/Invoke
+    // under the global lock; ResolveAnchorBlock/Line now run per line advance). Cleared on tab switch.
+    private readonly Dictionary<int, (double W, double H)> _pageSizeCache = [];
     // Right-click "Set as portal target" stashes a target here; "Link from current reading position"
     // then consumes it.
     private (int Page, int Block)? _pendingTargetForLink;
+
+    private (double W, double H) PageSize(DocumentState doc, int page)
+    {
+        if (_pageSizeCache.TryGetValue(page, out var size)) return size;
+        size = doc.Pdf.GetPageSize(page);
+        _pageSizeCache[page] = size;
+        return size;
+    }
 
     /// <summary>Raised when the portal list changes (add/delete/rename/tab switch) so
     /// <c>PortalsView</c> rebuilds its rows.</summary>
@@ -111,36 +134,28 @@ public sealed partial class MainWindowViewModel
     /// auto-dismisses once you read on to a different block. Not persisted; needs no rail mode.</summary>
     public void ShowBlockInPortal(int page, int block)
     {
-        if (_controller.ActiveDocument is not { } doc) return;
+        if (_controller.ActiveDocument is not { } doc || ActiveTab is not { } tab) return;
         if (!IsBlockResolvable(doc, page, block))
         {
             ShowStatusToast("No detected block here to open in a portal");
             return;
         }
 
-        var (pageW, pageH) = doc.Pdf.GetPageSize(page);
-        byte[]? png = BlockCropRenderer.RenderBlockAsPng(
-            doc.Pdf, page, doc.AnalysisCache[page].Blocks[block].BBox, pageW, pageH);
-        if (png is null || png.Length == 0)
+        var bitmap = RenderBlockCrop(doc, page, block);
+        if (bitmap is null)
         {
             ShowStatusToast("Could not render block");
             return;
         }
 
-        try
-        {
-            using var ms = new MemoryStream(png);
-            // Setting the peek image flips ShouldShowPortalWindow true → MainWindow opens the window.
-            SetPeekImage(new Bitmap(ms));
-        }
-        catch (Exception ex)
-        {
-            _logger.Error("[Portals] Failed to decode peek crop", ex);
-            ShowStatusToast("Could not render block");
-            return;
-        }
+        // Adopt the current tab as the image owner so the next EvaluatePortals does not treat this
+        // freshly-opened peek as belonging to a stale tab and immediately dismiss it.
+        _portalImageOwner = tab;
+        SetPeekImage(bitmap);   // raises ShouldShowPortalWindow → MainWindow opens the window
         PortalPeekLabel = DefaultPortalLabel(doc, page, block);
-        _peekAnchorReadingBlock = CurrentReadingBlock(doc);
+        // The peek holds while you stay in the same block (not line) — it shows a whole target block.
+        var (rp, rb, _) = CurrentReadingBlock(doc);
+        _peekAnchorReadingBlock = (rp, rb);
     }
 
     private void SetPeekImage(Bitmap? next)
@@ -163,136 +178,171 @@ public sealed partial class MainWindowViewModel
         SetPeekImage(null);
     }
 
-    /// <summary>The page-level (page, block) the reading position currently sits on, or block -1 when
-    /// not rail-reading. Read straight from RailNav — no text extraction (see <see cref="EvaluatePortals"/>).</summary>
-    private static (int Page, int Block) CurrentReadingBlock(DocumentState doc)
-        => (doc.CurrentPage,
-            doc.Rail is { Active: true, HasAnalysis: true } rail ? rail.CurrentNavigableArrayIndex : -1);
+    /// <summary>Clear the saved-portal tracking preview (image, label, hint, debounce/display ids).</summary>
+    private void ClearActivePortal()
+    {
+        _activePortalKey = null;
+        _displayedPortalId = null;
+        _portalTargetPending = false;
+        SetPortalImage(null);
+        ActivePortalLabel = null;
+        PortalHint = NoActivePortalHint;
+    }
+
+    /// <summary>The page-level (page, block, line) the reading position currently sits on; block/line
+    /// are -1 when not rail-reading. Read straight from RailNav — no text extraction (see
+    /// <see cref="EvaluatePortals"/>).</summary>
+    private static (int Page, int Block, int Line) CurrentReadingBlock(DocumentState doc)
+        => doc.Rail is { Active: true, HasAnalysis: true } rail
+            ? (doc.CurrentPage, rail.CurrentNavigableArrayIndex, rail.CurrentLine)
+            : (doc.CurrentPage, -1, -1);
 
     // --- Sync loop ---
 
     /// <summary>Re-evaluate which saved portal (if any) the reading position is inside and render its
     /// target into the tracking preview; also auto-dismiss a temporary peek once reading leaves the
-    /// block it was opened over. UI thread only (PDFium). Cheap while reading within one source
-    /// (debounced on the active portal id); <paramref name="forceRender"/> bypasses the debounce so a
-    /// pending target re-renders once its page is analysed.</summary>
+    /// block it was opened over. UI thread only (PDFium). Steady reading within one block returns
+    /// immediately (memoized on the reading block); <paramref name="forceRender"/> (portal mutation /
+    /// pending-target retry) bypasses that fast path.</summary>
     internal void EvaluatePortals(bool forceRender = false)
     {
         if (_controller.ActiveDocument is not { } doc || ActiveTab is not { } tab)
         {
             ClearPortalPeek();
-            if (ActivePortalImage is not null || _activePortalKey is not null)
-            {
-                _activePortalKey = null;
-                _portalImageOwner = null;
-                SetPortalImage(null);
-                ActivePortalLabel = null;
-                PortalHint = NoActivePortalHint;
-            }
+            if (_displayedPortalId is not null || ActivePortalImage is not null || _activePortalKey is not null)
+                ClearActivePortal();
+            _portalImageOwner = null;
+            _lastEvalReadingBlock = null;
+            _pageSizeCache.Clear();
             return;
         }
 
-        // The block under the reading position. Read straight from RailNav rather than
-        // GetReadingPosition(), whose per-call text extraction would tax every rail line advance: by
-        // construction CurrentNavigableArrayIndex == IndexOf(CurrentNavigableBlock) ==
-        // ReadingPosition.BlockIndex (all the page-level index into analysis.Blocks — see RailNav), so
-        // the seam the design flagged is closed. Block -1 when not rail-reading → no source active.
-        var (srcPage, srcBlock) = CurrentReadingBlock(doc);
+        var (srcPage, srcBlock, srcLine) = CurrentReadingBlock(doc);
+        bool ownerSwitched = !ReferenceEquals(_portalImageOwner, tab);
 
-        // Auto-dismiss a temporary peek when reading leaves the block it was opened over, or on a tab
-        // switch. (Saved-portal tracking is separate and continues below.)
-        if (_peekAnchorReadingBlock is { } anchor
-            && (anchor != (srcPage, srcBlock) || !ReferenceEquals(_portalImageOwner, tab)))
+        // Fast path: nothing that affects portals changed since the last evaluation (same tab, same
+        // reading block, not forced) — the active portal and peek state cannot have changed.
+        if (!forceRender && !ownerSwitched && _lastEvalReadingBlock == (srcPage, srcBlock, srcLine))
+            return;
+        _lastEvalReadingBlock = (srcPage, srcBlock, srcLine);
+
+        // Auto-dismiss a temporary peek when reading leaves the block it was opened over, or on tab switch.
+        if (_peekAnchorReadingBlock is { } anchor && (anchor != (srcPage, srcBlock) || ownerSwitched))
             ClearPortalPeek();
 
-        // The tracking image belongs to whichever tab last rendered it; a tab switch must not leave the
-        // previous document's target on screen. Clear and force a fresh evaluation for the new tab.
-        if (!ReferenceEquals(_portalImageOwner, tab))
+        // Tab switch: reset tracking state. The tracking IMAGE is cleared by the single render-or-clear
+        // below (not here) so one EvaluatePortals never swaps the tracking bitmap twice in a row (which
+        // would defeat the one-behind deferred-disposal guarantee).
+        if (ownerSwitched)
         {
             _portalImageOwner = tab;
             _activePortalKey = null;
+            _displayedPortalId = null;
+            _portalTargetPending = false;
             _pendingTargetForLink = null;
-            SetPortalImage(null);
-            ActivePortalLabel = null;
-            PortalHint = NoActivePortalHint;
-            forceRender = true;
+            _pageSizeCache.Clear();
         }
 
-        // No portals: nothing to auto-match.
+        // No portals: clear any tracking image (e.g. last portal deleted, or a stale crop on tab switch).
         if (tab.Portals.Portals.Count == 0)
         {
-            if (_activePortalKey is not null)
-            {
-                _activePortalKey = null;
-                SetPortalImage(null);
-                ActivePortalLabel = null;
-                PortalHint = NoActivePortalHint;
-            }
+            if (_displayedPortalId is not null || ActivePortalImage is not null || _activePortalKey is not null)
+                ClearActivePortal();
             return;
         }
 
-        // First portal whose resolved source block is the one being read (source page checked first
-        // so ResolveAnchorBlock — which calls into PDFium for page size — runs at most once or twice).
+        // The saved portal whose source the reading position has reached (source page checked first so
+        // the per-portal resolve work runs only for same-page sources).
         Portal? active = null;
+        int bestThreshold = -1;
         if (srcBlock >= 0)
         {
             foreach (var p in tab.Portals.Portals)
             {
                 if (p.Source.Page != srcPage) continue;
-                if (ResolveAnchorBlock(doc, p.Source) == srcBlock) { active = p; break; }
+                if (ResolveAnchorBlock(doc, p.Source) != srcBlock) continue;
+                // Whole-block source (Line < 0) → threshold 0 (matches anywhere in the block); a
+                // line-precise source matches once the reading line reaches it. Most-recently-passed
+                // line wins, so several references in one paragraph each take over in turn.
+                int threshold = Math.Max(0, ResolveAnchorLine(doc, p.Source, srcBlock));
+                if (srcLine >= threshold && threshold > bestThreshold)
+                {
+                    active = p;
+                    bestThreshold = threshold;
+                }
             }
         }
 
         string? key = active?.Id;
-        if (key == _activePortalKey && !forceRender) return;
+        // Debounce: skip when the active portal is unchanged — unless this is a tab switch, or a forced
+        // pass that needs to retry a target whose page was not analysed when first shown.
+        if (key == _activePortalKey && !ownerSwitched && !(forceRender && _portalTargetPending)) return;
 
         if (active is null)
         {
-            // No active source: pin the last target (Sioyek behaviour). Mark inactive so re-entering
-            // the same source later registers as a change and re-renders.
-            _activePortalKey = null;
+            // No source active at this reading position → hide the tracking preview (no pin), so the
+            // line threshold has a visible effect: a figure shows from its reference line and clears
+            // once you read above it or leave the source block, rather than lingering for good.
+            if (_displayedPortalId is not null || ActivePortalImage is not null || _activePortalKey is not null)
+                ClearActivePortal();
             return;
         }
 
         _activePortalKey = active.Id;
+        _displayedPortalId = active.Id;
         ActivePortalLabel = active.Label;
         RenderPortalTarget(doc, active.Target.Page, ResolveAnchorBlock(doc, active.Target));
     }
 
     /// <summary>Render a target block crop into <see cref="ActivePortalImage"/>. UI thread only.
-    /// A still-unanalysed target page (block &lt; 0) leaves the panel waiting; the analysis-complete
-    /// poll re-runs <see cref="EvaluatePortals"/> with forceRender.</summary>
+    /// A still-unanalysed target page (block &lt; 0) leaves the panel waiting and sets
+    /// <see cref="_portalTargetPending"/> so the analysis-complete poll retries via forceRender.</summary>
     private void RenderPortalTarget(DocumentState doc, int page, int block)
     {
-        if (block < 0 || page < 0 || page >= doc.PageCount
-            || !doc.AnalysisCache.TryGetValue(page, out var analysis)
-            || block >= analysis.Blocks.Count)
+        bool resolvable = block >= 0 && page >= 0 && page < doc.PageCount
+            && doc.AnalysisCache.TryGetValue(page, out var analysis) && block < analysis.Blocks.Count;
+        if (!resolvable)
         {
+            _portalTargetPending = true;
             SetPortalImage(null);
             PortalHint = "Resolving target…";
             return;
         }
 
-        var (pageW, pageH) = doc.Pdf.GetPageSize(page);
-        byte[]? png = BlockCropRenderer.RenderBlockAsPng(doc.Pdf, page, analysis.Blocks[block].BBox, pageW, pageH);
-        if (png is null || png.Length == 0)
+        _portalTargetPending = false;
+        var bitmap = RenderBlockCrop(doc, page, block);
+        if (bitmap is null)
         {
             SetPortalImage(null);
             PortalHint = "Could not render portal target.";
             return;
         }
+        SetPortalImage(bitmap);
+        PortalHint = null;
+    }
+
+    /// <summary>Rasterise a detected block region and decode it to an Avalonia <see cref="Bitmap"/>,
+    /// or null if the page/block is unavailable or rendering fails. UI thread only (PDFium).</summary>
+    private Bitmap? RenderBlockCrop(DocumentState doc, int page, int block)
+    {
+        if (block < 0 || page < 0 || page >= doc.PageCount
+            || !doc.AnalysisCache.TryGetValue(page, out var analysis)
+            || block >= analysis.Blocks.Count)
+            return null;
+
+        var (pageW, pageH) = PageSize(doc, page);
+        byte[]? png = BlockCropRenderer.RenderBlockAsPng(doc.Pdf, page, analysis.Blocks[block].BBox, pageW, pageH);
+        if (png is null || png.Length == 0) return null;
 
         try
         {
             using var ms = new MemoryStream(png);
-            SetPortalImage(new Bitmap(ms));
-            PortalHint = null;
+            return new Bitmap(ms);
         }
         catch (Exception ex)
         {
-            _logger.Error("[Portals] Failed to decode portal target crop", ex);
-            SetPortalImage(null);
-            PortalHint = "Could not render portal target.";
+            _logger.Error("[Portals] Failed to decode block crop", ex);
+            return null;
         }
     }
 
@@ -332,14 +382,16 @@ public sealed partial class MainWindowViewModel
         if (!doc.AnalysisCache.TryGetValue(a.Page, out var analysis)) return -1;
         var blocks = analysis.Blocks;
         if (blocks.Count == 0) return -1;
+        // Parse the stored role name once (enum compare avoids a per-block Role.ToString() allocation).
+        if (!Enum.TryParse<BlockRole>(a.Role, out var anchorRole)) return -1;
 
-        var (pageW, pageH) = doc.Pdf.GetPageSize(a.Page);
+        var (pageW, pageH) = PageSize(doc, a.Page);
 
         // Fast path: the stored index still points at the same block.
         if (a.Block >= 0 && a.Block < blocks.Count)
         {
             var b = blocks[a.Block];
-            if (b.Role.ToString() == a.Role && BBoxClose(b.BBox, a, pageW, pageH))
+            if (b.Role == anchorRole && BBoxClose(b.BBox, a, pageW, pageH))
                 return a.Block;
         }
 
@@ -351,7 +403,7 @@ public sealed partial class MainWindowViewModel
         for (int i = 0; i < blocks.Count; i++)
         {
             var b = blocks[i];
-            if (b.Role.ToString() != a.Role) continue;
+            if (b.Role != anchorRole) continue;
             float cx = (float)((b.BBox.X + b.BBox.W / 2f) / pageW);
             float cy = (float)((b.BBox.Y + b.BBox.H / 2f) / pageH);
             float d = (cx - ax) * (cx - ax) + (cy - ay) * (cy - ay);
@@ -360,6 +412,36 @@ public sealed partial class MainWindowViewModel
         if (best >= 0 && best != a.Block)
             _logger.Debug($"[Portals] Anchor fallback on page {a.Page}: stored block {a.Block} → "
                 + $"nearest-centre {best} (role {a.Role}).");
+        return best;
+    }
+
+    /// <summary>Resolve a source anchor's line index on the current analysis of its already-resolved
+    /// block, or -1 for a whole-block source. Mirrors <see cref="ResolveAnchorBlock"/>: trusts the
+    /// stored index while its normalized Y still matches, else falls back to the nearest-centre line.</summary>
+    private int ResolveAnchorLine(DocumentState doc, PortalAnchor a, int resolvedBlock)
+    {
+        if (a.Line < 0) return -1;   // whole-block source
+        if (!doc.AnalysisCache.TryGetValue(a.Page, out var analysis)
+            || resolvedBlock < 0 || resolvedBlock >= analysis.Blocks.Count)
+            return -1;
+        var lines = analysis.Blocks[resolvedBlock].Lines;
+        if (lines.Count == 0) return -1;
+        if (a.Ly < 0)   // no stored position (legacy / unexpected) → clamp the stored index
+            return Math.Min(a.Line, lines.Count - 1);
+
+        var (_, pageH) = PageSize(doc, a.Page);
+        const float eps = 0.02f;
+        // Fast path: the stored index still lines up by position.
+        if (a.Line < lines.Count && Math.Abs((float)(lines[a.Line].Y / pageH) - a.Ly) < eps)
+            return a.Line;
+        // Fallback: nearest-centre line.
+        int best = 0;
+        float bestDist = float.MaxValue;
+        for (int i = 0; i < lines.Count; i++)
+        {
+            float d = Math.Abs((float)(lines[i].Y / pageH) - a.Ly);
+            if (d < bestDist) { bestDist = d; best = i; }
+        }
         return best;
     }
 
@@ -372,19 +454,24 @@ public sealed partial class MainWindowViewModel
             && Math.Abs(nw - a.Nw) < eps && Math.Abs(nh - a.Nh) < eps;
     }
 
-    private static PortalAnchor MakeAnchor(DocumentState doc, int page, int block)
+    /// <summary>Build an anchor for a block; <paramref name="line"/> &gt;= 0 makes it a line-precise
+    /// source anchor (also captures the line centre's normalized Y). Targets pass line -1 (whole block).</summary>
+    private PortalAnchor MakeAnchor(DocumentState doc, int page, int block, int line = -1)
     {
-        var (pageW, pageH) = doc.Pdf.GetPageSize(page);
+        var (pageW, pageH) = PageSize(doc, page);
         var b = doc.AnalysisCache[page].Blocks[block];
+        float ly = line >= 0 && line < b.Lines.Count ? (float)(b.Lines[line].Y / pageH) : -1f;
         return new PortalAnchor
         {
             Page = page,
             Block = block,
+            Line = line,
             Role = b.Role.ToString(),
             Nx = (float)(b.BBox.X / pageW),
             Ny = (float)(b.BBox.Y / pageH),
             Nw = (float)(b.BBox.W / pageW),
             Nh = (float)(b.BBox.H / pageH),
+            Ly = ly,
         };
     }
 
@@ -401,8 +488,8 @@ public sealed partial class MainWindowViewModel
     {
         if (_controller.ActiveDocument is not { } doc || ActiveTab is not { } tab) return;
 
-        int sp, sb;
-        if (sourcePage is { } ep && sourceBlock is { } eb) { sp = ep; sb = eb; }
+        int sp, sb, sl;   // source page, block, line (-1 = whole-block source)
+        if (sourcePage is { } ep && sourceBlock is { } eb) { sp = ep; sb = eb; sl = -1; }
         else
         {
             var pos = _controller.GetReadingPosition();
@@ -413,6 +500,7 @@ public sealed partial class MainWindowViewModel
             }
             sp = pos.Page;
             sb = pos.BlockIndex;
+            sl = pos.LineIndex;   // anchor the source to the line you're on, so it fires at the reference
         }
 
         if (!IsBlockResolvable(doc, sp, sb) || !IsBlockResolvable(doc, targetPage, targetBlock))
@@ -425,8 +513,8 @@ public sealed partial class MainWindowViewModel
         {
             Id = Guid.NewGuid().ToString("n"),
             Label = string.IsNullOrWhiteSpace(label) ? DefaultPortalLabel(doc, targetPage, targetBlock) : label!,
-            Source = MakeAnchor(doc, sp, sb),
-            Target = MakeAnchor(doc, targetPage, targetBlock),
+            Source = MakeAnchor(doc, sp, sb, sl),
+            Target = MakeAnchor(doc, targetPage, targetBlock),   // line -1: a target is shown whole-block
             CreatedUtc = DateTime.UtcNow.ToString("o"),
         };
         tab.Portals.Portals.Add(portal);
@@ -466,13 +554,10 @@ public sealed partial class MainWindowViewModel
         if (ActiveTab is not { } tab) return;
         if (tab.Portals.Portals.RemoveAll(p => p.Id == id) == 0) return;
         tab.Portals.Save(tab.FilePath);
-        if (_activePortalKey == id)
-        {
-            _activePortalKey = null;
-            SetPortalImage(null);
-            ActivePortalLabel = null;
-            PortalHint = NoActivePortalHint;
-        }
+        // Clear the preview if the deleted portal is the one currently shown — even when it was pinned
+        // (read past, so _activePortalKey is null but _displayedPortalId still names it).
+        if (_displayedPortalId == id)
+            ClearActivePortal();
         NotifyPortalsChanged();
         EvaluatePortals(forceRender: true);
     }
@@ -486,20 +571,48 @@ public sealed partial class MainWindowViewModel
         if (portal.Label == label) return;
         portal.Label = label;
         tab.Portals.Save(tab.FilePath);
-        if (_activePortalKey == id) ActivePortalLabel = label;
+        if (_displayedPortalId == id) ActivePortalLabel = label;
         NotifyPortalsChanged();
     }
 
-    /// <summary>Navigate to a portal's source block and frame it (the list's "Go to source" action).</summary>
+    // Frame-zoom duration for "Go to source"; the line seek is deferred just past it.
+    private const double GoToSourceFrameMs = 320.0;
+
+    /// <summary>Navigate to a portal's source block, frame it, and seat the rail on the exact source
+    /// line (the list's "Go to source" action).</summary>
     public void GoToPortalSource(string id)
     {
         if (_controller.ActiveDocument is not { } doc || ActiveTab is not { } tab) return;
         var portal = tab.Portals.Portals.FirstOrDefault(p => p.Id == id);
         if (portal is null) return;
+
         GoToPage(portal.Source.Page);
         int block = ResolveAnchorBlock(doc, portal.Source);
-        if (block >= 0) SmoothlyFrameBlock(block);
+        if (block < 0) { RequestViewportFocus(); return; }
+
+        int line = ResolveAnchorLine(doc, portal.Source, block);   // -1 for a whole-block source
+        bool framed = SmoothlyFrameBlock(block, durationMs: GoToSourceFrameMs);
+        if (framed && line > 0)
+            SeekRailLineAfterFrame(line);
         RequestViewportFocus();
+    }
+
+    /// <summary>SmoothlyFrameBlock seats line 0 and re-zeroes the line when the rail activates mid-zoom,
+    /// so defer the line seek until the frame settles, then snap to the source line.</summary>
+    private void SeekRailLineAfterFrame(int line)
+    {
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(GoToSourceFrameMs + 80) };
+        timer.Tick += (_, _) =>
+        {
+            timer.Stop();
+            if (_controller.ActiveDocument is not { Rail: { Active: true, HasAnalysis: true } rail } d) return;
+            rail.CurrentLine = Math.Clamp(line, 0, Math.Max(0, rail.CurrentNavigableBlock.Lines.Count - 1));
+            var (ww, wh) = _controller.GetViewportSize();
+            d.StartSnap(ww, wh);
+            InvalidateCameraAndTab();
+            RequestAnimationFrame();
+        };
+        timer.Start();
     }
 
     /// <summary>Snapshot the active document's portals as display rows (cheap, no PDFium).</summary>
@@ -512,7 +625,9 @@ public sealed partial class MainWindowViewModel
             {
                 Portal = p,
                 Label = p.Label,
-                SourceText = $"Source: p.{p.Source.Page + 1}",
+                SourceText = p.Source.Line >= 0
+                    ? $"Source: p.{p.Source.Page + 1}, line {p.Source.Line + 1}"
+                    : $"Source: p.{p.Source.Page + 1}",
                 TargetText = $"Target: {p.Target.Role} · p.{p.Target.Page + 1}",
             });
         return rows;
@@ -520,7 +635,7 @@ public sealed partial class MainWindowViewModel
 
     private static string DefaultPortalLabel(DocumentState doc, int page, int block)
     {
-        if (!doc.AnalysisCache.TryGetValue(page, out var analysis) || block >= analysis.Blocks.Count)
+        if (!doc.AnalysisCache.TryGetValue(page, out var analysis) || block < 0 || block >= analysis.Blocks.Count)
             return $"Portal (p.{page + 1})";
         var role = analysis.Blocks[block].Role;
         // Ordinal among same-role blocks up to and including this one on the page (1-based).

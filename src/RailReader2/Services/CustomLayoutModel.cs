@@ -46,35 +46,11 @@ public sealed class CustomLayoutModelConfig
     public static string Path => System.IO.Path.Combine(AppConfig.ConfigDir, "custom_layout_model.json");
 
     public static CustomLayoutModelConfig Load()
-    {
-        try
-        {
-            if (File.Exists(Path))
-            {
-                var json = File.ReadAllText(Path);
-                return JsonSerializer.Deserialize(json, CustomLayoutModelJsonContext.Default.CustomLayoutModelConfig)
-                    ?? new CustomLayoutModelConfig();
-            }
-        }
-        catch (Exception ex)
-        {
-            RailReaderLogging.Logger.Error("Failed to load custom_layout_model.json", ex);
-        }
-        return new CustomLayoutModelConfig();
-    }
+        => JsonSidecar.Load(Path, CustomLayoutModelJsonContext.Default.CustomLayoutModelConfig,
+            static () => new CustomLayoutModelConfig());
 
     public void Save()
-    {
-        try
-        {
-            var json = JsonSerializer.Serialize(this, CustomLayoutModelJsonContext.Default.CustomLayoutModelConfig);
-            File.WriteAllText(Path, json);
-        }
-        catch (Exception ex)
-        {
-            RailReaderLogging.Logger.Error("Failed to save custom_layout_model.json", ex);
-        }
-    }
+        => JsonSidecar.Save(Path, this, CustomLayoutModelJsonContext.Default.CustomLayoutModelConfig);
 }
 
 /// <summary>

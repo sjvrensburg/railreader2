@@ -102,11 +102,22 @@ public partial class MainWindow : Window
 
     // --- Detached portal window (Phase 2) ---
 
+    protected override void OnClosing(WindowClosingEventArgs e)
+    {
+        // Close the floating portal window before the Closing-wired vm.Dispose() runs
+        // DisposePortalImages — otherwise the still-open window would briefly hold disposed bitmaps as
+        // its Image.Source. ClosePortalWindow is idempotent (OnUnloaded also calls it).
+        ClosePortalWindow();
+        base.OnClosing(e);
+    }
+
     private void UpdatePortalWindow(MainWindowViewModel vm)
     {
         if (vm.ShouldShowPortalWindow)
         {
-            if (_portalWindow is { } existing) { existing.Activate(); return; }
+            // Already open: just let its bindings (PortalWindowImage/Label) update. Do NOT Activate()
+            // — that would steal focus back to the floating window on every peek change.
+            if (_portalWindow is not null) return;
 
             var win = new PortalWindow { DataContext = vm };
             var settings = Services.PortalWindowSettings.Load();
@@ -154,12 +165,15 @@ public partial class MainWindow : Window
 
     private static void SavePortalWindowGeometry(PortalWindow win)
     {
+        // Persist the actual rendered size (Bounds), restored into Width/Height on the next pop-out.
+        // For a borderless window these match, so the window no longer drifts smaller each cycle the
+        // way saving ClientSize and reloading into Width/Height could.
         new Services.PortalWindowSettings
         {
             X = win.Position.X,
             Y = win.Position.Y,
-            Width = win.ClientSize.Width > 0 ? win.ClientSize.Width : win.Width,
-            Height = win.ClientSize.Height > 0 ? win.ClientSize.Height : win.Height,
+            Width = win.Bounds.Width > 0 ? win.Bounds.Width : win.Width,
+            Height = win.Bounds.Height > 0 ? win.Bounds.Height : win.Height,
             Topmost = win.Topmost,
         }.Save();
     }

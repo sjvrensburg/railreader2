@@ -21,42 +21,20 @@ public sealed class PortalWindowSettings
     public double Height { get; set; } = 320;
     public bool Topmost { get; set; } = true;
 
+    // Treat (0,0) as "unset" as well as the int.MinValue sentinel: some Linux/Wayland compositors
+    // report Window.Position as (0,0) regardless of the real location, which would otherwise pin the
+    // window to the top-left corner on every reopen. Falling back to centring is the safer default.
     [JsonIgnore]
-    public bool HasPosition => X != int.MinValue && Y != int.MinValue;
+    public bool HasPosition => X != int.MinValue && Y != int.MinValue && (X != 0 || Y != 0);
 
     public static string Path => System.IO.Path.Combine(AppConfig.ConfigDir, "portal_window.json");
 
     public static PortalWindowSettings Load()
-    {
-        try
-        {
-            if (File.Exists(Path))
-            {
-                var json = File.ReadAllText(Path);
-                return JsonSerializer.Deserialize(json, PortalWindowJsonContext.Default.PortalWindowSettings)
-                    ?? new PortalWindowSettings();
-            }
-        }
-        catch (Exception ex)
-        {
-            RailReaderLogging.Logger.Error("Failed to load portal_window.json", ex);
-        }
-        return new PortalWindowSettings();
-    }
+        => JsonSidecar.Load(Path, PortalWindowJsonContext.Default.PortalWindowSettings,
+            static () => new PortalWindowSettings());
 
     public void Save()
-    {
-        try
-        {
-            Directory.CreateDirectory(AppConfig.ConfigDir);
-            var json = JsonSerializer.Serialize(this, PortalWindowJsonContext.Default.PortalWindowSettings);
-            File.WriteAllText(Path, json);
-        }
-        catch (Exception ex)
-        {
-            RailReaderLogging.Logger.Error("Failed to save portal_window.json", ex);
-        }
-    }
+        => JsonSidecar.Save(Path, this, PortalWindowJsonContext.Default.PortalWindowSettings);
 }
 
 [JsonSourceGenerationOptions(

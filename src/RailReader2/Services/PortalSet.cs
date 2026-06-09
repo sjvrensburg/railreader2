@@ -24,6 +24,14 @@ public sealed class PortalAnchor
     public float Ny { get; set; }
     public float Nw { get; set; }
     public float Nh { get; set; }
+
+    /// <summary>Line index within the block for a line-precise source anchor, or -1 for a whole-block
+    /// anchor (always -1 for targets — a figure/table is shown as a whole block). <see cref="Ly"/> is
+    /// the line centre's Y as a fraction of page height, the resolution-independent fallback for
+    /// recovering the line if the block is re-analysed into a different line split. Defaulting both to
+    /// -1 means pre-line sidecars load as whole-block sources, unchanged.</summary>
+    public int Line { get; set; } = -1;
+    public float Ly { get; set; } = -1f;
 }
 
 /// <summary>
@@ -51,8 +59,9 @@ public sealed class PortalSet
 
     private static string Dir => System.IO.Path.Combine(AppConfig.ConfigDir, "portals");
 
-    /// <summary>Sidecar path for a PDF, keyed by the SHA-256 of its absolute path (same keying
-    /// convention as the annotations sidecar). The shell computes the hash itself.</summary>
+    /// <summary>Sidecar path for a PDF, keyed by the SHA-256 of its absolute path (full lowercase hex).
+    /// Same hash input as the annotations sidecar (the PDF's absolute path), but its own directory and
+    /// filename — the shell computes the hash itself.</summary>
     public static string PathFor(string pdfPath)
     {
         string full = System.IO.Path.GetFullPath(pdfPath);
@@ -61,37 +70,10 @@ public sealed class PortalSet
     }
 
     public static PortalSet Load(string pdfPath)
-    {
-        try
-        {
-            var path = PathFor(pdfPath);
-            if (File.Exists(path))
-            {
-                var json = File.ReadAllText(path);
-                return JsonSerializer.Deserialize(json, PortalJsonContext.Default.PortalSet)
-                    ?? new PortalSet();
-            }
-        }
-        catch (Exception ex)
-        {
-            RailReaderLogging.Logger.Error($"Failed to load portals sidecar for {pdfPath}", ex);
-        }
-        return new PortalSet();
-    }
+        => JsonSidecar.Load(PathFor(pdfPath), PortalJsonContext.Default.PortalSet, static () => new PortalSet());
 
     public void Save(string pdfPath)
-    {
-        try
-        {
-            Directory.CreateDirectory(Dir);
-            var json = JsonSerializer.Serialize(this, PortalJsonContext.Default.PortalSet);
-            File.WriteAllText(PathFor(pdfPath), json);
-        }
-        catch (Exception ex)
-        {
-            RailReaderLogging.Logger.Error($"Failed to save portals sidecar for {pdfPath}", ex);
-        }
-    }
+        => JsonSidecar.Save(PathFor(pdfPath), this, PortalJsonContext.Default.PortalSet);
 }
 
 [JsonSourceGenerationOptions(

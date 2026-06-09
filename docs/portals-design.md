@@ -66,8 +66,8 @@ A portal is anchored to **layout blocks**, identified by `(page, blockIndex)` wi
     {
       "id": "…",                 // stable id
       "label": "Figure 3",        // from the target block / caption, editable
-      "source": { "page": 4, "block": 7 },
-      "target": { "page": 9, "block": 2 },
+      "source": { "page": 4, "block": 7, "line": 5 },  // line-precise: fires at the reference, not the whole paragraph
+      "target": { "page": 9, "block": 2 },             // targets are whole-block (line omitted / -1)
       "createdUtc": "2026-06-08T…"
     }
   ]
@@ -87,6 +87,8 @@ Sioyek anchors source/target to raw page coordinates and intersection-tests the 
 - is robust to zoom and to RailReader2's block-locked rail navigation;
 - gives free, meaningful labels ("Figure 3" from the target's role/caption);
 - reuses `FindBlockAt()` hit-testing for the right-click authoring path.
+
+**Sources are line-precise (targets stay whole-block).** Because authoring always happens in rail mode, the source captures the *line* you're on (`pos.LineIndex`), not just the block, plus the line centre's normalized Y for re-analysis stability. A source matches once the reading line reaches its anchored line (`currentLine ≥ anchoredLine`), and "most-recently-passed line wins", so multiple references in one paragraph (line 2 → Fig 3, line 8 → Fig 4) each take over in turn — impossible with a whole-block source. A target is always whole-block (you show the entire figure/table/equation). Pre-line sidecars (no `line` field, default -1) load and behave as whole-block sources.
 
 ### 5.2 Reusable primitives (already in the repo)
 

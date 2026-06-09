@@ -18,6 +18,9 @@ public partial class PortalsView : PaneRefreshView
 {
     private MainWindowViewModel? _vm;
     private TabViewModel? _watchedTab;
+    // Set while a rename is in flight so the resulting PortalsChanged doesn't rebuild the ItemsSource
+    // (and destroy the TextBox) underneath the LostFocus/KeyDown event that triggered it.
+    private bool _suppressRowRebuild;
 
     public PortalsView()
     {
@@ -70,7 +73,11 @@ public partial class PortalsView : PaneRefreshView
         }
     }
 
-    private void OnPortalsChanged() => RefreshIfVisible();
+    private void OnPortalsChanged()
+    {
+        if (_suppressRowRebuild) return;
+        RefreshIfVisible();
+    }
 
     protected override void Refresh()
     {
@@ -103,16 +110,24 @@ public partial class PortalsView : PaneRefreshView
     private void OnLabelLostFocus(object? sender, RoutedEventArgs e)
     {
         if (sender is TextBox { DataContext: PortalRowViewModel row } tb)
-            _vm?.RenamePortal(row.Portal.Id, tb.Text ?? "");
+            Rename(row.Portal.Id, tb.Text);
     }
 
     private void OnLabelKeyDown(object? sender, KeyEventArgs e)
     {
         if (e.Key == Key.Enter && sender is TextBox { DataContext: PortalRowViewModel row } tb)
         {
-            _vm?.RenamePortal(row.Portal.Id, tb.Text ?? "");
+            Rename(row.Portal.Id, tb.Text);
             e.Handled = true;
         }
+    }
+
+    private void Rename(string id, string? label)
+    {
+        // Suppress the row rebuild the rename triggers — it would replace this very TextBox mid-event.
+        _suppressRowRebuild = true;
+        try { _vm?.RenamePortal(id, label ?? ""); }
+        finally { _suppressRowRebuild = false; }
     }
 
     // --- Pop-out / dock ---

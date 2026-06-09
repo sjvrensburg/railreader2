@@ -124,6 +124,10 @@ public sealed partial class MainWindowViewModel
             RestoreSidebarState(Tabs[ActiveTabIndex]);
         }
         OnPropertyChanged(nameof(ActiveTab));
+        // Re-evaluate portals for the now-active tab (or clear them when the last tab closed); also
+        // close any pop-out window once no document remains so it can't linger over an empty app.
+        EvaluatePortals();
+        if (Tabs.Count == 0) DismissPortalWindow();
         InvalidateAll();
     }
 
@@ -147,6 +151,9 @@ public sealed partial class MainWindowViewModel
             RestoreSidebarState(Tabs[index]);
 
             OnPropertyChanged(nameof(ActiveTab));
+            // Core's SelectDocument fires neither PageChanged nor ReadingPositionChanged, so evaluate
+            // portals here — otherwise the previous tab's target crop lingers on a quiescent switch.
+            EvaluatePortals();
             InvalidateAll();
         }
     }
