@@ -184,6 +184,7 @@ public sealed partial class MainWindowViewModel
         SetPortalImage(null);
         ActivePortalLabel = null;
         PortalHint = NoActivePortalHint;
+        InvalidatePortalMarkers();   // no portal active → drop the accent
     }
 
     /// <summary>The page-level (page, block, line) the reading position currently sits on; block/line
@@ -277,6 +278,7 @@ public sealed partial class MainWindowViewModel
             _displayedPortalId = active.Id;
             ActivePortalLabel = active.Label;
             RenderPortalTarget(doc, active.Target.Page, ResolveAnchorBlock(doc, active.Target));
+            InvalidatePortalMarkers();   // accent moved to the newly-active portal
             return;
         }
 
@@ -521,6 +523,7 @@ public sealed partial class MainWindowViewModel
         tab.Portals.Portals.Add(portal);
         tab.Portals.Save(tab.FilePath);
         NotifyPortalsChanged();
+        InvalidatePortalMarkers();
         ShowStatusToast($"Portal created: {portal.Label}");
         EvaluatePortals(forceRender: true);
     }
@@ -559,6 +562,7 @@ public sealed partial class MainWindowViewModel
         if (_displayedPortalId == id)
             ClearActivePortal();
         NotifyPortalsChanged();
+        InvalidatePortalMarkers();
         EvaluatePortals(forceRender: true);
     }
 
@@ -631,6 +635,83 @@ public sealed partial class MainWindowViewModel
                 TargetText = $"Target: {p.Target.Role} · p.{p.Target.Page + 1}",
             });
         return rows;
+    }
+
+    /// <summary>Id of the portal whose target is currently shown (pinned), or null. Read by the marker
+    /// layer to draw the active portal's two markers accented.</summary>
+    public string? DisplayedPortalId => _displayedPortalId;
+
+    /// <summary>Show a specific portal's target in the portal view — the "click a source marker" action.
+    /// Pins it like a normal activation (stays until a different source is reached).</summary>
+    public void ShowPortalTarget(Portal portal)
+    {
+        if (_controller.ActiveDocument is not { } doc) return;
+        _displayedPortalId = portal.Id;
+        ActivePortalLabel = portal.Label;
+        RenderPortalTarget(doc, portal.Target.Page, ResolveAnchorBlock(doc, portal.Target));
+        if (!IsPortalPoppedOut) ShowPane(SidePane.Portals);
+        InvalidatePortalMarkers();
+    }
+
+    /// <summary>Portal markers to draw/hit-test on the current page: a gutter marker per source line and
+    /// a corner badge per target block, positioned from the stored normalized anchors (so they show even
+    /// before a page is analysed). Cheap; no PDFium.</summary>
+    public IReadOnlyList<PortalMarker> BuildPortalMarkers()
+    {
+        if (_controller.ActiveDocument is not { } doc || ActiveTab is not { } tab
+            || tab.Portals.Portals.Count == 0)
+            return [];
+
+        int page = doc.CurrentPage;
+        double pw = doc.PageWidth, ph = doc.PageHeight;
+        if (pw <= 0 || ph <= 0) return [];
+
+        var markers = new List<PortalMarker>();
+
+        // Sources on this page, grouped by their stored (block, line) anchor.
+        var srcGroups = new Dictionary<(int Block, int Line), List<Portal>>();
+        foreach (var p in tab.Portals.Portals)
+        {
+            if (p.Source.Page != page) continue;
+            var key = (p.Source.Block, p.Source.Line);
+            if (!srcGroups.TryGetValue(key, out var list)) srcGroups[key] = list = [];
+            list.Add(p);
+        }
+        foreach (var list in srcGroups.Values)
+        {
+            var a = list[0].Source;
+            markers.Add(new PortalMarker
+            {
+                Kind = PortalMarkerKind.Source,
+                PageX = a.Nx * pw,                                       // source block left edge
+                PageY = (a.Ly >= 0 ? a.Ly : a.Ny + a.Nh / 2f) * ph,     // source line centre (or block centre)
+                Portals = list,
+                IsActive = _displayedPortalId is not null && list.Any(p => p.Id == _displayedPortalId),
+            });
+        }
+
+        // Targets on this page, grouped by their stored block.
+        var tgtGroups = new Dictionary<int, List<Portal>>();
+        foreach (var p in tab.Portals.Portals)
+        {
+            if (p.Target.Page != page) continue;
+            if (!tgtGroups.TryGetValue(p.Target.Block, out var list)) tgtGroups[p.Target.Block] = list = [];
+            list.Add(p);
+        }
+        foreach (var list in tgtGroups.Values)
+        {
+            var a = list[0].Target;
+            markers.Add(new PortalMarker
+            {
+                Kind = PortalMarkerKind.Target,
+                PageX = (a.Nx + a.Nw) * pw,    // target block top-right corner
+                PageY = a.Ny * ph,
+                Portals = list,
+                IsActive = _displayedPortalId is not null && list.Any(p => p.Id == _displayedPortalId),
+            });
+        }
+
+        return markers;
     }
 
     private static string DefaultPortalLabel(DocumentState doc, int page, int block)

@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
 using RailReader.Core.Models;
+using RailReader2.Services;
 using RailReader2.ViewModels;
 using static RailReader.Core.Services.VlmService;
 
@@ -228,6 +229,10 @@ public class ViewportPanel : Panel
             {
                 // Double-click on a detected block → smooth zoom into rail mode at its start.
             }
+            else if (isClick && TryHandlePortalMarkerClick(pos))
+            {
+                // Clicked a portal marker: showed its target, jumped to its source, or opened a chooser.
+            }
             else if (isClick)
             {
                 ViewModel.HandleClick(pos.X, pos.Y);
@@ -379,5 +384,63 @@ public class ViewportPanel : Panel
         double pageX = (screenPos.X - tab.Camera.OffsetX) / tab.Camera.Zoom;
         double pageY = (screenPos.Y - tab.Camera.OffsetY) / tab.Camera.Zoom;
         return (pageX, pageY);
+    }
+
+    /// <summary>Hit-test the always-on portal markers (screen-space, fixed pixel radius). Returns true if
+    /// a marker was clicked and acted on, so the normal click handler is skipped.</summary>
+    private bool TryHandlePortalMarkerClick(Point screenPos)
+    {
+        if (ViewModel is not { } vm || vm.ActiveTab is not { } tab) return false;
+        var markers = vm.BuildPortalMarkers();
+        if (markers.Count == 0) return false;
+
+        double zoom = tab.Camera.Zoom, ox = tab.Camera.OffsetX, oy = tab.Camera.OffsetY;
+        const double maxSq = PortalMarkerGeometry.HitRadius * PortalMarkerGeometry.HitRadius;
+        PortalMarker? hit = null;
+        double bestSq = maxSq;
+        foreach (var m in markers)
+        {
+            var (cx, cy) = PortalMarkerGeometry.ScreenCentre(
+                m.Kind == PortalMarkerKind.Source, m.PageX, m.PageY, zoom, ox, oy);
+            double dx = screenPos.X - cx, dy = screenPos.Y - cy;
+            double dsq = dx * dx + dy * dy;
+            if (dsq <= bestSq) { bestSq = dsq; hit = m; }
+        }
+        if (hit is null) return false;
+
+        ActOnPortalMarker(vm, hit);
+        return true;
+    }
+
+    /// <summary>Single portal → act directly (show target / go to source); several → a chooser flyout.</summary>
+    private void ActOnPortalMarker(MainWindowViewModel vm, PortalMarker marker)
+    {
+        if (marker.Portals.Count == 1)
+        {
+            InvokePortal(vm, marker.Kind, marker.Portals[0]);
+            return;
+        }
+
+        var menu = new ContextMenu();
+        foreach (var portal in marker.Portals)
+        {
+            string header = marker.Kind == PortalMarkerKind.Source
+                ? portal.Label   // pick which target to show
+                : $"{portal.Label}  —  from p.{portal.Source.Page + 1}"
+                  + (portal.Source.Line >= 0 ? $", line {portal.Source.Line + 1}" : "");
+            var item = new MenuItem { Header = header };
+            var captured = portal;
+            item.Click += (_, _) => InvokePortal(vm, marker.Kind, captured);
+            menu.Items.Add(item);
+        }
+        menu.Open(this);
+    }
+
+    private static void InvokePortal(MainWindowViewModel vm, PortalMarkerKind kind, Portal portal)
+    {
+        if (kind == PortalMarkerKind.Source)
+            vm.ShowPortalTarget(portal);
+        else
+            vm.GoToPortalSource(portal.Id);
     }
 }

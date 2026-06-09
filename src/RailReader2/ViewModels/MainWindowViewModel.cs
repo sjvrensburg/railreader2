@@ -726,6 +726,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     private void InvalidateCamera() => _invalidation?.InvalidateCamera?.Invoke();
     private void InvalidatePage() => _invalidation?.InvalidatePage?.Invoke();
     private void InvalidateOverlay() => _invalidation?.InvalidateOverlay?.Invoke();
+    internal void InvalidatePortalMarkers() => _invalidation?.InvalidatePortalMarkers?.Invoke();
 
     /// <summary>Raised whenever the search layer is invalidated (match navigation, page
     /// change, results finalised) so the Search pane refreshes its "N of M" display.</summary>
@@ -779,6 +780,9 @@ public sealed class InvalidationCallbacks
     public Action? InvalidateOverlay { get; init; }
     public Action? InvalidateSearch { get; init; }
     public Action? InvalidateAnnotations { get; init; }
+
+    /// <summary>Re-render the portal marker overlay (accent moved / portal added or removed).</summary>
+    public Action? InvalidatePortalMarkers { get; init; }
 
     /// <summary>Tell the document viewport's accessibility peer to re-evaluate and announce its state.
     /// Driven by Core's PageChanged / ReadingPositionChanged callbacks.</summary>

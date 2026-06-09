@@ -25,6 +25,8 @@
             <v:SearchHighlightLayer Name="SearchLayer" />
             <v:AnnotationLayer Name="AnnotationLayer" />
             <v:RailOverlayLayer Name="OverlayLayer" />
+            <!-- Always-on portal markers (gutter for sources, corner badge for targets) on top. -->
+            <v:PortalMarkerLayer Name="PortalMarkerLayer" />
         </v:ViewportPanel>
 
         <!-- Minimap overlay -->

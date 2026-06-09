@@ -82,6 +82,7 @@ public partial class MainWindow : Window
         // SearchInvalidated event; here we only repaint the highlight layer.
         InvalidateSearch = () => Document.RenderSearch(),
         InvalidateAnnotations = () => Document.RenderAnnotations(),
+        InvalidatePortalMarkers = () => Document.RenderPortalMarkers(),
         AnnounceAccessibility = () => Document.NotifyAccessibility(),
     };
 
