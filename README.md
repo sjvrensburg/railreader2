@@ -94,7 +94,7 @@ At high zoom levels, navigation switches to "rail mode" — the viewer locks ont
 
 - **Multi-tab support** — open multiple PDFs with independent per-tab state. Right-click a tab to duplicate or close
 - **Tab bar overflow** — tabs shrink with ellipsis when many are open. Horizontal mouse wheel scrolls the tab bar. Overflow dropdown button lists all tabs
-- **Side panel (accordion)** — a single-open accordion: opening one section collapses the others, and the open section fills the panel. Sections are **Outline** (table of contents, Ctrl+Shift+O), **Bookmarks** (named bookmarks, Ctrl+Shift+B), **Index** (figures/tables/equations browser with thumbnails and extracted equation text, Ctrl+Shift+I), **Search** (full-document text search, Ctrl+F), and **Comments** (a list of annotation notes and in-PDF reviewer comments). Toggle the whole panel with the sidebar button at the left of the tab strip
+- **Side panel (accordion)** — a single-open accordion: opening one section collapses the others, and the open section fills the panel. Sections are **Outline** (table of contents, Ctrl+Shift+O), **Bookmarks** (named bookmarks, Ctrl+Shift+B), **Index** (figures/tables/equations browser with thumbnails and extracted equation text, Ctrl+Shift+I), **Search** (full-document text search, Ctrl+F), **Comments** (a list of annotation notes and in-PDF reviewer comments), and **Portals** (linked context viewports — keep a referenced figure/table/equation in view while you read; see below). Toggle the whole panel with the sidebar button at the left of the tab strip
 - **Whole-document figure scan** — the Index section's **Scan All** button sweeps every page for figures, tables, and equations (beyond the background lookahead), building a complete browsable index with thumbnails
 - **Focus follows navigation** — clicking an entry in any side-panel section (an outline heading, search result, bookmark, or figure) moves keyboard focus back to the page, so scrolling immediately drives the document rather than the list
 - **Named bookmarks** — bookmark any page with a custom name (B key or + button in the Bookmarks section). Navigate to bookmarks with a single click. Rename and delete inline. "Back to previous location" button for quick return after jumping. Bookmarks persist in the document's annotation store (keyed by the PDF's path)
@@ -102,6 +102,7 @@ At high zoom levels, navigation switches to "rail mode" — the viewer locks ont
 - **On-screen nav buttons** — ◀/▶ buttons in the status bar for mouse-only page navigation
 - **Search** — full-document text search in the side panel's Search section, with results grouped by page, text snippets with highlighted match terms, regex and case sensitivity toggles, and match highlighting on the page (Ctrl+F)
 - **Copy as LaTeX** — send any detected equation, table, or figure to a Vision Language Model and copy the result to clipboard. Equations → LaTeX, tables → Markdown, figures → description. Access via `Ctrl+L` (current block), `Ctrl+right-click` (context menu), or Edit menu. Works with cloud APIs (OpenAI `gpt-5.4-nano-2026-03-17` recommended) or local models ([Ollama](https://ollama.com), [vLLM](docs/vllm-guide.md)). Configure in Settings > VLM. See the [VLM setup guide](docs/vllm-guide.md) for all options
+- **Portals (linked context viewports)** — link a reference in the text ("see Figure 3") to the figure, table, or equation it points to, and the target stays in view as you rail-read past the reference. The linked target shows in a docked **Portals** side-panel section and, optionally, a detachable always-on-top pop-out window for multi-monitor setups. Author a link from the Index pane's **Link ↪** button or by right-clicking a detected block; line-precise sources mean several references in one paragraph each surface their own target in turn. Always-on **on-page markers** (a gutter dot at the source line, a corner badge on the target block) show where portals are anchored — click one to show its target or jump to its source. **Open in Portal (Temporary)** peeks any block in the pop-out without saving a link, auto-dismissing as you read on. Portals persist per-document in a sidecar (keyed by the PDF's path). The concept — and the name — is borrowed from [Sioyek](https://sioyek.info/), whose Portals feature inspired this
 
 #### Annotations & text
 
@@ -336,8 +337,7 @@ RailReader2.slnx              # Default solution
 ├── src/RailReader2/            # Thin Avalonia UI shell
 ├── src/RailReader2.Cli/        # Headless CLI
 ├── src/RailReader.Export/      # Markdown export pipeline
-├── tests/RailReader.Core.Tests/  # xUnit headless tests against the Core packages
-└── tests/RailReader.Export.Tests/ # xUnit tests for Export
+└── tests/RailReader.Export.Tests/ # xUnit tests for Export (Core tests live upstream in RailReaderCore)
 ```
 
 ## Command-line interface
@@ -393,7 +393,7 @@ dotnet build RailReader2.slnx
 ### Test
 
 ```bash
-dotnet test tests/RailReader.Core.Tests
+dotnet test tests/RailReader.Export.Tests
 ```
 
 ### Run from source

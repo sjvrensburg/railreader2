@@ -19,11 +19,12 @@ Everything you need to know to get the most out of railreader2.
 11. [Text Selection](#text-selection)
 12. [Bookmarks](#bookmarks)
 13. [Index Pane](#index-pane)
-14. [Copy as LaTeX (VLM)](#copy-as-latex-vlm)
-15. [CLI Tool](#cli-tool)
-16. [Settings](#settings)
-17. [Troubleshooting](#troubleshooting)
-18. [Keyboard Shortcuts](#keyboard-shortcuts)
+14. [Portals](#portals)
+15. [Copy as LaTeX (VLM)](#copy-as-latex-vlm)
+16. [CLI Tool](#cli-tool)
+17. [Settings](#settings)
+18. [Troubleshooting](#troubleshooting)
+19. [Keyboard Shortcuts](#keyboard-shortcuts)
 
 ---
 
@@ -373,7 +374,7 @@ Bookmarks are stored in the same annotation file as highlights, notes, and other
 
 ## Index Pane
 
-Press `Ctrl+Shift+I` to open the **Index** pane — a browsable index of all figures, tables, and equations detected by the layout analysis model. It is one of the side-panel accordion sections (alongside Outline, Bookmarks, Search, and Comments).
+Press `Ctrl+Shift+I` to open the **Index** pane — a browsable index of all figures, tables, and equations detected by the layout analysis model. It is one of the side-panel accordion sections (alongside Outline, Bookmarks, Search, Comments, and Portals). Each entry also carries a **Link ↪** button for creating a [portal](#portals) to that figure, table, or equation.
 
 ### How it works
 
@@ -391,6 +392,37 @@ Each entry shows:
 - **Equations** — the extracted text content from the PDF text layer (e.g., Unicode math symbols)
 
 Use the **Figures**, **Tables**, and **Equations** toggle buttons at the top to filter by category. Click any entry to navigate to that page (focus returns to the page so you can scroll straight away).
+
+---
+
+## Portals
+
+A **portal** links a reference in the text — a "see Figure 3", a "cf. Table 2", an "(Eq. 7)" — to the figure, table, or equation it points to. Once linked, the target stays in view while you rail-read past the reference, so you never have to scroll away from the paragraph to see what it cites. The linked target appears in the side panel's **Portals** section and, optionally, in a detachable always-on-top pop-out window you can drag to a second monitor.
+
+### Creating a portal
+
+- **From the Index pane** — open the **Index** section, find the figure/table/equation, and click its **Link ↪** button while rail-reading the paragraph that refers to it.
+- **From the page** — right-click a detected block and choose **Create Portal — Keep This Block In View While Reading**. Or use the two-step **Set as Portal Target** → **Link Target to Current Paragraph** when it is easier to mark the figure first and find the reference afterwards.
+
+Sources are **line-precise**: the link fires at the exact line you were on, so several references in one paragraph (line 2 → Figure 3, line 8 → Figure 4) each surface their own target in turn. The shown target stays pinned until you reach a *different* portal's source, so it never flickers as you scroll.
+
+### On-page markers
+
+Subtle, always-on markers show where portals are anchored on the current page: a small **gutter dot** beside each source line and a **corner badge** on each target block. The currently-shown portal is drawn accented. Click a marker to act on it — a source shows its target, a target jumps back to its source; a marker standing for several portals opens a chooser.
+
+### Pop-out window
+
+Click **Pop out ↗** in the Portals pane (or click the docked preview) to detach the target into a floating, borderless, always-on-top window — useful on a multi-monitor setup. Drag its top bar to move it, the corner grip to resize; the **Pin** toggle controls always-on-top, and **Dock** returns it to the panel. Its size and position are remembered between pop-outs.
+
+### Temporary peek
+
+To glance at a block without saving a link, right-click it and choose **Open in Portal (Temporary)**. It opens in the pop-out window only, leaves any saved portal's tracking untouched, and dismisses itself once you read on.
+
+### Managing portals
+
+The Portals pane lists every portal in the document. Rename one inline, click **Go to source** to jump to and frame its reference, or **Delete** to remove it. Portals are saved per-document in a sidecar keyed by the PDF's path, so they persist across sessions.
+
+> **Acknowledgement:** the portal concept — and the name — is borrowed from [Sioyek](https://sioyek.info/), a PDF reader for research papers whose Portals feature inspired this one.
 
 ---
 

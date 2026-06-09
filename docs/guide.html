@@ -37,10 +37,10 @@
       {
         "@type": "TechArticle",
         "headline": "User Guide — railreader2",
-        "description": "Complete user guide for railreader2 — a desktop PDF viewer with AI-guided rail reading. Covers rail mode, auto-scroll, jump mode, colour effects, annotations, search, bookmarks, and all keyboard shortcuts.",
+        "description": "Complete user guide for railreader2 — a desktop PDF viewer with AI-guided rail reading. Covers rail mode, auto-scroll, jump mode, colour effects, annotations, search, bookmarks, portals, and all keyboard shortcuts.",
         "url": "https://sjvrensburg.github.io/railreader2/guide.html",
         "datePublished": "2026-02-26",
-        "dateModified": "2026-06-05",
+        "dateModified": "2026-06-09",
         "author": {
           "@type": "Person",
           "name": "Stéfan Janse van Rensburg"
@@ -124,6 +124,7 @@
         <li><a href="#bookmarks">Bookmarks</a></li>
         <li><a href="#figures-panel">Index Pane</a></li>
         <li><a href="#comments">Comments</a></li>
+        <li><a href="#portals">Portals</a></li>
         <li><a href="#vlm">Copy as LaTeX (VLM)</a></li>
         <li><a href="#cli-tool">CLI Tool</a></li>
         <li><a href="#settings">Settings</a></li>
@@ -742,6 +743,71 @@
         <li><strong>Review state:</strong> for in-PDF reviewer comments, you can change the review
           state inline from the list.</li>
       </ul>
+    </section>
+
+    <!-- Portals -->
+    <section class="guide-section" id="portals">
+      <h2>Portals</h2>
+      <p>
+        A <strong>portal</strong> links a reference in the text &mdash; a &ldquo;see Figure&nbsp;3&rdquo;,
+        a &ldquo;cf. Table&nbsp;2&rdquo;, an &ldquo;(Eq.&nbsp;7)&rdquo; &mdash; to the figure, table, or
+        equation it points to. Once linked, the target stays in view while you rail-read past the
+        reference, so you never have to scroll away from the paragraph to see what it cites.
+      </p>
+      <p>
+        The linked target appears in the side panel's <strong>Portals</strong> section, and &mdash;
+        optionally &mdash; in a detachable, always-on-top pop-out window you can drag to a second monitor.
+      </p>
+      <h3>Creating a portal</h3>
+      <ul>
+        <li><strong>From the Index pane:</strong> open the <strong>Index</strong> section, find the figure,
+          table, or equation, and click its <strong>Link&nbsp;&#8618;</strong> button while you are
+          rail-reading the paragraph that refers to it.</li>
+        <li><strong>From the page:</strong> right-click a detected block and choose
+          <strong>Create Portal &mdash; Keep This Block In View While Reading</strong>. Or use the two-step
+          <strong>Set as Portal Target</strong> &rarr; <strong>Link Target to Current Paragraph</strong> when
+          it is easier to mark the figure first and find the reference afterwards.</li>
+      </ul>
+      <p>
+        Sources are <strong>line-precise</strong>: the link fires at the exact line you were on, so several
+        references in one paragraph (line&nbsp;2 &rarr; Figure&nbsp;3, line&nbsp;8 &rarr; Figure&nbsp;4) each
+        surface their own target in turn. The shown target stays pinned until you reach a
+        <em>different</em> portal's source, so it never flickers as you scroll.
+      </p>
+      <h3>On-page markers</h3>
+      <p>
+        Subtle, always-on markers show where portals are anchored on the current page: a small
+        <strong>gutter dot</strong> beside each source line and a <strong>corner badge</strong> on each
+        target block. The currently-shown portal is drawn accented. Click a marker to act on it &mdash; a
+        source jumps to (shows) its target, a target jumps back to its source; a marker that stands for
+        several portals opens a chooser.
+      </p>
+      <h3>Pop-out window</h3>
+      <p>
+        Click <strong>Pop out&nbsp;&#8599;</strong> in the Portals pane (or click the docked preview) to
+        detach the target into a floating, borderless, always-on-top window &mdash; useful on a
+        multi-monitor setup. Drag its top bar to move it, the corner grip to resize; the
+        <strong>Pin</strong> toggle controls always-on-top, and <strong>Dock</strong> returns it to the
+        panel. Its size and position are remembered.
+      </p>
+      <h3>Temporary peek</h3>
+      <p>
+        To glance at a block without saving a link, right-click it and choose
+        <strong>Open in Portal (Temporary)</strong>. It opens in the pop-out window only, leaves any saved
+        portal's tracking untouched, and dismisses itself once you read on.
+      </p>
+      <h3>Managing portals</h3>
+      <p>
+        The Portals pane lists every portal in the document. Rename a portal inline, click
+        <strong>Go to source</strong> to jump to and frame its reference, or <strong>Delete</strong> to
+        remove it. Portals are saved per-document in a sidecar keyed by the PDF's path, so they persist
+        across sessions.
+      </p>
+      <p class="note">
+        <strong>Acknowledgement:</strong> the portal concept &mdash; and the name &mdash; is borrowed from
+        <a href="https://sioyek.info/">Sioyek</a>, a PDF reader for research papers whose Portals feature
+        inspired this one.
+      </p>
     </section>
 
     <!-- VLM -->
