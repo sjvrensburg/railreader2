@@ -1,6 +1,5 @@
 using System.Linq;
 using Avalonia.Media.Imaging;
-using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using RailReader.Core;
 using RailReader.Core.Models;
@@ -586,11 +585,12 @@ public sealed partial class MainWindowViewModel
         NotifyPortalsChanged();
     }
 
-    // Frame-zoom duration for "Go to source"; the line seek is deferred just past it.
+    // Frame-zoom duration for the list's "Go to source" action.
     private const double GoToSourceFrameMs = 320.0;
 
     /// <summary>Navigate to a portal's source block, frame it, and seat the rail on the exact source
-    /// line (the list's "Go to source" action).</summary>
+    /// line (the list's "Go to source" action). Core 0.27.0's SmoothlyFrameBlock seats the line as part
+    /// of the framing — line clamps to 0 for a whole-block source — so no post-frame seek is needed.</summary>
     public void GoToPortalSource(string id)
     {
         if (_controller.ActiveDocument is not { } doc || ActiveTab is not { } tab) return;
@@ -602,28 +602,8 @@ public sealed partial class MainWindowViewModel
         if (block < 0) { RequestViewportFocus(); return; }
 
         int line = ResolveAnchorLine(doc, portal.Source, block);   // -1 for a whole-block source
-        bool framed = SmoothlyFrameBlock(block, durationMs: GoToSourceFrameMs);
-        if (framed && line > 0)
-            SeekRailLineAfterFrame(line);
+        SmoothlyFrameBlock(block, durationMs: GoToSourceFrameMs, line: Math.Max(0, line));
         RequestViewportFocus();
-    }
-
-    /// <summary>SmoothlyFrameBlock seats line 0 and re-zeroes the line when the rail activates mid-zoom,
-    /// so defer the line seek until the frame settles, then snap to the source line.</summary>
-    private void SeekRailLineAfterFrame(int line)
-    {
-        var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(GoToSourceFrameMs + 80) };
-        timer.Tick += (_, _) =>
-        {
-            timer.Stop();
-            if (_controller.ActiveDocument is not { Rail: { Active: true, HasAnalysis: true } rail } d) return;
-            rail.CurrentLine = Math.Clamp(line, 0, Math.Max(0, rail.CurrentNavigableBlock.Lines.Count - 1));
-            var (ww, wh) = _controller.GetViewportSize();
-            d.StartSnap(ww, wh);
-            InvalidateCameraAndTab();
-            RequestAnimationFrame();
-        };
-        timer.Start();
     }
 
     /// <summary>Snapshot the active document's portals as display rows (cheap, no PDFium).</summary>
