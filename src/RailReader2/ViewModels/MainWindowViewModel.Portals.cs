@@ -448,11 +448,17 @@ public sealed partial class MainWindowViewModel
         return best;
     }
 
+    /// <summary>Block bbox as fractions of the page size. The single source of the normalization
+    /// convention, so the anchor written by <see cref="MakeAnchor"/> and the comparison in
+    /// <see cref="BBoxClose"/> can never drift out of step (the ε fast-path validation relies on them
+    /// matching to the bit).</summary>
+    private static (float Nx, float Ny, float Nw, float Nh) Normalize(BBox b, double pageW, double pageH)
+        => ((float)(b.X / pageW), (float)(b.Y / pageH), (float)(b.W / pageW), (float)(b.H / pageH));
+
     private static bool BBoxClose(BBox b, PortalAnchor a, double pageW, double pageH)
     {
         const float eps = 0.02f;
-        float nx = (float)(b.X / pageW), ny = (float)(b.Y / pageH);
-        float nw = (float)(b.W / pageW), nh = (float)(b.H / pageH);
+        var (nx, ny, nw, nh) = Normalize(b, pageW, pageH);
         return Math.Abs(nx - a.Nx) < eps && Math.Abs(ny - a.Ny) < eps
             && Math.Abs(nw - a.Nw) < eps && Math.Abs(nh - a.Nh) < eps;
     }
@@ -464,16 +470,17 @@ public sealed partial class MainWindowViewModel
         var (pageW, pageH) = PageSize(doc, page);
         var b = doc.AnalysisCache[page].Blocks[block];
         float ly = line >= 0 && line < b.Lines.Count ? (float)(b.Lines[line].Y / pageH) : -1f;
+        var (nx, ny, nw, nh) = Normalize(b.BBox, pageW, pageH);
         return new PortalAnchor
         {
             Page = page,
             Block = block,
             Line = line,
             Role = b.Role.ToString(),
-            Nx = (float)(b.BBox.X / pageW),
-            Ny = (float)(b.BBox.Y / pageH),
-            Nw = (float)(b.BBox.W / pageW),
-            Nh = (float)(b.BBox.H / pageH),
+            Nx = nx,
+            Ny = ny,
+            Nw = nw,
+            Nh = nh,
             Ly = ly,
         };
     }
