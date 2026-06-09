@@ -14,11 +14,14 @@ namespace RailReader2.Services;
 /// </summary>
 public sealed class PortalWindowSettings
 {
+    public const double DefaultWidth = 420;
+    public const double DefaultHeight = 320;
+
     // int.MinValue is the "no saved position" sentinel → centre on first pop-out.
     public int X { get; set; } = int.MinValue;
     public int Y { get; set; } = int.MinValue;
-    public double Width { get; set; } = 420;
-    public double Height { get; set; } = 320;
+    public double Width { get; set; } = DefaultWidth;
+    public double Height { get; set; } = DefaultHeight;
     public bool Topmost { get; set; } = true;
 
     // Treat (0,0) as "unset" as well as the int.MinValue sentinel: some Linux/Wayland compositors
@@ -30,8 +33,15 @@ public sealed class PortalWindowSettings
     public static string Path => System.IO.Path.Combine(AppConfig.ConfigDir, "portal_window.json");
 
     public static PortalWindowSettings Load()
-        => JsonSidecar.Load(Path, PortalWindowJsonContext.Default.PortalWindowSettings,
+    {
+        var s = JsonSidecar.Load(Path, PortalWindowJsonContext.Default.PortalWindowSettings,
             static () => new PortalWindowSettings());
+        // Guard a corrupt/hand-edited sidecar: a non-positive size would make the pop-out zero-sized.
+        // (Save always persists a positive size, so this only bites on manual tampering.)
+        if (s.Width <= 0) s.Width = DefaultWidth;
+        if (s.Height <= 0) s.Height = DefaultHeight;
+        return s;
+    }
 
     public void Save()
         => JsonSidecar.Save(Path, this, PortalWindowJsonContext.Default.PortalWindowSettings);

@@ -268,12 +268,12 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         catch (Exception ex) { _logger.Error("[ONNX] Worker init failed", ex); }
         _controller.StateChanged += OnControllerStateChanged;
         _controller.StatusMessage += ShowStatusToast;
-        // Push-based accessibility announcements: Core fires these (on the UI thread) the moment the
-        // page or rail reading position changes — including jumps that don't otherwise repaint the
-        // overlay (e.g. NavigateToRole). The render path still calls NotifyAccessibilityStateChanged
-        // for mode transitions; the peer's signature debounce makes the overlap free.
-        _controller.PageChanged = p => { AnnounceAccessibilityState(); EvaluatePortals(); };
-        _controller.ReadingPositionChanged = _ => { AnnounceAccessibilityState(); EvaluatePortals(); };
+        // Push-based reading-context updates: Core fires these (on the UI thread) the moment the page
+        // or rail reading position changes — including jumps that don't otherwise repaint the overlay
+        // (e.g. NavigateToRole). Both fan out through the one OnReadingContextChanged chokepoint so a
+        // future consumer of "the reading context moved" has a single place to hook.
+        _controller.PageChanged = _ => OnReadingContextChanged();
+        _controller.ReadingPositionChanged = _ => OnReadingContextChanged();
         WireAnnotationStoreSignals();
         SetupPollTimer();
     }
@@ -309,6 +309,15 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
     private void AnnounceAccessibilityState() => _invalidation?.AnnounceAccessibility?.Invoke();
 
+    /// <summary>The reading context (current page / rail line) changed: re-announce accessibility state
+    /// and re-evaluate which portal the reading position is inside. Driven by Core's PageChanged /
+    /// ReadingPositionChanged callbacks — the single place those two converge.</summary>
+    private void OnReadingContextChanged()
+    {
+        AnnounceAccessibilityState();
+        EvaluatePortals();
+    }
+
     // --- Poll timer & animation ---
 
     private void SetupPollTimer()
@@ -324,8 +333,10 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
                 tab.SubmitPendingLookahead(_controller.Worker);
             if (gotResults)
                 InvalidateOverlay();
-            // A pending portal whose target page just finished analysing re-renders here.
-            EvaluatePortals(forceRender: gotResults);
+            // Only force a portal re-evaluation when a pinned target is still waiting on its page to
+            // analyse — otherwise the reading-position callbacks + memo already cover the steady case,
+            // and forcing on every unrelated analysis result would defeat the fast path.
+            EvaluatePortals(forceRender: gotResults && _portalTargetPending);
             if (needsAnim)
                 RequestAnimationFrame();
             bool workerBusy = _controller.Worker is not null && !_controller.Worker.IsIdle;
@@ -345,8 +356,9 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             var (gotResults, _, _) = _controller.PollAnalysisResults();
             if (gotResults)
                 InvalidateOverlay();
-            // A pending portal whose target page just finished analysing re-renders here.
-            EvaluatePortals(forceRender: gotResults);
+            // As above: force only when a pinned target is still resolving, so background read-ahead
+            // (one result per analysed page) doesn't bypass the memo on every page.
+            EvaluatePortals(forceRender: gotResults && _portalTargetPending);
 
             bool hasWork = _controller.HasBackgroundAnalysisWork;
             bool railActive = _controller.ActiveDocument?.Rail.Active == true;

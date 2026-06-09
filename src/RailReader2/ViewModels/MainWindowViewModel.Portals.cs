@@ -43,10 +43,7 @@ public sealed partial class MainWindowViewModel
         {
             _portalPeekImage = value;
             OnPropertyChanged(nameof(PortalPeekImage));
-            OnPropertyChanged(nameof(PortalWindowImage));
-            OnPropertyChanged(nameof(PortalWindowLabel));
-            OnPropertyChanged(nameof(PortalWindowHint));
-            OnPropertyChanged(nameof(ShouldShowPortalWindow));
+            RaisePortalWindowProps();   // a peek change flips every pop-out-window-derived property
         }
     }
     private Bitmap? _portalPeekImageBehind;
@@ -73,6 +70,17 @@ public sealed partial class MainWindowViewModel
     partial void OnPortalPeekLabelChanged(string? value) => OnPropertyChanged(nameof(PortalWindowLabel));
     partial void OnPortalHintChanged(string? value) => OnPropertyChanged(nameof(PortalWindowHint));
     partial void OnIsPortalPoppedOutChanged(bool value) => OnPropertyChanged(nameof(ShouldShowPortalWindow));
+
+    // The pop-out window's content (PortalWindowImage/Label/Hint) and visibility (ShouldShowPortalWindow)
+    // are all derived from the peek + tracking state, so a peek swap flips all of them at once. The
+    // single-source partial hooks above each raise just the one derived prop their own field feeds.
+    private void RaisePortalWindowProps()
+    {
+        OnPropertyChanged(nameof(PortalWindowImage));
+        OnPropertyChanged(nameof(PortalWindowLabel));
+        OnPropertyChanged(nameof(PortalWindowHint));
+        OnPropertyChanged(nameof(ShouldShowPortalWindow));
+    }
 
     // Id of the portal whose crop the tracking preview is currently showing (pinned), or null when
     // nothing is shown. The preview stays on this portal until the reading position reaches a different
@@ -175,9 +183,14 @@ public sealed partial class MainWindowViewModel
         SetPeekImage(null);
     }
 
-    /// <summary>Clear the saved-portal tracking preview (image, label, hint, debounce/display ids).</summary>
+    /// <summary>Clear the saved-portal tracking preview (image, label, hint, debounce/display ids).
+    /// Idempotent — a no-op (no notifications, no marker repaint) when nothing is currently shown, so
+    /// callers can invoke it unconditionally.</summary>
     private void ClearActivePortal()
     {
+        if (_displayedPortalId is null && ActivePortalImage is null
+            && !_portalTargetPending && ActivePortalLabel is null)
+            return;
         _displayedPortalId = null;
         _portalTargetPending = false;
         SetPortalImage(null);
@@ -206,8 +219,7 @@ public sealed partial class MainWindowViewModel
         if (_controller.ActiveDocument is not { } doc || ActiveTab is not { } tab)
         {
             ClearPortalPeek();
-            if (_displayedPortalId is not null || ActivePortalImage is not null)
-                ClearActivePortal();
+            ClearActivePortal();
             _portalImageOwner = null;
             _lastEvalReadingBlock = null;
             _pageSizeCache.Clear();
@@ -242,8 +254,7 @@ public sealed partial class MainWindowViewModel
         // No portals: clear any tracking image (e.g. last portal deleted, or a stale crop on tab switch).
         if (tab.Portals.Portals.Count == 0)
         {
-            if (_displayedPortalId is not null || ActivePortalImage is not null)
-                ClearActivePortal();
+            ClearActivePortal();
             return;
         }
 
@@ -274,18 +285,14 @@ public sealed partial class MainWindowViewModel
         // the block, scrolling around — until another portal's source is crossed.
         if (active is not null && active.Id != _displayedPortalId)
         {
-            _displayedPortalId = active.Id;
-            ActivePortalLabel = active.Label;
-            RenderPortalTarget(doc, active.Target.Page, ResolveAnchorBlock(doc, active.Target));
-            InvalidatePortalMarkers();   // accent moved to the newly-active portal
+            Pin(doc, active);
             return;
         }
 
         // Nothing pinned (tab switch with no active source on the new tab, or never activated) → clear.
         if (_displayedPortalId is null)
         {
-            if (ActivePortalImage is not null || _portalTargetPending || ActivePortalLabel is not null)
-                ClearActivePortal();
+            ClearActivePortal();
             return;
         }
 
@@ -628,16 +635,23 @@ public sealed partial class MainWindowViewModel
     /// layer to draw the active portal's two markers accented.</summary>
     public string? DisplayedPortalId => _displayedPortalId;
 
+    /// <summary>Pin a portal as the shown one: render its target into the tracking preview, label it,
+    /// and accent its markers. Shared by the sync loop's activation and the marker-click path.</summary>
+    private void Pin(DocumentState doc, Portal portal)
+    {
+        _displayedPortalId = portal.Id;
+        ActivePortalLabel = portal.Label;
+        RenderPortalTarget(doc, portal.Target.Page, ResolveAnchorBlock(doc, portal.Target));
+        InvalidatePortalMarkers();
+    }
+
     /// <summary>Show a specific portal's target in the portal view — the "click a source marker" action.
     /// Pins it like a normal activation (stays until a different source is reached).</summary>
     public void ShowPortalTarget(Portal portal)
     {
         if (_controller.ActiveDocument is not { } doc) return;
-        _displayedPortalId = portal.Id;
-        ActivePortalLabel = portal.Label;
-        RenderPortalTarget(doc, portal.Target.Page, ResolveAnchorBlock(doc, portal.Target));
+        Pin(doc, portal);
         if (!IsPortalPoppedOut) ShowPane(SidePane.Portals);
-        InvalidatePortalMarkers();
     }
 
     /// <summary>Portal markers to draw/hit-test on the current page: a gutter marker per source line and
@@ -655,48 +669,41 @@ public sealed partial class MainWindowViewModel
 
         var markers = new List<PortalMarker>();
 
-        // Sources on this page, grouped by their stored (block, line) anchor.
-        var srcGroups = new Dictionary<(int Block, int Line), List<Portal>>();
-        foreach (var p in tab.Portals.Portals)
+        // One marker per distinct anchor on this page, grouping every portal that shares it (a source
+        // line can link several targets; a target block several sources) so a multi-portal marker can
+        // open a chooser. The endpoint differs only in which anchor is read, the group key, and where
+        // the glyph sits.
+        void AddMarkers(PortalMarkerKind kind, Func<Portal, PortalAnchor> endpoint,
+            Func<PortalAnchor, (int, int)> key, Func<PortalAnchor, (double X, double Y)> position)
         {
-            if (p.Source.Page != page) continue;
-            var key = (p.Source.Block, p.Source.Line);
-            if (!srcGroups.TryGetValue(key, out var list)) srcGroups[key] = list = [];
-            list.Add(p);
-        }
-        foreach (var list in srcGroups.Values)
-        {
-            var a = list[0].Source;
-            markers.Add(new PortalMarker
+            var groups = new Dictionary<(int, int), List<Portal>>();
+            foreach (var p in tab.Portals.Portals)
             {
-                Kind = PortalMarkerKind.Source,
-                PageX = a.Nx * pw,                                       // source block left edge
-                PageY = (a.Ly >= 0 ? a.Ly : a.Ny + a.Nh / 2f) * ph,     // source line centre (or block centre)
-                Portals = list,
-                IsActive = _displayedPortalId is not null && list.Any(p => p.Id == _displayedPortalId),
-            });
+                var a = endpoint(p);
+                if (a.Page != page) continue;
+                if (!groups.TryGetValue(key(a), out var list)) groups[key(a)] = list = [];
+                list.Add(p);
+            }
+            foreach (var list in groups.Values)
+            {
+                var (x, y) = position(endpoint(list[0]));
+                markers.Add(new PortalMarker
+                {
+                    Kind = kind,
+                    PageX = x,
+                    PageY = y,
+                    Portals = list,
+                    IsActive = _displayedPortalId is not null && list.Any(p => p.Id == _displayedPortalId),
+                });
+            }
         }
 
-        // Targets on this page, grouped by their stored block.
-        var tgtGroups = new Dictionary<int, List<Portal>>();
-        foreach (var p in tab.Portals.Portals)
-        {
-            if (p.Target.Page != page) continue;
-            if (!tgtGroups.TryGetValue(p.Target.Block, out var list)) tgtGroups[p.Target.Block] = list = [];
-            list.Add(p);
-        }
-        foreach (var list in tgtGroups.Values)
-        {
-            var a = list[0].Target;
-            markers.Add(new PortalMarker
-            {
-                Kind = PortalMarkerKind.Target,
-                PageX = (a.Nx + a.Nw) * pw,    // target block top-right corner
-                PageY = a.Ny * ph,
-                Portals = list,
-                IsActive = _displayedPortalId is not null && list.Any(p => p.Id == _displayedPortalId),
-            });
-        }
+        // Sources: gutter marker at the block's left edge, at the line centre (or block centre).
+        AddMarkers(PortalMarkerKind.Source, p => p.Source, a => (a.Block, a.Line),
+            a => (a.Nx * pw, (a.Ly >= 0 ? a.Ly : a.Ny + a.Nh / 2f) * ph));
+        // Targets: corner badge at the block's top-right corner.
+        AddMarkers(PortalMarkerKind.Target, p => p.Target, a => (a.Block, 0),
+            a => ((a.Nx + a.Nw) * pw, a.Ny * ph));
 
         return markers;
     }

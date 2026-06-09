@@ -122,8 +122,8 @@ public partial class MainWindow : Window
 
             var win = new PortalWindow { DataContext = vm };
             var settings = Services.PortalWindowSettings.Load();
-            win.Width = settings.Width > 0 ? settings.Width : 420;
-            win.Height = settings.Height > 0 ? settings.Height : 320;
+            win.Width = settings.Width;     // Load() guarantees a positive size (defaults live there)
+            win.Height = settings.Height;
             win.SyncTopmostToggle(settings.Topmost);
             if (settings.HasPosition)
             {
