@@ -102,6 +102,19 @@ public sealed partial class MainWindowViewModel
             InvalidateCameraAndTab, animate: true);
     }
 
+    /// <summary>Smoothly frame a block by index on the current page using rail's exact framing
+    /// and the app-native eased zoom (the double-click-to-zoom-into-rail gesture; also used by the
+    /// VLM "frame this block" path). Returns true if the block could be framed. Routes through
+    /// Dispatch(..., animate: true) so the eased motion is driven by RequestAnimationFrame — the same
+    /// path real user input takes.</summary>
+    public bool SmoothlyFrameBlock(int pageBlockIndex, double? zoom = null, double? durationMs = null)
+    {
+        bool ok = false;
+        Dispatch(() => ok = _controller.SmoothlyFrameBlock(pageBlockIndex, zoom, durationMs),
+            InvalidateCameraAndTab, animate: true);
+        return ok;
+    }
+
     // --- Rail navigation ---
 
     public void HandleArrowDown()

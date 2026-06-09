@@ -307,7 +307,7 @@ public class ViewportPanel : Panel
     /// under <paramref name="screenPos"/> (a centred frame for non-navigable figures/tables — the
     /// fallback in <c>SmoothlyFrameBlock</c>). The mouse-driven way to zoom onto a specific block,
     /// which has no keyboard equivalent. Returns false (so the normal click handler runs) when no
-    /// block is there. When a demo recording is active, captures it as a <c>frame_block</c> step.</summary>
+    /// block is there.</summary>
     private bool TryFrameBlockAt(Point screenPos)
     {
         if (ViewModel is not { } vm) return false;
@@ -316,9 +316,7 @@ public class ViewportPanel : Panel
         if (index < 0) return false;
         // A gentler ease than the native 180ms zoom — a double-click is a deliberate framing
         // gesture, so it reads as intentional rather than a snap.
-        if (!vm.SmoothlyFrameBlock(index, durationMs: FrameZoomDurationMs)) return false;
-        vm.ScriptRecorder?.RecordFrameBlock(index);
-        return true;
+        return vm.SmoothlyFrameBlock(index, durationMs: FrameZoomDurationMs);
     }
 
     private (double PageX, double PageY) ScreenToPage(Point screenPos)
