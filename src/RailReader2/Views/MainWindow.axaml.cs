@@ -11,6 +11,7 @@ namespace RailReader2.Views;
 public partial class MainWindow : Window
 {
     private MainWindowViewModel? _subscribedVm;
+    private PortalWindow? _portalWindow;
 
     // Fullscreen hover reveal: show threshold < hide threshold for hysteresis
     private const double FullScreenShowThreshold = 5.0;
@@ -86,6 +87,9 @@ public partial class MainWindow : Window
 
     protected override void OnUnloaded(Avalonia.Interactivity.RoutedEventArgs e)
     {
+        // Close the detached portal window first — a lingering non-modal window would keep the app
+        // process alive after the main window unloads.
+        ClosePortalWindow();
         if (_subscribedVm is { } vm)
         {
             vm.PropertyChanged -= OnVmPropertyChanged;
@@ -94,6 +98,70 @@ public partial class MainWindow : Window
             _subscribedVm = null;
         }
         base.OnUnloaded(e);
+    }
+
+    // --- Detached portal window (Phase 2) ---
+
+    private void UpdatePortalWindow(MainWindowViewModel vm)
+    {
+        if (vm.ShouldShowPortalWindow)
+        {
+            if (_portalWindow is { } existing) { existing.Activate(); return; }
+
+            var win = new PortalWindow { DataContext = vm };
+            var settings = Services.PortalWindowSettings.Load();
+            win.Width = settings.Width > 0 ? settings.Width : 420;
+            win.Height = settings.Height > 0 ? settings.Height : 320;
+            win.SyncTopmostToggle(settings.Topmost);
+            if (settings.HasPosition)
+            {
+                win.WindowStartupLocation = WindowStartupLocation.Manual;
+                win.Position = new PixelPoint(settings.X, settings.Y);
+            }
+            win.Closed += OnPortalWindowClosed;
+            _portalWindow = win;
+            // Non-modal, no owner so the user can drag it to another monitor and keep it on top.
+            win.Show();
+        }
+        else
+        {
+            ClosePortalWindow();
+        }
+    }
+
+    // The window's own teardown (covers app shutdown). The dock path goes through ClosePortalWindow,
+    // which unsubscribes first, so this only runs on an externally-driven close.
+    private void OnPortalWindowClosed(object? sender, EventArgs e)
+    {
+        if (_portalWindow is { } win)
+        {
+            SavePortalWindowGeometry(win);
+            win.Closed -= OnPortalWindowClosed;
+            _portalWindow = null;
+        }
+        if (Vm is { ShouldShowPortalWindow: true } vm)
+            vm.DismissPortalWindow();
+    }
+
+    private void ClosePortalWindow()
+    {
+        if (_portalWindow is not { } win) return;
+        SavePortalWindowGeometry(win);
+        win.Closed -= OnPortalWindowClosed;
+        _portalWindow = null;
+        win.Close();
+    }
+
+    private static void SavePortalWindowGeometry(PortalWindow win)
+    {
+        new Services.PortalWindowSettings
+        {
+            X = win.Position.X,
+            Y = win.Position.Y,
+            Width = win.ClientSize.Width > 0 ? win.ClientSize.Width : win.Width,
+            Height = win.ClientSize.Height > 0 ? win.ClientSize.Height : win.Height,
+            Topmost = win.Topmost,
+        }.Save();
     }
 
     private async void OnVmPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs args)
@@ -128,6 +196,9 @@ public partial class MainWindow : Window
                 break;
             case nameof(MainWindowViewModel.ActiveTool):
                 Document.UpdateAnnotationCursor();
+                break;
+            case nameof(MainWindowViewModel.ShouldShowPortalWindow):
+                UpdatePortalWindow(vm);
                 break;
             case nameof(MainWindowViewModel.IsFullScreen):
                 WindowState = vm.IsFullScreen ? WindowState.FullScreen : WindowState.Normal;

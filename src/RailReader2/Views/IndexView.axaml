@@ -68,6 +68,12 @@
                                        Source="{Binding Thumbnail}"
                                        IsVisible="{Binding HasThumbnail}"
                                        Margin="0,0,8,0" />
+                                <!-- Portals: link this detected block to the current reading position. -->
+                                <Button DockPanel.Dock="Right" Content="Link ↪"
+                                        Click="OnLinkToReadingPositionClick"
+                                        FontSize="11" Padding="6,2" Margin="6,0,0,0"
+                                        VerticalAlignment="Center"
+                                        ToolTip.Tip="Create a portal: keep this block in view while reading the current paragraph" />
                                 <StackPanel VerticalAlignment="Center">
                                     <TextBlock Text="{Binding Label}" FontWeight="SemiBold"
                                                TextTrimming="CharacterEllipsis" />

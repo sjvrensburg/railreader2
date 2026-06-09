@@ -261,6 +261,59 @@ public class ViewportPanel : Panel
             imageItem.Click += (_, _) => vm.FireAndForget(vm.CopyBlockAsImage(block), nameof(vm.CopyBlockAsImage));
             menu.Items.Add(imageItem);
 
+            // Portals authoring path B: link this detected block to a reading position. The block is
+            // on the current page; FindBlockIndexAt shares analysis.Blocks' index space. Actions that
+            // capture the current reading position are disabled (with an explanatory tooltip) unless
+            // rail mode is active, since there is no reading position outside it.
+            menu.Items.Add(new Separator());
+            int blockIndex = vm.FindBlockIndexAt(pageX, pageY);
+            int curPage = vm.Controller.ActiveDocument?.CurrentPage ?? 0;
+            bool canCapture = vm.CanCaptureReadingPosition;
+            const string railHint = "Rail-read (zoom in) the text that refers to this block first — "
+                + "the portal keeps this block in view while you read that paragraph.";
+
+            // Quick peek: show this block in the floating pop-out window now, no saved link, no rail
+            // mode needed. It leaves the docked Portals preview free to keep tracking saved portals.
+            var peekItem = new MenuItem { Header = "Open in Portal (Temporary)" };
+            ToolTip.SetTip(peekItem, "Show this block in the floating portal window now, without "
+                + "creating a saved link. It closes (or reverts to tracking) once you read on.");
+            peekItem.Click += (_, _) => vm.ShowBlockInPortal(curPage, blockIndex);
+            menu.Items.Add(peekItem);
+
+            // Primary one-shot: you're reading the referencing paragraph, right-click the figure.
+            var keepInViewItem = new MenuItem
+            {
+                Header = "Create Portal — Keep This Block In View While Reading",
+                IsEnabled = canCapture,
+            };
+            ToolTip.SetTip(keepInViewItem, canCapture
+                ? "Link the paragraph you're rail-reading to this block, so it stays visible in the "
+                  + "Portals panel as you read."
+                : railHint);
+            keepInViewItem.Click += (_, _) => vm.CreatePortal(curPage, blockIndex);
+            menu.Items.Add(keepInViewItem);
+
+            // Two-step alternative: stash this block as the target now, link the source later.
+            var setTargetItem = new MenuItem { Header = "Set as Portal Target (link later)" };
+            ToolTip.SetTip(setTargetItem,
+                "Remember this block as a portal target. Then rail-read the text that refers to it and "
+                + "choose “Link target to current paragraph”.");
+            setTargetItem.Click += (_, _) => vm.SetPortalTarget(curPage, blockIndex);
+            menu.Items.Add(setTargetItem);
+
+            var linkFromPosItem = new MenuItem
+            {
+                Header = "Link Target to Current Paragraph",
+                IsEnabled = canCapture && vm.HasPendingPortalTarget,
+            };
+            ToolTip.SetTip(linkFromPosItem, !vm.HasPendingPortalTarget
+                ? "First choose “Set as Portal Target (link later)” on the block you want to keep in view."
+                : canCapture
+                    ? "Create a portal from the block you marked as target to the paragraph you're now reading."
+                    : railHint);
+            linkFromPosItem.Click += (_, _) => vm.LinkFromCurrentPosition();
+            menu.Items.Add(linkFromPosItem);
+
             menu.Items.Add(new Separator());
         }
 

@@ -1,0 +1,78 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:RailReader2.ViewModels"
+        xmlns:conv="using:Avalonia.Data.Converters"
+        x:Class="RailReader2.Views.PortalWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Title="RailReader2 — Portal"
+        Width="420" Height="320"
+        MinWidth="180" MinHeight="140"
+        WindowDecorations="None"
+        ShowInTaskbar="True"
+        Topmost="True"
+        WindowStartupLocation="CenterScreen">
+    <!-- The window is intentionally dark (figures read well on it), so the chrome controls are
+         styled explicitly here rather than inheriting the app theme — otherwise their themed
+         foreground/background clashes with the dark bar and the labels become illegible. -->
+    <Window.Styles>
+        <Style Selector="Button.chrome, ToggleButton.chrome">
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="Background" Value="#33FFFFFF" />
+            <Setter Property="BorderBrush" Value="#66FFFFFF" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="3" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Padding" Value="10,2" />
+        </Style>
+        <Style Selector="Button.chrome /template/ ContentPresenter, ToggleButton.chrome /template/ ContentPresenter">
+            <Setter Property="Background" Value="#33FFFFFF" />
+            <Setter Property="TextElement.Foreground" Value="White" />
+        </Style>
+        <Style Selector="Button.chrome:pointerover /template/ ContentPresenter, ToggleButton.chrome:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#55FFFFFF" />
+            <Setter Property="TextElement.Foreground" Value="White" />
+        </Style>
+        <Style Selector="ToggleButton.chrome:checked /template/ ContentPresenter">
+            <Setter Property="Background" Value="#3A7BD5" />
+            <Setter Property="TextElement.Foreground" Value="White" />
+        </Style>
+    </Window.Styles>
+    <Border BorderBrush="#80808080" BorderThickness="1" Background="#1A1A1A">
+        <DockPanel>
+            <!-- Slim draggable chrome -->
+            <Border Name="ChromeBar" DockPanel.Dock="Top" Background="#2A2A2A" Height="28"
+                    PointerPressed="OnChromePointerPressed">
+                <DockPanel Margin="8,0,4,0" LastChildFill="True">
+                    <StackPanel Orientation="Horizontal" Spacing="4" DockPanel.Dock="Right">
+                        <ToggleButton Name="TopmostToggle" Classes="chrome" Content="Pin" IsChecked="True"
+                                      Click="OnTopmostToggle"
+                                      ToolTip.Tip="Keep this window above others (always on top)" />
+                        <Button Classes="chrome" Content="Dock" Click="OnDockClick"
+                                ToolTip.Tip="Return the portal to the side panel" />
+                    </StackPanel>
+                    <TextBlock Text="{Binding PortalWindowLabel}" Foreground="White"
+                               FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"
+                               TextTrimming="CharacterEllipsis" />
+                </DockPanel>
+            </Border>
+
+            <!-- Target crop (peek when one is up, otherwise saved-portal tracking) -->
+            <Grid>
+                <Image Source="{Binding PortalWindowImage}" Stretch="Uniform" Margin="4" />
+                <TextBlock Text="{Binding PortalWindowHint}" Foreground="#AAAAAA"
+                           HorizontalAlignment="Center" VerticalAlignment="Center"
+                           TextWrapping="Wrap" TextAlignment="Center" Margin="12"
+                           IsVisible="{Binding PortalWindowImage, Converter={x:Static conv:ObjectConverters.IsNull}}" />
+
+                <!-- Bottom-right resize grip (borderless windows have no OS resize border) -->
+                <Border Name="ResizeGrip" Width="16" Height="16"
+                        HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                        Background="Transparent" Cursor="BottomRightCorner"
+                        PointerPressed="OnResizePointerPressed">
+                    <Path Data="M 14,2 L 14,14 L 2,14" Stroke="#80FFFFFF" StrokeThickness="1.5" />
+                </Border>
+            </Grid>
+        </DockPanel>
+    </Border>
+</Window>

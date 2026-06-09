@@ -13,8 +13,10 @@ using RailReader2.Services;
 
 namespace RailReader2.ViewModels;
 
-/// <summary>The side-panel tabs, used by ShowPane for menu-driven pane navigation.</summary>
-public enum SidePane { Outline, Bookmarks, Index, Search, Comments }
+/// <summary>The side-panel tabs, used by ShowPane for menu-driven pane navigation. The enum order
+/// matches the accordion's grid-row order (see <c>OutlinePanel</c>), so a section's row is just
+/// <c>(int)Pane</c> — keep new panes appended.</summary>
+public enum SidePane { Outline, Bookmarks, Index, Search, Comments, Portals }
 
 // Core infrastructure: fields, constructor, animation, invalidation, config, status toast.
 // See partial class files for: Documents, Navigation, Annotations, Search.
@@ -270,8 +272,8 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         // page or rail reading position changes — including jumps that don't otherwise repaint the
         // overlay (e.g. NavigateToRole). The render path still calls NotifyAccessibilityStateChanged
         // for mode transitions; the peer's signature debounce makes the overlap free.
-        _controller.PageChanged = p => AnnounceAccessibilityState();
-        _controller.ReadingPositionChanged = _ => AnnounceAccessibilityState();
+        _controller.PageChanged = p => { AnnounceAccessibilityState(); EvaluatePortals(); };
+        _controller.ReadingPositionChanged = _ => { AnnounceAccessibilityState(); EvaluatePortals(); };
         WireAnnotationStoreSignals();
         SetupPollTimer();
     }
@@ -322,6 +324,8 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
                 tab.SubmitPendingLookahead(_controller.Worker);
             if (gotResults)
                 InvalidateOverlay();
+            // A pending portal whose target page just finished analysing re-renders here.
+            EvaluatePortals(forceRender: gotResults);
             if (needsAnim)
                 RequestAnimationFrame();
             bool workerBusy = _controller.Worker is not null && !_controller.Worker.IsIdle;
@@ -341,6 +345,8 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             var (gotResults, _, _) = _controller.PollAnalysisResults();
             if (gotResults)
                 InvalidateOverlay();
+            // A pending portal whose target page just finished analysing re-renders here.
+            EvaluatePortals(forceRender: gotResults);
 
             bool hasWork = _controller.HasBackgroundAnalysisWork;
             bool railActive = _controller.ActiveDocument?.Rail.Active == true;
@@ -422,7 +428,11 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(ActiveTab));
     }
 
-    public void Dispose() => _controller.Dispose();
+    public void Dispose()
+    {
+        DisposePortalImages();
+        _controller.Dispose();
+    }
 
     /// <summary>
     /// Fire-and-forget a Task from a UI event handler, logging any fault.
@@ -443,13 +453,18 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     [ObservableProperty] private string? _statusToast;
     private Timer? _toastTimer;
 
+    // How long a status toast stays on screen. Long enough to read a short sentence to completion
+    // (the previous 1.5s clipped messages mid-read); the timer is reset on each new toast, so rapid
+    // toggles still just show the latest.
+    private const int ToastDurationMs = 4000;
+
     public void ShowStatusToast(string message)
     {
         StatusToast = message;
         _toastTimer?.Dispose();
         _toastTimer = new Timer(_ =>
             Dispatcher.UIThread.Post(() => StatusToast = null),
-            null, 1500, Timeout.Infinite);
+            null, ToastDurationMs, Timeout.Infinite);
     }
 
     // CompositeAnnotationStore.Default is a process-global singleton and its two signals are

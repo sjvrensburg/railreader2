@@ -1,6 +1,6 @@
 # Portals — linked context viewports (design)
 
-**Status:** Design / not yet implemented
+**Status:** Implemented (Phases 0–2), 2026-06-09 — shell-only, no RailReaderCore change
 **Author:** drafted with Claude Code, 2026-06-08
 **Related roadmap item:** "Linked view / context preview — secondary viewport showing the surrounding paragraph at lower zoom" (Portals is the general, user-authored form of the same idea)
 
@@ -76,7 +76,9 @@ A portal is anchored to **layout blocks**, identified by `(page, blockIndex)` wi
 
 **Persistence:** a **shell-managed sidecar**, mirroring `CustomLayoutModel` (`AppConfig.ConfigDir/custom_layout_model.json`) and the annotations sidecar convention (`ConfigDir/annotations/<sha256>.json`). Keyed by the PDF's SHA-256 (same keying as annotations). **This needs no RailReaderCore change.**
 
-> **Open question — block-index stability.** Persistence assumes block indices are stable across sessions, i.e. re-running layout analysis on the same page yields the same block ordering. This holds if reading-order determination is deterministic; to confirm with Core. If it is not perfectly stable, fall back to anchoring by *(role + ordinal)* (e.g. "3rd Figure on page 9") or by the block's normalized bounding box with nearest-match on load.
+> **Open question — block-index stability. (Resolved in implementation.)** Persistence assumes block indices are stable across sessions, i.e. re-running layout analysis on the same page yields the same block ordering. As shipped, each anchor stores `(page, block)` **plus** `role` + a **normalized bbox**; `ResolveAnchorBlock` validates the stored index by role + bbox (ε ≈ 2%) and falls back to the nearest-centre same-role block if a page is re-analysed into a different order — so the feature is robust to ordering changes regardless.
+>
+> Separately, the *reading-position → block-index* seam (does `ReadingPosition.BlockIndex` index the same list as `PageAnalysis.Blocks`?) is **closed by construction** in Core: `RailNav.CurrentNavigableArrayIndex == Blocks.IndexOf(CurrentNavigableBlock) == ReadingPosition.BlockIndex`, all the page-level index into `analysis.Blocks`. The sync loop reads `CurrentNavigableArrayIndex` directly (cheaper than `GetReadingPosition()`, which extracts text on every call).
 
 ## 5. Architecture
 

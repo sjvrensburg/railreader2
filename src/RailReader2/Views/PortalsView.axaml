@@ -1,0 +1,85 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:RailReader2.ViewModels"
+             xmlns:v="using:RailReader2.Views"
+             xmlns:conv="using:Avalonia.Data.Converters"
+             x:Class="RailReader2.Views.PortalsView"
+             x:DataType="vm:MainWindowViewModel">
+    <DockPanel>
+        <!-- Header: pop-out toggle -->
+        <DockPanel DockPanel.Dock="Top" Margin="4,4,4,2">
+            <Button Name="PopOutButton" DockPanel.Dock="Right" Content="Pop out ↗"
+                    Click="OnPopOutClick" Height="26" Padding="8,0"
+                    VerticalAlignment="Center" VerticalContentAlignment="Center"
+                    ToolTip.Tip="Detach the portal view into a floating window (multi-monitor)" />
+            <TextBlock Text="Portals" FontWeight="SemiBold" VerticalAlignment="Center" />
+        </DockPanel>
+
+        <!-- Empty-state hint when no portals exist -->
+        <TextBlock Name="NoPortalsLabel" DockPanel.Dock="Top" Margin="8,4"
+                   Opacity="0.6" TextWrapping="Wrap" IsVisible="False"
+                   Text="No portals yet. In the Index pane, click “Link to reading position” on a figure, or right-click a detected block in the page." />
+
+        <!-- Management list -->
+        <ScrollViewer DockPanel.Dock="Top" MaxHeight="240"
+                      VerticalScrollBarVisibility="Auto">
+            <ItemsControl Name="PortalList">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:PortalRowViewModel">
+                        <Border BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                                BorderThickness="0,0,0,1" Padding="4,3">
+                            <StackPanel Spacing="3">
+                                <TextBox Text="{Binding Label}"
+                                         LostFocus="OnLabelLostFocus" KeyDown="OnLabelKeyDown"
+                                         FontWeight="SemiBold" Padding="4,2" />
+                                <DockPanel>
+                                    <StackPanel Orientation="Horizontal" Spacing="4"
+                                                DockPanel.Dock="Right" HorizontalAlignment="Right">
+                                        <Button Content="Go to source" Click="OnGoToSourceClick"
+                                                FontSize="11" Padding="6,2" />
+                                        <Button Content="Delete" Click="OnDeleteClick"
+                                                FontSize="11" Padding="6,2" />
+                                    </StackPanel>
+                                    <TextBlock Text="{Binding SourceText}" FontSize="11" Opacity="0.6"
+                                               VerticalAlignment="Center" />
+                                </DockPanel>
+                                <TextBlock Text="{Binding TargetText}" FontSize="11" Opacity="0.5" />
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+
+        <!-- Active target preview (or popped-out placeholder) -->
+        <Grid Margin="4">
+            <!-- Docked: the live target crop + label + waiting hint -->
+            <Grid IsVisible="{Binding !IsPortalPoppedOut}">
+                <Image Name="PortalImage" Stretch="Uniform"
+                       Source="{Binding ActivePortalImage}" />
+                <Border VerticalAlignment="Top" HorizontalAlignment="Stretch"
+                        Background="#99000000" Padding="6,3"
+                        IsVisible="{Binding ActivePortalLabel, Converter={x:Static conv:ObjectConverters.IsNotNull}}">
+                    <TextBlock Text="{Binding ActivePortalLabel}" Foreground="White"
+                               FontSize="12" FontWeight="SemiBold"
+                               TextTrimming="CharacterEllipsis" />
+                </Border>
+                <TextBlock Text="{Binding PortalHint}"
+                           HorizontalAlignment="Center" VerticalAlignment="Center"
+                           TextWrapping="Wrap" TextAlignment="Center" Opacity="0.6"
+                           Margin="12"
+                           IsVisible="{Binding ActivePortalImage, Converter={x:Static conv:ObjectConverters.IsNull}}" />
+            </Grid>
+
+            <!-- Detached: tap to dock -->
+            <Button IsVisible="{Binding IsPortalPoppedOut}"
+                    Click="OnDockClick"
+                    HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                    HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                    Background="Transparent">
+                <TextBlock Text="Portal popped out ↗&#x0a;(click to dock)"
+                           TextAlignment="Center" Opacity="0.6" />
+            </Button>
+        </Grid>
+    </DockPanel>
+</UserControl>

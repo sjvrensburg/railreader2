@@ -32,6 +32,11 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
     /// </summary>
     public PeekIndex? FullScanPeekIndex { get; set; }
 
+    /// <summary>This document's linked-context portals (shell-managed sidecar). Loaded in
+    /// <c>OpenDocument</c> right after annotations; follows <c>ActiveTab</c> for free. Duplicate tabs
+    /// of the same PDF each hold their own set (last-writer-wins; documented, not solved in v1).</summary>
+    public Services.PortalSet Portals { get; set; } = new();
+
     /// <summary>Whether the side panel (outline/bookmarks/search) is visible for this tab.</summary>
     public bool ShowSidePanel { get; set; }
 

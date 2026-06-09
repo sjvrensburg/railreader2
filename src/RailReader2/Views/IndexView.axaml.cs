@@ -421,6 +421,16 @@ public partial class IndexView : PaneRefreshView
             _vm.ShowStatusToast("Navigation unavailable during scan");
     }
 
+    // Portals authoring path A: link the clicked figure/table/equation to the current reading
+    // position. The inner button handles its own click, so the row's navigate handler doesn't fire.
+    private void OnLinkToReadingPositionClick(object? sender, RoutedEventArgs e)
+    {
+        if (_vm is null) return;
+        if (sender is not Button { DataContext: PeekEntryViewModel entry }) return;
+        _vm.CreatePortal(entry.Entry.PageIndex, entry.Entry.BlockIndex);
+        e.Handled = true;
+    }
+
     // --- Scan All ---
 
     private void OnScanAllClick(object? sender, RoutedEventArgs e)

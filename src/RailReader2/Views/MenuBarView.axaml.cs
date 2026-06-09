@@ -86,6 +86,7 @@ public partial class MenuBarView : UserControl
     private void OnShowBookmarksPane(object? s, RoutedEventArgs e) => Vm?.ShowPane(SidePane.Bookmarks);
     private void OnShowIndexPane(object? s, RoutedEventArgs e) => Vm?.ShowPane(SidePane.Index);
     private void OnShowCommentsPane(object? s, RoutedEventArgs e) => Vm?.ShowPane(SidePane.Comments);
+    private void OnShowPortalsPane(object? s, RoutedEventArgs e) => Vm?.ShowPane(SidePane.Portals);
     private void OnShowSearchPane(object? s, RoutedEventArgs e)
     { if (Vm is { } vm) { vm.ShowOutline = true; vm.OpenSearch(); } }
     private void OnHidePanel(object? s, RoutedEventArgs e)

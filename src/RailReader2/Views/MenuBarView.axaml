@@ -45,6 +45,7 @@
                 <MenuItem Header="_Index / Figures" InputGesture="Ctrl+Shift+I" Click="OnShowIndexPane" />
                 <MenuItem Header="_Search" InputGesture="Ctrl+F" Click="OnShowSearchPane" />
                 <MenuItem Header="_Comments" Click="OnShowCommentsPane" />
+                <MenuItem Header="_Portals" Click="OnShowPortalsPane" />
                 <Separator />
                 <MenuItem Header="_Hide Side Panel" Click="OnHidePanel" />
             </MenuItem>

@@ -8,8 +8,8 @@ using RailReader2.ViewModels;
 namespace RailReader2.Views;
 
 /// <summary>
-/// Side panel as an accordion. The five self-contained pane views (Outline, Bookmarks, Index,
-/// Search, Comments) are stacked as Expander sections. At most one is open at a time: opening a
+/// Side panel as an accordion. The six self-contained pane views (Outline, Bookmarks, Index,
+/// Search, Comments, Portals) are stacked as Expander sections. At most one is open at a time: opening a
 /// section collapses the others and that section's grid row is starred so it fills the panel
 /// (collapsed rows are header-height). The open section can also be collapsed, leaving none
 /// open. The open section is synced with the ViewModel's <see cref="MainWindowViewModel.ActivePane"/>
@@ -36,6 +36,7 @@ public partial class OutlinePanel : UserControl
             (IndexExpander, SidePane.Index),
             (SearchExpander, SidePane.Search),
             (CommentsExpander, SidePane.Comments),
+            (PortalsExpander, SidePane.Portals),
         ];
         foreach (var section in _sections)
             section.Expander.PropertyChanged += OnExpanderPropertyChanged;

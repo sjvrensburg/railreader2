@@ -44,6 +44,9 @@ public sealed partial class MainWindowViewModel
 
             _logger.Debug($"[OpenDocument] Loaded: {tab.PageCount} pages, {tab.PageWidth}x{tab.PageHeight}");
             tab.LoadAnnotations(_controller.AnnotationManager);
+            // Linked-context portals (shell sidecar, keyed by PDF SHA-256). Each tab holds its own
+            // set; duplicate tabs of the same PDF are last-writer-wins (documented, not solved in v1).
+            tab.Portals = Services.PortalSet.Load(tab.FilePath);
 
             // Save sidebar state from outgoing tab before switching
             if (ActiveTab is { } oldTab)
