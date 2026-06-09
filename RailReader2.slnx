@@ -3,11 +3,9 @@
     <Project Path="src/RailReader2/RailReader2.csproj" />
     <Project Path="src/RailReader2.Cli/RailReader2.Cli.csproj" />
     <Project Path="src/RailReader.Export/RailReader.Export.csproj" />
-    <Project Path="src/RailReader.Demo/RailReader.Demo.csproj" />
     <Project Path="src/Tools/RenderHarness.Headless/RenderHarness.Headless.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/RailReader.Export.Tests/RailReader.Export.Tests.csproj" />
-    <Project Path="tests/RailReader.Demo.Tests/RailReader.Demo.Tests.csproj" />
   </Folder>
 </Solution>
