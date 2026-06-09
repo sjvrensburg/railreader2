@@ -134,4 +134,13 @@ public partial class PortalsView : PaneRefreshView
 
     private void OnPopOutClick(object? sender, RoutedEventArgs e) => _vm?.PopOutPortal();
     private void OnDockClick(object? sender, RoutedEventArgs e) => _vm?.DockPortal();
+
+    // Click the docked target crop → pop it out into the floating window (only when a target is shown).
+    private void OnPreviewPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (!e.GetCurrentPoint(sender as Control).Properties.IsLeftButtonPressed) return;
+        if (_vm?.ActivePortalImage is null) return;
+        _vm.PopOutPortal();
+        e.Handled = true;
+    }
 }

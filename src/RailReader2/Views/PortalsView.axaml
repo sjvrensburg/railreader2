@@ -53,23 +53,28 @@
 
         <!-- Active target preview (or popped-out placeholder) -->
         <Grid Margin="4">
-            <!-- Docked: the live target crop + label + waiting hint -->
-            <Grid IsVisible="{Binding !IsPortalPoppedOut}">
-                <Image Name="PortalImage" Stretch="Uniform"
-                       Source="{Binding ActivePortalImage}" />
-                <Border VerticalAlignment="Top" HorizontalAlignment="Stretch"
-                        Background="#99000000" Padding="6,3"
-                        IsVisible="{Binding ActivePortalLabel, Converter={x:Static conv:ObjectConverters.IsNotNull}}">
-                    <TextBlock Text="{Binding ActivePortalLabel}" Foreground="White"
-                               FontSize="12" FontWeight="SemiBold"
-                               TextTrimming="CharacterEllipsis" />
-                </Border>
-                <TextBlock Text="{Binding PortalHint}"
-                           HorizontalAlignment="Center" VerticalAlignment="Center"
-                           TextWrapping="Wrap" TextAlignment="Center" Opacity="0.6"
-                           Margin="12"
-                           IsVisible="{Binding ActivePortalImage, Converter={x:Static conv:ObjectConverters.IsNull}}" />
-            </Grid>
+            <!-- Docked: the live target crop + label + waiting hint. Click the crop to pop it out. -->
+            <Border IsVisible="{Binding !IsPortalPoppedOut}"
+                    Background="Transparent" Cursor="Hand"
+                    PointerPressed="OnPreviewPointerPressed"
+                    ToolTip.Tip="Click to pop out into a floating window">
+                <Grid>
+                    <Image Name="PortalImage" Stretch="Uniform"
+                           Source="{Binding ActivePortalImage}" />
+                    <Border VerticalAlignment="Top" HorizontalAlignment="Stretch"
+                            Background="#99000000" Padding="6,3"
+                            IsVisible="{Binding ActivePortalLabel, Converter={x:Static conv:ObjectConverters.IsNotNull}}">
+                        <TextBlock Text="{Binding ActivePortalLabel}" Foreground="White"
+                                   FontSize="12" FontWeight="SemiBold"
+                                   TextTrimming="CharacterEllipsis" />
+                    </Border>
+                    <TextBlock Text="{Binding PortalHint}"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"
+                               TextWrapping="Wrap" TextAlignment="Center" Opacity="0.6"
+                               Margin="12"
+                               IsVisible="{Binding ActivePortalImage, Converter={x:Static conv:ObjectConverters.IsNull}}" />
+                </Grid>
+            </Border>
 
             <!-- Detached: tap to dock -->
             <Button IsVisible="{Binding IsPortalPoppedOut}"
