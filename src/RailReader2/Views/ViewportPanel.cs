@@ -245,7 +245,7 @@ public class ViewportPanel : Panel
 
     private void ShowViewportContextMenu(MainWindowViewModel vm, double pageX, double pageY)
     {
-        var menu = new ContextMenu();
+        var menu = new ContextMenu { FontSize = vm.CurrentFontSize };
 
         // Block actions (Copy as LaTeX / Markdown / Description / Image) when over a detected block.
         if (vm.FindBlockAt(pageX, pageY) is { } block)
@@ -336,7 +336,7 @@ public class ViewportPanel : Panel
     {
         if (ViewModel is not { } vm || vm.SelectedText is null) return;
 
-        var menu = new ContextMenu();
+        var menu = new ContextMenu { FontSize = vm.CurrentFontSize };
 
         var copyItem = new MenuItem { Header = "Copy", InputGesture = new KeyGesture(Key.C, KeyModifiers.Control) };
         copyItem.Click += (_, _) => vm.CopySelectedText();
@@ -421,7 +421,9 @@ public class ViewportPanel : Panel
             return;
         }
 
-        var menu = new ContextMenu();
+        // Context menus are popups in their own visual root, so they don't inherit the window's
+        // UiFontScale — set it explicitly like the app's dialogs do.
+        var menu = new ContextMenu { FontSize = vm.CurrentFontSize };
         foreach (var portal in marker.Portals)
         {
             string header = marker.Kind == PortalMarkerKind.Source
