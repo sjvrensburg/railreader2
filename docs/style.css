@@ -11,17 +11,70 @@
 @import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap");
 
 /* ------------------------------------------------------------------
-   Dark mode — override Folio tokens for a warm dark palette.
-   Keeps Folio principles: hairline borders, no accent, ink action.
+   Colour scheme — warm amber on ivory paper.
+   Overrides Folio primitives with the original Reading Room palette.
+   Folio structure (hairlines, pills, cards, layout) is preserved;
+   only the colours change.
    ------------------------------------------------------------------ */
+
+:root {
+  --folio-bone: #f4eee2;
+  --folio-snow: #fbf7ee;
+  --folio-ink: #211c15;
+  --folio-stone: #6b6253;
+  --folio-mist: #e3dac8;
+  --folio-whisper: #efe7d7;
+
+  --color-accent: #c8772e;
+  --color-accent-strong: #a85d1c;
+  --color-highlight: rgba(200, 119, 46, 0.22);
+}
 
 [data-theme="dark"] {
   --folio-bone: #1a1611;
   --folio-snow: #221d16;
   --folio-ink: #efe7d6;
   --folio-stone: #a99e89;
-  --folio-mist: #3a3024;
+  --folio-mist: #352d20;
   --folio-whisper: #211c15;
+
+  --color-accent: #e0954a;
+  --color-accent-strong: #f0a960;
+  --color-highlight: rgba(224, 149, 74, 0.24);
+}
+
+/* ------------------------------------------------------------------
+   Accent overrides for system.css base styles
+   ------------------------------------------------------------------ */
+
+::selection {
+  background: var(--color-highlight);
+  color: var(--color-text);
+}
+
+a {
+  color: var(--color-accent-strong);
+  text-decoration-color: color-mix(in srgb, var(--color-accent) 45%, transparent);
+}
+
+a:hover {
+  border-bottom-color: var(--color-accent);
+}
+
+.feature-list li::before {
+  background-color: var(--color-accent);
+}
+
+/* Primary pill button — amber fill instead of ink */
+.btn--primary {
+  --btn-bg: var(--color-accent);
+  --btn-fg: #fff8ee;
+  --btn-border: var(--color-accent);
+}
+
+.btn--primary:hover {
+  --btn-bg: var(--color-accent-strong);
+  --btn-border: var(--color-accent-strong);
 }
 
 /* ------------------------------------------------------------------
@@ -70,7 +123,7 @@
 }
 
 .theme-toggle:hover {
-  border-color: var(--color-text);
+  border-color: var(--color-accent);
   transform: rotate(-18deg);
 }
 
@@ -142,14 +195,14 @@
   bottom: 0;
   width: 100%;
   height: 1px;
-  background: var(--color-text);
+  background: var(--color-accent);
   transform: scaleX(0);
   transform-origin: left;
   transition: transform var(--dur-base) var(--ease-quiet);
 }
 
 .header nav a:hover {
-  color: var(--color-text);
+  color: var(--color-accent);
 }
 
 .header nav a:hover::after {
@@ -273,7 +326,7 @@
   font-size: var(--text-label-sm);
   font-weight: 500;
   letter-spacing: var(--tracking-wide);
-  color: var(--color-text-muted);
+  color: var(--color-accent-strong);
 }
 
 /* Conflict: current design uses serif italic kickers above headings.
@@ -322,7 +375,7 @@
 
 .overview__points li {
   padding-top: var(--space-2xs);
-  border-top: var(--border-hairline);
+  border-top: 2px solid var(--color-accent);
   font-size: var(--text-body-sm);
   line-height: var(--leading-body);
   color: var(--color-text-muted);
@@ -342,7 +395,7 @@
 .note {
   background: var(--color-surface);
   border: var(--border-hairline);
-  border-left: 3px solid var(--color-text);
+  border-left: 3px solid var(--color-accent);
   border-radius: var(--radius-md);
   padding: var(--space-md);
   margin-top: var(--space-lg);
@@ -394,7 +447,7 @@
   font-weight: 500;
   letter-spacing: var(--tracking-wide);
   text-transform: uppercase;
-  color: var(--color-text-muted);
+  color: var(--color-accent-strong);
   margin-bottom: var(--space-2xs);
 }
 
@@ -439,7 +492,7 @@
   font-weight: 500;
   letter-spacing: var(--tracking-wide);
   text-transform: uppercase;
-  color: var(--color-text-muted);
+  color: var(--color-accent-strong);
   margin-bottom: var(--space-md);
   padding-top: var(--space-2xs);
   border-top: var(--border-hairline);
@@ -547,7 +600,7 @@
   font-weight: 400;
   font-size: 1.5rem;
   line-height: 1;
-  color: var(--color-text);
+  color: var(--color-accent);
   width: var(--space-lg);
   text-align: center;
 }
@@ -608,7 +661,7 @@ pre code {
   font-weight: 500;
   letter-spacing: var(--tracking-wide);
   text-transform: uppercase;
-  color: var(--color-text-muted);
+  color: var(--color-accent-strong);
   padding: var(--space-md) var(--space-2xs) var(--space-2xs);
   border-bottom: var(--border-hairline);
 }
@@ -720,7 +773,7 @@ pre code {
 .toc {
   background: var(--color-surface);
   border: var(--border-hairline);
-  border-left: 3px solid var(--color-text);
+  border-left: 3px solid var(--color-accent);
   border-radius: var(--radius-md);
   padding: var(--space-md) var(--space-lg);
   margin-bottom: var(--space-xl);
@@ -732,7 +785,7 @@ pre code {
   font-weight: 500;
   letter-spacing: var(--tracking-wide);
   text-transform: uppercase;
-  color: var(--color-text-muted);
+  color: var(--color-accent-strong);
   margin-bottom: var(--space-2xs);
 }
 
@@ -757,7 +810,7 @@ pre code {
   letter-spacing: var(--tracking-tight);
   margin-bottom: var(--space-sm);
   padding-left: var(--space-2xs);
-  border-left: 3px solid var(--color-text);
+  border-left: 3px solid var(--color-accent);
 }
 
 .guide-section h3 {
@@ -820,7 +873,7 @@ pre code {
 
 .tip {
   background: var(--color-surface-subtle);
-  border-left: 3px solid var(--color-text);
+  border-left: 3px solid var(--color-accent);
   border-radius: 0 var(--radius-md) var(--radius-md) 0;
   padding: var(--space-sm) var(--space-md);
   margin: var(--space-sm) 0;
@@ -829,7 +882,7 @@ pre code {
 }
 
 .tip strong {
-  color: var(--color-text);
+  color: var(--color-accent-strong);
 }
 
 /* Inline Lucide icons in guide */
@@ -893,7 +946,7 @@ pre code {
 }
 
 .footer a:hover {
-  color: var(--color-text);
+  color: var(--color-accent);
 }
 
 /* ------------------------------------------------------------------
