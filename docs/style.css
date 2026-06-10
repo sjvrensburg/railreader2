@@ -5,11 +5,6 @@
    All tokens, typography, and base styles come from system.css.
    ============================================================ */
 
-/* Code needs a monospace font — Folio permits two families
-   (Instrument Serif + Inter) but <code> requires mono.
-   IBM Plex Mono is used for code elements only. */
-@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap");
-
 /* ------------------------------------------------------------------
    Colour scheme — warm amber on ivory paper.
    Overrides Folio primitives with the original Reading Room palette.
@@ -28,6 +23,9 @@
   --color-accent: #c8772e;
   --color-accent-strong: #a85d1c;
   --color-highlight: rgba(200, 119, 46, 0.22);
+  --color-on-accent: #fff8ee;
+  --color-lightbox-bg: rgba(33, 28, 21, 0.86);
+  --font-mono: 'IBM Plex Mono', 'Fira Mono', 'Consolas', monospace;
 }
 
 [data-theme="dark"] {
@@ -41,6 +39,8 @@
   --color-accent: #e0954a;
   --color-accent-strong: #f0a960;
   --color-highlight: rgba(224, 149, 74, 0.24);
+  --color-on-accent: #fff8ee;
+  --color-lightbox-bg: rgba(12, 9, 6, 0.9);
 }
 
 /* ------------------------------------------------------------------
@@ -68,7 +68,7 @@ a:hover {
 /* Primary pill button — amber fill instead of ink */
 .btn--primary {
   --btn-bg: var(--color-accent);
-  --btn-fg: #fff8ee;
+  --btn-fg: var(--color-on-accent);
   --btn-border: var(--color-accent);
 }
 
@@ -148,20 +148,7 @@ a:hover {
   gap: var(--space-2xs);
 }
 
-.header__logo {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2xs);
-  font-family: var(--font-display);
-  font-style: italic;
-  font-weight: 400;
-  font-size: 1.25rem;
-  letter-spacing: -0.01em;
-  color: var(--color-text);
-  text-decoration: none;
-  border-bottom: none;
-}
-
+/* .header__logo inherits from .brand (system.css) — only img overrides here */
 .header__logo img {
   height: 44px;
   width: auto;
@@ -294,12 +281,6 @@ a:hover {
   border: none;
 }
 
-@media (min-width: 880px) {
-  .hero__media .frame {
-    border-radius: 0;
-  }
-}
-
 /* ------------------------------------------------------------------
    Sections — Folio editorial rhythm
    ------------------------------------------------------------------ */
@@ -322,10 +303,6 @@ a:hover {
   position: absolute;
   top: var(--space-md);
   right: 0;
-  font-family: var(--font-body);
-  font-size: var(--text-label-sm);
-  font-weight: 500;
-  letter-spacing: var(--tracking-wide);
   color: var(--color-accent-strong);
 }
 
@@ -334,12 +311,6 @@ a:hover {
    the headline." Kept as a quiet uppercase label (label-sm) to
    preserve section categorisation without visual dominance. */
 .section__head .kicker {
-  font-family: var(--font-body);
-  font-style: normal;
-  font-size: var(--text-label-sm);
-  font-weight: 500;
-  letter-spacing: var(--tracking-wide);
-  text-transform: uppercase;
   color: var(--color-text-muted);
   margin-bottom: var(--space-2xs);
   display: block;
@@ -442,11 +413,6 @@ a:hover {
 }
 
 .feature-row__eyebrow {
-  font-family: var(--font-body);
-  font-size: var(--text-label-sm);
-  font-weight: 500;
-  letter-spacing: var(--tracking-wide);
-  text-transform: uppercase;
   color: var(--color-accent-strong);
   margin-bottom: var(--space-2xs);
 }
@@ -487,11 +453,6 @@ a:hover {
    ------------------------------------------------------------------ */
 
 .more-label {
-  font-family: var(--font-body);
-  font-size: var(--text-label-sm);
-  font-weight: 500;
-  letter-spacing: var(--tracking-wide);
-  text-transform: uppercase;
   color: var(--color-accent-strong);
   margin-bottom: var(--space-md);
   padding-top: var(--space-2xs);
@@ -616,7 +577,7 @@ a:hover {
    ------------------------------------------------------------------ */
 
 code {
-  font-family: 'IBM Plex Mono', 'Fira Mono', 'Consolas', monospace;
+  font-family: var(--font-mono);
   background: var(--color-surface-subtle);
   padding: 0.1em 0.35em;
   font-size: 0.85em;
@@ -630,7 +591,7 @@ pre {
   border-radius: var(--radius-md);
   padding: var(--space-md);
   overflow-x: auto;
-  font-family: 'IBM Plex Mono', 'Fira Mono', 'Consolas', monospace;
+  font-family: var(--font-mono);
   font-size: var(--text-body-sm);
   margin-bottom: var(--space-md);
   line-height: var(--leading-body);
@@ -679,7 +640,7 @@ pre code {
 }
 
 .shortcuts-table td:first-child {
-  font-family: 'IBM Plex Mono', 'Fira Mono', 'Consolas', monospace;
+  font-family: var(--font-mono);
   font-size: 0.82rem;
   white-space: nowrap;
   width: 220px;
@@ -722,7 +683,7 @@ pre code {
   position: fixed;
   inset: 0;
   z-index: 1000;
-  background: rgba(19, 18, 15, 0.86);
+  background: var(--color-lightbox-bg);
   backdrop-filter: blur(4px);
   align-items: center;
   justify-content: center;
