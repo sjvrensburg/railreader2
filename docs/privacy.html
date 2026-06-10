@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="light">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -9,8 +9,10 @@
   <link rel="canonical" href="https://sjvrensburg.github.io/railreader2/privacy.html">
   <link rel="icon" href="img/logo.png" type="image/png">
   <link rel="sitemap" type="application/xml" href="sitemap.xml">
+  <meta name="theme-color" content="#efece4">
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;600;700&family=Fira+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="system.css">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -19,7 +21,7 @@
 
   <header class="header">
     <div class="header__left">
-      <span class="header__logo"><img src="img/logo.png" alt="railreader2 icon" width="59" height="32">railreader2</span>
+      <a href="index.html" class="header__logo"><img src="img/logo.png" alt="railreader2 icon" width="56" height="30"><span class="brand-wordmark">railreader2</span></a>
       <nav>
         <a href="index.html">Home</a>
         <a href="guide.html">User Guide</a>
@@ -200,7 +202,7 @@
 
     function applyTheme(theme) {
       document.documentElement.setAttribute('data-theme', theme);
-      document.getElementById('theme-icon').textContent = theme === 'dark' ? '\u2600\uFE0F' : '\uD83C\uDF19';
+      document.getElementById('theme-icon').textContent = theme === 'dark' ? '☀️' : '🌙';
     }
 
     function toggleTheme() {
