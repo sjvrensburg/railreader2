@@ -15,10 +15,16 @@
             <TextBlock Text="Portals" FontWeight="SemiBold" VerticalAlignment="Center" />
         </DockPanel>
 
+        <!-- Automatic pinning toggle: reading a line that mentions "Figure N" / "Table N" shows it. -->
+        <CheckBox DockPanel.Dock="Top" Margin="8,0,8,2" FontSize="12"
+                  IsChecked="{Binding AutoPinPortals}"
+                  Content="Auto-pin referenced figures &amp; tables"
+                  ToolTip.Tip="While rail-reading, automatically show the figure or table the current line refers to (e.g. “see Figure 3”) — no manual link needed." />
+
         <!-- Empty-state hint when no portals exist -->
         <TextBlock Name="NoPortalsLabel" DockPanel.Dock="Top" Margin="8,4"
                    Opacity="0.6" TextWrapping="Wrap" IsVisible="False"
-                   Text="No portals yet. In the Index pane, click “Link to reading position” on a figure, or right-click a detected block in the page." />
+                   Text="No portals yet. Figures and tables referenced by the text you read appear here automatically. To link one manually, click “Link to reading position” in the Index pane, or right-click a detected block in the page." />
 
         <!-- Management list -->
         <ScrollViewer DockPanel.Dock="Top" MaxHeight="240"

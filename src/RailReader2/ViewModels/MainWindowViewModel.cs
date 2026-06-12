@@ -333,10 +333,11 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
                 tab.SubmitPendingLookahead(_controller.Worker);
             if (gotResults)
                 InvalidateOverlay();
-            // Only force a portal re-evaluation when a pinned target is still waiting on its page to
-            // analyse — otherwise the reading-position callbacks + memo already cover the steady case,
-            // and forcing on every unrelated analysis result would defeat the fast path.
-            EvaluatePortals(forceRender: gotResults && _portalTargetPending);
+            // Only force a portal re-evaluation when something is still waiting on analysis (a pinned
+            // target's page, or an automatic reference's caption page) — otherwise the
+            // reading-position callbacks + memo already cover the steady case, and forcing on every
+            // unrelated analysis result would defeat the fast path.
+            EvaluatePortals(forceRender: gotResults && PortalResolvePending);
             if (needsAnim)
                 RequestAnimationFrame();
             bool workerBusy = _controller.Worker is not null && !_controller.Worker.IsIdle;
@@ -356,9 +357,9 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             var (gotResults, _, _) = _controller.PollAnalysisResults();
             if (gotResults)
                 InvalidateOverlay();
-            // As above: force only when a pinned target is still resolving, so background read-ahead
-            // (one result per analysed page) doesn't bypass the memo on every page.
-            EvaluatePortals(forceRender: gotResults && _portalTargetPending);
+            // As above: force only when a pinned target or auto reference is still resolving, so
+            // background read-ahead (one result per analysed page) doesn't bypass the memo on every page.
+            EvaluatePortals(forceRender: gotResults && PortalResolvePending);
 
             bool hasWork = _controller.HasBackgroundAnalysisWork;
             bool railActive = _controller.ActiveDocument?.Rail.Active == true;

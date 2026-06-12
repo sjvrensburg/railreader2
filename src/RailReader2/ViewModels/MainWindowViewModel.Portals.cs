@@ -100,6 +100,41 @@ public sealed partial class MainWindowViewModel
     // then consumes it.
     private (int Page, int Block)? _pendingTargetForLink;
 
+    // --- Automatic pinning (figures/tables referenced by the current line) ---
+
+    // Caption-label index for the active document; reset on tab switch like _pageSizeCache.
+    private readonly ReferenceIndex _referenceIndex = new();
+    private readonly PortalPreferences _portalPrefs = PortalPreferences.Load();
+    // True when the current line mentions a figure/table whose caption page is not analysed yet —
+    // the analysis-complete poll then re-runs the evaluation (forceRender) to retry the resolve.
+    private bool _autoRefPending;
+    // _displayedPortalId values for auto pins, so they share the pin-until-different machinery with
+    // saved portals without ever colliding with a saved portal's guid.
+    private static string AutoPinId(ReferenceIndex.Reference r) => $"auto:{r.Kind}:{r.Number}";
+
+    /// <summary>Toggle for automatic pinning, persisted app-wide (sidecar). Turning it off clears a
+    /// currently shown auto pin; saved portals are unaffected either way.</summary>
+    public bool AutoPinPortals
+    {
+        get => _portalPrefs.AutoPinFiguresTables;
+        set
+        {
+            if (_portalPrefs.AutoPinFiguresTables == value) return;
+            _portalPrefs.AutoPinFiguresTables = value;
+            _portalPrefs.Save();
+            OnPropertyChanged(nameof(AutoPinPortals));
+            _autoRefPending = false;
+            if (!value && _displayedPortalId?.StartsWith("auto:", StringComparison.Ordinal) == true)
+                ClearActivePortal();
+            EvaluatePortals(forceRender: true);
+        }
+    }
+
+    /// <summary>True when the sync loop is waiting on background analysis — for a saved portal's
+    /// target page or an automatic reference's caption page — so the analysis poll should force a
+    /// re-evaluation when results arrive.</summary>
+    internal bool PortalResolvePending => _portalTargetPending || _autoRefPending;
+
     private (double W, double H) PageSize(DocumentState doc, int page)
     {
         if (_pageSizeCache.TryGetValue(page, out var size)) return size;
@@ -247,15 +282,10 @@ public sealed partial class MainWindowViewModel
             _portalImageOwner = tab;
             _displayedPortalId = null;
             _portalTargetPending = false;
+            _autoRefPending = false;
             _pendingTargetForLink = null;
             _pageSizeCache.Clear();
-        }
-
-        // No portals: clear any tracking image (e.g. last portal deleted, or a stale crop on tab switch).
-        if (tab.Portals.Portals.Count == 0)
-        {
-            ClearActivePortal();
-            return;
+            _referenceIndex.Clear();
         }
 
         // The saved portal whose source the reading position has reached (source page checked first so
@@ -285,9 +315,15 @@ public sealed partial class MainWindowViewModel
         // the block, scrolling around — until another portal's source is crossed.
         if (active is not null && active.Id != _displayedPortalId)
         {
+            _autoRefPending = false;
             Pin(doc, active);
             return;
         }
+
+        // No saved portal claimed this line — automatic pinning: a line mentioning "Figure N" /
+        // "Table N" pins the referenced float, with the same pin-until-different semantics.
+        if (active is null)
+            TryAutoPin(doc, srcPage, srcBlock, srcLine);
 
         // Nothing pinned (tab switch with no active source on the new tab, or never activated) → clear.
         if (_displayedPortalId is null)
@@ -301,6 +337,67 @@ public sealed partial class MainWindowViewModel
         if (forceRender && _portalTargetPending
             && tab.Portals.Portals.FirstOrDefault(p => p.Id == _displayedPortalId) is { } shown)
             RenderPortalTarget(doc, shown.Target.Page, ResolveAnchorBlock(doc, shown.Target));
+    }
+
+    /// <summary>Automatic pinning: parse the current rail line for figure/table references and pin
+    /// the first one that resolves to a detected caption + float. Skipped while reading a caption
+    /// block (the float is right there). An unresolved reference (caption page not analysed yet)
+    /// sets <see cref="_autoRefPending"/> so the analysis poll retries; the previously pinned target
+    /// stays up meanwhile. UI thread only.</summary>
+    private void TryAutoPin(DocumentState doc, int srcPage, int srcBlock, int srcLine)
+    {
+        _autoRefPending = false;
+        if (!AutoPinPortals || srcBlock < 0 || srcLine < 0) return;
+        if (!doc.AnalysisCache.TryGetValue(srcPage, out var analysis)
+            || srcBlock >= analysis.Blocks.Count
+            || analysis.Blocks[srcBlock].Role == BlockRole.Caption)
+            return;
+
+        var line = doc.Rail.CurrentLineInfo;
+        float top = line.Y - line.Height / 2f;
+        string? lineText = doc.GetOrExtractText(srcPage)
+            .ExtractTextInRect(line.X, top, line.X + line.Width, top + line.Height);
+        if (string.IsNullOrEmpty(lineText)) return;
+
+        foreach (var reference in ReferenceIndex.ParseLine(lineText))
+        {
+            string autoId = AutoPinId(reference);
+            if (autoId == _displayedPortalId) return;   // already showing this one — stay pinned
+            if (_referenceIndex.Resolve(doc, reference, srcPage) is { } target)
+            {
+                PinAutoReference(doc, autoId, reference, target);
+                return;
+            }
+            // Likely defined on a page that is not analysed yet — retry when more results arrive.
+            _autoRefPending = true;
+        }
+    }
+
+    /// <summary>Pin an automatically resolved reference: render the float together with its caption
+    /// (the union region, so the label under the figure confirms the match) into the tracking
+    /// preview. Shares <see cref="_displayedPortalId"/> with saved portals, so a later saved-portal
+    /// activation or a different reference takes over normally.</summary>
+    private void PinAutoReference(DocumentState doc, string autoId, ReferenceIndex.Reference reference,
+        ReferenceIndex.Target target)
+    {
+        var blocks = doc.AnalysisCache[target.Page].Blocks;
+        var region = Union(blocks[target.TargetBlock].BBox, blocks[target.CaptionBlock].BBox);
+        var bitmap = RenderRegionCrop(doc, target.Page, region);
+        if (bitmap is null) return;   // keep whatever was shown; reading on retries naturally
+
+        _displayedPortalId = autoId;
+        _portalTargetPending = false;
+        ActivePortalLabel = $"{reference} (p.{target.Page + 1}) · auto";
+        SetPortalImage(bitmap);
+        PortalHint = null;
+        InvalidatePortalMarkers();   // a previously accented saved portal loses the accent
+    }
+
+    private static BBox Union(BBox a, BBox b)
+    {
+        float x = Math.Min(a.X, b.X);
+        float y = Math.Min(a.Y, b.Y);
+        return new BBox(x, y, Math.Max(a.X + a.W, b.X + b.W) - x, Math.Max(a.Y + a.H, b.Y + b.H) - y);
     }
 
     /// <summary>Render a target block crop into <see cref="ActivePortalImage"/>. UI thread only.
@@ -338,9 +435,15 @@ public sealed partial class MainWindowViewModel
             || !doc.AnalysisCache.TryGetValue(page, out var analysis)
             || block >= analysis.Blocks.Count)
             return null;
+        return RenderRegionCrop(doc, page, analysis.Blocks[block].BBox);
+    }
 
+    /// <summary>Rasterise an arbitrary page region (e.g. a figure + its caption) and decode it to an
+    /// Avalonia <see cref="Bitmap"/>. UI thread only (PDFium).</summary>
+    private Bitmap? RenderRegionCrop(DocumentState doc, int page, BBox region)
+    {
         var (pageW, pageH) = PageSize(doc, page);
-        byte[]? png = BlockCropRenderer.RenderBlockAsPng(doc.Pdf, page, analysis.Blocks[block].BBox, pageW, pageH);
+        byte[]? png = BlockCropRenderer.RenderBlockAsPng(doc.Pdf, page, region, pageW, pageH);
         if (png is null || png.Length == 0) return null;
 
         try

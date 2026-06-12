@@ -162,3 +162,27 @@ Pannable secondary viewport; native PDF storage; coordinate-region and cross-doc
 - **Dock.Avalonia docking.** Already evaluated and abandoned for the side panel; not revisited — Portals needs at most a single pop-out window, not a docking manager.
 - **Full secondary viewport in v1.** Deferred to Phase 3; a static crop delivers the core value at a fraction of the cost.
 - **Coordinate-region anchoring (Sioyek-style).** Rejected for v1 in favour of block anchoring (§5.1); can be added later for non-detected regions.
+
+## 9. Automatic pinning (added 2026-06)
+
+Reading a rail line that mentions **"Figure N" / "Table N"** (incl. "Fig./Tab./Figs" abbreviations and
+dotted numbers like "2.1", letter suffixes like "4b") automatically pins the referenced float in the
+portal preview — no manual link needed. Toggle: checkbox at the top of the Portals pane, persisted
+app-wide in `ConfigDir/portal_prefs.json` (`Services/PortalPreferences.cs`), default on.
+
+Mechanics (`TryAutoPin` in `MainWindowViewModel.Portals.cs`, `Services/ReferenceIndex.cs`):
+
+- Runs inside `EvaluatePortals` when no *saved* portal claims the current line (saved portals always
+  win). Current-line text comes from the cached `PageText` + `Rail.CurrentLineInfo` rect — no
+  `GetReadingPosition` full-block extraction.
+- Resolution: `Caption`-role blocks across analysed pages are parsed for a leading "Figure N:"-style
+  label and associated with the nearest same-kind float block (horizontal-overlap preferred, then
+  smallest vertical gap; Figure accepts `Figure`+`Chart` roles, Table accepts `Table`). Parsed labels
+  are cached per page, keyed to the `PageAnalysis` instance (re-analysis rebuilds transparently).
+  Lookup scans outward from the current page, preceding page first at each distance.
+- The pin renders the **union of float + caption bboxes** (so the label confirms the match) and
+  shares `_displayedPortalId` ("auto:Kind:number") with saved portals — same pin-until-different
+  semantics; a different reference or a saved portal source takes over, nothing flaps while reading on.
+- Unresolved references (caption page not analysed yet) set `_autoRefPending`; the analysis polls
+  force a re-evaluation as background read-ahead delivers results. Reading the caption block itself
+  never triggers a pin.
