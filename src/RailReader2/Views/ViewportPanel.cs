@@ -449,10 +449,13 @@ public class ViewportPanel : Panel
     {
         if (kind == PortalMarkerKind.Source)
         {
-            // Pop out first: ShowPortalTarget opens the side pane only when tracking is docked, so
-            // detaching beforehand sends the target straight to the floating window.
+            // A double-click arrives as two click pairs, so the first release has already pinned the
+            // target (and opened the pane); the second release only needs to detach. Pop out before
+            // any pin so a fresh pin doesn't flip the pane open first, and skip the re-pin (and its
+            // expensive crop render) when this portal is already the one shown.
             if (popOut) vm.PopOutPortal();
-            vm.ShowPortalTarget(portal);
+            if (vm.DisplayedPortalId != portal.Id)
+                vm.ShowPortalTarget(portal);
         }
         else
         {

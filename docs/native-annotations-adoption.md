@@ -18,6 +18,11 @@ build the surrounding UI so the new capabilities are usable.
 - **Repo:** `~/railreader2` (github.com/sjvrensburg/railreader2), Avalonia desktop app
   (`src/RailReader2/`), headless CLI (`src/RailReader2.Cli/`), Markdown export
   (`src/RailReader.Export/`).
+
+> **Historical note (2026-06):** this plan was written against RailReaderCore 0.16→0.17 and
+> has long been executed. File references to `src/RailReader.Export/` are stale — the export
+> pipeline moved to the RailReaderCore repo and is consumed as the `RailReader.Export` NuGet
+> package since 0.28.0.
 - railreader2 consumes RailReaderCore **via NuGet** (pinned versions), currently
   **0.16.0**. (0.17.0 may take a few minutes to appear in the NuGet index after publish;
   if `dotnet restore` can't find it yet, wait and retry — don't switch to project

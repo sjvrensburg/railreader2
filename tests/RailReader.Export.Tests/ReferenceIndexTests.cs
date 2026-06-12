@@ -52,6 +52,16 @@ public class ReferenceIndexTests
         => Assert.Empty(ReferenceIndex.ParseLine("the table is shown"));   // "is" must not read as roman
 
     [Theory]
+    [InlineData("the table I made for this")]    // pronoun after lowercase kind word
+    [InlineData("the figure I show next")]
+    public void ParseLine_RejectsDigitlessNumbersAfterLowercaseKind(string line)
+        => Assert.Empty(ReferenceIndex.ParseLine(line));
+
+    [Fact]
+    public void ParseLine_AcceptsRomanAfterCapitalisedKind()
+        => Assert.Equal([new Ref(RefKind.Table, "ii")], ReferenceIndex.ParseLine("see Table II for"));
+
+    [Theory]
     [InlineData("Figures 2 and 3 show", new[] { "2", "3" })]
     [InlineData("Tables 1, 4 and 6 list", new[] { "1", "4", "6" })]
     [InlineData("Figs. 3–5 illustrate", new[] { "3", "5" })]   // range endpoints
@@ -61,7 +71,17 @@ public class ReferenceIndexTests
 
     [Fact]
     public void ParseLine_ContinuationStopsAtNonNumber()
-        => Assert.Single(ReferenceIndex.ParseLine("Figure 2 and the results show"));
+        => Assert.Single(ReferenceIndex.ParseLine("Figures 2 and the results show"));
+
+    [Theory]
+    [InlineData("Table 1, 95% of cases were correct", "1")]      // singular → no phantom Table 95
+    [InlineData("Figure 2 and 2008 observations saw", "2")]      // singular → no phantom Figure 2008
+    public void ParseLine_SingularMentionsDoNotExpandContinuations(string line, string only)
+    {
+        var refs = ReferenceIndex.ParseLine(line);
+        Assert.Single(refs);
+        Assert.Equal(only, refs[0].Number);
+    }
 
     [Fact]
     public void ParseLine_StartLimit_CatchesMentionSplitAcrossLines()
@@ -115,6 +135,8 @@ public class ReferenceIndexTests
     [InlineData("Figure 2 — Sample paths", true)]
     [InlineData("Figure 3", true)]                 // bare label (end of text) counts
     [InlineData("Figure 3 shows that the estimator", false)]   // body sentence → rejected
+    [InlineData("Fig. 2 - Sample paths", true)]                // spaced hyphen = caption separator
+    [InlineData("Figure 3-D printed scaffolds are shown", false)]   // compound hyphen ≠ separator
     public void ParseCaptionLabel_RequirePunctuation_FiltersBodySentences(string text, bool accepted)
         => Assert.Equal(accepted,
             ReferenceIndex.ParseCaptionLabel(text, requirePunctuation: true) is not null);

@@ -330,14 +330,13 @@ Rail reading parameters are editable via the Settings panel (gear icon in menu b
 
 ## Architecture
 
-The portable core (models, controllers, rail navigation, line detection, search, annotations, the SkiaSharp renderer) lives in the separate [RailReaderCore](https://github.com/sjvrensburg/RailReaderCore) repository and is consumed here as NuGet packages: `RailReader.Core`, `RailReader.Core.Pdfium`, `RailReader.Core.Analysis`, `RailReader.Renderer.Skia`. This repository contains the desktop application shell, the headless CLI, the Markdown export pipeline, and their tests:
+The portable core (models, controllers, rail navigation, line detection, search, annotations, the SkiaSharp renderer, and the Markdown export pipeline) lives in the separate [RailReaderCore](https://github.com/sjvrensburg/RailReaderCore) repository and is consumed here as NuGet packages: `RailReader.Core`, `RailReader.Core.Pdfium`, `RailReader.Core.Analysis`, `RailReader.Renderer.Skia`, `RailReader.Export`. This repository contains the desktop application shell, the headless CLI, and their tests:
 
 ```
 RailReader2.slnx              # Default solution
 ├── src/RailReader2/            # Thin Avalonia UI shell
 ├── src/RailReader2.Cli/        # Headless CLI
-├── src/RailReader.Export/      # Markdown export pipeline
-└── tests/RailReader.Export.Tests/ # xUnit tests for Export (Core tests live upstream in RailReaderCore)
+└── tests/RailReader.Export.Tests/ # xUnit tests for the upstream Export package (Core tests live upstream in RailReaderCore)
 ```
 
 ## Command-line interface

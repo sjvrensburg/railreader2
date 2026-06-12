@@ -26,8 +26,8 @@ public partial class PortalWindow : Window
 
     /// <summary>Apply the app's scaled font size (<c>MainWindowViewModel.CurrentFontSize</c>) to the
     /// window: body/hint text inherits it directly, the chrome bar (Lock/Pin/Dock buttons, label,
-    /// icons) a slightly smaller derived size. Called on creation and re-applied by MainWindow's
-    /// update path so a live scale change reaches an already-open window.</summary>
+    /// icons) a slightly smaller derived size. Called on creation and again from MainWindow's
+    /// CurrentFontSize property-change case, so a live Settings change reaches an open window.</summary>
     public void ApplyFontScale(double uiFontSize)
     {
         FontSize = uiFontSize;

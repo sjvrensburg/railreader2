@@ -37,7 +37,9 @@ internal sealed partial class ReferenceIndex
     private static partial Regex LineReferenceRegex();
 
     // Follow-on numbers of a plural/range mention — "Figures 2 and 3", "Tables 1, 4", "Figs. 3–5"
-    // (ranges yield their endpoints). \G anchors each match at the previous one's end.
+    // (ranges yield their endpoints). \G anchors each match at the previous one's end. Only applied
+    // after a PLURAL kind word: gating on the plural keeps ordinary prose numbers out ("Table 1, 95%
+    // of cases" must not produce a phantom Table 95).
     [GeneratedRegex(@"\G\s*(?:,|;|and|&|–|—|to|through|-)\s*(?<num>" + NumberPattern + ")",
         RegexOptions.IgnoreCase)]
     private static partial Regex ContinuationRegex();
@@ -48,9 +50,19 @@ internal sealed partial class ReferenceIndex
         RegexOptions.IgnoreCase)]
     private static partial Regex CaptionLabelRegex();
 
-    // A Text-role block only counts as a misclassified caption when it sits at most this close to an
-    // unlabelled float (fraction of page height) and overlaps it horizontally.
+    // A detected Caption block binds to a float only when it overlaps it horizontally within this
+    // vertical gap (fraction of page height) — a caption whose own float was misdetected must drop
+    // its label rather than bind to an unrelated float across the page.
+    private const double CaptionMaxGapFraction = 0.15;
+    // A Text-role block only counts as a misclassified caption under a tighter version of the same
+    // gate (plus caption-style punctuation, below).
     private const double PseudoCaptionMaxGapFraction = 0.08;
+
+    // Cap on synchronous per-call page-index builds: each build may extract a page's text via PDFium
+    // on the UI thread, so an unresolved reference on a large fully-analysed document must not build
+    // the whole index in one pass. Resolve reports `incomplete` instead; retries (analysis polls /
+    // later line advances) continue from the cached progress, a few pages at a time.
+    private const int MaxPageBuildsPerResolve = 8;
 
     // Per-page parsed caption labels, keyed to the exact PageAnalysis instance they were built from so
     // a re-analysed page (different instance in AnalysisCache) is transparently rebuilt.
@@ -58,10 +70,21 @@ internal sealed partial class ReferenceIndex
         List<(Reference Ref, int TargetBlock, int CaptionBlock)> Labels);
     private readonly Dictionary<int, PageLabels> _pages = [];
 
-    public void Clear() => _pages.Clear();
+    // Negative cache: references that matched nothing when the index covered N analysed pages. A
+    // changed analysed-page count (new background results, or a re-analysis trim) invalidates the
+    // entry, so late-arriving captions are still found — but steady re-reads of a dangling mention
+    // ("see Figure 99" with no such caption) cost a dictionary probe instead of a full scan.
+    private readonly Dictionary<Reference, int> _noMatch = [];
 
-    /// <summary>All figure/table references mentioned in a text run, in reading order, including
-    /// plural continuations ("Figures 2 and 3" yields both). Matches starting at or beyond
+    public void Clear()
+    {
+        _pages.Clear();
+        _noMatch.Clear();
+    }
+
+    /// <summary>All figure/table references mentioned in a text run, in reading order. Plural
+    /// mentions expand their continuations ("Figures 2 and 3" yields both); singular mentions do
+    /// not, so ordinary prose numbers after a reference stay out. Matches starting at or beyond
     /// <paramref name="startLimit"/> are ignored — pass the current line's length when the run is
     /// "current line + next line", so a mention split across the line break is caught without firing
     /// early for mentions that wholly belong to the next line.</summary>
@@ -71,12 +94,16 @@ internal sealed partial class ReferenceIndex
         foreach (Match m in LineReferenceRegex().Matches(text))
         {
             if (m.Index >= startLimit) break;
-            var kind = KindOf(m);
+            string kindWord = m.Groups["kind"].Value;
+            if (!AcceptNumber(kindWord, m.Groups["num"].Value)) continue;
+            var kind = char.ToLowerInvariant(kindWord[0]) == 'f' ? RefKind.Figure : RefKind.Table;
             refs.Add(new Reference(kind, NormalizeNumber(m.Groups["num"].Value)));
+
+            if (!kindWord.EndsWith('s') && !kindWord.EndsWith('S')) continue;   // continuations: plural only
             for (int pos = m.Index + m.Length;;)
             {
                 var c = ContinuationRegex().Match(text, pos);
-                if (!c.Success) break;
+                if (!c.Success || !AcceptNumber(kindWord, c.Groups["num"].Value)) break;
                 refs.Add(new Reference(kind, NormalizeNumber(c.Groups["num"].Value)));
                 pos = c.Index + c.Length;
             }
@@ -88,48 +115,85 @@ internal sealed partial class ReferenceIndex
     /// text does not start with a figure/table label. With <paramref name="requirePunctuation"/>, the
     /// label must also be followed by caption-style punctuation (":", ".", a dash, or end of text) —
     /// used to accept Text-role blocks as captions without swallowing body sentences like
-    /// "Figure 3 shows that...".</summary>
+    /// "Figure 3 shows that...". A plain hyphen counts only as a separator ("Fig. 2 - Sample"), not
+    /// a compound ("Figure 3-D printed...").</summary>
     internal static Reference? ParseCaptionLabel(string captionText, bool requirePunctuation = false)
     {
         var m = CaptionLabelRegex().Match(captionText);
-        if (!m.Success) return null;
+        if (!m.Success || !AcceptNumber(m.Groups["kind"].Value, m.Groups["num"].Value)) return null;
         if (requirePunctuation)
         {
             int i = m.Index + m.Length;
             while (i < captionText.Length && char.IsWhiteSpace(captionText[i])) i++;
-            if (i < captionText.Length && captionText[i] is not (':' or '.' or '—' or '–' or '-'))
-                return null;
+            if (i < captionText.Length)
+            {
+                char c = captionText[i];
+                bool punctuated = c is ':' or '.' or '—' or '–'
+                    || (c == '-' && (i + 1 >= captionText.Length || char.IsWhiteSpace(captionText[i + 1])));
+                if (!punctuated) return null;
+            }
         }
-        return new Reference(KindOf(m), NormalizeNumber(m.Groups["num"].Value));
+        return new Reference(
+            char.ToLowerInvariant(m.Groups["kind"].Value[0]) == 'f' ? RefKind.Figure : RefKind.Table,
+            NormalizeNumber(m.Groups["num"].Value));
     }
 
-    private static RefKind KindOf(Match m)
-        => char.ToLowerInvariant(m.Groups["kind"].Value[0]) == 'f' ? RefKind.Figure : RefKind.Table;
+    /// <summary>Digitless numbers (roman numerals, bare letters) are accepted only after a
+    /// capitalised kind word — keeps IEEE "Table II" and appendix "Figure B" while rejecting the
+    /// pronoun in "the table I made".</summary>
+    private static bool AcceptNumber(string kindWord, string number)
+    {
+        foreach (char c in number)
+            if (char.IsAsciiDigit(c))
+                return true;
+        return char.IsUpper(kindWord[0]);
+    }
 
     private static string NormalizeNumber(string number) => number.ToLowerInvariant();
 
     /// <summary>Resolve a reference to its defining caption + figure/table block, scanning analysed
     /// pages outward from <paramref name="nearPage"/> (nearest match wins; the preceding page is tried
     /// before the following one at each distance, since a referenced float most often sits before or
-    /// at the reference). Returns null when no analysed page carries the label yet — the caller may
-    /// retry as background analysis covers more pages.</summary>
-    public Target? Resolve(DocumentState doc, Reference reference, int nearPage)
+    /// at the reference). Returns null when no analysed page carries the label;
+    /// <paramref name="incomplete"/> is true when the scan ran out of its per-call page-build budget
+    /// before covering every analysed page — the caller should retry (progress is cached). A
+    /// complete miss is negative-cached until the set of analysed pages changes.</summary>
+    public Target? Resolve(DocumentState doc, Reference reference, int nearPage, out bool incomplete)
     {
+        incomplete = false;
+        int analysed = doc.AnalysisCache.Count;
+        if (_noMatch.TryGetValue(reference, out int seenAt) && seenAt == analysed)
+            return null;
+
+        int budget = MaxPageBuildsPerResolve;
         int pageCount = doc.PageCount;
         for (int d = 0; d < pageCount; d++)
         {
             int before = nearPage - d, after = nearPage + d;
-            if (before >= 0 && FindOnPage(doc, before, reference) is { } t1) return t1;
-            if (d > 0 && after < pageCount && FindOnPage(doc, after, reference) is { } t2) return t2;
+            if (before >= 0 && FindOnPage(doc, before, reference, ref budget, ref incomplete) is { } t1)
+                return t1;
+            if (d > 0 && after < pageCount && FindOnPage(doc, after, reference, ref budget, ref incomplete) is { } t2)
+                return t2;
         }
+        if (!incomplete)
+            _noMatch[reference] = analysed;
         return null;
     }
 
-    private Target? FindOnPage(DocumentState doc, int page, Reference reference)
+    private Target? FindOnPage(DocumentState doc, int page, Reference reference,
+        ref int budget, ref bool incomplete)
     {
         if (!doc.AnalysisCache.TryGetValue(page, out var analysis)) return null;
         if (!_pages.TryGetValue(page, out var entry) || !ReferenceEquals(entry.Analysis, analysis))
+        {
+            if (budget <= 0)
+            {
+                incomplete = true;   // not built yet and out of budget — a later call picks it up
+                return null;
+            }
+            budget--;
             _pages[page] = entry = BuildPage(doc, page, analysis);
+        }
         foreach (var (r, target, caption) in entry.Labels)
             if (r == reference)
                 return new Target(page, target, caption);
@@ -139,33 +203,36 @@ internal sealed partial class ReferenceIndex
     /// <summary>Parse every caption block on a page into (label → adjacent figure/table) entries.
     /// Detected <see cref="BlockRole.Caption"/> blocks are taken first; a second pass accepts
     /// Text-role blocks that read like a caption AND hug a float, covering detector misclassification.
-    /// Text extraction is cached per page (DocumentState.GetOrExtractText), so rebuilds after the
-    /// first touch are regex + geometry only.</summary>
+    /// Both passes require the float to overlap the caption horizontally within a bounded vertical
+    /// gap, so a label whose own float was misdetected is dropped rather than bound to an unrelated
+    /// block across the page. Text extraction is cached per page (DocumentState.GetOrExtractText),
+    /// so rebuilds after the first touch are regex + geometry only.</summary>
     private static PageLabels BuildPage(DocumentState doc, int page, PageAnalysis analysis)
     {
         List<(Reference Ref, int TargetBlock, int CaptionBlock)> labels = [];
         PageText? pageText = null;
         PageText Text() => pageText ??= doc.GetOrExtractText(page);
 
+        double captionMaxGap = analysis.PageHeight * CaptionMaxGapFraction;
         for (int i = 0; i < analysis.Blocks.Count; i++)
         {
             if (analysis.Blocks[i].Role != BlockRole.Caption) continue;
             if (ParseCaptionLabel(Text().ExtractBlockText(analysis.Blocks[i])) is not { } reference)
                 continue;
-            var (target, _, _) = FindNearestTarget(analysis, i, reference.Kind);
-            if (target >= 0)
+            var (target, gap, overlapX) = FindNearestTarget(analysis, i, reference.Kind);
+            if (target >= 0 && overlapX && gap <= captionMaxGap)
                 labels.Add((reference, target, i));
         }
 
-        double maxGap = analysis.PageHeight * PseudoCaptionMaxGapFraction;
+        double pseudoMaxGap = analysis.PageHeight * PseudoCaptionMaxGapFraction;
         for (int i = 0; i < analysis.Blocks.Count; i++)
         {
             if (analysis.Blocks[i].Role != BlockRole.Text) continue;
             // Geometry gate first (cheap): must hug a float of either kind before any text work.
             var fig = FindNearestTarget(analysis, i, RefKind.Figure);
             var tab = FindNearestTarget(analysis, i, RefKind.Table);
-            bool nearFig = fig.Index >= 0 && fig.OverlapX && fig.Gap <= maxGap;
-            bool nearTab = tab.Index >= 0 && tab.OverlapX && tab.Gap <= maxGap;
+            bool nearFig = fig.Index >= 0 && fig.OverlapX && fig.Gap <= pseudoMaxGap;
+            bool nearTab = tab.Index >= 0 && tab.OverlapX && tab.Gap <= pseudoMaxGap;
             if (!nearFig && !nearTab) continue;
 
             if (ParseCaptionLabel(Text().ExtractBlockText(analysis.Blocks[i]), requirePunctuation: true)

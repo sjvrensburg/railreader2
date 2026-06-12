@@ -116,14 +116,10 @@ public partial class MainWindow : Window
     {
         if (vm.ShouldShowPortalWindow)
         {
-            // Already open: just let its bindings (PortalWindowImage/Label) update — but re-apply the
-            // font scale so a settings change reaches the live window. Do NOT Activate() — that would
-            // steal focus back to the floating window on every peek change.
-            if (_portalWindow is not null)
-            {
-                _portalWindow.ApplyFontScale(vm.CurrentFontSize);
-                return;
-            }
+            // Already open: just let its bindings (PortalWindowImage/Label) update. Do NOT Activate()
+            // — that would steal focus back to the floating window on every peek change. (Live
+            // font-scale changes reach the open window via the CurrentFontSize case.)
+            if (_portalWindow is not null) return;
 
             var win = new PortalWindow { DataContext = vm };
             win.ApplyFontScale(vm.CurrentFontSize);
@@ -220,6 +216,10 @@ public partial class MainWindow : Window
                 break;
             case nameof(MainWindowViewModel.ShouldShowPortalWindow):
                 UpdatePortalWindow(vm);
+                break;
+            case nameof(MainWindowViewModel.CurrentFontSize):
+                // Live UI font-scale change from Settings — reach the open pop-out window too.
+                _portalWindow?.ApplyFontScale(vm.CurrentFontSize);
                 break;
             case nameof(MainWindowViewModel.IsFullScreen):
                 WindowState = vm.IsFullScreen ? WindowState.FullScreen : WindowState.Normal;

@@ -713,6 +713,8 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     {
         if (_window is not null)
             _window.FontSize = BaseFontSize * AppConfig.UiFontScale;
+        // Lets MainWindow forward the new scale to windows it owns (the portal pop-out).
+        OnPropertyChanged(nameof(CurrentFontSize));
     }
 
     public double CurrentFontSize => BaseFontSize * AppConfig.UiFontScale;

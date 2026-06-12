@@ -33,6 +33,8 @@ public sealed class ZoomPanImage : Control
     private const double MaxZoom = 16.0;
     private const double WheelZoomStep = 1.2;
 
+    private static readonly Cursor s_panCursor = new(StandardCursorType.SizeAll);
+
     static ZoomPanImage()
     {
         AffectsRender<ZoomPanImage>(SourceProperty);
@@ -49,7 +51,7 @@ public sealed class ZoomPanImage : Control
     {
         _zoom = 1.0;
         _offset = default;
-        _dragLast = null;
+        EndDrag();   // a Source swap mid-drag must also restore the cursor
         InvalidateVisual();
     }
 
@@ -108,8 +110,10 @@ public sealed class ZoomPanImage : Control
             _zoom = newZoom;
             ClampOffset(src.Size);
             InvalidateVisual();
+            // Handle only wheel events that actually zoomed — no-ops (already at fit, horizontal
+            // deltas) stay available to a scrollable ancestor if the control is ever hosted in one.
+            e.Handled = true;
         }
-        e.Handled = true;
     }
 
     protected override void OnPointerPressed(PointerPressedEventArgs e)
@@ -126,7 +130,7 @@ public sealed class ZoomPanImage : Control
         if (_zoom > 1.0)
         {
             _dragLast = e.GetPosition(this);
-            Cursor = new Cursor(StandardCursorType.SizeAll);
+            Cursor = s_panCursor;
             e.Pointer.Capture(this);
             e.Handled = true;
         }
@@ -136,6 +140,13 @@ public sealed class ZoomPanImage : Control
     {
         base.OnPointerMoved(e);
         if (_dragLast is not { } last || Source is not { } src) return;
+        // The button can be released without us seeing PointerReleased (capture stolen by a popup,
+        // window deactivation) — cancel the drag rather than panning on plain hover.
+        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+        {
+            EndDrag();
+            return;
+        }
         var p = e.GetPosition(this);
         _offset += p - last;
         _dragLast = p;
@@ -148,10 +159,22 @@ public sealed class ZoomPanImage : Control
     {
         base.OnPointerReleased(e);
         if (_dragLast is null) return;
-        _dragLast = null;
-        Cursor = Cursor.Default;
+        EndDrag();
         e.Pointer.Capture(null);
         e.Handled = true;
+    }
+
+    protected override void OnPointerCaptureLost(PointerCaptureLostEventArgs e)
+    {
+        base.OnPointerCaptureLost(e);
+        EndDrag();
+    }
+
+    private void EndDrag()
+    {
+        if (_dragLast is null) return;
+        _dragLast = null;
+        Cursor = Cursor.Default;
     }
 
     protected override void OnSizeChanged(SizeChangedEventArgs e)

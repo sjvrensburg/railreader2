@@ -168,9 +168,11 @@ Pannable secondary viewport; native PDF storage; coordinate-region and cross-doc
 Reading a rail line that mentions **"Figure N" / "Table N"** automatically pins the referenced float
 in the portal preview — no manual link needed. Recognised forms: "Fig./Tab./Figs" abbreviations,
 dotted numbers ("2.1"), letter suffixes ("4b"), appendix numbering ("A.2"), uppercase roman numerals
-("TABLE II"), plural/range mentions ("Figures 2 and 3", "Tables 4–6" → endpoints), and mentions split
-across a line break (the parse run includes the block's next line, gated so next-line-only mentions
-don't fire early). Toggle: checkbox at the top of the Portals pane, persisted
+("TABLE II"), plural/range mentions ("Figures 2 and 3", "Tables 4–6" → endpoints; continuations
+expand only after a *plural* kind word, so prose numbers after a singular mention — "Table 1, 95% of
+cases" — produce no phantom refs), and mentions split across a line break (the parse run includes the
+block's next line, gated so next-line-only mentions don't fire early). Digitless numbers (roman, bare
+letters) require a capitalised kind word, so "the table I made" is not a reference. Toggle: checkbox at the top of the Portals pane, persisted
 app-wide in `ConfigDir/portal_prefs.json` (`Services/PortalPreferences.cs`), default on.
 
 Mechanics (`TryAutoPin` in `MainWindowViewModel.Portals.cs`, `Services/ReferenceIndex.cs`):
@@ -183,16 +185,28 @@ Mechanics (`TryAutoPin` in `MainWindowViewModel.Portals.cs`, `Services/Reference
   smallest vertical gap; Figure accepts `Figure`+`Chart` roles, Table accepts `Table`). A second pass
   accepts `Text`-role blocks as captions when the detector misclassifies one — gated hard: leading
   label + caption punctuation (rejects body sentences like "Figure 3 shows…") + hugging a same-kind
-  float (horizontal overlap, gap ≤ 8% of page height); detected captions always win. Parsed labels
-  are cached per page, keyed to the `PageAnalysis` instance (re-analysis rebuilds transparently).
-  Lookup scans outward from the current page, preceding page first at each distance.
+  float (horizontal overlap, gap ≤ 8% of page height); detected captions always win, with their own
+  looser proximity gate (overlap + gap ≤ 15%), so a caption whose float was misdetected drops its
+  label instead of binding across the page. Parsed labels are cached per page, keyed to the
+  `PageAnalysis` instance (re-analysis rebuilds transparently). Lookup scans outward from the current
+  page, preceding page first at each distance, with a **per-call page-build budget** (8 pages) so an
+  unresolved mention on a large document never builds the whole index — and thus extracts text for
+  hundreds of pages — in one synchronous UI pass; retries continue from cached progress, and a
+  complete miss is negative-cached until the set of analysed pages changes.
 - The pin renders the **union of float + caption bboxes** (so the label confirms the match) and
-  shares `_displayedPortalId` ("auto:Kind:number") with saved portals — same pin-until-different
-  semantics; a different reference or a saved portal source takes over, nothing flaps while reading on.
-- Unresolved references (caption page not analysed yet) set `_autoRefPending`; the analysis polls
-  force a re-evaluation as background read-ahead delivers results. Reading the caption block itself
-  never triggers a pin.
+  shares `_displayedPortalId` ("auto:Kind:number:pPbB" — the resolved target is part of the identity,
+  so duplicate labels across chapters still switch correctly) with saved portals — same
+  pin-until-different semantics; a different reference or a saved portal source takes over, nothing
+  flaps while reading on. All of a line's mentions are resolved before pinning, so a slow-resolving
+  earlier mention can never silently displace one already shown. Crops that fail to render are
+  remembered and not retried (no repeated full-page rasterisation).
+- Unresolved references (caption page not analysed yet, or build budget exhausted) set
+  `_autoRefPending`; the analysis polls force a re-evaluation as background read-ahead delivers
+  results. The flag is reset at the top of every evaluation pass, so no path can leak it. Reading the
+  caption block itself — detected or pseudo — never triggers a pin.
 - **View lock**: the pop-out window's "Lock" toggle freezes the shown target — reading on switches
   nothing (no auto-pin, no saved-portal activation, no peek auto-dismiss) until unlocked. The lock is
-  released by docking/closing the window or switching tabs (the docked pane has no unlock control, so
-  it must never stay silently frozen); unlocking re-evaluates immediately so tracking catches up.
+  released whenever the popped-out state ends — the window's Dock button, the pane's dock button, a
+  WM close, or a tab switch all funnel through it (the docked pane has no unlock control, so it must
+  never stay silently frozen); unlocking re-evaluates immediately so tracking catches up. Turning the
+  auto-pin checkbox off respects an active lock (the frozen target stays visible).

@@ -63,13 +63,30 @@ public sealed partial class MainWindowViewModel
     public string? PortalWindowHint => PortalPeekImage is not null ? null : PortalHint;
 
     /// <summary>The pop-out window is shown while tracking is detached (the "Pop out" button) or a
-    /// temporary peek is up. MainWindow opens/closes the window in response to this.</summary>
-    public bool ShouldShowPortalWindow => IsPortalPoppedOut || PortalPeekImage is not null;
+    /// temporary peek is up — except mid-dismissal, where in-flight property raises must not let
+    /// MainWindow re-create the window being torn down. MainWindow opens/closes the window in
+    /// response to this.</summary>
+    public bool ShouldShowPortalWindow
+        => !_dismissingPortalWindow && (IsPortalPoppedOut || PortalPeekImage is not null);
+    private bool _dismissingPortalWindow;
 
     partial void OnActivePortalLabelChanged(string? value) => OnPropertyChanged(nameof(PortalWindowLabel));
     partial void OnPortalPeekLabelChanged(string? value) => OnPropertyChanged(nameof(PortalWindowLabel));
     partial void OnPortalHintChanged(string? value) => OnPropertyChanged(nameof(PortalWindowHint));
-    partial void OnIsPortalPoppedOutChanged(bool value) => OnPropertyChanged(nameof(ShouldShowPortalWindow));
+
+    // The view lock's lifetime is the popped-out state itself: every path that re-docks or closes
+    // the window (window Dock button, pane Dock button, WM close, dismissal) funnels through
+    // IsPortalPoppedOut=false, so releasing here cannot be bypassed — the docked pane has no unlock
+    // control and must never be left silently frozen. Unlocking re-evaluates so tracking catches up.
+    partial void OnIsPortalPoppedOutChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ShouldShowPortalWindow));
+        if (!value && _isPortalViewLocked)
+        {
+            ReleasePortalLock();
+            EvaluatePortals(forceRender: true);
+        }
+    }
 
     // The pop-out window's content (PortalWindowImage/Label/Hint) and visibility (ShouldShowPortalWindow)
     // are all derived from the peek + tracking state, so a peek swap flips all of them at once. The
@@ -105,12 +122,20 @@ public sealed partial class MainWindowViewModel
     // Caption-label index for the active document; reset on tab switch like _pageSizeCache.
     private readonly ReferenceIndex _referenceIndex = new();
     private readonly PortalPreferences _portalPrefs = PortalPreferences.Load();
-    // True when the current line mentions a figure/table whose caption page is not analysed yet —
-    // the analysis-complete poll then re-runs the evaluation (forceRender) to retry the resolve.
+    // True when the current line mentions a figure/table the index could not resolve yet (caption
+    // page unanalysed, or the per-call index-build budget ran out) — the analysis-complete poll then
+    // re-runs the evaluation (forceRender) to retry. Reset at the top of every full evaluation pass
+    // (the single point all non-memoized passes share), so no early-return path can leak it.
     private bool _autoRefPending;
+    // Auto pins whose target crop failed to render — skipped on retries so a deterministic render
+    // failure cannot re-trigger a full-page rasterisation on every pass. Cleared on tab switch.
+    private readonly HashSet<string> _failedAutoPins = [];
     // _displayedPortalId values for auto pins, so they share the pin-until-different machinery with
-    // saved portals without ever colliding with a saved portal's guid.
-    private static string AutoPinId(ReferenceIndex.Reference r) => $"auto:{r.Kind}:{r.Number}";
+    // saved portals without ever colliding with a saved portal's guid. The resolved target is part
+    // of the identity, so a same-labelled but different float (numbering restarts across chapters)
+    // still counts as "different" and replaces a stale pin.
+    private static string AutoPinId(ReferenceIndex.Reference r, ReferenceIndex.Target t)
+        => $"auto:{r.Kind}:{r.Number}:p{t.Page}b{t.TargetBlock}";
 
     /// <summary>Toggle for automatic pinning, persisted app-wide (sidecar). Turning it off clears a
     /// currently shown auto pin; saved portals are unaffected either way.</summary>
@@ -123,9 +148,13 @@ public sealed partial class MainWindowViewModel
             _portalPrefs.AutoPinFiguresTables = value;
             _portalPrefs.Save();
             OnPropertyChanged(nameof(AutoPinPortals));
-            _autoRefPending = false;
-            if (!value && _displayedPortalId?.StartsWith("auto:", StringComparison.Ordinal) == true)
-                ClearActivePortal();
+            // Toggling off drops a displayed auto pin — unless the view is locked: the lock's
+            // freeze contract wins, and the pin then simply stays until something replaces it after
+            // unlock. Fields only — the forced evaluation below performs the single image
+            // render-or-clear swap, preserving the one-behind disposal guarantee.
+            if (!value && !_isPortalViewLocked
+                && _displayedPortalId?.StartsWith("auto:", StringComparison.Ordinal) == true)
+                ResetDisplayedPortal();
             EvaluatePortals(forceRender: true);
         }
     }
@@ -183,11 +212,21 @@ public sealed partial class MainWindowViewModel
     /// Drives <see cref="ShouldShowPortalWindow"/> false, which MainWindow reacts to by closing it.</summary>
     public void DismissPortalWindow()
     {
-        // Closing/docking the window ends a view lock — the docked pane has no unlock control, so a
-        // surviving lock would freeze it invisibly. The unlock re-evaluates, resuming tracking.
-        IsPortalViewLocked = false;
-        ClearPortalPeek();
-        IsPortalPoppedOut = false;
+        // Guarded teardown: clearing the peek / flipping popped-out raises ShouldShowPortalWindow
+        // mid-way, and on the external-close path MainWindow has already nulled its window
+        // reference — without the guard it would re-create (flash) the very window being dismissed.
+        // The lock is released by the popped-out change hook.
+        _dismissingPortalWindow = true;
+        try
+        {
+            ClearPortalPeek();
+            IsPortalPoppedOut = false;
+        }
+        finally
+        {
+            _dismissingPortalWindow = false;
+        }
+        OnPropertyChanged(nameof(ShouldShowPortalWindow));
     }
 
     /// <summary>True while a reading position is available to use as a portal source — i.e. rail mode
@@ -265,6 +304,19 @@ public sealed partial class MainWindowViewModel
         InvalidatePortalMarkers();   // no portal active → drop the accent
     }
 
+    /// <summary>Drop the displayed-pin identity (id, label, hint, pending) WITHOUT touching the
+    /// tracking image. For callers that immediately force an <see cref="EvaluatePortals"/>: the
+    /// evaluation then performs the single render-or-clear image swap, so one pass never swaps the
+    /// tracking bitmap twice (which would defeat the one-behind deferred-disposal guarantee).</summary>
+    private void ResetDisplayedPortal()
+    {
+        _displayedPortalId = null;
+        _portalTargetPending = false;
+        ActivePortalLabel = null;
+        PortalHint = NoActivePortalHint;
+        InvalidatePortalMarkers();
+    }
+
     /// <summary>The page-level (page, block, line) the reading position currently sits on; block/line
     /// are -1 when not rail-reading. Read straight from RailNav — no text extraction (see
     /// <see cref="EvaluatePortals"/>).</summary>
@@ -288,6 +340,7 @@ public sealed partial class MainWindowViewModel
             ClearActivePortal();
             _portalImageOwner = null;
             _lastEvalReadingBlock = null;
+            _autoRefPending = false;
             _pageSizeCache.Clear();
             return;
         }
@@ -300,6 +353,10 @@ public sealed partial class MainWindowViewModel
         if (!forceRender && !ownerSwitched && _lastEvalReadingBlock == (srcPage, srcBlock, srcLine))
             return;
         _lastEvalReadingBlock = (srcPage, srcBlock, srcLine);
+        // Single reset point for the auto-retry flag: every full pass clears it, and only TryAutoPin
+        // re-arms it. Paths that skip TryAutoPin (lock, active saved portal) thus cannot leak a stale
+        // pending that would force a re-evaluation on every analysis result.
+        _autoRefPending = false;
 
         // Auto-dismiss a temporary peek when reading leaves the block it was opened over (unless the
         // view is locked), or on tab switch.
@@ -315,10 +372,10 @@ public sealed partial class MainWindowViewModel
             _portalImageOwner = tab;
             _displayedPortalId = null;
             _portalTargetPending = false;
-            _autoRefPending = false;
             _pendingTargetForLink = null;
             _pageSizeCache.Clear();
             _referenceIndex.Clear();
+            _failedAutoPins.Clear();
             ReleasePortalLock();   // a lock is per-document; the new tab tracks normally
         }
 
@@ -352,7 +409,6 @@ public sealed partial class MainWindowViewModel
         // the block, scrolling around — until another portal's source is crossed.
         if (active is not null && active.Id != _displayedPortalId)
         {
-            _autoRefPending = false;
             Pin(doc, active);
             return;
         }
@@ -383,7 +439,6 @@ public sealed partial class MainWindowViewModel
     /// stays up meanwhile. UI thread only.</summary>
     private void TryAutoPin(DocumentState doc, int srcPage, int srcBlock, int srcLine)
     {
-        _autoRefPending = false;
         if (!AutoPinPortals || srcBlock < 0 || srcLine < 0) return;
         if (!doc.AnalysisCache.TryGetValue(srcPage, out var analysis)
             || srcBlock >= analysis.Blocks.Count
@@ -409,31 +464,53 @@ public sealed partial class MainWindowViewModel
         if (lineIdx + 1 < lines.Count && LineText(pageText, lines[lineIdx + 1]) is { Length: > 0 } next)
             lineText = lineText + " " + next;
 
-        foreach (var reference in ReferenceIndex.ParseLine(lineText, startLimit))
+        var refs = ReferenceIndex.ParseLine(lineText, startLimit);
+        if (refs.Count == 0) return;
+
+        // Resolve every mention first: if ANY of this line's references is the one already shown,
+        // stay pinned (pin-until-different) — never let an earlier-in-line mention that resolves
+        // later silently flip the preview. Otherwise the first resolvable mention wins.
+        bool anyIncomplete = false;
+        var candidates = new List<(ReferenceIndex.Reference Ref, ReferenceIndex.Target Target)>();
+        foreach (var reference in refs)
         {
-            string autoId = AutoPinId(reference);
-            if (autoId == _displayedPortalId) return;   // already showing this one — stay pinned
-            if (_referenceIndex.Resolve(doc, reference, srcPage) is { } target)
-            {
-                PinAutoReference(doc, autoId, reference, target);
-                return;
-            }
-            // Likely defined on a page that is not analysed yet — retry when more results arrive.
-            _autoRefPending = true;
+            var target = _referenceIndex.Resolve(doc, reference, srcPage, out bool incomplete);
+            anyIncomplete |= incomplete;
+            if (target is not { } t) continue;
+            if (t.Page == srcPage && t.CaptionBlock == srcBlock) continue;   // reading the (pseudo-)caption itself
+            if (AutoPinId(reference, t) == _displayedPortalId) return;       // already showing — stay
+            if (!_failedAutoPins.Contains(AutoPinId(reference, t)))
+                candidates.Add((reference, t));
         }
+        if (candidates.Count > 0)
+        {
+            PinAutoReference(doc, candidates[0].Ref, candidates[0].Target);
+            return;
+        }
+        // Nothing pinned: retry while the index is still incomplete (budgeted build in progress) or
+        // more analysis results may still bring the caption in. A complete miss on a fully-analysed
+        // document is negative-cached by the index, so no retries are scheduled for it.
+        _autoRefPending = anyIncomplete || doc.AnalysisCache.Count < doc.PageCount;
     }
 
     /// <summary>Pin an automatically resolved reference: render the float together with its caption
     /// (the union region, so the label under the figure confirms the match) into the tracking
     /// preview. Shares <see cref="_displayedPortalId"/> with saved portals, so a later saved-portal
     /// activation or a different reference takes over normally.</summary>
-    private void PinAutoReference(DocumentState doc, string autoId, ReferenceIndex.Reference reference,
+    private void PinAutoReference(DocumentState doc, ReferenceIndex.Reference reference,
         ReferenceIndex.Target target)
     {
+        string autoId = AutoPinId(reference, target);
         var blocks = doc.AnalysisCache[target.Page].Blocks;
         var region = Union(blocks[target.TargetBlock].BBox, blocks[target.CaptionBlock].BBox);
         var bitmap = RenderRegionCrop(doc, target.Page, region);
-        if (bitmap is null) return;   // keep whatever was shown; reading on retries naturally
+        if (bitmap is null)
+        {
+            // Remember the failure: a deterministic render failure must not re-trigger a full-page
+            // rasterisation on every line advance / forced pass. Cleared on tab switch.
+            _failedAutoPins.Add(autoId);
+            return;   // keep whatever was shown
+        }
 
         _displayedPortalId = autoId;
         _portalTargetPending = false;
@@ -724,9 +801,10 @@ public sealed partial class MainWindowViewModel
         if (ActiveTab is not { } tab) return;
         if (tab.Portals.Portals.RemoveAll(p => p.Id == id) == 0) return;
         tab.Portals.Save(tab.FilePath);
-        // Clear the preview if the deleted portal is the one currently shown (pinned).
+        // Drop the pin identity if the deleted portal is the one shown; the forced evaluation below
+        // does the single image render-or-clear swap (never two swaps in one pass).
         if (_displayedPortalId == id)
-            ClearActivePortal();
+            ResetDisplayedPortal();
         NotifyPortalsChanged();
         InvalidatePortalMarkers();
         EvaluatePortals(forceRender: true);
