@@ -135,6 +135,34 @@ public sealed partial class MainWindowViewModel
     /// re-evaluation when results arrive.</summary>
     internal bool PortalResolvePending => _portalTargetPending || _autoRefPending;
 
+    // --- View lock (pop-out "Lock" toggle) ---
+
+    /// <summary>While true, the currently shown target is frozen: reading on does not switch it —
+    /// neither an automatic reference nor a saved portal's source takes over, and a temporary peek
+    /// is not auto-dismissed. Released by the toggle, docking/closing the pop-out, or a tab switch;
+    /// unlocking immediately re-evaluates so tracking catches up to the reading position.</summary>
+    public bool IsPortalViewLocked
+    {
+        get => _isPortalViewLocked;
+        set
+        {
+            if (_isPortalViewLocked == value) return;
+            _isPortalViewLocked = value;
+            OnPropertyChanged(nameof(IsPortalViewLocked));
+            if (!value) EvaluatePortals(forceRender: true);
+        }
+    }
+    private bool _isPortalViewLocked;
+
+    /// <summary>Drop the lock without re-evaluating — for callers already inside the sync loop
+    /// (tab switch) or about to evaluate themselves.</summary>
+    private void ReleasePortalLock()
+    {
+        if (!_isPortalViewLocked) return;
+        _isPortalViewLocked = false;
+        OnPropertyChanged(nameof(IsPortalViewLocked));
+    }
+
     private (double W, double H) PageSize(DocumentState doc, int page)
     {
         if (_pageSizeCache.TryGetValue(page, out var size)) return size;
@@ -155,6 +183,9 @@ public sealed partial class MainWindowViewModel
     /// Drives <see cref="ShouldShowPortalWindow"/> false, which MainWindow reacts to by closing it.</summary>
     public void DismissPortalWindow()
     {
+        // Closing/docking the window ends a view lock — the docked pane has no unlock control, so a
+        // surviving lock would freeze it invisibly. The unlock re-evaluates, resuming tracking.
+        IsPortalViewLocked = false;
         ClearPortalPeek();
         IsPortalPoppedOut = false;
     }
@@ -270,8 +301,10 @@ public sealed partial class MainWindowViewModel
             return;
         _lastEvalReadingBlock = (srcPage, srcBlock, srcLine);
 
-        // Auto-dismiss a temporary peek when reading leaves the block it was opened over, or on tab switch.
-        if (_peekAnchorReadingBlock is { } anchor && (anchor != (srcPage, srcBlock) || ownerSwitched))
+        // Auto-dismiss a temporary peek when reading leaves the block it was opened over (unless the
+        // view is locked), or on tab switch.
+        if (_peekAnchorReadingBlock is { } anchor
+            && ((anchor != (srcPage, srcBlock) && !_isPortalViewLocked) || ownerSwitched))
             ClearPortalPeek();
 
         // Tab switch: reset tracking state. The tracking IMAGE is cleared by the single render-or-clear
@@ -286,13 +319,17 @@ public sealed partial class MainWindowViewModel
             _pendingTargetForLink = null;
             _pageSizeCache.Clear();
             _referenceIndex.Clear();
+            ReleasePortalLock();   // a lock is per-document; the new tab tracks normally
         }
 
+        // View locked: the shown target is frozen — skip all reading-position-driven switching
+        // (saved-portal activation and auto-pinning). The pending-target retry below still runs so a
+        // locked, still-resolving target can finish rendering.
         // The saved portal whose source the reading position has reached (source page checked first so
         // the per-portal resolve work runs only for same-page sources).
         Portal? active = null;
         int bestThreshold = -1;
-        if (srcBlock >= 0)
+        if (srcBlock >= 0 && !_isPortalViewLocked)
         {
             foreach (var p in tab.Portals.Portals)
             {
@@ -322,7 +359,7 @@ public sealed partial class MainWindowViewModel
 
         // No saved portal claimed this line — automatic pinning: a line mentioning "Figure N" /
         // "Table N" pins the referenced float, with the same pin-until-different semantics.
-        if (active is null)
+        if (active is null && !_isPortalViewLocked)
             TryAutoPin(doc, srcPage, srcBlock, srcLine);
 
         // Nothing pinned (tab switch with no active source on the new tab, or never activated) → clear.

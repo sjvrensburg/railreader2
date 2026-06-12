@@ -46,6 +46,9 @@
                     PointerPressed="OnChromePointerPressed">
                 <DockPanel Margin="8,0,4,0" LastChildFill="True">
                     <StackPanel Orientation="Horizontal" Spacing="4" DockPanel.Dock="Right">
+                        <ToggleButton Classes="chrome" Content="Lock"
+                                      IsChecked="{Binding IsPortalViewLocked}"
+                                      ToolTip.Tip="Freeze this target: keep showing it while you read on — auto-pins and portal sources won't replace it until unlocked" />
                         <ToggleButton Name="TopmostToggle" Classes="chrome" Content="Pin" IsChecked="True"
                                       Click="OnTopmostToggle"
                                       ToolTip.Tip="Keep this window above others (always on top)" />

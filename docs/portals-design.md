@@ -186,3 +186,7 @@ Mechanics (`TryAutoPin` in `MainWindowViewModel.Portals.cs`, `Services/Reference
 - Unresolved references (caption page not analysed yet) set `_autoRefPending`; the analysis polls
   force a re-evaluation as background read-ahead delivers results. Reading the caption block itself
   never triggers a pin.
+- **View lock**: the pop-out window's "Lock" toggle freezes the shown target — reading on switches
+  nothing (no auto-pin, no saved-portal activation, no peek auto-dismiss) until unlocked. The lock is
+  released by docking/closing the window or switching tabs (the docked pane has no unlock control, so
+  it must never stay silently frozen); unlocking re-evaluates immediately so tracking catches up.
