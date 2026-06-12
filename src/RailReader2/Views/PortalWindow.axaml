@@ -24,7 +24,6 @@
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="3" />
             <Setter Property="VerticalAlignment" Value="Center" />
-            <Setter Property="FontSize" Value="11" />
             <Setter Property="Padding" Value="10,2" />
         </Style>
         <Style Selector="Button.chrome /template/ ContentPresenter, ToggleButton.chrome /template/ ContentPresenter">
@@ -43,7 +42,9 @@
     <Border BorderBrush="#80808080" BorderThickness="1" Background="#1A1A1A">
         <DockPanel>
             <!-- Slim draggable chrome -->
-            <Border Name="ChromeBar" DockPanel.Dock="Top" Background="#2A2A2A" Height="28"
+            <!-- Chrome text/icons inherit the font size set by ApplyFontScale (UI font-scale aware);
+                 the bar grows with it rather than clipping. -->
+            <Border Name="ChromeBar" DockPanel.Dock="Top" Background="#2A2A2A" MinHeight="28"
                     PointerPressed="OnChromePointerPressed">
                 <DockPanel Margin="4,0,4,0" LastChildFill="True">
                     <!-- View lock: freeze the shown target against reading-position-driven switching. -->
@@ -66,7 +67,7 @@
                                 ToolTip.Tip="Return the portal to the side panel" />
                     </StackPanel>
                     <TextBlock Text="{Binding PortalWindowLabel}" Foreground="White"
-                               FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"
+                               FontWeight="SemiBold" VerticalAlignment="Center"
                                TextTrimming="CharacterEllipsis" />
                 </DockPanel>
             </Border>

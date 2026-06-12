@@ -15,9 +15,23 @@ namespace RailReader2.Views;
 /// </summary>
 public partial class PortalWindow : Window
 {
+    // Chrome text sits a touch smaller than body text (12px at the 14px base), like the original
+    // fixed-size chrome, but now scales with the UI font-scale setting.
+    private const double ChromeFontRatio = 12.0 / 14.0;
+
     public PortalWindow()
     {
         InitializeComponent();
+    }
+
+    /// <summary>Apply the app's scaled font size (<c>MainWindowViewModel.CurrentFontSize</c>) to the
+    /// window: body/hint text inherits it directly, the chrome bar (Lock/Pin/Dock buttons, label,
+    /// icons) a slightly smaller derived size. Called on creation and re-applied by MainWindow's
+    /// update path so a live scale change reaches an already-open window.</summary>
+    public void ApplyFontScale(double uiFontSize)
+    {
+        FontSize = uiFontSize;
+        Avalonia.Controls.Documents.TextElement.SetFontSize(ChromeBar, uiFontSize * ChromeFontRatio);
     }
 
     /// <summary>Set the Pin toggle's checked state to match restored settings without re-firing its handler.</summary>

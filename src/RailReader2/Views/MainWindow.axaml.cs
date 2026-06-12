@@ -116,11 +116,17 @@ public partial class MainWindow : Window
     {
         if (vm.ShouldShowPortalWindow)
         {
-            // Already open: just let its bindings (PortalWindowImage/Label) update. Do NOT Activate()
-            // — that would steal focus back to the floating window on every peek change.
-            if (_portalWindow is not null) return;
+            // Already open: just let its bindings (PortalWindowImage/Label) update — but re-apply the
+            // font scale so a settings change reaches the live window. Do NOT Activate() — that would
+            // steal focus back to the floating window on every peek change.
+            if (_portalWindow is not null)
+            {
+                _portalWindow.ApplyFontScale(vm.CurrentFontSize);
+                return;
+            }
 
             var win = new PortalWindow { DataContext = vm };
+            win.ApplyFontScale(vm.CurrentFontSize);
             var settings = Services.PortalWindowSettings.Load();
             win.Width = settings.Width;     // Load() guarantees a positive size (defaults live there)
             win.Height = settings.Height;
