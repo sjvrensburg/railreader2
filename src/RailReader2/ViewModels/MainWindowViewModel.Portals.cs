@@ -456,7 +456,11 @@ public sealed partial class MainWindowViewModel
         }
 
         string? lineText = LineText(pageText, lines[lineIdx]);
-        if (string.IsNullOrEmpty(lineText)) return;
+        if (string.IsNullOrEmpty(lineText))
+        {
+            _logger.Debug($"[AutoPin] p{srcPage + 1} b{srcBlock} l{srcLine}: empty line text");
+            return;
+        }
 
         // Append the block's next line so a mention split across the break ("…see Figure ⏎ 3 shows…")
         // is caught; the start limit keeps mentions wholly on the next line from firing a line early.
@@ -466,6 +470,8 @@ public sealed partial class MainWindowViewModel
 
         var refs = ReferenceIndex.ParseLine(lineText, startLimit);
         if (refs.Count == 0) return;
+        _logger.Debug($"[AutoPin] p{srcPage + 1} b{srcBlock} l{srcLine}: "
+            + $"refs=[{string.Join(", ", refs)}] in \"{Truncate(lineText, 90)}\"");
 
         // Resolve every mention first: if ANY of this line's references is the one already shown,
         // stay pinned (pin-until-different) — never let an earlier-in-line mention that resolves
@@ -476,7 +482,11 @@ public sealed partial class MainWindowViewModel
         {
             var target = _referenceIndex.Resolve(doc, reference, srcPage, out bool incomplete);
             anyIncomplete |= incomplete;
-            if (target is not { } t) continue;
+            if (target is not { } t)
+            {
+                _logger.Debug($"[AutoPin]   {reference}: " + (incomplete ? "index incomplete, will retry" : "no caption found"));
+                continue;
+            }
             if (t.Page == srcPage && t.CaptionBlock == srcBlock) continue;   // reading the (pseudo-)caption itself
             if (AutoPinId(reference, t) == _displayedPortalId) return;       // already showing — stay
             if (!_failedAutoPins.Contains(AutoPinId(reference, t)))
@@ -484,6 +494,8 @@ public sealed partial class MainWindowViewModel
         }
         if (candidates.Count > 0)
         {
+            _logger.Debug($"[AutoPin]   pinning {candidates[0].Ref} → p{candidates[0].Target.Page + 1} "
+                + $"block {candidates[0].Target.TargetBlock}");
             PinAutoReference(doc, candidates[0].Ref, candidates[0].Target);
             return;
         }
@@ -492,6 +504,9 @@ public sealed partial class MainWindowViewModel
         // document is negative-cached by the index, so no retries are scheduled for it.
         _autoRefPending = anyIncomplete || doc.AnalysisCache.Count < doc.PageCount;
     }
+
+    private static string Truncate(string s, int max)
+        => s.Length <= max ? s : s[..max] + "…";
 
     /// <summary>Pin an automatically resolved reference: render the float together with its caption
     /// (the union region, so the label under the figure confirms the match) into the tracking
@@ -508,6 +523,7 @@ public sealed partial class MainWindowViewModel
         {
             // Remember the failure: a deterministic render failure must not re-trigger a full-page
             // rasterisation on every line advance / forced pass. Cleared on tab switch.
+            _logger.Debug($"[AutoPin]   crop render FAILED for {autoId} — not retrying");
             _failedAutoPins.Add(autoId);
             return;   // keep whatever was shown
         }
