@@ -39,6 +39,47 @@ public class ReferenceIndexTests
     public void ParseLine_IgnoresNonReferences(string line)
         => Assert.Empty(ReferenceIndex.ParseLine(line));
 
+    [Theory]
+    [InlineData("details in Figure A.2 of the appendix", "Figure", "a.2")]
+    [InlineData("as TABLE II shows", "Table", "ii")]
+    [InlineData("see Table IV for", "Table", "iv")]
+    [InlineData("Appendix Figure B contains", "Figure", "b")]
+    public void ParseLine_RecognisesAppendixAndRomanNumbers(string line, string kind, string number)
+        => Assert.Contains(new Ref(Enum.Parse<RefKind>(kind), number), ReferenceIndex.ParseLine(line));
+
+    [Fact]
+    public void ParseLine_RomanNumeralsAreUppercaseOnly()
+        => Assert.Empty(ReferenceIndex.ParseLine("the table is shown"));   // "is" must not read as roman
+
+    [Theory]
+    [InlineData("Figures 2 and 3 show", new[] { "2", "3" })]
+    [InlineData("Tables 1, 4 and 6 list", new[] { "1", "4", "6" })]
+    [InlineData("Figs. 3–5 illustrate", new[] { "3", "5" })]   // range endpoints
+    [InlineData("Tables 4.2 and 4.3 compare", new[] { "4.2", "4.3" })]
+    public void ParseLine_ExpandsPluralContinuations(string line, string[] numbers)
+        => Assert.Equal(numbers, ReferenceIndex.ParseLine(line).Select(r => r.Number));
+
+    [Fact]
+    public void ParseLine_ContinuationStopsAtNonNumber()
+        => Assert.Single(ReferenceIndex.ParseLine("Figure 2 and the results show"));
+
+    [Fact]
+    public void ParseLine_StartLimit_CatchesMentionSplitAcrossLines()
+    {
+        // "…see Figure" at the end of the current line, "3 shows…" starting the next.
+        string current = "as we see Figure";
+        string run = current + " " + "3 shows the effect";
+        Assert.Contains(new Ref(RefKind.Figure, "3"), ReferenceIndex.ParseLine(run, current.Length));
+    }
+
+    [Fact]
+    public void ParseLine_StartLimit_IgnoresMentionsWhollyOnNextLine()
+    {
+        string current = "the end of a sentence.";
+        string run = current + " " + "Figure 3 shows the effect";
+        Assert.Empty(ReferenceIndex.ParseLine(run, current.Length));
+    }
+
     [Fact]
     public void ParseLine_NormalisesSuffixCase()
         => Assert.Equal(
@@ -61,6 +102,22 @@ public class ReferenceIndexTests
     [InlineData("")]
     public void ParseCaptionLabel_RejectsNonLabels(string caption)
         => Assert.Null(ReferenceIndex.ParseCaptionLabel(caption));
+
+    [Theory]
+    [InlineData("TABLE II: Results", "Table", "ii")]
+    [InlineData("Figure A.4 — Residual plots", "Figure", "a.4")]
+    public void ParseCaptionLabel_RecognisesRomanAndAppendixLabels(string caption, string kind, string number)
+        => Assert.Equal(new Ref(Enum.Parse<RefKind>(kind), number), ReferenceIndex.ParseCaptionLabel(caption));
+
+    [Theory]
+    [InlineData("Figure 3: Convergence", true)]    // colon → caption-like
+    [InlineData("Table 4. Parameter estimates", true)]
+    [InlineData("Figure 2 — Sample paths", true)]
+    [InlineData("Figure 3", true)]                 // bare label (end of text) counts
+    [InlineData("Figure 3 shows that the estimator", false)]   // body sentence → rejected
+    public void ParseCaptionLabel_RequirePunctuation_FiltersBodySentences(string text, bool accepted)
+        => Assert.Equal(accepted,
+            ReferenceIndex.ParseCaptionLabel(text, requirePunctuation: true) is not null);
 
     // --- NearestTargetBlock: caption ↔ float association ---
 

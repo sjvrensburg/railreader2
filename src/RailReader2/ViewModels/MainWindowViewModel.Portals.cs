@@ -390,13 +390,26 @@ public sealed partial class MainWindowViewModel
             || analysis.Blocks[srcBlock].Role == BlockRole.Caption)
             return;
 
-        var line = doc.Rail.CurrentLineInfo;
-        float top = line.Y - line.Height / 2f;
-        string? lineText = doc.GetOrExtractText(srcPage)
-            .ExtractTextInRect(line.X, top, line.X + line.Width, top + line.Height);
+        var pageText = doc.GetOrExtractText(srcPage);
+        var lines = analysis.Blocks[srcBlock].Lines;
+        int lineIdx = Math.Min(srcLine, lines.Count - 1);
+
+        static string? LineText(PageText text, LineInfo line)
+        {
+            float top = line.Y - line.Height / 2f;
+            return text.ExtractTextInRect(line.X, top, line.X + line.Width, top + line.Height);
+        }
+
+        string? lineText = LineText(pageText, lines[lineIdx]);
         if (string.IsNullOrEmpty(lineText)) return;
 
-        foreach (var reference in ReferenceIndex.ParseLine(lineText))
+        // Append the block's next line so a mention split across the break ("…see Figure ⏎ 3 shows…")
+        // is caught; the start limit keeps mentions wholly on the next line from firing a line early.
+        int startLimit = lineText.Length;
+        if (lineIdx + 1 < lines.Count && LineText(pageText, lines[lineIdx + 1]) is { Length: > 0 } next)
+            lineText = lineText + " " + next;
+
+        foreach (var reference in ReferenceIndex.ParseLine(lineText, startLimit))
         {
             string autoId = AutoPinId(reference);
             if (autoId == _displayedPortalId) return;   // already showing this one — stay pinned

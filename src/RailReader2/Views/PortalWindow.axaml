@@ -2,6 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:RailReader2.ViewModels"
         xmlns:ctrl="using:RailReader2.Controls"
+        xmlns:a="using:Avalonia.Automation"
         xmlns:conv="using:Avalonia.Data.Converters"
         x:Class="RailReader2.Views.PortalWindow"
         x:DataType="vm:MainWindowViewModel"
@@ -44,11 +45,20 @@
             <!-- Slim draggable chrome -->
             <Border Name="ChromeBar" DockPanel.Dock="Top" Background="#2A2A2A" Height="28"
                     PointerPressed="OnChromePointerPressed">
-                <DockPanel Margin="8,0,4,0" LastChildFill="True">
+                <DockPanel Margin="4,0,4,0" LastChildFill="True">
+                    <!-- View lock: freeze the shown target against reading-position-driven switching. -->
+                    <ToggleButton Classes="chrome" DockPanel.Dock="Left" Margin="0,0,6,0" Padding="5,2"
+                                  IsChecked="{Binding IsPortalViewLocked}"
+                                  a:AutomationProperties.Name="Lock target"
+                                  ToolTip.Tip="Freeze this target: keep showing it while you read on — auto-pins and portal sources won't replace it until unlocked">
+                        <Panel>
+                            <ctrl:Icon Data="{StaticResource IconLockOpen}" SizeFactor="1.0"
+                                    IsVisible="{Binding !IsPortalViewLocked}" />
+                            <ctrl:Icon Data="{StaticResource IconLock}" SizeFactor="1.0"
+                                    IsVisible="{Binding IsPortalViewLocked}" />
+                        </Panel>
+                    </ToggleButton>
                     <StackPanel Orientation="Horizontal" Spacing="4" DockPanel.Dock="Right">
-                        <ToggleButton Classes="chrome" Content="Lock"
-                                      IsChecked="{Binding IsPortalViewLocked}"
-                                      ToolTip.Tip="Freeze this target: keep showing it while you read on — auto-pins and portal sources won't replace it until unlocked" />
                         <ToggleButton Name="TopmostToggle" Classes="chrome" Content="Pin" IsChecked="True"
                                       Click="OnTopmostToggle"
                                       ToolTip.Tip="Keep this window above others (always on top)" />

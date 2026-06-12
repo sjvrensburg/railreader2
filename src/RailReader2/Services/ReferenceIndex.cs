@@ -15,8 +15,9 @@ internal sealed partial class ReferenceIndex
 {
     internal enum RefKind { Figure, Table }
 
-    /// <summary>A parsed reference label, e.g. (Figure, "3.2"). Numbers are normalized (lowercase
-    /// suffix letter, no trailing dot) so an in-text mention and a caption label compare equal.</summary>
+    /// <summary>A parsed reference label, e.g. (Figure, "3.2"). Numbers are normalized to lowercase
+    /// (suffix letters, appendix prefixes, roman numerals) so an in-text mention and a caption label
+    /// compare equal.</summary>
     internal readonly record struct Reference(RefKind Kind, string Number)
     {
         public override string ToString() => $"{Kind} {Number}";
@@ -25,17 +26,31 @@ internal sealed partial class ReferenceIndex
     /// <summary>A resolved reference target: the figure/table block plus the caption that named it.</summary>
     internal readonly record struct Target(int Page, int TargetBlock, int CaptionBlock);
 
-    // In-text mentions: "Figure 3", "Fig. 2.1", "Figs 4a", "Table 12", "Tab. 3". Case-insensitive;
-    // the optional letter suffix covers sub-figure references ("Figure 4b").
-    [GeneratedRegex(@"\b(?<kind>fig(?:ure)?s?|tab(?:le)?s?)\.?\s*(?<num>\d+(?:\.\d+)*[a-z]?)\b",
+    // Number forms a figure/table label can take: arabic with an optional appendix-letter prefix and
+    // sub-figure suffix ("3", "2.1", "A.4", "4b"), or — case-sensitively, to avoid swallowing common
+    // words — uppercase roman numerals / a bare uppercase letter (IEEE "TABLE II", appendix "Figure A").
+    private const string NumberPattern = @"(?:(?:[A-Za-z]\.)?\d+(?:\.\d+)*[a-z]?|(?-i:[IVXLC]+|[A-Z]))\b";
+
+    // In-text mentions: "Figure 3", "Fig. 2.1", "Figs 4a", "Table 12", "Tab. 3", "TABLE II".
+    [GeneratedRegex(@"\b(?<kind>fig(?:ure)?s?|tab(?:le)?s?)\.?\s*(?<num>" + NumberPattern + ")",
         RegexOptions.IgnoreCase)]
     private static partial Regex LineReferenceRegex();
 
+    // Follow-on numbers of a plural/range mention — "Figures 2 and 3", "Tables 1, 4", "Figs. 3–5"
+    // (ranges yield their endpoints). \G anchors each match at the previous one's end.
+    [GeneratedRegex(@"\G\s*(?:,|;|and|&|–|—|to|through|-)\s*(?<num>" + NumberPattern + ")",
+        RegexOptions.IgnoreCase)]
+    private static partial Regex ContinuationRegex();
+
     // Caption labels must LEAD the caption text ("Figure 3: ..." / "Tab. 2 — ..."), allowing a little
     // leading punctuation/whitespace noise from text extraction.
-    [GeneratedRegex(@"^[\s\p{P}]{0,3}(?<kind>fig(?:ure)?|tab(?:le)?)\.?\s*(?<num>\d+(?:\.\d+)*[a-z]?)\b",
+    [GeneratedRegex(@"^[\s\p{P}]{0,3}(?<kind>fig(?:ure)?|tab(?:le)?)\.?\s*(?<num>" + NumberPattern + ")",
         RegexOptions.IgnoreCase)]
     private static partial Regex CaptionLabelRegex();
+
+    // A Text-role block only counts as a misclassified caption when it sits at most this close to an
+    // unlabelled float (fraction of page height) and overlaps it horizontally.
+    private const double PseudoCaptionMaxGapFraction = 0.08;
 
     // Per-page parsed caption labels, keyed to the exact PageAnalysis instance they were built from so
     // a re-analysed page (different instance in AnalysisCache) is transparently rebuilt.
@@ -45,28 +60,53 @@ internal sealed partial class ReferenceIndex
 
     public void Clear() => _pages.Clear();
 
-    /// <summary>All figure/table references mentioned in a line of text, in reading order.</summary>
-    public static List<Reference> ParseLine(string text)
+    /// <summary>All figure/table references mentioned in a text run, in reading order, including
+    /// plural continuations ("Figures 2 and 3" yields both). Matches starting at or beyond
+    /// <paramref name="startLimit"/> are ignored — pass the current line's length when the run is
+    /// "current line + next line", so a mention split across the line break is caught without firing
+    /// early for mentions that wholly belong to the next line.</summary>
+    public static List<Reference> ParseLine(string text, int startLimit = int.MaxValue)
     {
         List<Reference> refs = [];
         foreach (Match m in LineReferenceRegex().Matches(text))
-            refs.Add(MakeReference(m));
+        {
+            if (m.Index >= startLimit) break;
+            var kind = KindOf(m);
+            refs.Add(new Reference(kind, NormalizeNumber(m.Groups["num"].Value)));
+            for (int pos = m.Index + m.Length;;)
+            {
+                var c = ContinuationRegex().Match(text, pos);
+                if (!c.Success) break;
+                refs.Add(new Reference(kind, NormalizeNumber(c.Groups["num"].Value)));
+                pos = c.Index + c.Length;
+            }
+        }
         return refs;
     }
 
     /// <summary>The reference a caption's leading label declares ("Figure 3: ..."), or null when the
-    /// text does not start with a figure/table label.</summary>
-    internal static Reference? ParseCaptionLabel(string captionText)
+    /// text does not start with a figure/table label. With <paramref name="requirePunctuation"/>, the
+    /// label must also be followed by caption-style punctuation (":", ".", a dash, or end of text) —
+    /// used to accept Text-role blocks as captions without swallowing body sentences like
+    /// "Figure 3 shows that...".</summary>
+    internal static Reference? ParseCaptionLabel(string captionText, bool requirePunctuation = false)
     {
         var m = CaptionLabelRegex().Match(captionText);
-        return m.Success ? MakeReference(m) : null;
+        if (!m.Success) return null;
+        if (requirePunctuation)
+        {
+            int i = m.Index + m.Length;
+            while (i < captionText.Length && char.IsWhiteSpace(captionText[i])) i++;
+            if (i < captionText.Length && captionText[i] is not (':' or '.' or '—' or '–' or '-'))
+                return null;
+        }
+        return new Reference(KindOf(m), NormalizeNumber(m.Groups["num"].Value));
     }
 
-    private static Reference MakeReference(Match m)
-    {
-        var kind = char.ToLowerInvariant(m.Groups["kind"].Value[0]) == 'f' ? RefKind.Figure : RefKind.Table;
-        return new Reference(kind, m.Groups["num"].Value.ToLowerInvariant());
-    }
+    private static RefKind KindOf(Match m)
+        => char.ToLowerInvariant(m.Groups["kind"].Value[0]) == 'f' ? RefKind.Figure : RefKind.Table;
+
+    private static string NormalizeNumber(string number) => number.ToLowerInvariant();
 
     /// <summary>Resolve a reference to its defining caption + figure/table block, scanning analysed
     /// pages outward from <paramref name="nearPage"/> (nearest match wins; the preceding page is tried
@@ -97,33 +137,64 @@ internal sealed partial class ReferenceIndex
     }
 
     /// <summary>Parse every caption block on a page into (label → adjacent figure/table) entries.
+    /// Detected <see cref="BlockRole.Caption"/> blocks are taken first; a second pass accepts
+    /// Text-role blocks that read like a caption AND hug a float, covering detector misclassification.
     /// Text extraction is cached per page (DocumentState.GetOrExtractText), so rebuilds after the
     /// first touch are regex + geometry only.</summary>
     private static PageLabels BuildPage(DocumentState doc, int page, PageAnalysis analysis)
     {
-        List<(Reference, int, int)> labels = [];
+        List<(Reference Ref, int TargetBlock, int CaptionBlock)> labels = [];
         PageText? pageText = null;
+        PageText Text() => pageText ??= doc.GetOrExtractText(page);
+
         for (int i = 0; i < analysis.Blocks.Count; i++)
         {
             if (analysis.Blocks[i].Role != BlockRole.Caption) continue;
-            pageText ??= doc.GetOrExtractText(page);
-            if (ParseCaptionLabel(pageText.ExtractBlockText(analysis.Blocks[i])) is not { } reference)
+            if (ParseCaptionLabel(Text().ExtractBlockText(analysis.Blocks[i])) is not { } reference)
                 continue;
-            int target = NearestTargetBlock(analysis, i, reference.Kind);
+            var (target, _, _) = FindNearestTarget(analysis, i, reference.Kind);
             if (target >= 0)
                 labels.Add((reference, target, i));
         }
+
+        double maxGap = analysis.PageHeight * PseudoCaptionMaxGapFraction;
+        for (int i = 0; i < analysis.Blocks.Count; i++)
+        {
+            if (analysis.Blocks[i].Role != BlockRole.Text) continue;
+            // Geometry gate first (cheap): must hug a float of either kind before any text work.
+            var fig = FindNearestTarget(analysis, i, RefKind.Figure);
+            var tab = FindNearestTarget(analysis, i, RefKind.Table);
+            bool nearFig = fig.Index >= 0 && fig.OverlapX && fig.Gap <= maxGap;
+            bool nearTab = tab.Index >= 0 && tab.OverlapX && tab.Gap <= maxGap;
+            if (!nearFig && !nearTab) continue;
+
+            if (ParseCaptionLabel(Text().ExtractBlockText(analysis.Blocks[i]), requirePunctuation: true)
+                is not { } reference)
+                continue;
+            if (reference.Kind == RefKind.Figure ? !nearFig : !nearTab) continue;   // kind must match the hugged float
+            if (labels.Any(l => l.Ref == reference)) continue;                      // detected captions win
+            labels.Add((reference, reference.Kind == RefKind.Figure ? fig.Index : tab.Index, i));
+        }
+
         return new PageLabels(analysis, labels);
     }
+
+    /// <summary>Back-compat shim for tests: index of the nearest kind-matching float.</summary>
+    internal static int NearestTargetBlock(PageAnalysis analysis, int captionIndex, RefKind kind)
+        => FindNearestTarget(analysis, captionIndex, kind).Index;
 
     /// <summary>The figure/table block a caption belongs to: the role-matching block with the smallest
     /// vertical gap to the caption, preferring blocks that overlap it horizontally (captions sit
     /// directly above or below their float; the no-overlap fallback covers side captions and detector
-    /// quirks). -1 when the page has no candidate block of the right kind.</summary>
-    internal static int NearestTargetBlock(PageAnalysis analysis, int captionIndex, RefKind kind)
+    /// quirks). Index is -1 when the page has no candidate block of the right kind; Gap/OverlapX
+    /// describe the chosen candidate.</summary>
+    internal static (int Index, double Gap, bool OverlapX) FindNearestTarget(
+        PageAnalysis analysis, int captionIndex, RefKind kind)
     {
         var cap = analysis.Blocks[captionIndex].BBox;
         int best = -1;
+        double bestGap = 0;
+        bool bestOverlap = false;
         double bestScore = double.MaxValue;
         for (int j = 0; j < analysis.Blocks.Count; j++)
         {
@@ -144,8 +215,10 @@ internal sealed partial class ReferenceIndex
             {
                 bestScore = score;
                 best = j;
+                bestGap = gap;
+                bestOverlap = overlapX;
             }
         }
-        return best;
+        return (best, bestGap, bestOverlap);
     }
 }

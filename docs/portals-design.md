@@ -165,9 +165,12 @@ Pannable secondary viewport; native PDF storage; coordinate-region and cross-doc
 
 ## 9. Automatic pinning (added 2026-06)
 
-Reading a rail line that mentions **"Figure N" / "Table N"** (incl. "Fig./Tab./Figs" abbreviations and
-dotted numbers like "2.1", letter suffixes like "4b") automatically pins the referenced float in the
-portal preview — no manual link needed. Toggle: checkbox at the top of the Portals pane, persisted
+Reading a rail line that mentions **"Figure N" / "Table N"** automatically pins the referenced float
+in the portal preview — no manual link needed. Recognised forms: "Fig./Tab./Figs" abbreviations,
+dotted numbers ("2.1"), letter suffixes ("4b"), appendix numbering ("A.2"), uppercase roman numerals
+("TABLE II"), plural/range mentions ("Figures 2 and 3", "Tables 4–6" → endpoints), and mentions split
+across a line break (the parse run includes the block's next line, gated so next-line-only mentions
+don't fire early). Toggle: checkbox at the top of the Portals pane, persisted
 app-wide in `ConfigDir/portal_prefs.json` (`Services/PortalPreferences.cs`), default on.
 
 Mechanics (`TryAutoPin` in `MainWindowViewModel.Portals.cs`, `Services/ReferenceIndex.cs`):
@@ -177,7 +180,10 @@ Mechanics (`TryAutoPin` in `MainWindowViewModel.Portals.cs`, `Services/Reference
   `GetReadingPosition` full-block extraction.
 - Resolution: `Caption`-role blocks across analysed pages are parsed for a leading "Figure N:"-style
   label and associated with the nearest same-kind float block (horizontal-overlap preferred, then
-  smallest vertical gap; Figure accepts `Figure`+`Chart` roles, Table accepts `Table`). Parsed labels
+  smallest vertical gap; Figure accepts `Figure`+`Chart` roles, Table accepts `Table`). A second pass
+  accepts `Text`-role blocks as captions when the detector misclassifies one — gated hard: leading
+  label + caption punctuation (rejects body sentences like "Figure 3 shows…") + hugging a same-kind
+  float (horizontal overlap, gap ≤ 8% of page height); detected captions always win. Parsed labels
   are cached per page, keyed to the `PageAnalysis` instance (re-analysis rebuilds transparently).
   Lookup scans outward from the current page, preceding page first at each distance.
 - The pin renders the **union of float + caption bboxes** (so the label confirms the match) and
