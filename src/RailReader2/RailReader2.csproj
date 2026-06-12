@@ -27,11 +27,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="RailReader.Core" Version="0.27.0" />
-    <PackageReference Include="RailReader.Core.Pdfium" Version="0.27.0" />
-    <PackageReference Include="RailReader.Core.Analysis" Version="0.27.0" />
-    <PackageReference Include="RailReader.Renderer.Skia" Version="0.27.0" />
-    <PackageReference Include="RailReader.Core.Vlm.OpenAI" Version="0.27.0" />
+    <PackageReference Include="RailReader.Core" Version="0.28.0" />
+    <PackageReference Include="RailReader.Core.Pdfium" Version="0.28.0" />
+    <PackageReference Include="RailReader.Core.Analysis" Version="0.28.0" />
+    <PackageReference Include="RailReader.Renderer.Skia" Version="0.28.0" />
+    <PackageReference Include="RailReader.Core.Vlm.OpenAI" Version="0.28.0" />
   </ItemGroup>
 
 </Project>

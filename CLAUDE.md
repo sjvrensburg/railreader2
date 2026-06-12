@@ -53,15 +53,14 @@ dotnet publish src/RailReader2 -c Release -r win-x64 --self-contained     # Wind
 ## Architecture
 
 ```
-RailReader2.slnx                  # Default: app + CLI + export + screenshot tool + tests
+RailReader2.slnx                  # Default: app + CLI + screenshot tool + tests
 ├── src/RailReader2/              # Thin Avalonia UI shell
 ├── src/RailReader2.Cli/          # Headless CLI tool (zero Avalonia)
-├── src/RailReader.Export/        # Markdown export pipeline (zero Avalonia)
 ├── src/Tools/RenderHarness.Headless/ # Headless doc-screenshot generator (references the GUI project)
-└── tests/RailReader.Export.Tests/ # xUnit tests for Export (Core tests live upstream)
+└── tests/RailReader.Export.Tests/ # xUnit tests for the upstream Export package (Core tests live upstream)
 ```
 
-The portable core — `RailReader.Core`, `RailReader.Core.Pdfium`, `RailReader.Core.Analysis`, `RailReader.Renderer.Skia`, `RailReader.Core.Vlm.OpenAI` — lives in the separate [RailReaderCore](https://github.com/sjvrensburg/RailReaderCore) repository and is consumed here as NuGet packages. All references in this document to types like `DocumentController`, `DocumentState`, `AppConfig`, `AnnotationService`, `LayoutAnalyzer`, `SkiaPdfService`, `OverlayRenderer`, `RailReaderLogging`, etc. resolve through those packages. Logger bootstrap goes via `RailReaderLogging.Logger = new ConsoleLogger();` once at startup; the per-service Logger setters that previously existed are gone.
+The portable core — `RailReader.Core`, `RailReader.Core.Pdfium`, `RailReader.Core.Analysis`, `RailReader.Renderer.Skia`, `RailReader.Core.Vlm.OpenAI`, `RailReader.Export` — lives in the separate [RailReaderCore](https://github.com/sjvrensburg/RailReaderCore) repository and is consumed here as NuGet packages. All references in this document to types like `DocumentController`, `DocumentState`, `AppConfig`, `AnnotationService`, `LayoutAnalyzer`, `SkiaPdfService`, `OverlayRenderer`, `RailReaderLogging`, etc. resolve through those packages. Logger bootstrap goes via `RailReaderLogging.Logger = new ConsoleLogger();` once at startup; the per-service Logger setters that previously existed are gone.
 
 ### RailReader2 (Avalonia UI shell)
 
@@ -97,9 +96,9 @@ Separate console binary (`RailReader2.Cli`) for automated extraction. Zero Avalo
 
 Shipped as additional artifacts on GitHub Releases (Linux + Windows). ONNX model bundled in `models/` subdirectory within the archive.
 
-### RailReader.Export (Markdown export pipeline)
+### RailReader.Export (Markdown export pipeline — upstream package)
 
-Structured PDF-to-Markdown export library. Zero Avalonia deps — references Core + Renderer.Skia.
+Structured PDF-to-Markdown export library. Lives in the RailReaderCore repo and is consumed here as the `RailReader.Export` NuGet package (since 0.28.0); the in-repo copy was removed. Zero Avalonia deps — references Core + Renderer.Skia.
 
 - `MarkdownExportService.cs` — `IMarkdownExportService` implementation. Orchestrates per-page pipeline: layout analysis → text extraction → heading level resolution → VLM dispatch → annotation extraction → Markdown assembly. Writes to `TextWriter` for flexible output (file, stdout, StringWriter).
 - `HeadingLevelResolver.cs` — Maps `doc_title`/`paragraph_title` blocks to Markdown heading levels (H1–H6) by fuzzy-matching extracted text against the flattened PDF outline tree (case-insensitive containment, then Levenshtein similarity > 80%). Falls back to doc_title → H1, paragraph_title → H2.

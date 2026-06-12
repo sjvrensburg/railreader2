@@ -2,7 +2,6 @@
   <Folder Name="/src/">
     <Project Path="src/RailReader2/RailReader2.csproj" />
     <Project Path="src/RailReader2.Cli/RailReader2.Cli.csproj" />
-    <Project Path="src/RailReader.Export/RailReader.Export.csproj" />
     <Project Path="src/Tools/RenderHarness.Headless/RenderHarness.Headless.csproj" />
   </Folder>
   <Folder Name="/tests/">
