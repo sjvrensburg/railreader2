@@ -225,13 +225,16 @@ public class ViewportPanel : Panel
                 else
                     ViewModel.HandleBrowsePointerUp((float)pageX, (float)pageY);
             }
+            // Markers are tested before block framing so a double-click on a source pin opens the
+            // detached window rather than zooming into the block under it.
+            else if (isClick && TryHandlePortalMarkerClick(pos, popOut: _pressClickCount >= 2))
+            {
+                // Clicked a portal marker: showed its target (double-click: in the pop-out window),
+                // jumped to its source, or opened a chooser.
+            }
             else if (isClick && _pressClickCount >= 2 && TryFrameBlockAt(pos))
             {
                 // Double-click on a detected block → smooth zoom into rail mode at its start.
-            }
-            else if (isClick && TryHandlePortalMarkerClick(pos))
-            {
-                // Clicked a portal marker: showed its target, jumped to its source, or opened a chooser.
             }
             else if (isClick)
             {
@@ -393,7 +396,7 @@ public class ViewportPanel : Panel
 
     /// <summary>Hit-test the always-on portal markers (screen-space, fixed pixel radius). Returns true if
     /// a marker was clicked and acted on, so the normal click handler is skipped.</summary>
-    private bool TryHandlePortalMarkerClick(Point screenPos)
+    private bool TryHandlePortalMarkerClick(Point screenPos, bool popOut)
     {
         if (ViewModel is not { } vm || vm.ActiveTab is not { } tab) return false;
         var markers = vm.BuildPortalMarkers();
@@ -413,16 +416,17 @@ public class ViewportPanel : Panel
         }
         if (hit is null) return false;
 
-        ActOnPortalMarker(vm, hit);
+        ActOnPortalMarker(vm, hit, popOut);
         return true;
     }
 
-    /// <summary>Single portal → act directly (show target / go to source); several → a chooser flyout.</summary>
-    private void ActOnPortalMarker(MainWindowViewModel vm, PortalMarker marker)
+    /// <summary>Single portal → act directly (show target / go to source); several → a chooser flyout.
+    /// <paramref name="popOut"/> (double-click) shows a source pin's target in the detached window.</summary>
+    private void ActOnPortalMarker(MainWindowViewModel vm, PortalMarker marker, bool popOut)
     {
         if (marker.Portals.Count == 1)
         {
-            InvokePortal(vm, marker.Kind, marker.Portals[0]);
+            InvokePortal(vm, marker.Kind, marker.Portals[0], popOut);
             return;
         }
 
@@ -435,17 +439,24 @@ public class ViewportPanel : Panel
                   + (portal.Source.Line >= 0 ? $", line {portal.Source.Line + 1}" : "");
             var item = new MenuItem { Header = header };
             var captured = portal;
-            item.Click += (_, _) => InvokePortal(vm, marker.Kind, captured);
+            item.Click += (_, _) => InvokePortal(vm, marker.Kind, captured, popOut);
             menu.Items.Add(item);
         }
         menu.Open(this);
     }
 
-    private static void InvokePortal(MainWindowViewModel vm, PortalMarkerKind kind, Portal portal)
+    private static void InvokePortal(MainWindowViewModel vm, PortalMarkerKind kind, Portal portal, bool popOut)
     {
         if (kind == PortalMarkerKind.Source)
+        {
+            // Pop out first: ShowPortalTarget opens the side pane only when tracking is docked, so
+            // detaching beforehand sends the target straight to the floating window.
+            if (popOut) vm.PopOutPortal();
             vm.ShowPortalTarget(portal);
+        }
         else
+        {
             vm.GoToPortalSource(portal.Id);
+        }
     }
 }
