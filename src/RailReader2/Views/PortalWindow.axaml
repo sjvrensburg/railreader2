@@ -1,6 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:RailReader2.ViewModels"
+        xmlns:ctrl="using:RailReader2.Controls"
         xmlns:conv="using:Avalonia.Data.Converters"
         x:Class="RailReader2.Views.PortalWindow"
         x:DataType="vm:MainWindowViewModel"
@@ -57,9 +58,11 @@
                 </DockPanel>
             </Border>
 
-            <!-- Target crop (peek when one is up, otherwise saved-portal tracking) -->
+            <!-- Target crop (peek when one is up, otherwise saved-portal tracking).
+                 Zoomable/pannable for dense tables: wheel zooms, drag pans, double-click refits. -->
             <Grid>
-                <Image Source="{Binding PortalWindowImage}" Stretch="Uniform" Margin="4" />
+                <ctrl:ZoomPanImage Source="{Binding PortalWindowImage}" Margin="4"
+                                   ToolTip.Tip="Scroll to zoom, drag to pan, double-click to fit" />
                 <TextBlock Text="{Binding PortalWindowHint}" Foreground="#AAAAAA"
                            HorizontalAlignment="Center" VerticalAlignment="Center"
                            TextWrapping="Wrap" TextAlignment="Center" Margin="12"
