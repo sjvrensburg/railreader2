@@ -178,31 +178,19 @@ public class ViewportPanel : Panel
             return;
         }
 
-        // If left button was released outside the viewport (e.g. on toolbar),
-        // we never got OnPointerReleased — cancel the drag now.
+        // Left button released outside the viewport (e.g. over the toolbar) so OnPointerReleased never
+        // fired — tear down via the same path as a normal release, so an eraser-tip swap is restored
+        // and a barrel free-pan resumes the rail. Otherwise the Eraser tool stays stuck / rail paused.
         var point = e.GetCurrentPoint(this);
         if (!point.Properties.IsLeftButtonPressed)
         {
-            _dragging = false;
-            _browseAnnotationDrag = false;
-            _barrelPan = false;
+            EndGesture();
             return;
         }
 
         var dragPos = e.GetPosition(this);
 
-        // Barrel-button free-pan: pan like Ctrl+drag regardless of mode, never inking.
-        if (_barrelPan)
-        {
-            double bdx = dragPos.X - _lastPos.X;
-            double bdy = dragPos.Y - _lastPos.Y;
-            ViewModel.HandlePan(bdx, bdy, ctrlHeld: true);
-            _lastPos = dragPos;
-            e.Handled = true;
-            return;
-        }
-
-        if (ViewModel.IsAnnotating)
+        if (ViewModel.IsAnnotating && !_barrelPan)
         {
             var (pageX, pageY) = ScreenToPage(dragPos);
             bool shift = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
@@ -215,9 +203,11 @@ public class ViewportPanel : Panel
         }
         else
         {
+            // Plain drag-pan, or a barrel-button free-pan — barrel forces Ctrl-style free-pan/inspect
+            // (rail pauses) even inside annotation mode, so the pen repositions the page without inking.
             double dx = dragPos.X - _lastPos.X;
             double dy = dragPos.Y - _lastPos.Y;
-            bool ctrl = e.KeyModifiers.HasFlag(KeyModifiers.Control);
+            bool ctrl = _barrelPan || e.KeyModifiers.HasFlag(KeyModifiers.Control);
             ViewModel.HandlePan(dx, dy, ctrl);
         }
 
@@ -241,17 +231,14 @@ public class ViewportPanel : Panel
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
     {
         base.OnPointerReleased(e);
-        if (_dragging && ViewModel is not null)
+        // A barrel free-pan only repositions the page, so skip the click/annotation handling here;
+        // EndGesture() resumes the rail it paused.
+        if (_dragging && ViewModel is not null && !_barrelPan)
         {
             var pos = e.GetPosition(this);
             bool isClick = IsClick(pos);
 
-            if (_barrelPan)
-            {
-                // End free-pan: resume rail if the pan paused it (mirrors releasing Ctrl).
-                if (ViewModel.RailPaused) ViewModel.ResumeRailFromPause();
-            }
-            else if (ViewModel.IsAnnotating)
+            if (ViewModel.IsAnnotating)
             {
                 var (pageX, pageY) = ScreenToPage(pos);
                 ViewModel.HandleAnnotationPointerUp(pageX, pageY);
@@ -281,17 +268,29 @@ public class ViewportPanel : Panel
             }
         }
 
-        // Restore the tool an eraser-tip stroke temporarily replaced.
+        EndGesture();
+        e.Handled = true;
+    }
+
+    /// <summary>Tear down a pointer gesture, mirroring cleanup across BOTH exit paths — a normal
+    /// OnPointerReleased and the OnPointerMoved fallback when a release is missed. Restores any
+    /// eraser-tip tool swap, resumes the rail if a barrel free-pan paused it, and clears the
+    /// per-gesture flags. Keeping this in one place is what stops the two paths from drifting apart
+    /// (a stuck Eraser tool or a rail left paused).</summary>
+    private void EndGesture()
+    {
         if (_eraserTipPrevTool is { } prevTool)
         {
             ViewModel?.SetAnnotationTool(prevTool);
             _eraserTipPrevTool = null;
         }
 
+        if (_barrelPan && ViewModel is { RailPaused: true } vm)
+            vm.ResumeRailFromPause();
+
         _dragging = false;
         _browseAnnotationDrag = false;
         _barrelPan = false;
-        e.Handled = true;
     }
 
     // Context menus are popups in their own visual root, so they don't inherit the window's UiFontScale
