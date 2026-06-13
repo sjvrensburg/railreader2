@@ -130,12 +130,11 @@ public sealed partial class MainWindowViewModel
     // Auto pins whose target crop failed to render — skipped on retries so a deterministic render
     // failure cannot re-trigger a full-page rasterisation on every pass. Cleared on tab switch.
     private readonly HashSet<string> _failedAutoPins = [];
-    // Source/target of the currently displayed auto pin, kept so the on-page markers can be drawn for
-    // it (auto pins are never saved Portals, so BuildPortalMarkers has nothing else to read). Valid
-    // only while _displayedPortalId is an "auto:" id; stale values are ignored via that guard and
-    // cleared when the displayed pin is dropped.
-    private (int Page, int Block, int Line)? _autoPinSource;
-    private (int Page, int Block)? _autoPinTarget;
+    // Source/target blocks of the currently displayed auto pin, kept so the on-page markers can be
+    // drawn for it (auto pins are never saved Portals, so BuildPortalMarkers has nothing else to read).
+    // One field, set and cleared in lockstep with the "auto:" _displayedPortalId via SetAutoPin /
+    // ClearAutoPin, so the two can never drift out of sync.
+    private (int SrcPage, int SrcBlock, int SrcLine, int TgtPage, int TgtBlock)? _autoPin;
     // _displayedPortalId values for auto pins, so they share the pin-until-different machinery with
     // saved portals without ever colliding with a saved portal's guid. The resolved target is part
     // of the identity, so a same-labelled but different float (numbering restarts across chapters)
@@ -303,8 +302,7 @@ public sealed partial class MainWindowViewModel
             && !_portalTargetPending && ActivePortalLabel is null)
             return;
         _displayedPortalId = null;
-        _autoPinSource = null;
-        _autoPinTarget = null;
+        _autoPin = null;
         _portalTargetPending = false;
         SetPortalImage(null);
         ActivePortalLabel = null;
@@ -319,8 +317,7 @@ public sealed partial class MainWindowViewModel
     private void ResetDisplayedPortal()
     {
         _displayedPortalId = null;
-        _autoPinSource = null;
-        _autoPinTarget = null;
+        _autoPin = null;
         _portalTargetPending = false;
         ActivePortalLabel = null;
         PortalHint = NoActivePortalHint;
@@ -381,6 +378,7 @@ public sealed partial class MainWindowViewModel
         {
             _portalImageOwner = tab;
             _displayedPortalId = null;
+            _autoPin = null;
             _portalTargetPending = false;
             _pendingTargetForLink = null;
             _pageSizeCache.Clear();
@@ -523,8 +521,7 @@ public sealed partial class MainWindowViewModel
         }
 
         _displayedPortalId = autoId;
-        _autoPinSource = (srcPage, srcBlock, srcLine);
-        _autoPinTarget = (target.Page, target.TargetBlock);
+        _autoPin = (srcPage, srcBlock, srcLine, target.Page, target.TargetBlock);
         _portalTargetPending = false;
         ActivePortalLabel = $"{reference} (p.{target.Page + 1}) · auto";
         SetPortalImage(bitmap);
@@ -890,6 +887,7 @@ public sealed partial class MainWindowViewModel
     private void Pin(DocumentState doc, Portal portal)
     {
         _displayedPortalId = portal.Id;
+        _autoPin = null;   // a saved portal takes over — drop any auto-pin coordinates so they can't go stale
         ActivePortalLabel = portal.Label;
         RenderPortalTarget(doc, portal.Target.Page, ResolveAnchorBlock(doc, portal.Target));
         InvalidatePortalMarkers();
@@ -901,6 +899,14 @@ public sealed partial class MainWindowViewModel
     {
         if (_controller.ActiveDocument is not { } doc) return;
         Pin(doc, portal);
+        RevealPortalPane();
+    }
+
+    /// <summary>Surface the docked Portals pane (no-op while popped out). Used when a source marker is
+    /// clicked for a target that is ALREADY pinned — e.g. an auto pin, whose target never needs
+    /// re-pinning — so the click still has the expected effect of bringing the preview into view.</summary>
+    public void RevealPortalPane()
+    {
         if (!IsPortalPoppedOut) ShowPane(SidePane.Portals);
     }
 
@@ -920,25 +926,29 @@ public sealed partial class MainWindowViewModel
         if (pw <= 0 || ph <= 0) return [];
 
         var markers = new List<PortalMarker>();
+        // Anchors already carrying a marker, so an auto-pin marker doesn't add a second glyph on top of
+        // a saved one at the same spot (which would shadow the saved marker in the hit-test tie-break).
+        var occupied = new HashSet<(PortalMarkerKind, int, int)>();
 
         // One marker per distinct anchor on this page, grouping every portal that shares it (a source
         // line can link several targets; a target block several sources) so a multi-portal marker can
-        // open a chooser. The endpoint differs only in which anchor is read, the group key, and where
-        // the glyph sits.
-        void AddMarkers(PortalMarkerKind kind, Func<Portal, PortalAnchor> endpoint,
-            Func<PortalAnchor, (int, int)> key, Func<PortalAnchor, (double X, double Y)> position)
+        // open a chooser. The endpoint differs only in which anchor is read; position and group key come
+        // from the shared MarkerPos/MarkerKey helpers.
+        void AddMarkers(PortalMarkerKind kind, Func<Portal, PortalAnchor> endpoint)
         {
             var groups = new Dictionary<(int, int), List<Portal>>();
             foreach (var p in tab.Portals.Portals)
             {
                 var a = endpoint(p);
                 if (a.Page != page) continue;
-                if (!groups.TryGetValue(key(a), out var list)) groups[key(a)] = list = [];
+                var k = MarkerKey(kind, a);
+                if (!groups.TryGetValue(k, out var list)) groups[k] = list = [];
                 list.Add(p);
             }
-            foreach (var list in groups.Values)
+            foreach (var (k, list) in groups)
             {
-                var (x, y) = position(endpoint(list[0]));
+                var (x, y) = MarkerPos(kind, endpoint(list[0]), pw, ph);
+                occupied.Add((kind, k.Item1, k.Item2));
                 markers.Add(new PortalMarker
                 {
                     Kind = kind,
@@ -950,12 +960,8 @@ public sealed partial class MainWindowViewModel
             }
         }
 
-        // Sources: gutter marker at the block's left edge, at the line centre (or block centre).
-        AddMarkers(PortalMarkerKind.Source, p => p.Source, a => (a.Block, a.Line),
-            a => (a.Nx * pw, (a.Ly >= 0 ? a.Ly : a.Ny + a.Nh / 2f) * ph));
-        // Targets: corner badge at the block's top-right corner.
-        AddMarkers(PortalMarkerKind.Target, p => p.Target, a => (a.Block, 0),
-            a => ((a.Nx + a.Nw) * pw, a.Ny * ph));
+        AddMarkers(PortalMarkerKind.Source, p => p.Source);
+        AddMarkers(PortalMarkerKind.Target, p => p.Target);
 
         // The active auto pin is not a saved Portal, so add its source/target markers directly, backed
         // by a transient Portal so they behave exactly like a saved portal's markers — double-click the
@@ -964,27 +970,34 @@ public sealed partial class MainWindowViewModel
         // re-pin is correctly skipped (the target is already shown).
         if (autoActive && BuildAutoPinPortal(doc) is { } auto)
         {
-            void AddAutoMarker(PortalMarkerKind kind, PortalAnchor a,
-                Func<PortalAnchor, double> x, Func<PortalAnchor, double> y)
+            void AddAutoMarker(PortalMarkerKind kind, PortalAnchor a)
             {
-                if (a.Page != page) return;
-                markers.Add(new PortalMarker
-                {
-                    Kind = kind,
-                    PageX = x(a),
-                    PageY = y(a),
-                    Portals = [auto],
-                    IsActive = true,
-                });
+                var k = MarkerKey(kind, a);
+                // A saved portal already at this anchor keeps its marker (and stays clickable); a second
+                // overlapping auto marker would win the hit-test tie and shadow it.
+                if (a.Page != page || !occupied.Add((kind, k.Item1, k.Item2))) return;
+                var (x, y) = MarkerPos(kind, a, pw, ph);
+                markers.Add(new PortalMarker { Kind = kind, PageX = x, PageY = y, Portals = [auto], IsActive = true });
             }
-            AddAutoMarker(PortalMarkerKind.Source, auto.Source,
-                a => a.Nx * pw, a => (a.Ly >= 0 ? a.Ly : a.Ny + a.Nh / 2f) * ph);
-            AddAutoMarker(PortalMarkerKind.Target, auto.Target,
-                a => (a.Nx + a.Nw) * pw, a => a.Ny * ph);
+            AddAutoMarker(PortalMarkerKind.Source, auto.Source);
+            AddAutoMarker(PortalMarkerKind.Target, auto.Target);
         }
 
         return markers;
     }
+
+    /// <summary>Where a marker glyph sits in page space: a source gutter marker at the block's left
+    /// edge by the line centre (block centre if the anchor has no line), a target badge at the block's
+    /// top-right corner. Shared by saved-portal and auto-pin markers so the two cannot drift.</summary>
+    private static (double X, double Y) MarkerPos(PortalMarkerKind kind, PortalAnchor a, double pw, double ph)
+        => kind == PortalMarkerKind.Source
+            ? (a.Nx * pw, (a.Ly >= 0 ? a.Ly : a.Ny + a.Nh / 2f) * ph)
+            : ((a.Nx + a.Nw) * pw, a.Ny * ph);
+
+    /// <summary>Anchor identity for grouping/deduping markers: a source is keyed by block + line (so
+    /// several references on one line share a marker), a target by block alone.</summary>
+    private static (int, int) MarkerKey(PortalMarkerKind kind, PortalAnchor a)
+        => kind == PortalMarkerKind.Source ? (a.Block, a.Line) : (a.Block, 0);
 
     /// <summary>Build a transient (never-persisted) Portal for the currently displayed auto pin, so its
     /// on-page markers are interactive in the same way saved portals' are. Returns null if either
@@ -992,16 +1005,16 @@ public sealed partial class MainWindowViewModel
     /// <see cref="_displayedPortalId"/>.</summary>
     private Portal? BuildAutoPinPortal(DocumentState doc)
     {
-        if (_displayedPortalId is not { } id || _autoPinSource is not { } s || _autoPinTarget is not { } t)
+        if (_displayedPortalId is not { } id || _autoPin is not { } a)
             return null;
-        if (!IsBlockResolvable(doc, s.Page, s.Block) || !IsBlockResolvable(doc, t.Page, t.Block))
+        if (!IsBlockResolvable(doc, a.SrcPage, a.SrcBlock) || !IsBlockResolvable(doc, a.TgtPage, a.TgtBlock))
             return null;
         return new Portal
         {
             Id = id,
             Label = ActivePortalLabel ?? "",
-            Source = MakeAnchor(doc, s.Page, s.Block, s.Line),
-            Target = MakeAnchor(doc, t.Page, t.Block),
+            Source = MakeAnchor(doc, a.SrcPage, a.SrcBlock, a.SrcLine),
+            Target = MakeAnchor(doc, a.TgtPage, a.TgtBlock),
         };
     }
 

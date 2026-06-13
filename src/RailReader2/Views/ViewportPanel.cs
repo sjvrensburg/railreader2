@@ -457,6 +457,10 @@ public class ViewportPanel : Panel
             if (popOut) vm.PopOutPortal();
             if (vm.DisplayedPortalId != portal.Id)
                 vm.ShowPortalTarget(portal);
+            else if (!popOut)
+                // Already pinned (e.g. an auto pin, whose Id always equals the displayed id): a single
+                // click still surfaces the docked pane so the gesture isn't a silent no-op.
+                vm.RevealPortalPane();
         }
         else
         {
