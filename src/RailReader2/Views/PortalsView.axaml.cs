@@ -71,6 +71,13 @@ public partial class PortalsView : PaneRefreshView
             _vm?.EvaluatePortals(forceRender: true);
             RefreshIfVisible();
         }
+        // An auto-pinned reference shows in the preview without creating a saved-portal row, so the
+        // empty-state hint must also retreat when a target is pinned (otherwise its long text fills the
+        // pane and displaces the preview image). Toggle just the label — don't rebuild the row list.
+        else if (args.PropertyName == nameof(MainWindowViewModel.ActivePortalImage))
+        {
+            UpdateEmptyState();
+        }
     }
 
     private void OnPortalsChanged()
@@ -89,8 +96,18 @@ public partial class PortalsView : PaneRefreshView
         }
         var rows = _vm.BuildPortalRows();
         PortalList.ItemsSource = rows;
-        NoPortalsLabel.IsVisible = rows.Count == 0;
+        _hasPortalRows = rows.Count > 0;
+        UpdateEmptyState();
     }
+
+    // Cached so the empty-state can be re-evaluated on an ActivePortalImage change without rebuilding
+    // the (potentially edit-in-progress) row list.
+    private bool _hasPortalRows;
+
+    // The empty-state hint is for "nothing here at all": no saved portals AND no live preview. An
+    // auto-pinned reference shows a preview without a row, and must suppress the hint.
+    private void UpdateEmptyState()
+        => NoPortalsLabel.IsVisible = !_hasPortalRows && _vm?.ActivePortalImage is null;
 
     // --- Row actions ---
 

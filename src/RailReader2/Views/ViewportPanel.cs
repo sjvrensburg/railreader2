@@ -408,6 +408,7 @@ public class ViewportPanel : Panel
         double bestSq = maxSq;
         foreach (var m in markers)
         {
+            if (m.Portals.Count == 0) continue;   // defensive: a marker with no backing portal is inert
             var (cx, cy) = PortalMarkerGeometry.ScreenCentre(
                 m.Kind == PortalMarkerKind.Source, m.PageX, m.PageY, zoom, ox, oy);
             double dx = screenPos.X - cx, dy = screenPos.Y - cy;
@@ -459,7 +460,7 @@ public class ViewportPanel : Panel
         }
         else
         {
-            vm.GoToPortalSource(portal.Id);
+            vm.GoToPortalSource(portal);
         }
     }
 }

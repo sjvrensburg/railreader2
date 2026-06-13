@@ -130,6 +130,12 @@ public sealed partial class MainWindowViewModel
     // Auto pins whose target crop failed to render — skipped on retries so a deterministic render
     // failure cannot re-trigger a full-page rasterisation on every pass. Cleared on tab switch.
     private readonly HashSet<string> _failedAutoPins = [];
+    // Source/target of the currently displayed auto pin, kept so the on-page markers can be drawn for
+    // it (auto pins are never saved Portals, so BuildPortalMarkers has nothing else to read). Valid
+    // only while _displayedPortalId is an "auto:" id; stale values are ignored via that guard and
+    // cleared when the displayed pin is dropped.
+    private (int Page, int Block, int Line)? _autoPinSource;
+    private (int Page, int Block)? _autoPinTarget;
     // _displayedPortalId values for auto pins, so they share the pin-until-different machinery with
     // saved portals without ever colliding with a saved portal's guid. The resolved target is part
     // of the identity, so a same-labelled but different float (numbering restarts across chapters)
@@ -297,6 +303,8 @@ public sealed partial class MainWindowViewModel
             && !_portalTargetPending && ActivePortalLabel is null)
             return;
         _displayedPortalId = null;
+        _autoPinSource = null;
+        _autoPinTarget = null;
         _portalTargetPending = false;
         SetPortalImage(null);
         ActivePortalLabel = null;
@@ -311,6 +319,8 @@ public sealed partial class MainWindowViewModel
     private void ResetDisplayedPortal()
     {
         _displayedPortalId = null;
+        _autoPinSource = null;
+        _autoPinTarget = null;
         _portalTargetPending = false;
         ActivePortalLabel = null;
         PortalHint = NoActivePortalHint;
@@ -456,11 +466,7 @@ public sealed partial class MainWindowViewModel
         }
 
         string? lineText = LineText(pageText, lines[lineIdx]);
-        if (string.IsNullOrEmpty(lineText))
-        {
-            _logger.Debug($"[AutoPin] p{srcPage + 1} b{srcBlock} l{srcLine}: empty line text");
-            return;
-        }
+        if (string.IsNullOrEmpty(lineText)) return;
 
         // Append the block's next line so a mention split across the break ("…see Figure ⏎ 3 shows…")
         // is caught; the start limit keeps mentions wholly on the next line from firing a line early.
@@ -470,8 +476,6 @@ public sealed partial class MainWindowViewModel
 
         var refs = ReferenceIndex.ParseLine(lineText, startLimit);
         if (refs.Count == 0) return;
-        _logger.Debug($"[AutoPin] p{srcPage + 1} b{srcBlock} l{srcLine}: "
-            + $"refs=[{string.Join(", ", refs)}] in \"{Truncate(lineText, 90)}\"");
 
         // Resolve every mention first: if ANY of this line's references is the one already shown,
         // stay pinned (pin-until-different) — never let an earlier-in-line mention that resolves
@@ -482,11 +486,7 @@ public sealed partial class MainWindowViewModel
         {
             var target = _referenceIndex.Resolve(doc, reference, srcPage, out bool incomplete);
             anyIncomplete |= incomplete;
-            if (target is not { } t)
-            {
-                _logger.Debug($"[AutoPin]   {reference}: " + (incomplete ? "index incomplete, will retry" : "no caption found"));
-                continue;
-            }
+            if (target is not { } t) continue;
             if (t.Page == srcPage && t.CaptionBlock == srcBlock) continue;   // reading the (pseudo-)caption itself
             if (AutoPinId(reference, t) == _displayedPortalId) return;       // already showing — stay
             if (!_failedAutoPins.Contains(AutoPinId(reference, t)))
@@ -494,9 +494,7 @@ public sealed partial class MainWindowViewModel
         }
         if (candidates.Count > 0)
         {
-            _logger.Debug($"[AutoPin]   pinning {candidates[0].Ref} → p{candidates[0].Target.Page + 1} "
-                + $"block {candidates[0].Target.TargetBlock}");
-            PinAutoReference(doc, candidates[0].Ref, candidates[0].Target);
+            PinAutoReference(doc, candidates[0].Ref, candidates[0].Target, srcPage, srcBlock, srcLine);
             return;
         }
         // Nothing pinned: retry while the index is still incomplete (budgeted build in progress) or
@@ -505,15 +503,12 @@ public sealed partial class MainWindowViewModel
         _autoRefPending = anyIncomplete || doc.AnalysisCache.Count < doc.PageCount;
     }
 
-    private static string Truncate(string s, int max)
-        => s.Length <= max ? s : s[..max] + "…";
-
     /// <summary>Pin an automatically resolved reference: render the float together with its caption
     /// (the union region, so the label under the figure confirms the match) into the tracking
     /// preview. Shares <see cref="_displayedPortalId"/> with saved portals, so a later saved-portal
     /// activation or a different reference takes over normally.</summary>
     private void PinAutoReference(DocumentState doc, ReferenceIndex.Reference reference,
-        ReferenceIndex.Target target)
+        ReferenceIndex.Target target, int srcPage, int srcBlock, int srcLine)
     {
         string autoId = AutoPinId(reference, target);
         var blocks = doc.AnalysisCache[target.Page].Blocks;
@@ -523,12 +518,13 @@ public sealed partial class MainWindowViewModel
         {
             // Remember the failure: a deterministic render failure must not re-trigger a full-page
             // rasterisation on every line advance / forced pass. Cleared on tab switch.
-            _logger.Debug($"[AutoPin]   crop render FAILED for {autoId} — not retrying");
             _failedAutoPins.Add(autoId);
             return;   // keep whatever was shown
         }
 
         _displayedPortalId = autoId;
+        _autoPinSource = (srcPage, srcBlock, srcLine);
+        _autoPinTarget = (target.Page, target.TargetBlock);
         _portalTargetPending = false;
         ActivePortalLabel = $"{reference} (p.{target.Page + 1}) · auto";
         SetPortalImage(bitmap);
@@ -847,9 +843,16 @@ public sealed partial class MainWindowViewModel
     /// of the framing — line clamps to 0 for a whole-block source — so no post-frame seek is needed.</summary>
     public void GoToPortalSource(string id)
     {
-        if (_controller.ActiveDocument is not { } doc || ActiveTab is not { } tab) return;
-        var portal = tab.Portals.Portals.FirstOrDefault(p => p.Id == id);
-        if (portal is null) return;
+        if (ActiveTab is not { } tab) return;
+        if (tab.Portals.Portals.FirstOrDefault(p => p.Id == id) is { } portal)
+            GoToPortalSource(portal);
+    }
+
+    /// <summary>Navigate to a portal's source anchor. Takes the portal directly (not an id lookup) so a
+    /// transient auto-pin portal — which is never in the saved set — can drive it too.</summary>
+    public void GoToPortalSource(Portal portal)
+    {
+        if (_controller.ActiveDocument is not { } doc) return;
 
         GoToPage(portal.Source.Page);
         int block = ResolveAnchorBlock(doc, portal.Source);
@@ -906,8 +909,10 @@ public sealed partial class MainWindowViewModel
     /// before a page is analysed). Cheap; no PDFium.</summary>
     public IReadOnlyList<PortalMarker> BuildPortalMarkers()
     {
-        if (_controller.ActiveDocument is not { } doc || ActiveTab is not { } tab
-            || tab.Portals.Portals.Count == 0)
+        if (_controller.ActiveDocument is not { } doc || ActiveTab is not { } tab)
+            return [];
+        bool autoActive = _displayedPortalId?.StartsWith("auto:", StringComparison.Ordinal) == true;
+        if (tab.Portals.Portals.Count == 0 && !autoActive)
             return [];
 
         int page = doc.CurrentPage;
@@ -952,7 +957,52 @@ public sealed partial class MainWindowViewModel
         AddMarkers(PortalMarkerKind.Target, p => p.Target, a => (a.Block, 0),
             a => ((a.Nx + a.Nw) * pw, a.Ny * ph));
 
+        // The active auto pin is not a saved Portal, so add its source/target markers directly, backed
+        // by a transient Portal so they behave exactly like a saved portal's markers — double-click the
+        // source to detach the target into the pop-out window, click the target badge to jump to source.
+        // The transient Id matches _displayedPortalId so the markers draw accented and the source-click's
+        // re-pin is correctly skipped (the target is already shown).
+        if (autoActive && BuildAutoPinPortal(doc) is { } auto)
+        {
+            void AddAutoMarker(PortalMarkerKind kind, PortalAnchor a,
+                Func<PortalAnchor, double> x, Func<PortalAnchor, double> y)
+            {
+                if (a.Page != page) return;
+                markers.Add(new PortalMarker
+                {
+                    Kind = kind,
+                    PageX = x(a),
+                    PageY = y(a),
+                    Portals = [auto],
+                    IsActive = true,
+                });
+            }
+            AddAutoMarker(PortalMarkerKind.Source, auto.Source,
+                a => a.Nx * pw, a => (a.Ly >= 0 ? a.Ly : a.Ny + a.Nh / 2f) * ph);
+            AddAutoMarker(PortalMarkerKind.Target, auto.Target,
+                a => (a.Nx + a.Nw) * pw, a => a.Ny * ph);
+        }
+
         return markers;
+    }
+
+    /// <summary>Build a transient (never-persisted) Portal for the currently displayed auto pin, so its
+    /// on-page markers are interactive in the same way saved portals' are. Returns null if either
+    /// endpoint's page is not analysed (so MakeAnchor cannot read the block). The Id equals
+    /// <see cref="_displayedPortalId"/>.</summary>
+    private Portal? BuildAutoPinPortal(DocumentState doc)
+    {
+        if (_displayedPortalId is not { } id || _autoPinSource is not { } s || _autoPinTarget is not { } t)
+            return null;
+        if (!IsBlockResolvable(doc, s.Page, s.Block) || !IsBlockResolvable(doc, t.Page, t.Block))
+            return null;
+        return new Portal
+        {
+            Id = id,
+            Label = ActivePortalLabel ?? "",
+            Source = MakeAnchor(doc, s.Page, s.Block, s.Line),
+            Target = MakeAnchor(doc, t.Page, t.Block),
+        };
     }
 
     private static string DefaultPortalLabel(DocumentState doc, int page, int block)
