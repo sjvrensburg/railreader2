@@ -157,8 +157,7 @@ public sealed partial class MainWindowViewModel
             // freeze contract wins, and the pin then simply stays until something replaces it after
             // unlock. Fields only — the forced evaluation below performs the single image
             // render-or-clear swap, preserving the one-behind disposal guarantee.
-            if (!value && !_isPortalViewLocked
-                && _displayedPortalId?.StartsWith("auto:", StringComparison.Ordinal) == true)
+            if (!value && !_isPortalViewLocked && _autoPin is not null)
                 ResetDisplayedPortal();
             EvaluatePortals(forceRender: true);
         }
@@ -917,8 +916,13 @@ public sealed partial class MainWindowViewModel
     {
         if (_controller.ActiveDocument is not { } doc || ActiveTab is not { } tab)
             return [];
-        bool autoActive = _displayedPortalId?.StartsWith("auto:", StringComparison.Ordinal) == true;
-        if (tab.Portals.Portals.Count == 0 && !autoActive)
+        // The active auto pin is not a saved Portal, but BuildAutoPinPortal reifies it into a transient
+        // one with Id == _displayedPortalId, so it flows through the same grouping below as any saved
+        // portal: it gets a source/target marker, draws accented (its id matches), and naturally MERGES
+        // into a saved portal's marker (shared anchor → one multi-portal chooser) instead of overlapping.
+        var auto = _autoPin is not null ? BuildAutoPinPortal(doc) : null;
+        var portals = auto is null ? tab.Portals.Portals : tab.Portals.Portals.Append(auto);
+        if (tab.Portals.Portals.Count == 0 && auto is null)
             return [];
 
         int page = doc.CurrentPage;
@@ -926,9 +930,6 @@ public sealed partial class MainWindowViewModel
         if (pw <= 0 || ph <= 0) return [];
 
         var markers = new List<PortalMarker>();
-        // Anchors already carrying a marker, so an auto-pin marker doesn't add a second glyph on top of
-        // a saved one at the same spot (which would shadow the saved marker in the hit-test tie-break).
-        var occupied = new HashSet<(PortalMarkerKind, int, int)>();
 
         // One marker per distinct anchor on this page, grouping every portal that shares it (a source
         // line can link several targets; a target block several sources) so a multi-portal marker can
@@ -937,7 +938,7 @@ public sealed partial class MainWindowViewModel
         void AddMarkers(PortalMarkerKind kind, Func<Portal, PortalAnchor> endpoint)
         {
             var groups = new Dictionary<(int, int), List<Portal>>();
-            foreach (var p in tab.Portals.Portals)
+            foreach (var p in portals)
             {
                 var a = endpoint(p);
                 if (a.Page != page) continue;
@@ -945,10 +946,9 @@ public sealed partial class MainWindowViewModel
                 if (!groups.TryGetValue(k, out var list)) groups[k] = list = [];
                 list.Add(p);
             }
-            foreach (var (k, list) in groups)
+            foreach (var list in groups.Values)
             {
                 var (x, y) = MarkerPos(kind, endpoint(list[0]), pw, ph);
-                occupied.Add((kind, k.Item1, k.Item2));
                 markers.Add(new PortalMarker
                 {
                     Kind = kind,
@@ -962,26 +962,6 @@ public sealed partial class MainWindowViewModel
 
         AddMarkers(PortalMarkerKind.Source, p => p.Source);
         AddMarkers(PortalMarkerKind.Target, p => p.Target);
-
-        // The active auto pin is not a saved Portal, so add its source/target markers directly, backed
-        // by a transient Portal so they behave exactly like a saved portal's markers — double-click the
-        // source to detach the target into the pop-out window, click the target badge to jump to source.
-        // The transient Id matches _displayedPortalId so the markers draw accented and the source-click's
-        // re-pin is correctly skipped (the target is already shown).
-        if (autoActive && BuildAutoPinPortal(doc) is { } auto)
-        {
-            void AddAutoMarker(PortalMarkerKind kind, PortalAnchor a)
-            {
-                var k = MarkerKey(kind, a);
-                // A saved portal already at this anchor keeps its marker (and stays clickable); a second
-                // overlapping auto marker would win the hit-test tie and shadow it.
-                if (a.Page != page || !occupied.Add((kind, k.Item1, k.Item2))) return;
-                var (x, y) = MarkerPos(kind, a, pw, ph);
-                markers.Add(new PortalMarker { Kind = kind, PageX = x, PageY = y, Portals = [auto], IsActive = true });
-            }
-            AddAutoMarker(PortalMarkerKind.Source, auto.Source);
-            AddAutoMarker(PortalMarkerKind.Target, auto.Target);
-        }
 
         return markers;
     }

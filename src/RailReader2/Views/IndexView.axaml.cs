@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
@@ -421,13 +422,13 @@ public partial class IndexView : PaneRefreshView
             _vm.ShowStatusToast("Navigation unavailable during scan");
     }
 
-    // Portals authoring path A: link the clicked figure/table/equation to the current reading
-    // position. The inner button handles its own click, so the row's navigate handler doesn't fire.
-    private void OnLinkToReadingPositionClick(object? sender, RoutedEventArgs e)
+    // Right-click a result to open it in the temporary detached portal window (auto-opens; the user can
+    // Lock it there to keep it pinned, otherwise it dismisses on read-on/tab-switch). Needs no rail mode.
+    private void OnPeekEntryContextRequested(object? sender, ContextRequestedEventArgs e)
     {
         if (_vm is null) return;
-        if (sender is not Button { DataContext: PeekEntryViewModel entry }) return;
-        _vm.CreatePortal(entry.Entry.PageIndex, entry.Entry.BlockIndex);
+        if (sender is not Control { DataContext: PeekEntryViewModel entry }) return;
+        _vm.ShowBlockInPortal(entry.Entry.PageIndex, entry.Entry.BlockIndex);
         e.Handled = true;
     }
 

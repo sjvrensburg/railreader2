@@ -374,7 +374,7 @@ Bookmarks are stored in the same annotation file as highlights, notes, and other
 
 ## Index Pane
 
-Press `Ctrl+Shift+I` to open the **Index** pane — a browsable index of all figures, tables, and equations detected by the layout analysis model. It is one of the side-panel accordion sections (alongside Outline, Bookmarks, Search, Comments, and Portals). Each entry also carries a **Link ↪** button for creating a [portal](#portals) to that figure, table, or equation.
+Press `Ctrl+Shift+I` to open the **Index** pane — a browsable index of all figures, tables, and equations detected by the layout analysis model. It is one of the side-panel accordion sections (alongside Outline, Bookmarks, Search, Comments, and Portals). Click an entry to jump to it, or **right-click** it to open it in the detachable [portal](#portals) pop-out window.
 
 ### How it works
 
@@ -391,7 +391,7 @@ Each entry shows:
 - **Figures and tables** — a thumbnail crop of the detected region
 - **Equations** — the extracted text content from the PDF text layer (e.g., Unicode math symbols)
 
-Use the **Figures**, **Tables**, and **Equations** toggle buttons at the top to filter by category. Click any entry to navigate to that page (focus returns to the page so you can scroll straight away).
+Use the **Figures**, **Tables**, and **Equations** toggle buttons at the top to filter by category. Click any entry to navigate to that page (focus returns to the page so you can scroll straight away). **Right-click** an entry instead to open it in the [portal pop-out window](#pop-out-window) — a quick way to park a figure on a second monitor while you keep reading; **Lock** it there to keep it pinned.
 
 ---
 
@@ -401,8 +401,7 @@ A **portal** links a reference in the text — a "see Figure 3", a "cf. Table 2"
 
 ### Creating a portal
 
-- **From the Index pane** — open the **Index** section, find the figure/table/equation, and click its **Link ↪** button while rail-reading the paragraph that refers to it.
-- **From the page** — right-click a detected block and choose **Create Portal — Keep This Block In View While Reading**. Or use the two-step **Set as Portal Target** → **Link Target to Current Paragraph** when it is easier to mark the figure first and find the reference afterwards.
+Right-click a detected block on the page and choose **Create Portal — Keep This Block In View While Reading**. Or use the two-step **Set as Portal Target** → **Link Target to Current Paragraph** when it is easier to mark the figure first and find the reference afterwards.
 
 Sources are **line-precise**: the link fires at the exact line you were on, so several references in one paragraph (line 2 → Figure 3, line 8 → Figure 4) each surface their own target in turn. The shown target stays pinned until you reach a *different* portal's source, so it never flickers as you scroll.
 
@@ -412,11 +411,11 @@ Subtle, always-on markers show where portals are anchored on the current page: a
 
 ### Pop-out window
 
-Click **Pop out ↗** in the Portals pane (or click the docked preview) to detach the target into a floating, borderless, always-on-top window — useful on a multi-monitor setup. Drag its top bar to move it, the corner grip to resize; the **Pin** toggle controls always-on-top, and **Dock** returns it to the panel. Its size and position are remembered between pop-outs.
+Click **Pop out ↗** in the Portals pane (or click the docked preview) to detach the target into a floating, borderless, always-on-top window — useful on a multi-monitor setup. Drag its top bar to move it, the corner grip to resize; scroll to zoom and drag to pan inside it, double-click to fit. The **Pin** toggle controls always-on-top, **Lock** freezes the current target so reading on (or an auto-pin) won't replace it until you unlock, and **Dock** returns it to the panel. Its size and position are remembered between pop-outs.
 
 ### Temporary peek
 
-To glance at a block without saving a link, right-click it and choose **Open in Portal (Temporary)**. It opens in the pop-out window only, leaves any saved portal's tracking untouched, and dismisses itself once you read on.
+To glance at a block without saving a link, right-click it and choose **Open in Portal (Temporary)** — or right-click any entry in the [Index pane](#index-pane). It opens in the pop-out window only, leaves any saved portal's tracking untouched, and dismisses itself once you read on (unless you **Lock** it).
 
 ### Managing portals
 

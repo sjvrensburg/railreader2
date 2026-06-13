@@ -34,17 +34,19 @@ The earlier exploration of generic window **docking** (Dock.Avalonia) was abando
 ## 3. User experience
 
 ### 3.1 Authoring a portal
-The authoring flow is the real design question (the rendering is comparatively easy). Proposed primary path, reusing existing surfaces:
+The authoring flow is the real design question (the rendering is comparatively easy). The primary path reuses the block right-click menu (which already exists for Copy as LaTeX/Markdown/Image):
 
 1. While reading, the user reaches a reference (*"…in Figure 3…"*).
-2. They open the **Index** accordion section (`Ctrl+Shift+I`) — which already lists every detected figure, table, and equation with a thumbnail — and choose **"Link to current reading position"** on Figure 3.
+2. They **right-click the detected figure block** → **"Create Portal — Keep This Block In View While Reading"**.
    - The **source** is the block at the current reading position (`GetReadingPosition()` → page + block).
-   - The **target** is the Index entry's block.
+   - The **target** is the right-clicked block.
 3. The portal is created and immediately becomes active (you are reading the source), so Figure 3 appears in the portal view.
 
 Alternative / complementary paths:
-- **Right-click a detected block** → *"Set as portal target"*, then *"Link from current position"* (or vice-versa). The block right-click menu already exists (Copy as LaTeX/Markdown/Image).
+- The two-step **"Set as portal target"** → **"Link from current position"** (or vice-versa), when it is easier to mark the figure first and find the reference afterwards.
 - A **Portals** management section (see §3.3) for editing/removing links.
+
+> The **Index** accordion section (`Ctrl+Shift+I`) no longer authors *saved* portals (its earlier "Link ↪" button was removed). Right-clicking an Index entry instead opens it in the **temporary detached pop-out window** (`ShowBlockInPortal`) — a non-persisted peek, lockable to stay pinned — the same path as the block right-click "Open in Portal (Temporary)". Saved-portal authoring is now solely the block right-click above.
 
 ### 3.2 Viewing
 - A **Portal panel** shows the active target. When the reading position crosses from one source region into another, the panel swaps to that portal's target. When no source is active, the panel shows the most-recent target (pinned) or a hint.
@@ -139,7 +141,7 @@ schedulePortalRender(target):
 A single hard-coded portal, no authoring UI, no persistence: a "Portals" accordion section that, when the reading position enters block N on page P, renders block M on page Q via `BlockCropRenderer` into an `Image`. Proves the `ReadingPositionChanged` → match → render path end-to-end and surfaces any debounce/PDFium-thread issues before investing further.
 
 **Phase 1 — persistence + authoring.**
-Sidecar load/save (§4); create from the Index section and the block right-click menu; a Portals management list (label, go-to-source, delete); pin/unpin when no source is active.
+Sidecar load/save (§4); create from the block right-click menu (see §3.1 — the Index "Link" path was later removed); a Portals management list (label, go-to-source, delete); pin/unpin when no source is active.
 
 **Phase 2 — detach to a window (multi-monitor).**
 "Pop out" the portal view into a borderless non-modal `Window`, with always-on-top; restore into the panel on close.
