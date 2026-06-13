@@ -23,6 +23,12 @@ public class ViewportPanel : Panel
     // Track the last tool so we only update cursor when it changes
     private AnnotationTool _lastCursorTool = AnnotationTool.None;
 
+    // Stylus (pen) conveniences — X11-first; see docs/stylus-support.md for the Wayland/XWayland caveats.
+    // Design rule: pen detection only ever ADDS behavior, it never gates the mouse paths. A pen that
+    // XWayland misreports as a generic pointer therefore still behaves exactly like the mouse.
+    private AnnotationTool? _eraserTipPrevTool; // non-null while an eraser-tip stroke forces the Eraser tool
+    private bool _barrelPan;                     // true while a barrel-button drag is free-panning (Ctrl-equivalent)
+
     // Last position at which a link hover hit-test ran. Pointer moves arrive at
     // ~60–125Hz; gating the hit-test on a small movement delta avoids running it
     // (a per-page link scan) on every event without a perceptible cursor lag.
@@ -119,9 +125,25 @@ public class ViewportPanel : Panel
             _pressClickCount = e.ClickCount;
             e.Handled = true;
 
+            bool isPen = e.Pointer.Type == PointerType.Pen;
+
+            // Barrel button → free-pan/inspect (mirrors Ctrl+drag), even inside annotation mode, so the
+            // pen can reposition the page without inking. If XWayland doesn't surface the barrel state
+            // this is simply never true and the pen drags like the mouse.
+            _barrelPan = isPen && point.Properties.IsBarrelButtonPressed;
+            if (_barrelPan)
+                return; // the move handler pans; don't begin an annotation/browse stroke
+
             var (pageX, pageY) = ScreenToPage(_pressPos);
             if (ViewModel!.IsAnnotating)
             {
+                // Eraser tip → Eraser tool for the duration of this stroke; the original tool is
+                // restored on pointer-up. Flip-to-erase, the most intuitive stylus gesture.
+                if (isPen && point.Properties.IsEraser && ViewModel.ActiveTool != AnnotationTool.Eraser)
+                {
+                    _eraserTipPrevTool = ViewModel.ActiveTool;
+                    ViewModel.SetAnnotationTool(AnnotationTool.Eraser);
+                }
                 ViewModel.HandleAnnotationPointerDown(pageX, pageY);
             }
             else
@@ -163,10 +185,22 @@ public class ViewportPanel : Panel
         {
             _dragging = false;
             _browseAnnotationDrag = false;
+            _barrelPan = false;
             return;
         }
 
         var dragPos = e.GetPosition(this);
+
+        // Barrel-button free-pan: pan like Ctrl+drag regardless of mode, never inking.
+        if (_barrelPan)
+        {
+            double bdx = dragPos.X - _lastPos.X;
+            double bdy = dragPos.Y - _lastPos.Y;
+            ViewModel.HandlePan(bdx, bdy, ctrlHeld: true);
+            _lastPos = dragPos;
+            e.Handled = true;
+            return;
+        }
 
         if (ViewModel.IsAnnotating)
         {
@@ -212,7 +246,12 @@ public class ViewportPanel : Panel
             var pos = e.GetPosition(this);
             bool isClick = IsClick(pos);
 
-            if (ViewModel.IsAnnotating)
+            if (_barrelPan)
+            {
+                // End free-pan: resume rail if the pan paused it (mirrors releasing Ctrl).
+                if (ViewModel.RailPaused) ViewModel.ResumeRailFromPause();
+            }
+            else if (ViewModel.IsAnnotating)
             {
                 var (pageX, pageY) = ScreenToPage(pos);
                 ViewModel.HandleAnnotationPointerUp(pageX, pageY);
@@ -241,8 +280,17 @@ public class ViewportPanel : Panel
                 ViewModel.HandleClick(pos.X, pos.Y);
             }
         }
+
+        // Restore the tool an eraser-tip stroke temporarily replaced.
+        if (_eraserTipPrevTool is { } prevTool)
+        {
+            ViewModel?.SetAnnotationTool(prevTool);
+            _eraserTipPrevTool = null;
+        }
+
         _dragging = false;
         _browseAnnotationDrag = false;
+        _barrelPan = false;
         e.Handled = true;
     }
 
