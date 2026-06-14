@@ -16,6 +16,7 @@ public static class ExportCommand
 
         var pdfPath = Program.GetRequiredPdf(args);
         var outputPath = Program.GetOption(args, "output");
+        var password = Program.GetOption(args, "password");
         var pageRange = Program.GetOption(args, "pages");
         var figureDir = Program.GetOption(args, "figure-dir");
         var concurrencyStr = Program.GetOption(args, "concurrency");
@@ -70,7 +71,8 @@ public static class ExportCommand
 
         try
         {
-            service.ExportAsync(pdfPath, output, options, progress, CancellationToken.None)
+            service.ExportAsync(pdfPath, output, options, password: password,
+                    progress: progress, ct: CancellationToken.None)
                 .GetAwaiter().GetResult();
         }
         finally
@@ -100,6 +102,7 @@ public static class ExportCommand
         Console.WriteLine();
         Console.WriteLine("Output:");
         Console.WriteLine("  --output <path>             Markdown output file (default: stdout)");
+        Console.WriteLine("  --password <pwd>            Password for an encrypted PDF");
         Console.WriteLine("  --pages <range>             Page range (e.g. 1,3,5-10)");
         Console.WriteLine("  --no-page-breaks            Omit page break markers (---)");
         Console.WriteLine();

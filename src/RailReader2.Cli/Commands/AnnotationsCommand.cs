@@ -20,6 +20,7 @@ public static class AnnotationsCommand
 
         var pdfPath = Program.GetRequiredPdf(args);
         var outputPath = Program.GetOption(args, "output");
+        var password = Program.GetOption(args, "password");
         var format = Program.GetOption(args, "format") ?? "json";
         var pageRange = Program.GetOption(args, "pages");
         var includeText = Program.HasFlag(args, "include-text");
@@ -38,13 +39,44 @@ public static class AnnotationsCommand
         if (format == "pdf")
         {
             var outPath = outputPath ?? Path.ChangeExtension(Path.GetFileName(pdfPath), ".annotated.pdf");
-            var pdf = factory.CreatePdfService(pdfPath);
-            AnnotationExportService.Export(pdf, annotations, outPath);
+            IPdfService pdf;
+            try
+            {
+                pdf = factory.CreatePdfService(pdfPath, password);
+            }
+            catch (PdfPasswordRequiredException ex)
+            {
+                return Program.Fail(ex.WrongPassword
+                    ? "Incorrect password. Pass the correct --password for this encrypted PDF."
+                    : "This PDF is password-protected. Pass --password <pwd> to open it.");
+            }
+            try
+            {
+                AnnotationExportService.Export(pdf, annotations, outPath);
+            }
+            catch (InvalidOperationException)
+            {
+                // Flattening drops encryption, so Core refuses an encrypted source. Annotate in
+                // place instead (annotations are already written into the encrypted PDF).
+                return Program.Fail(
+                    "Cannot export an encrypted PDF to a flattened copy — the result would be unencrypted. " +
+                    "The annotations are already saved inside the original encrypted PDF.");
+            }
             Console.Error.WriteLine($"Annotated PDF written to {Path.GetFullPath(outPath)}");
             return 0;
         }
 
-        var pdf2 = factory.CreatePdfService(pdfPath);
+        IPdfService pdf2;
+        try
+        {
+            pdf2 = factory.CreatePdfService(pdfPath, password);
+        }
+        catch (PdfPasswordRequiredException ex)
+        {
+            return Program.Fail(ex.WrongPassword
+                ? "Incorrect password. Pass the correct --password for this encrypted PDF."
+                : "This PDF is password-protected. Pass --password <pwd> to open it.");
+        }
 
         var (pages, rangeError) = PageRangeParser.Parse(pageRange, pdf2.PageCount);
         if (rangeError != null) return Program.Fail(rangeError);
@@ -293,6 +325,7 @@ public static class AnnotationsCommand
         Console.WriteLine();
         Console.WriteLine("Options:");
         Console.WriteLine("  --output <path>       Output file path (default: stdout for JSON)");
+        Console.WriteLine("  --password <pwd>      Password for an encrypted PDF");
         Console.WriteLine("  --format <json|pdf>   Export format (default: json)");
         Console.WriteLine("  --pages <range>       Page range to export (e.g. 1,3,5-10; default: all)");
         Console.WriteLine("  --include-text        Extract text under each annotation");

@@ -77,7 +77,7 @@ public class MarkdownExportServiceTests
             factory.TestPdfPath,
             new StringWriter(),
             options,
-            progress);
+            progress: progress);
 
         Assert.True(progress.Reports.Count >= 1);
         Assert.Equal("Complete", progress.Reports[^1].Status);

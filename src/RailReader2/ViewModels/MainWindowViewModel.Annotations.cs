@@ -271,6 +271,15 @@ public sealed partial class MainWindowViewModel
         var outputPath = file.TryGetLocalPath() ?? file.Path.LocalPath;
         if (outputPath is null) return;
 
+        // A flattened export builds a brand-new PDF that cannot carry the source's encryption.
+        // Core refuses rather than silently emit a plaintext copy of a confidential document;
+        // catch it here and explain — the annotations are already saved inside the encrypted PDF.
+        if (!string.IsNullOrEmpty(tab.Pdf.Password))
+        {
+            ShowStatusToast("This PDF is password-protected — a flattened export would remove its password, so it's blocked. Your annotations are already saved inside the encrypted PDF.");
+            return;
+        }
+
         try
         {
             await Task.Run(() =>
@@ -280,6 +289,12 @@ public sealed partial class MainWindowViewModel
                         _logger.Debug($"[Export] Page {page + 1} of {total}..."));
             });
             _logger.Info($"[Export] Saved to {outputPath}");
+        }
+        catch (InvalidOperationException ex)
+        {
+            // Backstop in case Core refuses for a reason the pre-check above missed.
+            _logger.Error("[Export] Refused", ex);
+            ShowStatusToast("This PDF can't be exported to a flattened copy. Your annotations are saved inside the original PDF.");
         }
         catch (Exception ex)
         {

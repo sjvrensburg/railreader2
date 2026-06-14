@@ -1,6 +1,9 @@
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.Input;
+using RailReader.Core;
+using RailReader.Core.Services;
+using RailReader2.Views;
 
 namespace RailReader2.ViewModels;
 
@@ -31,16 +34,39 @@ public sealed partial class MainWindowViewModel
         {
             _logger.Debug($"[OpenDocument] Opening: {path}");
 
+            // Encrypted PDFs throw PdfPasswordRequiredException from CreateDocument (on the
+            // background thread). Dialogs must be shown on the UI thread, so the open attempt
+            // lives in Task.Run while the password *resolution* loops out here. The resolved
+            // password is held only inside the opened IPdfService — never persisted, and never
+            // passed again after CreateDocument (LoadAnnotations etc. read IPdfService.Password).
             TabViewModel? tab = null;
-            await Task.Run(() =>
+            string? password = null;
+            while (tab is null)
             {
-                var state = _controller.CreateDocument(path);
-                if (!state.LoadPageBitmap())
-                    throw new InvalidOperationException($"Failed to render first page of {Path.GetFileName(path)}");
-                tab = new TabViewModel(state);
-            });
+                var attemptPassword = password;
+                DocumentState? state = null;
+                try
+                {
+                    await Task.Run(() =>
+                    {
+                        state = _controller.CreateDocument(path, attemptPassword);
+                        if (!state.LoadPageBitmap())
+                            throw new InvalidOperationException($"Failed to render first page of {Path.GetFileName(path)}");
+                    });
+                }
+                catch (PdfPasswordRequiredException ex)
+                {
+                    if (_window is null) return;
+                    var entered = await new PasswordDialog(Path.GetFileName(path), ex.WrongPassword)
+                        .ShowDialog<string?>(_window);
+                    // Cancel = "changed my mind", not a failure — abort quietly (no toast).
+                    if (entered is null) return;
+                    password = entered;
+                    continue;
+                }
 
-            if (tab is null) return;
+                tab = new TabViewModel(state!);
+            }
 
             _logger.Debug($"[OpenDocument] Loaded: {tab.PageCount} pages, {tab.PageWidth}x{tab.PageHeight}");
             tab.LoadAnnotations(_controller.AnnotationManager);

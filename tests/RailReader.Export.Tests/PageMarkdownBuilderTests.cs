@@ -210,7 +210,6 @@ public class PageMarkdownBuilderTests
     {
         var sb = new System.Text.StringBuilder();
         var annotations = new PageMarkdownBuilder.PageAnnotations(
-            [],
             [new TextNoteAnnotation { Text = "Important point here", X = 10, Y = 10 }]);
 
         PageMarkdownBuilder.AppendAnnotations(sb, annotations);
@@ -223,8 +222,7 @@ public class PageMarkdownBuilderTests
     {
         var sb = new System.Text.StringBuilder();
         var annotations = new PageMarkdownBuilder.PageAnnotations(
-            [new HighlightAnnotation { Color = "#FFFF00", Rects = [new HighlightRect(10, 10, 100, 20)] }],
-            []);
+            [new HighlightAnnotation { Color = "#FFFF00", Rects = [new HighlightRect(10, 10, 100, 20)] }]);
 
         PageMarkdownBuilder.AppendAnnotations(sb, annotations);
 
@@ -236,8 +234,7 @@ public class PageMarkdownBuilderTests
     {
         var sb = new System.Text.StringBuilder();
         var annotations = new PageMarkdownBuilder.PageAnnotations(
-            [new HighlightAnnotation { Color = "#FFFF00", Rects = [new HighlightRect(10, 10, 100, 20)] }],
-            []);
+            [new HighlightAnnotation { Color = "#FFFF00", Rects = [new HighlightRect(10, 10, 100, 20)] }]);
         var pageText = MakePageText("highlighted text", 10, 10, 110, 30);
 
         PageMarkdownBuilder.AppendAnnotations(sb, annotations, pageText);
@@ -276,7 +273,6 @@ public class PageMarkdownBuilderTests
     public void BuildPlainText_WithAnnotations()
     {
         var annotations = new PageMarkdownBuilder.PageAnnotations(
-            [],
             [new TextNoteAnnotation { Text = "My note", X = 0, Y = 0 }]);
         var pageText = new PageText("Text.", []);
         var flatOutline = HeadingLevelResolver.FlattenOutline([]);
