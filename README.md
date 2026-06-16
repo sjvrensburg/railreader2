@@ -420,4 +420,5 @@ dotnet publish src/RailReader2 -c Release -r win-x64 --self-contained
 
 ## Related projects
 
-- **[rr2annotate](https://github.com/sjvrensburg/rr2parser)** — CLI tool that extracts your RailReader2 annotations into structured Markdown documents, grouped by section headings with surrounding paragraph context. Useful for feeding annotated PDFs to an AI for summarisation. Uses the RailReader2 CLI's `annotations` command as its data source.
+- **[RailReaderCore](https://github.com/sjvrensburg/RailReaderCore)** — the portable core consumed here as NuGet packages (`RailReader.Core`, `RailReader.Core.Pdfium`, `RailReader.Core.Analysis`, `RailReader.Renderer.Skia`, `RailReader.Export`): models, controllers, rail navigation, line detection, search, annotations, the SkiaSharp renderer, and the Markdown export pipeline.
+- **[railmark](https://github.com/sjvrensburg/railmark)** — CLI tool that extracts your RailReader2 annotations into structured Markdown documents, grouped by section headings with surrounding paragraph context. Useful for feeding annotated PDFs to an AI for summarisation. Uses the RailReader2 CLI's `annotations` command as its data source.
