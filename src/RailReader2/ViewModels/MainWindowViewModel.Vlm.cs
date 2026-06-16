@@ -10,23 +10,23 @@ namespace RailReader2.ViewModels;
 
 public sealed partial class MainWindowViewModel
 {
-    /// <summary>The current rail block (the seated navigable block copy actions operate on), or
-    /// null — with a "No block selected" toast — when nothing is seated. Shared by the block-copy
-    /// entry points (keyboard, context menu, and the Edit menu).</summary>
-    private LayoutBlock? CurrentRailBlockOrToast()
+    /// <summary>The active document plus its seated navigable rail block — what the block-copy entry
+    /// points (keyboard, context menu, Edit menu) operate on. Null when there is no open document
+    /// (silent), or with a "No block selected" toast when a document is open but no block is seated.</summary>
+    private (DocumentState Doc, LayoutBlock Block)? CurrentRailBlockOrToast()
     {
-        var doc = _controller.ActiveDocument;
-        LayoutBlock? block = doc?.Rail.HasAnalysis == true ? doc.Rail.CurrentNavigableBlock : null;
-        if (block is null)
+        if (_controller.ActiveDocument is not { } doc) return null;
+        if (!doc.Rail.HasAnalysis || doc.Rail.CurrentNavigableBlock is not { } block)
+        {
             ShowStatusToast("No block selected");
-        return block;
+            return null;
+        }
+        return (doc, block);
     }
 
     public async Task CopyBlockAsLatex()
     {
-        var doc = _controller.ActiveDocument;
-        if (doc is null) return;
-        if (CurrentRailBlockOrToast() is not { } block) return;
+        if (CurrentRailBlockOrToast() is not ({ } doc, { } block)) return;
         await SendBlockToVlm(doc, block, DefaultActionForBlock(block.Role));
     }
 
@@ -34,16 +34,14 @@ public sealed partial class MainWindowViewModel
     /// point — unlike <see cref="CopyBlockAsLatex"/>, which uses the block's default action).</summary>
     public async Task CopyCurrentBlock(BlockAction action)
     {
-        var doc = _controller.ActiveDocument;
-        if (doc is null) return;
-        if (CurrentRailBlockOrToast() is not { } block) return;
+        if (CurrentRailBlockOrToast() is not ({ } doc, { } block)) return;
         await SendBlockToVlm(doc, block, action);
     }
 
     /// <summary>Copy the current rail block as a PNG image (Edit-menu / agent entry point).</summary>
     public async Task CopyCurrentBlockAsImage()
     {
-        if (CurrentRailBlockOrToast() is not { } block) return;
+        if (CurrentRailBlockOrToast() is not (_, { } block)) return;
         await CopyBlockAsImage(block);
     }
 

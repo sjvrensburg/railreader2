@@ -25,6 +25,7 @@ Everything you need to know to get the most out of railreader2.
 17. [Settings](#settings)
 18. [Troubleshooting](#troubleshooting)
 19. [Keyboard Shortcuts](#keyboard-shortcuts)
+20. [Menu Bar](#menu-bar)
 
 ---
 
@@ -437,7 +438,7 @@ Press `Ctrl+L` to send the current rail block to a Vision Language Model and cop
 - **Tables** → copied as Markdown
 - **Figures** → copied as a brief description
 
-You can also `Ctrl+right-click` any detected block to open a context menu with **Copy as LaTeX**, **Copy as Markdown**, **Copy Description**, and **Copy Image** options.
+You can also `Ctrl+right-click` any detected block to open a context menu with **Copy as LaTeX**, **Copy as Markdown**, **Copy Description**, and **Copy Image** options. The same four actions are available from the **Edit menu** (Copy Block as LaTeX / Markdown / Description / Image), where they act on the current rail block.
 
 ### Setup
 
@@ -802,4 +803,21 @@ The log is overwritten at the start of each session. Old `.log` files are automa
 | `Ctrl+L` | Copy current block as LaTeX / Markdown / description (VLM) |
 | `Ctrl+C` | Copy selected text |
 | `Escape` | Cancel / close / stop / exit fullscreen |
+
+---
+
+## Menu Bar
+
+Every command is reachable from the menu bar by name — handy for discovery, keyboard navigation, and assistive technologies. There are six menus:
+
+- **File** — open, duplicate / close tab, export & import annotations, settings, quit.
+- **Edit** — find, annotation mode, undo / redo, and **Copy Block as LaTeX / Markdown / Description / Image** (the same VLM block actions as the `Ctrl+right-click` context menu, acting on the current rail block).
+- **View** — zoom, side panels, minimap, fullscreen, debug overlay, colour effects.
+- **Rail** — the rail-reading toggles: **Auto-Scroll**, **Jump Mode**, **Line Focus Dim**, **Line Highlight**, and **Add Bookmark** (mirroring the `P` / `J` / `F` / `H` / `B` shortcuts).
+- **Navigation** — go to / previous / next / first / last page, and semantic **Jump to Next / Previous** heading, figure, table, or equation.
+- **Help** — keyboard shortcuts, about, diagnostic log, clean-up.
+
+**Availability.** Menu items grey out when their action isn't currently possible: *Export with Annotations* is disabled for an encrypted (password-protected) PDF — a flattened copy would be unencrypted, so it's refused; the block-copy items need a configured VLM endpoint; and document-dependent commands are disabled when no document is open.
+
+**Access keys (mnemonics).** Each menu and item carries an `Alt`+letter access key — the underlined letter in its label. Press and hold `Alt` to reveal them, then the letter to activate: `Alt+F` File, `Alt+E` Edit, `Alt+V` View, `Alt+R` Rail, `Alt+N` Navigation, `Alt+H` Help. Access keys are kept distinct within each menu — for example *Copy Block as Markdown* uses `Alt+K` (not `Alt+M`, which already belongs to *Annotation Mode*).
 

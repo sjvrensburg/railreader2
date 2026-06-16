@@ -31,7 +31,7 @@
             <MenuItem Header="_Redo" InputGesture="Ctrl+Shift+Z" Click="OnRedo" IsEnabled="{Binding HasDocument}" />
             <Separator />
             <MenuItem Header="Copy Block as _LaTeX" InputGesture="Ctrl+L" Click="OnCopyBlockAsLatex" IsEnabled="{Binding CanVlmCopyBlock}" />
-            <MenuItem Header="Copy Block as _Markdown" Click="OnCopyBlockAsMarkdown" IsEnabled="{Binding CanVlmCopyBlock}" />
+            <MenuItem Header="Copy Block as Mar_kdown" Click="OnCopyBlockAsMarkdown" IsEnabled="{Binding CanVlmCopyBlock}" />
             <MenuItem Header="Copy Block as _Description" Click="OnCopyBlockAsDescription" IsEnabled="{Binding CanVlmCopyBlock}" />
             <MenuItem Header="Copy Block as _Image" Click="OnCopyBlockAsImage" IsEnabled="{Binding HasDocument}" />
         </MenuItem>

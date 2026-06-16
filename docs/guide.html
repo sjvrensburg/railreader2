@@ -132,6 +132,7 @@
         <li><a href="#troubleshooting">Troubleshooting</a></li>
         <li><a href="#icons">Controls &amp; Icons</a></li>
         <li><a href="#shortcuts">Keyboard Shortcuts</a></li>
+<li><a href="#menu-bar">Menu Bar</a></li>
       </ol>
     </nav>
 
@@ -836,7 +837,9 @@
         copy the result to the clipboard. You can also <code>Ctrl+right-click</code> any detected
         block to open a context menu with <strong>Copy as LaTeX</strong>,
         <strong>Copy as Markdown</strong>, <strong>Copy Description</strong>, and
-        <strong>Copy Image</strong> options. The <code>Ctrl+L</code> shortcut auto-selects
+        <strong>Copy Image</strong> options &mdash; the same four are on the
+        <strong>Edit menu</strong> (Copy Block as LaTeX / Markdown / Description / Image),
+        acting on the current rail block. The <code>Ctrl+L</code> shortcut auto-selects
         the action by block type: equations &rarr; LaTeX, tables &rarr; Markdown,
         figures &rarr; description.
       </p>
@@ -1255,6 +1258,37 @@ railreader2-cli export paper.pdf --figure-dir ./figures --output paper.md</code>
           <tr><td>Escape</td><td>Cancel tool / close search / stop auto-scroll / exit fullscreen</td></tr>
         </tbody>
       </table>
+    </section>
+
+    <!-- Menu Bar -->
+    <section class="guide-section" id="menu-bar">
+      <h2>Menu Bar</h2>
+      <p>
+        Every command is reachable from the menu bar by name &mdash; handy for discovery, keyboard
+        navigation, and assistive technologies. There are six menus:
+      </p>
+      <ul>
+        <li><strong>File</strong> &mdash; open, duplicate / close tab, export &amp; import annotations, settings, quit.</li>
+        <li><strong>Edit</strong> &mdash; find, annotation mode, undo / redo, and <strong>Copy Block as LaTeX / Markdown / Description / Image</strong> (the same VLM block actions as the <code>Ctrl+right-click</code> context menu, acting on the current rail block).</li>
+        <li><strong>View</strong> &mdash; zoom, side panels, minimap, fullscreen, debug overlay, colour effects.</li>
+        <li><strong>Rail</strong> &mdash; the rail-reading toggles: <strong>Auto-Scroll</strong>, <strong>Jump Mode</strong>, <strong>Line Focus Dim</strong>, <strong>Line Highlight</strong>, and <strong>Add Bookmark</strong> (mirroring the <code>P</code> / <code>J</code> / <code>F</code> / <code>H</code> / <code>B</code> shortcuts).</li>
+        <li><strong>Navigation</strong> &mdash; go to / previous / next / first / last page, and semantic <strong>Jump to Next / Previous</strong> heading, figure, table, or equation.</li>
+        <li><strong>Help</strong> &mdash; keyboard shortcuts, about, diagnostic log, clean-up.</li>
+      </ul>
+      <p>
+        <strong>Availability.</strong> Menu items grey out when their action isn't currently possible:
+        <em>Export with Annotations</em> is disabled for an encrypted (password-protected) PDF &mdash; a
+        flattened copy would be unencrypted, so it's refused; the block-copy items need a configured VLM
+        endpoint; and document-dependent commands are disabled when no document is open.
+      </p>
+      <p>
+        <strong>Access keys (mnemonics).</strong> Each menu and item carries an <code>Alt</code>+letter
+        access key &mdash; the underlined letter in its label. Hold <code>Alt</code> to reveal them, then
+        the letter to activate: <code>Alt+F</code> File, <code>Alt+E</code> Edit, <code>Alt+V</code> View,
+        <code>Alt+R</code> Rail, <code>Alt+N</code> Navigation, <code>Alt+H</code> Help. Access keys are
+        kept distinct within each menu &mdash; for example <em>Copy Block as Markdown</em> uses
+        <code>Alt+K</code> (not <code>Alt+M</code>, which already belongs to <em>Annotation Mode</em>).
+      </p>
     </section>
 
   </main>
