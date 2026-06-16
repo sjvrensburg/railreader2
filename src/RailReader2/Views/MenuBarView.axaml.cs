@@ -1,6 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using RailReader.Core.Models;
+using RailReader.Core.Services;
 using RailReader2.ViewModels;
 
 namespace RailReader2.Views;
@@ -150,4 +151,25 @@ public partial class MenuBarView : UserControl
     {
         if (Vm is { } vm) vm.FireAndForget(vm.CopyBlockAsLatex(), nameof(vm.CopyBlockAsLatex));
     }
+    private void OnCopyBlockAsMarkdown(object? s, RoutedEventArgs e)
+    {
+        if (Vm is { } vm) vm.FireAndForget(vm.CopyCurrentBlock(VlmService.BlockAction.Markdown), nameof(vm.CopyCurrentBlock));
+    }
+    private void OnCopyBlockAsDescription(object? s, RoutedEventArgs e)
+    {
+        if (Vm is { } vm) vm.FireAndForget(vm.CopyCurrentBlock(VlmService.BlockAction.Description), nameof(vm.CopyCurrentBlock));
+    }
+    private void OnCopyBlockAsImage(object? s, RoutedEventArgs e)
+    {
+        if (Vm is { } vm) vm.FireAndForget(vm.CopyCurrentBlockAsImage(), nameof(vm.CopyCurrentBlockAsImage));
+    }
+
+    // Rail menu — rail-reading toggles + bookmark (mirror the P/J/F/H/B keyboard shortcuts so
+    // they are discoverable and AT-SPI-actionable by name; the keys themselves are display-only here).
+    private void OnToggleAutoScroll(object? s, RoutedEventArgs e) => Vm?.ToggleAutoScrollExclusive();
+    private void OnToggleJumpMode(object? s, RoutedEventArgs e) => Vm?.ToggleJumpModeExclusive();
+    private void OnToggleLineFocusDim(object? s, RoutedEventArgs e) => Vm?.ToggleLineFocusBlur();
+    private void OnToggleLineHighlightMenu(object? s, RoutedEventArgs e) => Vm?.ToggleLineHighlight();
+    private void OnAddBookmark(object? s, RoutedEventArgs e)
+    { if (Vm is { } vm) vm.ShowBookmarkDialog = true; }
 }

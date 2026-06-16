@@ -10,20 +10,39 @@ namespace RailReader2.ViewModels;
 
 public sealed partial class MainWindowViewModel
 {
-    public async Task CopyBlockAsLatex()
+    /// <summary>The active document plus its seated navigable rail block — what the block-copy entry
+    /// points (keyboard, context menu, Edit menu) operate on. Null when there is no open document
+    /// (silent), or with a "No block selected" toast when a document is open but no block is seated.</summary>
+    private (DocumentState Doc, LayoutBlock Block)? CurrentRailBlockOrToast()
     {
-        var doc = _controller.ActiveDocument;
-        if (doc is null) return;
-
-        LayoutBlock? block = doc.Rail.HasAnalysis ? doc.Rail.CurrentNavigableBlock : null;
-        if (block is null)
+        if (_controller.ActiveDocument is not { } doc) return null;
+        if (!doc.Rail.HasAnalysis || doc.Rail.CurrentNavigableBlock is not { } block)
         {
             ShowStatusToast("No block selected");
-            return;
+            return null;
         }
+        return (doc, block);
+    }
 
-        var action = DefaultActionForBlock(block.Role);
+    public async Task CopyBlockAsLatex()
+    {
+        if (CurrentRailBlockOrToast() is not ({ } doc, { } block)) return;
+        await SendBlockToVlm(doc, block, DefaultActionForBlock(block.Role));
+    }
+
+    /// <summary>Copy the current rail block via a specific VLM action (Edit-menu / agent entry
+    /// point — unlike <see cref="CopyBlockAsLatex"/>, which uses the block's default action).</summary>
+    public async Task CopyCurrentBlock(BlockAction action)
+    {
+        if (CurrentRailBlockOrToast() is not ({ } doc, { } block)) return;
         await SendBlockToVlm(doc, block, action);
+    }
+
+    /// <summary>Copy the current rail block as a PNG image (Edit-menu / agent entry point).</summary>
+    public async Task CopyCurrentBlockAsImage()
+    {
+        if (CurrentRailBlockOrToast() is not (_, { } block)) return;
+        await CopyBlockAsImage(block);
     }
 
     public LayoutBlock? FindBlockAt(double pageX, double pageY)

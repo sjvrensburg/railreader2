@@ -225,6 +225,23 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
     public bool AutoScrollActive => _controller.AutoScrollActive;
 
+    // --- Menu-item enablement gating (so impossible actions grey out) ---
+
+    /// <summary>True when a document tab is open. Document-dependent menu items gate on this.</summary>
+    public bool HasDocument => ActiveTab is not null;
+
+    /// <summary>True when the active document is encrypted/password-protected. Flattened annotated
+    /// export refuses an encrypted source, so "Export with Annotations" gates this out.</summary>
+    public bool IsActiveDocumentEncrypted => !string.IsNullOrEmpty(ActiveTab?.Pdf.Password);
+
+    /// <summary>"Export with Annotations" (flattened PDF) is possible only for an unencrypted open
+    /// document — the annotation export service refuses an encrypted source.</summary>
+    public bool CanExportAnnotated => HasDocument && !IsActiveDocumentEncrypted;
+
+    /// <summary>Block copy-as-LaTeX/Markdown/Description require a configured VLM endpoint (and an
+    /// open document). Copy-as-Image needs neither a VLM (it is a local crop) — it gates on <see cref="HasDocument"/>.</summary>
+    public bool CanVlmCopyBlock => HasDocument && !string.IsNullOrWhiteSpace(AppConfig.VlmEndpoint);
+
     /// <summary>True when semi-auto scroll has parked on a stop unit (equation / table / figure /
     /// heading, or a column / page break) and is waiting for an explicit advance keypress. Drives
     /// the "parked — press D" affordance. Transitions are detected during the animation poll (Core
@@ -286,6 +303,31 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         _controller.ReadingPositionChanged = _ => OnReadingContextChanged();
         WireAnnotationStoreSignals();
         SetupPollTimer();
+    }
+
+    // Last-published menu-gating values, so a spurious ActiveTab raise re-publishes nothing.
+    private bool _gateHasDocument, _gateEncrypted, _gateCanExport, _gateCanVlm;
+
+    /// <summary>Menu-enablement gating (<see cref="HasDocument"/>, <see cref="CanExportAnnotated"/>,
+    /// <see cref="CanVlmCopyBlock"/>) all derive from the active tab — open/close/switch, encryption —
+    /// and the VLM config. Every one of those points re-raises <see cref="ActiveTab"/> (tab ops and
+    /// <see cref="OnConfigChanged"/> included), so refresh the gating flags alongside it rather than
+    /// touching each call site. <see cref="ActiveTab"/> is also re-raised on every animation frame
+    /// (overlay refresh), so only re-publish a flag whose value actually changed — otherwise auto-scroll
+    /// would needlessly re-evaluate every menu item's IsEnabled binding ~60×/s.</summary>
+    protected override void OnPropertyChanged(System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        base.OnPropertyChanged(e);
+        if (e.PropertyName != nameof(ActiveTab)) return;
+
+        if (HasDocument is var hasDoc && hasDoc != _gateHasDocument)
+        { _gateHasDocument = hasDoc; OnPropertyChanged(nameof(HasDocument)); }
+        if (IsActiveDocumentEncrypted is var enc && enc != _gateEncrypted)
+        { _gateEncrypted = enc; OnPropertyChanged(nameof(IsActiveDocumentEncrypted)); }
+        if (CanExportAnnotated is var canExport && canExport != _gateCanExport)
+        { _gateCanExport = canExport; OnPropertyChanged(nameof(CanExportAnnotated)); }
+        if (CanVlmCopyBlock is var canVlm && canVlm != _gateCanVlm)
+        { _gateCanVlm = canVlm; OnPropertyChanged(nameof(CanVlmCopyBlock)); }
     }
 
     private void OnControllerStateChanged(string propertyName)
