@@ -41,6 +41,21 @@
                        Margin="16,4,0,0"
                        IsVisible="{Binding Tabs.Count}" />
 
+        <!-- Semi-auto scroll parked: a clear bottom-centre "press D" affordance so a stop on an
+             equation / table / figure / heading (or a column / page break) never reads as a freeze.
+             Non-hit-testable so it never intercepts pan/zoom while you study the parked block. -->
+        <Border IsVisible="{Binding AutoScrollParked}"
+                VerticalAlignment="Bottom" HorizontalAlignment="Center"
+                Margin="0,0,0,28"
+                Background="#CC000000" CornerRadius="6" Padding="16,8"
+                BoxShadow="0 2 8 0 #40000000"
+                IsHitTestVisible="False">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="Parked" FontWeight="Bold" Foreground="#FFAA00" VerticalAlignment="Center" />
+                <TextBlock Text="press D or S to continue" Foreground="White" VerticalAlignment="Center" />
+            </StackPanel>
+        </Border>
+
         <!-- Scan All overlay: faded viewport + opaque progress card -->
         <Border IsVisible="{Binding IsScanAllActive}"
                 Background="#50000000"

@@ -419,6 +419,17 @@ public partial class MainWindow : Window
     /// <summary>Navigation and toggle keys — only when search is not focused. Returns true if handled.</summary>
     private bool HandleNavigationKey(MainWindowViewModel vm, KeyEventArgs e)
     {
+        // Semi-auto scroll: while parked on a stop unit, the forward/advance keys resume flow
+        // rather than boosting / navigating manually. Shift+D stays the debug-overlay toggle.
+        if (vm.AutoScrollParked
+            && e.Key is Key.Down or Key.S or Key.Right or Key.D or Key.Space
+            && !(e.Key == Key.D && e.KeyModifiers.HasFlag(KeyModifiers.Shift)))
+        {
+            vm.ResumeAutoScrollFromPark();
+            e.Handled = true;
+            return true;
+        }
+
         switch (e.Key)
         {
             case Key.Down or Key.S:

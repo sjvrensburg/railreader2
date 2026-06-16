@@ -53,6 +53,7 @@ public partial class StatusBarView : UserControl
             nameof(MainWindowViewModel.ActiveTabIndex) or
             nameof(MainWindowViewModel.ActiveTool) or
             nameof(MainWindowViewModel.AutoScrollActive) or
+            nameof(MainWindowViewModel.AutoScrollParked) or
             nameof(MainWindowViewModel.JumpMode) or
             nameof(MainWindowViewModel.StatusToast))
         {
@@ -320,7 +321,9 @@ public partial class StatusBarView : UserControl
             if (vm is { AutoScrollActive: true })
             {
                 AddSeparator();
-                StatusPanel.Children.Add(MakeBoldLabel("Auto-Scroll", AutoScrollBrush));
+                StatusPanel.Children.Add(vm.AutoScrollParked
+                    ? MakeBoldLabel("Parked — press D to continue", AmberBrush)
+                    : MakeBoldLabel("Auto-Scroll", AutoScrollBrush));
                 StatusPanel.Children.Add(MakeDangerButton("IconPause", (_, _) => vm.StopAutoScroll(), "Stop auto-scroll (P)"));
             }
 

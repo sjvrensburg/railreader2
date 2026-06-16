@@ -98,7 +98,7 @@
                 <TextBlock Grid.Row="6" Grid.Column="0" Text="End" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
                 <TextBlock Grid.Row="6" Grid.Column="1" Text="Snap to line end" Margin="0,2" />
                 <TextBlock Grid.Row="7" Grid.Column="0" Text="P" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
-                <TextBlock Grid.Row="7" Grid.Column="1" Text="Toggle auto-scroll (D/Right to boost)" Margin="0,2" />
+                <TextBlock Grid.Row="7" Grid.Column="1" Text="Toggle auto-scroll (D/S to continue when parked)" Margin="0,2" />
                 <TextBlock Grid.Row="8" Grid.Column="0" Text="Escape" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
                 <TextBlock Grid.Row="8" Grid.Column="1" Text="Stop auto-scroll" Margin="0,2" />
                 <TextBlock Grid.Row="9" Grid.Column="0" Text="J" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />

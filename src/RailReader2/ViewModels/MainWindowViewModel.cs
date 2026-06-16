@@ -35,6 +35,10 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     // the next callback is the first of a new animation sequence (after idle).
     private TimeSpan? _lastFrameTime;
 
+    // Last observed semi-auto park state, to fire AutoScrollParked notifications on transitions.
+    // Core parks mid-Tick without raising StateChanged, so the poll loop watches for the edge.
+    private bool _lastAutoScrollParked;
+
     [ObservableProperty] private int _activeTabIndex;
     [ObservableProperty] private bool _showOutline;
 
@@ -220,6 +224,12 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     }
 
     public bool AutoScrollActive => _controller.AutoScrollActive;
+
+    /// <summary>True when semi-auto scroll has parked on a stop unit (equation / table / figure /
+    /// heading, or a column / page break) and is waiting for an explicit advance keypress. Drives
+    /// the "parked — press D" affordance. Transitions are detected during the animation poll (Core
+    /// parks mid-Tick and does not raise StateChanged for it), see <see cref="OnAnimationFrame"/>.</summary>
+    public bool AutoScrollParked => _controller.AutoScrollParked;
     public bool RailPaused => _controller.RailPaused;
 
     public void ResumeRailFromPause()
@@ -415,6 +425,15 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         }
         if (result.AnnotationsChanged) InvalidateAnnotations();
         if (result.CameraChanged) InvalidateCamera();
+
+        // Semi-auto scroll parks mid-Tick (no StateChanged for it), so watch the edge here and
+        // surface it so the "parked — press D" affordance and status bar update.
+        bool parked = _controller.AutoScrollParked;
+        if (parked != _lastAutoScrollParked)
+        {
+            _lastAutoScrollParked = parked;
+            OnPropertyChanged(nameof(AutoScrollParked));
+        }
 
         if (result.StillAnimating) RequestAnimationFrame();
     }

@@ -23,6 +23,7 @@ public partial class SettingsWindow : Window
     private bool _loading = true;
     private readonly ObservableCollection<NavigableRoleItem> _roleItems = [];
     private readonly ObservableCollection<NavigableRoleItem> _centeringRoleItems = [];
+    private readonly ObservableCollection<NavigableRoleItem> _stopRoleItems = [];
     private CustomLayoutModelConfig _customModel = new();
 
     /// <summary>
@@ -91,9 +92,6 @@ public partial class SettingsWindow : Window
         LineFocusBlurSlider.Value = c.LineFocusBlurIntensity;
         LinePaddingSlider.Value = c.LinePadding;
         AutoScrollLinePause.Value = (decimal)c.AutoScrollLinePauseMs;
-        AutoScrollBlockPause.Value = (decimal)c.AutoScrollBlockPauseMs;
-        AutoScrollEquationPause.Value = (decimal)c.AutoScrollEquationPauseMs;
-        AutoScrollHeaderPause.Value = (decimal)c.AutoScrollHeaderPauseMs;
         AutoScrollTriggerCheck.IsChecked = c.AutoScrollTriggerEnabled;
         AutoScrollTriggerDelay.Value = (decimal)c.AutoScrollTriggerDelayMs;
         JumpPercentage.Value = (decimal)c.JumpPercentage;
@@ -109,6 +107,9 @@ public partial class SettingsWindow : Window
         BuildRoleCheckboxes(_centeringRoleItems, c.CenteringRoles,
             set => { vm.AppConfig.CenteringRoles = set; vm.OnConfigChanged(); },
             CenteringRolesList);
+        BuildRoleCheckboxes(_stopRoleItems, c.AutoScrollStopClasses,
+            set => { vm.AppConfig.AutoScrollStopClasses = set; vm.OnConfigChanged(); },
+            StopRolesList);
 
         VlmEndpoint.Text = c.VlmEndpoint ?? "";
         VlmModelName.Text = c.VlmModel ?? "";
@@ -199,9 +200,6 @@ public partial class SettingsWindow : Window
         c.PageCacheRadius = (int)(PageCacheRadius.Value ?? 24m);
         c.ColourEffectIntensity = IntensitySlider.Value;
         c.AutoScrollLinePauseMs = (double)(AutoScrollLinePause.Value ?? 400m);
-        c.AutoScrollBlockPauseMs = (double)(AutoScrollBlockPause.Value ?? 600m);
-        c.AutoScrollEquationPauseMs = (double)(AutoScrollEquationPause.Value ?? 600m);
-        c.AutoScrollHeaderPauseMs = (double)(AutoScrollHeaderPause.Value ?? 600m);
         c.AutoScrollTriggerDelayMs = (double)(AutoScrollTriggerDelay.Value ?? 2000m);
         c.JumpPercentage = (double)(JumpPercentage.Value ?? 25m);
         c.VlmEndpoint = string.IsNullOrWhiteSpace(VlmEndpoint.Text) ? null : VlmEndpoint.Text.Trim();
@@ -394,9 +392,7 @@ public partial class SettingsWindow : Window
             resetTab.MarginCropping = defaults.MarginCropping;
         }
         vm.AppConfig.AutoScrollLinePauseMs = defaults.AutoScrollLinePauseMs;
-        vm.AppConfig.AutoScrollBlockPauseMs = defaults.AutoScrollBlockPauseMs;
-        vm.AppConfig.AutoScrollEquationPauseMs = defaults.AutoScrollEquationPauseMs;
-        vm.AppConfig.AutoScrollHeaderPauseMs = defaults.AutoScrollHeaderPauseMs;
+        vm.AppConfig.AutoScrollStopClasses = new HashSet<BlockRole>(defaults.AutoScrollStopClasses);
         vm.AppConfig.AutoScrollTriggerEnabled = defaults.AutoScrollTriggerEnabled;
         vm.AppConfig.AutoScrollTriggerDelayMs = defaults.AutoScrollTriggerDelayMs;
         vm.AppConfig.JumpPercentage = defaults.JumpPercentage;
