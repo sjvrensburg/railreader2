@@ -340,23 +340,37 @@
     <section class="guide-section" id="auto-scroll">
       <h2>Auto-Scroll</h2>
       <p>
-        Press <code>P</code> in rail mode to toggle <strong>auto-scroll</strong>. The view
-        continuously scrolls horizontally along the current line, then advances to the next line
-        when it reaches the edge.
+        Press <code>P</code> in rail mode to toggle <strong>semi-automatic auto-scroll</strong>. The
+        view flows through prose line by line on its own &mdash; but rather than running unattended
+        through the whole document, it <strong>parks</strong> (stops and waits for you) whenever it
+        reaches something worth pausing on, then continues at your signal. The easy, mechanical part
+        stays automatic; the &ldquo;am I done with this?&rdquo; decision stays yours.
       </p>
       <ul>
-        <li><strong>Speed boost:</strong> Hold <code>D</code> or <code>Right</code> during auto-scroll to double the speed.</li>
-        <li><strong>Pauses:</strong> Auto-scroll pauses briefly at line boundaries (default 400ms) and block/page
-          transitions (default 600ms) to let your eyes settle. Configurable in Settings &rarr; Auto-Scroll.</li>
-        <li><strong>Stop:</strong> Press <code>Escape</code>, <code>P</code>, or any opposing navigation key (<code>Up</code>, <code>Left</code>).</li>
+        <li><strong>Where it parks:</strong> on arrival at a non-prose block &mdash; a display equation,
+          table, figure, or heading &mdash; and at the end of a column and a page. Continuous prose flows
+          straight through, even across paragraph breaks.</li>
+        <li><strong>Continuing:</strong> while parked, press <code>D</code> or <code>S</code>
+          (or <code>Right</code>/<code>Down</code>) to resume flow. A <strong>&ldquo;Parked &mdash; press D to
+          continue&rdquo;</strong> hint appears in the status bar and on-page so a stop never looks like a freeze.</li>
+        <li><strong>Inspect while parked:</strong> pan and zoom (and <code>Ctrl</code>+drag free-pan) stay
+          fully live while parked, so you can study a parked equation or figure for as long as you like.</li>
+        <li><strong>Reading beat:</strong> within prose, a brief pause is held at the end of every line
+          before moving to the next (default 400&nbsp;ms). Raise the <strong>Snap duration</strong>
+          (Settings &rarr; Rail Reading) if the move between lines feels too quick.</li>
+        <li><strong>What parks:</strong> the set of block types that park is configurable &mdash;
+          Settings &rarr; Auto-Scroll &rarr; <strong>Park On</strong> (headings, equations, tables, figures
+          by default; uncheck any to flow through it).</li>
+        <li><strong>Stop:</strong> press <code>Escape</code>, <code>P</code>, or an opposing navigation key
+          (<code>Up</code>, <code>Left</code>) to exit auto-scroll entirely.</li>
       </ul>
       <p>
-        The status bar shows a green <strong>"Auto-Scroll"</strong> indicator when active. Adjust
-        speed with the rail toolbar slider, <code>[</code> / <code>]</code> keys (&plusmn;5), or
-        <code>Ctrl+[</code> / <code>Ctrl+]</code> for fine adjustments (&plusmn;1). Scroll speed
-        is zoom-independent &mdash; reading pace stays consistent at any magnification. Narrow blocks
-        (equations, headings) that fit in the viewport receive proportional dwell time so they are not
-        skipped.
+        The status bar shows an <strong>"Auto-Scroll"</strong> indicator while flowing and
+        <strong>"Parked &mdash; press D to continue"</strong> while stopped. Adjust speed with the rail
+        toolbar slider, <code>[</code> / <code>]</code> keys (&plusmn;5), or <code>Ctrl+[</code> /
+        <code>Ctrl+]</code> for fine adjustments (&plusmn;1); holding <code>D</code>/<code>Right</code>
+        during flow temporarily boosts speed. Scroll speed is zoom-independent &mdash; reading pace stays
+        consistent at any magnification.
       </p>
       <p>
         <strong>Auto-scroll trigger:</strong> Auto-scroll can also start automatically after sustained
@@ -1076,8 +1090,9 @@ railreader2-cli export paper.pdf --figure-dir ./figures --output paper.md</code>
 
       <h3>Auto-Scroll</h3>
       <ul>
-        <li><strong>Line Pause:</strong> Pause duration at line boundaries (ms, 0 to disable).</li>
-        <li><strong>Block Pause:</strong> Pause duration at block/page boundaries (ms, 0 to disable).</li>
+        <li><strong>Line Pause:</strong> The per-line reading beat &mdash; pause held at the end of every line before moving to the next (ms, 0 to disable).</li>
+        <li><strong>Park On:</strong> Which block types auto-scroll parks on when it reaches them (headings, equations, tables, figures by default). Unchecked types flow through like prose; column and page breaks always park.</li>
+        <li><strong>Enable auto-scroll trigger / Trigger delay:</strong> Optionally auto-start auto-scroll after holding <code>D</code>/<code>Right</code> for the set delay.</li>
       </ul>
 
       <h3>Advanced</h3>
@@ -1212,7 +1227,7 @@ railreader2-cli export paper.pdf --figure-dir ./figures --output paper.md</code>
           <tr><td>Left / A</td><td>Scroll backward (hold)</td></tr>
           <tr><td>Shift+Right / Shift+Left</td><td>Short jump &mdash; half distance (jump mode)</td></tr>
           <tr><td>Home / End</td><td>Line start / end</td></tr>
-          <tr><td>P</td><td>Toggle auto-scroll</td></tr>
+          <tr><td>P</td><td>Toggle auto-scroll (semi-automatic; D/S to continue when parked)</td></tr>
           <tr><td>J</td><td>Toggle jump mode</td></tr>
           <tr><td>B</td><td>Add bookmark for current page</td></tr>
           <tr><td>Alt+Left / ` (backtick)</td><td>Navigate back</td></tr>

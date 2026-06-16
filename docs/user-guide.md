@@ -146,14 +146,18 @@ When rail mode is active, a floating toolbar appears with **P** (auto-scroll), *
 
 ## Auto-Scroll
 
-Press `P` in rail mode to toggle **auto-scroll**. The view continuously scrolls horizontally along the current line, then advances to the next line when it reaches the edge.
+Press `P` in rail mode to toggle **semi-automatic auto-scroll**. The view flows through prose line by line on its own — but instead of running unattended through the whole document, it **parks** (stops and waits for you) whenever it reaches something worth pausing on, then continues at your signal. This keeps the easy, mechanical part automatic while leaving the "am I done with this?" decision to you.
 
-- **Speed boost:** Hold `D` or `Right` during auto-scroll to double the speed.
-- **Pauses:** Auto-scroll pauses briefly at line boundaries (default 400ms) and block/page transitions (default 600ms) to let your eyes settle. Configurable in Settings > Auto-Scroll.
-- **Auto-scroll trigger:** Optionally, auto-scroll can start automatically after holding `D` or `Right` for a configurable delay. Enable this in Settings > Auto-Scroll > **Enable auto-scroll trigger** and set the desired hold duration.
-- **Stop:** Press `Escape`, `P`, or any opposing navigation key (`Up`, `Left`).
+- **Where it parks:** auto-scroll stops on arrival at a non-prose block — a display equation, table, figure, or heading — and at the end of a column and a page. Continuous prose flows straight through, even across paragraph breaks.
+- **Continuing:** while parked, press `D` or `S` (or `Right`/`Down`) to resume flow. The status bar and a small on-page banner show **"Parked — press D to continue"** so a stop never looks like a freeze.
+- **Inspect while parked:** pan and zoom (and `Ctrl`+drag free-pan) stay fully live while parked, so you can study a parked equation or figure for as long as you like before continuing.
+- **Reading beat:** within prose, a brief pause is held at the end of every line before moving to the next, giving your eyes time to settle. If the move between lines feels too quick, raise the **Snap duration** (Settings > Rail Reading).
+- **Speed:** adjust with the rail toolbar slider or the `[` / `]` keys; holding `D`/`Right` during flow temporarily boosts speed.
+- **What parks:** the set of block types that park is configurable — Settings > Auto-Scroll > **Park On** (headings, equations, tables, figures by default; uncheck any to flow through it instead).
+- **Auto-scroll trigger:** optionally, auto-scroll can start automatically after holding `D` or `Right` for a configurable delay. Enable this in Settings > Auto-Scroll > **Enable auto-scroll trigger** and set the desired hold duration.
+- **Stop:** press `Escape`, `P`, or an opposing navigation key (`Up`, `Left`) to exit auto-scroll entirely.
 
-The status bar shows a green **"Auto-Scroll"** indicator when active. Adjust speed with the rail toolbar slider or the `[` / `]` keys.
+The status bar shows an **"Auto-Scroll"** indicator while flowing and **"Parked — press D to continue"** while stopped.
 
 ---
 
@@ -695,8 +699,9 @@ Press `Ctrl+,` or use the menu to open Settings. Changes take effect immediately
 - **Jump Distance:** Percentage of visible width for jump mode (5–80%).
 
 ### Auto-Scroll
-- **Line Pause:** Pause duration at line boundaries (ms, 0 to disable).
-- **Block Pause:** Pause duration at block/page boundaries (ms, 0 to disable).
+- **Line Pause:** The per-line reading beat — the pause held at the end of every line before moving to the next (ms, 0 to disable).
+- **Park On:** Which block types auto-scroll parks on when it reaches them (headings, equations, tables, figures by default). Unchecked types flow through like prose; column and page breaks always park.
+- **Enable auto-scroll trigger / Trigger delay:** Optionally auto-start auto-scroll after holding `D`/`Right` for the set delay.
 
 ### Advanced
 - **Layout Model:** Choose between Docling Heron-INT8 (default, bundled, ~66 MB) and PP-DocLayoutV3 (alternative, ~50 MB). See the [Heron layout model guide](heron-layout-model.md) for installation instructions and trade-offs.
@@ -770,7 +775,7 @@ The log is overwritten at the start of each session. Old `.log` files are automa
 | `Left` / `A` | Scroll backward (hold) |
 | `Shift+Right` / `Shift+Left` | Short jump — half distance (jump mode) |
 | `Home` / `End` | Line start / end |
-| `P` | Toggle auto-scroll |
+| `P` | Toggle auto-scroll (semi-automatic; `D`/`S` to continue when parked) |
 | `J` | Toggle jump mode |
 | `B` | Add bookmark for current page |
 | `Alt+Left` / `` ` `` | Navigate back |

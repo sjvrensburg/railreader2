@@ -60,7 +60,7 @@ At high zoom levels, navigation switches to "rail mode" — the viewer locks ont
 #### Rail reading
 
 - **Rail toolbar** — docked vertical toolbar with toggle buttons (P/J/F/H) for auto-scroll, jump mode, line focus dim, and line highlight, plus sliders for scroll speed (or jump distance) and motion blur intensity; auto-scroll and jump mode are mutually exclusive
-- **Auto-scroll** — toggle continuous horizontal scrolling in rail mode (P key), hold D/Right to boost speed, with configurable pauses at line and block boundaries
+- **Semi-automatic auto-scroll** — flows through prose line by line in rail mode (P key) and **parks** (waits for a keypress) on arrival at a non-prose unit — equation, table, figure, heading — and at column/page breaks; press D/S to continue. Pan/zoom stay live while parked, and a "Parked — press D" affordance shows in the status bar + on-page. A brief reading beat is held on every line; which block types park is configurable (Settings > Auto-Scroll > Park On)
 - **Auto-scroll trigger** — optionally auto-start auto-scroll after holding D/Right for a configurable delay (default 2s). Off by default, configurable in Settings > Auto-Scroll
 - **Jump mode** — saccade-style reading (J key) that advances by a configurable percentage of the visible width; Shift+Right/Left for half-distance short jumps
 - **Line focus dim** — smooth feathered dimming of non-active lines to reduce peripheral distraction, with configurable intensity and padding
@@ -232,7 +232,7 @@ Run `railreader2-cli --help` or `railreader2-cli <command> --help` for all optio
 | Mouse wheel | Zoom towards cursor |
 | Click on block | Jump to block (rail mode) |
 | Home / End | Line start / end (rail mode) or first / last page |
-| P | Toggle auto-scroll (rail mode), D/Right to boost |
+| P | Toggle auto-scroll (rail mode); D/S to continue when parked |
 | J | Toggle jump mode (saccade-style advance) |
 | B | Add bookmark for current page |
 | Alt+Left / ` (backtick) | Navigate back |
@@ -319,8 +319,8 @@ Rail reading parameters are editable via the Settings panel (gear icon in menu b
 | `line_highlight_enabled` | Enable line highlight tint independently of line focus blur (`true`/`false`) |
 | `line_highlight_tint` | Colour tint on active line in rail mode: `Auto`, `Yellow`, `Cyan`, `Green`, `None` |
 | `line_highlight_opacity` | Line highlight tint opacity from 0.0 (off) to 1.0 (full) |
-| `auto_scroll_line_pause_ms` | Pause duration at line boundaries during auto-scroll (ms, 0 to disable) |
-| `auto_scroll_block_pause_ms` | Pause duration at block boundaries during auto-scroll (ms, 0 to disable) |
+| `auto_scroll_line_pause_ms` | Per-line reading beat — pause held at every line end before advancing during auto-scroll (ms, 0 to disable) |
+| `auto_scroll_stop_classes` | Which block types semi-auto scroll parks on when reached (array of class names; headings, equations, tables, figures by default). Configurable via Settings → Auto-Scroll → Park On. |
 | `jump_percentage` | Jump distance as percentage of visible width (5–80%) |
 | `dark_mode` | Enable dark UI theme (`true`/`false`) |
 | `navigable_classes` | Which block types rail mode navigates (array of class names). Configurable via Settings → Advanced. |
