@@ -214,6 +214,17 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(AutoScrollActive));
     }
 
+    /// <summary>Resume semi-auto scroll from a park (the reader's explicit advance keypress).
+    /// Routed here from the forward/advance keys while <see cref="AutoScrollParked"/> is set.
+    /// Restarting the animation frame lets Core un-park and flow on; the parked-state edge is
+    /// picked up by the poll loop, which clears the affordance.</summary>
+    public void ResumeAutoScrollFromPark()
+    {
+        _controller.ResumeAutoScrollFromPark();
+        OnPropertyChanged(nameof(AutoScrollParked));
+        RequestAnimationFrame();
+    }
+
     public void ToggleAutoScrollExclusive()
     {
         if (ActiveTab?.PendingRailSetup == true)

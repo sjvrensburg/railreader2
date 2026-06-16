@@ -127,7 +127,7 @@
                                            FormatString="F1" Width="130" HorizontalAlignment="Left"
                                            ValueChanged="OnSettingChanged" />
                             <TextBlock Grid.Row="2" Grid.Column="0" Text="Snap duration (ms):" VerticalAlignment="Center" />
-                            <NumericUpDown Grid.Row="2" Grid.Column="2" Name="SnapDuration" Value="300"
+                            <NumericUpDown Grid.Row="2" Grid.Column="2" Name="SnapDuration" Value="450"
                                            Minimum="50" Maximum="1000" Increment="10"
                                            FormatString="F0" Width="130" HorizontalAlignment="Left"
                                            ValueChanged="OnSettingChanged" />
@@ -200,34 +200,36 @@
                 <ScrollViewer VerticalScrollBarVisibility="Auto"
                               HorizontalScrollBarVisibility="Disabled">
                     <StackPanel Spacing="8" Margin="16">
-                        <TextBlock Text="Pause Durations" FontWeight="Bold" />
-                        <Separator />
-                        <TextBlock Text="Brief pause at line and block boundaries during auto-scroll, giving your eyes time to settle."
+                        <TextBlock Text="Auto-scroll flows through prose automatically and parks (waits for you to press D or S) when it reaches a non-prose block — an equation, table, figure, or heading — and at column and page breaks. Pan and zoom stay live while parked, so you can study what you've stopped on for as long as you like."
                                    TextWrapping="Wrap" Opacity="0.7" />
-                        <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto,4,Auto,4,Auto,4,Auto">
+
+                        <TextBlock Text="Reading Beat" FontWeight="Bold" Margin="0,12,0,0" />
+                        <Separator />
+                        <TextBlock Text="Brief rest held at the end of every line before moving to the next, giving your eyes time to settle. Raise the Snap duration (Rail Reading tab) if the move between lines feels too quick."
+                                   TextWrapping="Wrap" Opacity="0.7" />
+                        <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto">
                             <TextBlock Grid.Row="0" Grid.Column="0" Text="Line pause (ms):" VerticalAlignment="Center" />
                             <NumericUpDown Grid.Row="0" Grid.Column="2" Name="AutoScrollLinePause" Value="400"
                                            Minimum="0" Maximum="2000" Increment="50"
                                            FormatString="F0" Width="130" HorizontalAlignment="Left"
                                            ValueChanged="OnSettingChanged" />
-                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Block pause (ms):" VerticalAlignment="Center" />
-                            <NumericUpDown Grid.Row="2" Grid.Column="2" Name="AutoScrollBlockPause" Value="600"
-                                           Minimum="0" Maximum="2000" Increment="50"
-                                           FormatString="F0" Width="130" HorizontalAlignment="Left"
-                                           ValueChanged="OnSettingChanged" />
-                            <TextBlock Grid.Row="4" Grid.Column="0" Text="Equation pause (ms):" VerticalAlignment="Center" />
-                            <NumericUpDown Grid.Row="4" Grid.Column="2" Name="AutoScrollEquationPause" Value="600"
-                                           Minimum="0" Maximum="5000" Increment="50"
-                                           FormatString="F0" Width="130" HorizontalAlignment="Left"
-                                           ValueChanged="OnSettingChanged" />
-                            <TextBlock Grid.Row="6" Grid.Column="0" Text="Header pause (ms):" VerticalAlignment="Center" />
-                            <NumericUpDown Grid.Row="6" Grid.Column="2" Name="AutoScrollHeaderPause" Value="600"
-                                           Minimum="0" Maximum="5000" Increment="50"
-                                           FormatString="F0" Width="130" HorizontalAlignment="Left"
-                                           ValueChanged="OnSettingChanged" />
                         </Grid>
-                        <TextBlock Text="Set to 0 to disable pauses. Speed is controlled via the rail toolbar sliders."
+                        <TextBlock Text="Set to 0 to disable the per-line pause. Speed is controlled via the rail toolbar sliders."
                                    TextWrapping="Wrap" Opacity="0.5" Margin="0,8,0,0" />
+
+                        <TextBlock Text="Park On" FontWeight="Bold" Margin="0,12,0,0" />
+                        <Separator />
+                        <TextBlock Text="Which block types auto-scroll parks on when it reaches them. Unchecked types flow through like prose. (Column and page breaks always park.)"
+                                   TextWrapping="Wrap" Opacity="0.7" />
+                        <ItemsControl Name="StopRolesList">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="v:NavigableRoleItem">
+                                    <CheckBox Content="{Binding Label}"
+                                              IsChecked="{Binding IsChecked}"
+                                              Margin="0,1" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
 
                         <TextBlock Text="Auto-Scroll Trigger" FontWeight="Bold" Margin="0,12,0,0" />
                         <Separator />
