@@ -6,40 +6,43 @@
     <Menu>
         <MenuItem Header="_File">
             <MenuItem Header="_Open..." InputGesture="Ctrl+O" Command="{Binding OpenFileCommand}" />
-            <MenuItem Header="_Duplicate Tab" Command="{Binding DuplicateTabCommand}" />
+            <MenuItem Header="_Duplicate Tab" Command="{Binding DuplicateTabCommand}" IsEnabled="{Binding HasDocument}" />
             <Separator />
             <MenuItem Header="_Recent Files" x:Name="RecentFilesMenu" />
             <Separator />
-            <MenuItem Header="_Export with Annotations..." Command="{Binding ExportAnnotatedCommand}" />
-            <MenuItem Header="Export Annotations as _JSON..." Command="{Binding ExportAnnotationsJsonCommand}" />
-            <MenuItem Header="_Import Annotations..." Command="{Binding ImportAnnotationsJsonCommand}" />
+            <MenuItem Header="_Export with Annotations..." Command="{Binding ExportAnnotatedCommand}" IsEnabled="{Binding CanExportAnnotated}" />
+            <MenuItem Header="Export Annotations as _JSON..." Command="{Binding ExportAnnotationsJsonCommand}" IsEnabled="{Binding HasDocument}" />
+            <MenuItem Header="_Import Annotations..." Command="{Binding ImportAnnotationsJsonCommand}" IsEnabled="{Binding HasDocument}" />
             <Separator />
-            <MenuItem Header="_Close Tab" InputGesture="Ctrl+W" Click="OnCloseTab" />
+            <MenuItem Header="_Close Tab" InputGesture="Ctrl+W" Click="OnCloseTab" IsEnabled="{Binding HasDocument}" />
             <Separator />
             <MenuItem Header="_Settings..." InputGesture="Ctrl+OemComma" Click="OnShowSettings" />
             <Separator />
             <MenuItem Header="_Quit" InputGesture="Ctrl+Q" Click="OnQuit" />
         </MenuItem>
         <MenuItem Header="_Edit">
-            <MenuItem Header="_Find..." InputGesture="Ctrl+F" Click="OnShowFind" />
-            <MenuItem Header="Find _Next" InputGesture="F3" Click="OnFindNext" />
-            <MenuItem Header="Find _Previous" InputGesture="Shift+F3" Click="OnFindPrevious" />
+            <MenuItem Header="_Find..." InputGesture="Ctrl+F" Click="OnShowFind" IsEnabled="{Binding HasDocument}" />
+            <MenuItem Header="Find _Next" InputGesture="F3" Click="OnFindNext" IsEnabled="{Binding HasDocument}" />
+            <MenuItem Header="Find _Previous" InputGesture="Shift+F3" Click="OnFindPrevious" IsEnabled="{Binding HasDocument}" />
             <Separator />
-            <MenuItem Header="Annotation _Mode" InputGesture="Ctrl+E" Click="OnToggleAnnotationMode" />
+            <MenuItem Header="Annotation _Mode" InputGesture="Ctrl+E" Click="OnToggleAnnotationMode" IsEnabled="{Binding HasDocument}" />
             <Separator />
-            <MenuItem Header="_Undo" InputGesture="Ctrl+Z" Click="OnUndo" />
-            <MenuItem Header="_Redo" InputGesture="Ctrl+Shift+Z" Click="OnRedo" />
+            <MenuItem Header="_Undo" InputGesture="Ctrl+Z" Click="OnUndo" IsEnabled="{Binding HasDocument}" />
+            <MenuItem Header="_Redo" InputGesture="Ctrl+Shift+Z" Click="OnRedo" IsEnabled="{Binding HasDocument}" />
             <Separator />
-            <MenuItem Header="Copy Block as _LaTeX" InputGesture="Ctrl+L" Click="OnCopyBlockAsLatex" />
+            <MenuItem Header="Copy Block as _LaTeX" InputGesture="Ctrl+L" Click="OnCopyBlockAsLatex" IsEnabled="{Binding CanVlmCopyBlock}" />
+            <MenuItem Header="Copy Block as _Markdown" Click="OnCopyBlockAsMarkdown" IsEnabled="{Binding CanVlmCopyBlock}" />
+            <MenuItem Header="Copy Block as _Description" Click="OnCopyBlockAsDescription" IsEnabled="{Binding CanVlmCopyBlock}" />
+            <MenuItem Header="Copy Block as _Image" Click="OnCopyBlockAsImage" IsEnabled="{Binding HasDocument}" />
         </MenuItem>
         <MenuItem Header="_View">
-            <MenuItem Header="Zoom _In" InputGesture="Ctrl+OemPlus" Click="OnZoomIn" />
-            <MenuItem Header="Zoom _Out" InputGesture="Ctrl+OemMinus" Click="OnZoomOut" />
-            <MenuItem Header="_Fit Page" Command="{Binding FitPageCommand}" />
-            <MenuItem Header="Fit _Width" Command="{Binding FitWidthCommand}" />
-            <MenuItem Header="_Reset Zoom" InputGesture="Ctrl+D0" Click="OnResetZoom" />
+            <MenuItem Header="Zoom _In" InputGesture="Ctrl+OemPlus" Click="OnZoomIn" IsEnabled="{Binding HasDocument}" />
+            <MenuItem Header="Zoom _Out" InputGesture="Ctrl+OemMinus" Click="OnZoomOut" IsEnabled="{Binding HasDocument}" />
+            <MenuItem Header="_Fit Page" Command="{Binding FitPageCommand}" IsEnabled="{Binding HasDocument}" />
+            <MenuItem Header="Fit _Width" Command="{Binding FitWidthCommand}" IsEnabled="{Binding HasDocument}" />
+            <MenuItem Header="_Reset Zoom" InputGesture="Ctrl+D0" Click="OnResetZoom" IsEnabled="{Binding HasDocument}" />
             <Separator />
-            <MenuItem Header="Side _Panel">
+            <MenuItem Header="Side _Panel" IsEnabled="{Binding HasDocument}">
                 <MenuItem Header="_Outline" InputGesture="Ctrl+Shift+O" Click="OnShowOutlinePane" />
                 <MenuItem Header="_Bookmarks" Click="OnShowBookmarksPane" />
                 <MenuItem Header="_Index / Figures" InputGesture="Ctrl+Shift+I" Click="OnShowIndexPane" />
@@ -49,12 +52,12 @@
                 <Separator />
                 <MenuItem Header="_Hide Side Panel" Click="OnHidePanel" />
             </MenuItem>
-            <MenuItem Header="_Minimap" InputGesture="Ctrl+M" Click="OnToggleMinimap" />
+            <MenuItem Header="_Minimap" InputGesture="Ctrl+M" Click="OnToggleMinimap" IsEnabled="{Binding HasDocument}" />
             <MenuItem Header="_Fullscreen" InputGesture="F11" Click="OnToggleFullscreen" />
             <Separator />
-            <MenuItem Header="_Debug Overlay" InputGesture="Shift+D" Click="OnToggleDebug" />
+            <MenuItem Header="_Debug Overlay" InputGesture="Shift+D" Click="OnToggleDebug" IsEnabled="{Binding HasDocument}" />
             <Separator />
-            <MenuItem Header="Colour Effects">
+            <MenuItem Header="Colour Effects" IsEnabled="{Binding HasDocument}">
                 <MenuItem Header="None" Click="OnEffectNone" />
                 <MenuItem Header="High Contrast" Click="OnEffectHighContrast" />
                 <MenuItem Header="High Visibility" Click="OnEffectHighVisibility" />
@@ -62,7 +65,16 @@
                 <MenuItem Header="Invert" Click="OnEffectInvert" />
             </MenuItem>
         </MenuItem>
-        <MenuItem Header="_Navigation">
+        <MenuItem Header="_Rail" IsEnabled="{Binding HasDocument}">
+            <MenuItem Header="_Auto-Scroll" InputGesture="P" Click="OnToggleAutoScroll" />
+            <MenuItem Header="_Jump Mode" InputGesture="J" Click="OnToggleJumpMode" />
+            <Separator />
+            <MenuItem Header="Line _Focus Dim" InputGesture="F" Click="OnToggleLineFocusDim" />
+            <MenuItem Header="Line _Highlight" InputGesture="H" Click="OnToggleLineHighlightMenu" />
+            <Separator />
+            <MenuItem Header="Add _Bookmark..." InputGesture="B" Click="OnAddBookmark" />
+        </MenuItem>
+        <MenuItem Header="_Navigation" IsEnabled="{Binding HasDocument}">
             <MenuItem Header="_Go to Page..." InputGesture="Ctrl+G" Click="OnGoToPage" />
             <Separator />
             <MenuItem Header="_Previous Page" InputGesture="PageUp" Click="OnPrevPage" />

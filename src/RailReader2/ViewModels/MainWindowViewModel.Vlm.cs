@@ -10,20 +10,41 @@ namespace RailReader2.ViewModels;
 
 public sealed partial class MainWindowViewModel
 {
+    /// <summary>The current rail block (the seated navigable block copy actions operate on), or
+    /// null — with a "No block selected" toast — when nothing is seated. Shared by the block-copy
+    /// entry points (keyboard, context menu, and the Edit menu).</summary>
+    private LayoutBlock? CurrentRailBlockOrToast()
+    {
+        var doc = _controller.ActiveDocument;
+        LayoutBlock? block = doc?.Rail.HasAnalysis == true ? doc.Rail.CurrentNavigableBlock : null;
+        if (block is null)
+            ShowStatusToast("No block selected");
+        return block;
+    }
+
     public async Task CopyBlockAsLatex()
     {
         var doc = _controller.ActiveDocument;
         if (doc is null) return;
+        if (CurrentRailBlockOrToast() is not { } block) return;
+        await SendBlockToVlm(doc, block, DefaultActionForBlock(block.Role));
+    }
 
-        LayoutBlock? block = doc.Rail.HasAnalysis ? doc.Rail.CurrentNavigableBlock : null;
-        if (block is null)
-        {
-            ShowStatusToast("No block selected");
-            return;
-        }
-
-        var action = DefaultActionForBlock(block.Role);
+    /// <summary>Copy the current rail block via a specific VLM action (Edit-menu / agent entry
+    /// point — unlike <see cref="CopyBlockAsLatex"/>, which uses the block's default action).</summary>
+    public async Task CopyCurrentBlock(BlockAction action)
+    {
+        var doc = _controller.ActiveDocument;
+        if (doc is null) return;
+        if (CurrentRailBlockOrToast() is not { } block) return;
         await SendBlockToVlm(doc, block, action);
+    }
+
+    /// <summary>Copy the current rail block as a PNG image (Edit-menu / agent entry point).</summary>
+    public async Task CopyCurrentBlockAsImage()
+    {
+        if (CurrentRailBlockOrToast() is not { } block) return;
+        await CopyBlockAsImage(block);
     }
 
     public LayoutBlock? FindBlockAt(double pageX, double pageY)
