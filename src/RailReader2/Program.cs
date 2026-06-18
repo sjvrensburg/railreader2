@@ -66,22 +66,19 @@ internal sealed class Program
         var builder = AppBuilder.Configure<App>()
             .UsePlatformDetect();
 
-        // X11 CPU busy-loop mitigation (Linux/X11 only). Avalonia's native X11 dispatcher
-        // (X11PlatformThreading) does not implement IDispatcherImplWithExplicitBackgroundProcessing,
-        // so the base Dispatcher falls back to arming a "now + 1ms" OS timer whenever it has a
-        // low-priority job it can't drain immediately. That collapses the X11 RunLoop's epoll
-        // timeout to ~0, so it never sleeps: recvmsg() on the X server socket spins at ~30k/s
-        // returning EAGAIN and pins one core at 100%. It's intermittent (a stuck pending-input /
-        // never-draining-queue race), so it survives in long sessions once entered.
+        // Linux/X11 dispatcher selection. Avalonia's native X11 dispatcher (X11PlatformThreading)
+        // does not implement IDispatcherImplWithExplicitBackgroundProcessing, so when a low-priority
+        // dispatcher job stays perpetually queued it arms a "now + 1ms" OS timer that collapses the
+        // epoll timeout to ~0 and pins one core at 100% (recvmsg/EAGAIN storm). We originally
+        // switched to the GLib (GMainLoop) dispatcher to dodge that.
         //
-        // The GLib (GMainLoop) dispatcher DOES implement explicit background processing (it uses a
-        // GLib idle source instead of the +1ms timer), so it structurally cannot enter that spin.
-        // We therefore prefer it on Linux, with two safeguards:
-        //   * Guarded: only enabled when libglib-2.0.so.0 is actually loadable. Avalonia hard-
-        //     DllImports glib with no fallback, so enabling it on a glib-less system would throw
-        //     DllNotFoundException at startup. The probe keeps us on the epoll dispatcher there.
-        //   * Opt-out: RR_X11_GLIB=0|false|off|no forces the native epoll dispatcher.
-        //     RR_X11_GLIB=1|true|on|yes forces GLib even past the probe (debugging only).
+        // But the real trigger turned out to be indeterminate ProgressBars left attached to the
+        // visual tree (their infinite animation kept Avalonia's animation clock — and thus a
+        // low-priority job — armed forever); that's fixed in the views. The native dispatcher no
+        // longer spins AND paces animation (zoom / rail horizontal-scroll) noticeably more smoothly
+        // than the GLib loop, so it's the default again. GLib stays as an opt-in fallback
+        // (RR_X11_GLIB=1|true|on|yes), probe-guarded so a stray opt-in on a glib-less system can't
+        // throw DllNotFoundException at startup (Avalonia hard-DllImports glib with no fallback).
         if (OperatingSystem.IsLinux() && ShouldUseGLibMainLoop())
             builder = builder.With(new X11PlatformOptions { UseGLibMainLoop = true });
 
@@ -90,17 +87,14 @@ internal sealed class Program
             .LogToTrace();
     }
 
+    // GLib main loop is opt-in (see BuildAvaloniaApp); the native epoll dispatcher is the default.
     private static bool ShouldUseGLibMainLoop()
     {
-        switch (ParseBool(Environment.GetEnvironmentVariable("RR_X11_GLIB")))
-        {
-            case false: return false;   // explicit opt-out -> native epoll dispatcher
-            case true: return true;     // explicit opt-in  -> GLib even if the probe would fail
-            default:
-                // Default: prefer GLib, but only if it's actually loadable so we never crash on a
-                // system without glib (Avalonia has no internal fallback to epoll).
-                return NativeLibrary.TryLoad("libglib-2.0.so.0", out _);
-        }
+        // Only when explicitly requested via RR_X11_GLIB=1|true|on|yes, and only if libglib is
+        // actually loadable (Avalonia hard-DllImports it with no fallback).
+        if (ParseBool(Environment.GetEnvironmentVariable("RR_X11_GLIB")) != true)
+            return false;
+        return NativeLibrary.TryLoad("libglib-2.0.so.0", out _);
     }
 
     private static bool? ParseBool(string? value) => value switch

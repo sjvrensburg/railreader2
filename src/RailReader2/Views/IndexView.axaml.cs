@@ -130,6 +130,10 @@ public partial class IndexView : PaneRefreshView
         if (_vm is null) return;
         bool active = _vm.IsScanAllActive;
         ScanAllBanner.IsVisible = active;
+        // Only animate while the banner is shown. An attached (collapsed) indeterminate
+        // ProgressBar keeps Avalonia's animation clock running, which busy-loops the
+        // X11/GLib dispatcher at ~100% CPU until the app is restarted.
+        ScanAllProgressBar.IsIndeterminate = active;
         ScanAllButton.IsEnabled = !active;
         if (active)
             ScanAllProgressText.Text = _vm.ScanAllProgress;

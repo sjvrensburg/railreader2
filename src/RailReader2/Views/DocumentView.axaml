@@ -65,7 +65,11 @@
                     CornerRadius="8" Padding="24,16"
                     BoxShadow="0 2 8 0 #40000000">
                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8">
-                    <ProgressBar IsIndeterminate="True"
+                    <!-- IsIndeterminate is gated on visibility on purpose: an indeterminate
+                         ProgressBar left attached to the tree (collapsed) keeps running its
+                         infinite animation, which holds Avalonia's animation clock open and
+                         busy-loops the X11/GLib dispatcher at ~100% CPU. Stop it when hidden. -->
+                    <ProgressBar IsIndeterminate="{Binding IsScanAllActive}"
                                  Width="180" Height="4"
                                  Foreground="{DynamicResource SystemControlHighlightAccentBrush}" />
                     <TextBlock Text="{Binding ScanAllProgress}"
