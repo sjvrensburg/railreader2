@@ -3,7 +3,9 @@
              x:Class="RailReader2.Views.LoadingOverlay">
     <Border Background="#78000000" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8">
-            <ProgressBar IsIndeterminate="True" Width="40" Height="40" />
+            <!-- Gate on the overlay's own visibility: a hidden-but-attached indeterminate
+                 ProgressBar keeps Avalonia's animation clock (and the dispatcher) spinning. -->
+            <ProgressBar IsIndeterminate="{Binding $parent[UserControl].IsVisible}" Width="40" Height="40" />
             <TextBlock Text="Loading page..." Foreground="White" HorizontalAlignment="Center" />
         </StackPanel>
     </Border>

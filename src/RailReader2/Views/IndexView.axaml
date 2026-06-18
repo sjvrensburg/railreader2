@@ -31,8 +31,11 @@
                 Background="{DynamicResource SystemControlHighlightListLowBrush}"
                 Padding="8,6" IsVisible="False">
             <StackPanel Spacing="4">
+                <!-- Starts non-indeterminate; UpdateScanAllBanner() toggles IsIndeterminate
+                     with the banner's visibility. A collapsed-but-attached indeterminate
+                     ProgressBar keeps Avalonia's animation clock (and the dispatcher) spinning. -->
                 <ProgressBar Name="ScanAllProgressBar"
-                             IsIndeterminate="True"
+                             IsIndeterminate="False"
                              Minimum="0" Maximum="100"
                              Height="4" />
                 <TextBlock Name="ScanAllProgressText"
