@@ -25,6 +25,7 @@ public partial class SettingsWindow : Window
     private readonly ObservableCollection<NavigableRoleItem> _centeringRoleItems = [];
     private readonly ObservableCollection<NavigableRoleItem> _stopRoleItems = [];
     private CustomLayoutModelConfig _customModel = new();
+    private CancellationTokenSource? _downloadCts;
 
     /// <summary>
     /// Roles offered in the settings UI. Excludes <see cref="BlockRole.Unknown"/>
@@ -163,12 +164,18 @@ public partial class SettingsWindow : Window
                     var pps = PPDocLayoutSModelLocator.FindModelPath();
                     BuiltinAnalyzerStatus.Text = pps != null
                         ? $"PP-DocLayout-S model: {pps}  Restart to apply."
-                        : $"PP-DocLayout-S model not found ({PPDocLayoutSModelLocator.FileName}). See docs/pp-doclayout-s.md to download it; the app will fall back to PP-DocLayoutV3 until then.";
+                        : $"PP-DocLayout-S model not found ({PPDocLayoutSModelLocator.FileName}). Press Download to install it.";
                     break;
                 }
             default:
-                BuiltinAnalyzerStatus.Text = "Using PP-DocLayoutV3.";
-                break;
+                {
+                    var v3 = LayoutModelRegistry.PPDocLayoutV3;
+                    var path = LayoutModelLocator.FindModelPath(v3);
+                    BuiltinAnalyzerStatus.Text = path != null
+                        ? $"PP-DocLayoutV3 model: {path}  Restart to apply."
+                        : $"PP-DocLayoutV3 model not found ({v3.FileName}). Press Download to install it (~{v3.ApproxSizeMb} MB).";
+                    break;
+                }
         }
     }
 
@@ -181,6 +188,48 @@ public partial class SettingsWindow : Window
             _customModel.Save();
             UpdateBuiltinAnalyzerStatus();
         }
+    }
+
+    /// <summary>
+    /// Downloads the currently-selected built-in model to the writable
+    /// <c>ConfigDir/models</c> location (works inside the read-only AppImage),
+    /// verifying its published SHA-256. The model becomes usable after a restart.
+    /// </summary>
+    private async void OnDownloadModel(object? sender, RoutedEventArgs e)
+    {
+        if (LayoutModelDownloader.DescriptorFor(_customModel.BuiltinAnalyzer) is not { } desc)
+            return;
+
+        _downloadCts?.Cancel();
+        _downloadCts = new CancellationTokenSource();
+
+        SetDownloadUiActive(true);
+        DownloadProgress.Value = 0;
+        BuiltinAnalyzerStatus.Text = $"Downloading {desc.DisplayName} (~{desc.ApproxSizeMb} MB)…";
+
+        var progress = new Progress<double>(p => DownloadProgress.Value = p);
+        var result = await LayoutModelDownloader.DownloadAsync(desc, progress, _downloadCts.Token);
+
+        SetDownloadUiActive(false);
+        BuiltinAnalyzerStatus.Text = result switch
+        {
+            { Ok: true } => $"Installed {desc.DisplayName} → {result.Path}  Restart to apply.",
+            { Error: "Cancelled." } => "Download cancelled.",
+            _ => $"Download failed: {result.Error}",
+        };
+
+        _downloadCts.Dispose();
+        _downloadCts = null;
+    }
+
+    private void OnCancelDownload(object? sender, RoutedEventArgs e) => _downloadCts?.Cancel();
+
+    private void SetDownloadUiActive(bool active)
+    {
+        DownloadProgress.IsVisible = active;
+        CancelDownloadButton.IsVisible = active;
+        DownloadModelButton.IsEnabled = !active;
+        BuiltinAnalyzerCombo.IsEnabled = !active;
     }
 
     private sealed record BuiltinAnalyzerItem(BuiltinAnalyzer Value, string Label);

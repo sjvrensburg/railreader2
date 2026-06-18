@@ -306,12 +306,20 @@
                         <TextBlock Text="Layout Model" FontWeight="Bold" Margin="0,16,0,0" />
                         <Separator />
                         <TextBlock TextWrapping="Wrap" Opacity="0.7"
-                                   Text="Docling Heron (INT8, ~66 MB) is the default model with 17 layout classes. PP-DocLayoutV3 (~50 MB) is bundled as a fallback and can be selected instead." />
+                                   Text="Docling Heron (INT8, ~66 MB) is the default model with 17 layout classes and ships with the app. PP-DocLayoutV3 (~125 MB, model-supplied reading order) and PP-DocLayout-S (lightweight) are optional — select one below and press Download to install it. Downloads are saved to your config folder, so they work even from a read-only AppImage." />
                         <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto" Margin="0,4,0,0">
                             <TextBlock Grid.Column="0" Text="Model:" VerticalAlignment="Center" />
                             <ComboBox Grid.Column="2" Name="BuiltinAnalyzerCombo"
                                       Width="240" HorizontalAlignment="Left"
                                       SelectionChanged="OnBuiltinAnalyzerChanged" />
+                        </Grid>
+                        <Grid ColumnDefinitions="Auto,8,Auto,8,*" Margin="0,6,0,0">
+                            <Button Grid.Column="0" Name="DownloadModelButton" Content="Download model"
+                                    Click="OnDownloadModel" />
+                            <Button Grid.Column="2" Name="CancelDownloadButton" Content="Cancel"
+                                    Click="OnCancelDownload" IsVisible="False" />
+                            <ProgressBar Grid.Column="4" Name="DownloadProgress" Minimum="0" Maximum="1"
+                                         IsVisible="False" VerticalAlignment="Center" Height="6" />
                         </Grid>
                         <TextBlock Name="BuiltinAnalyzerStatus" TextWrapping="Wrap" Opacity="0.7" FontSize="11"
                                    Margin="0,2,0,0" />
