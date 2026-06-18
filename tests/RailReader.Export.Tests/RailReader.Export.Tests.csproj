@@ -16,11 +16,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="RailReader.Core" Version="0.33.0" />
-    <PackageReference Include="RailReader.Core.Pdfium" Version="0.33.0" />
-    <PackageReference Include="RailReader.Core.Analysis" Version="0.33.0" />
-    <PackageReference Include="RailReader.Renderer.Skia" Version="0.33.0" />
-    <PackageReference Include="RailReader.Export" Version="0.33.0" />
+    <PackageReference Include="RailReader.Core" Version="0.34.0" />
+    <PackageReference Include="RailReader.Core.Pdfium" Version="0.34.0" />
+    <PackageReference Include="RailReader.Core.Analysis" Version="0.34.0" />
+    <PackageReference Include="RailReader.Renderer.Skia" Version="0.34.0" />
+    <PackageReference Include="RailReader.Export" Version="0.34.0" />
     <!-- For shell-internal helpers under test (ReferenceIndex); pulls Avalonia in but stays headless. -->
     <ProjectReference Include="../../src/RailReader2/RailReader2.csproj" />
   </ItemGroup>
