@@ -94,13 +94,36 @@ jobs:
           EOF
           chmod +x AppDir/AppRun
 
-          ARCH=x86_64 ./appimagetool AppDir railreader2-linux-x86_64.AppImage
+          # zstd-compressed squashfs: decompresses far faster than the default,
+          # so demand-paging the ~138 MB bundled .NET runtime through FUSE on
+          # launch is cheaper. Level 19 keeps the file small (zstd decompression
+          # speed is ~constant across levels, so this is a build-time cost only).
+          ARCH=x86_64 ./appimagetool --comp zstd \
+            --mksquashfs-opt -Xcompression-level --mksquashfs-opt 19 \
+            AppDir railreader2-linux-x86_64.AppImage
 
       - name: Upload artifact
         uses: actions/upload-artifact@v7
         with:
           name: linux-appimage
           path: railreader2-linux-x86_64.AppImage
+
+      # FUSE-free alternative: the same self-contained publish as a plain tarball.
+      # Extracting and running ./railreader2-linux-x64/RailReader2 avoids squashfs
+      # demand-paging entirely — fastest cold start for users who prefer it.
+      - name: Package tarball
+        run: |
+          mkdir -p publish/models
+          cp models/$MODEL_NAME publish/models/
+          chmod +x publish/RailReader2
+          mv publish railreader2-linux-x64
+          tar czf railreader2-linux-x64.tar.gz railreader2-linux-x64
+
+      - name: Upload tarball artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: linux-tarball
+          path: railreader2-linux-x64.tar.gz
 
   build-windows:
     needs: download-model
@@ -280,6 +303,7 @@ jobs:
           make_latest: true
           files: |
             railreader2-linux-x86_64.AppImage
+            railreader2-linux-x64.tar.gz
             railreader2-setup-x64.exe
             railreader2-cli-linux-x64.tar.gz
             railreader2-cli-win-x64.zip
