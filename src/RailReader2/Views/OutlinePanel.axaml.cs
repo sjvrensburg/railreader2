@@ -37,6 +37,7 @@ public partial class OutlinePanel : UserControl
             (SearchExpander, SidePane.Search),
             (CommentsExpander, SidePane.Comments),
             (PortalsExpander, SidePane.Portals),
+            (TableReadingExpander, SidePane.TableReading),
         ];
         foreach (var section in _sections)
             section.Expander.PropertyChanged += OnExpanderPropertyChanged;

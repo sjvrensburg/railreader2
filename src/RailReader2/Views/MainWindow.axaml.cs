@@ -437,9 +437,14 @@ public partial class MainWindow : Window
             case Key.Up or Key.W:
                 vm.HandleArrowUp(); e.Handled = true; return true;
             case Key.Right:
+                // Cell mode on a table: plain Right steps cells; Shift+Right stays a fine pan (inspect).
+                if (!e.KeyModifiers.HasFlag(KeyModifiers.Shift) && vm.TryHandleCellHorizontal(forward: true))
+                { e.Handled = true; return true; }
                 vm.HandleArrowRight(e.KeyModifiers.HasFlag(KeyModifiers.Shift));
                 e.Handled = true; return true;
             case Key.Left or Key.A:
+                if (!e.KeyModifiers.HasFlag(KeyModifiers.Shift) && vm.TryHandleCellHorizontal(forward: false))
+                { e.Handled = true; return true; }
                 vm.HandleArrowLeft(e.KeyModifiers.HasFlag(KeyModifiers.Shift));
                 e.Handled = true; return true;
             case Key.P:
@@ -486,6 +491,7 @@ public partial class MainWindow : Window
                 }
                 e.Handled = true; return true;
             case Key.D:
+                if (vm.TryHandleCellHorizontal(forward: true)) { e.Handled = true; return true; }
                 vm.HandleArrowRight(); e.Handled = true; return true;
             case Key.Home:
                 if (vm.ActiveTab is { } tH && tH.Rail.Active)
@@ -542,6 +548,10 @@ public partial class MainWindow : Window
                 vm.NextMatch(); e.Handled = true; return true;
             case Key.F11:
                 vm.IsFullScreen = !vm.IsFullScreen; e.Handled = true; return true;
+            // Disarm a pending "start rail here" click first — it's a one-shot action mode, so a single
+            // Escape should always cancel it rather than being shadowed by the other Escape handlers.
+            case Key.Escape when vm.ArmActivateRailClick:
+                vm.ArmActivateRailClick = false; e.Handled = true; return true;
             case Key.Escape when vm.AutoScrollActive:
                 vm.StopAutoScroll(); e.Handled = true; return true;
             case Key.Escape when vm.IsFullScreen:
@@ -554,6 +564,8 @@ public partial class MainWindow : Window
                 vm.ClearSearch();
                 vm.ActivePane = SidePane.Outline;
                 e.Handled = true; return true;
+            case Key.Escape when vm.ForcedRailActive:
+                vm.ExitForcedRail(); e.Handled = true; return true;
             default: return false;
         }
     }

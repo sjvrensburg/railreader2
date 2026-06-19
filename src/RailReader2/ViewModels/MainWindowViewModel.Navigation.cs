@@ -151,6 +151,35 @@ public sealed partial class MainWindowViewModel
     public void HandleArrowRelease(bool isHorizontal)
         => Dispatch(() => _controller.HandleArrowRelease(isHorizontal), animate: true);
 
+    /// <summary>Toggle the "start rail here" armed state (the toolbar button). When on, the next
+    /// viewport click force-activates rail mode at that point at the current zoom.</summary>
+    public void ToggleArmActivateRailClick() => ArmActivateRailClick = !ArmActivateRailClick;
+
+    /// <summary>True while rail is held active below the zoom threshold by a forced "start rail here"
+    /// activation. Used to drive an Escape that releases it.</summary>
+    public bool ForcedRailActive => _controller.ForcedRailActive;
+
+    /// <summary>Release a forced ("start rail here") rail activation, deactivating rail if the current
+    /// zoom is below the threshold.</summary>
+    public void ExitForcedRail()
+    {
+        _controller.ExitForcedRail();
+        InvalidateNavigation();
+    }
+
+    /// <summary>Consume an armed "start rail here" click: force rail mode active at the clicked point
+    /// (current page coords) regardless of zoom, seating the nearest navigable block and the line under
+    /// the click — no magnification. Disarms afterwards. Toasts when the page has no analysis yet.</summary>
+    public void ActivateRailAtClick(double canvasX, double canvasY)
+    {
+        ArmActivateRailClick = false;
+        if (IsScanAllActive) return;
+        bool ok = false;
+        Dispatch(() => ok = _controller.ActivateRailAt(canvasX, canvasY), InvalidateCameraAndTab, animate: true);
+        if (!ok)
+            ShowStatusToast("Rail-reading needs layout analysis here — try again in a moment");
+    }
+
     public void HandleClick(double canvasX, double canvasY)
     {
         if (IsScanAllActive) return;
