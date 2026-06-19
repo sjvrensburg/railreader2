@@ -175,6 +175,7 @@ public sealed partial class MainWindowViewModel
             ActiveTabIndex = index;
             _controller.SelectDocument(index);
             RestoreSidebarState(Tabs[index]);
+            ResetTableStateForTabSwitch();
 
             OnPropertyChanged(nameof(ActiveTab));
             // Core's SelectDocument fires neither PageChanged nor ReadingPositionChanged, so evaluate

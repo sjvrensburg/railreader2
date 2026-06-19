@@ -39,6 +39,7 @@ public partial class ToolBarView : UserControl
         BrowseButton.Click += (_, _) => _vm?.SetAnnotationTool(AnnotationTool.None);
         SelectButton.Click += (_, _) => _vm?.SetAnnotationTool(AnnotationTool.TextSelect);
         CopyButton.Click += (_, _) => _vm?.CopySelectedText();
+        RailHereButton.Click += (_, _) => _vm?.ToggleArmActivateRailClick();
         AnnotateButton.Click += (_, _) => _vm?.ToggleAnnotationMode();
 
         // Text-markup tools (drag over text) and drawing/note tools — all native Core tools.
@@ -71,6 +72,9 @@ public partial class ToolBarView : UserControl
             case nameof(MainWindowViewModel.IsAnnotationMode):
                 UpdateModeState();
                 break;
+            case nameof(MainWindowViewModel.ArmActivateRailClick):
+                UpdateRailHereState();
+                break;
             case "SelectedText":
                 UpdateCopyVisibility();
                 break;
@@ -81,6 +85,7 @@ public partial class ToolBarView : UserControl
     {
         UpdateToggleState();
         UpdateModeState();
+        UpdateRailHereState();
         UpdateCopyVisibility();
         RebuildColorFlyout();
         RebuildThicknessFlyout();
@@ -111,6 +116,9 @@ public partial class ToolBarView : UserControl
         AnnotationSection.IsVisible = on;
         AnnotateButton.IsChecked = on;
     }
+
+    private void UpdateRailHereState()
+        => RailHereButton.IsChecked = _vm?.ArmActivateRailClick ?? false;
 
     private void UpdateCopyVisibility()
         => CopyButton.IsVisible = _vm?.SelectedText is not null;

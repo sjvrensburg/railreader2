@@ -29,6 +29,8 @@
     <StreamGeometry x:Key="IconPause">M15,3 H18 A1,1 0 0 1 19,4 V20 A1,1 0 0 1 18,21 H15 A1,1 0 0 1 14,20 V4 A1,1 0 0 1 15,3 Z M0 0 M6,3 H9 A1,1 0 0 1 10,4 V20 A1,1 0 0 1 9,21 H6 A1,1 0 0 1 5,20 V4 A1,1 0 0 1 6,3 Z</StreamGeometry>
     <StreamGeometry x:Key="IconPlus">M5 12h14 M0 0 M12 5v14</StreamGeometry>
     <StreamGeometry x:Key="IconPanelLeft">M5,3 H19 A2,2 0 0 1 21,5 V19 A2,2 0 0 1 19,21 H5 A2,2 0 0 1 3,19 V5 A2,2 0 0 1 5,3 Z M0 0 M9,3 V21</StreamGeometry>
+    <!-- Crosshair: "start rail reading here" (click target). Lucide crosshair (ISC). -->
+    <StreamGeometry x:Key="IconRailHere">M2 12 A10 10 0 0 1 22 12 A10 10 0 0 1 2 12 M0 0 M22 12 L18 12 M0 0 M6 12 L2 12 M0 0 M12 6 L12 2 M0 0 M12 22 L12 18</StreamGeometry>
 
     <!-- Icon control theme: stroked Lucide path, Foreground-tinted, uniformly scaled,
          decorative (hidden from the accessibility tree). -->

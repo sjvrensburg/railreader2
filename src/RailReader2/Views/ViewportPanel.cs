@@ -251,6 +251,12 @@ public class ViewportPanel : Panel
                 else
                     ViewModel.HandleBrowsePointerUp((float)pageX, (float)pageY);
             }
+            // "Start rail here": when armed, a single click force-activates rail at the click point
+            // (any zoom). Checked before markers/block-framing so it wins regardless of what's under it.
+            else if (isClick && ViewModel.ArmActivateRailClick)
+            {
+                ViewModel.ActivateRailAtClick(pos.X, pos.Y);
+            }
             // Markers are tested before block framing so a double-click on a source pin opens the
             // detached window rather than zooming into the block under it.
             else if (isClick && TryHandlePortalMarkerClick(pos, popOut: _pressClickCount >= 2))

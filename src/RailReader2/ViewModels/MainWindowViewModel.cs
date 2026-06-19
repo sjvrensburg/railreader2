@@ -16,7 +16,7 @@ namespace RailReader2.ViewModels;
 /// <summary>The side-panel tabs, used by ShowPane for menu-driven pane navigation. The enum order
 /// matches the accordion's grid-row order (see <c>OutlinePanel</c>), so a section's row is just
 /// <c>(int)Pane</c> — keep new panes appended.</summary>
-public enum SidePane { Outline, Bookmarks, Index, Search, Comments, Portals }
+public enum SidePane { Outline, Bookmarks, Index, Search, Comments, Portals, TableReading }
 
 // Core infrastructure: fields, constructor, animation, invalidation, config, status toast.
 // See partial class files for: Documents, Navigation, Annotations, Search.
@@ -109,6 +109,12 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     }
 
     [ObservableProperty] private bool _showMinimap;
+
+    /// <summary>When armed (via the toolbar's "Start rail here" toggle), the next viewport click
+    /// force-activates rail mode at that point regardless of zoom — see <see cref="ActivateRailAtClick"/>.
+    /// Consumed (reset to false) by that click, by Escape, or by toggling the button off.</summary>
+    [ObservableProperty] private bool _armActivateRailClick;
+
     [ObservableProperty] private bool _showSettings;
     [ObservableProperty] private bool _showAbout;
     [ObservableProperty] private bool _showShortcuts;
@@ -826,6 +832,8 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     {
         InvalidateCamera();
         OnPropertyChanged(nameof(ActiveTab));
+        OnPropertyChanged(nameof(IsRailOnTable));
+        SyncTablePanelAutoOpen();
     }
 
     private void InvalidateNavigation()
@@ -834,6 +842,8 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         InvalidateOverlay();
         InvalidatePage();
         OnPropertyChanged(nameof(ActiveTab));
+        OnPropertyChanged(nameof(IsRailOnTable));
+        SyncTablePanelAutoOpen();
         RequestAnimationFrame();
     }
 

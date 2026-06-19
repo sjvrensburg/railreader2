@@ -1,0 +1,28 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:RailReader2.ViewModels"
+             x:Class="RailReader2.Views.TableReadingView"
+             x:DataType="vm:MainWindowViewModel">
+    <StackPanel Margin="8,6" Spacing="6">
+        <TextBlock Text="Reading aids for the table the rail is on."
+                   FontSize="11" Opacity="0.7" TextWrapping="Wrap" />
+
+        <TextBlock Text="Navigation" FontWeight="SemiBold" Margin="0,4,0,0" />
+        <StackPanel Orientation="Horizontal" Spacing="12">
+            <RadioButton Name="ModeCellRadio" GroupName="TableMode" Content="Cell by cell"
+                         ToolTip.Tip="Left/Right step through the cells of a row (rolls to the next/previous row at the edges)." />
+            <RadioButton Name="ModeRowRadio" GroupName="TableMode" Content="Row by row"
+                         ToolTip.Tip="Left/Right keep their normal block navigation; Up/Down move row to row." />
+        </StackPanel>
+
+        <TextBlock Text="Focus area" FontWeight="SemiBold" Margin="0,4,0,0" />
+        <StackPanel Spacing="2">
+            <RadioButton Name="ScopeCellRadio" GroupName="TableScope" Content="Cell" />
+            <RadioButton Name="ScopeRowRadio" GroupName="TableScope" Content="Row" />
+            <RadioButton Name="ScopeColumnRadio" GroupName="TableScope" Content="Column" />
+            <RadioButton Name="ScopeRowColRadio" GroupName="TableScope" Content="Row + column" />
+        </StackPanel>
+        <TextBlock Text="Shapes the line highlight (H) and focus dim (F) while reading a table. Column is inferred — accuracy varies on merged or irregular tables."
+                   FontSize="11" Opacity="0.6" TextWrapping="Wrap" />
+    </StackPanel>
+</UserControl>

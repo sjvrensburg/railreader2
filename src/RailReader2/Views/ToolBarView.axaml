@@ -35,6 +35,16 @@
 
             <Border Classes="toolSep" />
 
+            <!-- Start rail-reading wherever you click, at the current magnification (no zoom-in).
+                 Arm this, then click the line you want to start on. -->
+            <ToggleButton Name="RailHereButton" Classes="toolBtn"
+                          ToolTip.Tip="Start rail here — then click where to begin (rail-reads at the current zoom)"
+                          a:AutomationProperties.Name="Start rail reading here">
+                <c:Icon Data="{StaticResource IconRailHere}" />
+            </ToggleButton>
+
+            <Border Classes="toolSep" />
+
             <ToggleButton Name="AnnotateButton" Classes="toolBtn" ToolTip.Tip="Annotation Mode (Ctrl+E)"
                           a:AutomationProperties.Name="Annotation mode">
                 <c:Icon Data="{StaticResource IconAnnotate}" />
