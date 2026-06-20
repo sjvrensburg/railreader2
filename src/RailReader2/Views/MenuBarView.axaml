@@ -66,6 +66,8 @@
             </MenuItem>
         </MenuItem>
         <MenuItem Header="_Rail" IsEnabled="{Binding HasDocument}">
+            <MenuItem Header="Start Rail _Here" InputGesture="R" Click="OnStartRailHere" />
+            <Separator />
             <MenuItem Header="_Auto-Scroll" InputGesture="P" Click="OnToggleAutoScroll" />
             <MenuItem Header="_Jump Mode" InputGesture="J" Click="OnToggleJumpMode" />
             <Separator />

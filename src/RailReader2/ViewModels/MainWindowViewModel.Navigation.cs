@@ -155,6 +155,19 @@ public sealed partial class MainWindowViewModel
     /// viewport click force-activates rail mode at that point at the current zoom.</summary>
     public void ToggleArmActivateRailClick() => ArmActivateRailClick = !ArmActivateRailClick;
 
+    /// <summary>Click-free "start rail here" for the keyboard shortcut, Rail menu, screen readers, and
+    /// automation. The toolbar gesture arms a pointer click to pick the point; this resolves the point
+    /// itself — the viewport centre — so no pointer is needed (the accessibility/agentic entry point).
+    /// Toggles: if a forced activation is already in effect it is released (mirrors the Escape exit),
+    /// otherwise rail force-activates on the block nearest the viewport centre at the current zoom.</summary>
+    public void StartRailHere()
+    {
+        if (ActiveTab is null) return;
+        if (ForcedRailActive) { ExitForcedRail(); return; }
+        var (ww, wh) = _controller.GetViewportSize();
+        ActivateRailAtClick(ww / 2.0, wh / 2.0);
+    }
+
     /// <summary>True while rail is held active below the zoom threshold by a forced "start rail here"
     /// activation. Used to drive an Escape that releases it.</summary>
     public bool ForcedRailActive => _controller.ForcedRailActive;
