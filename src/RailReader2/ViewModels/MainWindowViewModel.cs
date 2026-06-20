@@ -511,6 +511,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     public void Dispose()
     {
         DisposePortalImages();
+        DisposeFreezeImages();
         _controller.Dispose();
     }
 

@@ -144,8 +144,11 @@ public sealed partial class MainWindowViewModel
             if (forward) _controller.HandleArrowDown(); else _controller.HandleArrowUp();
 
             // Still on the same table row-set with cells? Re-seat to the matching column and re-snap.
-            // (Leaving the table → different block → fall through, rail keeps reading.)
-            if (ReferenceEquals(rail.CurrentNavigableBlock, block)
+            // (Leaving the table → different block → fall through, rail keeps reading.) The
+            // NavigableCount guard matters because the advance may land on a not-yet-analyzed page
+            // where CurrentNavigableBlock would index an empty list and throw.
+            if (rail.NavigableCount > 0
+                && ReferenceEquals(rail.CurrentNavigableBlock, block)
                 && rail.CurrentCells is { Count: > 0 } cells)
             {
                 rail.CurrentCell = NearestCellIndex(cells, targetX);

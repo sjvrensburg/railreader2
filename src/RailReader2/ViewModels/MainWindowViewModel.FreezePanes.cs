@@ -91,12 +91,22 @@ public sealed partial class MainWindowViewModel
     /// (page/table changed); the caller still drains <paramref name="retired"/> for disposal.</summary>
     internal FreezeTiles? GetFreezeTiles(TabViewModel tab, out IReadOnlyList<SKImage> retired)
     {
-        if (_freezeBlock is null
-            || !ReferenceEquals(tab, ActiveTab)
-            || tab.State.CurrentPage != _freezePage
+        // Not frozen, or rendering a tab that isn't the active one (transient mid-switch) — skip
+        // without disturbing the freeze.
+        if (_freezeBlock is null || !ReferenceEquals(tab, ActiveTab))
+        {
+            retired = TakeRetired();
+            return null;
+        }
+
+        // The anchor no longer applies — navigated off the frozen page/table, exited rail, or a
+        // re-analysis replaced the block. Release the freeze so IsFrozen reflects reality instead of
+        // leaving the toggle stuck on "Unfreeze" with nothing pinned.
+        if (tab.State.CurrentPage != _freezePage
             || tab.Rail is not { Active: true, NavigableCount: > 0 } rail
             || !ReferenceEquals(rail.CurrentNavigableBlock, _freezeBlock))
         {
+            ClearFreeze();
             retired = TakeRetired();
             return null;
         }
@@ -187,5 +197,18 @@ public sealed partial class MainWindowViewModel
         var arr = _freezeRetired.ToArray();
         _freezeRetired.Clear();
         return arr;
+    }
+
+    /// <summary>Dispose all freeze crops (active + pending-retired) on VM teardown, so an active
+    /// freeze doesn't leak its SKImages at shutdown. Called from <see cref="Dispose"/>.</summary>
+    internal void DisposeFreezeImages()
+    {
+        _freezeCorner?.Dispose();
+        _freezeTop?.Dispose();
+        _freezeLeft?.Dispose();
+        _freezeCorner = _freezeTop = _freezeLeft = null;
+        foreach (var img in _freezeRetired) img.Dispose();
+        _freezeRetired.Clear();
+        _freezeBlock = null;
     }
 }
