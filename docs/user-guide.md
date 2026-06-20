@@ -12,20 +12,21 @@ Everything you need to know to get the most out of railreader2.
 4. [Auto-Scroll](#auto-scroll)
 5. [Jump Mode](#jump-mode)
 6. [Line Focus & Highlight](#line-focus--highlight)
-7. [Colour Effects](#colour-effects)
-8. [Search](#search)
-9. [Annotations](#annotations)
-10. [PDF Links](#pdf-links)
-11. [Text Selection](#text-selection)
-12. [Bookmarks](#bookmarks)
-13. [Index Pane](#index-pane)
-14. [Portals](#portals)
-15. [Copy as LaTeX (VLM)](#copy-as-latex-vlm)
-16. [CLI Tool](#cli-tool)
-17. [Settings](#settings)
-18. [Troubleshooting](#troubleshooting)
-19. [Keyboard Shortcuts](#keyboard-shortcuts)
-20. [Menu Bar](#menu-bar)
+7. [Table Reading (experimental)](#table-reading-experimental)
+8. [Colour Effects](#colour-effects)
+9. [Search](#search)
+10. [Annotations](#annotations)
+11. [PDF Links](#pdf-links)
+12. [Text Selection](#text-selection)
+13. [Bookmarks](#bookmarks)
+14. [Index Pane](#index-pane)
+15. [Portals](#portals)
+16. [Copy as LaTeX (VLM)](#copy-as-latex-vlm)
+17. [CLI Tool](#cli-tool)
+18. [Settings](#settings)
+19. [Troubleshooting](#troubleshooting)
+20. [Keyboard Shortcuts](#keyboard-shortcuts)
+21. [Menu Bar](#menu-bar)
 
 ---
 
@@ -200,6 +201,36 @@ Choose from five presets in Settings > Rail Reading:
 | **None** | No tint — line is highlighted by dimming only |
 
 Opacity is adjustable from 0.0 (invisible) to 1.0 (fully opaque). The default is Auto at 25% opacity.
+
+---
+
+## Table Reading (experimental)
+
+> **Experimental.** Table reading relies on best-effort cell detection. It works well on simple, well-ruled tables, but can misread dense or irregular ones — tables that group thousands with spaces (`1 288 272`), use dashes for empty cells, have merged or multi-row headers, or right-align their columns. Expect rough edges on complex tables.
+
+When the rail settles on a detected **table**, a **Table Reading** section opens automatically in the side panel (and your previous panel is restored when you leave the table). It offers three aids.
+
+### Cell navigation
+
+Choose how the arrow keys move within a table:
+
+- **Cell by cell** (default) — `Left`/`Right` step through the cells of a row, rolling to the next/previous row at the edges. `Down`/`Up` move to the cell **directly below/above in the same column**, like Excel. At the top or bottom row, `Down`/`Up` leave the table and continue reading.
+- **Row by row** — `Left`/`Right` keep their normal block navigation; `Down`/`Up` move from row to row.
+
+### Focus area
+
+While reading a table, the line highlight (`H`) and focus dim (`F`) can be shaped to a region instead of the whole line:
+
+- **Cell** — just the current cell
+- **Row** — the current row
+- **Column** — the current column
+- **Row + column** — both (a cross centred on the current cell)
+
+The focus area only chooses the *shape* — whether the tint and dim actually show is still controlled by the usual `H` (highlight) and `F` (focus dim) toggles. The column is **inferred** from the cell positions, so its accuracy varies on merged or irregular tables.
+
+### Freeze panes
+
+Freeze the rows **above** and the columns **left of** the current cell so they stay visible while you scroll through the rest of the table — exactly like Excel's *Freeze Panes*. Navigate to the cell you want as the top-left of the scrollable area, then click **Freeze here** in the Table Reading panel or press `Z`. The frozen header row and label column stay pinned, tracking the live table as you move. Click **Unfreeze** (or press `Z` again) to release; the freeze also clears when you leave the table.
 
 ---
 
