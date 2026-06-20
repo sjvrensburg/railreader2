@@ -150,8 +150,14 @@ public partial class DocumentView : UserControl
             Minimap.InvalidateVisual();
         }
         RenderPortalMarkers();   // a rail page cross changes which page's markers apply
+        RenderFreezePanes();     // a colour-effect / DPI change re-renders the page → refresh frozen tiles' effect too
         Viewport.NotifyAccessibilityStateChanged(); // page change → announce
     }
+
+    /// <summary>Re-send the freeze-panes overlay state. Called from the camera path (UpdateAllLayers)
+    /// and from RenderPage so a colour-effect change (which invalidates the page, not the camera)
+    /// repaints the frozen tiles with the new effect immediately rather than on the next navigation.</summary>
+    public void RenderFreezePanes() => FreezeLayer.UpdateState(BuildFreezePaneState(_tab));
 
     /// <summary>Re-send the portal marker overlay state (markers added/removed, accent moved, or page
     /// changed). Cheap: the page-space marker list is cached and only rebuilt when it actually changes.</summary>
@@ -197,7 +203,7 @@ public partial class DocumentView : UserControl
         OverlayLayer.UpdateState(BuildOverlayState(_tab));
         SearchLayer.UpdateState(BuildSearchState(_tab));
         AnnotationLayer.UpdateState(BuildAnnotationState(_tab));
-        FreezeLayer.UpdateState(BuildFreezePaneState(_tab));
+        RenderFreezePanes();
         PortalMarkerLayer.UpdateState(BuildPortalMarkerState(_tab));
     }
 
