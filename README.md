@@ -78,6 +78,15 @@ At high zoom levels, navigation switches to "rail mode" — the viewer locks ont
 - **Analysis indicator** — status bar shows "Analyzing..." during layout inference
 - **Configurable navigation** — choose which block types are navigable in rail mode via Settings → Advanced
 
+#### Table reading (experimental)
+
+> **Experimental.** Table reading relies on best-effort cell detection. It works well on simple, well-ruled tables but can misread dense or irregular ones — tables that group thousands with spaces (`1 288 272`), use dashes for empty cells, have merged or multi-row headers, or right-align their columns. Expect rough edges on complex tables.
+
+- **Table Reading panel** — when the rail settles on a detected table, a **Table Reading** section opens in the side panel with the controls below, and your previous panel is restored when you leave the table
+- **Cell-by-cell navigation** — in *Cell* mode, Left/Right step through the cells of a row (rolling to the next/previous row at the edges) and **Down/Up move to the cell directly below/above in the same column** (Excel-style); at the table's top/bottom they leave the table and read on. *Row* mode keeps Left/Right as block navigation and moves row-to-row with Up/Down
+- **Table focus aids** — a focus scope (Cell / Row / Column / Row + column) shapes the line highlight (H) and focus dim (F) while reading a table, so the current cell, row, and/or column stands out. The column is inferred (accuracy varies on merged or irregular tables)
+- **Freeze panes** — freeze at the current cell (the **Freeze** button in the Table Reading panel, or the `Z` key) to pin the rows **above** and columns **left of** that cell while you scroll the rest of the table, like Excel's *Freeze Panes*. Unfreeze (same button/key) to release; the freeze clears when you leave the table
+
 #### Visual comfort
 
 - **Colour effects** — GPU-accelerated accessibility filters (High Contrast, High Visibility, Amber, Invert) with adjustable intensity. Per-document: each tab keeps its own effect, persisted across sessions

@@ -117,6 +117,7 @@
         <li><a href="#auto-scroll">Auto-Scroll</a></li>
         <li><a href="#jump-mode">Jump Mode</a></li>
         <li><a href="#line-focus-highlight">Line Focus &amp; Highlight</a></li>
+        <li><a href="#table-reading">Table Reading <em>(experimental)</em></a></li>
         <li><a href="#colour-effects">Colour Effects</a></li>
         <li><a href="#search">Search</a></li>
         <li><a href="#annotations">Annotations</a></li>
@@ -442,6 +443,56 @@
       </ul>
       <p>
         Opacity is adjustable from 0.0 (invisible) to 1.0 (fully opaque). The default is Auto at 25% opacity.
+      </p>
+    </section>
+
+    <!-- 6b. Table Reading (experimental) -->
+    <section class="guide-section" id="table-reading">
+      <h2>Table Reading</h2>
+      <p>
+        <strong>Experimental.</strong> Table reading relies on best-effort cell detection. It works
+        well on simple, well-ruled tables, but can misread dense or irregular ones &mdash; tables that
+        group thousands with spaces (<code>1&nbsp;288&nbsp;272</code>), use dashes for empty cells,
+        have merged or multi-row headers, or right-align their columns. Expect rough edges on complex
+        tables.
+      </p>
+      <p>
+        When the rail settles on a detected <strong>table</strong>, a <strong>Table Reading</strong>
+        section opens automatically in the side panel (your previous panel is restored when you leave
+        the table). It offers three aids.
+      </p>
+
+      <h3>Cell navigation</h3>
+      <ul>
+        <li><strong>Cell by cell</strong> (default) &mdash; <code>Left</code>/<code>Right</code> step
+          through the cells of a row, rolling to the next/previous row at the edges.
+          <code>Down</code>/<code>Up</code> move to the cell <strong>directly below/above in the same
+          column</strong>, like Excel. At the top or bottom row, <code>Down</code>/<code>Up</code>
+          leave the table and continue reading.</li>
+        <li><strong>Row by row</strong> &mdash; <code>Left</code>/<code>Right</code> keep their normal
+          block navigation; <code>Down</code>/<code>Up</code> move from row to row.</li>
+      </ul>
+
+      <h3>Focus area</h3>
+      <p>
+        While reading a table, the line highlight (<code>H</code>) and focus dim (<code>F</code>) can
+        be shaped to a region instead of the whole line: <strong>Cell</strong>, <strong>Row</strong>,
+        <strong>Column</strong>, or <strong>Row&nbsp;+&nbsp;column</strong> (a cross centred on the
+        current cell). The focus area only chooses the <em>shape</em> &mdash; whether the tint and dim
+        actually show is still controlled by the usual <code>H</code> and <code>F</code> toggles. The
+        column is <strong>inferred</strong> from cell positions, so its accuracy varies on merged or
+        irregular tables.
+      </p>
+
+      <h3>Freeze panes</h3>
+      <p>
+        Freeze the rows <strong>above</strong> and the columns <strong>left of</strong> the current
+        cell so they stay visible while you scroll through the rest of the table &mdash; exactly like
+        Excel's <em>Freeze Panes</em>. Navigate to the cell you want as the top-left of the scrollable
+        area, then click <strong>Freeze here</strong> in the Table Reading panel or press
+        <code>Z</code>. The frozen header row and label column stay pinned, tracking the live table as
+        you move. Click <strong>Unfreeze</strong> (or press <code>Z</code> again) to release; the
+        freeze also clears when you leave the table.
       </p>
     </section>
 
