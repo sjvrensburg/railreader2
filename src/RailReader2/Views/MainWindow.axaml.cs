@@ -433,8 +433,13 @@ public partial class MainWindow : Window
         switch (e.Key)
         {
             case Key.Down or Key.S:
+                // Cell mode on a table: plain Down steps to the cell directly below (Excel-style).
+                if (!e.KeyModifiers.HasFlag(KeyModifiers.Shift) && vm.TryHandleCellVertical(forward: true))
+                { e.Handled = true; return true; }
                 vm.HandleArrowDown(); e.Handled = true; return true;
             case Key.Up or Key.W:
+                if (!e.KeyModifiers.HasFlag(KeyModifiers.Shift) && vm.TryHandleCellVertical(forward: false))
+                { e.Handled = true; return true; }
                 vm.HandleArrowUp(); e.Handled = true; return true;
             case Key.Right:
                 // Cell mode on a table: plain Right steps cells; Shift+Right stays a fine pan (inspect).
@@ -467,6 +472,9 @@ public partial class MainWindow : Window
                 vm.ToggleLineFocusBlur(); e.Handled = true; return true;
             case Key.H:
                 vm.ToggleLineHighlight(); RailToolBar.UpdateToggleStates(); e.Handled = true; return true;
+            case Key.Z when vm.CanFreeze || vm.IsFrozen:
+                // Table freeze-panes: pin rows above + columns left of the current cell (Excel-style).
+                vm.ToggleFreeze(); e.Handled = true; return true;
             case Key.OemOpenBrackets when e.KeyModifiers == (KeyModifiers.Control | KeyModifiers.Shift):
                 RailToolBar.AdjustBlur(-0.01); e.Handled = true; return true;
             case Key.OemCloseBrackets when e.KeyModifiers == (KeyModifiers.Control | KeyModifiers.Shift):

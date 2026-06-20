@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using RailReader.Core.Models;
 using RailReader2.Services;
 
@@ -58,6 +60,7 @@ public sealed partial class MainWindowViewModel
         _autoOpenedTablePanel = false;     // don't auto-close a panel we didn't open for this tab
         _paneBeforeTable = null;
         ArmActivateRailClick = false;      // a pending click-to-rail shouldn't carry to another tab
+        ClearFreeze();                     // a freeze belongs to one document; don't leak it across tabs
     }
 
     /// <summary>Open the side panel to the Table Reading section when the rail seats on a table, and
@@ -85,7 +88,10 @@ public sealed partial class MainWindowViewModel
             if (_autoOpenedTablePanel)
                 ShowOutline = false;
             _autoOpenedTablePanel = false;
+            ClearFreeze(); // freeze is a per-table aid — release it when the rail leaves the table
         }
+
+        OnPropertyChanged(nameof(CanFreeze));
     }
 
     /// <summary>True when the rail is currently seated on a <see cref="BlockRole.Table"/> block — drives
@@ -112,6 +118,58 @@ public sealed partial class MainWindowViewModel
             InvalidateNavigation, animate: true);
         // If Core reported the move didn't apply (no cells on this line), let the caller fall back.
         return stepped;
+    }
+
+    /// <summary>
+    /// Excel-style vertical cell navigation: in cell mode on a table, Down/Up move to the cell in the
+    /// *same column* of the next/previous row (rather than the row's first cell). We advance the row
+    /// through the normal controller path — which keeps all block/page-edge handling — then re-seat the
+    /// cell to the column nearest the one we left and re-snap. Returns true when handled (the caller
+    /// then skips its own line nav). Returns false outside cell mode / off a table so the caller runs
+    /// the usual <see cref="HandleArrowDown"/>/<see cref="HandleArrowUp"/>. At the table's top/bottom the
+    /// row advance leaves the table block and re-seating is skipped, so the rail keeps reading onward.
+    /// </summary>
+    public bool TryHandleCellVertical(bool forward)
+    {
+        if (IsScanAllActive) return false;
+        if (TableNavMode != TableNavMode.Cell) return false;
+        if (ActiveTab?.Rail is not { Active: true, HasAnalysis: true, HasCells: true } rail) return false;
+        if (rail.CurrentNavigableBlock.Role != BlockRole.Table) return false;
+        if (rail.CurrentCellInfo is not { } cell) return false;
+
+        var block = rail.CurrentNavigableBlock;
+        float targetX = cell.CenterX;
+        Dispatch(() =>
+        {
+            if (forward) _controller.HandleArrowDown(); else _controller.HandleArrowUp();
+
+            // Still on the same table row-set with cells? Re-seat to the matching column and re-snap.
+            // (Leaving the table → different block → fall through, rail keeps reading.)
+            if (ReferenceEquals(rail.CurrentNavigableBlock, block)
+                && rail.CurrentCells is { Count: > 0 } cells)
+            {
+                rail.CurrentCell = NearestCellIndex(cells, targetX);
+                var cam = ActiveTab!.Camera;
+                var (ww, wh) = _controller.GetViewportSize();
+                rail.StartSnapToCell(cam.OffsetX, cam.OffsetY, cam.Zoom, ww, wh);
+            }
+        }, InvalidateNavigation, animate: true);
+        return true;
+    }
+
+    /// <summary>Index of the cell whose centre is horizontally nearest <paramref name="targetX"/> —
+    /// preserves the visual column across rows (robust on ragged tables where inferred column bands
+    /// may be wrong).</summary>
+    private static int NearestCellIndex(IReadOnlyList<CellInfo> cells, float targetX)
+    {
+        int best = 0;
+        float bestDist = float.MaxValue;
+        for (int i = 0; i < cells.Count; i++)
+        {
+            float d = Math.Abs(cells[i].CenterX - targetX);
+            if (d < bestDist) { bestDist = d; best = i; }
+        }
+        return best;
     }
 
     /// <summary>The focus scope actually used for rendering: in row-by-row mode there is no current

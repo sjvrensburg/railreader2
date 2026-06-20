@@ -25,6 +25,9 @@
             <v:SearchHighlightLayer Name="SearchLayer" />
             <v:AnnotationLayer Name="AnnotationLayer" />
             <v:RailOverlayLayer Name="OverlayLayer" />
+            <!-- Table freeze-panes: rows above + columns left of the frozen cell, pinned over the page.
+                 Above the overlay so the table focus-dim doesn't dim the frozen tiles. -->
+            <v:FreezePaneLayer Name="FreezeLayer" />
             <!-- Always-on portal markers (gutter for sources, corner badge for targets) on top. -->
             <v:PortalMarkerLayer Name="PortalMarkerLayer" />
         </v:ViewportPanel>

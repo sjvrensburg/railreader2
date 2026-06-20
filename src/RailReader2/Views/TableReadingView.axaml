@@ -24,5 +24,11 @@
         </StackPanel>
         <TextBlock Text="Shapes the line highlight (H) and focus dim (F) while reading a table. Column is inferred — accuracy varies on merged or irregular tables."
                    FontSize="11" Opacity="0.6" TextWrapping="Wrap" />
+
+        <TextBlock Text="Freeze panes" FontWeight="SemiBold" Margin="0,8,0,0" />
+        <Button Name="FreezeButton" HorizontalAlignment="Stretch" Content="Freeze here"
+                ToolTip.Tip="Pin the rows above and columns to the left of the current cell (Excel-style). Click again to unfreeze. Shortcut: Z" />
+        <TextBlock Text="Keeps the rows above and columns left of the current cell visible while you scroll through the rest of the table."
+                   FontSize="11" Opacity="0.6" TextWrapping="Wrap" />
     </StackPanel>
 </UserControl>

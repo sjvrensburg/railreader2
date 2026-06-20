@@ -190,13 +190,14 @@ public partial class DocumentView : UserControl
             tab.OnDpiRenderComplete = () => _shared.RequestAnimationFrame();
     }
 
-    /// <summary>Sends fresh state to all four composition layer handlers.</summary>
+    /// <summary>Sends fresh state to all composition layer handlers.</summary>
     private void UpdateAllLayers()
     {
         PageLayer.UpdateState(BuildPageState(_tab));
         OverlayLayer.UpdateState(BuildOverlayState(_tab));
         SearchLayer.UpdateState(BuildSearchState(_tab));
         AnnotationLayer.UpdateState(BuildAnnotationState(_tab));
+        FreezeLayer.UpdateState(BuildFreezePaneState(_tab));
         PortalMarkerLayer.UpdateState(BuildPortalMarkerState(_tab));
     }
 
@@ -327,6 +328,42 @@ public partial class DocumentView : UserControl
             TableDimIntensity: (float)vm.AppConfig.LineFocusBlurIntensity,
             TableCell: tableCell,
             TableColumn: tableColumn);
+    }
+
+    private static readonly FreezePaneRenderState EmptyFreeze =
+        new(null, null, null, default, default, default, ColourEffect.None, 0f, null);
+
+    /// <summary>Builds the table freeze-panes overlay state: pulls the (lazily rendered) crop images
+    /// from the VM, forwards any retired crops to the layer for composition-thread disposal, and maps
+    /// the three page-space regions to screen-space destination rects (pinned to the table's top-left,
+    /// clamped to the viewport; the top band tracks horizontal scroll, the left band vertical).</summary>
+    private FreezePaneRenderState BuildFreezePaneState(TabViewModel? tab)
+    {
+        var vm = _shared!;
+        if (tab is null) return EmptyFreeze;
+
+        var tiles = vm.GetFreezeTiles(tab, out var retired);
+        foreach (var img in retired)
+            if (!FreezeLayer.TrySendMessage(new RetireImage(img)))
+                img.Dispose();
+
+        if (tiles is not { } t) return EmptyFreeze;
+
+        var cam = BuildCamera(tab);
+        float zoom = cam.ScaleX, ox = cam.TransX, oy = cam.TransY;
+
+        float pinX = Math.Max(0f, t.CornerBox.X * zoom + ox);
+        float pinY = Math.Max(0f, t.CornerBox.Y * zoom + oy);
+
+        return new FreezePaneRenderState(
+            t.Corner, t.Top, t.Left,
+            Dst(t.CornerBox, zoom, pinX, pinY),                  // static at the pin
+            Dst(t.TopBox, zoom, t.TopBox.X * zoom + ox, pinY),   // tracks horizontal scroll
+            Dst(t.LeftBox, zoom, pinX, t.LeftBox.Y * zoom + oy), // tracks vertical scroll
+            vm.Controller.ActiveColourEffect, vm.Controller.ActiveColourIntensity, vm.ColourEffects);
+
+        static SKRect Dst(BBox box, float zoom, float x, float y)
+            => SKRect.Create(x, y, box.W * zoom, box.H * zoom);
     }
 
     private AnnotationRenderState BuildAnnotationState(TabViewModel? tab)
