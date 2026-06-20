@@ -31,6 +31,8 @@ public partial class TableReadingView : UserControl
         ScopeColumnRadio.IsCheckedChanged += (_, _) => Apply(() => _vm!.TableFocusScope = TableFocusScope.Column, ScopeColumnRadio);
         ScopeRowColRadio.IsCheckedChanged += (_, _) => Apply(() => _vm!.TableFocusScope = TableFocusScope.RowAndColumn, ScopeRowColRadio);
 
+        FreezeButton.Click += (_, _) => _vm?.ToggleFreeze();
+
         DataContextChanged += OnDataContextChanged;
     }
 
@@ -72,6 +74,16 @@ public partial class TableReadingView : UserControl
         if (e.PropertyName is nameof(MainWindowViewModel.TableNavMode)
             or nameof(MainWindowViewModel.TableFocusScope))
             SyncFromVm();
+        else if (e.PropertyName is nameof(MainWindowViewModel.IsFrozen)
+            or nameof(MainWindowViewModel.CanFreeze))
+            UpdateFreezeButton();
+    }
+
+    private void UpdateFreezeButton()
+    {
+        if (_vm is null) return;
+        FreezeButton.Content = _vm.IsFrozen ? "Unfreeze" : "Freeze here";
+        FreezeButton.IsEnabled = _vm.IsFrozen || _vm.CanFreeze;
     }
 
     private void SyncFromVm()
@@ -87,6 +99,7 @@ public partial class TableReadingView : UserControl
             ScopeRowRadio.IsChecked = _vm.TableFocusScope == TableFocusScope.Row;
             ScopeColumnRadio.IsChecked = _vm.TableFocusScope == TableFocusScope.Column;
             ScopeRowColRadio.IsChecked = _vm.TableFocusScope == TableFocusScope.RowAndColumn;
+            UpdateFreezeButton();
         }
         finally
         {
