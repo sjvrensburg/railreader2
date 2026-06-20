@@ -122,11 +122,13 @@
             </Grid>
 
             <TextBlock Text="Pan (below zoom threshold)" FontWeight="Bold" />
-            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" Margin="8,0">
+            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" Margin="8,0">
                 <TextBlock Grid.Row="0" Grid.Column="0" Text="Arrows/WASD" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
                 <TextBlock Grid.Row="0" Grid.Column="1" Text="Pan" Margin="0,2" />
                 <TextBlock Grid.Row="1" Grid.Column="0" Text="Click+drag" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
                 <TextBlock Grid.Row="1" Grid.Column="1" Text="Pan" Margin="0,2" />
+                <TextBlock Grid.Row="2" Grid.Column="0" Text="R" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="2" Grid.Column="1" Text="Start rail here at the current zoom (press again or Escape to exit)" Margin="0,2" />
             </Grid>
 
             <TextBlock Text="Annotations" FontWeight="Bold" />

@@ -456,6 +456,9 @@ public partial class MainWindow : Window
                 vm.ToggleAutoScrollExclusive(); e.Handled = true; return true;
             case Key.J:
                 vm.ToggleJumpModeExclusive(); e.Handled = true; return true;
+            case Key.R:
+                // Click-free "start rail here" — force rail at the viewport centre (toggles off if forced).
+                vm.StartRailHere(); e.Handled = true; return true;
             case Key.C:
             {
                 var effect = vm.CycleColourEffect();
