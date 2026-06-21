@@ -224,8 +224,9 @@ public partial class MainWindow : Window
                 UpdatePortalWindow(vm);
                 break;
             case nameof(MainWindowViewModel.CurrentFontSize):
-                // Live UI font-scale change from Settings — reach the open pop-out window too.
+                // Live UI font-scale change from Settings — reach the open pop-out + tear-off windows too.
                 _portalWindow?.ApplyFontScale(vm.CurrentFontSize);
+                foreach (var win in _documentWindows) win.ApplyFontScale(vm.CurrentFontSize);
                 break;
             case nameof(MainWindowViewModel.IsFullScreen):
                 WindowState = vm.IsFullScreen ? WindowState.FullScreen : WindowState.Normal;

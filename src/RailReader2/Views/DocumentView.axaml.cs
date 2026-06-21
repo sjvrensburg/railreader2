@@ -134,6 +134,27 @@ public partial class DocumentView : UserControl, IViewportSurface
             _images = null;
             _ownsImages = false;
         }
+        // Drop references so a late event (a queued pointer / size change during the reparent or
+        // close) can't reach a removed/disposed Core viewport through OwnerView → SurfaceViewport.
+        Viewport.OwnerView = null;
+        _viewport = null;
+    }
+
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+        // Re-parenting (e.g. moving a docked split pane into a tear-off window) tears down each
+        // composition layer's visual and recreates it empty on re-attach (CompositionLayerControl
+        // nulls its visual on detach). A static pane produces no TickResult change, so the frame
+        // loop won't repaint it — re-push this surface's full state here so it isn't blank until a
+        // later resize/interaction. No-op on the initial attach: _viewport is still null then
+        // (Initialize runs afterwards and pushes state itself).
+        if (_shared is not null && _viewport is not null)
+        {
+            UpdatePagePanelSize(_tab);
+            UpdateAllLayers();
+            Minimap.InvalidateVisual();
+        }
     }
 
     // ── IViewportSurface ──────────────────────────────────────────────────────────

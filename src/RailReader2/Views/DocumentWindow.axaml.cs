@@ -31,6 +31,11 @@ public partial class DocumentWindow : Window
         HostPanel.Children.Add(view);
     }
 
+    /// <summary>Apply the app's scaled font size (<c>MainWindowViewModel.CurrentFontSize</c>); the hosted
+    /// DocumentView's chrome (toolbar / status text) inherits it. Called on creation and again from
+    /// MainWindow's CurrentFontSize property-change case so a live Settings change reaches the window.</summary>
+    public void ApplyFontScale(double uiFontSize) => FontSize = uiFontSize;
+
     protected override void OnKeyDown(KeyEventArgs e)
     {
         if (KeyHandler?.Invoke(e) == true) return;
