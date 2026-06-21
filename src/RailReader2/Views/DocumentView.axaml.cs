@@ -89,6 +89,7 @@ public partial class DocumentView : UserControl, IViewportSurface
         _images = tab?.PrimaryImages;
 
         Viewport.ViewModel = shared;
+        Viewport.OwnerView = this; // so screen↔page mapping uses THIS pane's viewport camera
         Minimap.ViewModel = shared;
         ToolBar.ViewModel = shared;
 

@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
+using RailReader.Core;
 using RailReader.Core.Models;
 using RailReader2.Services;
 using RailReader2.ViewModels;
@@ -12,6 +13,16 @@ namespace RailReader2.Views;
 public class ViewportPanel : Panel
 {
     public MainWindowViewModel? ViewModel { get; set; }
+
+    /// <summary>The DocumentView hosting this panel. Its viewport's camera is the one this panel must
+    /// use for screen↔page mapping — so clicks/selection in a split pane / tear-off window map through
+    /// that pane's own camera, not the document's primary. Set by <c>DocumentView.Initialize</c>.</summary>
+    public DocumentView? OwnerView { get; set; }
+
+    /// <summary>This panel's viewport camera (its DocumentView's), falling back to the active tab's
+    /// primary camera before the owner is wired or when there is no document.</summary>
+    private Camera? ActiveCamera => OwnerView?.SurfaceViewport?.Camera ?? ViewModel?.ActiveTab?.Camera;
+
     private bool _dragging;
     private Point _lastPos;
     private Point _pressPos;
@@ -440,10 +451,10 @@ public class ViewportPanel : Panel
 
     private (double PageX, double PageY) ScreenToPage(Point screenPos)
     {
-        if (ViewModel?.ActiveTab is not { } tab)
+        if (ActiveCamera is not { } cam)
             return (screenPos.X, screenPos.Y);
-        double pageX = (screenPos.X - tab.Camera.OffsetX) / tab.Camera.Zoom;
-        double pageY = (screenPos.Y - tab.Camera.OffsetY) / tab.Camera.Zoom;
+        double pageX = (screenPos.X - cam.OffsetX) / cam.Zoom;
+        double pageY = (screenPos.Y - cam.OffsetY) / cam.Zoom;
         return (pageX, pageY);
     }
 
@@ -451,11 +462,11 @@ public class ViewportPanel : Panel
     /// a marker was clicked and acted on, so the normal click handler is skipped.</summary>
     private bool TryHandlePortalMarkerClick(Point screenPos, bool popOut)
     {
-        if (ViewModel is not { } vm || vm.ActiveTab is not { } tab) return false;
+        if (ViewModel is not { } vm || vm.ActiveTab is null || ActiveCamera is not { } cam) return false;
         var markers = vm.BuildPortalMarkers();
         if (markers.Count == 0) return false;
 
-        double zoom = tab.Camera.Zoom, ox = tab.Camera.OffsetX, oy = tab.Camera.OffsetY;
+        double zoom = cam.Zoom, ox = cam.OffsetX, oy = cam.OffsetY;
         const double maxSq = PortalMarkerGeometry.HitRadius * PortalMarkerGeometry.HitRadius;
         PortalMarker? hit = null;
         double bestSq = maxSq;
