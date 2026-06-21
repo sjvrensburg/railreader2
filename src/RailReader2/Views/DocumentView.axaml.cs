@@ -1,9 +1,15 @@
+using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input;
+using Avalonia.Interactivity;
 using RailReader.Core;
 using RailReader.Core.Models;
 using RailReader.Renderer.Skia;
 using RailReader2.ViewModels;
 using SkiaSharp;
+// The x:Name="Viewport" control (ViewportPanel) collides with the Core Viewport type;
+// alias the type so per-view references are unambiguous.
+using CoreViewport = RailReader.Core.Viewport;
 
 namespace RailReader2.Views;
 
@@ -17,10 +23,24 @@ namespace RailReader2.Views;
 /// This was extracted verbatim from MainWindow so a DocumentView can later be instantiated
 /// per Dock document; behaviour for the single-active case is unchanged.
 /// </summary>
-public partial class DocumentView : UserControl
+public partial class DocumentView : UserControl, IViewportSurface
 {
     private MainWindowViewModel? _shared;
     private TabViewModel? _tab;
+    // True when _images is owned by this view (a detached/secondary surface created its own) and
+    // must be disposed on rebind/teardown; false when borrowed from _tab.PrimaryImages (the primary
+    // surface shares the document's images with the minimap and must NOT dispose them).
+    private bool _ownsImages;
+    // A freshly-bound secondary viewport that had no layout size yet: centre it on first SizeChanged.
+    private bool _pendingCenter;
+    // The viewport this surface renders. Today always the tab's Primary view; a split-pane /
+    // tear-off surface will render a detached viewport of the same document (multi-viewport).
+    // Per-view geometry (camera/rail/page/dims) is read from here; model + focused state
+    // (annotations, analysis cache, selection, search, display prefs) stays on _tab / _shared.
+    private CoreViewport? _viewport;
+    // Per-view GPU-image lifecycle for _viewport (shared with the minimap via _tab.PrimaryImages
+    // while _viewport is the Primary view; a detached surface gets its own).
+    private ViewportImages? _images;
     private bool _wired;
 
     // Minimap-redraw throttle: skip imperceptible sub-pixel indicator moves.
@@ -65,15 +85,25 @@ public partial class DocumentView : UserControl
     {
         _shared = shared;
         _tab = tab;
+        _viewport = tab?.State.Primary;
+        _images = tab?.PrimaryImages;
 
         Viewport.ViewModel = shared;
+        Viewport.OwnerView = this; // so screen↔page mapping uses THIS pane's viewport camera
         Minimap.ViewModel = shared;
+        Minimap.OwnerView = this; // so the minimap reflects + drives THIS pane's viewport, not the primary
         ToolBar.ViewModel = shared;
 
+        _ownsImages = false; // borrowing tab.PrimaryImages (shared with the minimap)
         shared.SetViewportSize(Viewport.Bounds.Width, Viewport.Bounds.Height);
         if (!_wired)
         {
             Viewport.SizeChanged += OnViewportSizeChanged;
+            // A press anywhere in this pane makes it the focused surface (input routes here). Tunnel +
+            // handledEventsToo so it fires even when ViewportPanel marks the event handled for its own
+            // drag/click logic.
+            Viewport.AddHandler(InputElement.PointerPressedEvent, OnViewportPressedForFocus,
+                RoutingStrategies.Tunnel, handledEventsToo: true);
             _wired = true;
         }
 
@@ -82,10 +112,10 @@ public partial class DocumentView : UserControl
         // window.Opened (which calls OpenDocument) can fire before this finishes wiring.
         // If a tab is already present, re-center and push fresh state now that layout
         // is complete (CenterPage previously ran with the wrong viewport size).
-        if (tab is not null && Viewport.Bounds.Width > 0)
+        if (_viewport is { } vp && Viewport.Bounds.Width > 0)
         {
-            tab.CenterPage(Viewport.Bounds.Width, Viewport.Bounds.Height);
-            tab.UpdateRailZoom(Viewport.Bounds.Width, Viewport.Bounds.Height);
+            vp.CenterPage(Viewport.Bounds.Width, Viewport.Bounds.Height);
+            vp.UpdateRailZoom(Viewport.Bounds.Width, Viewport.Bounds.Height);
             UpdatePagePanelSize(tab);
             UpdateLayerBindings(tab);
         }
@@ -96,8 +126,97 @@ public partial class DocumentView : UserControl
         if (_wired)
         {
             Viewport.SizeChanged -= OnViewportSizeChanged;
+            Viewport.RemoveHandler(InputElement.PointerPressedEvent, OnViewportPressedForFocus);
             _wired = false;
         }
+        if (_ownsImages)
+        {
+            _images?.Dispose();
+            _images = null;
+            _ownsImages = false;
+        }
+        // Drop references so a late event (a queued pointer / size change during the reparent or
+        // close) can't reach a removed/disposed Core viewport through OwnerView → SurfaceViewport.
+        Viewport.OwnerView = null;
+        Minimap.OwnerView = null;
+        _viewport = null;
+    }
+
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+        // Re-parenting (e.g. moving a docked split pane into a tear-off window) tears down each
+        // composition layer's visual and recreates it empty on re-attach (CompositionLayerControl
+        // nulls its visual on detach). A static pane produces no TickResult change, so the frame
+        // loop won't repaint it — re-push this surface's full state here so it isn't blank until a
+        // later resize/interaction. No-op on the initial attach: _viewport is still null then
+        // (Initialize runs afterwards and pushes state itself).
+        if (_shared is not null && _viewport is not null)
+        {
+            UpdatePagePanelSize(_tab);
+            UpdateAllLayers();
+            Minimap.InvalidateVisual();
+        }
+    }
+
+    // ── IViewportSurface ──────────────────────────────────────────────────────────
+
+    /// <summary>The Core viewport this surface renders (per-view camera/rail/page), or null.</summary>
+    public CoreViewport? SurfaceViewport => _viewport;
+
+    public (double Width, double Height) SurfaceSize => (Viewport.Bounds.Width, Viewport.Bounds.Height);
+
+    /// <summary>This surface's GPU image wraps, for its OWN embedded minimap: a detached pane owns its
+    /// <see cref="ViewportImages"/>, the primary borrows the document's. Null before binding.</summary>
+    internal SKImage? SurfaceMinimapImage => _images?.MinimapImage;
+    internal SKImage? SurfacePageImage => _images?.CachedImage;
+
+    public void SetFocusedVisual(bool focused)
+        => FocusBorder.BorderThickness = new Thickness(focused ? 2 : 0);
+
+    /// <summary>Render this surface against a specific viewport of the active document (a split pane /
+    /// tear-off window), with its own <see cref="ViewportImages"/>. The model state (annotations,
+    /// analysis cache, prefs) stays on <see cref="Tab"/>; only the per-view geometry + page images move.
+    /// Disposes the previously-owned images if any.</summary>
+    public void BindViewport(CoreViewport vp, ViewportImages images, bool ownsImages)
+    {
+        if (_ownsImages && _images is { } old && !ReferenceEquals(old, images))
+            old.Dispose();
+        _viewport = vp;
+        _images = images;
+        _ownsImages = ownsImages;
+
+        // A detached viewport needs its own wake hooks: Core sets DpiRenderReady / fires the analysis
+        // fan-out off the UI thread, and only an animation frame picks those up. (The primary view's
+        // equivalent is wired via tab.OnDpiRenderComplete in Initialize.)
+        if (_shared is { } vm)
+        {
+            vp.OnDpiRenderComplete = () => vm.RequestAnimationFrame();
+            vp.RequestAnimation = () => vm.RequestAnimationFrame();
+        }
+
+        var (ww, wh) = (Viewport.Bounds.Width, Viewport.Bounds.Height);
+        if (ww > 0 && wh > 0)
+        {
+            vp.SetSize(ww, wh);
+            vp.CenterPage(ww, wh);
+            vp.UpdateRailZoom(ww, wh);
+            _pendingCenter = false;
+        }
+        else
+        {
+            // Not laid out yet (a freshly-created pane); centre on the first SizeChanged.
+            _pendingCenter = true;
+        }
+        UpdatePagePanelSize(_tab);
+        UpdateAllLayers();
+        Minimap.InvalidateVisual();
+    }
+
+    private void OnViewportPressedForFocus(object? sender, PointerPressedEventArgs e)
+    {
+        if (_shared is { } vm && _viewport is { } vp)
+            vm.FocusSurface(this, vp);
     }
 
     /// <summary>Switch the rendered tab (active document changed).</summary>
@@ -120,7 +239,12 @@ public partial class DocumentView : UserControl
         // would otherwise call OnDpiRenderComplete and schedule a wasted animation frame.
         if (_tab is { } prev)
             prev.OnDpiRenderComplete = null;
+        if (_ownsImages)
+            _images?.Dispose();
         _tab = tab;
+        _viewport = tab?.State.Primary;
+        _images = tab?.PrimaryImages;
+        _ownsImages = false; // borrowing tab.PrimaryImages
         UpdateLayerBindings(tab);
         UpdatePagePanelSize(tab);
         Minimap.InvalidateVisual();
@@ -178,13 +302,29 @@ public partial class DocumentView : UserControl
     private void OnViewportSizeChanged(object? sender, SizeChangedEventArgs e)
     {
         if (_shared is null) return;
-        _shared.SetViewportSize(Viewport.Bounds.Width, Viewport.Bounds.Height);
-        if (_tab is { } tab)
+        var (ww, wh) = (Viewport.Bounds.Width, Viewport.Bounds.Height);
+        if (_viewport is { } vp)
         {
-            var (ww, wh) = (Viewport.Bounds.Width, Viewport.Bounds.Height);
-            tab.ClampCamera(ww, wh);
-            UpdatePagePanelSize(tab);
+            // Per-view size → correct ReadingPosition.HorizontalFraction for this surface.
+            vp.SetSize(ww, wh);
+            // The controller's ambient size (input geometry + tick/clamp) tracks the focused surface;
+            // update it when we are the focused one. The frame loop swaps it per surface while ticking.
+            if (ReferenceEquals(vp, _shared.Controller.FocusedViewport))
+                _shared.SetViewportSize(ww, wh);
+            if (_pendingCenter)
+            {
+                // First layout of a freshly-bound pane: fit/centre it now that it has bounds.
+                vp.CenterPage(ww, wh);
+                vp.UpdateRailZoom(ww, wh);
+                _pendingCenter = false;
+            }
+            vp.ClampCamera(ww, wh);
+            UpdatePagePanelSize(_tab);
             UpdateAllLayers();
+        }
+        else
+        {
+            _shared.SetViewportSize(ww, wh);
         }
     }
 
@@ -215,51 +355,51 @@ public partial class DocumentView : UserControl
     /// </summary>
     private void UpdatePagePanelSize(TabViewModel? tab)
     {
-        if (tab is null)
+        if (_viewport is not { } vp)
         {
             PagePanel.Width = 0;
             PagePanel.Height = 0;
             return;
         }
 
-        PagePanel.Width = tab.PageWidth;
-        PagePanel.Height = tab.PageHeight;
+        PagePanel.Width = vp.PageWidth;
+        PagePanel.Height = vp.PageHeight;
 
         // The minimap is ≤200×280px — sub-pixel viewport indicator movement is
         // invisible. Use thresholds large enough to skip redraws during smooth
         // scrolling frames where the visual change is imperceptible.
-        if (Math.Abs(tab.Camera.OffsetX - _lastMinimapOx) > 24.0 ||
-            Math.Abs(tab.Camera.OffsetY - _lastMinimapOy) > 24.0 ||
-            Math.Abs(tab.Camera.Zoom - _lastMinimapZoom) > 0.02)
+        if (Math.Abs(vp.Camera.OffsetX - _lastMinimapOx) > 24.0 ||
+            Math.Abs(vp.Camera.OffsetY - _lastMinimapOy) > 24.0 ||
+            Math.Abs(vp.Camera.Zoom - _lastMinimapZoom) > 0.02)
         {
-            _lastMinimapOx = tab.Camera.OffsetX;
-            _lastMinimapOy = tab.Camera.OffsetY;
-            _lastMinimapZoom = tab.Camera.Zoom;
+            _lastMinimapOx = vp.Camera.OffsetX;
+            _lastMinimapOy = vp.Camera.OffsetY;
+            _lastMinimapZoom = vp.Camera.Zoom;
             Minimap.InvalidateVisual();
         }
     }
 
     // ── State builders ──────────────────────────────────────────────────────────
 
-    private static SKMatrix BuildCamera(TabViewModel? tab)
+    private static SKMatrix BuildCamera(CoreViewport? vp)
     {
-        if (tab is null) return SKMatrix.Identity;
-        float zoom = (float)tab.Camera.Zoom;
+        if (vp is null) return SKMatrix.Identity;
+        float zoom = (float)vp.Camera.Zoom;
         return SKMatrix.CreateScaleTranslation(
-            zoom, zoom, (float)tab.Camera.OffsetX, (float)tab.Camera.OffsetY);
+            zoom, zoom, (float)vp.Camera.OffsetX, (float)vp.Camera.OffsetY);
     }
 
     private PdfPageRenderState BuildPageState(TabViewModel? tab)
     {
         var vm = _shared!;
         float lineY = 0, lineH = 0;
-        if (tab?.Rail is { Active: true, NavigableCount: > 0 })
+        if (_viewport?.Rail is { Active: true, NavigableCount: > 0 })
         {
-            var line = tab.Rail.CurrentLineInfo;
+            var line = _viewport.Rail.CurrentLineInfo;
             lineY = line.Y;
             lineH = line.Height;
         }
-        var (image, retired) = tab?.GetCachedImage() ?? (null, null);
+        var (image, retired) = _images?.GetCachedImage() ?? (null, null);
         if (retired is not null)
         {
             // Send the retired image to the composition thread for safe disposal.
@@ -270,15 +410,15 @@ public partial class DocumentView : UserControl
         }
         return new PdfPageRenderState(
             Image: image,
-            PageW: (float)(tab?.PageWidth ?? 0),
-            PageH: (float)(tab?.PageHeight ?? 0),
-            Camera: BuildCamera(tab),
-            ScrollSpeed: (float)(tab?.Rail.ScrollSpeed ?? 0),
-            ZoomSpeed: (float)(tab?.Camera.ZoomSpeed ?? 0),
+            PageW: (float)(_viewport?.PageWidth ?? 0),
+            PageH: (float)(_viewport?.PageHeight ?? 0),
+            Camera: BuildCamera(_viewport),
+            ScrollSpeed: (float)(_viewport?.Rail.ScrollSpeed ?? 0),
+            ZoomSpeed: (float)(_viewport?.Camera.ZoomSpeed ?? 0),
             MotionBlur: vm.AppConfig.MotionBlur,
             MotionBlurIntensity: (float)vm.AppConfig.MotionBlurIntensity,
             // On a table the scoped table focus-dim (in the overlay) replaces the page line dim.
-            LineFocusBlur: (tab?.LineFocusBlur ?? false) && !vm.TableFocusActive(tab),
+            LineFocusBlur: (tab?.LineFocusBlur ?? false) && !vm.TableFocusActive(_viewport),
             LineFocusIntensity: (float)vm.AppConfig.LineFocusBlurIntensity,
             LinePadding: (float)vm.AppConfig.LinePadding,
             LineY: lineY,
@@ -293,29 +433,29 @@ public partial class DocumentView : UserControl
         var vm = _shared!;
         LayoutBlock? currentBlock = null;
         LineInfo currentLine = default;
-        if (tab?.Rail is { Active: true, HasAnalysis: true } rail && rail.NavigableCount > 0)
+        if (_viewport?.Rail is { Active: true, HasAnalysis: true } rail && rail.NavigableCount > 0)
         {
             currentBlock = rail.CurrentNavigableBlock;
             currentLine = rail.CurrentLineInfo;
         }
         PageAnalysis? debugAnalysis = null;
-        if (tab?.DebugOverlay == true)
-            tab.AnalysisCache.TryGetValue(tab.CurrentPage, out debugAnalysis);
+        if (tab?.DebugOverlay == true && _viewport is { } dbgVp)
+            tab.AnalysisCache.TryGetValue(dbgVp.CurrentPage, out debugAnalysis);
 
         // Scoped table focus aids: when the rail is on a table row with cells, the overlay draws the
         // scoped tint/dim and the package line highlight + page dim are suppressed (passed false).
-        bool tableFocus = vm.TableFocusActive(tab);
+        bool tableFocus = vm.TableFocusActive(_viewport);
         var tableScope = vm.EffectiveTableFocusScope;
-        CellInfo? tableCell = tableFocus ? tab!.Rail.CurrentCellInfo : null;
+        CellInfo? tableCell = tableFocus ? _viewport!.Rail.CurrentCellInfo : null;
         // The column band is only needed (and only inferred) for the column-bearing scopes.
         Services.ColumnBand? tableColumn = tableFocus
             && tableScope is Services.TableFocusScope.Column or Services.TableFocusScope.RowAndColumn
-            ? vm.CurrentTableColumn(tab) : null;
+            ? vm.CurrentTableColumn(_viewport) : null;
 
         return new RailOverlayRenderState(
-            Camera: BuildCamera(tab),
-            PageW: (float)(tab?.PageWidth ?? 0),
-            PageH: (float)(tab?.PageHeight ?? 0),
+            Camera: BuildCamera(_viewport),
+            PageW: (float)(_viewport?.PageWidth ?? 0),
+            PageH: (float)(_viewport?.PageHeight ?? 0),
             CurrentBlock: currentBlock,
             CurrentLine: currentLine,
             DebugOverlay: tab?.DebugOverlay ?? false,
@@ -355,7 +495,7 @@ public partial class DocumentView : UserControl
 
         if (tiles is not { } t) return EmptyFreeze;
 
-        var cam = BuildCamera(tab);
+        var cam = BuildCamera(_viewport);
         float zoom = cam.ScaleX, ox = cam.TransX, oy = cam.TransY;
 
         float pinX = Math.Max(0f, t.CornerBox.X * zoom + ox);
@@ -376,8 +516,8 @@ public partial class DocumentView : UserControl
     {
         var vm = _shared!;
         List<Annotation>? pageAnnotations = null;
-        if (tab is not null)
-            tab.Annotations.Pages.TryGetValue(tab.CurrentPage, out pageAnnotations);
+        if (tab is not null && _viewport is { } vp)
+            tab.Annotations.Pages.TryGetValue(vp.CurrentPage, out pageAnnotations);
 
         // Pre-sort by z-order on the UI thread so the compositor doesn't need LINQ.
         // Cache the result: z-order only changes when the page's annotation set
@@ -389,7 +529,7 @@ public partial class DocumentView : UserControl
         }
         else if (ReferenceEquals(pageAnnotations, _annoSortSource)
             && pageAnnotations.Count == _annoSortCount
-            && tab!.CurrentPage == _annoSortPage)
+            && _viewport!.CurrentPage == _annoSortPage)
         {
             sorted = _annoSortResult;
         }
@@ -398,12 +538,12 @@ public partial class DocumentView : UserControl
             sorted = AnnotationRenderer.SortByZOrder(pageAnnotations);
             _annoSortSource = pageAnnotations;
             _annoSortCount = pageAnnotations.Count;
-            _annoSortPage = tab!.CurrentPage;
+            _annoSortPage = _viewport!.CurrentPage;
             _annoSortResult = sorted;
         }
 
         return new AnnotationRenderState(
-            Camera: BuildCamera(tab),
+            Camera: BuildCamera(_viewport),
             PageAnnotations: sorted,
             SelectedAnnotation: vm.SelectedAnnotation,
             PreviewAnnotation: vm.PreviewAnnotation,
@@ -413,35 +553,34 @@ public partial class DocumentView : UserControl
     private SearchRenderState BuildSearchState(TabViewModel? tab)
     {
         var vm = _shared!;
-        // Refresh the per-page match cache against the page currently on screen.
-        // SearchService only updates it on match navigation, so scroll/GoToPage page
-        // changes would otherwise leave it showing a previous page's matches.
-        vm.RefreshCurrentPageSearchMatches();
-        var matches = vm.CurrentPageSearchMatches;
+        // Render THIS surface's own page matches: a split pane / tear-off can sit on a different page
+        // than the focused view, so key the highlights by this viewport's page (MatchesForPage) rather
+        // than the focused view's CurrentPageSearchMatches.
+        var matches = _viewport is { } mvp ? vm.MatchesForPage(mvp.CurrentPage) : null;
         int activeLocalIndex = -1;
-        if (matches is { Count: > 0 } && tab is not null)
+        if (matches is { Count: > 0 } && _viewport is { } vp)
         {
             // The active local index only changes on match navigation or page
             // change — not while the camera moves. Cache across camera-only frames.
             if (ReferenceEquals(matches, _searchIdxMatches)
                 && vm.ActiveMatchIndex == _searchIdxActive
-                && tab.CurrentPage == _searchIdxPage)
+                && vp.CurrentPage == _searchIdxPage)
             {
                 activeLocalIndex = _searchIdxResult;
             }
             else
             {
                 activeLocalIndex = OverlayRenderer.ComputeActiveLocalIndex(
-                    vm.SearchMatches, matches, vm.ActiveMatchIndex, tab.CurrentPage);
+                    vm.SearchMatches, matches, vm.ActiveMatchIndex, vp.CurrentPage);
                 _searchIdxMatches = matches;
                 _searchIdxActive = vm.ActiveMatchIndex;
-                _searchIdxPage = tab.CurrentPage;
+                _searchIdxPage = vp.CurrentPage;
                 _searchIdxResult = activeLocalIndex;
             }
         }
 
         // Compute viewport in page space for search highlight culling.
-        var camera = BuildCamera(tab);
+        var camera = BuildCamera(_viewport);
         SKRect viewport = SKRect.Empty;
         if (camera.TryInvert(out var inv))
         {
@@ -459,7 +598,7 @@ public partial class DocumentView : UserControl
     private PortalMarkerRenderState BuildPortalMarkerState(TabViewModel? tab)
     {
         var vm = _shared!;
-        int page = tab?.CurrentPage ?? int.MinValue;
+        int page = _viewport?.CurrentPage ?? int.MinValue;
         int count = tab?.Portals.Portals.Count ?? 0;
         string? displayed = vm.DisplayedPortalId;
 
@@ -471,10 +610,10 @@ public partial class DocumentView : UserControl
             _markerCount = count;
             _markerDisplayed = displayed;
             _markerCache = [];
-            foreach (var m in vm.BuildPortalMarkers())
+            foreach (var m in vm.BuildPortalMarkers(_viewport))
                 _markerCache.Add(new PortalMarkerInfo(
                     m.Kind == PortalMarkerKind.Source, m.PageX, m.PageY, m.IsActive, m.Count));
         }
-        return new PortalMarkerRenderState(BuildCamera(tab), _markerCache);
+        return new PortalMarkerRenderState(BuildCamera(_viewport), _markerCache);
     }
 }

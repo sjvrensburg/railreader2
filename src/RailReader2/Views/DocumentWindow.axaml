@@ -1,0 +1,12 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:RailReader2.ViewModels"
+        x:Class="RailReader2.Views.DocumentWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Title="railreader2"
+        Width="820" Height="900"
+        MinWidth="320" MinHeight="240">
+    <!-- Hosts a single torn-off DocumentView (set in code via Host); it renders its own viewport of
+         the active document. Native window chrome gives free resize/move/multi-monitor. -->
+    <Panel Name="HostPanel" />
+</Window>

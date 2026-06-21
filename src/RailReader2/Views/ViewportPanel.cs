@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
+using RailReader.Core;
 using RailReader.Core.Models;
 using RailReader2.Services;
 using RailReader2.ViewModels;
@@ -12,6 +13,16 @@ namespace RailReader2.Views;
 public class ViewportPanel : Panel
 {
     public MainWindowViewModel? ViewModel { get; set; }
+
+    /// <summary>The DocumentView hosting this panel. Its viewport's camera is the one this panel must
+    /// use for screen↔page mapping — so clicks/selection in a split pane / tear-off window map through
+    /// that pane's own camera, not the document's primary. Set by <c>DocumentView.Initialize</c>.</summary>
+    public DocumentView? OwnerView { get; set; }
+
+    /// <summary>This panel's viewport camera (its DocumentView's), falling back to the active tab's
+    /// primary camera before the owner is wired or when there is no document.</summary>
+    private Camera? ActiveCamera => OwnerView?.SurfaceViewport?.Camera ?? ViewModel?.ActiveTab?.Camera;
+
     private bool _dragging;
     private Point _lastPos;
     private Point _pressPos;
@@ -333,7 +344,10 @@ public class ViewportPanel : Panel
             // rail mode is active, since there is no reading position outside it.
             menu.Items.Add(new Separator());
             int blockIndex = vm.FindBlockIndexAt(pageX, pageY);
-            int curPage = vm.Controller.ActiveDocument?.CurrentPage ?? 0;
+            // The clicked pane is focused (PointerPressed → FocusSurface), so the focused viewport's
+            // page matches FindBlockAt's lookup — a split pane / tear-off on a different page than the
+            // primary anchors its portal on its OWN page, not the primary's.
+            int curPage = vm.Controller.FocusedViewport?.CurrentPage ?? 0;
             bool canCapture = vm.CanCaptureReadingPosition;
             const string railHint = "Rail-read (zoom in) the text that refers to this block first — "
                 + "the portal keeps this block in view while you read that paragraph.";
@@ -440,10 +454,10 @@ public class ViewportPanel : Panel
 
     private (double PageX, double PageY) ScreenToPage(Point screenPos)
     {
-        if (ViewModel?.ActiveTab is not { } tab)
+        if (ActiveCamera is not { } cam)
             return (screenPos.X, screenPos.Y);
-        double pageX = (screenPos.X - tab.Camera.OffsetX) / tab.Camera.Zoom;
-        double pageY = (screenPos.Y - tab.Camera.OffsetY) / tab.Camera.Zoom;
+        double pageX = (screenPos.X - cam.OffsetX) / cam.Zoom;
+        double pageY = (screenPos.Y - cam.OffsetY) / cam.Zoom;
         return (pageX, pageY);
     }
 
@@ -451,11 +465,11 @@ public class ViewportPanel : Panel
     /// a marker was clicked and acted on, so the normal click handler is skipped.</summary>
     private bool TryHandlePortalMarkerClick(Point screenPos, bool popOut)
     {
-        if (ViewModel is not { } vm || vm.ActiveTab is not { } tab) return false;
-        var markers = vm.BuildPortalMarkers();
+        if (ViewModel is not { } vm || vm.ActiveTab is null || ActiveCamera is not { } cam) return false;
+        var markers = vm.BuildPortalMarkers(OwnerView?.SurfaceViewport);
         if (markers.Count == 0) return false;
 
-        double zoom = tab.Camera.Zoom, ox = tab.Camera.OffsetX, oy = tab.Camera.OffsetY;
+        double zoom = cam.Zoom, ox = cam.OffsetX, oy = cam.OffsetY;
         const double maxSq = PortalMarkerGeometry.HitRadius * PortalMarkerGeometry.HitRadius;
         PortalMarker? hit = null;
         double bestSq = maxSq;

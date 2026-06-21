@@ -108,6 +108,25 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         ViewportFocusRequested?.Invoke();
     }
 
+    // --- Multi-viewport pane commands (raised to MainWindow, which owns the pane / window views) ---
+
+    /// <summary>Add a split pane to the right of the focused one (VS Code "Split Right").</summary>
+    public event Action? SplitRightRequested;
+    /// <summary>Close the focused split pane / tear-off window (the primary pane can't be closed).</summary>
+    public event Action? CloseSurfaceRequested;
+    /// <summary>Move the focused split pane into its own floating window (or open a new window).</summary>
+    public event Action? MoveSurfaceToWindowRequested;
+    /// <summary>Collapse back to a single primary pane (close every extra pane + tear-off window).</summary>
+    public event Action? CloseExtraSurfacesRequested;
+
+    /// <summary>Whether viewport splitting / tear-off is available (a document must be open).</summary>
+    public bool CanSplitViewport => ActiveTab is not null;
+
+    public void RequestSplitRight() { if (ActiveTab is not null) SplitRightRequested?.Invoke(); }
+    public void RequestCloseSurface() => CloseSurfaceRequested?.Invoke();
+    public void RequestMoveSurfaceToWindow() { if (ActiveTab is not null) MoveSurfaceToWindowRequested?.Invoke(); }
+    public void RequestCloseExtraSurfaces() => CloseExtraSurfacesRequested?.Invoke();
+
     [ObservableProperty] private bool _showMinimap;
 
     /// <summary>When armed (via the toolbar's "Start rail here" toggle), the next viewport click
@@ -190,6 +209,10 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     // Delegated state from controller subsystems
     public List<SearchMatch> SearchMatches => _controller.Search.SearchMatches;
     public List<SearchMatch>? CurrentPageSearchMatches => _controller.Search.CurrentPageSearchMatches;
+    /// <summary>Search matches on a specific page (or null). Lets each viewport surface render its OWN
+    /// page's highlights — a split pane / tear-off can sit on a different page than the focused view,
+    /// for which <see cref="CurrentPageSearchMatches"/> (the focused view's page) would be wrong.</summary>
+    public IReadOnlyList<SearchMatch>? MatchesForPage(int page) => _controller.Search.MatchesForPage(page);
     public int ActiveMatchIndex
     {
         get => _controller.Search.ActiveMatchIndex;
@@ -353,6 +376,73 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     }
     public void SetInvalidation(InvalidationCallbacks callbacks) => _invalidation = callbacks;
 
+    // --- Viewport surfaces (multi-viewport: split panes + tear-off windows over one document) ---
+
+    // Every live renderable surface (the primary docked pane + any extra split panes + tear-off
+    // windows). The frame loop ticks each one's viewport independently; document-wide invalidations
+    // broadcast to all. Always contains at least the primary DocumentView once the window is loaded.
+    private readonly List<IViewportSurface> _surfaces = new();
+
+    // Per-frame scratch: each live surface and its TickResult, reused so the hot loop allocates nothing.
+    private readonly List<(IViewportSurface Surface, TickResult Result)> _tickScratch = new();
+
+    /// <summary>All live viewport surfaces (read-only). Consumed by the host's broadcast invalidation.</summary>
+    public IReadOnlyList<IViewportSurface> Surfaces => _surfaces;
+
+    /// <summary>True when more than one viewport surface is live — splitting or a tear-off is active.</summary>
+    public bool HasMultipleSurfaces => _surfaces.Count > 1;
+
+    public void RegisterSurface(IViewportSurface surface)
+    {
+        if (_surfaces.Contains(surface)) return;
+        _surfaces.Add(surface);
+        UpdateSurfaceFocusVisuals();
+    }
+
+    public void UnregisterSurface(IViewportSurface surface)
+    {
+        if (_surfaces.Remove(surface))
+            UpdateSurfaceFocusVisuals();
+    }
+
+    /// <summary>The surface whose viewport is the controller's focused one (where input is routed), or null.</summary>
+    public IViewportSurface? FocusedSurface
+    {
+        get
+        {
+            var vp = _controller.FocusedViewport;
+            foreach (var s in _surfaces)
+                if (ReferenceEquals(s.SurfaceViewport, vp)) return s;
+            return null;
+        }
+    }
+
+    /// <summary>Make <paramref name="vp"/> the focused viewport — all keyboard/scroll/menu commands then
+    /// act on this surface (Core routes host input through <c>FocusedViewport</c>). Idempotent.</summary>
+    public void FocusSurface(IViewportSurface surface, Viewport vp)
+    {
+        if (ReferenceEquals(_controller.FocusedViewport, vp)) return;
+        _controller.FocusedViewport = vp;
+        // The controller's ambient size (input geometry) now tracks this surface.
+        var (w, h) = surface.SurfaceSize;
+        if (w > 0 && h > 0) _controller.SetViewportSize(w, h);
+        UpdateSurfaceFocusVisuals();
+        // The status bar / menu gating / rail toolbar reflect the focused view.
+        InvalidateCamera();
+        OnPropertyChanged(nameof(ActiveTab));
+        OnPropertyChanged(nameof(IsRailOnTable));
+    }
+
+    /// <summary>Light up the focused pane's border, but only when more than one surface is live (a lone
+    /// viewport has no focus ambiguity, so it shows no border).</summary>
+    public void UpdateSurfaceFocusVisuals()
+    {
+        bool multi = _surfaces.Count > 1;
+        var focused = _controller.FocusedViewport;
+        foreach (var s in _surfaces)
+            s.SetFocusedVisual(multi && ReferenceEquals(s.SurfaceViewport, focused));
+    }
+
     // --- Accessibility / automation queries (consumed by DocumentViewportAutomationPeer) ---
 
     /// <summary>The current rail reading position (page / block / line + role and extracted text), or
@@ -454,25 +544,55 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             : 1.0 / 60.0;
         _lastFrameTime = frameTime;
 
-        var result = _controller.Tick(dt);
+        // Multi-viewport frame: drain the analysis worker ONCE for the whole document (not per
+        // view), then advance each live surface's own viewport and apply its own TickResult to that
+        // surface's layers. Core 0.41.0 ticks/clamps/snaps and seats each viewport against its OWN
+        // Viewport.Width/Height (kept current by DocumentView's vp.SetSize), so no ambient-size swap
+        // is needed here — the single-surface path is byte-identical to the old Tick(dt).
+        bool anyAnimating = false;
+        var focused = _controller.FocusedViewport;
+        _tickScratch.Clear();
+        foreach (var surface in _surfaces)
+        {
+            if (surface.SurfaceViewport is not { } vp) continue;
+            var r = _controller.TickViewport(vp, dt, pumpAnalysis: false);
+            _tickScratch.Add((surface, r));
+            anyAnimating |= r.StillAnimating;
+        }
 
-        if (result.PageChanged)
+        // One document-global analysis pump, quiescent only when nothing is animating (the gate the
+        // single-view Tick(dt) applied to the focused view).
+        var (gotResults, _, gotPageChange) = _controller.PumpAnalysis(quiescent: !anyAnimating);
+
+        foreach (var (surface, r) in _tickScratch)
         {
-            // A rail/auto-scroll page cross surfaces only here and calls just
-            // InvalidatePage, so refresh the per-page search and annotation overlays
-            // alongside the page bitmap — otherwise the previous page's rects stay
-            // painted over the new page (e.g. page 7's search highlights on page 1).
-            InvalidatePage();
-            InvalidateSearch();
-            InvalidateAnnotations();
+            // A just-arrived analysis result (gotResults) can seat any view's rail, and an analysis
+            // page change (gotPageChange) is document-global — so fold them into every surface.
+            bool pageChanged = r.PageChanged || gotPageChange;
+            bool overlayChanged = r.OverlayChanged || gotResults;
+            bool isFocused = ReferenceEquals(surface.SurfaceViewport, focused);
+            if (pageChanged)
+            {
+                // A page cross calls just RenderPage, so refresh this surface's per-page search and
+                // annotation overlays alongside the page bitmap (otherwise the previous page's rects
+                // stay painted over the new page).
+                surface.RenderPage();
+                surface.RenderSearch();
+                surface.RenderAnnotations();
+            }
+            if (overlayChanged) surface.RenderOverlay();
+            if (r.AnnotationsChanged) surface.RenderAnnotations();
+            if (r.CameraChanged)
+            {
+                surface.RenderCamera();
+                if (isFocused) _invalidation?.UpdateZoomDisplay?.Invoke();
+            }
+            // The focused surface drives the status bar + menu/rail-toolbar gating, which read
+            // FocusedViewport — refresh them when its page or overlay changed (so a focused split pane /
+            // tear-off advancing its OWN page updates the page/zoom/rail readout, not just the primary's).
+            if (isFocused && (overlayChanged || pageChanged)) OnPropertyChanged(nameof(ActiveTab));
         }
-        if (result.OverlayChanged)
-        {
-            InvalidateOverlay();
-            OnPropertyChanged(nameof(ActiveTab));
-        }
-        if (result.AnnotationsChanged) InvalidateAnnotations();
-        if (result.CameraChanged) InvalidateCamera();
+        _tickScratch.Clear();
 
         // Semi-auto scroll parks mid-Tick (no StateChanged for it), so watch the edge here and
         // surface it so the "parked — press D" affordance and status bar update.
@@ -483,7 +603,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             OnPropertyChanged(nameof(AutoScrollParked));
         }
 
-        if (result.StillAnimating) RequestAnimationFrame();
+        if (anyAnimating) RequestAnimationFrame();
     }
 
     public void RequestAnimationFrame()
@@ -874,4 +994,9 @@ public sealed class InvalidationCallbacks
     /// <summary>Tell the document viewport's accessibility peer to re-evaluate and announce its state.
     /// Driven by Core's PageChanged / ReadingPositionChanged callbacks.</summary>
     public Action? AnnounceAccessibility { get; init; }
+
+    /// <summary>Refresh the focused viewport's zoom % in the status bar, without re-rendering any
+    /// surface. The per-frame loop calls this when the focused surface's camera changed (the broadcast
+    /// <see cref="InvalidateCamera"/> already folds the same status-bar update in).</summary>
+    public Action? UpdateZoomDisplay { get; init; }
 }

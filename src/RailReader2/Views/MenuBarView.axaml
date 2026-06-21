@@ -55,6 +55,14 @@
             <MenuItem Header="_Minimap" InputGesture="Ctrl+M" Click="OnToggleMinimap" IsEnabled="{Binding HasDocument}" />
             <MenuItem Header="_Fullscreen" InputGesture="F11" Click="OnToggleFullscreen" />
             <Separator />
+            <MenuItem Header="Split _Editor" IsEnabled="{Binding HasDocument}">
+                <MenuItem Header="Split _Right" InputGesture="Ctrl+OemBackslash" Click="OnSplitRight" />
+                <MenuItem Header="Move Pane to _New Window" Click="OnMoveSurfaceToWindow" />
+                <Separator />
+                <MenuItem Header="_Close Pane" InputGesture="Ctrl+Shift+OemBackslash" Click="OnCloseSurface" />
+                <MenuItem Header="Close _All Extra Panes" Click="OnCloseExtraSurfaces" />
+            </MenuItem>
+            <Separator />
             <MenuItem Header="_Debug Overlay" InputGesture="Shift+D" Click="OnToggleDebug" IsEnabled="{Binding HasDocument}" />
             <Separator />
             <MenuItem Header="Colour Effects" IsEnabled="{Binding HasDocument}">

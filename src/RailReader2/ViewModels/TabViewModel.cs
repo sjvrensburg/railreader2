@@ -2,7 +2,6 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using RailReader.Core;
 using RailReader.Core.Models;
 using RailReader.Core.Services;
-using RailReader.Renderer.Skia;
 using SkiaSharp;
 
 namespace RailReader2.ViewModels;
@@ -55,61 +54,35 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
     public int CachedDpi => State.CachedDpi;
 
     /// <summary>
+    /// Per-viewport GPU-image lifecycle for this document's <c>Primary</c> view. A detached
+    /// viewport (split-pane / tear-off) owns its own <see cref="ViewportImages"/>; the document's
+    /// image accessors below delegate here so the single-viewport case is unchanged.
+    /// </summary>
+    public ViewportImages PrimaryImages { get; }
+
+    /// <summary>
     /// Returns the cached SKImage for GPU rendering and the previous image that
     /// was replaced (if any). The caller is responsible for disposing the retired
     /// image on a thread-safe boundary (e.g. the composition thread via OnMessage).
     /// Created on demand from the IRenderedPage; the UI layer owns this because
     /// SKImage.FromBitmap must be called on the UI thread.
     /// </summary>
-    public (SKImage? Current, SKImage? Retired) GetCachedImage()
-    {
-        if (State.CachedPage is SkiaRenderedPage sp)
-        {
-            if (_cachedImage is null || _cachedImagePage != sp)
-            {
-                var retired = _cachedImage;
-                _cachedImage = SKImage.FromBitmap(sp.Bitmap);
-                _cachedImagePage = sp;
-                return (_cachedImage, retired);
-            }
-            return (_cachedImage, null);
-        }
-        return (null, null);
-    }
+    public (SKImage? Current, SKImage? Retired) GetCachedImage() => PrimaryImages.GetCachedImage();
 
     /// <summary>
     /// Returns the current cached image without lifecycle management.
     /// Use only when no image transition is expected (e.g. minimap snapshot).
     /// </summary>
-    public SKImage? CachedImage => _cachedImage;
+    public SKImage? CachedImage => PrimaryImages.CachedImage;
 
-    private SKImage? _cachedImage;
-    private SkiaRenderedPage? _cachedImagePage;
-
-    public SKBitmap? MinimapBitmap => (State.MinimapPage as SkiaRenderedPage)?.Bitmap;
+    public SKBitmap? MinimapBitmap => PrimaryImages.MinimapBitmap;
 
     /// <summary>
     /// Returns <see cref="MinimapBitmap"/> wrapped as an SKImage so the canvas
     /// can use sampling-aware DrawImage. Re-wraps when the underlying bitmap
     /// changes; previous wrappers are disposed.
     /// </summary>
-    public SKImage? MinimapImage
-    {
-        get
-        {
-            var bm = MinimapBitmap;
-            if (bm is null) return null;
-            if (_minimapImageSource is null || !ReferenceEquals(_minimapImageSource, bm))
-            {
-                _minimapImage?.Dispose();
-                _minimapImage = SKImage.FromBitmap(bm);
-                _minimapImageSource = bm;
-            }
-            return _minimapImage;
-        }
-    }
-    private SKImage? _minimapImage;
-    private SKBitmap? _minimapImageSource;
+    public SKImage? MinimapImage => PrimaryImages.MinimapImage;
 
     public Action? OnDpiRenderComplete
     {
@@ -120,6 +93,7 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
     public TabViewModel(DocumentState state)
     {
         State = state;
+        PrimaryImages = new ViewportImages(state.Primary);
 
         _title = state.Title;
         _currentPage = state.CurrentPage;
@@ -170,12 +144,7 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
     public void Dispose()
     {
         State.StateChanged -= OnStateChanged;
-        _cachedImage?.Dispose();
-        _cachedImage = null;
-        _cachedImagePage = null;
-        _minimapImage?.Dispose();
-        _minimapImage = null;
-        _minimapImageSource = null;
+        PrimaryImages.Dispose();
         State.Dispose();
     }
 }

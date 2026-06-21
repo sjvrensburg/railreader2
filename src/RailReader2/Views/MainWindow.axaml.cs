@@ -39,6 +39,8 @@ public partial class MainWindow : Window
             // The DocumentView owns the viewport wiring, viewport-size sync, and the
             // initial (incl. window.Opened-early-tab) render for the active tab.
             Document.Initialize(vm, vm.ActiveTab);
+            vm.RegisterSurface(Document); // the primary, always-present docked surface
+            InitPanes(vm);
             vm.SetInvalidation(BuildInvalidationCallbacks(vm));
 
             SetupClipboardAndToolBar(vm);
@@ -68,22 +70,24 @@ public partial class MainWindow : Window
     /// </summary>
     private InvalidationCallbacks BuildInvalidationCallbacks(MainWindowViewModel vm) => new()
     {
-        // Layer rendering is delegated to the DocumentView (which owns the layers and
-        // builds state for its tab); cross-cutting chrome (status bar, search panel)
-        // stays here.
+        // Layer rendering is delegated to the viewport surfaces (each DocumentView owns its layers and
+        // builds state for its own viewport). A document-wide invalidation broadcasts to every live
+        // surface (primary pane + split panes + tear-off windows); cross-cutting chrome (status bar,
+        // search panel) stays here. The per-frame loop applies each surface's own TickResult directly.
         InvalidateCamera = () =>
         {
-            Document.RenderCamera();
+            foreach (var s in vm.Surfaces) s.RenderCamera();
             StatusBar.UpdateZoom();
         },
-        InvalidatePage = () => Document.RenderPage(),
-        InvalidateOverlay = () => Document.RenderOverlay(),
+        InvalidatePage = () => { foreach (var s in vm.Surfaces) s.RenderPage(); },
+        InvalidateOverlay = () => { foreach (var s in vm.Surfaces) s.RenderOverlay(); },
         // The Search pane refreshes its own "N of M" display via the VM's
         // SearchInvalidated event; here we only repaint the highlight layer.
-        InvalidateSearch = () => Document.RenderSearch(),
-        InvalidateAnnotations = () => Document.RenderAnnotations(),
-        InvalidatePortalMarkers = () => Document.RenderPortalMarkers(),
-        AnnounceAccessibility = () => Document.NotifyAccessibility(),
+        InvalidateSearch = () => { foreach (var s in vm.Surfaces) s.RenderSearch(); },
+        InvalidateAnnotations = () => { foreach (var s in vm.Surfaces) s.RenderAnnotations(); },
+        InvalidatePortalMarkers = () => { foreach (var s in vm.Surfaces) s.RenderPortalMarkers(); },
+        AnnounceAccessibility = () => { foreach (var s in vm.Surfaces) s.NotifyAccessibility(); },
+        UpdateZoomDisplay = () => StatusBar.UpdateZoom(),
     };
 
     protected override void OnUnloaded(Avalonia.Interactivity.RoutedEventArgs e)
@@ -93,6 +97,7 @@ public partial class MainWindow : Window
         ClosePortalWindow();
         if (_subscribedVm is { } vm)
         {
+            TeardownPanes(vm); // closes tear-off windows + unsubscribes pane commands
             vm.PropertyChanged -= OnVmPropertyChanged;
             vm.ViewportFocusRequested -= OnViewportFocusRequested;
             Document.Teardown();
@@ -188,6 +193,7 @@ public partial class MainWindow : Window
         {
             case nameof(MainWindowViewModel.ActiveTab):
                 Document.SetTab(vm.ActiveTab);
+                CollapseExtrasIfDocumentChanged(vm); // split panes / tear-offs belong to one document
                 UpdateRailToolBarVisibility();
                 break;
             case nameof(MainWindowViewModel.ShowOutline):
@@ -218,8 +224,9 @@ public partial class MainWindow : Window
                 UpdatePortalWindow(vm);
                 break;
             case nameof(MainWindowViewModel.CurrentFontSize):
-                // Live UI font-scale change from Settings — reach the open pop-out window too.
+                // Live UI font-scale change from Settings — reach the open pop-out + tear-off windows too.
                 _portalWindow?.ApplyFontScale(vm.CurrentFontSize);
+                foreach (var win in _documentWindows) win.ApplyFontScale(vm.CurrentFontSize);
                 break;
             case nameof(MainWindowViewModel.IsFullScreen):
                 WindowState = vm.IsFullScreen ? WindowState.FullScreen : WindowState.Normal;
@@ -280,7 +287,9 @@ public partial class MainWindow : Window
 
     private void UpdateRailToolBarVisibility()
     {
-        bool shouldShow = Vm?.ActiveTab?.Rail.Active == true;
+        // Reflect the focused pane's rail (with splits the rail-reader may be a secondary viewport),
+        // falling back to the active document's primary rail when nothing is focused.
+        bool shouldShow = (Vm?.Controller.FocusedViewport?.Rail.Active ?? Vm?.ActiveTab?.Rail.Active) == true;
         bool wasVisible = RailToolBar.IsVisible;
         RailToolBar.IsVisible = shouldShow;
 
@@ -311,10 +320,17 @@ public partial class MainWindow : Window
     /// </summary>
     protected override void OnKeyDown(KeyEventArgs e)
     {
-        if (Vm is not { } vm) { base.OnKeyDown(e); return; }
+        if (Vm is { } vm && TryHandleKey(vm, e)) return;
+        base.OnKeyDown(e);
+    }
 
-        // During Scan All, only Escape is allowed (to cancel the scan).
-        // All other keyboard input is suppressed.
+    /// <summary>Run the window's key-handling tiers — Scan-All guard, Ctrl shortcuts, Alt history,
+    /// rail/navigation keys, global keys — returning true when the key was handled (or swallowed).
+    /// Shared by <see cref="OnKeyDown"/> and the tear-off document windows, which forward their keys
+    /// here so a focused detached pane gets the same shortcuts (input routes through FocusedViewport).</summary>
+    internal bool TryHandleKey(MainWindowViewModel vm, KeyEventArgs e)
+    {
+        // During Scan All, only Escape is allowed (to cancel the scan); all other keys are swallowed.
         if (vm.IsScanAllActive)
         {
             if (e.Key == Key.Escape)
@@ -322,17 +338,17 @@ public partial class MainWindow : Window
                 vm.CancelScanAll();
                 e.Handled = true;
             }
-            return;
+            return true;
         }
 
         if (e.KeyModifiers.HasFlag(KeyModifiers.Control) && HandleCtrlShortcut(vm, e))
-            { RailToolBar.SyncState(); return; }
+            { RailToolBar.SyncState(); return true; }
 
         // Alt+Arrow: navigation history (back/forward)
         if (e.KeyModifiers.HasFlag(KeyModifiers.Alt))
         {
-            if (e.Key == Key.Left) { vm.NavigateBack(); e.Handled = true; return; }
-            if (e.Key == Key.Right) { vm.NavigateForward(); e.Handled = true; return; }
+            if (e.Key == Key.Left) { vm.NavigateBack(); e.Handled = true; return true; }
+            if (e.Key == Key.Right) { vm.NavigateForward(); e.Handled = true; return true; }
         }
 
         // When the search TextBox has focus, let text input keys through. Also require the
@@ -342,18 +358,28 @@ public partial class MainWindow : Window
             || StatusBar.IsEditing;
 
         if (!textInputFocused && HandleNavigationKey(vm, e))
-            { RailToolBar.SyncState(); return; }
+            { RailToolBar.SyncState(); return true; }
 
         if (HandleGlobalKey(vm, e))
-            { RailToolBar.SyncState(); return; }
+            { RailToolBar.SyncState(); return true; }
 
-        base.OnKeyDown(e);
+        return false;
     }
 
     /// <summary>Ctrl+ keyboard shortcuts. Returns true if the key was handled.</summary>
     private bool HandleCtrlShortcut(MainWindowViewModel vm, KeyEventArgs e)
     {
         bool shift = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
+
+        // Viewport splitting (VS Code: Ctrl+\ split, Ctrl+Shift+\ close the focused pane/window).
+        // The backslash key's Key enum value is keyboard-layout dependent (OemBackslash vs OemPipe vs
+        // others across X11/Windows/layouts), so match the layout-independent physical key position.
+        if (e.PhysicalKey == PhysicalKey.Backslash)
+        {
+            if (shift) vm.RequestCloseSurface(); else vm.RequestSplitRight();
+            e.Handled = true; return true;
+        }
+
         switch (e.Key)
         {
             case Key.O when shift:

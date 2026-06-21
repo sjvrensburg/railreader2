@@ -59,10 +59,13 @@
                                IsVisible="False" />
 
                 <Panel>
-                    <!-- Self-contained PDF viewport (layers + minimap + annotation toolbar
-                         + scan-all). Always present (and thus always sized), like the old
-                         viewport; renders empty when no document is open. -->
-                    <v:DocumentView Name="Document" />
+                    <!-- Pane grid: the primary self-contained PDF viewport (layers + minimap +
+                         annotation toolbar + scan-all), always present and always sized. Split
+                         panes add columns + GridSplitters here at runtime (PaneManager); each pane
+                         renders its own viewport of the active document. Renders empty when none open. -->
+                    <Grid Name="PaneGrid" ColumnDefinitions="*">
+                        <v:DocumentView Name="Document" Grid.Column="0" />
+                    </Grid>
 
                     <!-- Welcome text overlay when no document open -->
                     <TextBlock Name="WelcomeText"
