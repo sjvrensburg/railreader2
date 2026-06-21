@@ -209,6 +209,10 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     // Delegated state from controller subsystems
     public List<SearchMatch> SearchMatches => _controller.Search.SearchMatches;
     public List<SearchMatch>? CurrentPageSearchMatches => _controller.Search.CurrentPageSearchMatches;
+    /// <summary>Search matches on a specific page (or null). Lets each viewport surface render its OWN
+    /// page's highlights — a split pane / tear-off can sit on a different page than the focused view,
+    /// for which <see cref="CurrentPageSearchMatches"/> (the focused view's page) would be wrong.</summary>
+    public IReadOnlyList<SearchMatch>? MatchesForPage(int page) => _controller.Search.MatchesForPage(page);
     public int ActiveMatchIndex
     {
         get => _controller.Search.ActiveMatchIndex;
@@ -542,24 +546,15 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
         // Multi-viewport frame: drain the analysis worker ONCE for the whole document (not per
         // view), then advance each live surface's own viewport and apply its own TickResult to that
-        // surface's layers. For a single surface this is byte-identical to the old Tick(dt) path —
-        // one viewport (focused == primary), the ambient size already matches it so no swap occurs,
-        // and the pump runs once with quiescent gated on that view's animation.
+        // surface's layers. Core 0.41.0 ticks/clamps/snaps and seats each viewport against its OWN
+        // Viewport.Width/Height (kept current by DocumentView's vp.SetSize), so no ambient-size swap
+        // is needed here — the single-surface path is byte-identical to the old Tick(dt).
         bool anyAnimating = false;
         var focused = _controller.FocusedViewport;
         _tickScratch.Clear();
         foreach (var surface in _surfaces)
         {
             if (surface.SurfaceViewport is not { } vp) continue;
-            // Swap the controller's ambient size to this surface so its clamp/snap/centre animate
-            // against the correct bounds (Core's per-view tick still reads the ambient size). Skipped
-            // when it already matches — so the single-surface path never touches it here.
-            var (sw, sh) = surface.SurfaceSize;
-            if (sw > 0 && sh > 0)
-            {
-                var (cw, ch) = _controller.GetViewportSize();
-                if (sw != cw || sh != ch) _controller.SetViewportSize(sw, sh);
-            }
             var r = _controller.TickViewport(vp, dt, pumpAnalysis: false);
             _tickScratch.Add((surface, r));
             anyAnimating |= r.StillAnimating;
@@ -598,17 +593,6 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             }
         }
         _tickScratch.Clear();
-
-        // Restore the ambient size to the focused surface so subsequent input routes correctly.
-        if (FocusedSurface is { } fs)
-        {
-            var (fw, fh) = fs.SurfaceSize;
-            if (fw > 0 && fh > 0)
-            {
-                var (cw, ch) = _controller.GetViewportSize();
-                if (fw != cw || fh != ch) _controller.SetViewportSize(fw, fh);
-            }
-        }
 
         // Semi-auto scroll parks mid-Tick (no StateChanged for it), so watch the edge here and
         // surface it so the "parked — press D" affordance and status bar update.

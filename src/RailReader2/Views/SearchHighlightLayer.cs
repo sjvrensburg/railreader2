@@ -14,7 +14,7 @@ namespace RailReader2.Views;
 /// </summary>
 internal sealed record SearchRenderState(
     SKMatrix Camera,
-    List<SearchMatch>? Matches,
+    IReadOnlyList<SearchMatch>? Matches,
     int ActiveLocalIndex,
     SKRect ViewportInPageSpace);
 

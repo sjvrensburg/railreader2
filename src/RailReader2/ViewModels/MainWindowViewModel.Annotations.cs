@@ -98,7 +98,7 @@ public sealed partial class MainWindowViewModel
 
     public void HandleAnnotationPointerDown(double pageX, double pageY)
     {
-        var (needsDialog, isEdit, existingNote, px, py) = _controller.Annotations.HandleAnnotationPointerDown(_controller.ActiveDocument, pageX, pageY);
+        var (needsDialog, isEdit, existingNote, px, py) = _controller.Annotations.HandleAnnotationPointerDown(_controller.FocusedViewport, pageX, pageY);
 
         if (needsDialog)
         {
@@ -116,7 +116,7 @@ public sealed partial class MainWindowViewModel
 
     public void HandleAnnotationPointerMove(double pageX, double pageY, bool shiftHeld = false)
     {
-        if (_controller.Annotations.HandleAnnotationPointerMove(_controller.ActiveDocument, pageX, pageY, shiftHeld))
+        if (_controller.Annotations.HandleAnnotationPointerMove(_controller.FocusedViewport, pageX, pageY, shiftHeld))
         {
             OnPropertyChanged(nameof(SelectedText));
             InvalidateAnnotations();
@@ -125,7 +125,7 @@ public sealed partial class MainWindowViewModel
 
     public void HandleAnnotationPointerUp(double pageX, double pageY)
     {
-        if (_controller.Annotations.HandleAnnotationPointerUp(_controller.ActiveDocument, pageX, pageY))
+        if (_controller.Annotations.HandleAnnotationPointerUp(_controller.FocusedViewport, pageX, pageY))
         {
             InvalidateAnnotations();
             NotifyAnnotationsMutated();
@@ -148,7 +148,7 @@ public sealed partial class MainWindowViewModel
         }
         else
         {
-            _controller.Annotations.CommitPendingFreeText(_controller.ActiveDocument, result);
+            _controller.Annotations.CommitPendingFreeText(_controller.FocusedViewport, result);
             NotifyAnnotationsMutated();
         }
         InvalidateAnnotations();
@@ -161,7 +161,7 @@ public sealed partial class MainWindowViewModel
         var result = await dialog.ShowDialog<string?>(_window);
         if (string.IsNullOrEmpty(result)) return;
 
-        _controller.Annotations.CompleteTextNote(_controller.ActiveDocument, pageX, pageY, result);
+        _controller.Annotations.CompleteTextNote(_controller.FocusedViewport, pageX, pageY, result);
         InvalidateAnnotations();
         NotifyAnnotationsMutated();
     }
@@ -173,7 +173,7 @@ public sealed partial class MainWindowViewModel
         var result = await dialog.ShowDialog<string?>(_window);
         if (result is null) return;
 
-        _controller.Annotations.CompleteTextNoteEdit(_controller.ActiveDocument, note, result);
+        _controller.Annotations.CompleteTextNoteEdit(_controller.FocusedViewport, note, result);
         InvalidateAnnotations();
         NotifyAnnotationsMutated();
     }
@@ -186,7 +186,7 @@ public sealed partial class MainWindowViewModel
     /// </summary>
     public bool HandleBrowsePointerDown(float pageX, float pageY)
     {
-        bool hit = _controller.Annotations.HandleBrowsePointerDown(_controller.ActiveDocument, pageX, pageY);
+        bool hit = _controller.Annotations.HandleBrowsePointerDown(_controller.FocusedViewport, pageX, pageY);
         OnPropertyChanged(nameof(SelectedAnnotation));
         InvalidateAnnotations();
         return hit;
@@ -204,7 +204,7 @@ public sealed partial class MainWindowViewModel
 
     public bool HandleBrowsePointerUp(float pageX, float pageY)
     {
-        if (_controller.Annotations.HandleBrowsePointerUp(_controller.ActiveDocument, pageX, pageY))
+        if (_controller.Annotations.HandleBrowsePointerUp(_controller.FocusedViewport, pageX, pageY))
         {
             InvalidateAnnotations();
             return true;
@@ -214,7 +214,7 @@ public sealed partial class MainWindowViewModel
 
     public (bool Handled, TextNoteAnnotation? EditNote) HandleBrowseClick(float pageX, float pageY, bool isDoubleClick = false)
     {
-        var result = _controller.Annotations.HandleBrowseClick(_controller.ActiveDocument, pageX, pageY, isDoubleClick);
+        var result = _controller.Annotations.HandleBrowseClick(_controller.FocusedViewport, pageX, pageY, isDoubleClick);
         if (result.Handled)
         {
             OnPropertyChanged(nameof(SelectedAnnotation));
@@ -232,7 +232,7 @@ public sealed partial class MainWindowViewModel
 
     public void DeleteSelectedAnnotation()
     {
-        if (_controller.Annotations.DeleteSelectedAnnotation(_controller.ActiveDocument))
+        if (_controller.Annotations.DeleteSelectedAnnotation(_controller.FocusedViewport))
         {
             OnPropertyChanged(nameof(SelectedAnnotation));
             InvalidateAnnotations();
@@ -242,14 +242,14 @@ public sealed partial class MainWindowViewModel
 
     public void UndoAnnotation()
     {
-        _controller.Annotations.UndoAnnotation(_controller.ActiveDocument);
+        _controller.Annotations.UndoAnnotation(_controller.FocusedViewport);
         InvalidateAnnotations();
         NotifyAnnotationsMutated();
     }
 
     public void RedoAnnotation()
     {
-        _controller.Annotations.RedoAnnotation(_controller.ActiveDocument);
+        _controller.Annotations.RedoAnnotation(_controller.FocusedViewport);
         InvalidateAnnotations();
         NotifyAnnotationsMutated();
     }

@@ -546,11 +546,10 @@ public partial class DocumentView : UserControl, IViewportSurface
     private SearchRenderState BuildSearchState(TabViewModel? tab)
     {
         var vm = _shared!;
-        // Refresh the per-page match cache against the page currently on screen.
-        // SearchService only updates it on match navigation, so scroll/GoToPage page
-        // changes would otherwise leave it showing a previous page's matches.
-        vm.RefreshCurrentPageSearchMatches();
-        var matches = vm.CurrentPageSearchMatches;
+        // Render THIS surface's own page matches: a split pane / tear-off can sit on a different page
+        // than the focused view, so key the highlights by this viewport's page (MatchesForPage) rather
+        // than the focused view's CurrentPageSearchMatches.
+        var matches = _viewport is { } mvp ? vm.MatchesForPage(mvp.CurrentPage) : null;
         int activeLocalIndex = -1;
         if (matches is { Count: > 0 } && _viewport is { } vp)
         {
