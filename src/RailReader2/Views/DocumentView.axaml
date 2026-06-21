@@ -84,5 +84,11 @@
                 </StackPanel>
             </Border>
         </Border>
+
+        <!-- Focused-pane affordance: an accent border drawn over the surface (no layout shift,
+             never hit-tested). Only made visible by SetFocusedVisual when more than one viewport
+             surface is live, so a single pane shows no border. -->
+        <Border Name="FocusBorder" IsHitTestVisible="False" BorderThickness="0"
+                BorderBrush="{DynamicResource SystemControlHighlightAccentBrush}" />
     </Panel>
 </UserControl>

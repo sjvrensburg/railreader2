@@ -1,4 +1,7 @@
+using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input;
+using Avalonia.Interactivity;
 using RailReader.Core;
 using RailReader.Core.Models;
 using RailReader.Renderer.Skia;
@@ -20,10 +23,14 @@ namespace RailReader2.Views;
 /// This was extracted verbatim from MainWindow so a DocumentView can later be instantiated
 /// per Dock document; behaviour for the single-active case is unchanged.
 /// </summary>
-public partial class DocumentView : UserControl
+public partial class DocumentView : UserControl, IViewportSurface
 {
     private MainWindowViewModel? _shared;
     private TabViewModel? _tab;
+    // True when _images is owned by this view (a detached/secondary surface created its own) and
+    // must be disposed on rebind/teardown; false when borrowed from _tab.PrimaryImages (the primary
+    // surface shares the document's images with the minimap and must NOT dispose them).
+    private bool _ownsImages;
     // The viewport this surface renders. Today always the tab's Primary view; a split-pane /
     // tear-off surface will render a detached viewport of the same document (multi-viewport).
     // Per-view geometry (camera/rail/page/dims) is read from here; model + focused state
@@ -83,10 +90,16 @@ public partial class DocumentView : UserControl
         Minimap.ViewModel = shared;
         ToolBar.ViewModel = shared;
 
+        _ownsImages = false; // borrowing tab.PrimaryImages (shared with the minimap)
         shared.SetViewportSize(Viewport.Bounds.Width, Viewport.Bounds.Height);
         if (!_wired)
         {
             Viewport.SizeChanged += OnViewportSizeChanged;
+            // A press anywhere in this pane makes it the focused surface (input routes here). Tunnel +
+            // handledEventsToo so it fires even when ViewportPanel marks the event handled for its own
+            // drag/click logic.
+            Viewport.AddHandler(InputElement.PointerPressedEvent, OnViewportPressedForFocus,
+                RoutingStrategies.Tunnel, handledEventsToo: true);
             _wired = true;
         }
 
@@ -109,8 +122,55 @@ public partial class DocumentView : UserControl
         if (_wired)
         {
             Viewport.SizeChanged -= OnViewportSizeChanged;
+            Viewport.RemoveHandler(InputElement.PointerPressedEvent, OnViewportPressedForFocus);
             _wired = false;
         }
+        if (_ownsImages)
+        {
+            _images?.Dispose();
+            _images = null;
+            _ownsImages = false;
+        }
+    }
+
+    // ── IViewportSurface ──────────────────────────────────────────────────────────
+
+    /// <summary>The Core viewport this surface renders (per-view camera/rail/page), or null.</summary>
+    public CoreViewport? SurfaceViewport => _viewport;
+
+    public (double Width, double Height) SurfaceSize => (Viewport.Bounds.Width, Viewport.Bounds.Height);
+
+    public void SetFocusedVisual(bool focused)
+        => FocusBorder.BorderThickness = new Thickness(focused ? 2 : 0);
+
+    /// <summary>Render this surface against a specific viewport of the active document (a split pane /
+    /// tear-off window), with its own <see cref="ViewportImages"/>. The model state (annotations,
+    /// analysis cache, prefs) stays on <see cref="Tab"/>; only the per-view geometry + page images move.
+    /// Disposes the previously-owned images if any.</summary>
+    public void BindViewport(CoreViewport vp, ViewportImages images, bool ownsImages)
+    {
+        if (_ownsImages && _images is { } old && !ReferenceEquals(old, images))
+            old.Dispose();
+        _viewport = vp;
+        _images = images;
+        _ownsImages = ownsImages;
+
+        var (ww, wh) = (Viewport.Bounds.Width, Viewport.Bounds.Height);
+        if (ww > 0 && wh > 0)
+        {
+            vp.SetSize(ww, wh);
+            vp.CenterPage(ww, wh);
+            vp.UpdateRailZoom(ww, wh);
+        }
+        UpdatePagePanelSize(_tab);
+        UpdateAllLayers();
+        Minimap.InvalidateVisual();
+    }
+
+    private void OnViewportPressedForFocus(object? sender, PointerPressedEventArgs e)
+    {
+        if (_shared is { } vm && _viewport is { } vp)
+            vm.FocusSurface(this, vp);
     }
 
     /// <summary>Switch the rendered tab (active document changed).</summary>
@@ -133,9 +193,12 @@ public partial class DocumentView : UserControl
         // would otherwise call OnDpiRenderComplete and schedule a wasted animation frame.
         if (_tab is { } prev)
             prev.OnDpiRenderComplete = null;
+        if (_ownsImages)
+            _images?.Dispose();
         _tab = tab;
         _viewport = tab?.State.Primary;
         _images = tab?.PrimaryImages;
+        _ownsImages = false; // borrowing tab.PrimaryImages
         UpdateLayerBindings(tab);
         UpdatePagePanelSize(tab);
         Minimap.InvalidateVisual();
@@ -193,13 +256,22 @@ public partial class DocumentView : UserControl
     private void OnViewportSizeChanged(object? sender, SizeChangedEventArgs e)
     {
         if (_shared is null) return;
-        _shared.SetViewportSize(Viewport.Bounds.Width, Viewport.Bounds.Height);
-        if (_tab is { } tab && _viewport is { } vp)
+        var (ww, wh) = (Viewport.Bounds.Width, Viewport.Bounds.Height);
+        if (_viewport is { } vp)
         {
-            var (ww, wh) = (Viewport.Bounds.Width, Viewport.Bounds.Height);
+            // Per-view size → correct ReadingPosition.HorizontalFraction for this surface.
+            vp.SetSize(ww, wh);
+            // The controller's ambient size (input geometry + tick/clamp) tracks the focused surface;
+            // update it when we are the focused one. The frame loop swaps it per surface while ticking.
+            if (ReferenceEquals(vp, _shared.Controller.FocusedViewport))
+                _shared.SetViewportSize(ww, wh);
             vp.ClampCamera(ww, wh);
-            UpdatePagePanelSize(tab);
+            UpdatePagePanelSize(_tab);
             UpdateAllLayers();
+        }
+        else
+        {
+            _shared.SetViewportSize(ww, wh);
         }
     }
 

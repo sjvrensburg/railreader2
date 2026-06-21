@@ -39,6 +39,7 @@ public partial class MainWindow : Window
             // The DocumentView owns the viewport wiring, viewport-size sync, and the
             // initial (incl. window.Opened-early-tab) render for the active tab.
             Document.Initialize(vm, vm.ActiveTab);
+            vm.RegisterSurface(Document); // the primary, always-present docked surface
             vm.SetInvalidation(BuildInvalidationCallbacks(vm));
 
             SetupClipboardAndToolBar(vm);
@@ -68,22 +69,24 @@ public partial class MainWindow : Window
     /// </summary>
     private InvalidationCallbacks BuildInvalidationCallbacks(MainWindowViewModel vm) => new()
     {
-        // Layer rendering is delegated to the DocumentView (which owns the layers and
-        // builds state for its tab); cross-cutting chrome (status bar, search panel)
-        // stays here.
+        // Layer rendering is delegated to the viewport surfaces (each DocumentView owns its layers and
+        // builds state for its own viewport). A document-wide invalidation broadcasts to every live
+        // surface (primary pane + split panes + tear-off windows); cross-cutting chrome (status bar,
+        // search panel) stays here. The per-frame loop applies each surface's own TickResult directly.
         InvalidateCamera = () =>
         {
-            Document.RenderCamera();
+            foreach (var s in vm.Surfaces) s.RenderCamera();
             StatusBar.UpdateZoom();
         },
-        InvalidatePage = () => Document.RenderPage(),
-        InvalidateOverlay = () => Document.RenderOverlay(),
+        InvalidatePage = () => { foreach (var s in vm.Surfaces) s.RenderPage(); },
+        InvalidateOverlay = () => { foreach (var s in vm.Surfaces) s.RenderOverlay(); },
         // The Search pane refreshes its own "N of M" display via the VM's
         // SearchInvalidated event; here we only repaint the highlight layer.
-        InvalidateSearch = () => Document.RenderSearch(),
-        InvalidateAnnotations = () => Document.RenderAnnotations(),
-        InvalidatePortalMarkers = () => Document.RenderPortalMarkers(),
-        AnnounceAccessibility = () => Document.NotifyAccessibility(),
+        InvalidateSearch = () => { foreach (var s in vm.Surfaces) s.RenderSearch(); },
+        InvalidateAnnotations = () => { foreach (var s in vm.Surfaces) s.RenderAnnotations(); },
+        InvalidatePortalMarkers = () => { foreach (var s in vm.Surfaces) s.RenderPortalMarkers(); },
+        AnnounceAccessibility = () => { foreach (var s in vm.Surfaces) s.NotifyAccessibility(); },
+        UpdateZoomDisplay = () => StatusBar.UpdateZoom(),
     };
 
     protected override void OnUnloaded(Avalonia.Interactivity.RoutedEventArgs e)
