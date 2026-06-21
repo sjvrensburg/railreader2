@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using RailReader.Core;
 using RailReader.Core.Models;
 using RailReader2.Services;
 
@@ -180,18 +181,19 @@ public sealed partial class MainWindowViewModel
     public TableFocusScope EffectiveTableFocusScope =>
         TableNavMode == TableNavMode.Row ? TableFocusScope.Row : TableFocusScope;
 
-    /// <summary>True when the scoped table focus aids apply to <paramref name="tab"/> — rail seated on a
+    /// <summary>True when the scoped table focus aids apply to <paramref name="vp"/> — rail seated on a
     /// table row with cells. When active the overlay draws scoped tint/dim and the normal line
-    /// highlight + page focus-dim are suppressed for that frame.</summary>
-    public bool TableFocusActive(TabViewModel? tab) =>
-        tab?.Rail is { Active: true, HasAnalysis: true, HasCells: true } rail
+    /// highlight + page focus-dim are suppressed for that frame. Reads the surface's OWN viewport rail
+    /// (a split pane / tear-off can be on a table while the primary isn't, or vice-versa).</summary>
+    public bool TableFocusActive(Viewport? vp) =>
+        vp?.Rail is { Active: true, HasAnalysis: true, HasCells: true } rail
         && rail.CurrentNavigableBlock.Role == BlockRole.Table;
 
     /// <summary>The inferred column band under the current rail cell, or null when not on a table cell.
     /// Used by the overlay/page focus aids for the Column / Row+Column scopes.</summary>
-    public ColumnBand? CurrentTableColumn(TabViewModel? tab)
+    public ColumnBand? CurrentTableColumn(Viewport? vp)
     {
-        if (tab?.Rail is not { Active: true, HasAnalysis: true, HasCells: true } rail) return null;
+        if (vp?.Rail is not { Active: true, HasAnalysis: true, HasCells: true } rail) return null;
         if (rail.CurrentNavigableBlock.Role != BlockRole.Table) return null;
         if (rail.CurrentCellInfo is not { } cell) return null;
 

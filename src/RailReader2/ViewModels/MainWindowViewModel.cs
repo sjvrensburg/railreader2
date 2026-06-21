@@ -580,17 +580,17 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
                 surface.RenderSearch();
                 surface.RenderAnnotations();
             }
-            if (overlayChanged)
-            {
-                surface.RenderOverlay();
-                if (isFocused) OnPropertyChanged(nameof(ActiveTab));
-            }
+            if (overlayChanged) surface.RenderOverlay();
             if (r.AnnotationsChanged) surface.RenderAnnotations();
             if (r.CameraChanged)
             {
                 surface.RenderCamera();
                 if (isFocused) _invalidation?.UpdateZoomDisplay?.Invoke();
             }
+            // The focused surface drives the status bar + menu/rail-toolbar gating, which read
+            // FocusedViewport — refresh them when its page or overlay changed (so a focused split pane /
+            // tear-off advancing its OWN page updates the page/zoom/rail readout, not just the primary's).
+            if (isFocused && (overlayChanged || pageChanged)) OnPropertyChanged(nameof(ActiveTab));
         }
         _tickScratch.Clear();
 

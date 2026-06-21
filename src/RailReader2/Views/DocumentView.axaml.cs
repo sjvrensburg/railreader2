@@ -91,6 +91,7 @@ public partial class DocumentView : UserControl, IViewportSurface
         Viewport.ViewModel = shared;
         Viewport.OwnerView = this; // so screen↔page mapping uses THIS pane's viewport camera
         Minimap.ViewModel = shared;
+        Minimap.OwnerView = this; // so the minimap reflects + drives THIS pane's viewport, not the primary
         ToolBar.ViewModel = shared;
 
         _ownsImages = false; // borrowing tab.PrimaryImages (shared with the minimap)
@@ -137,6 +138,7 @@ public partial class DocumentView : UserControl, IViewportSurface
         // Drop references so a late event (a queued pointer / size change during the reparent or
         // close) can't reach a removed/disposed Core viewport through OwnerView → SurfaceViewport.
         Viewport.OwnerView = null;
+        Minimap.OwnerView = null;
         _viewport = null;
     }
 
@@ -163,6 +165,11 @@ public partial class DocumentView : UserControl, IViewportSurface
     public CoreViewport? SurfaceViewport => _viewport;
 
     public (double Width, double Height) SurfaceSize => (Viewport.Bounds.Width, Viewport.Bounds.Height);
+
+    /// <summary>This surface's GPU image wraps, for its OWN embedded minimap: a detached pane owns its
+    /// <see cref="ViewportImages"/>, the primary borrows the document's. Null before binding.</summary>
+    internal SKImage? SurfaceMinimapImage => _images?.MinimapImage;
+    internal SKImage? SurfacePageImage => _images?.CachedImage;
 
     public void SetFocusedVisual(bool focused)
         => FocusBorder.BorderThickness = new Thickness(focused ? 2 : 0);
@@ -411,7 +418,7 @@ public partial class DocumentView : UserControl, IViewportSurface
             MotionBlur: vm.AppConfig.MotionBlur,
             MotionBlurIntensity: (float)vm.AppConfig.MotionBlurIntensity,
             // On a table the scoped table focus-dim (in the overlay) replaces the page line dim.
-            LineFocusBlur: (tab?.LineFocusBlur ?? false) && !vm.TableFocusActive(tab),
+            LineFocusBlur: (tab?.LineFocusBlur ?? false) && !vm.TableFocusActive(_viewport),
             LineFocusIntensity: (float)vm.AppConfig.LineFocusBlurIntensity,
             LinePadding: (float)vm.AppConfig.LinePadding,
             LineY: lineY,
@@ -437,13 +444,13 @@ public partial class DocumentView : UserControl, IViewportSurface
 
         // Scoped table focus aids: when the rail is on a table row with cells, the overlay draws the
         // scoped tint/dim and the package line highlight + page dim are suppressed (passed false).
-        bool tableFocus = vm.TableFocusActive(tab);
+        bool tableFocus = vm.TableFocusActive(_viewport);
         var tableScope = vm.EffectiveTableFocusScope;
         CellInfo? tableCell = tableFocus ? _viewport!.Rail.CurrentCellInfo : null;
         // The column band is only needed (and only inferred) for the column-bearing scopes.
         Services.ColumnBand? tableColumn = tableFocus
             && tableScope is Services.TableFocusScope.Column or Services.TableFocusScope.RowAndColumn
-            ? vm.CurrentTableColumn(tab) : null;
+            ? vm.CurrentTableColumn(_viewport) : null;
 
         return new RailOverlayRenderState(
             Camera: BuildCamera(_viewport),
@@ -603,7 +610,7 @@ public partial class DocumentView : UserControl, IViewportSurface
             _markerCount = count;
             _markerDisplayed = displayed;
             _markerCache = [];
-            foreach (var m in vm.BuildPortalMarkers())
+            foreach (var m in vm.BuildPortalMarkers(_viewport))
                 _markerCache.Add(new PortalMarkerInfo(
                     m.Kind == PortalMarkerKind.Source, m.PageX, m.PageY, m.IsActive, m.Count));
         }

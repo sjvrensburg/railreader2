@@ -119,9 +119,11 @@ public partial class StatusBarView : UserControl
     public void UpdateZoom()
     {
         if (_zoomLabel is null) return;
-        var tab = (DataContext as MainWindowViewModel)?.ActiveTab;
-        if (tab is null) return;
-        int pct = (int)Math.Round(tab.Camera.Zoom * 100);
+        var vm = DataContext as MainWindowViewModel;
+        if (vm?.ActiveTab is null) return;
+        // The focused viewport's zoom (a split pane / tear-off can be at a different zoom than Primary).
+        double zoom = vm.Controller.FocusedViewport?.Camera.Zoom ?? vm.ActiveTab.Camera.Zoom;
+        int pct = (int)Math.Round(zoom * 100);
         _zoomLabel.Text = $"Zoom: {pct}%";
         Avalonia.Automation.AutomationProperties.SetName(_zoomLabel, $"Zoom {pct} percent");
     }
@@ -134,7 +136,7 @@ public partial class StatusBarView : UserControl
 
         var input = new TextBox
         {
-            Text = (tab.CurrentPage + 1).ToString(),
+            Text = ((vm.Controller.FocusedViewport?.CurrentPage ?? tab.CurrentPage) + 1).ToString(),
             Width = 50,
             MinHeight = 0,
             Padding = new Avalonia.Thickness(4, 0),
@@ -172,7 +174,7 @@ public partial class StatusBarView : UserControl
 
         var input = new TextBox
         {
-            Text = ((int)Math.Round(tab.Camera.Zoom * 100)).ToString(),
+            Text = ((int)Math.Round((vm.Controller.FocusedViewport?.Camera.Zoom ?? tab.Camera.Zoom) * 100)).ToString(),
             Width = 56,
             MinHeight = 0,
             Padding = new Avalonia.Thickness(4, 0),
@@ -210,12 +212,12 @@ public partial class StatusBarView : UserControl
     private const int BreadcrumbMaxChars = 60;
     private const string BreadcrumbSeparator = " \u203a ";  // ›
 
-    private void AddBreadcrumb(TabViewModel tab)
+    private void AddBreadcrumb(TabViewModel tab, int currentPage)
     {
         var outline = tab.Outline;
         if (outline is null || outline.Count == 0) return;
 
-        var path = OutlineBreadcrumb.BuildPath(outline, tab.CurrentPage);
+        var path = OutlineBreadcrumb.BuildPath(outline, currentPage);
         if (path.Count == 0) return;
 
         var full = string.Join(BreadcrumbSeparator, path.Select(e => e.Title));
@@ -265,23 +267,31 @@ public partial class StatusBarView : UserControl
             return;
         }
 
-        int zoomPct = (int)Math.Round(tab.Camera.Zoom * 100);
+        // The focused viewport drives the page/zoom/rail readout (a split pane / tear-off can sit on a
+        // different page/zoom/rail than the Primary). Document-level facts (page count, outline) use tab.
+        var vp = vm!.Controller.FocusedViewport;
+        int curPage = vp?.CurrentPage ?? tab.CurrentPage;
+        double zoom = vp?.Camera.Zoom ?? tab.Camera.Zoom;
+        var rail = vp?.Rail ?? tab.Rail;
+        bool pendingRail = vp?.PendingRailSetup ?? tab.PendingRailSetup;
+
+        int zoomPct = (int)Math.Round(zoom * 100);
         StatusPanel.Children.Add(MakeNavButton("IconChevronLeft", (_, _) =>
-        { if (vm?.ActiveTab is { } t) vm.GoToPage(t.CurrentPage - 1); }, "Previous page (PgUp)", "PreviousPage"));
+        { if (vm?.Controller.FocusedViewport is { } v) vm.GoToPage(v.CurrentPage - 1); }, "Previous page (PgUp)", "PreviousPage"));
         _pageLabel = new TextBlock
         {
-            Text = $"Page {tab.CurrentPage + 1}/{tab.PageCount}",
+            Text = $"Page {curPage + 1}/{tab.PageCount}",
             VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
             Cursor = new Cursor(StandardCursorType.Hand),
         };
         ToolTip.SetTip(_pageLabel, "Click to go to page");
         // Spoken form reads cleaner than the compact "3/15"; AutomationId is a stable handle.
-        Avalonia.Automation.AutomationProperties.SetName(_pageLabel, $"Page {tab.CurrentPage + 1} of {tab.PageCount}");
+        Avalonia.Automation.AutomationProperties.SetName(_pageLabel, $"Page {curPage + 1} of {tab.PageCount}");
         Avalonia.Automation.AutomationProperties.SetAutomationId(_pageLabel, "PageIndicator");
         _pageLabel.Tapped += (_, _) => BeginPageEdit(vm!, tab);
         StatusPanel.Children.Add(_pageLabel);
         StatusPanel.Children.Add(MakeNavButton("IconChevronRight", (_, _) =>
-        { if (vm?.ActiveTab is { } t) vm.GoToPage(t.CurrentPage + 1); }, "Next page (PgDn)", "NextPage"));
+        { if (vm?.Controller.FocusedViewport is { } v) vm.GoToPage(v.CurrentPage + 1); }, "Next page (PgDn)", "NextPage"));
         AddSeparator();
         _zoomLabel = new TextBlock
         {
@@ -295,9 +305,9 @@ public partial class StatusBarView : UserControl
         _zoomLabel.Tapped += (_, _) => BeginZoomEdit(vm!, tab);
         StatusPanel.Children.Add(_zoomLabel);
 
-        AddBreadcrumb(tab);
+        AddBreadcrumb(tab, curPage);
 
-        if (tab.PendingRailSetup)
+        if (pendingRail)
         {
             AddSeparator();
             StatusPanel.Children.Add(new TextBlock
@@ -307,13 +317,13 @@ public partial class StatusBarView : UserControl
                 FontStyle = Avalonia.Media.FontStyle.Italic,
             });
         }
-        else if (tab.Rail.Active)
+        else if (rail.Active)
         {
             AddSeparator();
             StatusPanel.Children.Add(new TextBlock
             {
-                Text = $"Block {tab.Rail.CurrentBlock + 1}/{tab.Rail.NavigableCount} | " +
-                       $"Line {tab.Rail.CurrentLine + 1}/{tab.Rail.CurrentLineCount}"
+                Text = $"Block {rail.CurrentBlock + 1}/{rail.NavigableCount} | " +
+                       $"Line {rail.CurrentLine + 1}/{rail.CurrentLineCount}"
             });
             AddSeparator();
             StatusPanel.Children.Add(MakeBoldLabel("Rail Mode", RailModeBrush));

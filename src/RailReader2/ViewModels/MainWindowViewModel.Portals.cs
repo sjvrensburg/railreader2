@@ -913,9 +913,9 @@ public sealed partial class MainWindowViewModel
     /// <summary>Portal markers to draw/hit-test on the current page: a gutter marker per source line and
     /// a corner badge per target block, positioned from the stored normalized anchors (so they show even
     /// before a page is analysed). Cheap; no PDFium.</summary>
-    public IReadOnlyList<PortalMarker> BuildPortalMarkers()
+    public IReadOnlyList<PortalMarker> BuildPortalMarkers(Viewport? vp)
     {
-        if (_controller.ActiveDocument is not { } doc || ActiveTab is not { } tab)
+        if (vp is null || _controller.ActiveDocument is not { } doc || ActiveTab is not { } tab)
             return [];
         // The active auto pin is not a saved Portal, but BuildAutoPinPortal reifies it into a transient
         // one with Id == _displayedPortalId, so it flows through the same grouping below as any saved
@@ -926,8 +926,9 @@ public sealed partial class MainWindowViewModel
         if (tab.Portals.Portals.Count == 0 && auto is null)
             return [];
 
-        int page = doc.CurrentPage;
-        double pw = doc.PageWidth, ph = doc.PageHeight;
+        // This surface's own page (a split pane / tear-off can be on a different page than Primary).
+        int page = vp.CurrentPage;
+        double pw = vp.PageWidth, ph = vp.PageHeight;
         if (pw <= 0 || ph <= 0) return [];
 
         var markers = new List<PortalMarker>();

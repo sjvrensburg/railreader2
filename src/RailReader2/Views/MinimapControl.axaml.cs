@@ -7,6 +7,7 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Rendering.SceneGraph;
 using Avalonia.Skia;
+using RailReader.Core;
 using RailReader2.ViewModels;
 using SkiaSharp;
 
@@ -20,6 +21,13 @@ public partial class MinimapControl : UserControl
         get => _vm;
         set { _vm = value; ApplyConfig(); }
     }
+
+    /// <summary>The DocumentView hosting this minimap — its viewport is the one this minimap reflects and
+    /// drives, so a split pane / tear-off minimap shows and navigates its OWN viewport (not the primary).
+    /// Set by <c>DocumentView.Initialize</c>.</summary>
+    public DocumentView? OwnerView { get; set; }
+
+    private Viewport? PaneViewport => OwnerView?.SurfaceViewport;
 
     private const double MoveStripeHeight = 12;
     private const double ResizeHandleSize = 18;
@@ -95,10 +103,14 @@ public partial class MinimapControl : UserControl
         // Resolve the window client size here (UI thread) rather than inside the
         // composition-thread draw op via Application.Current.
         var win = TopLevel.GetTopLevel(this);
+        // Snapshot THIS pane's viewport + its own image wraps on the UI thread (a split pane / tear-off
+        // reflects its own page/camera, not the primary's).
         context.Custom(new MinimapDrawOperation(
             new Rect(0, 0, Bounds.Width, Bounds.Height),
             this,
-            _vm,
+            PaneViewport,
+            OwnerView?.SurfaceMinimapImage,
+            OwnerView?.SurfacePageImage,
             showChrome: _hover || dragging,
             drag: dragging,
             resizeCorner: ResizeCornerInside(),
@@ -170,7 +182,7 @@ public partial class MinimapControl : UserControl
             if (Math.Abs(dx) < NavigateDragThreshold && Math.Abs(dy) < NavigateDragThreshold)
                 return;
             _drag = DragMode.Navigate;
-            if (_vm?.ActiveTab is { } t0) NavigateToPoint(_dragStartLocal, t0);
+            if (PaneViewport is { } vp0) NavigateToPoint(_dragStartLocal, vp0);
         }
 
         switch (_drag)
@@ -182,7 +194,7 @@ public partial class MinimapControl : UserControl
                 ApplyMove(dx, dy);
                 break;
             case DragMode.Navigate:
-                if (_vm?.ActiveTab is { } tab) NavigateToPoint(local, tab);
+                if (PaneViewport is { } vp) NavigateToPoint(local, vp);
                 break;
         }
         e.Handled = true;
@@ -197,7 +209,7 @@ public partial class MinimapControl : UserControl
 
         if (prev == DragMode.Pending)
         {
-            if (_vm?.ActiveTab is { } tab) NavigateToPoint(pt, tab);
+            if (PaneViewport is { } vp) NavigateToPoint(pt, vp);
             TopLevel.GetTopLevel(this)?.Focus();
         }
         else if (prev is DragMode.Move or DragMode.Resize)
@@ -260,12 +272,12 @@ public partial class MinimapControl : UserControl
         double maxH = Math.Max(MinSize, winH * MaxViewportFraction);
 
         double newW, newH;
-        if (_vm?.ActiveTab is { } tab && tab.PageWidth > 0 && tab.PageHeight > 0)
+        if (PaneViewport is { } vp && vp.PageWidth > 0 && vp.PageHeight > 0)
         {
             // Project the drag onto the page-aspect diagonal direction so any
             // direction of motion produces a continuous, aspect-preserving
             // resize. Avoids axis-driven flipping that caused jitter.
-            double aspect = tab.PageWidth / tab.PageHeight;
+            double aspect = vp.PageWidth / vp.PageHeight;
             double dirLen = Math.Sqrt(aspect * aspect + 1);
             double dirX = aspect / dirLen; // unit vector along the corner ray
             double dirY = 1.0 / dirLen;
@@ -305,11 +317,15 @@ public partial class MinimapControl : UserControl
         return top is null ? (1200, 900) : (top.ClientSize.Width, top.ClientSize.Height);
     }
 
-    private void NavigateToPoint(Point pos, TabViewModel tab)
+    private void NavigateToPoint(Point pos, Viewport vp)
     {
+        // Clicking a pane's minimap focuses that pane so input routes there (idempotent; the camera
+        // mutation below acts directly on this viewport regardless of focus).
+        if (OwnerView is { } ov) ViewModel?.FocusSurface(ov, vp);
+
         double controlW = Bounds.Width;
         double controlH = Bounds.Height;
-        var thumb = ThumbnailGeometry.Compute(controlW, controlH, tab.PageWidth, tab.PageHeight);
+        var thumb = ThumbnailGeometry.Compute(controlW, controlH, vp.PageWidth, vp.PageHeight);
         if (thumb is null) return;
         var t = thumb.Value;
 
@@ -318,16 +334,16 @@ public partial class MinimapControl : UserControl
 
         var (winW, winH) = WindowClientSize();
 
-        tab.Camera.OffsetX = winW / 2.0 - pageX * tab.Camera.Zoom;
-        tab.Camera.OffsetY = winH / 2.0 - pageY * tab.Camera.Zoom;
-        tab.ClampCamera(winW, winH);
+        vp.Camera.OffsetX = winW / 2.0 - pageX * vp.Camera.Zoom;
+        vp.Camera.OffsetY = winH / 2.0 - pageY * vp.Camera.Zoom;
+        vp.ClampCamera(winW, winH);
 
-        tab.UpdateRailZoom(winW, winH);
-        if (tab.Rail.Active)
+        vp.UpdateRailZoom(winW, winH);
+        if (vp.Rail.Active)
         {
-            tab.Rail.FindNearestBlock(tab.Camera.OffsetX, tab.Camera.OffsetY,
-                tab.Camera.Zoom, winW, winH);
-            tab.StartSnap(winW, winH);
+            vp.Rail.FindNearestBlock(vp.Camera.OffsetX, vp.Camera.OffsetY,
+                vp.Camera.Zoom, winW, winH);
+            vp.StartSnap(winW, winH);
             ViewModel?.RequestAnimationFrame();
         }
 
@@ -350,7 +366,7 @@ public partial class MinimapControl : UserControl
     {
         private readonly Rect _bounds;
         private readonly MinimapControl _control;
-        private readonly MainWindowViewModel? _vm;
+        private readonly Viewport? _vp;
         private readonly bool _showChrome;
         private readonly bool _drag;
         private readonly Corner _resizeCorner;
@@ -377,23 +393,23 @@ public partial class MinimapControl : UserControl
             new(SKFilterMode.Linear, SKMipmapMode.Linear);
 
         public MinimapDrawOperation(Rect bounds, MinimapControl control,
-            MainWindowViewModel? vm, bool showChrome, bool drag, Corner resizeCorner,
+            Viewport? vp, SKImage? thumbImage, SKImage? primaryImage,
+            bool showChrome, bool drag, Corner resizeCorner,
             double winW, double winH)
         {
             _bounds = bounds;
             _control = control;
-            _vm = vm;
+            _vp = vp;
             _showChrome = showChrome;
             _drag = drag;
             _resizeCorner = resizeCorner;
             _winW = winW;
             _winH = winH;
-            var tab = vm?.ActiveTab;
-            _thumbImage = tab?.MinimapImage;
-            _primaryImage = tab?.CachedImage;
-            _oxQ = (int)(tab?.Camera.OffsetX ?? 0) / 16;
-            _oyQ = (int)(tab?.Camera.OffsetY ?? 0) / 16;
-            _zoomQ = (int)((tab?.Camera.Zoom ?? 1.0) * 50);
+            _thumbImage = thumbImage;
+            _primaryImage = primaryImage;
+            _oxQ = (int)(vp?.Camera.OffsetX ?? 0) / 16;
+            _oyQ = (int)(vp?.Camera.OffsetY ?? 0) / 16;
+            _zoomQ = (int)((vp?.Camera.Zoom ?? 1.0) * 50);
         }
 
         public Rect Bounds => _bounds;
@@ -422,8 +438,8 @@ public partial class MinimapControl : UserControl
             using var lease = leaseFeature.Lease();
             var canvas = lease.SkCanvas;
 
-            var tab = _vm?.ActiveTab;
-            if (tab is null) return;
+            var vp = _vp;
+            if (vp is null) return;
 
             float controlW = (float)_bounds.Width;
             float controlH = (float)_bounds.Height;
@@ -432,7 +448,7 @@ public partial class MinimapControl : UserControl
             var bgPaint = s_bgPaint ??= new SKPaint { Color = new SKColor(40, 40, 40, 200) };
             canvas.DrawRoundRect(controlRect, bgPaint);
 
-            var thumb = ThumbnailGeometry.Compute(controlW, controlH, tab.PageWidth, tab.PageHeight);
+            var thumb = ThumbnailGeometry.Compute(controlW, controlH, vp.PageWidth, vp.PageHeight);
             if (thumb is null) return;
             var t = thumb.Value;
             var destRect = SKRect.Create((float)t.X, (float)t.Y, (float)t.W, (float)t.H);
@@ -463,10 +479,10 @@ public partial class MinimapControl : UserControl
             float scale = (float)t.Scale;
 
             var vpRect = SKRect.Create(
-                (float)(-tab.Camera.OffsetX / tab.Camera.Zoom) * scale + (float)t.X,
-                (float)(-tab.Camera.OffsetY / tab.Camera.Zoom) * scale + (float)t.Y,
-                (float)(winW / tab.Camera.Zoom) * scale,
-                (float)(winH / tab.Camera.Zoom) * scale);
+                (float)(-vp.Camera.OffsetX / vp.Camera.Zoom) * scale + (float)t.X,
+                (float)(-vp.Camera.OffsetY / vp.Camera.Zoom) * scale + (float)t.Y,
+                (float)(winW / vp.Camera.Zoom) * scale,
+                (float)(winH / vp.Camera.Zoom) * scale);
 
             var vpFill = s_vpFill ??= new SKPaint { Color = new SKColor(100, 180, 255, 120) };
             canvas.DrawRect(vpRect, vpFill);

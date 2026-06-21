@@ -344,7 +344,10 @@ public class ViewportPanel : Panel
             // rail mode is active, since there is no reading position outside it.
             menu.Items.Add(new Separator());
             int blockIndex = vm.FindBlockIndexAt(pageX, pageY);
-            int curPage = vm.Controller.ActiveDocument?.CurrentPage ?? 0;
+            // The clicked pane is focused (PointerPressed → FocusSurface), so the focused viewport's
+            // page matches FindBlockAt's lookup — a split pane / tear-off on a different page than the
+            // primary anchors its portal on its OWN page, not the primary's.
+            int curPage = vm.Controller.FocusedViewport?.CurrentPage ?? 0;
             bool canCapture = vm.CanCaptureReadingPosition;
             const string railHint = "Rail-read (zoom in) the text that refers to this block first — "
                 + "the portal keeps this block in view while you read that paragraph.";
@@ -463,7 +466,7 @@ public class ViewportPanel : Panel
     private bool TryHandlePortalMarkerClick(Point screenPos, bool popOut)
     {
         if (ViewModel is not { } vm || vm.ActiveTab is null || ActiveCamera is not { } cam) return false;
-        var markers = vm.BuildPortalMarkers();
+        var markers = vm.BuildPortalMarkers(OwnerView?.SurfaceViewport);
         if (markers.Count == 0) return false;
 
         double zoom = cam.Zoom, ox = cam.OffsetX, oy = cam.OffsetY;
