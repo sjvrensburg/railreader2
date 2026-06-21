@@ -163,13 +163,31 @@ public partial class MainWindow
     }
 
     /// <summary>Rebuild the PaneGrid's columns, splitters, and pane placement from <see cref="_panes"/>.
-    /// Layout is [pane, splitter, pane, splitter, …]: even columns are equal-weight panes, odd columns
-    /// are fixed-width GridSplitter handles that redistribute the adjacent star widths when dragged.</summary>
+    /// Layout is [pane, splitter, pane, splitter, …]: even columns are equal-weight panes (MinWidth so
+    /// a splitter can't collapse one), odd columns are fixed-width GridSplitter handles that
+    /// redistribute the adjacent star widths when dragged.
+    /// <para>Non-destructive to the panes: existing pane controls stay attached (re-parenting a
+    /// DocumentView would reset its composition layers), only the splitters are recreated. Panes no
+    /// longer in <see cref="_panes"/> (closed or moved to a window) are detached so they can be
+    /// re-hosted elsewhere.</para></summary>
     private void RebuildPaneGrid()
     {
-        PaneGrid.Children.Clear();
-        PaneGrid.ColumnDefinitions.Clear();
+        // Drop the old splitters (stateless, recreated below).
+        for (int i = PaneGrid.Children.Count - 1; i >= 0; i--)
+            if (PaneGrid.Children[i] is GridSplitter)
+                PaneGrid.Children.RemoveAt(i);
 
+        // Detach panes that are no longer ours (closed / relocated to a tear-off window).
+        for (int i = PaneGrid.Children.Count - 1; i >= 0; i--)
+            if (PaneGrid.Children[i] is DocumentView dv && !_panes.Contains(dv))
+                PaneGrid.Children.RemoveAt(i);
+
+        // Attach any pane not yet in the grid (a freshly-created split pane).
+        foreach (var pane in _panes)
+            if (!PaneGrid.Children.Contains(pane))
+                PaneGrid.Children.Add(pane);
+
+        PaneGrid.ColumnDefinitions.Clear();
         for (int i = 0; i < _panes.Count; i++)
         {
             if (i > 0)
@@ -185,9 +203,7 @@ public partial class MainWindow
                 PaneGrid.Children.Add(splitter);
             }
             PaneGrid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(1, GridUnitType.Star)) { MinWidth = 120 });
-            var pane = _panes[i];
-            Grid.SetColumn(pane, PaneGrid.ColumnDefinitions.Count - 1);
-            PaneGrid.Children.Add(pane);
+            Grid.SetColumn(_panes[i], PaneGrid.ColumnDefinitions.Count - 1);
         }
     }
 }
