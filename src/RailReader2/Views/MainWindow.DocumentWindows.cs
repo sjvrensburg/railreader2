@@ -22,19 +22,18 @@ public partial class MainWindow
 
         if (vm.FocusedSurface is DocumentView pane && !ReferenceEquals(pane, Document) && _panes.Contains(pane))
         {
-            // Relocate the existing pane: pull it out of the grid (reparented into the window). It was
-            // already navigated/seated as a docked pane, so don't re-seat.
+            // Relocate the existing pane: pull it out of the grid (reparented into the window).
             _panes.Remove(pane);
             RebuildPaneGrid();
-            HostInDocumentWindow(pane, seatRail: false);
+            HostInDocumentWindow(pane);
         }
-        else if (CreateSecondaryView() is { } view)
+        else if (CreateSecondaryView() is { } view) // rail seated in CreateSecondaryView
         {
-            HostInDocumentWindow(view, seatRail: true);
+            HostInDocumentWindow(view);
         }
     }
 
-    private void HostInDocumentWindow(DocumentView view, bool seatRail)
+    private void HostInDocumentWindow(DocumentView view)
     {
         if (Vm is not { } vm) return;
 
@@ -60,10 +59,7 @@ public partial class MainWindow
         if (view.SurfaceViewport is { } focusVp)
         {
             vm.FocusSurface(view, focusVp);
-            // Seat a freshly-created detached viewport's rail/analysis via Core's per-view nav (now
-            // focused). Skip when relocating an existing pane — already navigated as a docked pane.
-            if (seatRail)
-                vm.GoToPage(focusVp.CurrentPage);
+            vm.RequestAnimationFrame();
         }
     }
 

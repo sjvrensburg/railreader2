@@ -369,13 +369,18 @@ public partial class MainWindow : Window
     private bool HandleCtrlShortcut(MainWindowViewModel vm, KeyEventArgs e)
     {
         bool shift = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
+
+        // Viewport splitting (VS Code: Ctrl+\ split, Ctrl+Shift+\ close the focused pane/window).
+        // The backslash key's Key enum value is keyboard-layout dependent (OemBackslash vs OemPipe vs
+        // others across X11/Windows/layouts), so match the layout-independent physical key position.
+        if (e.PhysicalKey == PhysicalKey.Backslash)
+        {
+            if (shift) vm.RequestCloseSurface(); else vm.RequestSplitRight();
+            e.Handled = true; return true;
+        }
+
         switch (e.Key)
         {
-            // Viewport splitting (VS Code: Ctrl+\ split, Ctrl+Shift+\ close the focused pane/window).
-            case Key.OemBackslash when shift:
-                vm.RequestCloseSurface(); e.Handled = true; return true;
-            case Key.OemBackslash:
-                vm.RequestSplitRight(); e.Handled = true; return true;
             case Key.O when shift:
                 vm.TogglePane(SidePane.Outline);
                 e.Handled = true; return true;

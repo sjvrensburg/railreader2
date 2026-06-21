@@ -74,6 +74,10 @@ public partial class MainWindow
         vp.CurrentPage = focused.CurrentPage; // new surface mirrors the current page, then navigates freely
         vp.IsLive = true;
         vp.LoadPageBitmap();
+        // Seat this view's rail with the page's layout. GoToPage(samePage) early-returns before
+        // analysing, so submit directly: a cache hit (the page the primary already analysed) seats the
+        // rail synchronously, otherwise it schedules analysis and the fan-out seats it when it arrives.
+        doc.SubmitAnalysis(vp, vm.Controller.Worker, vm.Controller.Config.NavigableRoles);
 
         var view = new DocumentView();
         view.Initialize(vm, tab);                                   // model wiring (annotations / prefs)
@@ -114,12 +118,11 @@ public partial class MainWindow
         if (CreateSecondaryView() is not { } view) return;
         _panes.Add(view);
         RebuildPaneGrid();
-        // VS Code: the new split becomes the focused pane. Then navigate it to its page through Core's
-        // per-view path so its rail/analysis seats (the focused viewport is now this one).
+        // VS Code: the new split becomes the focused pane (rail already seated in CreateSecondaryView).
         if (view.SurfaceViewport is { } vp)
         {
             Vm?.FocusSurface(view, vp);
-            Vm?.GoToPage(vp.CurrentPage);
+            Vm?.RequestAnimationFrame();
         }
     }
 
