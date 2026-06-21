@@ -108,6 +108,25 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         ViewportFocusRequested?.Invoke();
     }
 
+    // --- Multi-viewport pane commands (raised to MainWindow, which owns the pane / window views) ---
+
+    /// <summary>Add a split pane to the right of the focused one (VS Code "Split Right").</summary>
+    public event Action? SplitRightRequested;
+    /// <summary>Close the focused split pane / tear-off window (the primary pane can't be closed).</summary>
+    public event Action? CloseSurfaceRequested;
+    /// <summary>Move the focused split pane into its own floating window (or open a new window).</summary>
+    public event Action? MoveSurfaceToWindowRequested;
+    /// <summary>Collapse back to a single primary pane (close every extra pane + tear-off window).</summary>
+    public event Action? CloseExtraSurfacesRequested;
+
+    /// <summary>Whether viewport splitting / tear-off is available (a document must be open).</summary>
+    public bool CanSplitViewport => ActiveTab is not null;
+
+    public void RequestSplitRight() { if (ActiveTab is not null) SplitRightRequested?.Invoke(); }
+    public void RequestCloseSurface() => CloseSurfaceRequested?.Invoke();
+    public void RequestMoveSurfaceToWindow() { if (ActiveTab is not null) MoveSurfaceToWindowRequested?.Invoke(); }
+    public void RequestCloseExtraSurfaces() => CloseExtraSurfacesRequested?.Invoke();
+
     [ObservableProperty] private bool _showMinimap;
 
     /// <summary>When armed (via the toolbar's "Start rail here" toggle), the next viewport click

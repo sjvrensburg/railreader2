@@ -31,6 +31,8 @@ public partial class DocumentView : UserControl, IViewportSurface
     // must be disposed on rebind/teardown; false when borrowed from _tab.PrimaryImages (the primary
     // surface shares the document's images with the minimap and must NOT dispose them).
     private bool _ownsImages;
+    // A freshly-bound secondary viewport that had no layout size yet: centre it on first SizeChanged.
+    private bool _pendingCenter;
     // The viewport this surface renders. Today always the tab's Primary view; a split-pane /
     // tear-off surface will render a detached viewport of the same document (multi-viewport).
     // Per-view geometry (camera/rail/page/dims) is read from here; model + focused state
@@ -155,12 +157,27 @@ public partial class DocumentView : UserControl, IViewportSurface
         _images = images;
         _ownsImages = ownsImages;
 
+        // A detached viewport needs its own wake hooks: Core sets DpiRenderReady / fires the analysis
+        // fan-out off the UI thread, and only an animation frame picks those up. (The primary view's
+        // equivalent is wired via tab.OnDpiRenderComplete in Initialize.)
+        if (_shared is { } vm)
+        {
+            vp.OnDpiRenderComplete = () => vm.RequestAnimationFrame();
+            vp.RequestAnimation = () => vm.RequestAnimationFrame();
+        }
+
         var (ww, wh) = (Viewport.Bounds.Width, Viewport.Bounds.Height);
         if (ww > 0 && wh > 0)
         {
             vp.SetSize(ww, wh);
             vp.CenterPage(ww, wh);
             vp.UpdateRailZoom(ww, wh);
+            _pendingCenter = false;
+        }
+        else
+        {
+            // Not laid out yet (a freshly-created pane); centre on the first SizeChanged.
+            _pendingCenter = true;
         }
         UpdatePagePanelSize(_tab);
         UpdateAllLayers();
@@ -265,6 +282,13 @@ public partial class DocumentView : UserControl, IViewportSurface
             // update it when we are the focused one. The frame loop swaps it per surface while ticking.
             if (ReferenceEquals(vp, _shared.Controller.FocusedViewport))
                 _shared.SetViewportSize(ww, wh);
+            if (_pendingCenter)
+            {
+                // First layout of a freshly-bound pane: fit/centre it now that it has bounds.
+                vp.CenterPage(ww, wh);
+                vp.UpdateRailZoom(ww, wh);
+                _pendingCenter = false;
+            }
             vp.ClampCamera(ww, wh);
             UpdatePagePanelSize(_tab);
             UpdateAllLayers();

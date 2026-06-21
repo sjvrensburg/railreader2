@@ -93,6 +93,12 @@ public partial class MenuBarView : UserControl
     private void OnHidePanel(object? s, RoutedEventArgs e)
     { if (Vm is { } vm) vm.ShowOutline = false; }
 
+    // Split editor / tear-off panes (the VM raises these to MainWindow, which owns the pane views).
+    private void OnSplitRight(object? s, RoutedEventArgs e) => Vm?.RequestSplitRight();
+    private void OnMoveSurfaceToWindow(object? s, RoutedEventArgs e) => Vm?.RequestMoveSurfaceToWindow();
+    private void OnCloseSurface(object? s, RoutedEventArgs e) => Vm?.RequestCloseSurface();
+    private void OnCloseExtraSurfaces(object? s, RoutedEventArgs e) => Vm?.RequestCloseExtraSurfaces();
+
     private void OnToggleMinimap(object? s, RoutedEventArgs e)
     { if (Vm is { } vm) vm.ShowMinimap = !vm.ShowMinimap; }
     private void OnToggleFullscreen(object? s, RoutedEventArgs e)
