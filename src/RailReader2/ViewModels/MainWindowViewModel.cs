@@ -436,6 +436,22 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(IsRailOnTable));
     }
 
+    /// <summary>Focus the registered surface that currently renders <paramref name="vp"/> — used on a
+    /// tab switch/open to route focus to the (active) tab's own viewport. Falls back to setting
+    /// controller focus directly if no surface renders it yet. Idempotent.</summary>
+    public void FocusViewport(Viewport vp)
+    {
+        foreach (var s in _surfaces)
+            if (ReferenceEquals(s.SurfaceViewport, vp))
+            {
+                FocusSurface(s, vp);
+                return;
+            }
+        _controller.FocusedViewport = vp;
+        WireFocusedSignals(vp);
+        UpdateSurfaceFocusVisuals();
+    }
+
     // The viewport whose PageChanged/ReadingPositionChanged currently drive OnReadingContextChanged.
     private Viewport? _signalWiredViewport;
 

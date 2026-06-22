@@ -30,6 +30,21 @@ public sealed partial class MainWindowViewModel
     public async Task OpenDocument(string path)
     {
         if (IsScanAllActive) return;
+
+        // Decision #1: if this file is already open in another tab, don't open a second copy —
+        // add a viewport to the SHARED DocumentModel (one PDF handle + analysis/text caches +
+        // annotations across all its tabs; no duplicate ONNX work). The new tab is kept as a
+        // separate tab with its own camera / page / rail.
+        var full = Path.GetFullPath(path);
+        foreach (var t in Tabs)
+        {
+            if (string.Equals(Path.GetFullPath(t.FilePath), full, StringComparison.Ordinal))
+            {
+                OpenSharedViewportTab(t);
+                return;
+            }
+        }
+
         try
         {
             _logger.Debug($"[OpenDocument] Opening: {path}");
@@ -65,7 +80,7 @@ public sealed partial class MainWindowViewModel
                     continue;
                 }
 
-                tab = new TabViewModel(state!);
+                tab = new TabViewModel(state!, state!.Primary);
             }
 
             _logger.Debug($"[OpenDocument] Loaded: {tab.PageCount} pages, {tab.PageWidth}x{tab.PageHeight}");
@@ -88,13 +103,8 @@ public sealed partial class MainWindowViewModel
 
             ActiveTabIndex = Tabs.Count - 1;
             OnPropertyChanged(nameof(ActiveTab));
-
-            // Navigate duplicate tab to the source tab's page
-            if (_pendingDuplicatePage is { } dupPage)
-            {
-                _pendingDuplicatePage = null;
-                _controller.GoToPage(dupPage);
-            }
+            // Route focus to this tab's own view (wires its reading-context signals + focus visuals).
+            FocusViewport(tab.Viewport);
 
             InvalidateAll();
 
@@ -110,6 +120,49 @@ public sealed partial class MainWindowViewModel
             _logger.Error($"Failed to open {path}", ex);
             ShowStatusToast($"Failed to open: {Path.GetFileName(path)}");
         }
+    }
+
+    /// <summary>Open a new tab that shares <paramref name="existing"/>'s <see cref="DocumentModel"/>
+    /// via a fresh <see cref="Viewport"/> (railreader2#180 decision #1). The new view starts on the
+    /// duplicate-source page (or the existing tab's current page), seeded + sized like a split pane so
+    /// its rail seats and it centres correctly when shown. Caches + annotations are shared with the
+    /// existing tab; the new tab navigates independently.</summary>
+    private void OpenSharedViewportTab(TabViewModel existing)
+    {
+        var model = existing.State;
+        var vp = model.AddViewport();
+        int page = _pendingDuplicatePage ?? existing.CurrentPage;
+        _pendingDuplicatePage = null;
+        vp.CurrentPage = Math.Clamp(page, 0, model.PageCount - 1);
+        vp.IsLive = true;
+
+        // Size from the surface the user currently sees so the initial centre/zoom is right; the
+        // DocumentView re-sizes it on its next layout pass once this tab is shown.
+        var (w, h) = FocusedViewportSize();
+        if (w > 0 && h > 0) vp.SetSize(w, h);
+        vp.LoadPageBitmap();
+        vp.CenterPage(vp.Width, vp.Height);
+        vp.UpdateRailZoom(vp.Width, vp.Height);
+        // Seat this view's rail: a cache hit (the page the existing view already analysed) seats
+        // synchronously; otherwise analysis is scheduled and the fan-out seats it on arrival.
+        model.SubmitAnalysis(vp, _controller.Worker, _controller.Config.NavigableRoles);
+        model.QueueLookahead(vp, _controller.Config.AnalysisLookaheadPages);
+
+        // Shares the model (PDF/caches/annotations already loaded); only the per-tab portal sidecar +
+        // sidebar state are tab-local. Do NOT re-checkout annotations — that's per-model, done once.
+        var tab = new TabViewModel(model, vp) { Portals = Services.PortalSet.Load(model.FilePath) };
+
+        if (ActiveTab is { } oldTab) SaveSidebarState(oldTab);
+        tab.ShowSidePanel = ShowOutline;
+        if (ReadSidePanelWidth is { } getWidth) tab.SidePanelWidth = getWidth();
+
+        Tabs.Add(tab);
+        ActiveTabIndex = Tabs.Count - 1;
+        OnPropertyChanged(nameof(ActiveTab));
+        FocusViewport(vp);
+        InvalidateAll();
+        RequestAnimationFrame();
+        StartBackgroundAnalysis();
     }
 
     [RelayCommand]
@@ -137,8 +190,27 @@ public sealed partial class MainWindowViewModel
         if (IsScanAllActive) return;
         if (index < 0 || index >= Tabs.Count) return;
         var tab = Tabs[index];
-        _controller.CloseDocument(_controller.Documents.IndexOf(tab.State));
         Tabs.RemoveAt(index);
+
+        // Model lifecycle (decision #1): several tabs may share one DocumentModel. Dispose the model
+        // only when its LAST tab closes; otherwise just free this tab's own viewport (a duplicate
+        // tab's secondary view). Closing the model's Primary-view tab while sibling tabs remain leaves
+        // the (now unshown) Primary alive — harmless; it's freed when the model is disposed.
+        bool modelStillUsed = false;
+        foreach (var t in Tabs)
+            if (ReferenceEquals(t.State, tab.State)) { modelStillUsed = true; break; }
+
+        tab.Dispose(); // unsubscribe + free this tab's images (not the shared model / its viewport)
+        if (!modelStillUsed)
+        {
+            int docIdx = _controller.Documents.IndexOf(tab.State);
+            if (docIdx >= 0) _controller.CloseDocument(docIdx); // disposes model + all its viewports
+        }
+        else if (!ReferenceEquals(tab.Viewport, tab.State.Primary))
+        {
+            tab.State.RemoveViewport(tab.Viewport); // free this duplicate tab's own viewport
+        }
+
         if (Tabs.Count == 0)
         {
             ActiveTabIndex = 0;
@@ -150,6 +222,7 @@ public sealed partial class MainWindowViewModel
             RestoreSidebarState(Tabs[ActiveTabIndex]);
         }
         OnPropertyChanged(nameof(ActiveTab));
+        if (Tabs.Count > 0) FocusViewport(Tabs[ActiveTabIndex].Viewport);
         // Re-evaluate portals for the now-active tab (or clear them when the last tab closed); also
         // close any pop-out window once no document remains so it can't linger over an empty app.
         EvaluatePortals();
@@ -172,14 +245,19 @@ public sealed partial class MainWindowViewModel
             if (IsAnnotating)
                 CancelAnnotationTool();
 
+            // Quiesce the tab we're leaving (its viewport is still the focused one at this point) —
+            // matches the old SelectDocument behaviour now that tab focus is viewport-based (#1).
+            _controller.StopAutoScroll();
+
             ActiveTabIndex = index;
-            _controller.SelectDocument(index);
+            OnPropertyChanged(nameof(ActiveTab)); // → Document.SetTab rebinds to this tab's own viewport
+            // Route focus to the selected tab's viewport (replaces the old document-index SelectDocument).
+            FocusViewport(Tabs[index].Viewport);
             RestoreSidebarState(Tabs[index]);
             ResetTableStateForTabSwitch();
 
-            OnPropertyChanged(nameof(ActiveTab));
-            // Core's SelectDocument fires neither PageChanged nor ReadingPositionChanged, so evaluate
-            // portals here — otherwise the previous tab's target crop lingers on a quiescent switch.
+            // Focusing fires neither PageChanged nor ReadingPositionChanged, so evaluate portals here —
+            // otherwise the previous tab's target crop lingers on a quiescent switch.
             EvaluatePortals();
             InvalidateAll();
         }
@@ -194,7 +272,8 @@ public sealed partial class MainWindowViewModel
 
         var selectedTab = ActiveTab;
         Tabs.Move(fromIndex, toIndex);
-        _controller.MoveDocument(fromIndex, toIndex);
+        // Tab order is independent of Core's Documents order now (#1): focus is viewport-based, not
+        // document-index-based, so there's no MoveDocument to keep in lock-step.
 
         if (selectedTab is not null)
             ActiveTabIndex = Tabs.IndexOf(selectedTab);

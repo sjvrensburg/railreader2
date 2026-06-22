@@ -28,7 +28,7 @@ public partial class DocumentView : UserControl, IViewportSurface
     private MainWindowViewModel? _shared;
     private TabViewModel? _tab;
     // True when _images is owned by this view (a detached/secondary surface created its own) and
-    // must be disposed on rebind/teardown; false when borrowed from _tab.PrimaryImages (the primary
+    // must be disposed on rebind/teardown; false when borrowed from _tab.Images (the primary
     // surface shares the document's images with the minimap and must NOT dispose them).
     private bool _ownsImages;
     // A freshly-bound secondary viewport that had no layout size yet: centre it on first SizeChanged.
@@ -38,7 +38,7 @@ public partial class DocumentView : UserControl, IViewportSurface
     // Per-view geometry (camera/rail/page/dims) is read from here; model + focused state
     // (annotations, analysis cache, selection, search, display prefs) stays on _tab / _shared.
     private CoreViewport? _viewport;
-    // Per-view GPU-image lifecycle for _viewport (shared with the minimap via _tab.PrimaryImages
+    // Per-view GPU-image lifecycle for _viewport (shared with the minimap via _tab.Images
     // while _viewport is the Primary view; a detached surface gets its own).
     private ViewportImages? _images;
     private bool _wired;
@@ -85,8 +85,8 @@ public partial class DocumentView : UserControl, IViewportSurface
     {
         _shared = shared;
         _tab = tab;
-        _viewport = tab?.State.Primary;
-        _images = tab?.PrimaryImages;
+        _viewport = tab?.Viewport;
+        _images = tab?.Images;
 
         Viewport.ViewModel = shared;
         Viewport.OwnerView = this; // so screen↔page mapping uses THIS pane's viewport camera
@@ -94,7 +94,7 @@ public partial class DocumentView : UserControl, IViewportSurface
         Minimap.OwnerView = this; // so the minimap reflects + drives THIS pane's viewport, not the primary
         ToolBar.ViewModel = shared;
 
-        _ownsImages = false; // borrowing tab.PrimaryImages (shared with the minimap)
+        _ownsImages = false; // borrowing tab.Images (shared with the minimap)
         // Size THIS pane's own viewport (Phase 3: no controller ambient size any more).
         _viewport?.SetSize(Viewport.Bounds.Width, Viewport.Bounds.Height);
         if (!_wired)
@@ -243,9 +243,9 @@ public partial class DocumentView : UserControl, IViewportSurface
         if (_ownsImages)
             _images?.Dispose();
         _tab = tab;
-        _viewport = tab?.State.Primary;
-        _images = tab?.PrimaryImages;
-        _ownsImages = false; // borrowing tab.PrimaryImages
+        _viewport = tab?.Viewport;
+        _images = tab?.Images;
+        _ownsImages = false; // borrowing tab.Images
         UpdateLayerBindings(tab);
         UpdatePagePanelSize(tab);
         Minimap.InvalidateVisual();
