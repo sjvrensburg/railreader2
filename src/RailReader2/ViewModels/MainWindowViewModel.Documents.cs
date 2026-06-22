@@ -29,6 +29,11 @@ public sealed partial class MainWindowViewModel
 
     public async Task OpenDocument(string path)
     {
+        // Consume the duplicate-source page up front so it can never leak into a later, unrelated
+        // open (e.g. if this call early-returns below). Only the duplicate-tab dedup path uses it.
+        int? duplicatePage = _pendingDuplicatePage;
+        _pendingDuplicatePage = null;
+
         if (IsScanAllActive) return;
 
         // Decision #1: if this file is already open in another tab, don't open a second copy —
@@ -40,7 +45,7 @@ public sealed partial class MainWindowViewModel
         {
             if (string.Equals(Path.GetFullPath(t.FilePath), full, StringComparison.Ordinal))
             {
-                OpenSharedViewportTab(t);
+                OpenSharedViewportTab(t, duplicatePage);
                 return;
             }
         }
@@ -116,7 +121,6 @@ public sealed partial class MainWindowViewModel
         }
         catch (Exception ex)
         {
-            _pendingDuplicatePage = null;
             _logger.Error($"Failed to open {path}", ex);
             ShowStatusToast($"Failed to open: {Path.GetFileName(path)}");
         }
@@ -127,12 +131,11 @@ public sealed partial class MainWindowViewModel
     /// duplicate-source page (or the existing tab's current page), seeded + sized like a split pane so
     /// its rail seats and it centres correctly when shown. Caches + annotations are shared with the
     /// existing tab; the new tab navigates independently.</summary>
-    private void OpenSharedViewportTab(TabViewModel existing)
+    private void OpenSharedViewportTab(TabViewModel existing, int? duplicatePage)
     {
         var model = existing.State;
         var vp = model.AddViewport();
-        int page = _pendingDuplicatePage ?? existing.CurrentPage;
-        _pendingDuplicatePage = null;
+        int page = duplicatePage ?? existing.CurrentPage;
         vp.CurrentPage = Math.Clamp(page, 0, model.PageCount - 1);
         vp.IsLive = true;
 
@@ -246,7 +249,10 @@ public sealed partial class MainWindowViewModel
                 CancelAnnotationTool();
 
             // Quiesce the tab we're leaving (its viewport is still the focused one at this point) —
-            // matches the old SelectDocument behaviour now that tab focus is viewport-based (#1).
+            // matches the old SelectDocument behaviour now that tab focus is viewport-based (#1):
+            // end any in-progress free-pan (else its RailPause would stay set on the hidden view and
+            // leave it stuck in the free-pan camera on return) and stop its auto-scroll.
+            if (RailPaused) ResumeRailFromPause();
             _controller.StopAutoScroll();
 
             ActiveTabIndex = index;

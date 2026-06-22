@@ -239,7 +239,10 @@ public partial class DocumentView : UserControl, IViewportSurface
         // Stop the outgoing tab driving this view: a late DPI render completing on the old tab
         // would otherwise call OnDpiRenderComplete and schedule a wasted animation frame.
         if (_tab is { } prev)
+        {
             prev.OnDpiRenderComplete = null;
+            prev.Viewport.RequestAnimation = null; // stop the outgoing tab waking this pane
+        }
         if (_ownsImages)
             _images?.Dispose();
         _tab = tab;
@@ -329,7 +332,14 @@ public partial class DocumentView : UserControl, IViewportSurface
         if (_shared is null) return;
         UpdateAllLayers();
         if (tab is not null)
+        {
+            // Wire this tab's viewport wake hooks (mirrors BindViewport for split panes): a DPI
+            // re-render or an off-thread analysis fan-out only repaints if the viewport can request a
+            // frame. Needed for a shared-model tab shown here while focus is on another surface — its
+            // rail would otherwise seat without repainting until an unrelated frame.
             tab.OnDpiRenderComplete = () => _shared.RequestAnimationFrame();
+            tab.Viewport.RequestAnimation = () => _shared.RequestAnimationFrame();
+        }
     }
 
     /// <summary>Sends fresh state to all composition layer handlers.</summary>
