@@ -156,7 +156,7 @@ public sealed partial class MainWindowViewModel
             if (vp.CurrentPage != f.Page) // a page-wide freeze belongs to the page it was set on
             {
                 ClearFreeze(vp);
-                OnPropertyChanged(nameof(IsFrozen));
+                RaiseFreezeStateIfFocused(vp);
             }
             else
             {
@@ -192,25 +192,26 @@ public sealed partial class MainWindowViewModel
         bool hasTop = f.TopBox is { W: > 0.5f, H: > 0.5f };
         bool hasLeft = f.LeftBox is { W: > 0.5f, H: > 0.5f };
 
-        f.Dpi = dpi;
-        if (!hasCorner && !hasTop && !hasLeft) return;
+        if (!hasCorner && !hasTop && !hasLeft) { f.Dpi = dpi; return; } // nothing to pin; no retry
 
         // Render the page once and crop the regions *exactly* (no padding): the strips span a full page
-        // dimension, so any padding would accumulate into visible drift.
+        // dimension, so any padding would accumulate into visible drift. Mark f.Dpi only on SUCCESS, so a
+        // transient render failure retries next frame instead of sticking at this DPI with null crops.
         try
         {
             using var page = vp.Owner.Pdf.RenderPage(vp.CurrentPage, dpi);
-            if (page is not SkiaRenderedPage skia) return;
+            if (page is not SkiaRenderedPage skia) return; // leave f.Dpi 0 → retry next frame
             var bmp = skia.Bitmap;
             float sx = bmp.Width / pageW;
             float sy = bmp.Height / pageH;
             if (hasCorner) f.Corner = CropExact(bmp, f.CornerBox, sx, sy);
             if (hasTop) f.Top = CropExact(bmp, f.TopBox, sx, sy);
             if (hasLeft) f.Left = CropExact(bmp, f.LeftBox, sx, sy);
+            f.Dpi = dpi;
         }
         catch (Exception ex)
         {
-            _logger.Error("[Freeze] crop render failed", ex);
+            _logger.Error("[Freeze] crop render failed", ex); // leave f.Dpi 0 → retry next frame
         }
     }
 
@@ -255,8 +256,27 @@ public sealed partial class MainWindowViewModel
         return arr;
     }
 
+    /// <summary>Remove a viewport's freeze (active + retired crops) and RETURN the crop images without
+    /// disposing them, so a closing surface can retire them on its FreezePaneLayer's composition thread
+    /// (the race-free path — a UI-thread dispose could free a bitmap mid-OnRender). Used by
+    /// <c>DocumentView</c> on close of a split pane / tear-off that still has its layer attached.</summary>
+    internal IReadOnlyList<SKImage> TakeFreezeCrops(Viewport vp)
+    {
+        var imgs = new List<SKImage>();
+        if (_freezeByVp.Remove(vp, out var f))
+        {
+            if (f.Corner is not null) imgs.Add(f.Corner);
+            if (f.Top is not null) imgs.Add(f.Top);
+            if (f.Left is not null) imgs.Add(f.Left);
+        }
+        if (_freezeRetired.Remove(vp, out var list))
+            imgs.AddRange(list);
+        return imgs;
+    }
+
     /// <summary>Dispose a removed viewport's freeze crops directly (the view is gone — its layer will
-    /// never drain the retire queue). Called when a tab / split pane / tear-off closes.</summary>
+    /// never drain the retire queue). Called when a tab closes (its Document pane has already rebound to
+    /// another tab, so its layer no longer references these crops).</summary>
     internal void DisposeFreezeFor(Viewport vp)
     {
         if (_freezeByVp.Remove(vp, out var f))
@@ -265,6 +285,17 @@ public sealed partial class MainWindowViewModel
         }
         if (_freezeRetired.Remove(vp, out var list))
             foreach (var img in list) img.Dispose();
+    }
+
+    /// <summary>When the armed freeze mode changes — most importantly when it clears to
+    /// <see cref="FreezeMode.None"/> (Escape, tab switch, re-pressing the mode) — re-render every
+    /// surface's freeze layer so the guide line drops immediately. Without this, a disarm that isn't
+    /// followed by a pointer move would leave the last guide painted (the layer only repaints on the
+    /// camera path or a SetFreezeGuide change).</summary>
+    partial void OnFreezeArmModeChanged(FreezeMode value)
+    {
+        foreach (var s in _surfaces)
+            s.RenderFreezePanes();
     }
 
     /// <summary>Dispose all freeze crops (active + pending-retired) on VM teardown.</summary>

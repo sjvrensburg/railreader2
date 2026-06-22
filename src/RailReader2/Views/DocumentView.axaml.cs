@@ -149,6 +149,18 @@ public partial class DocumentView : UserControl, IViewportSurface
             _images = null;
             _ownsImages = false;
         }
+        // Retire this surface's freeze crops on the FreezePaneLayer's composition thread before dropping
+        // the viewport reference: a UI-thread dispose could free a raster bitmap while OnRender is still
+        // drawing it. The VM hands the crops over WITHOUT disposing; clearing the layer state first drops
+        // the layer's reference so the queued RetireImage frees them only after the clear is processed.
+        // Teardown is close/shutdown-only (never relocate), so taking the freeze here can't lose a live one.
+        if (_shared is { } fvm && _viewport is { } fvp)
+        {
+            FreezeLayer.UpdateState(EmptyFreeze);
+            foreach (var img in fvm.TakeFreezeCrops(fvp))
+                if (!FreezeLayer.TrySendMessage(new RetireImage(img)))
+                    img.Dispose();
+        }
         // Drop references so a late event (a queued pointer / size change during the reparent or
         // close) can't reach a removed/disposed Core viewport through OwnerView → SurfaceViewport.
         Viewport.OwnerView = null;
@@ -301,8 +313,10 @@ public partial class DocumentView : UserControl, IViewportSurface
     public void RenderFreezePanes()
     {
         FreezeLayer.UpdateState(BuildFreezePaneState(_tab));
-        // Show the per-pane Unfreeze chip whenever THIS view is frozen.
-        FreezeChip.IsVisible = _shared is { } vm && _viewport is { } vp && vm.IsViewportFrozen(vp);
+        // Show the per-pane Unfreeze chip whenever THIS view is frozen. Set only on change — this runs on
+        // every camera frame, and a redundant IsVisible write invalidates the chip's layout each time.
+        bool chip = _shared is { } vm && _viewport is { } vp && vm.IsViewportFrozen(vp);
+        if (FreezeChip.IsVisible != chip) FreezeChip.IsVisible = chip;
     }
 
     /// <summary>Set/clear this pane's armed freeze-mode guide line(s) at a screen-space point (or
@@ -311,8 +325,7 @@ public partial class DocumentView : UserControl, IViewportSurface
     public void SetFreezeGuide(FreezeMode mode, double screenX, double screenY)
     {
         var next = mode == FreezeMode.None ? ((FreezeMode, double, double)?)null : (mode, screenX, screenY);
-        if (System.Collections.Generic.EqualityComparer<(FreezeMode, double, double)?>.Default.Equals(_freezeGuide, next))
-            return;
+        if (_freezeGuide == next) return; // nullable value-tuple equality — no change, no repaint
         _freezeGuide = next;
         RenderFreezePanes();
     }
@@ -531,9 +544,12 @@ public partial class DocumentView : UserControl, IViewportSurface
 
         // Armed freeze-mode guide line(s) for this pane — already in screen space (they track the
         // pointer exactly, no snapping). Drawn full-length by the handler.
+        // Gate on the live armed mode, not just the cached point: when a freeze is disarmed without a
+        // further pointer move (Escape, tab switch, re-pressing the mode), _freezeGuide can still hold the
+        // last point — only paint it while a mode is actually armed, so a stale guide never lingers.
         bool showGuide = false, guideH = false, guideV = false;
         float guideX = 0f, guideY = 0f;
-        if (_freezeGuide is { } g)
+        if (_freezeGuide is { } g && vm.FreezeArmMode != FreezeMode.None)
         {
             showGuide = true;
             guideH = g.Mode is FreezeMode.Rows or FreezeMode.Both;

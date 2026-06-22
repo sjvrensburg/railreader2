@@ -86,7 +86,6 @@ internal sealed class RailOverlayVisualHandler : CompositionCustomVisualHandler
                 state.LinePadding, state.Tint, state.TintOpacity,
                 OverlayRenderer.GetDimPaint(), OverlayRenderer.GetRevealPaint(),
                 OverlayRenderer.GetOutlinePaint(), OverlayRenderer.GetLinePaint());
-
         }
 
         if (state.DebugOverlay && state.DebugAnalysis is { } analysis)

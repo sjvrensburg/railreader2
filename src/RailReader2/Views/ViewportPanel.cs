@@ -145,6 +145,12 @@ public class ViewportPanel : Panel
             if (_barrelPan)
                 return; // the move handler pans; don't begin an annotation/browse stroke
 
+            // While a freeze placement is armed, a left click drops the split (committed on release as a
+            // click). Don't begin a browse/annotation stroke here — grabbing an annotation would set
+            // _browseAnnotationDrag and make the release take the browse branch, swallowing the freeze.
+            if (ViewModel!.FreezeArmMode != FreezeMode.None)
+                return;
+
             var (pageX, pageY) = ScreenToPage(_pressPos);
             if (ViewModel!.IsAnnotating)
             {
@@ -242,6 +248,20 @@ public class ViewportPanel : Panel
 
         _lastPos = dragPos;
         e.Handled = true;
+    }
+
+    protected override void OnPointerExited(PointerEventArgs e)
+    {
+        base.OnPointerExited(e);
+        // Pointer left this pane: drop its armed guide line so it doesn't stay painted here while the
+        // pointer (and a fresh guide) moves onto a different split pane. The move handler re-pushes it on
+        // re-entry. (OnPointerMoved only clears the guide once disarmed, never on a plain cross-pane exit.)
+        if (_freezeGuidePushed)
+        {
+            OwnerView?.SetFreezeGuide(FreezeMode.None, 0, 0);
+            Cursor = Cursor.Default;
+            _freezeGuidePushed = false;
+        }
     }
 
     private bool _showingLinkCursor;
