@@ -3,7 +3,7 @@
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
-    <Version>3.45.0.0</Version>
+    <Version>3.46.0.0</Version>
     <!-- Precompile IL to native (R2R) at publish time: cuts JIT/startup cost on
          both the AppImage and the Windows installer. Publish-only; no effect on
          dotnet build/run. -->

@@ -35,18 +35,21 @@ public partial class MainWindow
         vm.CloseExtraSurfacesRequested += OnCloseExtraSurfaces;
     }
 
-    // The document the extra surfaces currently belong to. When the active document changes, the
-    // extras (which render the previous document's viewports) collapse back to the single primary pane.
-    private TabViewModel? _surfaceTab;
+    // The document MODEL the extra surfaces currently belong to. Extra panes / tear-offs render
+    // viewports of one model, so they collapse only when the active model actually changes — NOT when
+    // merely switching between two tabs of the same file (decision #1: those share one model, so the
+    // splits stay valid). Keyed on the model, not the TabViewModel, for exactly that reason.
+    private DocumentModel? _surfaceModel;
 
-    /// <summary>Collapse split panes + tear-off windows when the active document changes — they render
-    /// the previous document's viewports. The ActiveTab notification also fires on plain overlay frames,
-    /// so this no-ops unless the document reference actually changed. Call after <c>Document.SetTab</c>,
-    /// so the primary pane is already rebound to the new document's primary view.</summary>
+    /// <summary>Collapse split panes + tear-off windows when the active <b>document model</b> changes —
+    /// they render the previous model's viewports. Switching between tabs that share a model (duplicate
+    /// tabs of the same file) keeps them. The ActiveTab notification also fires on plain overlay frames,
+    /// so this no-ops unless the model reference actually changed. Call after <c>Document.SetTab</c>.</summary>
     private void CollapseExtrasIfDocumentChanged(MainWindowViewModel vm)
     {
-        if (ReferenceEquals(vm.ActiveTab, _surfaceTab)) return;
-        _surfaceTab = vm.ActiveTab;
+        var model = vm.ActiveTab?.State;
+        if (ReferenceEquals(model, _surfaceModel)) return;
+        _surfaceModel = model;
         if (_panes.Count > 1 || _documentWindows.Count > 0)
             OnCloseExtraSurfaces();
     }
