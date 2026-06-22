@@ -145,6 +145,12 @@ public class ViewportPanel : Panel
             if (_barrelPan)
                 return; // the move handler pans; don't begin an annotation/browse stroke
 
+            // While a freeze placement is armed, a left click drops the split (committed on release as a
+            // click). Don't begin a browse/annotation stroke here — grabbing an annotation would set
+            // _browseAnnotationDrag and make the release take the browse branch, swallowing the freeze.
+            if (ViewModel!.FreezeArmMode != FreezeMode.None)
+                return;
+
             var (pageX, pageY) = ScreenToPage(_pressPos);
             if (ViewModel!.IsAnnotating)
             {
@@ -172,6 +178,24 @@ public class ViewportPanel : Panel
 
         if (!_dragging)
         {
+            // Freeze placement armed: the pointer IS the guide line(s) for the chosen mode (horizontal
+            // for rows, vertical for columns, both for a cross). Push the screen-space guide to this
+            // pane and show a crosshair; clear it once disarmed.
+            if (ViewModel.FreezeArmMode != FreezeMode.None)
+            {
+                var p = e.GetPosition(this);
+                OwnerView?.SetFreezeGuide(ViewModel.FreezeArmMode, p.X, p.Y);
+                Cursor = s_crossCursor;
+                _freezeGuidePushed = true;
+                return;
+            }
+            if (_freezeGuidePushed)
+            {
+                OwnerView?.SetFreezeGuide(FreezeMode.None, 0, 0);
+                Cursor = Cursor.Default; // the link/annotation cursor logic re-applies on the next move
+                _freezeGuidePushed = false;
+            }
+
             // Not dragging — update cursor for link hover (only in browse mode)
             if (!ViewModel.IsAnnotating)
             {
@@ -226,7 +250,24 @@ public class ViewportPanel : Panel
         e.Handled = true;
     }
 
+    protected override void OnPointerExited(PointerEventArgs e)
+    {
+        base.OnPointerExited(e);
+        // Pointer left this pane: drop its armed guide line so it doesn't stay painted here while the
+        // pointer (and a fresh guide) moves onto a different split pane. The move handler re-pushes it on
+        // re-entry. (OnPointerMoved only clears the guide once disarmed, never on a plain cross-pane exit.)
+        if (_freezeGuidePushed)
+        {
+            OwnerView?.SetFreezeGuide(FreezeMode.None, 0, 0);
+            Cursor = Cursor.Default;
+            _freezeGuidePushed = false;
+        }
+    }
+
     private bool _showingLinkCursor;
+    // True while this pane is pushing a freeze-mode guide line, so it can be cleared once disarmed.
+    private bool _freezeGuidePushed;
+    private static readonly Cursor s_crossCursor = new(StandardCursorType.Cross);
 
     private void UpdateLinkCursor(bool overLink)
     {
@@ -261,6 +302,15 @@ public class ViewportPanel : Panel
                     ViewModel.HandleBrowseClick((float)pageX, (float)pageY, _pressClickCount >= 2);
                 else
                     ViewModel.HandleBrowsePointerUp((float)pageX, (float)pageY);
+            }
+            // Freeze placement: when armed, a click drops the page-wide split at the pointer (rows
+            // above / columns left pin, per mode), on THIS pane's viewport. Free — no boundary snapping.
+            else if (isClick && ViewModel.FreezeArmMode != FreezeMode.None)
+            {
+                var (pageX, pageY) = ScreenToPage(pos);
+                ViewModel.PlaceFreeze(OwnerView?.SurfaceViewport, pageX, pageY);
+                OwnerView?.SetFreezeGuide(FreezeMode.None, 0, 0); // commit clears the guide
+                _freezeGuidePushed = false;
             }
             // "Start rail here": when armed, a single click force-activates rail at the click point
             // (any zoom). Checked before markers/block-framing so it wins regardless of what's under it.

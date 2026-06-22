@@ -459,23 +459,13 @@ public partial class MainWindow : Window
         switch (e.Key)
         {
             case Key.Down or Key.S:
-                // Cell mode on a table: plain Down steps to the cell directly below (Excel-style).
-                if (!e.KeyModifiers.HasFlag(KeyModifiers.Shift) && vm.TryHandleCellVertical(forward: true))
-                { e.Handled = true; return true; }
                 vm.HandleArrowDown(); e.Handled = true; return true;
             case Key.Up or Key.W:
-                if (!e.KeyModifiers.HasFlag(KeyModifiers.Shift) && vm.TryHandleCellVertical(forward: false))
-                { e.Handled = true; return true; }
                 vm.HandleArrowUp(); e.Handled = true; return true;
             case Key.Right:
-                // Cell mode on a table: plain Right steps cells; Shift+Right stays a fine pan (inspect).
-                if (!e.KeyModifiers.HasFlag(KeyModifiers.Shift) && vm.TryHandleCellHorizontal(forward: true))
-                { e.Handled = true; return true; }
                 vm.HandleArrowRight(e.KeyModifiers.HasFlag(KeyModifiers.Shift));
                 e.Handled = true; return true;
             case Key.Left or Key.A:
-                if (!e.KeyModifiers.HasFlag(KeyModifiers.Shift) && vm.TryHandleCellHorizontal(forward: false))
-                { e.Handled = true; return true; }
                 vm.HandleArrowLeft(e.KeyModifiers.HasFlag(KeyModifiers.Shift));
                 e.Handled = true; return true;
             case Key.P:
@@ -501,9 +491,12 @@ public partial class MainWindow : Window
                 vm.ToggleLineFocusBlur(); e.Handled = true; return true;
             case Key.H:
                 vm.ToggleLineHighlight(); RailToolBar.UpdateToggleStates(); e.Handled = true; return true;
-            case Key.Z when vm.CanFreeze || vm.IsFrozen:
-                // Table freeze-panes: pin rows above + columns left of the current cell (Excel-style).
-                vm.ToggleFreeze(); e.Handled = true; return true;
+            case Key.Z when vm.CanFreeze || vm.IsFrozen || vm.FreezeArmMode != FreezeMode.None:
+                // Freeze panes: Unfreeze if frozen, else arm a "both" placement — the pointer becomes a
+                // crossing guide; click to drop the page-wide split (rows above + columns left). The
+                // Table-Reading panel offers rows-only / columns-only. Z again cancels the arm.
+                if (vm.IsFrozen) vm.Unfreeze(); else vm.ArmFreeze(FreezeMode.Both);
+                e.Handled = true; return true;
             case Key.OemOpenBrackets when e.KeyModifiers == (KeyModifiers.Control | KeyModifiers.Shift):
                 RailToolBar.AdjustBlur(-0.01); e.Handled = true; return true;
             case Key.OemCloseBrackets when e.KeyModifiers == (KeyModifiers.Control | KeyModifiers.Shift):
@@ -528,7 +521,6 @@ public partial class MainWindow : Window
                 }
                 e.Handled = true; return true;
             case Key.D:
-                if (vm.TryHandleCellHorizontal(forward: true)) { e.Handled = true; return true; }
                 vm.HandleArrowRight(); e.Handled = true; return true;
             case Key.Home:
                 if (vm.ActiveTab is { } tH && tH.Rail.Active)
@@ -587,6 +579,8 @@ public partial class MainWindow : Window
                 vm.IsFullScreen = !vm.IsFullScreen; e.Handled = true; return true;
             // Disarm a pending "start rail here" click first — it's a one-shot action mode, so a single
             // Escape should always cancel it rather than being shadowed by the other Escape handlers.
+            case Key.Escape when vm.FreezeArmMode != FreezeMode.None:
+                vm.FreezeArmMode = FreezeMode.None; e.Handled = true; return true;
             case Key.Escape when vm.ArmActivateRailClick:
                 vm.ArmActivateRailClick = false; e.Handled = true; return true;
             case Key.Escape when vm.AutoScrollActive:

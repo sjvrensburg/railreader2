@@ -72,9 +72,22 @@ public partial class DocumentView : UserControl, IViewportSurface
     private int _markerCount = -1;
     private string? _markerDisplayed = "\u0000"; // sentinel distinct from null and any portal id
 
+    // Armed freeze-mode guide line(s) for THIS pane: the mode + the pointer position in SCREEN space.
+    // Null when not arming. Set by ViewportPanel as the pointer moves while a freeze mode is armed.
+    private (FreezeMode Mode, double X, double Y)? _freezeGuide;
+
     public DocumentView()
     {
         InitializeComponent();
+        // The floating Unfreeze chip clears THIS pane's freeze (per-viewport) and refreshes immediately.
+        FreezeChip.Click += (_, _) =>
+        {
+            if (_shared is { } vm && _viewport is { } vp)
+            {
+                vm.UnfreezeViewport(vp);
+                RenderFreezePanes();
+            }
+        };
     }
 
     public TabViewModel? Tab => _tab;
@@ -135,6 +148,18 @@ public partial class DocumentView : UserControl, IViewportSurface
             _images?.Dispose();
             _images = null;
             _ownsImages = false;
+        }
+        // Retire this surface's freeze crops on the FreezePaneLayer's composition thread before dropping
+        // the viewport reference: a UI-thread dispose could free a raster bitmap while OnRender is still
+        // drawing it. The VM hands the crops over WITHOUT disposing; clearing the layer state first drops
+        // the layer's reference so the queued RetireImage frees them only after the clear is processed.
+        // Teardown is close/shutdown-only (never relocate), so taking the freeze here can't lose a live one.
+        if (_shared is { } fvm && _viewport is { } fvp)
+        {
+            FreezeLayer.UpdateState(EmptyFreeze);
+            foreach (var img in fvm.TakeFreezeCrops(fvp))
+                if (!FreezeLayer.TrySendMessage(new RetireImage(img)))
+                    img.Dispose();
         }
         // Drop references so a late event (a queued pointer / size change during the reparent or
         // close) can't reach a removed/disposed Core viewport through OwnerView → SurfaceViewport.
@@ -285,7 +310,25 @@ public partial class DocumentView : UserControl, IViewportSurface
     /// <summary>Re-send the freeze-panes overlay state. Called from the camera path (UpdateAllLayers)
     /// and from RenderPage so a colour-effect change (which invalidates the page, not the camera)
     /// repaints the frozen tiles with the new effect immediately rather than on the next navigation.</summary>
-    public void RenderFreezePanes() => FreezeLayer.UpdateState(BuildFreezePaneState(_tab));
+    public void RenderFreezePanes()
+    {
+        FreezeLayer.UpdateState(BuildFreezePaneState(_tab));
+        // Show the per-pane Unfreeze chip whenever THIS view is frozen. Set only on change — this runs on
+        // every camera frame, and a redundant IsVisible write invalidates the chip's layout each time.
+        bool chip = _shared is { } vm && _viewport is { } vp && vm.IsViewportFrozen(vp);
+        if (FreezeChip.IsVisible != chip) FreezeChip.IsVisible = chip;
+    }
+
+    /// <summary>Set/clear this pane's armed freeze-mode guide line(s) at a screen-space point (or
+    /// <see cref="FreezeMode.None"/> to clear), re-rendering the freeze layer only when it changes.
+    /// Called by <see cref="ViewportPanel"/> as the pointer moves while a freeze mode is armed.</summary>
+    public void SetFreezeGuide(FreezeMode mode, double screenX, double screenY)
+    {
+        var next = mode == FreezeMode.None ? ((FreezeMode, double, double)?)null : (mode, screenX, screenY);
+        if (_freezeGuide == next) return; // nullable value-tuple equality — no change, no repaint
+        _freezeGuide = next;
+        RenderFreezePanes();
+    }
 
     /// <summary>Re-send the portal marker overlay state (markers added/removed, accent moved, or page
     /// changed). Cheap: the page-space marker list is cached and only rebuilt when it actually changes.</summary>
@@ -423,8 +466,7 @@ public partial class DocumentView : UserControl, IViewportSurface
             ZoomSpeed: (float)(_viewport?.Camera.ZoomSpeed ?? 0),
             MotionBlur: vm.AppConfig.MotionBlur,
             MotionBlurIntensity: (float)vm.AppConfig.MotionBlurIntensity,
-            // On a table the scoped table focus-dim (in the overlay) replaces the page line dim.
-            LineFocusBlur: (tab?.LineFocusBlur ?? false) && !vm.TableFocusActive(_viewport),
+            LineFocusBlur: tab?.LineFocusBlur ?? false,
             LineFocusIntensity: (float)vm.AppConfig.LineFocusBlurIntensity,
             LinePadding: (float)vm.AppConfig.LinePadding,
             LineY: lineY,
@@ -448,16 +490,6 @@ public partial class DocumentView : UserControl, IViewportSurface
         if (tab?.DebugOverlay == true && _viewport is { } dbgVp)
             tab.AnalysisCache.TryGetValue(dbgVp.CurrentPage, out debugAnalysis);
 
-        // Scoped table focus aids: when the rail is on a table row with cells, the overlay draws the
-        // scoped tint/dim and the package line highlight + page dim are suppressed (passed false).
-        bool tableFocus = vm.TableFocusActive(_viewport);
-        var tableScope = vm.EffectiveTableFocusScope;
-        CellInfo? tableCell = tableFocus ? _viewport!.Rail.CurrentCellInfo : null;
-        // The column band is only needed (and only inferred) for the column-bearing scopes.
-        Services.ColumnBand? tableColumn = tableFocus
-            && tableScope is Services.TableFocusScope.Column or Services.TableFocusScope.RowAndColumn
-            ? vm.CurrentTableColumn(_viewport) : null;
-
         return new RailOverlayRenderState(
             Camera: BuildCamera(_viewport),
             PageW: (float)(_viewport?.PageWidth ?? 0),
@@ -468,18 +500,11 @@ public partial class DocumentView : UserControl, IViewportSurface
             DebugAnalysis: debugAnalysis,
             DebugModelLabel: vm.ActiveLayoutModelName,
             Effect: vm.Controller.ActiveColourEffect,
-            LineFocusBlur: (tab?.LineFocusBlur ?? false) && !tableFocus,
-            LineHighlightEnabled: (tab?.LineHighlightEnabled ?? true) && !tableFocus,
+            LineFocusBlur: tab?.LineFocusBlur ?? false,
+            LineHighlightEnabled: tab?.LineHighlightEnabled ?? true,
             LinePadding: (float)vm.AppConfig.LinePadding,
             Tint: vm.AppConfig.LineHighlightTint,
-            TintOpacity: (float)vm.AppConfig.LineHighlightOpacity,
-            TableScope: tableScope,
-            // Highlight + dim stay on the usual controls (H / F); the table scope only shapes them.
-            TableHighlight: tableFocus && (tab?.LineHighlightEnabled ?? true),
-            TableDim: tableFocus && (tab?.LineFocusBlur ?? false),
-            TableDimIntensity: (float)vm.AppConfig.LineFocusBlurIntensity,
-            TableCell: tableCell,
-            TableColumn: tableColumn);
+            TintOpacity: (float)vm.AppConfig.LineHighlightOpacity);
     }
 
     private static readonly FreezePaneRenderState EmptyFreeze =
@@ -492,27 +517,53 @@ public partial class DocumentView : UserControl, IViewportSurface
     private FreezePaneRenderState BuildFreezePaneState(TabViewModel? tab)
     {
         var vm = _shared!;
-        if (tab is null) return EmptyFreeze;
+        if (tab is null || _viewport is not { } fvp) return EmptyFreeze;
 
-        var tiles = vm.GetFreezeTiles(tab, out var retired);
+        // Per-viewport (railreader2#180): each pane renders ITS OWN viewport's freeze, so a freeze in
+        // one split/tab no longer bleeds into the others.
+        var tiles = vm.GetFreezeTiles(fvp, out var retired);
         foreach (var img in retired)
             if (!FreezeLayer.TrySendMessage(new RetireImage(img)))
                 img.Dispose();
 
-        if (tiles is not { } t) return EmptyFreeze;
-
         var cam = BuildCamera(_viewport);
         float zoom = cam.ScaleX, ox = cam.TransX, oy = cam.TransY;
 
-        float pinX = Math.Max(0f, t.CornerBox.X * zoom + ox);
-        float pinY = Math.Max(0f, t.CornerBox.Y * zoom + oy);
+        // Committed frozen crops (absent while merely previewing a pick).
+        SKImage? corner = null, top = null, left = null;
+        SKRect cornerDst = default, topDst = default, leftDst = default;
+        if (tiles is { } t)
+        {
+            float pinX = Math.Max(0f, t.CornerBox.X * zoom + ox);
+            float pinY = Math.Max(0f, t.CornerBox.Y * zoom + oy);
+            corner = t.Corner; top = t.Top; left = t.Left;
+            cornerDst = Dst(t.CornerBox, zoom, pinX, pinY);                  // static at the pin
+            topDst = Dst(t.TopBox, zoom, t.TopBox.X * zoom + ox, pinY);      // tracks horizontal scroll
+            leftDst = Dst(t.LeftBox, zoom, pinX, t.LeftBox.Y * zoom + oy);   // tracks vertical scroll
+        }
+
+        // Armed freeze-mode guide line(s) for this pane — already in screen space (they track the
+        // pointer exactly, no snapping). Drawn full-length by the handler.
+        // Gate on the live armed mode, not just the cached point: when a freeze is disarmed without a
+        // further pointer move (Escape, tab switch, re-pressing the mode), _freezeGuide can still hold the
+        // last point — only paint it while a mode is actually armed, so a stale guide never lingers.
+        bool showGuide = false, guideH = false, guideV = false;
+        float guideX = 0f, guideY = 0f;
+        if (_freezeGuide is { } g && vm.FreezeArmMode != FreezeMode.None)
+        {
+            showGuide = true;
+            guideH = g.Mode is FreezeMode.Rows or FreezeMode.Both;
+            guideV = g.Mode is FreezeMode.Columns or FreezeMode.Both;
+            guideX = (float)g.X;
+            guideY = (float)g.Y;
+        }
+
+        if (corner is null && top is null && left is null && !showGuide) return EmptyFreeze;
 
         return new FreezePaneRenderState(
-            t.Corner, t.Top, t.Left,
-            Dst(t.CornerBox, zoom, pinX, pinY),                  // static at the pin
-            Dst(t.TopBox, zoom, t.TopBox.X * zoom + ox, pinY),   // tracks horizontal scroll
-            Dst(t.LeftBox, zoom, pinX, t.LeftBox.Y * zoom + oy), // tracks vertical scroll
-            vm.Controller.ActiveColourEffect, vm.Controller.ActiveColourIntensity, vm.ColourEffects);
+            corner, top, left, cornerDst, topDst, leftDst,
+            vm.Controller.ActiveColourEffect, vm.Controller.ActiveColourIntensity, vm.ColourEffects,
+            showGuide, guideH, guideV, guideX, guideY);
 
         static SKRect Dst(BBox box, float zoom, float x, float y)
             => SKRect.Create(x, y, box.W * zoom, box.H * zoom);

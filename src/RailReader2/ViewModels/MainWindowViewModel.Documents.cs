@@ -226,6 +226,10 @@ public sealed partial class MainWindowViewModel
         }
         OnPropertyChanged(nameof(ActiveTab));
         if (Tabs.Count > 0) FocusViewport(Tabs[ActiveTabIndex].Viewport);
+        // Free the closed view's frozen-pane crops (#180) only AFTER the Document pane has rebound to the
+        // now-active tab above — by then its FreezePaneLayer no longer references these crops, so this
+        // UI-thread dispose can't free a bitmap the compositor is still drawing for the closed viewport.
+        DisposeFreezeFor(tab.Viewport);
         // Re-evaluate portals for the now-active tab (or clear them when the last tab closed); also
         // close any pop-out window once no document remains so it can't linger over an empty app.
         EvaluatePortals();

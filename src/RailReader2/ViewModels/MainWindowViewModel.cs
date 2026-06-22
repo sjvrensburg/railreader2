@@ -134,6 +134,11 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     /// Consumed (reset to false) by that click, by Escape, or by toggling the button off.</summary>
     [ObservableProperty] private bool _armActivateRailClick;
 
+    /// <summary>When set (via a Freeze-mode control), the pointer shows the matching guide line(s) and
+    /// the next viewport click drops the freeze split there — see <see cref="PlaceFreeze"/>. Cleared by
+    /// that click, by Escape, by re-picking the same mode, or on tab switch.</summary>
+    [ObservableProperty] private FreezeMode _freezeArmMode;
+
     [ObservableProperty] private bool _showSettings;
     [ObservableProperty] private bool _showAbout;
     [ObservableProperty] private bool _showShortcuts;
@@ -434,6 +439,9 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         InvalidateCamera();
         OnPropertyChanged(nameof(ActiveTab));
         OnPropertyChanged(nameof(IsRailOnTable));
+        // Freeze is per-viewport — the toggle's state/enable reflects the newly-focused view.
+        OnPropertyChanged(nameof(IsFrozen));
+        OnPropertyChanged(nameof(CanFreeze));
     }
 
     /// <summary>Focus the registered surface that currently renders <paramref name="vp"/> — used on a
@@ -505,6 +513,10 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     {
         AnnounceAccessibilityState();
         EvaluatePortals();
+        // A page change can add/remove tables (CanFreeze) or take the focused view off its frozen page
+        // (IsFrozen auto-clears in GetFreezeTiles) — keep the Freeze toggle's label/enable in sync.
+        OnPropertyChanged(nameof(IsFrozen));
+        OnPropertyChanged(nameof(CanFreeze));
     }
 
     // --- Poll timer & animation ---

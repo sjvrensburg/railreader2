@@ -96,8 +96,9 @@ public partial class MainWindow
         if (Vm is not { } vm) return;
         var vp = view.SurfaceViewport;
         vm.UnregisterSurface(view);
-        view.Teardown(); // disposes its owned ViewportImages + removes handlers
-        if (vp is { } v) SafeRemoveViewport(vm, v);
+        view.Teardown(); // disposes its owned ViewportImages + handlers + retires its freeze crops (#180)
+        if (vp is { } v)
+            SafeRemoveViewport(vm, v);
     }
 
     /// <summary>Remove a viewport from whichever open document owns it. Iterating the open tabs (all
