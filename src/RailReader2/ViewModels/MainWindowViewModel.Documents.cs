@@ -44,7 +44,7 @@ public sealed partial class MainWindowViewModel
             while (tab is null)
             {
                 var attemptPassword = password;
-                DocumentState? state = null;
+                DocumentModel? state = null;
                 try
                 {
                     await Task.Run(() =>

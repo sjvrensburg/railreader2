@@ -99,7 +99,7 @@ public partial class MainWindow
 
     /// <summary>Remove a viewport from whichever open document owns it. Iterating the open tabs (all
     /// public API) keeps this safe whether the document was merely switched away from (still alive →
-    /// frees the bitmap now) or was closed (its DocumentState.Dispose already freed the viewport, so
+    /// frees the bitmap now) or was closed (its DocumentModel.Dispose already freed the viewport, so
     /// it isn't found here — no double-dispose). Avoids the internal Viewport.Owner / IsDisposed.</summary>
     private static void SafeRemoveViewport(MainWindowViewModel vm, Viewport vp)
     {

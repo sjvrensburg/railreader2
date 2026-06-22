@@ -196,7 +196,7 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(IsPortalViewLocked));
     }
 
-    private (double W, double H) PageSize(DocumentState doc, int page)
+    private (double W, double H) PageSize(DocumentModel doc, int page)
     {
         if (_pageSizeCache.TryGetValue(page, out var size)) return size;
         size = doc.Pdf.GetPageSize(page);
@@ -237,7 +237,7 @@ public sealed partial class MainWindowViewModel
     /// is active with layout analysis. Authoring actions that capture the current reading position
     /// gate on this (the right-click menu disables them, with an explanatory tooltip, otherwise).</summary>
     public bool CanCaptureReadingPosition
-        => _controller.ActiveDocument is { Rail: { Active: true, HasAnalysis: true } };
+        => _controller.FocusedViewport?.Owner is { Rail: { Active: true, HasAnalysis: true } };
 
     /// <summary>True when a block has been stashed via <see cref="SetPortalTarget"/> and is waiting to
     /// be linked to a reading position.</summary>
@@ -248,7 +248,7 @@ public sealed partial class MainWindowViewModel
     /// auto-dismisses once you read on to a different block. Not persisted; needs no rail mode.</summary>
     public void ShowBlockInPortal(int page, int block)
     {
-        if (_controller.ActiveDocument is not { } doc || ActiveTab is not { } tab) return;
+        if (_controller.FocusedViewport?.Owner is not { } doc || ActiveTab is not { } tab) return;
         if (!IsBlockResolvable(doc, page, block))
         {
             ShowStatusToast("No detected block here to open in a portal");
@@ -326,7 +326,7 @@ public sealed partial class MainWindowViewModel
     /// <summary>The page-level (page, block, line) the reading position currently sits on; block/line
     /// are -1 when not rail-reading. Read straight from RailNav — no text extraction (see
     /// <see cref="EvaluatePortals"/>).</summary>
-    private static (int Page, int Block, int Line) CurrentReadingBlock(DocumentState doc)
+    private static (int Page, int Block, int Line) CurrentReadingBlock(DocumentModel doc)
         => doc.Rail is { Active: true, HasAnalysis: true } rail
             ? (doc.CurrentPage, rail.CurrentNavigableArrayIndex, rail.CurrentLine)
             : (doc.CurrentPage, -1, -1);
@@ -340,7 +340,7 @@ public sealed partial class MainWindowViewModel
     /// pending-target retry) bypasses that fast path.</summary>
     internal void EvaluatePortals(bool forceRender = false)
     {
-        if (_controller.ActiveDocument is not { } doc || ActiveTab is not { } tab)
+        if (_controller.FocusedViewport?.Owner is not { } doc || ActiveTab is not { } tab)
         {
             ClearPortalPeek();
             ClearActivePortal();
@@ -445,10 +445,10 @@ public sealed partial class MainWindowViewModel
     /// block (the float is right there). An unresolved reference (caption page not analysed yet)
     /// sets <see cref="_autoRefPending"/> so the analysis poll retries; the previously pinned target
     /// stays up meanwhile. UI thread only.</summary>
-    private void TryAutoPin(DocumentState doc, int srcPage, int srcBlock, int srcLine)
+    private void TryAutoPin(DocumentModel doc, int srcPage, int srcBlock, int srcLine)
     {
         if (!AutoPinPortals || srcBlock < 0 || srcLine < 0) return;
-        if (!doc.AnalysisCache.TryGetValue(srcPage, out var analysis)
+        if (!doc.TryGetAnalysis(srcPage, out var analysis)
             || srcBlock >= analysis.Blocks.Count
             || analysis.Blocks[srcBlock].Role == BlockRole.Caption)
             return;
@@ -498,18 +498,19 @@ public sealed partial class MainWindowViewModel
         // Nothing pinned: retry while the index is still incomplete (budgeted build in progress) or
         // more analysis results may still bring the caption in. A complete miss on a fully-analysed
         // document is negative-cached by the index, so no retries are scheduled for it.
-        _autoRefPending = anyIncomplete || doc.AnalysisCache.Count < doc.PageCount;
+        _autoRefPending = anyIncomplete || doc.AnalysedPageCount < doc.PageCount;
     }
 
     /// <summary>Pin an automatically resolved reference: render the float together with its caption
     /// (the union region, so the label under the figure confirms the match) into the tracking
     /// preview. Shares <see cref="_displayedPortalId"/> with saved portals, so a later saved-portal
     /// activation or a different reference takes over normally.</summary>
-    private void PinAutoReference(DocumentState doc, ReferenceIndex.Reference reference,
+    private void PinAutoReference(DocumentModel doc, ReferenceIndex.Reference reference,
         ReferenceIndex.Target target, int srcPage, int srcBlock, int srcLine)
     {
         string autoId = AutoPinId(reference, target);
-        var blocks = doc.AnalysisCache[target.Page].Blocks;
+        if (!doc.TryGetAnalysis(target.Page, out var targetAnalysis)) return;
+        var blocks = targetAnalysis.Blocks;
         var region = Union(blocks[target.TargetBlock].BBox, blocks[target.CaptionBlock].BBox);
         var bitmap = RenderRegionCrop(doc, target.Page, region);
         if (bitmap is null)
@@ -539,10 +540,10 @@ public sealed partial class MainWindowViewModel
     /// <summary>Render a target block crop into <see cref="ActivePortalImage"/>. UI thread only.
     /// A still-unanalysed target page (block &lt; 0) leaves the panel waiting and sets
     /// <see cref="_portalTargetPending"/> so the analysis-complete poll retries via forceRender.</summary>
-    private void RenderPortalTarget(DocumentState doc, int page, int block)
+    private void RenderPortalTarget(DocumentModel doc, int page, int block)
     {
         bool resolvable = block >= 0 && page >= 0 && page < doc.PageCount
-            && doc.AnalysisCache.TryGetValue(page, out var analysis) && block < analysis.Blocks.Count;
+            && doc.TryGetAnalysis(page, out var analysis) && block < analysis.Blocks.Count;
         if (!resolvable)
         {
             _portalTargetPending = true;
@@ -565,10 +566,10 @@ public sealed partial class MainWindowViewModel
 
     /// <summary>Rasterise a detected block region and decode it to an Avalonia <see cref="Bitmap"/>,
     /// or null if the page/block is unavailable or rendering fails. UI thread only (PDFium).</summary>
-    private Bitmap? RenderBlockCrop(DocumentState doc, int page, int block)
+    private Bitmap? RenderBlockCrop(DocumentModel doc, int page, int block)
     {
         if (block < 0 || page < 0 || page >= doc.PageCount
-            || !doc.AnalysisCache.TryGetValue(page, out var analysis)
+            || !doc.TryGetAnalysis(page, out var analysis)
             || block >= analysis.Blocks.Count)
             return null;
         return RenderRegionCrop(doc, page, analysis.Blocks[block].BBox);
@@ -576,7 +577,7 @@ public sealed partial class MainWindowViewModel
 
     /// <summary>Rasterise an arbitrary page region (e.g. a figure + its caption) and decode it to an
     /// Avalonia <see cref="Bitmap"/>. UI thread only (PDFium).</summary>
-    private Bitmap? RenderRegionCrop(DocumentState doc, int page, BBox region)
+    private Bitmap? RenderRegionCrop(DocumentModel doc, int page, BBox region)
     {
         var (pageW, pageH) = PageSize(doc, page);
         byte[]? png = BlockCropRenderer.RenderBlockAsPng(doc.Pdf, page, region, pageW, pageH);
@@ -624,10 +625,10 @@ public sealed partial class MainWindowViewModel
     /// <summary>Resolve a stored anchor to a live block index on its page, or -1 if the page is not
     /// analysed yet. Fast path: the stored index, validated by role + normalized bbox (ε ≈ 2%). If a
     /// page was re-analysed into a different order, falls back to the nearest-centre same-role block.</summary>
-    private int ResolveAnchorBlock(DocumentState doc, PortalAnchor a)
+    private int ResolveAnchorBlock(DocumentModel doc, PortalAnchor a)
     {
         if (a.Page < 0 || a.Page >= doc.PageCount) return -1;
-        if (!doc.AnalysisCache.TryGetValue(a.Page, out var analysis)) return -1;
+        if (!doc.TryGetAnalysis(a.Page, out var analysis)) return -1;
         var blocks = analysis.Blocks;
         if (blocks.Count == 0) return -1;
         // Parse the stored role name once (enum compare avoids a per-block Role.ToString() allocation).
@@ -666,10 +667,10 @@ public sealed partial class MainWindowViewModel
     /// <summary>Resolve a source anchor's line index on the current analysis of its already-resolved
     /// block, or -1 for a whole-block source. Mirrors <see cref="ResolveAnchorBlock"/>: trusts the
     /// stored index while its normalized Y still matches, else falls back to the nearest-centre line.</summary>
-    private int ResolveAnchorLine(DocumentState doc, PortalAnchor a, int resolvedBlock)
+    private int ResolveAnchorLine(DocumentModel doc, PortalAnchor a, int resolvedBlock)
     {
         if (a.Line < 0) return -1;   // whole-block source
-        if (!doc.AnalysisCache.TryGetValue(a.Page, out var analysis)
+        if (!doc.TryGetAnalysis(a.Page, out var analysis)
             || resolvedBlock < 0 || resolvedBlock >= analysis.Blocks.Count)
             return -1;
         var lines = analysis.Blocks[resolvedBlock].Lines;
@@ -710,10 +711,12 @@ public sealed partial class MainWindowViewModel
 
     /// <summary>Build an anchor for a block; <paramref name="line"/> &gt;= 0 makes it a line-precise
     /// source anchor (also captures the line centre's normalized Y). Targets pass line -1 (whole block).</summary>
-    private PortalAnchor MakeAnchor(DocumentState doc, int page, int block, int line = -1)
+    private PortalAnchor MakeAnchor(DocumentModel doc, int page, int block, int line = -1)
     {
         var (pageW, pageH) = PageSize(doc, page);
-        var b = doc.AnalysisCache[page].Blocks[block];
+        if (!doc.TryGetAnalysis(page, out var pageAnalysis))
+            throw new KeyNotFoundException($"No analysis cached for page {page}");
+        var b = pageAnalysis.Blocks[block];
         float ly = line >= 0 && line < b.Lines.Count ? (float)(b.Lines[line].Y / pageH) : -1f;
         var (nx, ny, nw, nh) = Normalize(b.BBox, pageW, pageH);
         return new PortalAnchor
@@ -730,8 +733,8 @@ public sealed partial class MainWindowViewModel
         };
     }
 
-    private static bool IsBlockResolvable(DocumentState doc, int page, int block)
-        => block >= 0 && doc.AnalysisCache.TryGetValue(page, out var a) && block < a.Blocks.Count;
+    private static bool IsBlockResolvable(DocumentModel doc, int page, int block)
+        => block >= 0 && doc.TryGetAnalysis(page, out var a) && block < a.Blocks.Count;
 
     // --- Authoring / management ---
 
@@ -741,7 +744,7 @@ public sealed partial class MainWindowViewModel
     public void CreatePortal(int targetPage, int targetBlock, int? sourcePage = null,
         int? sourceBlock = null, string? label = null)
     {
-        if (_controller.ActiveDocument is not { } doc || ActiveTab is not { } tab) return;
+        if (_controller.FocusedViewport?.Owner is not { } doc || ActiveTab is not { } tab) return;
 
         int sp, sb, sl;   // source page, block, line (-1 = whole-block source)
         if (sourcePage is { } ep && sourceBlock is { } eb) { sp = ep; sb = eb; sl = -1; }
@@ -783,7 +786,7 @@ public sealed partial class MainWindowViewModel
     /// <summary>Right-click path: stash a block as the pending portal target.</summary>
     public void SetPortalTarget(int page, int block)
     {
-        if (_controller.ActiveDocument is not { } doc) return;
+        if (_controller.FocusedViewport?.Owner is not { } doc) return;
         if (!IsBlockResolvable(doc, page, block))
         {
             ShowStatusToast("No detected block here to set as a portal target");
@@ -849,7 +852,7 @@ public sealed partial class MainWindowViewModel
     /// transient auto-pin portal — which is never in the saved set — can drive it too.</summary>
     public void GoToPortalSource(Portal portal)
     {
-        if (_controller.ActiveDocument is not { } doc) return;
+        if (_controller.FocusedViewport?.Owner is not { } doc) return;
 
         GoToPage(portal.Source.Page);
         int block = ResolveAnchorBlock(doc, portal.Source);
@@ -884,7 +887,7 @@ public sealed partial class MainWindowViewModel
 
     /// <summary>Pin a portal as the shown one: render its target into the tracking preview, label it,
     /// and accent its markers. Shared by the sync loop's activation and the marker-click path.</summary>
-    private void Pin(DocumentState doc, Portal portal)
+    private void Pin(DocumentModel doc, Portal portal)
     {
         _displayedPortalId = portal.Id;
         _autoPin = null;   // a saved portal takes over — drop any auto-pin coordinates so they can't go stale
@@ -897,7 +900,7 @@ public sealed partial class MainWindowViewModel
     /// Pins it like a normal activation (stays until a different source is reached).</summary>
     public void ShowPortalTarget(Portal portal)
     {
-        if (_controller.ActiveDocument is not { } doc) return;
+        if (_controller.FocusedViewport?.Owner is not { } doc) return;
         Pin(doc, portal);
         RevealPortalPane();
     }
@@ -915,7 +918,7 @@ public sealed partial class MainWindowViewModel
     /// before a page is analysed). Cheap; no PDFium.</summary>
     public IReadOnlyList<PortalMarker> BuildPortalMarkers(Viewport? vp)
     {
-        if (vp is null || _controller.ActiveDocument is not { } doc || ActiveTab is not { } tab)
+        if (vp is null || _controller.FocusedViewport?.Owner is not { } doc || ActiveTab is not { } tab)
             return [];
         // The active auto pin is not a saved Portal, but BuildAutoPinPortal reifies it into a transient
         // one with Id == _displayedPortalId, so it flows through the same grouping below as any saved
@@ -985,7 +988,7 @@ public sealed partial class MainWindowViewModel
     /// on-page markers are interactive in the same way saved portals' are. Returns null if either
     /// endpoint's page is not analysed (so MakeAnchor cannot read the block). The Id equals
     /// <see cref="_displayedPortalId"/>.</summary>
-    private Portal? BuildAutoPinPortal(DocumentState doc)
+    private Portal? BuildAutoPinPortal(DocumentModel doc)
     {
         if (_displayedPortalId is not { } id || _autoPin is not { } a)
             return null;
@@ -1000,9 +1003,9 @@ public sealed partial class MainWindowViewModel
         };
     }
 
-    private static string DefaultPortalLabel(DocumentState doc, int page, int block)
+    private static string DefaultPortalLabel(DocumentModel doc, int page, int block)
     {
-        if (!doc.AnalysisCache.TryGetValue(page, out var analysis) || block < 0 || block >= analysis.Blocks.Count)
+        if (!doc.TryGetAnalysis(page, out var analysis) || block < 0 || block >= analysis.Blocks.Count)
             return $"Portal (p.{page + 1})";
         var role = analysis.Blocks[block].Role;
         // Ordinal among same-role blocks up to and including this one on the page (1-based).

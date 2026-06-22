@@ -13,11 +13,11 @@ public sealed partial class MainWindowViewModel
     /// <summary>The active document plus its seated navigable rail block — what the block-copy entry
     /// points (keyboard, context menu, Edit menu) operate on. Null when there is no open document
     /// (silent), or with a "No block selected" toast when a document is open but no block is seated.</summary>
-    private (DocumentState Doc, Viewport Vp, LayoutBlock Block)? CurrentRailBlockOrToast()
+    private (DocumentModel Doc, Viewport Vp, LayoutBlock Block)? CurrentRailBlockOrToast()
     {
         // The focused viewport's rail (a split pane / tear-off can be rail-reading a different
         // block/page than the primary), not the document's Primary facade.
-        if (_controller.ActiveDocument is not { } doc || _controller.FocusedViewport is not { } vp) return null;
+        if (_controller.FocusedViewport?.Owner is not { } doc || _controller.FocusedViewport is not { } vp) return null;
         if (!vp.Rail.HasAnalysis || vp.Rail.CurrentNavigableBlock is not { } block)
         {
             ShowStatusToast("No block selected");
@@ -49,11 +49,11 @@ public sealed partial class MainWindowViewModel
 
     public LayoutBlock? FindBlockAt(double pageX, double pageY)
     {
-        var doc = _controller.ActiveDocument;
+        var doc = _controller.FocusedViewport?.Owner;
         var vp = _controller.FocusedViewport;
         if (doc is null || vp is null) return null;
 
-        if (!doc.AnalysisCache.TryGetValue(vp.CurrentPage, out var analysis))
+        if (!doc.TryGetAnalysis(vp.CurrentPage, vp.AnalysisParams, out var analysis))
             return null;
 
         foreach (var b in analysis.Blocks)
@@ -70,11 +70,11 @@ public sealed partial class MainWindowViewModel
     /// <see cref="FindBlockAt"/> and Core's <c>analysis.Blocks</c>.</summary>
     public int FindBlockIndexAt(double pageX, double pageY)
     {
-        var doc = _controller.ActiveDocument;
+        var doc = _controller.FocusedViewport?.Owner;
         var vp = _controller.FocusedViewport;
         if (doc is null || vp is null) return -1;
 
-        if (!doc.AnalysisCache.TryGetValue(vp.CurrentPage, out var analysis))
+        if (!doc.TryGetAnalysis(vp.CurrentPage, vp.AnalysisParams, out var analysis))
             return -1;
 
         for (int i = 0; i < analysis.Blocks.Count; i++)
@@ -89,7 +89,7 @@ public sealed partial class MainWindowViewModel
 
     public async Task CopyBlockWithAction(LayoutBlock block, BlockAction action)
     {
-        var doc = _controller.ActiveDocument;
+        var doc = _controller.FocusedViewport?.Owner;
         var vp = _controller.FocusedViewport;
         if (doc is null || vp is null) return;
         await SendBlockToVlm(doc, vp, block, action);
@@ -97,7 +97,7 @@ public sealed partial class MainWindowViewModel
 
     public async Task CopyBlockAsImage(LayoutBlock block)
     {
-        var doc = _controller.ActiveDocument;
+        var doc = _controller.FocusedViewport?.Owner;
         var vp = _controller.FocusedViewport;
         if (doc is null || vp is null) return;
 
@@ -119,7 +119,7 @@ public sealed partial class MainWindowViewModel
     private static BlockAction DefaultActionForBlock(BlockRole role) =>
         VlmService.GetBlockAction(role) ?? BlockAction.LaTeX;
 
-    private async Task SendBlockToVlm(DocumentState doc, Viewport vp, LayoutBlock block, BlockAction action)
+    private async Task SendBlockToVlm(DocumentModel doc, Viewport vp, LayoutBlock block, BlockAction action)
     {
         if (string.IsNullOrWhiteSpace(AppConfig.VlmEndpoint))
         {

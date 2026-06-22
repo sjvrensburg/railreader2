@@ -158,10 +158,10 @@ internal sealed partial class ReferenceIndex
     /// <paramref name="incomplete"/> is true when the scan ran out of its per-call page-build budget
     /// before covering every analysed page — the caller should retry (progress is cached). A
     /// complete miss is negative-cached until the set of analysed pages changes.</summary>
-    public Target? Resolve(DocumentState doc, Reference reference, int nearPage, out bool incomplete)
+    public Target? Resolve(DocumentModel doc, Reference reference, int nearPage, out bool incomplete)
     {
         incomplete = false;
-        int analysed = doc.AnalysisCache.Count;
+        int analysed = doc.AnalysedPageCount;
         if (_noMatch.TryGetValue(reference, out int seenAt) && seenAt == analysed)
             return null;
 
@@ -180,10 +180,10 @@ internal sealed partial class ReferenceIndex
         return null;
     }
 
-    private Target? FindOnPage(DocumentState doc, int page, Reference reference,
+    private Target? FindOnPage(DocumentModel doc, int page, Reference reference,
         ref int budget, ref bool incomplete)
     {
-        if (!doc.AnalysisCache.TryGetValue(page, out var analysis)) return null;
+        if (!doc.TryGetAnalysis(page, out var analysis)) return null;
         if (!_pages.TryGetValue(page, out var entry) || !ReferenceEquals(entry.Analysis, analysis))
         {
             if (budget <= 0)
@@ -205,9 +205,9 @@ internal sealed partial class ReferenceIndex
     /// Text-role blocks that read like a caption AND hug a float, covering detector misclassification.
     /// Both passes require the float to overlap the caption horizontally within a bounded vertical
     /// gap, so a label whose own float was misdetected is dropped rather than bound to an unrelated
-    /// block across the page. Text extraction is cached per page (DocumentState.GetOrExtractText),
+    /// block across the page. Text extraction is cached per page (DocumentModel.GetOrExtractText),
     /// so rebuilds after the first touch are regex + geometry only.</summary>
-    private static PageLabels BuildPage(DocumentState doc, int page, PageAnalysis analysis)
+    private static PageLabels BuildPage(DocumentModel doc, int page, PageAnalysis analysis)
     {
         List<(Reference Ref, int TargetBlock, int CaptionBlock)> labels = [];
         PageText? pageText = null;
