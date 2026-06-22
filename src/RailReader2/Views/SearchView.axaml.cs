@@ -214,7 +214,7 @@ public partial class SearchView : UserControl
         }
 
         bool caseSensitive = CaseSensitiveToggle.IsChecked == true;
-        var doc = _vm.Controller.ActiveDocument;
+        var doc = _vm.Controller.FocusedViewport?.Owner;
         if (doc is null) return;
 
         var (regex, comparison, regexError) = SearchService.PrepareSearchParams(query, caseSensitive, useRegex);

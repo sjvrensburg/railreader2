@@ -154,7 +154,7 @@ public sealed partial class MainWindowViewModel
             {
                 rail.CurrentCell = NearestCellIndex(cells, targetX);
                 var cam = ActiveTab!.Camera;
-                var (ww, wh) = _controller.GetViewportSize();
+                var (ww, wh) = FocusedViewportSize();
                 rail.StartSnapToCell(cam.OffsetX, cam.OffsetY, cam.Zoom, ww, wh);
             }
         }, InvalidateNavigation, animate: true);

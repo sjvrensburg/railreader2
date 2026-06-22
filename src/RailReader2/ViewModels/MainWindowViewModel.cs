@@ -326,10 +326,9 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         _controller.StatusMessage += ShowStatusToast;
         // Push-based reading-context updates: Core fires these (on the UI thread) the moment the page
         // or rail reading position changes — including jumps that don't otherwise repaint the overlay
-        // (e.g. NavigateToRole). Both fan out through the one OnReadingContextChanged chokepoint so a
-        // future consumer of "the reading context moved" has a single place to hook.
-        _controller.PageChanged = _ => OnReadingContextChanged();
-        _controller.ReadingPositionChanged = _ => OnReadingContextChanged();
+        // (e.g. NavigateToRole). Phase 3 removed the controller-level facades, so these are wired
+        // per-viewport on the FOCUSED view (in WireFocusedSignals, re-pointed by FocusSurface) — the
+        // old facade only ever fired for the focused view, so this is equivalent.
         WireAnnotationStoreSignals();
         SetupPollTimer();
     }
@@ -421,17 +420,43 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     /// act on this surface (Core routes host input through <c>FocusedViewport</c>). Idempotent.</summary>
     public void FocusSurface(IViewportSurface surface, Viewport vp)
     {
+        // Re-point the per-viewport reading-context subscription to the now-focused view (replaces the
+        // removed controller-level PageChanged/ReadingPositionChanged facades — Phase 3). Done before
+        // the already-focused early-return so the very first focus (primary on open) gets wired too.
+        WireFocusedSignals(vp);
         if (ReferenceEquals(_controller.FocusedViewport, vp)) return;
         _controller.FocusedViewport = vp;
         // The controller's ambient size (input geometry) now tracks this surface.
         var (w, h) = surface.SurfaceSize;
-        if (w > 0 && h > 0) _controller.SetViewportSize(w, h);
+        if (w > 0 && h > 0) _controller.FocusedViewport?.SetSize(w, h);
         UpdateSurfaceFocusVisuals();
         // The status bar / menu gating / rail toolbar reflect the focused view.
         InvalidateCamera();
         OnPropertyChanged(nameof(ActiveTab));
         OnPropertyChanged(nameof(IsRailOnTable));
     }
+
+    // The viewport whose PageChanged/ReadingPositionChanged currently drive OnReadingContextChanged.
+    private Viewport? _signalWiredViewport;
+
+    /// <summary>Subscribe the focused viewport's reading-context events to <see cref="OnReadingContextChanged"/>,
+    /// unsubscribing the previously-focused one. Idempotent. Replaces the controller-level event facade
+    /// removed in Phase 3 — the facade only ever fired for the focused view.</summary>
+    private void WireFocusedSignals(Viewport vp)
+    {
+        if (ReferenceEquals(_signalWiredViewport, vp)) return;
+        if (_signalWiredViewport is { } prev)
+        {
+            prev.PageChanged -= OnFocusedViewportPageChanged;
+            prev.ReadingPositionChanged -= OnFocusedViewportReadingPositionChanged;
+        }
+        _signalWiredViewport = vp;
+        vp.PageChanged += OnFocusedViewportPageChanged;
+        vp.ReadingPositionChanged += OnFocusedViewportReadingPositionChanged;
+    }
+
+    private void OnFocusedViewportPageChanged(int _) => OnReadingContextChanged();
+    private void OnFocusedViewportReadingPositionChanged(ReadingPosition _) => OnReadingContextChanged();
 
     /// <summary>Light up the focused pane's border, but only when more than one surface is live (a lone
     /// viewport has no focus ambiguity, so it shows no border).</summary>
@@ -510,7 +535,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             EvaluatePortals(forceRender: gotResults && PortalResolvePending);
 
             bool hasWork = _controller.HasBackgroundAnalysisWork;
-            bool railActive = _controller.ActiveDocument?.Rail.Active == true;
+            bool railActive = _controller.FocusedViewport?.Owner?.Rail.Active == true;
             if (!railActive && _controller.Worker.IsIdle && hasWork)
                 _controller.TrySubmitBackgroundReadAhead();
 
@@ -615,7 +640,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         _animationRequested = true;
         // RequestAnimationFrame is deprecated in Avalonia 12 in favour of compositor-based
         // animation timers, but those callbacks fire on the composition thread. Our per-frame
-        // OnAnimationFrame (Controller.Tick + DocumentState mutation + layer invalidation) must
+        // OnAnimationFrame (Controller.Tick + DocumentModel mutation + layer invalidation) must
         // run on the UI thread, so we keep the UI-thread-synced RequestAnimationFrame here.
 #pragma warning disable CS0618 // Type or member is obsolete
         _window?.RequestAnimationFrame(OnAnimationFrame);
@@ -724,11 +749,11 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     [RelayCommand(CanExecute = nameof(CanStartScanAll))]
     public void StartScanAll()
     {
-        var doc = _controller.ActiveDocument;
+        var doc = _controller.FocusedViewport?.Owner;
         if (doc is null || IsScanAllActive) return;
 
         // Already fully scanned?
-        if (doc.AnalysisCache.Count >= doc.PageCount)
+        if (doc.AnalysedPageCount >= doc.PageCount)
         {
             ShowStatusToast("All pages already scanned");
             return;
@@ -737,7 +762,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         IsScanAllActive = true;
         if (ActiveTab is { } tab) tab.FullScanPeekIndex = null;
         _scanAllOriginalWindowPages = _appConfig.BackgroundAnalysisWindowPages;
-        _scanAllLastScanned = doc.AnalysisCache.Count;
+        _scanAllLastScanned = doc.AnalysedPageCount;
         _scanAllStallTicks = 0;
 
         // Expand to whole-document sweep and re-centre the queue from page 0
@@ -758,7 +783,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
     private void OnScanAllTick(object? sender, EventArgs e)
     {
-        var doc = _controller.ActiveDocument;
+        var doc = _controller.FocusedViewport?.Owner;
         if (doc is null) { CancelScanAll(); return; }
 
         // Poll any completed analysis results
@@ -769,7 +794,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         if (workerIdle)
             _controller.TrySubmitBackgroundReadAhead();
 
-        int scanned = doc.AnalysisCache.Count;
+        int scanned = doc.AnalysedPageCount;
         int total = doc.PageCount;
         ScanAllProgress = $"Scanning… {scanned} of {total} pages";
 
@@ -814,17 +839,17 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     /// </summary>
     private void TeardownScanAll(bool completed)
     {
-        var doc = _controller.ActiveDocument;
+        var doc = _controller.FocusedViewport?.Owner;
 
         StopScanAllTimer();
 
         // Capture counts before trimming so the toast reflects the sweep result.
-        int scanned = doc?.AnalysisCache.Count ?? 0;
+        int scanned = doc?.AnalysedPageCount ?? 0;
         int total = doc?.PageCount ?? 0;
 
         // Build the full figure index from whatever was scanned, store per-tab.
         if (doc is not null && ActiveTab is { } tab)
-            tab.FullScanPeekIndex = PeekIndexBuilder.Build(doc.AnalysisCache, doc.PageCount);
+            tab.FullScanPeekIndex = PeekIndexBuilder.Build(doc.CanonicalAnalyses, doc.PageCount);
 
         // Restore the analysis window the user had before the sweep.
         _appConfig.BackgroundAnalysisWindowPages = _scanAllOriginalWindowPages;
@@ -862,7 +887,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     /// preserves the figure/equation/table data. Removed pages will be re-analyzed
     /// on demand when the user navigates near them.
     /// </summary>
-    private void TrimDistantAnalysisCache(DocumentState doc)
+    private void TrimDistantAnalysisCache(DocumentModel doc)
     {
         int window = _scanAllOriginalWindowPages;
         if (window <= 0) return; // whole-document mode: don't trim
@@ -871,28 +896,9 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         int lo = Math.Max(0, center - window);
         int hi = Math.Min(doc.PageCount - 1, center + window);
 
-        // Downcast from IReadOnlyDictionary to Dictionary to remove entries.
-        // The runtime type is Dictionary<int, PageAnalysis> (DocumentState._analysisCache).
-        // If a future Core version wraps the cache, log it loudly rather than
-        // silently skipping the trim — otherwise a whole-document sweep would
-        // leave every page's analysis resident with no visible symptom.
-        if (doc.AnalysisCache is not Dictionary<int, PageAnalysis> mutable)
-        {
-            _logger.Error(
-                $"[ScanAll] AnalysisCache is {doc.AnalysisCache.GetType().Name}, not a mutable " +
-                "Dictionary — cannot trim distant pages; analysis memory will not be reclaimed.");
-            return;
-        }
-
-        var keysToRemove = new List<int>();
-        foreach (var kvp in mutable)
-        {
-            if (kvp.Key < lo || kvp.Key > hi)
-                keysToRemove.Add(kvp.Key);
-        }
-
-        foreach (var key in keysToRemove)
-            mutable.Remove(key);
+        // Core owns the (page, params)-keyed analysis cache now (Phase 3) — ask it to drop every
+        // page outside the keep-window. Replaces the old downcast-to-mutable-Dictionary hack.
+        doc.EvictAnalysisOutside(lo, hi);
     }
 
     private const double BaseFontSize = 14.0;
@@ -907,7 +913,15 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
     public double CurrentFontSize => BaseFontSize * AppConfig.UiFontScale;
 
-    public void SetViewportSize(double w, double h) => _controller.SetViewportSize(w, h);
+    // Phase 3: Core no longer keeps an ambient size — each viewport is sized via Viewport.SetSize.
+    // This sizes the focused viewport (the surface the user is acting on); a DocumentView sizes its
+    // own viewport directly in its layout handler.
+    public void SetViewportSize(double w, double h) => _controller.FocusedViewport?.SetSize(w, h);
+
+    /// <summary>The focused viewport's size, or (0,0) if none — replaces the removed
+    /// <c>controller.GetViewportSize()</c> ambient accessor (Phase 3).</summary>
+    private (double, double) FocusedViewportSize()
+        => _controller.FocusedViewport is { } v ? (v.Width, v.Height) : (0.0, 0.0);
 
     // --- Invalidation helpers ---
 

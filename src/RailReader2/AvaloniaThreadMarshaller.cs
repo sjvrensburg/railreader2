@@ -11,6 +11,6 @@ public sealed class AvaloniaThreadMarshaller : IThreadMarshaller
     public void AssertUIThread()
     {
         Debug.Assert(Dispatcher.UIThread.CheckAccess(),
-            "DocumentState mutation called from non-UI thread");
+            "DocumentModel mutation called from non-UI thread");
     }
 }

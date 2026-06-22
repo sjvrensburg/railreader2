@@ -97,7 +97,7 @@ public sealed partial class MainWindowViewModel
         if (current <= 0) return;
         double target = Math.Clamp(percent / 100.0, 0.5, 20.0); // mirrors Core's HandleZoom clamp
         double delta = ((target / current) - 1.0) / ZoomDeltaScale;
-        var (ww, wh) = _controller.GetViewportSize();
+        var (ww, wh) = FocusedViewportSize();
         Dispatch(() => _controller.HandleZoom(delta, ww / 2.0, wh / 2.0, ctrlHeld: false),
             InvalidateCameraAndTab, animate: true);
     }
@@ -164,7 +164,7 @@ public sealed partial class MainWindowViewModel
     {
         if (ActiveTab is null) return;
         if (ForcedRailActive) { ExitForcedRail(); return; }
-        var (ww, wh) = _controller.GetViewportSize();
+        var (ww, wh) = FocusedViewportSize();
         ActivateRailAtClick(ww / 2.0, wh / 2.0);
     }
 
@@ -294,7 +294,7 @@ public sealed partial class MainWindowViewModel
 
     public void ToggleLineFocusBlur()
     {
-        if (_controller.ActiveDocument is { } doc)
+        if (_controller.FocusedViewport?.Owner is { } doc)
         {
             doc.LineFocusBlur = !doc.LineFocusBlur;
             InvalidatePage();
@@ -315,10 +315,10 @@ public sealed partial class MainWindowViewModel
     /// </summary>
     public void ApplyMarginCropping(bool enabled)
     {
-        if (_controller.ActiveDocument is not { } doc) return;
+        if (_controller.FocusedViewport?.Owner is not { } doc) return;
         if (doc.MarginCropping == enabled) return;
 
-        var (ww, wh) = _controller.GetViewportSize();
+        var (ww, wh) = FocusedViewportSize();
         var (_, _, preRw, _) = doc.GetFitRect();
         double preFitZoom = preRw > 0 ? ww / preRw : doc.Camera.Zoom;
         bool atFitWidth = doc.Camera.Zoom <= preFitZoom * AtFitWidthHysteresis;
@@ -337,13 +337,13 @@ public sealed partial class MainWindowViewModel
 
     public void ToggleMarginCropping()
     {
-        if (_controller.ActiveDocument is { } doc)
+        if (_controller.FocusedViewport?.Owner is { } doc)
             ApplyMarginCropping(!doc.MarginCropping);
     }
 
     public void ToggleLineHighlight()
     {
-        if (_controller.ActiveDocument is { } doc)
+        if (_controller.FocusedViewport?.Owner is { } doc)
         {
             doc.LineHighlightEnabled = !doc.LineHighlightEnabled;
             InvalidateOverlay();

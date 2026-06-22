@@ -95,7 +95,8 @@ public partial class DocumentView : UserControl, IViewportSurface
         ToolBar.ViewModel = shared;
 
         _ownsImages = false; // borrowing tab.PrimaryImages (shared with the minimap)
-        shared.SetViewportSize(Viewport.Bounds.Width, Viewport.Bounds.Height);
+        // Size THIS pane's own viewport (Phase 3: no controller ambient size any more).
+        _viewport?.SetSize(Viewport.Bounds.Width, Viewport.Bounds.Height);
         if (!_wired)
         {
             Viewport.SizeChanged += OnViewportSizeChanged;
@@ -305,12 +306,9 @@ public partial class DocumentView : UserControl, IViewportSurface
         var (ww, wh) = (Viewport.Bounds.Width, Viewport.Bounds.Height);
         if (_viewport is { } vp)
         {
-            // Per-view size → correct ReadingPosition.HorizontalFraction for this surface.
+            // Per-view size → correct tick/clamp/seat + ReadingPosition.HorizontalFraction for this
+            // surface. Phase 3: each viewport owns its size; there is no controller ambient size.
             vp.SetSize(ww, wh);
-            // The controller's ambient size (input geometry + tick/clamp) tracks the focused surface;
-            // update it when we are the focused one. The frame loop swaps it per surface while ticking.
-            if (ReferenceEquals(vp, _shared.Controller.FocusedViewport))
-                _shared.SetViewportSize(ww, wh);
             if (_pendingCenter)
             {
                 // First layout of a freshly-bound pane: fit/centre it now that it has bounds.
@@ -322,10 +320,8 @@ public partial class DocumentView : UserControl, IViewportSurface
             UpdatePagePanelSize(_tab);
             UpdateAllLayers();
         }
-        else
-        {
-            _shared.SetViewportSize(ww, wh);
-        }
+        // No bound viewport yet → nothing to size (Phase 3 removed the controller ambient size; the
+        // primary is sized from its own bounds once a tab binds here).
     }
 
     private void UpdateLayerBindings(TabViewModel? tab)

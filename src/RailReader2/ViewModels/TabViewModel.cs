@@ -7,13 +7,13 @@ using SkiaSharp;
 namespace RailReader2.ViewModels;
 
 /// <summary>
-/// Thin Avalonia wrapper around <see cref="DocumentState"/>.
+/// Thin Avalonia wrapper around <see cref="DocumentModel"/>.
 /// Surfaces [ObservableProperty] for data binding and delegates
 /// only what the Views actually need.
 /// </summary>
 public sealed partial class TabViewModel : ObservableObject, IDisposable
 {
-    public DocumentState State { get; }
+    public DocumentModel State { get; }
 
     [ObservableProperty] private string _title;
     [ObservableProperty] private int _currentPage;
@@ -48,7 +48,7 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
     public IPdfService Pdf => State.Pdf;
     public Camera Camera => State.Camera;
     public RailNav Rail => State.Rail;
-    public IReadOnlyDictionary<int, PageAnalysis> AnalysisCache => State.AnalysisCache;
+    public IReadOnlyDictionary<int, PageAnalysis> AnalysisCache => State.CanonicalAnalyses;
     public List<OutlineEntry> Outline => State.Outline;
     public AnnotationFile Annotations => State.Annotations;
     public int CachedDpi => State.CachedDpi;
@@ -90,7 +90,7 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
         set => State.OnDpiRenderComplete = value;
     }
 
-    public TabViewModel(DocumentState state)
+    public TabViewModel(DocumentModel state)
     {
         State = state;
         PrimaryImages = new ViewportImages(state.Primary);

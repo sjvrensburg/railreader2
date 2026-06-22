@@ -36,7 +36,7 @@ public sealed partial class MainWindowViewModel
     /// edit. Core writes /State to the PDF on save; the undo action is railreader2-side.</summary>
     public void SetReviewState(Annotation ann, ReviewState newState)
     {
-        if (_controller.ActiveDocument is not { } doc) return;
+        if (_controller.FocusedViewport?.Owner is not { } doc) return;
         if (ann.State == newState) return;
 
         var action = new ChangeReviewStateAction(ann, ann.State, newState);
@@ -65,10 +65,10 @@ public sealed partial class MainWindowViewModel
     /// otherwise recenter the camera directly.</summary>
     public void ScrollToAnnotation(Annotation ann)
     {
-        if (_controller.ActiveDocument is not { } doc) return;
+        if (_controller.FocusedViewport?.Owner is not { } doc) return;
         if (AnnotationGeometry.GetAnnotationBounds(ann) is not { } b) return;
 
-        var (ww, wh) = _controller.GetViewportSize();
+        var (ww, wh) = FocusedViewportSize();
         double centerX = (b.Left + b.Right) / 2.0;
         double centerY = (b.Top + b.Bottom) / 2.0;
 

@@ -642,7 +642,7 @@ public partial class MainWindow : Window
         // A chrome toggle reflows the layout and may force a GPU texture re-upload
         // on the page layer; that's exactly what we don't want during scroll. The
         // user isn't trying to surface the chrome mid-scroll anyway.
-        var doc = vm.Controller.ActiveDocument;
+        var doc = vm.Controller.FocusedViewport?.Owner;
         if (vm.AutoScrollActive || (doc is not null && doc.Rail.ScrollSpeed > 0.1))
             return;
 

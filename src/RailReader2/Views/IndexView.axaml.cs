@@ -35,7 +35,7 @@ public partial class IndexView : PaneRefreshView
     private MainWindowViewModel? _vm;
 
     private DispatcherTimer? _peekDebounceTimer;
-    private DocumentState? _peekWatchedDoc;
+    private DocumentModel? _peekWatchedDoc;
     private readonly Dictionary<int, Bitmap?> _thumbnailCache = [];
     private readonly Dictionary<int, SKBitmap?> _pageThumbCache = [];
     private readonly Dictionary<int, string?> _textCache = [];
@@ -101,7 +101,7 @@ public partial class IndexView : PaneRefreshView
             case nameof(MainWindowViewModel.ActiveTab):
                 // Only reset peek state when the actual document changes (tab switch),
                 // not on every page navigation within the same document.
-                var newDoc = _vm?.Controller.ActiveDocument;
+                var newDoc = _vm?.Controller.FocusedViewport?.Owner;
                 if (newDoc != _peekWatchedDoc)
                 {
                     SubscribePeekUpdates();
@@ -143,7 +143,7 @@ public partial class IndexView : PaneRefreshView
 
     private void SubscribePeekUpdates()
     {
-        var doc = _vm?.Controller.ActiveDocument;
+        var doc = _vm?.Controller.FocusedViewport?.Owner;
         if (doc == _peekWatchedDoc) return;
 
         if (_peekWatchedDoc is not null)
@@ -187,7 +187,7 @@ public partial class IndexView : PaneRefreshView
 
     private void RefreshPeekIndex()
     {
-        var doc = _vm?.Controller.ActiveDocument;
+        var doc = _vm?.Controller.FocusedViewport?.Owner;
         if (doc is null)
         {
             PeekEntryList.ItemsSource = null;
@@ -195,7 +195,7 @@ public partial class IndexView : PaneRefreshView
             return;
         }
 
-        var index = PeekIndexBuilder.Build(doc.AnalysisCache, doc.PageCount);
+        var index = PeekIndexBuilder.Build(doc.CanonicalAnalyses, doc.PageCount);
         var fullScan = _vm?.ActiveTab?.FullScanPeekIndex;
 
         // Progress text: if we have a full-scan index, report coverage from that
@@ -266,7 +266,7 @@ public partial class IndexView : PaneRefreshView
     /// pages remain visible in the Figures pane.
     /// </summary>
     private void AddFullScanSupplement(List<PeekEntryViewModel> entries, PeekIndex fullScan,
-        DocumentState doc, bool showFigures, bool showTables, bool showEquations)
+        DocumentModel doc, bool showFigures, bool showTables, bool showEquations)
     {
         // Live entries already cover every page present in the analysis cache
         // (the live index is built solely from AnalysisCache), so supplement only
@@ -280,11 +280,11 @@ public partial class IndexView : PaneRefreshView
             AddEntries(entries, FilterUncached(fullScan.Equations, doc), "Equation");
     }
 
-    private static List<PeekEntry> FilterUncached(IReadOnlyList<PeekEntry> scanEntries, DocumentState doc)
+    private static List<PeekEntry> FilterUncached(IReadOnlyList<PeekEntry> scanEntries, DocumentModel doc)
     {
         var result = new List<PeekEntry>();
         foreach (var entry in scanEntries)
-            if (!doc.AnalysisCache.ContainsKey(entry.PageIndex))
+            if (!doc.IsPageAnalysed(entry.PageIndex))
                 result.Add(entry);
         return result;
     }
@@ -302,7 +302,7 @@ public partial class IndexView : PaneRefreshView
         }
     }
 
-    private void GenerateThumbnails(List<PeekEntryViewModel> entries, DocumentState doc)
+    private void GenerateThumbnails(List<PeekEntryViewModel> entries, DocumentModel doc)
     {
         foreach (var vm in entries)
         {
@@ -334,7 +334,7 @@ public partial class IndexView : PaneRefreshView
         }
     }
 
-    private static string? ExtractEntryText(DocumentState doc, PeekEntry entry)
+    private static string? ExtractEntryText(DocumentModel doc, PeekEntry entry)
     {
         var pageText = doc.GetOrExtractText(entry.PageIndex);
         var bbox = entry.BBox;
@@ -345,7 +345,7 @@ public partial class IndexView : PaneRefreshView
     /// Renders or returns a cached page thumbnail SKBitmap. Avoids calling
     /// PDFium's RenderThumbnail multiple times for the same page.
     /// </summary>
-    private SKBitmap? GetPageThumb(DocumentState doc, int pageIndex)
+    private SKBitmap? GetPageThumb(DocumentModel doc, int pageIndex)
     {
         if (_pageThumbCache.TryGetValue(pageIndex, out var cached))
             return cached;
@@ -364,7 +364,7 @@ public partial class IndexView : PaneRefreshView
         return result;
     }
 
-    private Bitmap? CropBlockThumbnail(DocumentState doc, PeekEntry entry)
+    private Bitmap? CropBlockThumbnail(DocumentModel doc, PeekEntry entry)
     {
         var bitmap = GetPageThumb(doc, entry.PageIndex);
         if (bitmap is null) return null;
