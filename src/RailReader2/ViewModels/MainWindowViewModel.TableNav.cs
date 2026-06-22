@@ -61,7 +61,10 @@ public sealed partial class MainWindowViewModel
         _autoOpenedTablePanel = false;     // don't auto-close a panel we didn't open for this tab
         _paneBeforeTable = null;
         ArmActivateRailClick = false;      // a pending click-to-rail shouldn't carry to another tab
-        ClearFreeze();                     // a freeze belongs to one document; don't leak it across tabs
+        FreezeArmMode = FreezeMode.None;   // ditto a pending freeze placement
+        // Freeze is now per-viewport (railreader2#180) and survives tab switches — each view keeps its
+        // own frozen table — so it is NOT cleared here. The IsFrozen/CanFreeze notifications for the
+        // newly-focused view are raised by FocusViewport.
     }
 
     /// <summary>Open the side panel to the Table Reading section when the rail seats on a table, and
@@ -89,7 +92,9 @@ public sealed partial class MainWindowViewModel
             if (_autoOpenedTablePanel)
                 ShowOutline = false;
             _autoOpenedTablePanel = false;
-            ClearFreeze(); // freeze is a per-table aid — release it when the rail leaves the table
+            // Freeze is no longer rail-bound (it's a spatial, mouse-picked, per-viewport aid) — leaving
+            // the table via the rail no longer releases it; it clears when the view leaves the page or
+            // the user unfreezes.
         }
 
         OnPropertyChanged(nameof(CanFreeze));

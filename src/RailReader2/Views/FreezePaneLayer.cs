@@ -16,7 +16,11 @@ namespace RailReader2.Views;
 internal sealed record FreezePaneRenderState(
     SKImage? Corner, SKImage? Top, SKImage? Left,
     SKRect CornerDst, SKRect TopDst, SKRect LeftDst,
-    ColourEffect Effect, float EffectIntensity, ColourEffectShaders? Effects);
+    ColourEffect Effect, float EffectIntensity, ColourEffectShaders? Effects,
+    // Armed freeze-mode guide line(s) at the pointer (screen-space): a horizontal line (rows → freeze
+    // above), a vertical line (columns → freeze left), or both. Drawn full-length as accent guides so
+    // the user aims before clicking.
+    bool ShowGuide = false, bool GuideH = false, bool GuideV = false, float GuideX = 0, float GuideY = 0);
 
 /// <summary>Hosts a CompositionCustomVisual that draws Excel-style frozen table panes (the rows above
 /// and columns left of the frozen cell) pinned over the live page while rail-reading a table.</summary>
@@ -57,7 +61,7 @@ internal sealed class FreezePaneVisualHandler : CompositionCustomVisualHandler
     {
         var state = _state;
         if (state is null) return;
-        if (state.Corner is null && state.Top is null && state.Left is null) return;
+        if (state.Corner is null && state.Top is null && state.Left is null && !state.ShowGuide) return;
 
         if (context.TryGetFeature(typeof(ISkiaSharpApiLeaseFeature)) is not ISkiaSharpApiLeaseFeature leaseFeature)
             return;
@@ -93,5 +97,21 @@ internal sealed class FreezePaneVisualHandler : CompositionCustomVisualHandler
 
         // Don't let the cached paint retain a filter that may be disposed before the next frame.
         s_paint.ColorFilter = null;
+
+        // Armed freeze-mode guide: full-length line(s) at the pointer, so the user aims the page-wide
+        // split before clicking. Drawn last, over everything, in an accent colour.
+        if (state.ShowGuide)
+        {
+            using var line = new SKPaint
+            {
+                Color = new SKColor(0x29, 0x9D, 0xF5), // accent blue
+                IsStroke = true,
+                StrokeWidth = 2f,
+                IsAntialias = true,
+            };
+            const float far = 100000f;
+            if (state.GuideH) canvas.DrawLine(-far, state.GuideY, far, state.GuideY, line); // freeze above
+            if (state.GuideV) canvas.DrawLine(state.GuideX, -far, state.GuideX, far, line); // freeze left
+        }
     }
 }

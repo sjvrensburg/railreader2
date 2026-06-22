@@ -31,7 +31,12 @@ public partial class TableReadingView : UserControl
         ScopeColumnRadio.IsCheckedChanged += (_, _) => Apply(() => _vm!.TableFocusScope = TableFocusScope.Column, ScopeColumnRadio);
         ScopeRowColRadio.IsCheckedChanged += (_, _) => Apply(() => _vm!.TableFocusScope = TableFocusScope.RowAndColumn, ScopeRowColRadio);
 
-        FreezeButton.Click += (_, _) => _vm?.ToggleFreeze();
+        // Freeze-mode toggles arm a placement (the pointer then shows the matching guide line; a click
+        // drops the split). Click (not IsCheckedChanged) so syncing IsChecked from the VM can't loop.
+        FreezeRowsButton.Click += (_, _) => _vm?.ArmFreeze(FreezeMode.Rows);
+        FreezeColumnsButton.Click += (_, _) => _vm?.ArmFreeze(FreezeMode.Columns);
+        FreezeBothButton.Click += (_, _) => _vm?.ArmFreeze(FreezeMode.Both);
+        UnfreezeButton.Click += (_, _) => _vm?.Unfreeze();
 
         DataContextChanged += OnDataContextChanged;
     }
@@ -75,15 +80,25 @@ public partial class TableReadingView : UserControl
             or nameof(MainWindowViewModel.TableFocusScope))
             SyncFromVm();
         else if (e.PropertyName is nameof(MainWindowViewModel.IsFrozen)
-            or nameof(MainWindowViewModel.CanFreeze))
-            UpdateFreezeButton();
+            or nameof(MainWindowViewModel.CanFreeze)
+            or nameof(MainWindowViewModel.FreezeArmMode))
+            UpdateFreezeControls();
     }
 
-    private void UpdateFreezeButton()
+    private void UpdateFreezeControls()
     {
         if (_vm is null) return;
-        FreezeButton.Content = _vm.IsFrozen ? "Unfreeze" : "Freeze here";
-        FreezeButton.IsEnabled = _vm.IsFrozen || _vm.CanFreeze;
+        var mode = _vm.FreezeArmMode;
+        // The armed mode shows as the pressed toggle; modes are available whenever a page is loaded
+        // (or while armed). Unfreeze is enabled only when this view actually has a freeze.
+        FreezeRowsButton.IsChecked = mode == FreezeMode.Rows;
+        FreezeColumnsButton.IsChecked = mode == FreezeMode.Columns;
+        FreezeBothButton.IsChecked = mode == FreezeMode.Both;
+        bool canArm = _vm.CanFreeze || mode != FreezeMode.None;
+        FreezeRowsButton.IsEnabled = canArm;
+        FreezeColumnsButton.IsEnabled = canArm;
+        FreezeBothButton.IsEnabled = canArm;
+        UnfreezeButton.IsEnabled = _vm.IsFrozen;
     }
 
     private void SyncFromVm()
@@ -99,7 +114,7 @@ public partial class TableReadingView : UserControl
             ScopeRowRadio.IsChecked = _vm.TableFocusScope == TableFocusScope.Row;
             ScopeColumnRadio.IsChecked = _vm.TableFocusScope == TableFocusScope.Column;
             ScopeRowColRadio.IsChecked = _vm.TableFocusScope == TableFocusScope.RowAndColumn;
-            UpdateFreezeButton();
+            UpdateFreezeControls();
         }
         finally
         {

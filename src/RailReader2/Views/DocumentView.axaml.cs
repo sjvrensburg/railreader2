@@ -72,9 +72,22 @@ public partial class DocumentView : UserControl, IViewportSurface
     private int _markerCount = -1;
     private string? _markerDisplayed = "\u0000"; // sentinel distinct from null and any portal id
 
+    // Armed freeze-mode guide line(s) for THIS pane: the mode + the pointer position in SCREEN space.
+    // Null when not arming. Set by ViewportPanel as the pointer moves while a freeze mode is armed.
+    private (FreezeMode Mode, double X, double Y)? _freezeGuide;
+
     public DocumentView()
     {
         InitializeComponent();
+        // The floating Unfreeze chip clears THIS pane's freeze (per-viewport) and refreshes immediately.
+        FreezeChip.Click += (_, _) =>
+        {
+            if (_shared is { } vm && _viewport is { } vp)
+            {
+                vm.UnfreezeViewport(vp);
+                RenderFreezePanes();
+            }
+        };
     }
 
     public TabViewModel? Tab => _tab;
@@ -285,7 +298,24 @@ public partial class DocumentView : UserControl, IViewportSurface
     /// <summary>Re-send the freeze-panes overlay state. Called from the camera path (UpdateAllLayers)
     /// and from RenderPage so a colour-effect change (which invalidates the page, not the camera)
     /// repaints the frozen tiles with the new effect immediately rather than on the next navigation.</summary>
-    public void RenderFreezePanes() => FreezeLayer.UpdateState(BuildFreezePaneState(_tab));
+    public void RenderFreezePanes()
+    {
+        FreezeLayer.UpdateState(BuildFreezePaneState(_tab));
+        // Show the per-pane Unfreeze chip whenever THIS view is frozen.
+        FreezeChip.IsVisible = _shared is { } vm && _viewport is { } vp && vm.IsViewportFrozen(vp);
+    }
+
+    /// <summary>Set/clear this pane's armed freeze-mode guide line(s) at a screen-space point (or
+    /// <see cref="FreezeMode.None"/> to clear), re-rendering the freeze layer only when it changes.
+    /// Called by <see cref="ViewportPanel"/> as the pointer moves while a freeze mode is armed.</summary>
+    public void SetFreezeGuide(FreezeMode mode, double screenX, double screenY)
+    {
+        var next = mode == FreezeMode.None ? ((FreezeMode, double, double)?)null : (mode, screenX, screenY);
+        if (System.Collections.Generic.EqualityComparer<(FreezeMode, double, double)?>.Default.Equals(_freezeGuide, next))
+            return;
+        _freezeGuide = next;
+        RenderFreezePanes();
+    }
 
     /// <summary>Re-send the portal marker overlay state (markers added/removed, accent moved, or page
     /// changed). Cheap: the page-space marker list is cached and only rebuilt when it actually changes.</summary>
@@ -492,27 +522,50 @@ public partial class DocumentView : UserControl, IViewportSurface
     private FreezePaneRenderState BuildFreezePaneState(TabViewModel? tab)
     {
         var vm = _shared!;
-        if (tab is null) return EmptyFreeze;
+        if (tab is null || _viewport is not { } fvp) return EmptyFreeze;
 
-        var tiles = vm.GetFreezeTiles(tab, out var retired);
+        // Per-viewport (railreader2#180): each pane renders ITS OWN viewport's freeze, so a freeze in
+        // one split/tab no longer bleeds into the others.
+        var tiles = vm.GetFreezeTiles(fvp, out var retired);
         foreach (var img in retired)
             if (!FreezeLayer.TrySendMessage(new RetireImage(img)))
                 img.Dispose();
 
-        if (tiles is not { } t) return EmptyFreeze;
-
         var cam = BuildCamera(_viewport);
         float zoom = cam.ScaleX, ox = cam.TransX, oy = cam.TransY;
 
-        float pinX = Math.Max(0f, t.CornerBox.X * zoom + ox);
-        float pinY = Math.Max(0f, t.CornerBox.Y * zoom + oy);
+        // Committed frozen crops (absent while merely previewing a pick).
+        SKImage? corner = null, top = null, left = null;
+        SKRect cornerDst = default, topDst = default, leftDst = default;
+        if (tiles is { } t)
+        {
+            float pinX = Math.Max(0f, t.CornerBox.X * zoom + ox);
+            float pinY = Math.Max(0f, t.CornerBox.Y * zoom + oy);
+            corner = t.Corner; top = t.Top; left = t.Left;
+            cornerDst = Dst(t.CornerBox, zoom, pinX, pinY);                  // static at the pin
+            topDst = Dst(t.TopBox, zoom, t.TopBox.X * zoom + ox, pinY);      // tracks horizontal scroll
+            leftDst = Dst(t.LeftBox, zoom, pinX, t.LeftBox.Y * zoom + oy);   // tracks vertical scroll
+        }
+
+        // Armed freeze-mode guide line(s) for this pane — already in screen space (they track the
+        // pointer exactly, no snapping). Drawn full-length by the handler.
+        bool showGuide = false, guideH = false, guideV = false;
+        float guideX = 0f, guideY = 0f;
+        if (_freezeGuide is { } g)
+        {
+            showGuide = true;
+            guideH = g.Mode is FreezeMode.Rows or FreezeMode.Both;
+            guideV = g.Mode is FreezeMode.Columns or FreezeMode.Both;
+            guideX = (float)g.X;
+            guideY = (float)g.Y;
+        }
+
+        if (corner is null && top is null && left is null && !showGuide) return EmptyFreeze;
 
         return new FreezePaneRenderState(
-            t.Corner, t.Top, t.Left,
-            Dst(t.CornerBox, zoom, pinX, pinY),                  // static at the pin
-            Dst(t.TopBox, zoom, t.TopBox.X * zoom + ox, pinY),   // tracks horizontal scroll
-            Dst(t.LeftBox, zoom, pinX, t.LeftBox.Y * zoom + oy), // tracks vertical scroll
-            vm.Controller.ActiveColourEffect, vm.Controller.ActiveColourIntensity, vm.ColourEffects);
+            corner, top, left, cornerDst, topDst, leftDst,
+            vm.Controller.ActiveColourEffect, vm.Controller.ActiveColourIntensity, vm.ColourEffects,
+            showGuide, guideH, guideV, guideX, guideY);
 
         static SKRect Dst(BBox box, float zoom, float x, float y)
             => SKRect.Create(x, y, box.W * zoom, box.H * zoom);

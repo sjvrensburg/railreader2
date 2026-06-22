@@ -85,6 +85,17 @@
             </Border>
         </Border>
 
+        <!-- Frozen-state affordance: an always-obvious chip shown over THIS pane whenever its view has
+             a freeze, so unfreezing never requires hunting through the side panel. Per-pane (each
+             DocumentView toggles its own from its viewport's freeze state). -->
+        <Button Name="FreezeChip" IsVisible="False"
+                VerticalAlignment="Top" HorizontalAlignment="Right"
+                Margin="0,6,12,0" Padding="10,5"
+                Background="{DynamicResource SystemControlHighlightAccentBrush}"
+                Foreground="White" CornerRadius="6"
+                Content="❄ Frozen — Unfreeze"
+                ToolTip.Tip="Clear this view's frozen panes" />
+
         <!-- Focused-pane affordance: an accent border drawn over the surface (no layout shift,
              never hit-tested). Only made visible by SetFocusedVisual when more than one viewport
              surface is live, so a single pane shows no border. -->

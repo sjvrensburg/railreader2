@@ -203,6 +203,7 @@ public sealed partial class MainWindowViewModel
         foreach (var t in Tabs)
             if (ReferenceEquals(t.State, tab.State)) { modelStillUsed = true; break; }
 
+        DisposeFreezeFor(tab.Viewport); // free this view's frozen-pane crops (per-viewport, #180)
         tab.Dispose(); // unsubscribe + free this tab's images (not the shared model / its viewport)
         if (!modelStillUsed)
         {
