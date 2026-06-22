@@ -459,23 +459,13 @@ public partial class MainWindow : Window
         switch (e.Key)
         {
             case Key.Down or Key.S:
-                // Cell mode on a table: plain Down steps to the cell directly below (Excel-style).
-                if (!e.KeyModifiers.HasFlag(KeyModifiers.Shift) && vm.TryHandleCellVertical(forward: true))
-                { e.Handled = true; return true; }
                 vm.HandleArrowDown(); e.Handled = true; return true;
             case Key.Up or Key.W:
-                if (!e.KeyModifiers.HasFlag(KeyModifiers.Shift) && vm.TryHandleCellVertical(forward: false))
-                { e.Handled = true; return true; }
                 vm.HandleArrowUp(); e.Handled = true; return true;
             case Key.Right:
-                // Cell mode on a table: plain Right steps cells; Shift+Right stays a fine pan (inspect).
-                if (!e.KeyModifiers.HasFlag(KeyModifiers.Shift) && vm.TryHandleCellHorizontal(forward: true))
-                { e.Handled = true; return true; }
                 vm.HandleArrowRight(e.KeyModifiers.HasFlag(KeyModifiers.Shift));
                 e.Handled = true; return true;
             case Key.Left or Key.A:
-                if (!e.KeyModifiers.HasFlag(KeyModifiers.Shift) && vm.TryHandleCellHorizontal(forward: false))
-                { e.Handled = true; return true; }
                 vm.HandleArrowLeft(e.KeyModifiers.HasFlag(KeyModifiers.Shift));
                 e.Handled = true; return true;
             case Key.P:
@@ -531,7 +521,6 @@ public partial class MainWindow : Window
                 }
                 e.Handled = true; return true;
             case Key.D:
-                if (vm.TryHandleCellHorizontal(forward: true)) { e.Handled = true; return true; }
                 vm.HandleArrowRight(); e.Handled = true; return true;
             case Key.Home:
                 if (vm.ActiveTab is { } tH && tH.Rail.Active)

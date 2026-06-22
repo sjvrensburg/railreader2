@@ -3,7 +3,6 @@
              xmlns:vm="using:RailReader2.ViewModels"
              x:Class="RailReader2.Views.TableReadingView"
              x:DataType="vm:MainWindowViewModel">
-    <!-- Scrollable so nothing clips when the panel is short. Detail lives in tooltips, not body text. -->
     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
         <StackPanel Margin="8,6" Spacing="6">
             <TextBlock Text="Freeze panes" FontWeight="SemiBold" />
@@ -20,23 +19,6 @@
             </UniformGrid>
             <Button Name="UnfreezeButton" HorizontalAlignment="Stretch" Content="Unfreeze"
                     ToolTip.Tip="Clear this view's freeze." />
-
-            <TextBlock Text="Navigation" FontWeight="SemiBold" Margin="0,8,0,0" />
-            <StackPanel Spacing="2">
-                <RadioButton Name="ModeCellRadio" GroupName="TableMode" Content="Cell by cell"
-                             ToolTip.Tip="Left/Right step through the cells of a row (rolls to the next/previous row at the edges)." />
-                <RadioButton Name="ModeRowRadio" GroupName="TableMode" Content="Row by row"
-                             ToolTip.Tip="Left/Right keep their normal block navigation; Up/Down move row to row." />
-            </StackPanel>
-
-            <TextBlock Text="Focus area" FontWeight="SemiBold" Margin="0,8,0,0"
-                       ToolTip.Tip="Shapes the line highlight (H) and focus dim (F) while reading a table. Column is inferred — accuracy varies on irregular tables." />
-            <StackPanel Spacing="2">
-                <RadioButton Name="ScopeCellRadio" GroupName="TableScope" Content="Cell" />
-                <RadioButton Name="ScopeRowRadio" GroupName="TableScope" Content="Row" />
-                <RadioButton Name="ScopeColumnRadio" GroupName="TableScope" Content="Column" />
-                <RadioButton Name="ScopeRowColRadio" GroupName="TableScope" Content="Row + column" />
-            </StackPanel>
         </StackPanel>
     </ScrollViewer>
 </UserControl>

@@ -382,7 +382,6 @@ public sealed partial class MainWindowViewModel
             _pendingTargetForLink = null;
             _pageSizeCache.Clear();
             _referenceIndex.Clear();
-            _tableColumns.Clear();   // release the previous document's inferred table-column bands
             _failedAutoPins.Clear();
             ReleasePortalLock();   // a lock is per-document; the new tab tracks normally
         }

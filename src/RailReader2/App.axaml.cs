@@ -17,13 +17,6 @@ public partial class App : Application
     /// <see cref="Views.SettingsWindow"/>.</summary>
     internal const RenderQuality DefaultRenderQuality = RenderQuality.High;
 
-    /// <summary>The desktop keeps table cell detection on (Core defaults it off). It only adds
-    /// per-table-row cell geometry during analysis (cheap, pure overlay) and underpins the "Table
-    /// Reading" cell navigation + scoped focus aids, so it is always-on with no UI toggle — the startup
-    /// migration re-enables it if a config ever has it off. Cells are computed at analysis time, so a
-    /// change only affects documents opened afterwards.</summary>
-    internal const bool DefaultCellNavigation = true;
-
     /// <summary>True only on a genuine first run — when no config file exists yet. On that first run
     /// the desktop seeds <see cref="DefaultRenderQuality"/> so the user gets High rather than Core's
     /// Quality. Any existing config is left untouched (pre-0.24.0 configs simply fall through to Core's
@@ -65,15 +58,6 @@ public partial class App : Application
                 if (seedRenderQuality)
                 {
                     config.RenderQuality = DefaultRenderQuality;
-                    configDirty = true;
-                }
-                // Table cell detection underpins cell-by-cell reading + the scoped table focus aids and
-                // is a cheap per-table-row overlay, so keep it on for everyone — including configs written
-                // before the feature existed (which serialized it as false). Persisted, so this is a
-                // one-time migration rather than per-launch work.
-                if (!config.CellNavigation)
-                {
-                    config.CellNavigation = DefaultCellNavigation;
                     configDirty = true;
                 }
                 if (configDirty) config.Save();

@@ -453,8 +453,7 @@ public partial class DocumentView : UserControl, IViewportSurface
             ZoomSpeed: (float)(_viewport?.Camera.ZoomSpeed ?? 0),
             MotionBlur: vm.AppConfig.MotionBlur,
             MotionBlurIntensity: (float)vm.AppConfig.MotionBlurIntensity,
-            // On a table the scoped table focus-dim (in the overlay) replaces the page line dim.
-            LineFocusBlur: (tab?.LineFocusBlur ?? false) && !vm.TableFocusActive(_viewport),
+            LineFocusBlur: tab?.LineFocusBlur ?? false,
             LineFocusIntensity: (float)vm.AppConfig.LineFocusBlurIntensity,
             LinePadding: (float)vm.AppConfig.LinePadding,
             LineY: lineY,
@@ -478,16 +477,6 @@ public partial class DocumentView : UserControl, IViewportSurface
         if (tab?.DebugOverlay == true && _viewport is { } dbgVp)
             tab.AnalysisCache.TryGetValue(dbgVp.CurrentPage, out debugAnalysis);
 
-        // Scoped table focus aids: when the rail is on a table row with cells, the overlay draws the
-        // scoped tint/dim and the package line highlight + page dim are suppressed (passed false).
-        bool tableFocus = vm.TableFocusActive(_viewport);
-        var tableScope = vm.EffectiveTableFocusScope;
-        CellInfo? tableCell = tableFocus ? _viewport!.Rail.CurrentCellInfo : null;
-        // The column band is only needed (and only inferred) for the column-bearing scopes.
-        Services.ColumnBand? tableColumn = tableFocus
-            && tableScope is Services.TableFocusScope.Column or Services.TableFocusScope.RowAndColumn
-            ? vm.CurrentTableColumn(_viewport) : null;
-
         return new RailOverlayRenderState(
             Camera: BuildCamera(_viewport),
             PageW: (float)(_viewport?.PageWidth ?? 0),
@@ -498,18 +487,11 @@ public partial class DocumentView : UserControl, IViewportSurface
             DebugAnalysis: debugAnalysis,
             DebugModelLabel: vm.ActiveLayoutModelName,
             Effect: vm.Controller.ActiveColourEffect,
-            LineFocusBlur: (tab?.LineFocusBlur ?? false) && !tableFocus,
-            LineHighlightEnabled: (tab?.LineHighlightEnabled ?? true) && !tableFocus,
+            LineFocusBlur: tab?.LineFocusBlur ?? false,
+            LineHighlightEnabled: tab?.LineHighlightEnabled ?? true,
             LinePadding: (float)vm.AppConfig.LinePadding,
             Tint: vm.AppConfig.LineHighlightTint,
-            TintOpacity: (float)vm.AppConfig.LineHighlightOpacity,
-            TableScope: tableScope,
-            // Highlight + dim stay on the usual controls (H / F); the table scope only shapes them.
-            TableHighlight: tableFocus && (tab?.LineHighlightEnabled ?? true),
-            TableDim: tableFocus && (tab?.LineFocusBlur ?? false),
-            TableDimIntensity: (float)vm.AppConfig.LineFocusBlurIntensity,
-            TableCell: tableCell,
-            TableColumn: tableColumn);
+            TintOpacity: (float)vm.AppConfig.LineHighlightOpacity);
     }
 
     private static readonly FreezePaneRenderState EmptyFreeze =
