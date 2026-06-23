@@ -481,6 +481,20 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     private void OnFocusedViewportPageChanged(int _) => OnReadingContextChanged();
     private void OnFocusedViewportReadingPositionChanged(ReadingPosition _) => OnReadingContextChanged();
 
+    /// <summary>Drop the focused-viewport reading-context subscription, releasing the strong reference
+    /// the wiring holds. Needed when no viewport replaces it (last tab closed / shutdown) — otherwise
+    /// <see cref="_signalWiredViewport"/> would keep a disposed viewport (and, via Viewport.Owner, its
+    /// whole DocumentModel + PDFium handle) alive until the next document opens.</summary>
+    private void UnwireFocusedSignals()
+    {
+        if (_signalWiredViewport is { } prev)
+        {
+            prev.PageChanged -= OnFocusedViewportPageChanged;
+            prev.ReadingPositionChanged -= OnFocusedViewportReadingPositionChanged;
+        }
+        _signalWiredViewport = null;
+    }
+
     /// <summary>Light up the focused pane's border, but only when more than one surface is live (a lone
     /// viewport has no focus ambiguity, so it shows no border).</summary>
     public void UpdateSurfaceFocusVisuals()
@@ -682,6 +696,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
     public void Dispose()
     {
+        UnwireFocusedSignals();
         DisposePortalImages();
         DisposeFreezeImages();
         _controller.Dispose();

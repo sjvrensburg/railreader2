@@ -35,4 +35,14 @@ public interface IViewportSurface
     /// <summary>Show or hide this surface's focused-pane affordance (a border accent). The VM only
     /// turns it on when more than one surface is live — a lone viewport has no focus ambiguity.</summary>
     void SetFocusedVisual(bool focused);
+
+    /// <summary>The tab that supplies this surface's model + per-tab display prefs, or null. For a
+    /// secondary surface (split pane / tear-off) this is the tab it was created from, independent of
+    /// its own viewport.</summary>
+    TabViewModel? BoundTab { get; }
+
+    /// <summary>Re-point a secondary surface's model/pref source to a sibling tab of the same document
+    /// model — used when the tab it was created from closes while the model (and this surface's own
+    /// viewport) survive, so its per-tab prefs don't go stale. No-op for the primary pane.</summary>
+    void RebindTab(TabViewModel newTab);
 }

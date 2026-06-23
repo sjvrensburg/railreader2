@@ -152,8 +152,14 @@ public sealed partial class MainWindowViewModel
         => Dispatch(() => _controller.HandleArrowRelease(isHorizontal), animate: true);
 
     /// <summary>Toggle the "start rail here" armed state (the toolbar button). When on, the next
-    /// viewport click force-activates rail mode at that point at the current zoom.</summary>
-    public void ToggleArmActivateRailClick() => ArmActivateRailClick = !ArmActivateRailClick;
+    /// viewport click force-activates rail mode at that point at the current zoom. Arming disarms any
+    /// pending freeze placement — only one viewport-click gesture may be armed at a time.</summary>
+    public void ToggleArmActivateRailClick()
+    {
+        ArmActivateRailClick = !ArmActivateRailClick;
+        if (ArmActivateRailClick)
+            FreezeArmMode = FreezeMode.None;
+    }
 
     /// <summary>Click-free "start rail here" for the keyboard shortcut, Rail menu, screen readers, and
     /// automation. The toolbar gesture arms a pointer click to pick the point; this resolves the point
@@ -181,8 +187,9 @@ public sealed partial class MainWindowViewModel
     }
 
     /// <summary>Consume an armed "start rail here" click: force rail mode active at the clicked point
-    /// (current page coords) regardless of zoom, seating the nearest navigable block and the line under
-    /// the click — no magnification. Disarms afterwards. Toasts when the page has no analysis yet.</summary>
+    /// (canvas/screen coords — the controller maps them to the page) regardless of zoom, seating the
+    /// nearest navigable block and the line under the click — no magnification. Disarms afterwards.
+    /// Toasts when the page has no analysis yet.</summary>
     public void ActivateRailAtClick(double canvasX, double canvasY)
     {
         ArmActivateRailClick = false;

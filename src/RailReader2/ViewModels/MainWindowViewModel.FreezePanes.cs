@@ -62,12 +62,16 @@ public sealed partial class MainWindowViewModel
     {
         FreezeArmMode = FreezeArmMode == mode ? FreezeMode.None : mode;
         if (FreezeArmMode != FreezeMode.None)
+        {
+            // Only one viewport-click gesture may be armed at a time; disarm "start rail here".
+            ArmActivateRailClick = false;
             ShowStatusToast(FreezeArmMode switch
             {
                 FreezeMode.Rows => "Click to freeze everything above the line",
                 FreezeMode.Columns => "Click to freeze everything left of the line",
                 _ => "Click to freeze everything above and left of the lines",
             });
+        }
     }
 
     /// <summary>Commit an armed placement at a page-space point in <paramref name="vp"/>: set the row

@@ -90,9 +90,10 @@ public sealed partial class MainWindowViewModel
 
             _logger.Debug($"[OpenDocument] Loaded: {tab.PageCount} pages, {tab.PageWidth}x{tab.PageHeight}");
             tab.LoadAnnotations(_controller.AnnotationManager);
-            // Linked-context portals (shell sidecar, keyed by PDF SHA-256). Each tab holds its own
-            // set; duplicate tabs of the same PDF are last-writer-wins (documented, not solved in v1).
-            tab.Portals = Services.PortalSet.Load(tab.FilePath);
+            // Linked-context portals (shell sidecar, keyed by PDF SHA-256). One reference-counted set is
+            // shared across all tabs/panes of the same PDF, so saves from duplicate tabs don't clobber
+            // each other (released in CloseTab).
+            tab.Portals = Services.PortalSetManager.Default.Checkout(tab.FilePath);
 
             // Save sidebar state from outgoing tab before switching
             if (ActiveTab is { } oldTab)
@@ -151,9 +152,9 @@ public sealed partial class MainWindowViewModel
         model.SubmitAnalysis(vp, _controller.Worker, _controller.Config.NavigableRoles);
         model.QueueLookahead(vp, _controller.Config.AnalysisLookaheadPages);
 
-        // Shares the model (PDF/caches/annotations already loaded); only the per-tab portal sidecar +
-        // sidebar state are tab-local. Do NOT re-checkout annotations — that's per-model, done once.
-        var tab = new TabViewModel(model, vp) { Portals = Services.PortalSet.Load(model.FilePath) };
+        // Shares the model (PDF/caches/annotations already loaded). Portals are shared too via the
+        // reference-counted manager, so this tab sees and saves the same set as its sibling.
+        var tab = new TabViewModel(model, vp) { Portals = Services.PortalSetManager.Default.Checkout(model.FilePath) };
 
         if (ActiveTab is { } oldTab) SaveSidebarState(oldTab);
         tab.ShowSidePanel = ShowOutline;
@@ -203,7 +204,19 @@ public sealed partial class MainWindowViewModel
         foreach (var t in Tabs)
             if (ReferenceEquals(t.State, tab.State)) { modelStillUsed = true; break; }
 
+        // Re-point any secondary surface (split pane / tear-off) created from this tab to a surviving
+        // sibling tab of the same model BEFORE disposing the tab — otherwise the orphaned surface would
+        // keep reading per-tab prefs from the now-frozen disposed tab. Its own viewport is untouched.
+        if (modelStillUsed)
+        {
+            var sibling = Tabs.First(t => ReferenceEquals(t.State, tab.State));
+            foreach (var s in _surfaces)
+                if (ReferenceEquals(s.BoundTab, tab))
+                    s.RebindTab(sibling);
+        }
+
         tab.Dispose(); // unsubscribe + free this tab's images (not the shared model / its viewport)
+        Services.PortalSetManager.Default.Release(tab.FilePath); // drop our portal-set checkout
         if (!modelStillUsed)
         {
             int docIdx = _controller.Documents.IndexOf(tab.State);
@@ -226,6 +239,8 @@ public sealed partial class MainWindowViewModel
         }
         OnPropertyChanged(nameof(ActiveTab));
         if (Tabs.Count > 0) FocusViewport(Tabs[ActiveTabIndex].Viewport);
+        else UnwireFocusedSignals(); // no viewport to re-point to — release the disposed one
+
         // Free the closed view's frozen-pane crops (#180) only AFTER the Document pane has rebound to the
         // now-active tab above — by then its FreezePaneLayer no longer references these crops, so this
         // UI-thread dispose can't free a bitmap the compositor is still drawing for the closed viewport.

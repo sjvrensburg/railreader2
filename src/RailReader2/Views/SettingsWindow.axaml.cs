@@ -224,6 +224,14 @@ public partial class SettingsWindow : Window
 
     private void OnCancelDownload(object? sender, RoutedEventArgs e) => _downloadCts?.Cancel();
 
+    /// <summary>Cancel any in-flight model download when the dialog is closed mid-download — otherwise
+    /// the HTTP copy + hash would run to completion against a window the user has already dismissed.</summary>
+    protected override void OnClosed(EventArgs e)
+    {
+        _downloadCts?.Cancel();
+        base.OnClosed(e);
+    }
+
     private void SetDownloadUiActive(bool active)
     {
         DownloadProgress.IsVisible = active;
