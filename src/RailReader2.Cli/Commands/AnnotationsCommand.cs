@@ -54,13 +54,18 @@ public static class AnnotationsCommand
             {
                 AnnotationExportService.Export(pdf, annotations, outPath);
             }
-            catch (InvalidOperationException)
+            catch (InvalidOperationException ex)
             {
-                // Flattening drops encryption, so Core refuses an encrypted source. Annotate in
-                // place instead (annotations are already written into the encrypted PDF).
-                return Program.Fail(
-                    "Cannot export an encrypted PDF to a flattened copy — the result would be unencrypted. " +
-                    "The annotations are already saved inside the original encrypted PDF.");
+                // Export throws InvalidOperationException both for the encrypted-source refusal and
+                // for in-PDFium load/save failures. Only the former carries a password; otherwise
+                // surface the real error rather than the (wrong) encryption message.
+                if (!string.IsNullOrEmpty(pdf.Password))
+                    // Flattening drops encryption, so Core refuses an encrypted source. Annotate in
+                    // place instead (annotations are already written into the encrypted PDF).
+                    return Program.Fail(
+                        "Cannot export an encrypted PDF to a flattened copy — the result would be unencrypted. " +
+                        "The annotations are already saved inside the original encrypted PDF.");
+                return Program.Fail($"Failed to export annotated PDF: {ex.Message}");
             }
             Console.Error.WriteLine($"Annotated PDF written to {Path.GetFullPath(outPath)}");
             return 0;

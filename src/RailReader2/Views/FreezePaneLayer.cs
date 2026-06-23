@@ -38,6 +38,7 @@ internal sealed class FreezePaneVisualHandler : CompositionCustomVisualHandler
     [ThreadStatic] private static ColourEffect s_effectType;
     [ThreadStatic] private static float s_effectIntensity;
     [ThreadStatic] private static SKPaint? s_paint;
+    [ThreadStatic] private static SKPaint? s_guidePaint;
 
     private FreezePaneRenderState? _state;
 
@@ -102,7 +103,7 @@ internal sealed class FreezePaneVisualHandler : CompositionCustomVisualHandler
         // split before clicking. Drawn last, over everything, in an accent colour.
         if (state.ShowGuide)
         {
-            using var line = new SKPaint
+            var line = s_guidePaint ??= new SKPaint
             {
                 Color = new SKColor(0x29, 0x9D, 0xF5), // accent blue
                 IsStroke = true,

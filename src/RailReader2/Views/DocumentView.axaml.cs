@@ -279,6 +279,23 @@ public partial class DocumentView : UserControl, IViewportSurface
         Minimap.InvalidateVisual();
     }
 
+    /// <summary>The tab supplying this surface's model + per-tab prefs (see <see cref="IViewportSurface"/>).</summary>
+    public TabViewModel? BoundTab => _tab;
+
+    /// <summary>Re-point a SECONDARY surface's model/pref source to a sibling tab of the same document
+    /// model when its original backing tab closes (the model — and this surface's own viewport —
+    /// survive). Keeps this surface's own viewport / images / wake hooks; only swaps which tab supplies
+    /// per-tab display prefs + model state. No-op for the primary pane, whose viewport IS the tab's own
+    /// (it follows ActiveTab via <see cref="SetTab"/>, which swaps the viewport too).</summary>
+    public void RebindTab(TabViewModel newTab)
+    {
+        if (newTab is null || ReferenceEquals(_tab, newTab)) return;
+        // Only a secondary surface (its own viewport, distinct from the tab's) re-points here.
+        if (_viewport is null || ReferenceEquals(_viewport, _tab?.Viewport)) return;
+        _tab = newTab;
+        UpdateAllLayers(); // prefs (debug overlay / line focus / highlight) re-read from the new tab
+    }
+
     public void UpdateAnnotationCursor() => Viewport.UpdateAnnotationCursor();
 
     /// <summary>Move keyboard focus to the viewport so nav keys drive the page (used after a
