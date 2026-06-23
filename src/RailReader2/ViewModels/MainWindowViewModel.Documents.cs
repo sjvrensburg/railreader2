@@ -198,8 +198,9 @@ public sealed partial class MainWindowViewModel
 
         // Model lifecycle (decision #1): several tabs may share one DocumentModel. Dispose the model
         // only when its LAST tab closes; otherwise just free this tab's own viewport (a duplicate
-        // tab's secondary view). Closing the model's Primary-view tab while sibling tabs remain leaves
-        // the (now unshown) Primary alive — harmless; it's freed when the model is disposed.
+        // tab's secondary view). RailReaderCore 0.44.0 (#77): RemoveViewport promotes a sibling when
+        // the removed view is the model's Primary, so closing the Primary-view tab while siblings
+        // remain no longer leaves an orphaned Primary pinning its page caches (was decision-#1 limit b).
         bool modelStillUsed = false;
         foreach (var t in Tabs)
             if (ReferenceEquals(t.State, tab.State)) { modelStillUsed = true; break; }
@@ -222,9 +223,12 @@ public sealed partial class MainWindowViewModel
             int docIdx = _controller.Documents.IndexOf(tab.State);
             if (docIdx >= 0) _controller.CloseDocument(docIdx); // disposes model + all its viewports
         }
-        else if (!ReferenceEquals(tab.Viewport, tab.State.Primary))
+        else
         {
-            tab.State.RemoveViewport(tab.Viewport); // free this duplicate tab's own viewport
+            // Free this tab's own viewport. If it happened to be the model's Primary, Core 0.44.0
+            // promotes a surviving sibling to Primary instead of throwing (the sibling tabs each own a
+            // live viewport, so at least one always remains).
+            tab.State.RemoveViewport(tab.Viewport);
         }
 
         if (Tabs.Count == 0)

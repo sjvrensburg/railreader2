@@ -448,6 +448,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     /// controller focus directly if no surface renders it yet. Idempotent.</summary>
     public void FocusViewport(Viewport vp)
     {
+        RefreshTabLiveness();
         foreach (var s in _surfaces)
             if (ReferenceEquals(s.SurfaceViewport, vp))
             {
@@ -457,6 +458,19 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         _controller.FocusedViewport = vp;
         WireFocusedSignals(vp);
         UpdateSurfaceFocusVisuals();
+    }
+
+    /// <summary>Keep each tab's own viewport live only while its tab is the active one (shown in the
+    /// Document pane). Inactive tabs' viewports go non-live so RailReaderCore 0.44.0 (#77) can evict
+    /// their page caches (<c>AnyViewportNeeds</c> honours <c>IsLive</c>) and skip them for
+    /// reading-position persistence — resolving decision-#1 limitation (c). Secondary surface viewports
+    /// (split panes / tear-offs) own their own <c>IsLive</c> and are never a tab's viewport, so they are
+    /// untouched here. Cheap + idempotent: just toggles a flag, safe to call on every focus change.</summary>
+    private void RefreshTabLiveness()
+    {
+        var active = ActiveTab;
+        foreach (var t in Tabs)
+            t.Viewport.IsLive = ReferenceEquals(t, active);
     }
 
     // The viewport whose PageChanged/ReadingPositionChanged currently drive OnReadingContextChanged.
@@ -622,6 +636,10 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         {
             if (surface.SurfaceViewport is not { } vp) continue;
             var r = _controller.TickViewport(vp, dt, pumpAnalysis: false);
+            // A frozen view's rail snap / auto-scroll re-aims the camera each frame (incl. the horizontal
+            // snap to the line start); clamp it back so the body can't slide left of / above the frozen
+            // panes and reveal the row labels / header behind them.
+            ClampFrozenCamera(vp);
             _tickScratch.Add((surface, r));
             anyAnimating |= r.StillAnimating;
         }
@@ -728,6 +746,10 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
     public void ShowStatusToast(string message)
     {
+        // Already showing this exact message → keep it as-is. Without this, a repeated trigger (e.g. every
+        // scroll-wheel notch while zoom is frozen-locked) would dispose+recreate the timer on each call,
+        // churning timers and re-arming the same toast indefinitely.
+        if (message == StatusToast) return;
         StatusToast = message;
         _toastTimer?.Dispose();
         _toastTimer = new Timer(_ =>

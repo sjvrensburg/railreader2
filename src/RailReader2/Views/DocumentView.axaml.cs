@@ -380,6 +380,15 @@ public partial class DocumentView : UserControl, IViewportSurface
                 _pendingCenter = false;
             }
             vp.ClampCamera(ww, wh);
+            // A resize re-clamps / re-centres the live camera offsets, which would slide the body out from
+            // under the frozen panes (their corner is anchored to the freeze-time offsets). The freeze
+            // geometry is tied to the view size it was set at, so drop it on a genuine resize. (A freeze
+            // can only exist after first layout, so _pendingCenter never coincides with one.)
+            if (_shared.IsViewportFrozen(vp))
+            {
+                _shared.UnfreezeViewport(vp);
+                _shared.ShowStatusToast("Panes unfrozen — the view was resized");
+            }
             UpdatePagePanelSize(_tab);
             UpdateAllLayers();
         }
@@ -544,19 +553,24 @@ public partial class DocumentView : UserControl, IViewportSurface
                 img.Dispose();
 
         var cam = BuildCamera(_viewport);
-        float zoom = cam.ScaleX, ox = cam.TransX, oy = cam.TransY;
+        float ox = cam.TransX, oy = cam.TransY;   // live body pan — frozen panes track it on their free axis
 
-        // Committed frozen crops (absent while merely previewing a pick).
+        // Committed frozen crops (absent while merely previewing a pick). The panes are drawn at the
+        // freeze-time zoom (z0) and anchored to the freeze-time camera: the corner is fully pinned, the
+        // top band's row position is frozen but its columns track the body's live horizontal pan, the
+        // left band mirrors that for vertical. So the header/labels stay aligned with the body cell being
+        // read, and freezing never jumps the view (the panes overlay the live page exactly at freeze).
         SKImage? corner = null, top = null, left = null;
         SKRect cornerDst = default, topDst = default, leftDst = default;
         if (tiles is { } t)
         {
-            float pinX = Math.Max(0f, t.CornerBox.X * zoom + ox);
-            float pinY = Math.Max(0f, t.CornerBox.Y * zoom + oy);
+            float z0 = t.Zoom;
             corner = t.Corner; top = t.Top; left = t.Left;
-            cornerDst = Dst(t.CornerBox, zoom, pinX, pinY);                  // static at the pin
-            topDst = Dst(t.TopBox, zoom, t.TopBox.X * zoom + ox, pinY);      // tracks horizontal scroll
-            leftDst = Dst(t.LeftBox, zoom, pinX, t.LeftBox.Y * zoom + oy);   // tracks vertical scroll
+            float cornerX = t.CornerBox.X * z0 + t.OffsetX;
+            float cornerY = t.CornerBox.Y * z0 + t.OffsetY;
+            cornerDst = Dst(t.CornerBox, z0, cornerX, cornerY);                  // fully pinned
+            topDst = Dst(t.TopBox, z0, t.TopBox.X * z0 + ox, cornerY);           // tracks horizontal pan
+            leftDst = Dst(t.LeftBox, z0, cornerX, t.LeftBox.Y * z0 + oy);        // tracks vertical pan
         }
 
         // Armed freeze-mode guide line(s) for this pane — already in screen space (they track the

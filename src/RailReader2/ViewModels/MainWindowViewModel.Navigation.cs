@@ -62,22 +62,34 @@ public sealed partial class MainWindowViewModel
 
     [RelayCommand]
     public void FitPage()
-        => Dispatch(_controller.FitPage, InvalidateCameraAndTab);
+    {
+        if (ZoomBlockedByFreeze()) return;
+        Dispatch(_controller.FitPage, InvalidateCameraAndTab);
+    }
 
     [RelayCommand]
     public void FitWidth()
-        => Dispatch(_controller.FitWidth, InvalidateCameraAndTab);
+    {
+        if (ZoomBlockedByFreeze()) return;
+        Dispatch(_controller.FitWidth, InvalidateCameraAndTab);
+    }
 
     // --- Camera ---
 
     public void HandleZoom(double scrollDelta, double cursorX, double cursorY, bool ctrlHeld)
-        => Dispatch(() => _controller.HandleZoom(scrollDelta, cursorX, cursorY, ctrlHeld), InvalidateCameraAndTab, animate: true);
+    {
+        if (ZoomBlockedByFreeze()) return;
+        Dispatch(() => _controller.HandleZoom(scrollDelta, cursorX, cursorY, ctrlHeld), InvalidateCameraAndTab, animate: true);
+    }
 
     public void HandlePan(double dx, double dy, bool ctrlHeld = false)
-        => Dispatch(() => _controller.HandlePan(dx, dy, ctrlHeld), InvalidateCameraAndTab);
+        => Dispatch(() => _controller.HandlePan(dx, dy, ctrlHeld), () => { ClampFrozenCameraAfterPan(); InvalidateCameraAndTab(); });
 
     public void HandleZoomKey(bool zoomIn)
-        => Dispatch(() => _controller.HandleZoomKey(zoomIn), InvalidateCameraAndTab, animate: true);
+    {
+        if (ZoomBlockedByFreeze()) return;
+        Dispatch(() => _controller.HandleZoomKey(zoomIn), InvalidateCameraAndTab, animate: true);
+    }
 
     public void HandleResetZoom() => FitPage();
 
@@ -92,6 +104,7 @@ public sealed partial class MainWindowViewModel
     /// 50–2000% range.</summary>
     public void SetZoomPercent(double percent)
     {
+        if (ZoomBlockedByFreeze()) return;
         if (ActiveTab is not { } tab) return;
         double current = tab.Camera.Zoom;
         if (current <= 0) return;
@@ -110,6 +123,10 @@ public sealed partial class MainWindowViewModel
     /// RequestAnimationFrame — the same path real user input takes.</summary>
     public bool SmoothlyFrameBlock(int pageBlockIndex, double? zoom = null, double? durationMs = null, int line = 0)
     {
+        // Framing eases the zoom, which would slide the frozen panes out of alignment with the body —
+        // gate it like every other zoom entry point. Reachable while frozen via double-click block-framing
+        // and the portal "Go to source" action.
+        if (ZoomBlockedByFreeze()) return false;
         bool ok = false;
         Dispatch(() => ok = _controller.SmoothlyFrameBlock(pageBlockIndex, zoom, durationMs, line),
             InvalidateCameraAndTab, animate: true);
