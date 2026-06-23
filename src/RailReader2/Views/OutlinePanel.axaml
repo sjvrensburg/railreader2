@@ -23,7 +23,7 @@
          code-behind; the rest are header-height). The open section tracks the ViewModel's
          ActivePane, so the View menu and keyboard shortcuts drive it. The panel is shown/hidden
          via the sidebar toggle in the tab strip. -->
-    <Grid Name="Accordion" RowDefinitions="*,Auto,Auto,Auto,Auto,Auto,Auto">
+    <Grid Name="Accordion" RowDefinitions="*,Auto,Auto,Auto,Auto,Auto">
         <Expander Grid.Row="0" Name="OutlineExpander" Classes="accordion" Header="Outline"
                   a:AutomationProperties.AutomationId="OutlineSection">
             <v:OutlineView />
@@ -47,12 +47,6 @@
         <Expander Grid.Row="5" Name="PortalsExpander" Classes="accordion" Header="Portals"
                   a:AutomationProperties.AutomationId="PortalsSection">
             <v:PortalsView />
-        </Expander>
-        <!-- Auto-appears only while the rail is seated on a table. -->
-        <Expander Grid.Row="6" Name="TableReadingExpander" Classes="accordion" Header="Table Reading"
-                  IsVisible="{Binding IsRailOnTable}"
-                  a:AutomationProperties.AutomationId="TableReadingSection">
-            <v:TableReadingView />
         </Expander>
     </Grid>
 </UserControl>

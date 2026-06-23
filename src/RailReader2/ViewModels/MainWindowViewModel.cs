@@ -16,7 +16,7 @@ namespace RailReader2.ViewModels;
 /// <summary>The side-panel tabs, used by ShowPane for menu-driven pane navigation. The enum order
 /// matches the accordion's grid-row order (see <c>OutlinePanel</c>), so a section's row is just
 /// <c>(int)Pane</c> — keep new panes appended.</summary>
-public enum SidePane { Outline, Bookmarks, Index, Search, Comments, Portals, TableReading }
+public enum SidePane { Outline, Bookmarks, Index, Search, Comments, Portals }
 
 // Core infrastructure: fields, constructor, animation, invalidation, config, status toast.
 // See partial class files for: Documents, Navigation, Annotations, Search.
@@ -438,8 +438,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         // The status bar / menu gating / rail toolbar reflect the focused view.
         InvalidateCamera();
         OnPropertyChanged(nameof(ActiveTab));
-        OnPropertyChanged(nameof(IsRailOnTable));
-        // Freeze is per-viewport — the toggle's state/enable reflects the newly-focused view.
+        // Freeze is per-viewport — the toolbar Freeze button's state/enable reflects the newly-focused view.
         OnPropertyChanged(nameof(IsFrozen));
         OnPropertyChanged(nameof(CanFreeze));
     }
@@ -995,8 +994,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     {
         InvalidateCamera();
         OnPropertyChanged(nameof(ActiveTab));
-        OnPropertyChanged(nameof(IsRailOnTable));
-        SyncTablePanelAutoOpen();
+        OnPropertyChanged(nameof(CanFreeze));
     }
 
     private void InvalidateNavigation()
@@ -1005,8 +1003,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         InvalidateOverlay();
         InvalidatePage();
         OnPropertyChanged(nameof(ActiveTab));
-        OnPropertyChanged(nameof(IsRailOnTable));
-        SyncTablePanelAutoOpen();
+        OnPropertyChanged(nameof(CanFreeze));
         RequestAnimationFrame();
     }
 

@@ -38,6 +38,13 @@
         <Style Selector="Button.toolBtn:disabled">
             <Setter Property="Opacity" Value="0.4" />
         </Style>
+        <!-- A plain Button.toolBtn (e.g. the Freeze flyout button) can't use the :checked pseudo,
+             so .active mirrors the accent look for an armed / engaged state. -->
+        <Style Selector="Button.toolBtn.active">
+            <Setter Property="Background" Value="{DynamicResource SystemControlHighlightAccentBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SystemControlHighlightAccentBrush}" />
+            <Setter Property="Foreground" Value="White" />
+        </Style>
         <!-- Borderless variant (sidebar toggle): no outline, slightly tighter padding. -->
         <Style Selector="ToggleButton.toolBtn.borderless">
             <Setter Property="BorderThickness" Value="0" />

@@ -15,6 +15,10 @@ public partial class ToolBarView : UserControl
     private MainWindowViewModel? _vm;
     private readonly Flyout _colorFlyout = new();
     private readonly Flyout _thicknessFlyout = new();
+    // Freeze-pane flyout hosts the reusable FreezePanesView (Rows / Columns / Both / Unfreeze); it binds
+    // to the same VM. Freeze is page-wide and table-independent, so the button is always available.
+    private readonly Flyout _freezeFlyout = new();
+    private readonly FreezePanesView _freezeView = new();
 
     public MainWindowViewModel? ViewModel
     {
@@ -24,6 +28,7 @@ public partial class ToolBarView : UserControl
             if (_vm is not null)
                 _vm.PropertyChanged -= OnVmPropertyChanged;
             _vm = value;
+            _freezeView.DataContext = value;
             if (_vm is not null)
             {
                 _vm.PropertyChanged += OnVmPropertyChanged;
@@ -55,6 +60,9 @@ public partial class ToolBarView : UserControl
 
         ColorButton.Flyout = _colorFlyout;
         ThicknessButton.Flyout = _thicknessFlyout;
+
+        _freezeFlyout.Content = _freezeView;
+        FreezeButton.Flyout = _freezeFlyout;
     }
 
     private void OnVmPropertyChanged(object? sender, PropertyChangedEventArgs args)
@@ -75,6 +83,15 @@ public partial class ToolBarView : UserControl
             case nameof(MainWindowViewModel.ArmActivateRailClick):
                 UpdateRailHereState();
                 break;
+            case nameof(MainWindowViewModel.FreezeArmMode):
+                UpdateFreezeState();
+                // Picking a mode arms a placement; dismiss the flyout so the next click lands on the page.
+                if (_vm?.FreezeArmMode != FreezeMode.None) _freezeFlyout.Hide();
+                break;
+            case nameof(MainWindowViewModel.IsFrozen):
+            case nameof(MainWindowViewModel.CanFreeze):
+                UpdateFreezeState();
+                break;
             case "SelectedText":
                 UpdateCopyVisibility();
                 break;
@@ -86,6 +103,7 @@ public partial class ToolBarView : UserControl
         UpdateToggleState();
         UpdateModeState();
         UpdateRailHereState();
+        UpdateFreezeState();
         UpdateCopyVisibility();
         RebuildColorFlyout();
         RebuildThicknessFlyout();
@@ -119,6 +137,16 @@ public partial class ToolBarView : UserControl
 
     private void UpdateRailHereState()
         => RailHereButton.IsChecked = _vm?.ArmActivateRailClick ?? false;
+
+    // The Freeze button accents (.active) while a placement is armed or a freeze is in place, and is
+    // enabled whenever there's something to do (a page to freeze, an armed placement, or a live freeze).
+    private void UpdateFreezeState()
+    {
+        bool armed = (_vm?.FreezeArmMode ?? FreezeMode.None) != FreezeMode.None;
+        bool frozen = _vm?.IsFrozen ?? false;
+        FreezeButton.IsEnabled = (_vm?.CanFreeze ?? false) || armed || frozen;
+        FreezeButton.Classes.Set("active", armed || frozen);
+    }
 
     private void UpdateCopyVisibility()
         => CopyButton.IsVisible = _vm?.SelectedText is not null;

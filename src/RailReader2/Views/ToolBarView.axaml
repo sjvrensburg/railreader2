@@ -43,6 +43,14 @@
                 <c:Icon Data="{StaticResource IconRailHere}" />
             </ToggleButton>
 
+            <!-- Freeze panes — page-wide, table-independent. The button opens a flyout (Rows / Columns /
+                 Both / Unfreeze); .active accents it while a freeze is armed or in place. Shortcut: Z. -->
+            <Button Name="FreezeButton" Classes="toolBtn"
+                    ToolTip.Tip="Freeze panes — pin rows/columns in place while you scroll (any page). Shortcut: Z"
+                    a:AutomationProperties.Name="Freeze panes">
+                <c:Icon Data="{StaticResource IconFreeze}" />
+            </Button>
+
             <Border Classes="toolSep" />
 
             <ToggleButton Name="AnnotateButton" Classes="toolBtn" ToolTip.Tip="Annotation Mode (Ctrl+E)"

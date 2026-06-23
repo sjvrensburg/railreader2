@@ -311,6 +311,10 @@ public class ViewportPanel : Panel
                 ViewModel.PlaceFreeze(OwnerView?.SurfaceViewport, pageX, pageY);
                 OwnerView?.SetFreezeGuide(FreezeMode.None, 0, 0); // commit clears the guide
                 _freezeGuidePushed = false;
+                // Restore the normal cursor here: clearing _freezeGuidePushed disables OnPointerMoved's
+                // disarm reset, so without this the crosshair would stick. Link/annotation cursor logic
+                // re-applies on the next move.
+                Cursor = Cursor.Default;
             }
             // "Start rail here": when armed, a single click force-activates rail at the click point
             // (any zoom). Checked before markers/block-framing so it wins regardless of what's under it.

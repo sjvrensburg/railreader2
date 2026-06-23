@@ -1,4 +1,3 @@
-using System;
 using System.ComponentModel;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
@@ -7,15 +6,16 @@ using RailReader2.ViewModels;
 namespace RailReader2.Views;
 
 /// <summary>
-/// The "Table Reading" accordion section: freeze-pane controls for the table the rail is on. Binds to
-/// the shared <see cref="MainWindowViewModel"/> via the inherited DataContext; controls are wired
-/// imperatively (like <see cref="ToolBarView"/>).
+/// Freeze-pane controls (Rows / Columns / Both / Unfreeze) — hosted in the toolbar's Freeze flyout
+/// (<see cref="ToolBarView"/>). Freeze is page-wide and table-independent, so it is available on any
+/// page. Binds to the shared <see cref="MainWindowViewModel"/> via the supplied DataContext; controls
+/// are wired imperatively (like <see cref="ToolBarView"/>).
 /// </summary>
-public partial class TableReadingView : UserControl
+public partial class FreezePanesView : UserControl
 {
     private MainWindowViewModel? _vm;
 
-    public TableReadingView()
+    public FreezePanesView()
     {
         InitializeComponent();
 
@@ -26,10 +26,28 @@ public partial class TableReadingView : UserControl
         FreezeBothButton.Click += (_, _) => _vm?.ArmFreeze(FreezeMode.Both);
         UnfreezeButton.Click += (_, _) => _vm?.Unfreeze();
 
-        DataContextChanged += OnDataContextChanged;
+        // Hosted in the toolbar's Freeze flyout, so this control is loaded/unloaded on every open/close.
+        // (Re)wire to the VM on both DataContext change and load so re-opening the flyout stays live.
+        DataContextChanged += (_, _) => Rewire();
     }
 
-    private void OnDataContextChanged(object? sender, EventArgs e)
+    protected override void OnLoaded(RoutedEventArgs e)
+    {
+        base.OnLoaded(e);
+        Rewire();
+    }
+
+    protected override void OnUnloaded(RoutedEventArgs e)
+    {
+        if (_vm is not null)
+        {
+            _vm.PropertyChanged -= OnVmPropertyChanged;
+            _vm = null;
+        }
+        base.OnUnloaded(e);
+    }
+
+    private void Rewire()
     {
         if (_vm is not null)
             _vm.PropertyChanged -= OnVmPropertyChanged;
@@ -41,16 +59,6 @@ public partial class TableReadingView : UserControl
             _vm.PropertyChanged += OnVmPropertyChanged;
             UpdateFreezeControls();
         }
-    }
-
-    protected override void OnUnloaded(RoutedEventArgs e)
-    {
-        if (_vm is not null)
-        {
-            _vm.PropertyChanged -= OnVmPropertyChanged;
-            _vm = null;
-        }
-        base.OnUnloaded(e);
     }
 
     private void OnVmPropertyChanged(object? sender, PropertyChangedEventArgs e)
