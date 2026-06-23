@@ -14,29 +14,42 @@ public enum FreezeMode { None, Rows, Columns, Both }
 // both), the pointer becomes a matching guide line (horizontal → freeze everything ABOVE it,
 // vertical → everything LEFT of it, both → a crossing pair), and a click drops the split at exactly
 // that point — no snapping to detected boundaries (which are sometimes wrong) and no dependence on
-// table detection at all. The frozen page strips pin in screen space while the body scrolls. Three
-// crop images are rendered from the page bitmap and composited by FreezePaneLayer; the SKImage
+// table detection at all. The frozen page strips pin in screen space while the body scrolls; they are
+// captured at the FREEZE-TIME camera (zoom + offsets), so they show exactly what was above / left of
+// the split when frozen (not the page's absolute top-left → no jump) and the top/left bands track the
+// body's live pan on their free axis so a table's header/labels stay aligned with the cell being read.
+// To keep that alignment, ZOOM IS DISABLED while frozen (every zoom entry point toasts and no-ops); the
+// crops therefore render once and any zoom that escapes the lock self-clears the freeze (GetFreezeTiles).
+// Three crop images are rendered from the page bitmap and composited by FreezePaneLayer; the SKImage
 // lifecycle mirrors PdfPageLayer (retire on the composition thread).
 //
 // Freeze state is PER-VIEWPORT (keyed by Core Viewport): with several views on one document (split
 // panes / tear-offs / duplicate tabs) each view freezes independently. The split (FreezeX/FreezeY,
-// page-space; 0 = that axis not frozen) is bound to the page it was set on and clears when the view
-// leaves that page or on Unfreeze. Axes compose: freeze rows, then add a column freeze, etc.
+// page-space; 0 = that axis not frozen) is bound to the page + zoom it was set on and clears when the
+// view leaves that page, zooms, is resized, or on Unfreeze. Axes compose: freeze rows, then add cols.
 public sealed partial class MainWindowViewModel
 {
-    /// <summary>Pre-rendered frozen-pane crops + their page-space regions for one frame.
-    /// Any field may be null (a rows-only / columns-only freeze has no left / top region).</summary>
+    /// <summary>Pre-rendered frozen-pane crops + their page-space regions for one frame, plus the
+    /// freeze-time camera that anchors them. Any crop may be null (a rows-only / columns-only freeze has
+    /// no left / top region). The dst rects are derived in the view layer: the corner pins at the
+    /// freeze-time screen position, the top band tracks the body's live horizontal pan, the left band
+    /// the live vertical pan — all at the freeze-time zoom (zoom is locked while frozen).</summary>
     internal readonly record struct FreezeTiles(
         SKImage? Corner, SKImage? Top, SKImage? Left,
-        BBox CornerBox, BBox TopBox, BBox LeftBox);
+        BBox CornerBox, BBox TopBox, BBox LeftBox,
+        float Zoom, float OffsetX, float OffsetY);
 
     /// <summary>One viewport's active freeze: the page it applies to, the two page-space split lines,
-    /// and the lazily-rendered crops + the DPI they were rendered at.</summary>
+    /// the freeze-time camera (the panes are anchored to the view as it was when frozen, not to the page
+    /// origin — so freezing never yanks the page-top into view), and the lazily-rendered crops + DPI.</summary>
     private sealed class FreezeState
     {
         public required int Page;
         public required float FreezeX;   // page-space: columns left of this freeze (0 = none)
         public required float FreezeY;   // page-space: rows above this freeze (0 = none)
+        public required float Zoom;      // camera zoom at freeze time (locked while frozen)
+        public required float OffsetX;   // camera offset at freeze time (screen-space)
+        public required float OffsetY;
         public SKImage? Corner, Top, Left;
         public BBox CornerBox, TopBox, LeftBox;
         public int Dpi; // 0 = not yet rendered for this anchor
@@ -108,7 +121,16 @@ public sealed partial class MainWindowViewModel
             InvalidateNavigation();
             return;
         }
-        _freezeByVp[vp] = new FreezeState { Page = page, FreezeX = freezeX, FreezeY = freezeY };
+        // Anchor to the camera as it is right now: the frozen panes capture whatever is currently above /
+        // left of the split (not the page's absolute top-left) and pin it where it sits, so freezing a
+        // mid-page table's header freezes just that header and the view never jumps.
+        _freezeByVp[vp] = new FreezeState
+        {
+            Page = page, FreezeX = freezeX, FreezeY = freezeY,
+            Zoom = (float)vp.Camera.Zoom,
+            OffsetX = (float)vp.Camera.OffsetX,
+            OffsetY = (float)vp.Camera.OffsetY,
+        };
         RaiseFreezeStateIfFocused(vp);
         InvalidateNavigation();
     }
@@ -136,6 +158,37 @@ public sealed partial class MainWindowViewModel
         InvalidateNavigation();
     }
 
+    /// <summary>Zoom is disabled while the focused view is frozen: the frozen panes are captured at the
+    /// freeze-time zoom, so zooming the body would slide the header/labels out of alignment with the
+    /// cells they describe — defeating the feature. Returns true (and toasts) when a zoom request should
+    /// be swallowed. Gated on every zoom entry point (wheel/keys/fit/percent).</summary>
+    public bool ZoomBlockedByFreeze()
+    {
+        if (!IsFrozen) return false;
+        ShowStatusToast("Zoom is disabled while panes are frozen — unfreeze (Z) to zoom");
+        return true;
+    }
+
+    /// <summary>After a pan, keep the focused frozen view from scrolling its body back past the split.</summary>
+    public void ClampFrozenCameraAfterPan()
+    {
+        if (FreezeVp is { } vp) ClampFrozenCamera(vp);
+    }
+
+    /// <summary>Keep a frozen view from scrolling its body back past the split — the body pane only ever
+    /// shows content beyond the split, so the frozen rows/columns are never revealed (duplicated) in the
+    /// body. Zoom is locked while frozen, so the freeze-time offsets are the exact limits; pans/snaps
+    /// toward the page end are unaffected. Applied after a manual pan AND after every per-frame tick
+    /// (rail line-snap and auto-scroll re-aim the camera each frame, including the horizontal snap-to-
+    /// line-start that would otherwise slide the row labels out from behind the frozen column). No-op
+    /// unless <paramref name="vp"/> is frozen on its current page.</summary>
+    internal void ClampFrozenCamera(Viewport vp)
+    {
+        if (!_freezeByVp.TryGetValue(vp, out var f) || f.Page != vp.CurrentPage) return;
+        if (f.FreezeY > 0.5f && vp.Camera.OffsetY > f.OffsetY) vp.Camera.OffsetY = f.OffsetY;
+        if (f.FreezeX > 0.5f && vp.Camera.OffsetX > f.OffsetX) vp.Camera.OffsetX = f.OffsetX;
+    }
+
     private void RaiseFreezeStateIfFocused(Viewport vp)
     {
         if (!ReferenceEquals(vp, FreezeVp)) return;
@@ -157,24 +210,27 @@ public sealed partial class MainWindowViewModel
     {
         if (_freezeByVp.TryGetValue(vp, out var f))
         {
-            if (vp.CurrentPage != f.Page) // a page-wide freeze belongs to the page it was set on
+            // A freeze belongs to the page AND zoom it was set on. Leaving the page invalidates it; so does
+            // any zoom change that escaped the freeze zoom-lock (a block-frame, portal jump, rail-zoom snap,
+            // or an in-flight zoom animation that outlived the freeze click) — clear rather than draw the
+            // captured panes misaligned with the now-differently-zoomed body. The 0.1% epsilon ignores
+            // float noise; while genuinely locked the zoom stays bit-identical so this never fires.
+            if (vp.CurrentPage != f.Page || Math.Abs(vp.Camera.Zoom - f.Zoom) > f.Zoom * 0.001)
             {
                 ClearFreeze(vp);
                 RaiseFreezeStateIfFocused(vp);
             }
-            else
+            else if (f.Dpi == 0)
             {
-                // Render at a zoom-proportional DPI so the pinned strips are as crisp as the live page;
-                // re-render only when the zoom diverges by >1.5x (page-tier hysteresis).
-                int desiredDpi = Math.Clamp((int)(72f * (float)vp.Camera.Zoom), 150, 600);
-                if (f.Dpi == 0 || desiredDpi > f.Dpi * 1.5f || desiredDpi * 1.5f < f.Dpi)
-                    RenderFreezeCrops(vp, f, desiredDpi);
+                // Render once at the freeze-time zoom (locked, so this never re-renders — panes never rescale).
+                RenderFreezeCrops(vp, f, Math.Clamp((int)(72f * f.Zoom), 150, 600));
             }
         }
 
         retired = DrainRetired(vp);
         return _freezeByVp.TryGetValue(vp, out var ff)
-            ? new FreezeTiles(ff.Corner, ff.Top, ff.Left, ff.CornerBox, ff.TopBox, ff.LeftBox)
+            ? new FreezeTiles(ff.Corner, ff.Top, ff.Left, ff.CornerBox, ff.TopBox, ff.LeftBox,
+                ff.Zoom, ff.OffsetX, ff.OffsetY)
             : null;
     }
 
@@ -184,13 +240,20 @@ public sealed partial class MainWindowViewModel
         float pageW = (float)vp.PageWidth, pageH = (float)vp.PageHeight;
         float fx = f.FreezeX, fy = f.FreezeY;
 
-        // Page-space regions: corner (above ∧ left of the split), top strip (above, right of the
-        // column split), left strip (left of the column split, below the row split). Full page extent —
-        // a rows-only freeze (fx == 0) has no corner/left; a columns-only freeze (fy == 0) has no
+        // The frozen content is what was VISIBLE above / left of the split when frozen — not the page's
+        // absolute top-left. topY0/leftX0 are the page coords at the viewport's top / left edge at freeze
+        // time (clamped into the frozen band), so a mid-page table's header freezes just the header and
+        // the panes overlay the live view exactly at the instant of freezing (no jump).
+        float topY0 = Math.Clamp(-f.OffsetY / f.Zoom, 0f, fy);
+        float leftX0 = Math.Clamp(-f.OffsetX / f.Zoom, 0f, fx);
+
+        // Page-space regions: corner (frozen rows ∧ frozen cols), top strip (frozen rows, over the body
+        // columns → tracks horizontal pan), left strip (frozen cols, over the body rows → tracks vertical
+        // pan). A rows-only freeze (fx == 0) has no corner/left; a columns-only freeze (fy == 0) has no
         // corner/top.
-        f.CornerBox = new BBox(0, 0, fx, fy);
-        f.TopBox = new BBox(fx, 0, pageW - fx, fy);
-        f.LeftBox = new BBox(0, fy, fx, pageH - fy);
+        f.CornerBox = new BBox(leftX0, topY0, fx - leftX0, fy - topY0);
+        f.TopBox = new BBox(fx, topY0, pageW - fx, fy - topY0);
+        f.LeftBox = new BBox(leftX0, fy, fx - leftX0, pageH - fy);
 
         bool hasCorner = f.CornerBox is { W: > 0.5f, H: > 0.5f };
         bool hasTop = f.TopBox is { W: > 0.5f, H: > 0.5f };
