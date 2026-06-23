@@ -12,7 +12,7 @@ Everything you need to know to get the most out of railreader2.
 4. [Auto-Scroll](#auto-scroll)
 5. [Jump Mode](#jump-mode)
 6. [Line Focus & Highlight](#line-focus--highlight)
-7. [Table Reading (experimental)](#table-reading-experimental)
+7. [Freeze Panes](#freeze-panes)
 8. [Colour Effects](#colour-effects)
 9. [Search](#search)
 10. [Annotations](#annotations)
@@ -204,33 +204,19 @@ Opacity is adjustable from 0.0 (invisible) to 1.0 (fully opaque). The default is
 
 ---
 
-## Table Reading (experimental)
+## Freeze Panes
 
-> **Experimental.** Table reading relies on best-effort cell detection. It works well on simple, well-ruled tables, but can misread dense or irregular ones — tables that group thousands with spaces (`1 288 272`), use dashes for empty cells, have merged or multi-row headers, or right-align their columns. Expect rough edges on complex tables.
+Pin part of a page in place — like Excel's *Freeze Panes* — so a header row, a label column, or both stay visible while the rest of the page scrolls under them. It is **page-wide and works on any page**, not just detected tables, and it does not depend on table detection at all.
 
-When the rail settles on a detected **table**, a **Table Reading** section opens automatically in the side panel (and your previous panel is restored when you leave the table). It offers three aids.
+Open the **Freeze** button (the snowflake) on the toolbar — it is always available whenever a page is loaded — and pick a mode:
 
-### Cell navigation
+- **Rows** — then click in the page to freeze everything **above** a horizontal line.
+- **Columns** — then click to freeze everything **left of** a vertical line.
+- **Both** — then click to freeze above **and** left of a crossing point. Shortcut: press `Z` to arm "both" directly.
 
-Choose how the arrow keys move within a table:
+The pointer shows a guide line while a placement is armed; the click drops the split exactly where you point — there is no snapping to detected boundaries (which are sometimes wrong). The two axes compose: freeze rows first, then add a column freeze to build up to "both". The frozen strips stay pinned in place, re-rendered crisply as you zoom, while the body scrolls freely.
 
-- **Cell by cell** (default) — `Left`/`Right` step through the cells of a row, rolling to the next/previous row at the edges. `Down`/`Up` move to the cell **directly below/above in the same column**, like Excel. At the top or bottom row, `Down`/`Up` leave the table and continue reading.
-- **Row by row** — `Left`/`Right` keep their normal block navigation; `Down`/`Up` move from row to row.
-
-### Focus area
-
-While reading a table, the line highlight (`H`) and focus dim (`F`) can be shaped to a region instead of the whole line:
-
-- **Cell** — just the current cell
-- **Row** — the current row
-- **Column** — the current column
-- **Row + column** — both (a cross centred on the current cell)
-
-The focus area only chooses the *shape* — whether the tint and dim actually show is still controlled by the usual `H` (highlight) and `F` (focus dim) toggles. The column is **inferred** from the cell positions, so its accuracy varies on merged or irregular tables.
-
-### Freeze panes
-
-Freeze the rows **above** and the columns **left of** the current cell so they stay visible while you scroll through the rest of the table — exactly like Excel's *Freeze Panes*. Navigate to the cell you want as the top-left of the scrollable area, then click **Freeze here** in the Table Reading panel or press `Z`. The frozen header row and label column stay pinned, tracking the live table as you move. Click **Unfreeze** (or press `Z` again) to release; the freeze also clears when you leave the table.
+Each split pane and tear-off window freezes **independently**, and a freeze belongs to the page it was set on — it clears automatically when that view moves to another page. To release it, click **Unfreeze** in the Freeze flyout, use the **❄ Frozen — Unfreeze** chip that appears in the frozen pane's corner, or press `Z` again. Press `Escape` to cancel a placement you've armed but not yet dropped.
 
 ---
 

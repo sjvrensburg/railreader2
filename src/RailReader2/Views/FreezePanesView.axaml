@@ -1,11 +1,13 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:RailReader2.ViewModels"
-             x:Class="RailReader2.Views.TableReadingView"
+             x:Class="RailReader2.Views.FreezePanesView"
              x:DataType="vm:MainWindowViewModel">
     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-        <StackPanel Margin="8,6" Spacing="6">
+        <StackPanel Margin="8,6" Spacing="6" MinWidth="200">
             <TextBlock Text="Freeze panes" FontWeight="SemiBold" />
+            <TextBlock Text="Pin rows / columns in place while the rest of the page scrolls — works on any page."
+                       TextWrapping="Wrap" FontSize="11" Opacity="0.7" />
             <UniformGrid Columns="3">
                 <ToggleButton Name="FreezeRowsButton" Content="Rows" Margin="0,0,2,0"
                               HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"

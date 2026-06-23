@@ -31,6 +31,8 @@
     <StreamGeometry x:Key="IconPanelLeft">M5,3 H19 A2,2 0 0 1 21,5 V19 A2,2 0 0 1 19,21 H5 A2,2 0 0 1 3,19 V5 A2,2 0 0 1 5,3 Z M0 0 M9,3 V21</StreamGeometry>
     <!-- Crosshair: "start rail reading here" (click target). Lucide crosshair (ISC). -->
     <StreamGeometry x:Key="IconRailHere">M2 12 A10 10 0 0 1 22 12 A10 10 0 0 1 2 12 M0 0 M22 12 L18 12 M0 0 M6 12 L2 12 M0 0 M12 6 L12 2 M0 0 M12 22 L12 18</StreamGeometry>
+    <!-- Snowflake: "freeze panes" (pin rows/columns). Six-spoke star with chevron tips. -->
+    <StreamGeometry x:Key="IconFreeze">M2 12h20 M0 0 M12 2v20 M0 0 m20 16-4-4 4-4 M0 0 m4 8 4 4-4 4 M0 0 m16 4-4 4-4-4 M0 0 m8 20 4-4 4 4</StreamGeometry>
 
     <!-- Icon control theme: stroked Lucide path, Foreground-tinted, uniformly scaled,
          decorative (hidden from the accessibility tree). -->

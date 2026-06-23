@@ -264,7 +264,7 @@ public sealed partial class MainWindowViewModel
             // Route focus to the selected tab's viewport (replaces the old document-index SelectDocument).
             FocusViewport(Tabs[index].Viewport);
             RestoreSidebarState(Tabs[index]);
-            ResetTableStateForTabSwitch();
+            ResetArmStateForTabSwitch();
 
             // Focusing fires neither PageChanged nor ReadingPositionChanged, so evaluate portals here —
             // otherwise the previous tab's target crop lingers on a quiescent switch.
