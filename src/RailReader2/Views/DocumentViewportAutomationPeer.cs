@@ -4,6 +4,7 @@ using System.Text;
 using Avalonia.Automation;
 using Avalonia.Automation.Peers;
 using Avalonia.Automation.Provider;
+using RailReader.Core;
 using RailReader.Core.Commands;
 using RailReader.Core.Models;
 using RailReader2.ViewModels;
@@ -56,12 +57,19 @@ internal sealed class DocumentViewportAutomationPeer : ControlAutomationPeer, IV
     {
         _owner = owner;
         _lastSig = Signature();
-        var tab = _owner.ViewModel?.ActiveTab;
+        var vp = FocusedViewport;
         // Cheap seed; no Core queries during (possibly off-thread) creation — rail text and the page
         // outline are filled by the first NotifyStateChanged from the render path.
-        _cachedName = ComputeName(tab, position: null);
-        _cachedDescription = Describe(tab, position: null, outline: "");
+        _cachedName = ComputeName(vp, position: null);
+        _cachedDescription = Describe(vp, position: null, outline: "");
     }
+
+    /// <summary>The viewport this peer describes: the focused view (a secondary/detached pane or the
+    /// primary), so the gate here matches the focused-view "where am I" Core queries
+    /// (<see cref="MainWindowViewModel.GetReadingPosition"/>/<see cref="MainWindowViewModel.GetPageDescription"/>,
+    /// no-index forms) and the two can't report different pages. RailReaderCore 0.43.0 routed those
+    /// queries through the focused view; gating on the primary <c>ActiveTab</c> here would mix the two.</summary>
+    private Viewport? FocusedViewport => _owner.ViewModel?.Controller.FocusedViewport;
 
     protected override string GetClassNameCore() => "DocumentViewport";
     protected override AutomationControlType GetAutomationControlTypeCore() => AutomationControlType.Document;
@@ -87,14 +95,14 @@ internal sealed class DocumentViewportAutomationPeer : ControlAutomationPeer, IV
         _lastSig = sig;
 
         var vm = _owner.ViewModel;
-        var tab = vm?.ActiveTab;
+        var vp = FocusedViewport;
         // Rail position (role + block/line text), computed in Core; null when not rail-reading.
-        var position = tab is { Rail.Active: true } ? vm?.GetReadingPosition() : null;
-        string outline = PageOutline(vm, tab?.CurrentPage ?? -1);
+        var position = vp is { Rail.Active: true } ? vm?.GetReadingPosition() : null;
+        string outline = PageOutline(vm, vp?.CurrentPage ?? -1);
 
         string previousName = _cachedName;
-        _cachedName = ComputeName(tab, position);
-        _cachedDescription = Describe(tab, position, outline);
+        _cachedName = ComputeName(vp, position);
+        _cachedDescription = Describe(vp, position, outline);
 
         // Announce via the focused element's NAME change — the lever AT-SPI/UIA most reliably speak.
         // The full state stays on the description for on-demand reads; we don't separately raise it, to
@@ -107,30 +115,30 @@ internal sealed class DocumentViewportAutomationPeer : ControlAutomationPeer, IV
     /// camera frames (which would spam during the snap animation).</summary>
     private (int, bool, int, int) Signature()
     {
-        if (_owner.ViewModel?.ActiveTab is not { } tab) return (-1, false, -1, -1);
-        var rail = tab.Rail;
-        return (tab.CurrentPage, rail.Active,
+        if (FocusedViewport is not { } vp) return (-1, false, -1, -1);
+        var rail = vp.Rail;
+        return (vp.CurrentPage, rail.Active,
             rail.Active ? rail.CurrentBlock : -1,
             rail.Active ? rail.CurrentLine : -1);
     }
 
     /// <summary>Stable landmark name while browsing; the current line while rail-reading.</summary>
-    private static string ComputeName(TabViewModel? tab, ReadingPosition? position)
+    private static string ComputeName(Viewport? vp, ReadingPosition? position)
     {
-        if (tab is { Rail.Active: true } railTab)
-            return position?.LineText is { Length: > 0 } line ? line : $"Rail line {railTab.Rail.CurrentLine + 1}";
+        if (vp is { Rail.Active: true } railVp)
+            return position?.LineText is { Length: > 0 } line ? line : $"Rail line {railVp.Rail.CurrentLine + 1}";
         return BrowseName;
     }
 
-    private static string Describe(TabViewModel? tab, ReadingPosition? position, string outline)
+    private static string Describe(Viewport? vp, ReadingPosition? position, string outline)
     {
-        if (tab is null) return "No document open.";
+        if (vp is null) return "No document open.";
 
         var sb = new StringBuilder();
         sb.Append(CultureInfo.InvariantCulture,
-            $"Page {tab.CurrentPage + 1} of {tab.PageCount}, zoom {tab.Camera.Zoom * 100:F0}%");
+            $"Page {vp.CurrentPage + 1} of {vp.Owner.PageCount}, zoom {vp.Camera.Zoom * 100:F0}%");
 
-        var rail = tab.Rail;
+        var rail = vp.Rail;
         if (rail.Active)
         {
             int lineNo = (position?.LineIndex ?? rail.CurrentLine) + 1;
