@@ -1,3 +1,4 @@
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.Input;
 using RailReader.Core;
 using RailReader.Core.Models;
@@ -189,6 +190,36 @@ public sealed partial class MainWindowViewModel
         if (ForcedRailActive) { ExitForcedRail(); return; }
         var (ww, wh) = FocusedViewportSize();
         ActivateRailAtClick(ww / 2.0, wh / 2.0);
+    }
+
+    /// <summary>Apply a requested initial view from launch flags (<c>--page</c>/<c>--zoom</c>/<c>--rail</c>),
+    /// after the startup document has opened. Page is 1-based; zoom is a percentage (e.g. 300 = 300%).
+    /// Rail engages once the page is analysed: a high enough zoom seats it via the tick, otherwise this
+    /// forces it at the viewport centre (a short poll waits for analysis, then gives up — no model = no
+    /// rail).</summary>
+    public void ApplyStartupView(int? page1Based, double? zoomPercent, bool rail)
+    {
+        if (ActiveTab is not { } tab) return;
+        if (page1Based is { } p)
+            GoToPage(Math.Clamp(p - 1, 0, Math.Max(0, tab.PageCount - 1)));
+        if (zoomPercent is { } z)
+            SetZoomPercent(z);
+        if (!rail) return;
+
+        StartBackgroundAnalysis();
+        // Rail needs the current page analysed; poll briefly, then force rail if the tick hasn't already
+        // engaged it (a >threshold zoom would have). Capped so a missing ONNX model can't poll forever.
+        int attempts = 0;
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(150) };
+        timer.Tick += (_, _) =>
+        {
+            attempts++;
+            if (ActiveTab is not { } t || attempts > 80) { timer.Stop(); return; }
+            if (!t.AnalysisCache.ContainsKey(t.State.CurrentPage)) return;
+            timer.Stop();
+            if (!t.Rail.Active && !ForcedRailActive) StartRailHere();
+        };
+        timer.Start();
     }
 
     /// <summary>True while rail is held active below the zoom threshold by a forced "start rail here"

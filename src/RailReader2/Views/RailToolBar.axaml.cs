@@ -1,4 +1,5 @@
 using Avalonia;
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Interactivity;
@@ -38,7 +39,7 @@ public partial class RailToolBar : UserControl
 
     private static readonly IBrush LabelBrush = new SolidColorBrush(Color.FromRgb(180, 180, 180));
 
-    private Button MakeToggleButton(string label, string tooltip, EventHandler<RoutedEventArgs> handler)
+    private Button MakeToggleButton(string label, string accessibleName, string tooltip, EventHandler<RoutedEventArgs> handler)
     {
         var btn = new Button
         {
@@ -58,6 +59,10 @@ public partial class RailToolBar : UserControl
             BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(3),
         };
+        // The visible content is a single glyph-letter (P/J/F/H); give assistive tech / UI-automation
+        // a descriptive accessible name so it reads "Auto-scroll", not "P". Verified via the live AT-SPI
+        // tree: these buttons expose a 'click' action but surfaced as bare single letters.
+        AutomationProperties.SetName(btn, accessibleName);
         ToolTip.SetTip(btn, tooltip);
         btn.Click += handler;
         return btn;
@@ -65,7 +70,7 @@ public partial class RailToolBar : UserControl
 
     private void BuildButtons()
     {
-        _autoScrollBtn = MakeToggleButton("P", "Toggle auto-scroll (P)", (_, _) =>
+        _autoScrollBtn = MakeToggleButton("P", "Auto-scroll", "Toggle auto-scroll (P)", (_, _) =>
         {
             if (ViewModel is { } vm)
             {
@@ -76,7 +81,7 @@ public partial class RailToolBar : UserControl
         });
         ButtonPanel.Children.Add(_autoScrollBtn);
 
-        _jumpBtn = MakeToggleButton("J", "Toggle jump mode (J)", (_, _) =>
+        _jumpBtn = MakeToggleButton("J", "Jump mode", "Toggle jump mode (J)", (_, _) =>
         {
             if (ViewModel is { } vm)
             {
@@ -87,7 +92,7 @@ public partial class RailToolBar : UserControl
         });
         ButtonPanel.Children.Add(_jumpBtn);
 
-        _focusBlurBtn = MakeToggleButton("F", "Toggle line focus blur (F)", (_, _) =>
+        _focusBlurBtn = MakeToggleButton("F", "Line focus blur", "Toggle line focus blur (F)", (_, _) =>
         {
             if (ViewModel is { } vm)
             {
@@ -97,7 +102,7 @@ public partial class RailToolBar : UserControl
         });
         ButtonPanel.Children.Add(_focusBlurBtn);
 
-        _highlightBtn = MakeToggleButton("H", "Toggle line highlight (H)", (_, _) =>
+        _highlightBtn = MakeToggleButton("H", "Line highlight", "Toggle line highlight (H)", (_, _) =>
         {
             if (ViewModel is { } vm)
             {
@@ -143,6 +148,7 @@ public partial class RailToolBar : UserControl
             TickFrequency = 5,
         };
         ToolTip.SetTip(_speedSlider, "Scroll speed ([ / ] keys)");
+        AutomationProperties.SetName(_speedSlider, "Scroll speed");
         _speedSlider.PropertyChanged += OnSpeedSliderPropertyChanged;
         SliderPanel.Children.Add(_speedSlider);
 
@@ -161,6 +167,7 @@ public partial class RailToolBar : UserControl
             TickFrequency = 0.1,
         };
         ToolTip.SetTip(_blurSlider, "Motion blur intensity (Shift+[ / Shift+] keys)");
+        AutomationProperties.SetName(_blurSlider, "Motion blur intensity");
         _blurSlider.PropertyChanged += OnBlurSliderPropertyChanged;
         SliderPanel.Children.Add(_blurSlider);
     }
@@ -230,6 +237,7 @@ public partial class RailToolBar : UserControl
         ToolTip.SetTip(_speedSlider, jumpMode
             ? "Jump distance % ([ / ] keys)"
             : "Scroll speed ([ / ] keys)");
+        AutomationProperties.SetName(_speedSlider, jumpMode ? "Jump distance" : "Scroll speed");
     }
 
     /// <summary>
