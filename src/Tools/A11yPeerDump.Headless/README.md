@@ -63,36 +63,33 @@ matters for the agent's input/screencast transport, not the a11y tree).
 
 ### Live AT-SPI cross-check (on X11, no Accerciser GUI required)
 
+Use the companion script `scripts/atspi-dump.py`:
+
 ```bash
 # 1. Enable the a11y bus, then launch the app (any X11 session works)
 gsettings set org.gnome.desktop.interface toolkit-accessibility true
-railreader2 some.pdf &
+railreader2 some.pdf &        # or: dotnet run -c Release --project src/RailReader2 -- some.pdf &
 
-# 2a. dogtail one-liner — dumps the live AT-SPI tree (apt: python3-dogtail)
-python3 -c "import dogtail.tree as t; t.root.application('railreader2').dump()"
-
-# 2b. or pyatspi (apt: python3-pyatspi, gir1.2-atspi-2.0) — walk + print roles/names/actions
-python3 - <<'PY'
-import pyatspi
-def walk(node, d=0):
-    actions = ""
-    try:
-        ai = node.queryAction()
-        actions = " actions=[" + ",".join(ai.getName(i) for i in range(ai.nActions)) + "]"
-    except NotImplementedError:
-        pass
-    print("  "*d + f"{node.getRoleName()}: {node.name!r}{actions}")
-    for child in node:
-        walk(child, d+1)
-for app in pyatspi.Registry.getDesktop(0):
-    if app.name and "railreader" in app.name.lower():
-        walk(app)
-PY
+# 2. Dump the live tree — note the SYSTEM python (pyatspi is an apt package, invisible to conda):
+/usr/bin/python3 scripts/atspi-dump.py
 ```
 
-The `actions=[...]` column from 2b is the thing the peer audit can't see: whether
-the AT-SPI backend exposes a callable **Action** for each menu item. Compare it
-against this tool's menu audit to close the open question.
+It prints the full tree with an `actions=[...]` column, then a focused summary of
+whether each menu item exposes a callable **Action** — the thing the peer audit
+can't see. Gotchas it handles / you should know:
+
+- **Run it with `/usr/bin/python3`**, not a conda/venv `python3`. `pyatspi` lives in
+  the system `dist-packages`; a conda interpreter raises `ModuleNotFoundError` even
+  though `apt` reports it installed.
+- RailReader2 registers on the a11y bus as **`'Avalonia Application'`** (Avalonia
+  doesn't derive it from the assembly), with the frame named `railreader2`. The
+  script matches both.
+
+**What the live run established (2026-06-27, KDE/X11):** menu items expose **no**
+AT-SPI Action (so menus are not agent-actionable on Linux — use buttons + keyboard
+accelerators); all buttons expose `click`/`toggle`; and in rail mode the viewport
+node's accessible **name is the live line text** being read. See
+`memory/project_agent_readiness` for the full findings.
 
 ## Notes
 
