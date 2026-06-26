@@ -97,9 +97,20 @@ Open multiple PDFs in tabs with `Ctrl+O`. Each tab has independent zoom, positio
 - **Duplicate Tab** — opens the same PDF in a new tab
 - **Close Tab** — closes the tab
 
+Opening a file that is already open — or duplicating a tab — does not load the PDF a second time. The two tabs share one underlying document: the PDF handle, the layout/text caches, and the annotations are shared (so there is no duplicate analysis work, and an annotation made in one tab appears in the other), while each tab keeps its own page, zoom, and rail position.
+
 **Tab bar overflow:** When many tabs are open, they shrink with ellipsis text. Use the mouse wheel to scroll the tab bar horizontally, or click the overflow button (a downward chevron) at the end of the tab bar to see all tabs and jump to one.
 
 Switching tabs automatically exits any active annotation mode to prevent accidental edits on the wrong document.
+
+### Split panes and tear-off windows
+
+To see one document at several positions at once — for example, keeping a figure in view while you read the text that discusses it — you can split the viewport:
+
+- **Split Right** (View ▸ Split Editor ▸ Split Right, or `Ctrl+\`) adds another pane beside the current one. Panes sit side by side and are resized by dragging the splitter between them. Add as many as you like; close one with **Close Pane** (`Ctrl+Shift+\`), or **Close All Extra Panes** to return to a single view.
+- **Move Pane to New Window** (in the same menu) tears the focused pane off into its own floating, always-on-top window for a second monitor.
+
+Every pane and window is an independent viewport showing the same document with its own page, zoom, and rail position. **Click a pane to focus it** — keyboard, scroll, and menu commands then act on the focused pane. Closing all extra panes returns to a single view.
 
 ---
 
@@ -761,6 +772,8 @@ The log is overwritten at the start of each session. Old `.log` files are automa
 | `Ctrl+O` | Open file |
 | `Ctrl+W` | Close tab |
 | `Ctrl+Tab` | Next tab |
+| `Ctrl+\` | Split editor (add a pane to the right) |
+| `Ctrl+Shift+\` | Close the focused pane |
 | `Ctrl+Q` | Quit |
 | `Ctrl+,` | Settings |
 | `Ctrl+M` | Toggle minimap |
@@ -787,6 +800,8 @@ The log is overwritten at the start of each session. Old `.log` files are automa
 
 | Key | Action |
 |-----|--------|
+| `R` | Start rail here — then click where to begin (rail-reads at the current zoom) |
+| `Z` | Freeze panes (both axes) / unfreeze |
 | `Down` / `S` | Next line |
 | `Up` / `W` | Previous line |
 | `Right` / `D` | Scroll forward (hold) |
@@ -829,7 +844,7 @@ Every command is reachable from the menu bar by name — handy for discovery, ke
 
 - **File** — open, duplicate / close tab, export & import annotations, settings, quit.
 - **Edit** — find, annotation mode, undo / redo, and **Copy Block as LaTeX / Markdown / Description / Image** (the same VLM block actions as the `Ctrl+right-click` context menu, acting on the current rail block).
-- **View** — zoom, side panels, minimap, fullscreen, debug overlay, colour effects.
+- **View** — zoom, side panels, minimap, fullscreen, **Split Editor** (split right, move pane to a new window, close panes), debug overlay, colour effects.
 - **Rail** — the rail-reading toggles: **Auto-Scroll**, **Jump Mode**, **Line Focus Dim**, **Line Highlight**, and **Add Bookmark** (mirroring the `P` / `J` / `F` / `H` / `B` shortcuts).
 - **Navigation** — go to / previous / next / first / last page, and semantic **Jump to Next / Previous** heading, figure, table, or equation.
 - **Help** — keyboard shortcuts, about, diagnostic log, clean-up.

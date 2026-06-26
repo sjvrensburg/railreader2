@@ -87,8 +87,9 @@ refreshed PNGs. Only touch the harness if you add a new UI state to capture
 
 ## Notes / limitations
 
-- Zoom is set precisely via `DocumentState.ApplyZoom`, followed by
-  `UpdateRenderDpiIfNeeded()` so the page is re-rastered sharp at high zoom.
+- Zoom/pan is set precisely on the tab's per-viewport `Camera` (`t.Camera.Zoom`/
+  `OffsetX`/`OffsetY` on the `TabViewModel`, which delegates to its Core `Viewport`),
+  followed by `UpdateRenderDpiIfNeeded()` so the page is re-rastered sharp at high zoom.
 - All shots reuse a single booted app instance; switching PDFs re-opens the
   document in the same window. An in-flight async DPI raster is drained between
   shots to avoid PDFium contention.

@@ -78,14 +78,9 @@ At high zoom levels, navigation switches to "rail mode" — the viewer locks ont
 - **Analysis indicator** — status bar shows "Analyzing..." during layout inference
 - **Configurable navigation** — choose which block types are navigable in rail mode via Settings → Advanced
 
-#### Table reading (experimental)
+#### Freeze panes
 
-> **Experimental.** Table reading relies on best-effort cell detection. It works well on simple, well-ruled tables but can misread dense or irregular ones — tables that group thousands with spaces (`1 288 272`), use dashes for empty cells, have merged or multi-row headers, or right-align their columns. Expect rough edges on complex tables.
-
-- **Table Reading panel** — when the rail settles on a detected table, a **Table Reading** section opens in the side panel with the controls below, and your previous panel is restored when you leave the table
-- **Cell-by-cell navigation** — in *Cell* mode, Left/Right step through the cells of a row (rolling to the next/previous row at the edges) and **Down/Up move to the cell directly below/above in the same column** (Excel-style); at the table's top/bottom they leave the table and read on. *Row* mode keeps Left/Right as block navigation and moves row-to-row with Up/Down
-- **Table focus aids** — a focus scope (Cell / Row / Column / Row + column) shapes the line highlight (H) and focus dim (F) while reading a table, so the current cell, row, and/or column stands out. The column is inferred (accuracy varies on merged or irregular tables)
-- **Freeze panes** — freeze at the current cell (the **Freeze** button in the Table Reading panel, or the `Z` key) to pin the rows **above** and columns **left of** that cell while you scroll the rest of the table, like Excel's *Freeze Panes*. Unfreeze (same button/key) to release; the freeze clears when you leave the table
+- **Freeze panes** — pin part of a page in place, like Excel's *Freeze Panes*, so a header row, a label column, or both stay visible while the rest of the page scrolls. Open the **Freeze** button (snowflake) on the toolbar and pick a mode — **Rows** (freeze everything above a horizontal guide line), **Columns** (everything left of a vertical line), or **Both** (a crossing pair; `Z` arms "both" directly). Click to drop the split exactly where you point — no snapping to detected boundaries, and no dependence on table detection: it is page-wide and works on any page. Zoom is locked while frozen so the panes and body can't drift. Each split pane and tear-off window freezes independently; a freeze clears when its view leaves the page. Release via **Unfreeze** in the flyout, the **❄ Frozen — Unfreeze** chip in the pane's corner, or `Z`
 
 #### Visual comfort
 
@@ -101,8 +96,9 @@ At high zoom levels, navigation switches to "rail mode" — the viewer locks ont
 
 #### Navigation & document management
 
-- **Multi-tab support** — open multiple PDFs with independent per-tab state. Right-click a tab to duplicate or close
+- **Multi-tab support** — open multiple PDFs with independent per-tab state. Right-click a tab to duplicate or close. Opening the same file twice (or duplicating a tab) shares one underlying document — the PDF handle, layout/text caches, and annotations are shared (no duplicate analysis work), while each tab keeps its own page, zoom, and rail position
 - **Tab bar overflow** — tabs shrink with ellipsis when many are open. Horizontal mouse wheel scrolls the tab bar. Overflow dropdown button lists all tabs
+- **Split panes & tear-off windows** — view one document at several positions at once: split the editor into N side-by-side resizable panes (View ▸ Split Editor ▸ Split Right, Ctrl+\) or move a pane into its own floating always-on-top window. Each pane/window is an independent viewport with its own page, zoom, and rail; click a pane to focus it so keyboard, scroll, and menu commands act on it
 - **Side panel (accordion)** — a single-open accordion: opening one section collapses the others, and the open section fills the panel. Sections are **Outline** (table of contents, Ctrl+Shift+O), **Bookmarks** (named bookmarks, Ctrl+Shift+B), **Index** (figures/tables/equations browser with thumbnails and extracted equation text, Ctrl+Shift+I), **Search** (full-document text search, Ctrl+F), **Comments** (a list of annotation notes and in-PDF reviewer comments), and **Portals** (linked context viewports — keep a referenced figure/table/equation in view while you read; see below). Toggle the whole panel with the sidebar button at the left of the tab strip
 - **Whole-document figure scan** — the Index section's **Scan All** button sweeps every page for figures, tables, and equations (beyond the background lookahead), building a complete browsable index with thumbnails
 - **Focus follows navigation** — clicking an entry in any side-panel section (an outline heading, search result, bookmark, or figure) moves keyboard focus back to the page, so scrolling immediately drives the document rather than the list
@@ -226,6 +222,8 @@ Run `railreader2-cli --help` or `railreader2-cli <command> --help` for all optio
 | Ctrl+O | Open file |
 | Ctrl+W | Close tab |
 | Ctrl+Tab | Next tab |
+| Ctrl+\ | Split editor (add a pane to the right) |
+| Ctrl+Shift+\ | Close the focused pane |
 | Ctrl+Q | Quit |
 | PgDown / PgUp | Next / previous page |
 | Home / End | First / last page |
@@ -244,6 +242,8 @@ Run `railreader2-cli --help` or `railreader2-cli <command> --help` for all optio
 | P | Toggle auto-scroll (rail mode); D/S to continue when parked |
 | J | Toggle jump mode (saccade-style advance) |
 | B | Add bookmark for current page |
+| R | Start rail here — then click where to begin (rail-reads at the current zoom) |
+| Z | Freeze panes (both axes) / unfreeze |
 | Alt+Left / ` (backtick) | Navigate back |
 | Alt+Right | Navigate forward |
 | C | Cycle colour effect on active tab |
