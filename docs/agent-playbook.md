@@ -46,12 +46,17 @@ gsettings set org.gnome.desktop.interface toolkit-accessibility true
 # Launch on a document (positional arg = PDF path)
 railreader2 /path/to/paper.pdf
 #   or from source:  dotnet run -c Release --project src/RailReader2 -- /path/to/paper.pdf
+
+# Known-state startup flags (any combination; applied once the document opens):
+railreader2 /path/to/paper.pdf --page 7 --zoom 300 --rail
+#   --page <n>      1-based page to open on
+#   --zoom <pct>    zoom percentage (e.g. 300 = 300%); clamped to 50–2000
+#   --rail          engage rail mode (forces it at the viewport centre once the page is
+#                   analysed; a --zoom above the rail threshold engages it on its own)
 ```
 
-**App identity on the a11y bus:** the application registers as **`Avalonia Application`**
-(Avalonia doesn't derive it from the assembly); the top-level **frame is named
-`railreader2`**. Match on the frame, or on the Avalonia app name. There are no
-`--page/--zoom/--rail` startup flags yet — reach the desired state with the actions below.
+**App identity on the a11y bus:** the application registers as **`RailReader2`** (set via
+`Application.Name`), with the top-level **frame named `railreader2`**. Match on either.
 
 ---
 
@@ -168,7 +173,6 @@ continue when parked) · `J` jump mode · `H` line highlight · `F` line focus d
 ## 8. Known gaps / caveats (as of 2026-06-27)
 
 - **Menus aren't AT-SPI-actionable** — use buttons + accelerators (§1).
-- App name on the bus is the generic `Avalonia Application` (frame is `railreader2`).
 - **Input/screencast transport:** AT-SPI (the tree above) is display-server-agnostic, but an
   agent's *input injection and screen capture* on Wayland go through the portals
   (RemoteDesktop/ScreenCast); on X11 they're direct. This playbook covers the a11y tree, not

@@ -30,6 +30,10 @@ public partial class App : Application
 
     public override void Initialize()
     {
+        // The accessibility/automation backends surface this as the application's name on the bus
+        // (AT-SPI on Linux); without it the app registers as the generic "Avalonia Application", which an
+        // agent/screen reader can't identify. The window frame is named separately (via the window title).
+        Name = "RailReader2";
         AvaloniaXamlLoader.Load(this);
     }
 
@@ -76,12 +80,49 @@ public partial class App : Application
                 // First non-flag argument that names an existing file is the PDF to open.
                 var docPath = args?.FirstOrDefault(a => !a.StartsWith("--") && File.Exists(a));
                 if (docPath is not null)
-                    window.Opened += (_, _) => vm.FireAndForget(vm.OpenDocument(docPath), nameof(vm.OpenDocument));
+                {
+                    // Optional known-state startup flags (for agents / scripted launches):
+                    //   --page <n> (1-based)   --zoom <percent, e.g. 300>   --rail
+                    var (startPage, startZoom, startRail) = ParseStartupFlags(args!);
+                    window.Opened += (_, _) => vm.FireAndForget(OpenStartupDocument(), nameof(vm.OpenDocument));
+
+                    async System.Threading.Tasks.Task OpenStartupDocument()
+                    {
+                        await vm.OpenDocument(docPath);
+                        if (startPage is not null || startZoom is not null || startRail)
+                            vm.ApplyStartupView(startPage, startZoom, startRail);
+                    }
+                }
 
                 window.Show();
             }, DispatcherPriority.Background);
         }
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    /// <summary>Parse the optional known-state startup flags: <c>--page &lt;n&gt;</c> (1-based),
+    /// <c>--zoom &lt;percent&gt;</c> (e.g. 300 for 300%), and <c>--rail</c>. Unknown/malformed values are
+    /// ignored; the PDF path is a separate positional argument.</summary>
+    private static (int? Page, double? Zoom, bool Rail) ParseStartupFlags(string[] args)
+    {
+        int? page = null;
+        double? zoom = null;
+        bool rail = false;
+        for (int i = 0; i < args.Length; i++)
+        {
+            switch (args[i])
+            {
+                case "--page" when i + 1 < args.Length && int.TryParse(args[i + 1], out var p):
+                    page = p; i++; break;
+                case "--zoom" when i + 1 < args.Length && double.TryParse(
+                        args[i + 1], System.Globalization.NumberStyles.Float,
+                        System.Globalization.CultureInfo.InvariantCulture, out var z):
+                    zoom = z; i++; break;
+                case "--rail":
+                    rail = true; break;
+            }
+        }
+        return (page, zoom, rail);
     }
 }
