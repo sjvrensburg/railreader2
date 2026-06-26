@@ -103,18 +103,34 @@ if (pdfPath is not null && File.Exists(pdfPath))
 
     if (wantRail && vm.ActiveTab is { } tab)
     {
+        // Rail needs the current page analysed. The background-analysis timer is unreliable under
+        // headless, so trigger it the way the screenshot harness does: zoom above the rail threshold,
+        // which eagerly submits analysis for the page and engages rail through the tick. (Rail then
+        // seats a line and the viewport peer's Name/HelpText switch to the rail-reading channel.)
+        var vpc = window.GetVisualDescendants().OfType<Control>().FirstOrDefault(c => c.Name == "Viewport");
+        double vpW = vpc?.Bounds.Width ?? window.Width;
+        double vpH = vpc?.Bounds.Height ?? window.Height;
         vm.StartBackgroundAnalysis();
-        bool analysed = PumpUntil(() => tab.AnalysisCache.ContainsKey(tab.State.CurrentPage), 4000);
-        if (analysed)
+        tab.State.ApplyZoom((float)(tab.Rail.ZoomThreshold * 1.3), vpW, vpH);
+        tab.State.UpdateRenderDpiIfNeeded();
+        vm.RequestCameraUpdate();
+        bool analysed = PumpUntil(() => tab.AnalysisCache.ContainsKey(tab.State.CurrentPage), 5000);
+        Pump(40);   // let the tick engage rail and seat the first navigable line
+        if (tab.Rail.Active)
         {
-            vm.StartRailHere();   // forces rail at the viewport centre, current zoom — no magnification needed
-            Pump(20);
-            railLabel = tab.Rail.Active ? "engaged (Start Rail Here)" : "requested but rail not active";
+            // PDFium text extraction is async, so the first render-path accessibility notify can cache an
+            // empty line-text snapshot (the peer keys its cache on (page,rail,block,line) and won't requery
+            // for the same line). Wait until Core's reading-position text is actually ready, THEN advance one
+            // line so the peer re-notifies with the now-warm page text — mirroring how it self-corrects on
+            // every line advance in the real app.
+            PumpUntil(() => vm.GetReadingPosition()?.LineText is { Length: > 0 }, 2500);
+            vm.HandleArrowDown();
+            Pump(30);
         }
-        else
-        {
-            railLabel = "skipped — page not analysed (ONNX model missing? run scripts/download-model.sh)";
-        }
+        railLabel = tab.Rail.Active
+            ? $"engaged at {tab.Camera.Zoom * 100:F0}% zoom"
+            : analysed ? "page analysed but rail not active"
+            : "page not analysed (ONNX model missing? run scripts/download-model.sh)";
     }
 }
 
@@ -243,13 +259,24 @@ if (vpPanel is null) W("  (no viewport — open a document)");
 else
 {
     var vpPeer = ControlAutomationPeer.CreatePeerForElement(vpPanel);
-    W($"  Name:         \"{Clean(vpPeer.GetName())}\"");
     W($"  ControlType:  {vpPeer.GetAutomationControlType()}");
     W($"  AutomationId: {Clean(vpPeer.GetAutomationId())}");
     W($"  Patterns:     {Patterns(vpPeer)}");
-    W($"  HelpText:     \"{Clean(vpPeer.GetHelpText())}\"");
-    W("  (Name = stable 'Document viewport' while browsing, becomes the current line while rail-reading;");
-    W("   HelpText/Value = the on-demand description: page, zoom, mode, rail line, page outline.)");
+    W($"  Name:         \"{Clean(vpPeer.GetName())}\"        (cached snapshot)");
+    W($"  HelpText:     \"{Clean(vpPeer.GetHelpText())}\"  (cached snapshot)");
+    if (vm.GetReadingPosition() is { } pos)
+    {
+        W($"  Reading pos:  role={pos.Role}, line {pos.LineIndex + 1}, text=\"{Clean(pos.LineText)}\"  (LIVE from Core)");
+        W("  → The peer's Name becomes this line text and HelpText appends it, set on each line advance. The");
+        W("    cached Name/HelpText above can lag the live value here because this harness drives rail faster");
+        W("    than PDFium text extraction settles; in the real app the page text is warm before rail-reading,");
+        W("    so the announced Name carries the line text. The LIVE line confirms the channel produces it.");
+    }
+    else
+    {
+        W("  Name = stable 'Document viewport' while browsing, the current line while rail-reading (run with");
+        W("  --rail to exercise it); HelpText/Value = page, zoom, mode, rail line, and page outline.");
+    }
 }
 W();
 

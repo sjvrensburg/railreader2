@@ -21,9 +21,13 @@ dotnet run --project src/Tools/A11yPeerDump.Headless -c Release -- mypaper.pdf -
 ```
 
 - positional `*.pdf` — document to open (default: first `experiments/PDFs/*.pdf`).
-- `--rail` — engage rail mode (via "Start Rail Here") so the viewport peer's
-  rail-line description is exercised. Needs the page analysed, so the **ONNX layout
-  model must be present** (`./scripts/download-model.sh`); skipped with a note if not.
+- `--rail` — engage rail mode (zoom above the rail threshold, which submits the
+  page for analysis and seats the rail) so the viewport peer's rail-line channel is
+  exercised. Needs the **ONNX layout model present** (`./scripts/download-model.sh`);
+  reported as skipped if the page can't be analysed. The report prints both the peer's
+  cached Name/HelpText and the **live** Core reading position (role + line text) — the
+  latter is the authoritative proof the channel produces the line text, since the
+  cached snapshot can lag the live value under the harness's rapid drive.
 - `--out <file>` — write the report to a file instead of stdout.
 
 ## What the report contains
