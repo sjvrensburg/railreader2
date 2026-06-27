@@ -22,6 +22,18 @@ public partial class PortalWindow : Window
     public PortalWindow()
     {
         InitializeComponent();
+
+        // Windows-only: Aero Snap (drag-to-edge, Win+Arrow half-tiling) requires the native window to
+        // carry WS_THICKFRAME + WS_MAXIMIZEBOX — styles a borderless WindowDecorations.None window lacks,
+        // so on Windows the portal can't be docked to a screen edge the way it can under most X11 WMs
+        // (which happily snap even undecorated tops). BorderOnly is the cheapest decoration level that
+        // still gets those styles (resizable + maximizable are on by default) *without* WS_CAPTION, and
+        // — unlike Full + ExtendClientAreaToDecorationsHint — it leaves NeedsManagedDecorations false, so
+        // this Avalonia build draws no managed title bar/caption buttons over our custom dark chrome.
+        // Kept Windows-only: WindowDecorations.None already snaps fine on Linux/X11, and bumping the
+        // level there risks the WM drawing its own titlebar (MWM hints are coarse), regressing the look.
+        if (OperatingSystem.IsWindows())
+            WindowDecorations = WindowDecorations.BorderOnly;
     }
 
     /// <summary>Apply the app's scaled font size (<c>MainWindowViewModel.CurrentFontSize</c>) to the
