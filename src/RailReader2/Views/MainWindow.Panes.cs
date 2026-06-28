@@ -98,21 +98,7 @@ public partial class MainWindow
         vm.UnregisterSurface(view);
         view.Teardown(); // disposes its owned ViewportImages + handlers + retires its freeze crops (#180)
         if (vp is { } v)
-            SafeRemoveViewport(vm, v);
-    }
-
-    /// <summary>Remove a viewport from whichever open document owns it. Iterating the open tabs (all
-    /// public API) keeps this safe whether the document was merely switched away from (still alive →
-    /// frees the bitmap now) or was closed (its DocumentModel.Dispose already freed the viewport, so
-    /// it isn't found here — no double-dispose). Avoids the internal Viewport.Owner / IsDisposed.</summary>
-    private static void SafeRemoveViewport(MainWindowViewModel vm, Viewport vp)
-    {
-        foreach (var tab in vm.Tabs)
-            if (tab.State.Viewports.Contains(vp))
-            {
-                tab.State.RemoveViewport(vp);
-                return;
-            }
+            vm.SafeRemoveViewport(v); // shared with the portal viewport teardown (MainWindowViewModel)
     }
 
     // ── Split panes ────────────────────────────────────────────────────────────────────────

@@ -72,15 +72,20 @@
                 </DockPanel>
             </Border>
 
-            <!-- Target crop (peek when one is up, otherwise saved-portal tracking).
-                 Zoomable/pannable for dense tables: wheel zooms, drag pans, double-click refits. -->
+            <!-- Content. When a portal target is up the window hosts a LIVE confined viewport
+                 (LiveHost, a chrome-less DocumentView pinned to the target block via Core FocusBlock —
+                 rail/freeze/annotate all work in it); otherwise it falls back to the static crop /
+                 hint. MainWindow adds the DocumentView into LiveHost and toggles IsPortalLive. -->
             <Grid>
+                <Panel Name="LiveHost" IsVisible="{Binding IsPortalLive}" />
+
                 <ctrl:ZoomPanImage Source="{Binding PortalWindowImage}" Margin="4"
+                                   IsVisible="{Binding !IsPortalLive}"
                                    ToolTip.Tip="Scroll to zoom, drag to pan, double-click to fit" />
                 <TextBlock Text="{Binding PortalWindowHint}" Foreground="#AAAAAA"
                            HorizontalAlignment="Center" VerticalAlignment="Center"
                            TextWrapping="Wrap" TextAlignment="Center" Margin="12"
-                           IsVisible="{Binding PortalWindowImage, Converter={x:Static conv:ObjectConverters.IsNull}}" />
+                           IsVisible="{Binding ShowPortalHint}" />
 
                 <!-- Bottom-right resize grip (borderless windows have no OS resize border) -->
                 <Border Name="ResizeGrip" Width="16" Height="16"

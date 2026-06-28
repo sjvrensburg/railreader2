@@ -389,6 +389,9 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
     // Per-frame scratch: each live surface and its TickResult, reused so the hot loop allocates nothing.
     private readonly List<(IViewportSurface Surface, TickResult Result)> _tickScratch = new();
+    // Per-frame snapshot of _surfaces, so a mid-frame (un)registration (the portal surface opening/
+    // closing from EvaluatePortals) can't invalidate the tick enumeration. Reused to avoid per-frame alloc.
+    private readonly List<IViewportSurface> _surfaceSnapshot = new();
 
     /// <summary>All live viewport surfaces (read-only). Consumed by the host's broadcast invalidation.</summary>
     public IReadOnlyList<IViewportSurface> Surfaces => _surfaces;
@@ -423,12 +426,17 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
     /// <summary>Make <paramref name="vp"/> the focused viewport — all keyboard/scroll/menu commands then
     /// act on this surface (Core routes host input through <c>FocusedViewport</c>). Idempotent.</summary>
-    public void FocusSurface(IViewportSurface surface, Viewport vp)
+    public void FocusSurface(IViewportSurface surface, Viewport vp, bool wireReadingSignals = true)
     {
         // Re-point the per-viewport reading-context subscription to the now-focused view (replaces the
         // removed controller-level PageChanged/ReadingPositionChanged facades — Phase 3). Done before
         // the already-focused early-return so the very first focus (primary on open) gets wired too.
-        WireFocusedSignals(vp);
+        // The confined portal viewport opts OUT (wireReadingSignals:false): it takes INPUT focus for its
+        // toolbar/keys, but a11y announcements + the portal pin loop must keep tracking the MAIN reading
+        // view, not the satellite — otherwise focusing the pop-out hijacks both (its
+        // PageChanged/ReadingPositionChanged would drive OnReadingContextChanged). This realises the
+        // intent already documented at OnPortalPointerPressed ("the reading-position sync is unaffected").
+        if (wireReadingSignals) WireFocusedSignals(vp);
         if (ReferenceEquals(_controller.FocusedViewport, vp)) return;
         _controller.FocusedViewport = vp;
         // The controller's ambient size (input geometry) now tracks this surface.
@@ -471,6 +479,21 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         var active = ActiveTab;
         foreach (var t in Tabs)
             t.Viewport.IsLive = ReferenceEquals(t, active);
+    }
+
+    /// <summary>Remove <paramref name="vp"/> from whichever open document still owns it. Iterating the
+    /// open tabs (all public API) keeps this safe whether the document is alive (frees the viewport now)
+    /// or was already disposed (its model isn't found among the tabs → no-op, no double-free). Avoids
+    /// touching the internal <c>Viewport.Owner</c>/<c>IsDisposed</c>. Shared by the secondary-pane
+    /// teardown and the live portal viewport.</summary>
+    internal void SafeRemoveViewport(Viewport vp)
+    {
+        foreach (var tab in Tabs)
+            if (tab.State.Viewports.Contains(vp))
+            {
+                tab.State.RemoveViewport(vp);
+                return;
+            }
     }
 
     // The viewport whose PageChanged/ReadingPositionChanged currently drive OnReadingContextChanged.
@@ -610,7 +633,27 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             _backgroundTimer.Start();
     }
 
+    private bool _inAnimationFrame;
+
+    /// <summary>True while the per-frame <c>OnAnimationFrame</c> is executing. The host defers
+    /// structural portal-surface changes (register/host/teardown) when set — doing them mid-frame
+    /// re-enters / mutates the surface list — but applies user-initiated ones (a peek) synchronously
+    /// when clear, so they take effect before the next frame's portal evaluation can revise them.</summary>
+    public bool IsInAnimationFrame => _inAnimationFrame;
+
     private void OnAnimationFrame(TimeSpan frameTime)
+    {
+        // Re-entrancy guard: a per-frame property change (e.g. ActiveTab → portal-view sync, or a
+        // window Show pumping the dispatcher) must never nest a second frame — that would Clear/refill
+        // the shared _tickScratch mid-enumeration ("Collection was modified"). A skipped nested frame is
+        // harmless: the outer frame re-arms RequestAnimationFrame when anything is still animating.
+        if (_inAnimationFrame) return;
+        _inAnimationFrame = true;
+        try { RunAnimationFrame(frameTime); }
+        finally { _inAnimationFrame = false; }
+    }
+
+    private void RunAnimationFrame(TimeSpan frameTime)
     {
         _animationRequested = false;
 
@@ -632,7 +675,12 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         bool anyAnimating = false;
         var focused = _controller.FocusedViewport;
         _tickScratch.Clear();
-        foreach (var surface in _surfaces)
+        // Iterate a snapshot: TickViewport fires ReadingPositionChanged → EvaluatePortals, which can
+        // synchronously open/close the pop-out and (un)register the portal surface mid-frame. The
+        // snapshot keeps this enumeration valid; a surface registered this frame ticks the next one.
+        _surfaceSnapshot.Clear();
+        _surfaceSnapshot.AddRange(_surfaces);
+        foreach (var surface in _surfaceSnapshot)
         {
             if (surface.SurfaceViewport is not { } vp) continue;
             var r = _controller.TickViewport(vp, dt, pumpAnalysis: false);

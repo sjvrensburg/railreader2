@@ -43,6 +43,7 @@ public partial class MainWindow
             FontSize = vm.CurrentFontSize,
             Title = vm.ActiveTab is { } t ? $"railreader2 — {t.Title}" : "railreader2",
             KeyHandler = e => TryHandleKey(vm, e),
+            KeyUpHandler = e => TryHandleKeyUp(vm, e),
         };
         win.Host(view);
         win.Closed += OnDocumentWindowClosed;
