@@ -220,6 +220,12 @@ public sealed partial class MainWindowViewModel
         Services.PortalSetManager.Default.Release(tab.FilePath); // drop our portal-set checkout
         if (!modelStillUsed)
         {
+            // Tear the live portal view down FIRST if its viewport sits on this about-to-be-disposed
+            // model: unregister its surface (stop ticking) + remove its viewport while the model is still
+            // alive, so CloseDocument can't dispose the portal viewport out from under a still-registered
+            // surface — and so the ActiveTab notification below can't re-sync against a disposed view.
+            if (_portalViewport?.Owner is { } pOwner && ReferenceEquals(pOwner, tab.State))
+                RequestPortalViewTeardown();
             int docIdx = _controller.Documents.IndexOf(tab.State);
             if (docIdx >= 0) _controller.CloseDocument(docIdx); // disposes model + all its viewports
         }

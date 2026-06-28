@@ -19,6 +19,10 @@ public partial class DocumentWindow : Window
     /// <summary>Forwards a key event to the main window's <c>TryHandleKey</c>; returns true if handled.</summary>
     public Func<KeyEventArgs, bool>? KeyHandler { get; set; }
 
+    /// <summary>Forwards a key-RELEASE to the main window's shared handler, so releasing a held arrow
+    /// stops this detached viewport's rail hold-to-scroll (otherwise it free-runs after release).</summary>
+    public Func<KeyEventArgs, bool>? KeyUpHandler { get; set; }
+
     /// <summary>The hosted DocumentView (its surface), or null before <see cref="Host"/>.</summary>
     public DocumentView? HostedView => _view;
 
@@ -40,5 +44,11 @@ public partial class DocumentWindow : Window
     {
         if (KeyHandler?.Invoke(e) == true) return;
         base.OnKeyDown(e);
+    }
+
+    protected override void OnKeyUp(KeyEventArgs e)
+    {
+        if (KeyUpHandler?.Invoke(e) == true) return;
+        base.OnKeyUp(e);
     }
 }

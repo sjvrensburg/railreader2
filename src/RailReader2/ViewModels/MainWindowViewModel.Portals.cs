@@ -28,6 +28,7 @@ public sealed partial class MainWindowViewModel
             _activePortalImage = value;
             OnPropertyChanged(nameof(ActivePortalImage));
             OnPropertyChanged(nameof(PortalWindowImage));
+            OnPropertyChanged(nameof(ShowPortalHint));   // ShowPortalHint reads PortalWindowImage
         }
     }
     private Bitmap? _portalImageBehind;       // one-behind, disposed on the following swap
@@ -97,6 +98,7 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(PortalWindowLabel));
         OnPropertyChanged(nameof(PortalWindowHint));
         OnPropertyChanged(nameof(ShouldShowPortalWindow));
+        OnPropertyChanged(nameof(ShowPortalHint));   // re-derives from PortalWindowImage (peek ?? active)
     }
 
     // Id of the portal whose crop the tracking preview is currently showing (pinned), or null when
@@ -265,11 +267,13 @@ public sealed partial class MainWindowViewModel
         // Adopt the current tab as the image owner so the next EvaluatePortals does not treat this
         // freshly-opened peek as belonging to a stale tab and immediately dismiss it.
         _portalImageOwner = tab;
+        _peekShownBlock = (page, block);   // live-view target precedence (peek over saved/auto)
         SetPeekImage(bitmap);   // raises ShouldShowPortalWindow → MainWindow opens the window
         PortalPeekLabel = DefaultPortalLabel(doc, page, block);
         // The peek holds while you stay in the same block (not line) — it shows a whole target block.
         var (rp, rb, _) = CurrentReadingBlock(doc);
         _peekAnchorReadingBlock = (rp, rb);
+        RaisePortalView();   // re-aim the live portal viewport (if popped out) at the peek block
     }
 
     private void SetPeekImage(Bitmap? next)
@@ -288,8 +292,10 @@ public sealed partial class MainWindowViewModel
     {
         if (PortalPeekImage is null && PortalPeekLabel is null && _peekAnchorReadingBlock is null) return;
         _peekAnchorReadingBlock = null;
+        _peekShownBlock = null;
         PortalPeekLabel = null;
         SetPeekImage(null);
+        RaisePortalView();   // peek gone → revert the live view to the saved/auto target (or tear down)
     }
 
     /// <summary>Clear the saved-portal tracking preview (image, label, hint, debounce/display ids).
@@ -307,6 +313,7 @@ public sealed partial class MainWindowViewModel
         ActivePortalLabel = null;
         PortalHint = NoActivePortalHint;
         InvalidatePortalMarkers();   // no portal active → drop the accent
+        RaisePortalView();   // nothing pinned → tear down the live portal viewport
     }
 
     /// <summary>Drop the displayed-pin identity (id, label, hint, pending) WITHOUT touching the
@@ -527,6 +534,7 @@ public sealed partial class MainWindowViewModel
         SetPortalImage(bitmap);
         PortalHint = null;
         InvalidatePortalMarkers();   // a previously accented saved portal loses the accent
+        RaisePortalView();   // auto pin changed → (re-)aim the live portal viewport at the float
     }
 
     private static BBox Union(BBox a, BBox b)
@@ -548,6 +556,7 @@ public sealed partial class MainWindowViewModel
             _portalTargetPending = true;
             SetPortalImage(null);
             PortalHint = "Resolving target…";
+            RaisePortalView();   // unresolved → live view shows hint until the page is analysed
             return;
         }
 
@@ -557,10 +566,13 @@ public sealed partial class MainWindowViewModel
         {
             SetPortalImage(null);
             PortalHint = "Could not render portal target.";
+            // The live viewport renders the block directly (it doesn't need the crop), so still aim it.
+            RaisePortalView();
             return;
         }
         SetPortalImage(bitmap);
         PortalHint = null;
+        RaisePortalView();   // saved target resolved → (re-)aim the live portal viewport at it
     }
 
     /// <summary>Rasterise a detected block region and decode it to an Avalonia <see cref="Bitmap"/>,

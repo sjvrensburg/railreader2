@@ -373,7 +373,11 @@ public sealed partial class MainWindowViewModel
         if (_controller.FocusedViewport?.Owner is not { } doc) return;
         if (doc.MarginCropping == enabled) return;
 
-        var (ww, wh) = FocusedViewportSize();
+        // Size the re-fit off the document's MAIN view, never a confined portal viewport: the fit targets
+        // doc.Primary and a confined portal ignores cropping, so the portal's (smaller) dimensions would
+        // mis-fit the main view. When the focused view is confined, fall back to the active tab's viewport.
+        var refVp = _controller.FocusedViewport is { Focus: null } fv ? fv : ActiveTab?.Viewport;
+        var (ww, wh) = refVp is { } r ? (r.Width, r.Height) : FocusedViewportSize();
         var (_, _, preRw, _) = doc.GetFitRect();
         double preFitZoom = preRw > 0 ? ww / preRw : doc.Camera.Zoom;
         bool atFitWidth = doc.Camera.Zoom <= preFitZoom * AtFitWidthHysteresis;
@@ -392,6 +396,9 @@ public sealed partial class MainWindowViewModel
 
     public void ToggleMarginCropping()
     {
+        // Margin cropping is a document-level pref. Toggle it on the focused viewport's document; the
+        // re-fit inside ApplyMarginCropping sizes off the main view (not a confined portal), so this stays
+        // reachable even while the live portal viewport is focused — they share the same document model.
         if (_controller.FocusedViewport?.Owner is { } doc)
             ApplyMarginCropping(!doc.MarginCropping);
     }

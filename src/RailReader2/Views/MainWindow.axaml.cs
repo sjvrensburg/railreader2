@@ -12,6 +12,13 @@ public partial class MainWindow : Window
 {
     private MainWindowViewModel? _subscribedVm;
     private PortalWindow? _portalWindow;
+    // The live confined DocumentView hosted in the pop-out (Core 0.45.0 FocusBlock). Created when the
+    // window opens over a pinned target, re-aimed when the target changes, torn down on dock/close/
+    // tab-switch. Mirrors the tear-off surface lifecycle (CreateSecondaryView/DisposeSecondaryView).
+    private DocumentView? _portalView;
+    // The (page, block) the portal view is currently aimed at — so a re-sync for the SAME target leaves
+    // the user's pan/zoom/rail inside the portal undisturbed; only a different target re-frames.
+    private (int Page, int Block)? _portalAimed;
 
     // Fullscreen hover reveal: show threshold < hide threshold for hysteresis
     private const double FullScreenShowThreshold = 5.0;
@@ -57,6 +64,8 @@ public partial class MainWindow : Window
             _subscribedVm = vm;
             vm.PropertyChanged += OnVmPropertyChanged;
             vm.ViewportFocusRequested += OnViewportFocusRequested;
+            vm.PortalViewChanged += OnPortalViewChanged;
+            vm.PortalViewTeardownRequested += OnPortalViewTeardownRequested;
         }
     }
 
@@ -100,6 +109,8 @@ public partial class MainWindow : Window
             TeardownPanes(vm); // closes tear-off windows + unsubscribes pane commands
             vm.PropertyChanged -= OnVmPropertyChanged;
             vm.ViewportFocusRequested -= OnViewportFocusRequested;
+            vm.PortalViewChanged -= OnPortalViewChanged;
+            vm.PortalViewTeardownRequested -= OnPortalViewTeardownRequested;
             Document.Teardown();
             _subscribedVm = null;
         }
@@ -121,26 +132,37 @@ public partial class MainWindow : Window
     {
         if (vm.ShouldShowPortalWindow)
         {
-            // Already open: just let its bindings (PortalWindowImage/Label) update. Do NOT Activate()
-            // — that would steal focus back to the floating window on every peek change. (Live
-            // font-scale changes reach the open window via the CurrentFontSize case.)
-            if (_portalWindow is not null) return;
-
-            var win = new PortalWindow { DataContext = vm };
-            win.ApplyFontScale(vm.CurrentFontSize);
-            var settings = Services.PortalWindowSettings.Load();
-            win.Width = settings.Width;     // Load() guarantees a positive size (defaults live there)
-            win.Height = settings.Height;
-            win.SyncTopmostToggle(settings.Topmost);
-            if (settings.HasPosition)
+            // Open the window once (do NOT Activate() an already-open one — that would steal focus back
+            // to the floating window on every peek change; live font-scale reaches it via CurrentFontSize).
+            if (_portalWindow is null)
             {
-                win.WindowStartupLocation = WindowStartupLocation.Manual;
-                win.Position = new PixelPoint(settings.X, settings.Y);
+                var win = new PortalWindow { DataContext = vm };
+                win.ApplyFontScale(vm.CurrentFontSize);
+                var settings = Services.PortalWindowSettings.Load();
+                win.Width = settings.Width;     // Load() guarantees a positive size (defaults live there)
+                win.Height = settings.Height;
+                win.SyncTopmostToggle(settings.Topmost);
+                if (settings.HasPosition)
+                {
+                    win.WindowStartupLocation = WindowStartupLocation.Manual;
+                    win.Position = new PixelPoint(settings.X, settings.Y);
+                }
+                win.Closed += OnPortalWindowClosed;
+                // Forward keys to the shared handler (acts on the focused viewport) so rail/freeze/
+                // annotation shortcuts work in the portal once it's focused — same as a tear-off window.
+                win.KeyHandler = e => TryHandleKey(vm, e);
+                win.KeyUpHandler = e => TryHandleKeyUp(vm, e);
+                // Any click in the portal window focuses its live viewport, so the floating toolbar +
+                // keys target the portal (not the main view). Tunnel so it runs before child handlers;
+                // never marks the event handled, so the chrome drag / buttons still work.
+                win.AddHandler(InputElement.PointerPressedEvent, OnPortalPointerPressed,
+                    Avalonia.Interactivity.RoutingStrategies.Tunnel, handledEventsToo: true);
+                _portalWindow = win;
+                // Non-modal, no owner so the user can drag it to another monitor and keep it on top.
+                win.Show();
             }
-            win.Closed += OnPortalWindowClosed;
-            _portalWindow = win;
-            // Non-modal, no owner so the user can drag it to another monitor and keep it on top.
-            win.Show();
+            // Host / re-aim the live confined viewport for the current target (or fall back to the crop).
+            SyncPortalView(vm);
         }
         else
         {
@@ -148,10 +170,113 @@ public partial class MainWindow : Window
         }
     }
 
+    private bool _portalSyncQueued;
+
+    // The VM is about to dispose a model that owns the live portal viewport — tear the hosted view down
+    // synchronously first (unregister surface + remove viewport while the model is still alive).
+    private void OnPortalViewTeardownRequested()
+    {
+        if (Vm is { } vm) TeardownPortalView(vm);
+    }
+
+    private void OnPortalViewChanged()
+    {
+        if (Vm is not { } vm || _portalWindow is null) return;
+        // Mid-frame (a pin from EvaluatePortals during the tick) → defer, since structural surface work
+        // is unsafe there. User-initiated (a temporary peek from the context menu) → apply now, so it
+        // shows before the next frame's portal evaluation can auto-dismiss/revise it (otherwise a peek
+        // opened over an existing auto-pin can be reverted before it ever renders).
+        if (vm.IsInAnimationFrame) QueuePortalSync();
+        else SyncPortalView(vm);
+    }
+
+    /// <summary>Defer the (structural) portal-view sync to a dispatcher job, coalescing bursts. The
+    /// trigger (EvaluatePortals → pin) often fires from inside the animation frame, where creating /
+    /// registering / hosting a surface synchronously is unsafe (re-entrancy + collection mutation). A
+    /// Background-priority post runs it cleanly between frames.</summary>
+    private void QueuePortalSync()
+    {
+        if (_portalSyncQueued) return;
+        _portalSyncQueued = true;
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            _portalSyncQueued = false;
+            if (Vm is { } vm) SyncPortalView(vm);
+        }, Avalonia.Threading.DispatcherPriority.Background);
+    }
+
+    // Focus the portal's live viewport on any click in the pop-out, so its floating toolbar (annotate /
+    // freeze / start-rail-here) and forwarded keys act on the portal rather than the main view. The
+    // reading-position sync is unaffected (EvaluatePortals tracks doc.Primary, never the focused view).
+    private void OnPortalPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        // Input focus only — wireReadingSignals:false keeps a11y + the portal pin loop tracking the main
+        // reading view (the portal is a confined satellite, not the document's reading position).
+        if (Vm is { } vm && _portalView is { SurfaceViewport: { } vp })
+            vm.FocusSurface(_portalView, vp, wireReadingSignals: false);
+    }
+
+    /// <summary>Reconcile the pop-out's live confined viewport with the current portal target: host a
+    /// DocumentView (bound to a fresh viewport on the active model) when a target is pinned, re-aim it
+    /// when the target CHANGES (leaving user pan/zoom alone otherwise), rebuild it on a tab switch, and
+    /// tear it down when nothing is pinned. No-op when the window is closed.</summary>
+    private void SyncPortalView(MainWindowViewModel vm)
+    {
+        var target = _portalWindow is null ? null : vm.ComputePortalLiveTarget();
+        if (target is not { } t || vm.PortalReadingDoc is not { } doc)
+        {
+            TeardownPortalView(vm);
+            return;
+        }
+
+        // Tab switch: the existing portal viewport sits on the previous model — rebuild on the new one.
+        if (_portalView is { } pv && pv.SurfaceViewport?.Owner is { } owner && !ReferenceEquals(owner, doc))
+            TeardownPortalView(vm);
+
+        if (_portalView is null)
+        {
+            var vp = vm.CreatePortalViewport(doc);
+            var view = new DocumentView();
+            view.Initialize(vm, vm.ActiveTab);                              // model/pref wiring
+            view.BindViewport(vp, new ViewportImages(vp), ownsImages: true); // its own page/minimap images
+            vm.RegisterSurface(view);   // ticked by the frame loop; NOT focused (no reading-sync hijack)
+            _portalView = view;
+            _portalWindow!.Host(view);
+            vm.UpdatePortalLive(true);
+            _portalAimed = null;
+        }
+
+        if (_portalAimed != (t.Page, t.Block))
+        {
+            _portalAimed = (t.Page, t.Block);
+            vm.AimPortalViewport(t);
+            vm.RequestAnimationFrame();
+        }
+    }
+
+    private void TeardownPortalView(MainWindowViewModel vm)
+    {
+        vm.UpdatePortalLive(false);
+        _portalAimed = null;
+        if (_portalView is not { } view) return;
+        // If the user had clicked into the portal, it is the focused viewport — re-home focus to the
+        // main surface after removing it so input doesn't dangle on a removed viewport.
+        bool wasFocused = ReferenceEquals(vm.Controller.FocusedViewport, view.SurfaceViewport);
+        _portalView = null;
+        _portalWindow?.Unhost();
+        vm.UnregisterSurface(view);   // stop ticking before the Core viewport goes away
+        view.Teardown();              // frees its owned page/minimap images
+        vm.TeardownPortalViewport();  // RemoveViewport from the model (defensive on a disposed model)
+        if (wasFocused && Document.SurfaceViewport is { } primaryVp)
+            vm.FocusSurface(Document, primaryVp);
+    }
+
     // The window's own teardown (covers app shutdown). The dock path goes through ClosePortalWindow,
     // which unsubscribes first, so this only runs on an externally-driven close.
     private void OnPortalWindowClosed(object? sender, EventArgs e)
     {
+        // Tear down the live confined viewport while the window (and its host panel) still exist.
+        if (Vm is { } vm0) TeardownPortalView(vm0);
         if (_portalWindow is { } win)
         {
             SavePortalWindowGeometry(win);
@@ -165,6 +290,7 @@ public partial class MainWindow : Window
     private void ClosePortalWindow()
     {
         if (_portalWindow is not { } win) return;
+        if (Vm is { } vm) TeardownPortalView(vm);   // before _portalWindow is nulled (Unhost needs it)
         SavePortalWindowGeometry(win);
         win.Closed -= OnPortalWindowClosed;
         _portalWindow = null;
@@ -194,6 +320,11 @@ public partial class MainWindow : Window
             case nameof(MainWindowViewModel.ActiveTab):
                 Document.SetTab(vm.ActiveTab);
                 CollapseExtrasIfDocumentChanged(vm); // split panes / tear-offs belong to one document
+                // ActiveTab is re-raised from INSIDE the animation frame (per-frame overlay/page change),
+                // not only on real tab switches — defer the structural portal-surface sync out of the
+                // frame (mirrors OnPortalViewChanged) so it can't tear down / rebuild the surface mid-tick.
+                if (vm.IsInAnimationFrame) QueuePortalSync();
+                else SyncPortalView(vm); // rebuild the portal viewport on the now-active model (or tear down)
                 UpdateRailToolBarVisibility();
                 break;
             case nameof(MainWindowViewModel.ShowOutline):
@@ -603,28 +734,37 @@ public partial class MainWindow : Window
 
     protected override void OnKeyUp(KeyEventArgs e)
     {
-        if (Vm is { } vm && e.Key is Key.Left or Key.Right or Key.A or Key.D)
+        if (Vm is { } vm) TryHandleKeyUp(vm, e);
+        if (!e.Handled)
+            base.OnKeyUp(e);
+    }
+
+    /// <summary>Shared key-release handling (rail scroll stop, edge-hold clear, rail resume). Forwarded
+    /// from the portal / tear-off windows too, so releasing an arrow while a floating window is focused
+    /// stops its viewport's hold-to-scroll — otherwise the scroll free-runs after release.</summary>
+    private bool TryHandleKeyUp(MainWindowViewModel vm, KeyEventArgs e)
+    {
+        if (e.Key is Key.Left or Key.Right or Key.A or Key.D)
         {
             vm.HandleArrowRelease(true);
             e.Handled = true;
         }
 
         // Clear non-rail edge-hold on vertical key release
-        if (Vm is { } vm3 && e.Key is Key.Down or Key.Up or Key.S or Key.W or Key.Space)
+        if (e.Key is Key.Down or Key.Up or Key.S or Key.W or Key.Space)
         {
-            vm3.Controller.ClearPageEdgeHold();
+            vm.Controller.ClearPageEdgeHold();
             e.Handled = true;
         }
 
         // Resume rail mode when Ctrl is released after free pan
-        if (Vm is { RailPaused: true } vm2 && e.Key is Key.LeftCtrl or Key.RightCtrl)
+        if (vm is { RailPaused: true } && e.Key is Key.LeftCtrl or Key.RightCtrl)
         {
-            vm2.ResumeRailFromPause();
+            vm.ResumeRailFromPause();
             e.Handled = true;
         }
 
-        if (!e.Handled)
-            base.OnKeyUp(e);
+        return e.Handled;
     }
 
     protected override void OnPointerMoved(PointerEventArgs e)
