@@ -265,7 +265,7 @@ public partial class MainWindow : Window
         _portalView = null;
         _portalWindow?.Unhost();
         vm.UnregisterSurface(view);   // stop ticking before the Core viewport goes away
-        view.Teardown();              // frees its owned page/minimap images
+        view.Teardown();              // retires its owned page/minimap images on the composition thread (#191)
         vm.TeardownPortalViewport();  // RemoveViewport from the model (defensive on a disposed model)
         if (wasFocused && Document.SurfaceViewport is { } primaryVp)
             vm.FocusSurface(Document, primaryVp);

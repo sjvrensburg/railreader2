@@ -96,7 +96,7 @@ public partial class MainWindow
         if (Vm is not { } vm) return;
         var vp = view.SurfaceViewport;
         vm.UnregisterSurface(view);
-        view.Teardown(); // disposes its owned ViewportImages + handlers + retires its freeze crops (#180)
+        view.Teardown(); // retires its owned page/minimap images + freeze crops on the composition thread (#180, #191)
         if (vp is { } v)
             vm.SafeRemoveViewport(v); // shared with the portal viewport teardown (MainWindowViewModel)
     }
