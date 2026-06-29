@@ -97,10 +97,16 @@ public sealed partial class MainWindowViewModel
 
         if (_displayedPortalId is null) return null;
 
-        // Auto pin: confine to the referenced float block. (The docked crop shows float+caption union;
-        // the live view confines to the float block — a focused figure has no rail lines anyway.)
+        // Auto pin: frame the SAME float+caption union the docked crop shows, so a multi-part figure
+        // (e.g. two diagrams side by side under one full-width "Figure N" caption) isn't clipped to a
+        // single sub-figure in the live view. The FocusBlock index stays the float (a focused figure has
+        // no rail lines anyway); only the framed/clamped bounds widen. Falls back to the float bounds when
+        // the caption block isn't resolvable.
         if (_autoPin is { } a && BlockBounds(doc, a.TgtPage, a.TgtBlock) is { } ab)
-            return (a.TgtPage, a.TgtBlock, ab);
+        {
+            var bounds = BlockBounds(doc, a.TgtPage, a.CaptionBlock) is { } cb ? Union(ab, cb) : ab;
+            return (a.TgtPage, a.TgtBlock, bounds);
+        }
 
         // Saved portal: resolve the stored target anchor to a live block on its page.
         if (tab.Portals.Portals.FirstOrDefault(p => p.Id == _displayedPortalId) is { } portal)
