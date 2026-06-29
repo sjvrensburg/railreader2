@@ -74,6 +74,8 @@ public partial class PortalsView : PaneRefreshView
         // An auto-pinned reference shows in the preview without creating a saved-portal row, so the
         // empty-state hint must also retreat when a target is pinned (otherwise its long text fills the
         // pane and displaces the preview image). Toggle just the label — don't rebuild the row list.
+        // _displayedPortalId changes always coincide with an ActivePortalImage swap, so this is the
+        // reliable trigger even when the crop itself is elided (#190 popped-out + live).
         else if (args.PropertyName == nameof(MainWindowViewModel.ActivePortalImage))
         {
             UpdateEmptyState();
@@ -104,10 +106,13 @@ public partial class PortalsView : PaneRefreshView
     // the (potentially edit-in-progress) row list.
     private bool _hasPortalRows;
 
-    // The empty-state hint is for "nothing here at all": no saved portals AND no live preview. An
-    // auto-pinned reference shows a preview without a row, and must suppress the hint.
+    // The empty-state hint is for "nothing here at all": no saved portals AND nothing pinned. An
+    // auto-pinned reference (or a resolving target) shows a preview without a row, and must suppress the
+    // hint. Keyed off whether a target is displayed (DisplayedPortalId) rather than the crop bitmap: the
+    // crop is elided while popped-out + live (#190), yet a target is still pinned, so an image-null test
+    // would wrongly resurface the hint behind the popped-out placeholder.
     private void UpdateEmptyState()
-        => NoPortalsLabel.IsVisible = !_hasPortalRows && _vm?.ActivePortalImage is null;
+        => NoPortalsLabel.IsVisible = !_hasPortalRows && _vm?.DisplayedPortalId is null;
 
     // --- Row actions ---
 

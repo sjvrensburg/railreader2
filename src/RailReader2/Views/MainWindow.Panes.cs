@@ -63,10 +63,43 @@ public partial class MainWindow
         CloseAllDocumentWindows();
     }
 
-    // ── Shared surface lifecycle (reused by split panes and tear-off windows) ──────────────
+    // ── Shared surface lifecycle (split panes, tear-off windows, AND the live portal viewport) ──────
+    //
+    // The DocumentView wiring half of "spin up a secondary surface" is identical for all three: a fresh
+    // DocumentView, model/pref wiring, its own ViewportImages (ownsImages), then surface registration.
+    // BuildSecondarySurface / DisposeSecondarySurface are that single shared core (#192) — the callers
+    // own the genuinely different parts: how the viewport is created + seated, whether the new surface
+    // is focused, and where the view is hosted (PaneGrid, a tear-off window, or the portal pop-out).
 
-    /// <summary>Create a fresh viewport on the active document and a DocumentView bound to it,
-    /// opening on the focused view's current page. Registers it as a surface. Null if no document.</summary>
+    /// <summary>Bind a fresh chrome-carrying DocumentView to an already-created <paramref name="vp"/> and
+    /// register it as a tickable surface. The shared core of every secondary surface; the caller created
+    /// + seated the viewport and decides focus + hosting. Null if there's no active tab.</summary>
+    private DocumentView? BuildSecondarySurface(Viewport vp)
+    {
+        if (Vm is not { } vm || vm.ActiveTab is not { } tab) return null;
+        var view = new DocumentView();
+        view.Initialize(vm, tab);                                       // model wiring (annotations / prefs)
+        view.BindViewport(vp, new ViewportImages(vp), ownsImages: true); // its own page/minimap images
+        vm.RegisterSurface(view);
+        return view;
+    }
+
+    /// <summary>Tear down a surface built by <see cref="BuildSecondarySurface"/>: unregister it from the
+    /// frame loop, retire its owned images on the composition thread, then remove + dispose its viewport
+    /// from the owning model (Core re-points focus off a removed focused view to that doc's primary).
+    /// Shared by split panes, tear-offs, and the live portal viewport (#192).</summary>
+    private void DisposeSecondarySurface(DocumentView view)
+    {
+        if (Vm is not { } vm) return;
+        var vp = view.SurfaceViewport;
+        vm.UnregisterSurface(view);
+        view.Teardown(); // retires its owned page/minimap images + freeze crops on the composition thread (#180, #191)
+        if (vp is { } v)
+            vm.SafeRemoveViewport(v); // safe whether the model is alive or already disposed
+    }
+
+    /// <summary>Create a fresh viewport on the active document and a DocumentView bound to it, opening on
+    /// the focused view's current page (split panes / tear-offs). Null if no document.</summary>
     private DocumentView? CreateSecondaryView()
     {
         if (Vm is not { } vm || vm.ActiveTab is not { } tab) return null;
@@ -82,23 +115,7 @@ public partial class MainWindow
         // rail synchronously, otherwise it schedules analysis and the fan-out seats it when it arrives.
         doc.SubmitAnalysis(vp, vm.Controller.Worker, vm.Controller.Config.NavigableRoles);
 
-        var view = new DocumentView();
-        view.Initialize(vm, tab);                                   // model wiring (annotations / prefs)
-        view.BindViewport(vp, new ViewportImages(vp), ownsImages: true); // its own page/minimap images
-        vm.RegisterSurface(view);
-        return view;
-    }
-
-    /// <summary>Unregister a secondary surface, dispose its images, and remove + dispose its viewport
-    /// from its owning document. Core re-points focus off a removed focused view to that doc's primary.</summary>
-    private void DisposeSecondaryView(DocumentView view)
-    {
-        if (Vm is not { } vm) return;
-        var vp = view.SurfaceViewport;
-        vm.UnregisterSurface(view);
-        view.Teardown(); // retires its owned page/minimap images + freeze crops on the composition thread (#180, #191)
-        if (vp is { } v)
-            vm.SafeRemoveViewport(v); // shared with the portal viewport teardown (MainWindowViewModel)
+        return BuildSecondarySurface(vp);
     }
 
     // ── Split panes ────────────────────────────────────────────────────────────────────────
@@ -132,7 +149,7 @@ public partial class MainWindow
         if (idx < 0) return;
 
         _panes.RemoveAt(idx);
-        DisposeSecondaryView(pane); // Core re-points focus to Primary if this pane was focused
+        DisposeSecondarySurface(pane); // Core re-points focus to Primary if this pane was focused
         RebuildPaneGrid();
 
         // Move focus to a neighbouring remaining pane (Core already fell back to Primary; refine it).
@@ -147,7 +164,7 @@ public partial class MainWindow
         // Remove every docked pane except the primary.
         for (int i = _panes.Count - 1; i >= 1; i--)
         {
-            DisposeSecondaryView(_panes[i]);
+            DisposeSecondarySurface(_panes[i]);
             _panes.RemoveAt(i);
         }
         RebuildPaneGrid();

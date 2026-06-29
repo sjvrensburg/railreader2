@@ -47,6 +47,14 @@ public sealed partial class MainWindowViewModel
     /// <summary>The "no active portal" hint shows only when not live and there is no crop to show.</summary>
     public bool ShowPortalHint => !_isPortalLive && PortalWindowImage is null;
 
+    /// <summary>True when the saved-tracking / auto-pin crop (<see cref="ActivePortalImage"/>) has no
+    /// on-screen consumer: the pop-out is popped out (the docked preview is hidden, showing the Dock
+    /// button) AND hosting the live confined viewport (the pop-out's static crop is hidden). Rasterising
+    /// the 300-DPI block crop is then pure waste (#190) — the render paths skip it and docking
+    /// re-materialises the current target. NB: a docked temporary peek IS live but NOT popped out, so the
+    /// visible docked preview still renders its saved-tracking crop.</summary>
+    private bool PortalCropRedundant => IsPortalPoppedOut && _isPortalLive;
+
     /// <summary>Raised when the pop-out's desired live target may have changed (a pin, peek, clear, or
     /// pop-out/dock). MainWindow re-syncs the hosted DocumentView (creating, re-aiming, or tearing it
     /// down). Raised only at genuine content-change points — never per animation frame — so the user can
