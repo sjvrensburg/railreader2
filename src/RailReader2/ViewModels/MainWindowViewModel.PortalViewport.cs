@@ -41,11 +41,16 @@ public sealed partial class MainWindowViewModel
             _isPortalLive = value;
             OnPropertyChanged(nameof(IsPortalLive));
             OnPropertyChanged(nameof(ShowPortalHint));
+            // Going live while popped-out makes the already-materialised tracking crop redundant (the
+            // docked pane is hidden, the pop-out shows the confined viewport) — free it now (#5/#190).
+            // Self-guards on PortalCropRedundant, so the not-live transition is a no-op.
+            ReleaseRedundantTrackingCrop();
         }
     }
 
-    /// <summary>The "no active portal" hint shows only when not live and there is no crop to show.</summary>
-    public bool ShowPortalHint => !_isPortalLive && PortalWindowImage is null;
+    /// <summary>The "no active portal" hint shows only when not live, there is no crop to show, and no
+    /// temporary peek is logically up (a peek's crop can be elided to null while it is shown live).</summary>
+    public bool ShowPortalHint => !_isPortalLive && !HasActivePeek && PortalWindowImage is null;
 
     /// <summary>True when the saved-tracking / auto-pin crop (<see cref="ActivePortalImage"/>) has no
     /// on-screen consumer: the pop-out is popped out (the docked preview is hidden, showing the Dock
@@ -157,14 +162,9 @@ public sealed partial class MainWindowViewModel
         vp.RequestAnimation?.Invoke();
     }
 
-    /// <summary>Remove the portal viewport from its model. MainWindow unregisters + tears down the
-    /// DocumentView first (so it stops ticking and frees its images). Idempotent.</summary>
-    internal void TeardownPortalViewport()
-    {
-        if (_portalViewport is not { } vp) return;
-        _portalViewport = null;
-        // Shared iterate-the-open-tabs removal: safe whether the model is still alive (frees the portal
-        // viewport now) or was already disposed by a tab-close (its model isn't among the tabs → no-op).
-        SafeRemoveViewport(vp);
-    }
+    /// <summary>Drop the VM's reference to the portal viewport. The Core viewport removal is owned by the
+    /// shared surface teardown (<c>DisposeSecondarySurface</c>) on the normal path; the bare-viewport-undo
+    /// path in <c>SyncPortalView</c> (no surface was built) removes it explicitly before calling this, so
+    /// this no longer double-removes (#192/#8). Idempotent.</summary>
+    internal void TeardownPortalViewport() => _portalViewport = null;
 }

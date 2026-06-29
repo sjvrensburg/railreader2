@@ -272,7 +272,10 @@ public partial class MainWindow : Window
             // reading-position sync keeps tracking the main view.
             if (BuildSecondarySurface(vp) is not { } view)
             {
-                vm.TeardownPortalViewport();   // no active tab (unreachable here) — undo the bare viewport
+                // No active tab (unreachable here): no surface was built to dispose, so remove the bare
+                // viewport directly before dropping the VM ref (#8 — TeardownPortalViewport no longer removes).
+                vm.SafeRemoveViewport(vp);
+                vm.TeardownPortalViewport();
                 return;
             }
             _portalView = view;
@@ -295,7 +298,7 @@ public partial class MainWindow : Window
         _portalView = null;
         _portalWindow?.Unhost();
         DisposeSecondarySurface(view);   // shared unregister + image-retire + viewport-remove (#192)
-        vm.TeardownPortalViewport();     // drop the VM's _portalViewport ref (its remove is a no-op here)
+        vm.TeardownPortalViewport();     // drop the VM's _portalViewport ref (surface dispose did the remove, #8)
         if (wasFocused && Document.SurfaceViewport is { } primaryVp)
             vm.FocusSurface(Document, primaryVp);
     }
