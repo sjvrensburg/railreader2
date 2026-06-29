@@ -58,17 +58,25 @@ public sealed partial class MainWindowViewModel
 
     private const string NoActivePortalHint = "No active portal — read into a linked source.";
 
+    // A temporary peek is logically active whenever a peek block is set — keyed on _peekShownBlock, NOT
+    // the bitmap. While the live confined viewport is up it renders the peek block itself, so the 300-DPI
+    // crop is elided (#6) and PortalPeekImage can be null even though a peek is up. Window visibility and
+    // content selection follow the logical peek, not the (sometimes-absent) crop.
+    private bool HasActivePeek => _peekShownBlock is not null;
+
     // What the pop-out window shows: the peek when one is up, otherwise the saved-portal tracking view.
-    public Bitmap? PortalWindowImage => PortalPeekImage ?? ActivePortalImage;
-    public string? PortalWindowLabel => PortalPeekImage is not null ? PortalPeekLabel : ActivePortalLabel;
-    public string? PortalWindowHint => PortalPeekImage is not null ? null : PortalHint;
+    // The crop image may be null while the live viewport renders the target/peek itself (#190/#6); the
+    // ZoomPanImage that binds these is hidden behind the live host in that case (IsVisible="!IsPortalLive").
+    public Bitmap? PortalWindowImage => HasActivePeek ? PortalPeekImage : ActivePortalImage;
+    public string? PortalWindowLabel => HasActivePeek ? PortalPeekLabel : ActivePortalLabel;
+    public string? PortalWindowHint => HasActivePeek ? null : PortalHint;
 
     /// <summary>The pop-out window is shown while tracking is detached (the "Pop out" button) or a
     /// temporary peek is up — except mid-dismissal, where in-flight property raises must not let
     /// MainWindow re-create the window being torn down. MainWindow opens/closes the window in
     /// response to this.</summary>
     public bool ShouldShowPortalWindow
-        => !_dismissingPortalWindow && (IsPortalPoppedOut || PortalPeekImage is not null);
+        => !_dismissingPortalWindow && (IsPortalPoppedOut || HasActivePeek);
     private bool _dismissingPortalWindow;
 
     partial void OnActivePortalLabelChanged(string? value) => OnPropertyChanged(nameof(PortalWindowLabel));
@@ -82,11 +90,20 @@ public sealed partial class MainWindowViewModel
     partial void OnIsPortalPoppedOutChanged(bool value)
     {
         OnPropertyChanged(nameof(ShouldShowPortalWindow));
-        if (!value && _isPortalViewLocked)
+        if (value) return;
+
+        // Docking. A per-pop-out view lock is released and tracking catches up to the reading position;
+        // EvaluatePortals re-pins (and renders) if the position moved to a different portal while locked.
+        if (_isPortalViewLocked)
         {
             ReleasePortalLock();
             EvaluatePortals(forceRender: true);
         }
+        // The docked preview is visible again. While popped-out + live the tracking crop was skipped
+        // (#190) — re-materialise the current target now so the preview isn't blank/stale. A no-op (no
+        // re-rasterise) unless a crop was actually elided; if the unlock above already re-pinned to a
+        // different target it cleared the flag, so this won't double-render.
+        RerenderDisplayedCrop();
     }
 
     // The pop-out window's content (PortalWindowImage/Label/Hint) and visibility (ShouldShowPortalWindow)
@@ -108,6 +125,11 @@ public sealed partial class MainWindowViewModel
     // True when the active portal's target page was not yet analysed at render time, so a forced pass
     // (target page just analysed) should retry instead of being debounced away.
     private bool _portalTargetPending;
+    // True when the currently displayed target's tracking crop was deliberately NOT rasterised because
+    // it had no on-screen consumer (popped-out + live: PortalCropRedundant) — so ActivePortalImage does
+    // not reflect _displayedPortalId. Docking re-materialises it (RerenderDisplayedCrop, #190). Cleared
+    // whenever the crop is actually (re-)rendered or the displayed pin is cleared.
+    private bool _trackingCropSkipped;
     // Reading position (page, block, line) at the last evaluation — lets steady reading on one line
     // skip the whole match. Includes the line because line-precise sources can change the match as the
     // reading position advances line-by-line within a block.
@@ -133,10 +155,11 @@ public sealed partial class MainWindowViewModel
     // failure cannot re-trigger a full-page rasterisation on every pass. Cleared on tab switch.
     private readonly HashSet<string> _failedAutoPins = [];
     // Source/target blocks of the currently displayed auto pin, kept so the on-page markers can be
-    // drawn for it (auto pins are never saved Portals, so BuildPortalMarkers has nothing else to read).
-    // One field, set and cleared in lockstep with the "auto:" _displayedPortalId via SetAutoPin /
-    // ClearAutoPin, so the two can never drift out of sync.
-    private (int SrcPage, int SrcBlock, int SrcLine, int TgtPage, int TgtBlock)? _autoPin;
+    // drawn for it (auto pins are never saved Portals, so BuildPortalMarkers has nothing else to read)
+    // and so the float+caption union crop can be reproduced on a dock re-render (#190 — hence CaptionBlock).
+    // One field, set and cleared in lockstep with the "auto:" _displayedPortalId, so the two can never
+    // drift out of sync.
+    private (int SrcPage, int SrcBlock, int SrcLine, int TgtPage, int TgtBlock, int CaptionBlock)? _autoPin;
     // _displayedPortalId values for auto pins, so they share the pin-until-different machinery with
     // saved portals without ever colliding with a saved portal's guid. The resolved target is part
     // of the identity, so a same-labelled but different float (numbering restarts across chapters)
@@ -257,11 +280,19 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        var bitmap = RenderBlockCrop(doc, page, block);
-        if (bitmap is null)
+        // The crop is shown in the pop-out ONLY when the live confined viewport isn't up. While it is, the
+        // live view shows the peek block itself (ComputePortalLiveTarget gives the peek precedence), so
+        // rasterising a 300-DPI crop the live host hides is pure waste (#6). Skip it then — HasActivePeek
+        // (keyed on _peekShownBlock, not the bitmap) keeps the window open and the live view re-aims below.
+        Bitmap? bitmap = null;
+        if (!_isPortalLive)
         {
-            ShowStatusToast("Could not render block");
-            return;
+            bitmap = RenderBlockCrop(doc, page, block);
+            if (bitmap is null)
+            {
+                ShowStatusToast("Could not render block");
+                return;
+            }
         }
 
         // Adopt the current tab as the image owner so the next EvaluatePortals does not treat this
@@ -290,7 +321,8 @@ public sealed partial class MainWindowViewModel
     /// window then shows saved-portal tracking again, or closes if tracking was not detached.</summary>
     private void ClearPortalPeek()
     {
-        if (PortalPeekImage is null && PortalPeekLabel is null && _peekAnchorReadingBlock is null) return;
+        if (PortalPeekImage is null && PortalPeekLabel is null
+            && _peekShownBlock is null && _peekAnchorReadingBlock is null) return;
         _peekAnchorReadingBlock = null;
         _peekShownBlock = null;
         PortalPeekLabel = null;
@@ -309,6 +341,7 @@ public sealed partial class MainWindowViewModel
         _displayedPortalId = null;
         _autoPin = null;
         _portalTargetPending = false;
+        _trackingCropSkipped = false;
         SetPortalImage(null);
         ActivePortalLabel = null;
         PortalHint = NoActivePortalHint;
@@ -325,6 +358,7 @@ public sealed partial class MainWindowViewModel
         _displayedPortalId = null;
         _autoPin = null;
         _portalTargetPending = false;
+        _trackingCropSkipped = false;
         ActivePortalLabel = null;
         PortalHint = NoActivePortalHint;
         InvalidatePortalMarkers();
@@ -350,7 +384,7 @@ public sealed partial class MainWindowViewModel
         if (_controller.FocusedViewport?.Owner is not { } doc || ActiveTab is not { } tab)
         {
             ClearPortalPeek();
-            ClearActivePortal();
+            ClearActivePortal();   // also resets _trackingCropSkipped
             _portalImageOwner = null;
             _lastEvalReadingBlock = null;
             _autoRefPending = false;
@@ -386,6 +420,7 @@ public sealed partial class MainWindowViewModel
             _displayedPortalId = null;
             _autoPin = null;
             _portalTargetPending = false;
+            _trackingCropSkipped = false;
             _pendingTargetForLink = null;
             _pageSizeCache.Clear();
             _referenceIndex.Clear();
@@ -440,10 +475,15 @@ public sealed partial class MainWindowViewModel
         }
 
         // A target is pinned and unchanged. Retry it only if it was still resolving when first shown and
-        // its page just finished analysing (a forced poll pass).
-        if (forceRender && _portalTargetPending
-            && tab.Portals.Portals.FirstOrDefault(p => p.Id == _displayedPortalId) is { } shown)
-            RenderPortalTarget(doc, shown.Target.Page, ResolveAnchorBlock(doc, shown.Target));
+        // its page just finished analysing (a forced poll pass). Auto pins resolve their own union crop;
+        // saved portals re-resolve the stored anchor.
+        if (forceRender && _portalTargetPending)
+        {
+            if (_autoPin is { } ap)
+                RenderAutoPinTarget(doc, ap);
+            else if (tab.Portals.Portals.FirstOrDefault(p => p.Id == _displayedPortalId) is { } shown)
+                RenderPortalTarget(doc, shown.Target.Page, ResolveAnchorBlock(doc, shown.Target));
+        }
     }
 
     /// <summary>Automatic pinning: parse the current rail line for figure/table references and pin
@@ -515,23 +555,29 @@ public sealed partial class MainWindowViewModel
         ReferenceIndex.Target target, int srcPage, int srcBlock, int srcLine)
     {
         string autoId = AutoPinId(reference, target);
-        if (!doc.TryGetAnalysis(target.Page, out var targetAnalysis)) return;
-        var blocks = targetAnalysis.Blocks;
-        var region = Union(blocks[target.TargetBlock].BBox, blocks[target.CaptionBlock].BBox);
-        var bitmap = RenderRegionCrop(doc, target.Page, region);
-        if (bitmap is null)
+
+        // Render the float+caption union crop into the tracking preview — unless that preview has no
+        // on-screen consumer right now (#190: popped-out + live shows the confined viewport instead and
+        // re-renders on dock). The skip still pins + aims the live viewport; only the rasterise is elided.
+        Bitmap? bitmap = null;
+        if (!PortalCropRedundant)
         {
-            // Remember the failure: a deterministic render failure must not re-trigger a full-page
-            // rasterisation on every line advance / forced pass. Cleared on tab switch.
-            _failedAutoPins.Add(autoId);
-            return;   // keep whatever was shown
+            bitmap = RenderAutoPinUnionCrop(doc, target.Page, target.TargetBlock, target.CaptionBlock);
+            if (bitmap is null)
+            {
+                // Remember the failure: a deterministic render failure must not re-trigger a full-page
+                // rasterisation on every line advance / forced pass. Cleared on tab switch.
+                _failedAutoPins.Add(autoId);
+                return;   // keep whatever was shown
+            }
         }
 
         _displayedPortalId = autoId;
-        _autoPin = (srcPage, srcBlock, srcLine, target.Page, target.TargetBlock);
+        _autoPin = (srcPage, srcBlock, srcLine, target.Page, target.TargetBlock, target.CaptionBlock);
         _portalTargetPending = false;
+        _trackingCropSkipped = bitmap is null;   // skipped while redundant → re-render on dock
         ActivePortalLabel = $"{reference} (p.{target.Page + 1}) · auto";
-        SetPortalImage(bitmap);
+        SetPortalImage(bitmap);   // null while redundant: releases the prior crop (nothing shows it now)
         PortalHint = null;
         InvalidatePortalMarkers();   // a previously accented saved portal loses the accent
         RaisePortalView();   // auto pin changed → (re-)aim the live portal viewport at the float
@@ -553,26 +599,143 @@ public sealed partial class MainWindowViewModel
             && doc.TryGetAnalysis(page, out var analysis) && block < analysis.Blocks.Count;
         if (!resolvable)
         {
-            _portalTargetPending = true;
-            SetPortalImage(null);
-            PortalHint = "Resolving target…";
-            RaisePortalView();   // unresolved → live view shows hint until the page is analysed
+            ShowResolvingTarget();
             return;
         }
 
         _portalTargetPending = false;
+
+        // #190: while popped-out AND live, the docked preview is hidden and the pop-out shows the live
+        // confined viewport — the 300-DPI crop has no on-screen consumer, so skip the rasterise. Docking
+        // re-materialises it (RerenderDisplayedCrop). The live viewport renders the block itself, so it's
+        // still aimed below via RaisePortalView.
+        if (PortalCropRedundant)
+        {
+            _trackingCropSkipped = true;
+            SetPortalImage(null);   // release the prior crop (nothing on-screen consumes it now)
+            PortalHint = null;
+            RaisePortalView();
+            return;
+        }
+
         var bitmap = RenderBlockCrop(doc, page, block);
         if (bitmap is null)
         {
+            _trackingCropSkipped = false;
             SetPortalImage(null);
             PortalHint = "Could not render portal target.";
             // The live viewport renders the block directly (it doesn't need the crop), so still aim it.
             RaisePortalView();
             return;
         }
+        _trackingCropSkipped = false;
         SetPortalImage(bitmap);
         PortalHint = null;
         RaisePortalView();   // saved target resolved → (re-)aim the live portal viewport at it
+    }
+
+    /// <summary>Materialise the currently displayed target's tracking crop into <see cref="ActivePortalImage"/>
+    /// when it was elided (#190). The render paths skip the rasterise while popped-out + live (the docked
+    /// preview is hidden); docking re-reveals that preview, so the crop must be produced now or it would
+    /// stay blank/stale. A no-op unless a crop was actually skipped (so a normal dock never re-rasterises).
+    /// If the target page's analysis was evicted while popped-out, the per-kind render below falls back to
+    /// the resolving hint + pending retry rather than leaving a silent blank (#1/#2). UI thread only.</summary>
+    private void RerenderDisplayedCrop()
+    {
+        if (!_trackingCropSkipped) return;
+        if (_controller.FocusedViewport?.Owner is not { } doc || ActiveTab is not { } tab
+            || _displayedPortalId is null)
+        {
+            _trackingCropSkipped = false;
+            return;
+        }
+
+        if (_autoPin is { } a)
+            // Reproduce the auto pin's float+caption union crop (the stored CaptionBlock makes this
+            // possible without re-parsing the reference). RenderAutoPinTarget clears _trackingCropSkipped
+            // and, if the page was evicted, shows the resolving hint + retries instead of a blank (#1).
+            RenderAutoPinTarget(doc, a);
+        else if (tab.Portals.Portals.FirstOrDefault(p => p.Id == _displayedPortalId) is { } portal)
+            // Now docked (not redundant), RenderPortalTarget rasterises — or, if the page was evicted,
+            // shows the resolving hint + retries rather than leaving the preview blank (#2).
+            RenderPortalTarget(doc, portal.Target.Page, ResolveAnchorBlock(doc, portal.Target));
+        else
+            _trackingCropSkipped = false;   // displayed id no longer matches a saved/auto pin
+    }
+
+    /// <summary>Render the displayed auto pin's float+caption union crop into the tracking preview, or —
+    /// if the target page's analysis is gone (evicted while popped-out) or still pending — show the
+    /// resolving hint + arm the pending retry, mirroring <see cref="RenderPortalTarget"/> for saved
+    /// portals. For the dock re-render and the analysis-complete poll, NOT the initial pin (which keeps
+    /// the prior target on a render failure rather than switching to a placeholder). UI thread only.</summary>
+    private void RenderAutoPinTarget(DocumentModel doc,
+        (int SrcPage, int SrcBlock, int SrcLine, int TgtPage, int TgtBlock, int CaptionBlock) a)
+    {
+        // While popped-out + live the docked crop has no consumer (#190) — skip, mark elided, aim live.
+        if (PortalCropRedundant)
+        {
+            _portalTargetPending = false;
+            _trackingCropSkipped = true;
+            SetPortalImage(null);
+            PortalHint = null;
+            RaisePortalView();
+            return;
+        }
+        // Target page not (re-)analysed yet (evicted / still analysing) → wait + retry on the poll (#1).
+        if (!IsBlockResolvable(doc, a.TgtPage, a.TgtBlock) || !IsBlockResolvable(doc, a.TgtPage, a.CaptionBlock))
+        {
+            ShowResolvingTarget();
+            return;
+        }
+        // Analysis present — render. A deterministic render failure won't fix itself on a poll, so surface
+        // it and clear pending (matches RenderPortalTarget) rather than spin forever on "Resolving…".
+        _portalTargetPending = false;
+        _trackingCropSkipped = false;
+        var bitmap = RenderAutoPinUnionCrop(doc, a.TgtPage, a.TgtBlock, a.CaptionBlock);
+        SetPortalImage(bitmap);
+        PortalHint = bitmap is null ? "Could not render portal target." : null;
+        RaisePortalView();
+    }
+
+    /// <summary>Show the "resolving" placeholder and arm the pending-retry flag so the analysis-complete
+    /// poll re-renders the target once its page is (re-)analysed. Used when a target page is not in the
+    /// analysis cache — the initial resolve, or a dock re-render after the page was evicted (#190). Clears
+    /// <see cref="_trackingCropSkipped"/>: nothing is elided, we are waiting on analysis.</summary>
+    private void ShowResolvingTarget()
+    {
+        _portalTargetPending = true;
+        _trackingCropSkipped = false;
+        SetPortalImage(null);
+        PortalHint = "Resolving target…";
+        RaisePortalView();   // unresolved → live view shows hint until the page is analysed
+    }
+
+    /// <summary>Free the saved/auto tracking crop once it has no on-screen consumer: popped-out + live
+    /// (<see cref="PortalCropRedundant"/>) hides the docked pane and shows the confined viewport, so the
+    /// ~MB bitmap rendered while docked is pure residency (#5/#190). Marks it elided so docking
+    /// re-materialises it (<see cref="RerenderDisplayedCrop"/>). Idempotent — no-op if nothing is shown.
+    /// Does not touch the peek (it is shown via the live view, and its logical state keeps the window
+    /// open regardless of its bitmap).</summary>
+    private void ReleaseRedundantTrackingCrop()
+    {
+        if (!PortalCropRedundant || _displayedPortalId is null || ActivePortalImage is null) return;
+        _trackingCropSkipped = true;
+        SetPortalImage(null);
+    }
+
+    /// <summary>Render an auto pin's float+caption union crop (the docked preview shows the caption under
+    /// the float to confirm the match). Returns null if either block index is out of range on the target
+    /// page's current analysis, or the rasterise fails. The single source of the union-crop composition,
+    /// shared by <see cref="PinAutoReference"/> and the dock/poll re-render so the two can't drift (#7).
+    /// UI thread only (PDFium).</summary>
+    private Bitmap? RenderAutoPinUnionCrop(DocumentModel doc, int tgtPage, int tgtBlock, int captionBlock)
+    {
+        if (!doc.TryGetAnalysis(tgtPage, out var analysis)
+            || tgtBlock < 0 || tgtBlock >= analysis.Blocks.Count
+            || captionBlock < 0 || captionBlock >= analysis.Blocks.Count)
+            return null;
+        var region = Union(analysis.Blocks[tgtBlock].BBox, analysis.Blocks[captionBlock].BBox);
+        return RenderRegionCrop(doc, tgtPage, region);
     }
 
     /// <summary>Rasterise a detected block region and decode it to an Avalonia <see cref="Bitmap"/>,

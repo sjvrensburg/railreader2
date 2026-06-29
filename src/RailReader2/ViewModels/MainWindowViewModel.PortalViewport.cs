@@ -41,11 +41,24 @@ public sealed partial class MainWindowViewModel
             _isPortalLive = value;
             OnPropertyChanged(nameof(IsPortalLive));
             OnPropertyChanged(nameof(ShowPortalHint));
+            // Going live while popped-out makes the already-materialised tracking crop redundant (the
+            // docked pane is hidden, the pop-out shows the confined viewport) — free it now (#5/#190).
+            // Self-guards on PortalCropRedundant, so the not-live transition is a no-op.
+            ReleaseRedundantTrackingCrop();
         }
     }
 
-    /// <summary>The "no active portal" hint shows only when not live and there is no crop to show.</summary>
-    public bool ShowPortalHint => !_isPortalLive && PortalWindowImage is null;
+    /// <summary>The "no active portal" hint shows only when not live, there is no crop to show, and no
+    /// temporary peek is logically up (a peek's crop can be elided to null while it is shown live).</summary>
+    public bool ShowPortalHint => !_isPortalLive && !HasActivePeek && PortalWindowImage is null;
+
+    /// <summary>True when the saved-tracking / auto-pin crop (<see cref="ActivePortalImage"/>) has no
+    /// on-screen consumer: the pop-out is popped out (the docked preview is hidden, showing the Dock
+    /// button) AND hosting the live confined viewport (the pop-out's static crop is hidden). Rasterising
+    /// the 300-DPI block crop is then pure waste (#190) — the render paths skip it and docking
+    /// re-materialises the current target. NB: a docked temporary peek IS live but NOT popped out, so the
+    /// visible docked preview still renders its saved-tracking crop.</summary>
+    private bool PortalCropRedundant => IsPortalPoppedOut && _isPortalLive;
 
     /// <summary>Raised when the pop-out's desired live target may have changed (a pin, peek, clear, or
     /// pop-out/dock). MainWindow re-syncs the hosted DocumentView (creating, re-aiming, or tearing it
@@ -84,10 +97,16 @@ public sealed partial class MainWindowViewModel
 
         if (_displayedPortalId is null) return null;
 
-        // Auto pin: confine to the referenced float block. (The docked crop shows float+caption union;
-        // the live view confines to the float block — a focused figure has no rail lines anyway.)
+        // Auto pin: frame the SAME float+caption union the docked crop shows, so a multi-part figure
+        // (e.g. two diagrams side by side under one full-width "Figure N" caption) isn't clipped to a
+        // single sub-figure in the live view. The FocusBlock index stays the float (a focused figure has
+        // no rail lines anyway); only the framed/clamped bounds widen. Falls back to the float bounds when
+        // the caption block isn't resolvable.
         if (_autoPin is { } a && BlockBounds(doc, a.TgtPage, a.TgtBlock) is { } ab)
-            return (a.TgtPage, a.TgtBlock, ab);
+        {
+            var bounds = BlockBounds(doc, a.TgtPage, a.CaptionBlock) is { } cb ? Union(ab, cb) : ab;
+            return (a.TgtPage, a.TgtBlock, bounds);
+        }
 
         // Saved portal: resolve the stored target anchor to a live block on its page.
         if (tab.Portals.Portals.FirstOrDefault(p => p.Id == _displayedPortalId) is { } portal)
@@ -149,14 +168,9 @@ public sealed partial class MainWindowViewModel
         vp.RequestAnimation?.Invoke();
     }
 
-    /// <summary>Remove the portal viewport from its model. MainWindow unregisters + tears down the
-    /// DocumentView first (so it stops ticking and frees its images). Idempotent.</summary>
-    internal void TeardownPortalViewport()
-    {
-        if (_portalViewport is not { } vp) return;
-        _portalViewport = null;
-        // Shared iterate-the-open-tabs removal: safe whether the model is still alive (frees the portal
-        // viewport now) or was already disposed by a tab-close (its model isn't among the tabs → no-op).
-        SafeRemoveViewport(vp);
-    }
+    /// <summary>Drop the VM's reference to the portal viewport. The Core viewport removal is owned by the
+    /// shared surface teardown (<c>DisposeSecondarySurface</c>) on the normal path; the bare-viewport-undo
+    /// path in <c>SyncPortalView</c> (no surface was built) removes it explicitly before calling this, so
+    /// this no longer double-removes (#192/#8). Idempotent.</summary>
+    internal void TeardownPortalViewport() => _portalViewport = null;
 }

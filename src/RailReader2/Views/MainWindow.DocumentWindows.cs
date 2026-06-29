@@ -80,7 +80,7 @@ public partial class MainWindow
         // Was this window's viewport the focused one? Capture before disposal re-points focus.
         bool wasFocused = Vm is { } vm0
             && ReferenceEquals(vm0.Controller.FocusedViewport, view.SurfaceViewport);
-        DisposeSecondaryView(view);
+        DisposeSecondarySurface(view);
 
         // Closing the FOCUSED window: Core re-points FocusedViewport to the primary, but the desktop
         // focus projections (ambient size, status-bar zoom, rail toolbar, menu gating) are only
@@ -98,7 +98,7 @@ public partial class MainWindow
         foreach (var win in _documentWindows)
             if (win.HostedView is { } v && ReferenceEquals(v.SurfaceViewport, focused))
             {
-                win.Close(); // → OnDocumentWindowClosed → DisposeSecondaryView
+                win.Close(); // → OnDocumentWindowClosed → DisposeSecondarySurface
                 return true;
             }
         return false;

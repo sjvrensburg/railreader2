@@ -14,7 +14,8 @@ public partial class MainWindow : Window
     private PortalWindow? _portalWindow;
     // The live confined DocumentView hosted in the pop-out (Core 0.45.0 FocusBlock). Created when the
     // window opens over a pinned target, re-aimed when the target changes, torn down on dock/close/
-    // tab-switch. Mirrors the tear-off surface lifecycle (CreateSecondaryView/DisposeSecondaryView).
+    // tab-switch. Shares the secondary-surface lifecycle (BuildSecondarySurface/DisposeSecondarySurface)
+    // with split panes and tear-offs (#192).
     private DocumentView? _portalView;
     // The (page, block) the portal view is currently aimed at — so a re-sync for the SAME target leaves
     // the user's pan/zoom/rail inside the portal undisturbed; only a different target re-frames.
@@ -182,12 +183,42 @@ public partial class MainWindow : Window
     private void OnPortalViewChanged()
     {
         if (Vm is not { } vm || _portalWindow is null) return;
-        // Mid-frame (a pin from EvaluatePortals during the tick) → defer, since structural surface work
-        // is unsafe there. User-initiated (a temporary peek from the context menu) → apply now, so it
-        // shows before the next frame's portal evaluation can auto-dismiss/revise it (otherwise a peek
-        // opened over an existing auto-pin can be reverted before it ever renders).
+        // Re-aiming an ALREADY-hosted portal view to a changed target touches only that viewport's
+        // camera/focus — never the _surfaces registry — so it's safe to run synchronously even mid-frame,
+        // and it MUST: a pin fires from EvaluatePortals inside the tick, and deferring the re-aim at
+        // Background priority starves it during continuous rail reading (the frame clock keeps the
+        // dispatcher busy above Background), freezing the pop-out on the first float until reading stops.
+        // Try the in-frame re-aim first; fall back to the deferred sync only when STRUCTURAL work
+        // (create / teardown / tab-switch) is needed, which can't safely mutate _surfaces mid-frame.
+        if (vm.IsInAnimationFrame && TryReaimHostedPortalView(vm)) return;
         if (vm.IsInAnimationFrame) QueuePortalSync();
         else SyncPortalView(vm);
+    }
+
+    /// <summary>Fast path for <see cref="OnPortalViewChanged"/>: if the portal view is already hosted on
+    /// the current target's document, re-aim it to the (possibly changed) target and return true. Returns
+    /// false when STRUCTURAL work is needed instead — no view yet (create), the target was cleared
+    /// (teardown), or the active document changed (tab-switch rebuild) — which the caller defers out of
+    /// the frame. Safe mid-frame: never registers/unregisters a surface.</summary>
+    private bool TryReaimHostedPortalView(MainWindowViewModel vm)
+    {
+        if (_portalView is not { } view || view.SurfaceViewport?.Owner is not { } owner) return false;
+        if (vm.ComputePortalLiveTarget() is not { } t || vm.PortalReadingDoc is not { } doc
+            || !ReferenceEquals(owner, doc))
+            return false;
+        ReaimPortalView(vm, t);
+        return true;
+    }
+
+    /// <summary>Aim the hosted portal viewport at <paramref name="t"/>, but only when the target actually
+    /// changed — so a re-sync for the SAME target leaves the user's pan/zoom/rail inside the portal
+    /// undisturbed. Shared by the in-frame fast path and the deferred <see cref="SyncPortalView"/>.</summary>
+    private void ReaimPortalView(MainWindowViewModel vm, (int Page, int Block, RailReader.Core.Models.BBox Bounds) t)
+    {
+        if (_portalAimed == (t.Page, t.Block)) return;
+        _portalAimed = (t.Page, t.Block);
+        vm.AimPortalViewport(t);
+        vm.RequestAnimationFrame();
     }
 
     /// <summary>Defer the (structural) portal-view sync to a dispatcher job, coalescing bursts. The
@@ -236,22 +267,24 @@ public partial class MainWindow : Window
         if (_portalView is null)
         {
             var vp = vm.CreatePortalViewport(doc);
-            var view = new DocumentView();
-            view.Initialize(vm, vm.ActiveTab);                              // model/pref wiring
-            view.BindViewport(vp, new ViewportImages(vp), ownsImages: true); // its own page/minimap images
-            vm.RegisterSurface(view);   // ticked by the frame loop; NOT focused (no reading-sync hijack)
+            // Same shared surface core as split panes / tear-offs (#192) — but NOT focused on create: the
+            // confined portal takes input focus only on click (OnPortalPointerPressed), so the
+            // reading-position sync keeps tracking the main view.
+            if (BuildSecondarySurface(vp) is not { } view)
+            {
+                // No active tab (unreachable here): no surface was built to dispose, so remove the bare
+                // viewport directly before dropping the VM ref (#8 — TeardownPortalViewport no longer removes).
+                vm.SafeRemoveViewport(vp);
+                vm.TeardownPortalViewport();
+                return;
+            }
             _portalView = view;
             _portalWindow!.Host(view);
             vm.UpdatePortalLive(true);
             _portalAimed = null;
         }
 
-        if (_portalAimed != (t.Page, t.Block))
-        {
-            _portalAimed = (t.Page, t.Block);
-            vm.AimPortalViewport(t);
-            vm.RequestAnimationFrame();
-        }
+        ReaimPortalView(vm, t);
     }
 
     private void TeardownPortalView(MainWindowViewModel vm)
@@ -264,9 +297,8 @@ public partial class MainWindow : Window
         bool wasFocused = ReferenceEquals(vm.Controller.FocusedViewport, view.SurfaceViewport);
         _portalView = null;
         _portalWindow?.Unhost();
-        vm.UnregisterSurface(view);   // stop ticking before the Core viewport goes away
-        view.Teardown();              // retires its owned page/minimap images on the composition thread (#191)
-        vm.TeardownPortalViewport();  // RemoveViewport from the model (defensive on a disposed model)
+        DisposeSecondarySurface(view);   // shared unregister + image-retire + viewport-remove (#192)
+        vm.TeardownPortalViewport();     // drop the VM's _portalViewport ref (surface dispose did the remove, #8)
         if (wasFocused && Document.SurfaceViewport is { } primaryVp)
             vm.FocusSurface(Document, primaryVp);
     }
