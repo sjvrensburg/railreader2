@@ -78,6 +78,27 @@ public sealed class ViewportImages : IDisposable
         }
     }
 
+    /// <summary>
+    /// Hands over the wrapped page + minimap <see cref="SKImage"/>s for deferred, thread-safe
+    /// disposal and resets this instance to its empty state — WITHOUT disposing them on the calling
+    /// (UI) thread. Both wraps are drawn on the composition/render thread (the page via
+    /// <c>PdfPageLayer.OnRender</c>, the minimap via its custom draw op), so a direct UI-thread
+    /// <c>Dispose()</c> could free one mid-render (railreader2#191). The caller must retire each
+    /// returned image on a thread-safe boundary (a <c>RetireImage</c> message to a composition layer).
+    /// After this call the instance is empty (re-wraps lazily) and may be reused or dropped.
+    /// </summary>
+    public List<SKImage> TakeRetiredImages()
+    {
+        var retired = new List<SKImage>(2);
+        if (_cachedImage is not null) retired.Add(_cachedImage);
+        if (_minimapImage is not null) retired.Add(_minimapImage);
+        _cachedImage = null;
+        _cachedImagePage = null;
+        _minimapImage = null;
+        _minimapImageSource = null;
+        return retired;
+    }
+
     public void Dispose()
     {
         _cachedImage?.Dispose();

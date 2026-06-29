@@ -28,8 +28,9 @@ public partial class DocumentView : UserControl, IViewportSurface
     private MainWindowViewModel? _shared;
     private TabViewModel? _tab;
     // True when _images is owned by this view (a detached/secondary surface created its own) and
-    // must be disposed on rebind/teardown; false when borrowed from _tab.Images (the primary
-    // surface shares the document's images with the minimap and must NOT dispose them).
+    // must be retired (composition-thread dispose, not UI-thread — railreader2#191) on rebind/teardown;
+    // false when borrowed from _tab.Images (the primary surface shares the document's images with the
+    // minimap and must NOT dispose them).
     private bool _ownsImages;
     // A freshly-bound secondary viewport that had no layout size yet: centre it on first SizeChanged.
     private bool _pendingCenter;
@@ -145,7 +146,9 @@ public partial class DocumentView : UserControl, IViewportSurface
         }
         if (_ownsImages)
         {
-            _images?.Dispose();
+            // Retire (don't UI-thread Dispose) the owned page/minimap textures — the compositor may
+            // still be drawing them on a reading-driven portal teardown (railreader2#191).
+            if (_images is { } owned) RetireOwnedImages(owned);
             _images = null;
             _ownsImages = false;
         }
@@ -207,7 +210,7 @@ public partial class DocumentView : UserControl, IViewportSurface
     public void BindViewport(CoreViewport vp, ViewportImages images, bool ownsImages)
     {
         if (_ownsImages && _images is { } old && !ReferenceEquals(old, images))
-            old.Dispose();
+            RetireOwnedImages(old); // composition-thread dispose; UpdateAllLayers below re-pushes the new image
         _viewport = vp;
         _images = images;
         _ownsImages = ownsImages;
@@ -239,6 +242,25 @@ public partial class DocumentView : UserControl, IViewportSurface
         Minimap.InvalidateVisual();
     }
 
+    /// <summary>
+    /// Disposes a now-detached OWNED <see cref="ViewportImages"/> (a secondary / tear-off / portal
+    /// surface's own page+minimap wraps) on a thread-safe boundary. Both textures are drawn on the
+    /// composition/render thread, so a direct UI-thread <c>Dispose()</c> could free one mid-render — the
+    /// same hazard the page and freeze layers avoid with <c>RetireImage</c> (railreader2#191; the portal
+    /// view made this teardown reading-driven, widening the window). Drops the page layer's image
+    /// reference first (a null-image state, which also frees the layer's GPU upload), then hands each wrap
+    /// to the <see cref="PageLayer"/> composition thread for disposal — processed FIFO after the cleared
+    /// state, so a texture is freed only once the layer has stopped drawing it. Falls back to a UI-thread
+    /// dispose only when the layer's visual is already gone (the compositor is no longer drawing here).
+    /// </summary>
+    private void RetireOwnedImages(ViewportImages images)
+    {
+        PageLayer.UpdateState(BlankPage);
+        foreach (var img in images.TakeRetiredImages())
+            if (!PageLayer.TrySendMessage(new RetireImage(img)))
+                img.Dispose();
+    }
+
     private void OnViewportPressedForFocus(object? sender, PointerPressedEventArgs e)
     {
         if (_shared is { } vm && _viewport is { } vp)
@@ -268,8 +290,8 @@ public partial class DocumentView : UserControl, IViewportSurface
             prev.OnDpiRenderComplete = null;
             prev.Viewport.RequestAnimation = null; // stop the outgoing tab waking this pane
         }
-        if (_ownsImages)
-            _images?.Dispose();
+        if (_ownsImages && _images is { } owned)
+            RetireOwnedImages(owned); // composition-thread dispose; UpdateLayerBindings below re-pushes
         _tab = tab;
         _viewport = tab?.Viewport;
         _images = tab?.Images;
@@ -535,6 +557,15 @@ public partial class DocumentView : UserControl, IViewportSurface
 
     private static readonly FreezePaneRenderState EmptyFreeze =
         new(null, null, null, default, default, default, ColourEffect.None, 0f, null);
+
+    // A page state carrying no image: pushed to PageLayer to drop its reference to (and GPU upload of)
+    // a page texture about to be freed, before the texture is retired on the composition thread
+    // (railreader2#191). All other fields are inert — OnRender early-returns on a null image.
+    private static readonly PdfPageRenderState BlankPage = new(
+        Image: null, PageW: 0f, PageH: 0f, Camera: SKMatrix.Identity,
+        ScrollSpeed: 0f, ZoomSpeed: 0f, MotionBlur: false, MotionBlurIntensity: 0f,
+        LineFocusBlur: false, LineFocusIntensity: 0f, LinePadding: 0f,
+        LineY: 0f, LineH: 0f, Effect: ColourEffect.None, EffectIntensity: 0f, Effects: null);
 
     /// <summary>Builds the table freeze-panes overlay state: pulls the (lazily rendered) crop images
     /// from the VM, forwards any retired crops to the layer for composition-thread disposal, and maps

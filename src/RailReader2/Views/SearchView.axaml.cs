@@ -300,7 +300,11 @@ public partial class SearchView : UserControl
     {
         if (_vm is null) return;
         int total = _vm.SearchMatches.Count;
-        int current = total > 0 ? _vm.ActiveMatchIndex + 1 : 0;
-        SearchMatchCount.Text = total > 0 ? $"{current} of {total}" : "";
+        if (total == 0) { SearchMatchCount.Text = ""; return; }
+        // A block-confined (portal) view can have matches but none reachable → ActiveMatchIndex == -1.
+        // Guard on Core's HasActiveMatch so the 1-based counter never reads "0 of N" (RailReaderCore 0.45.2).
+        SearchMatchCount.Text = _vm.HasActiveSearchMatch
+            ? $"{_vm.ActiveMatchIndex + 1} of {total}"
+            : $"0 of {total} reachable";
     }
 }

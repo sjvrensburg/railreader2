@@ -224,6 +224,14 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         set => _controller.Search.ActiveMatchIndex = value;
     }
 
+    /// <summary>True when there is a reachable active search match. In a block-confined (portal)
+    /// viewport the search can have matches but none the block clamp can scroll to, so Core reports
+    /// <see cref="ActiveMatchIndex"/> == -1; this surfaces Core's
+    /// <see cref="RailReader.Core.Commands.SearchResult.HasActiveMatch"/> predicate so a 1-based
+    /// "{i} of {n}" counter guards on it and never renders "match 0 of N" (RailReaderCore 0.45.2).
+    /// An unconfined view always reports true when matches exist.</summary>
+    public bool HasActiveSearchMatch => _controller.Search.GetSearchState().HasActiveMatch;
+
     public AnnotationTool ActiveTool => _controller.Annotations.ActiveTool;
     public bool IsAnnotating => _controller.Annotations.IsAnnotating;
     public Annotation? SelectedAnnotation
