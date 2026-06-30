@@ -17,9 +17,13 @@ public partial class MainWindow : Window
     // tab-switch. Shares the secondary-surface lifecycle (BuildSecondarySurface/DisposeSecondarySurface)
     // with split panes and tear-offs (#192).
     private DocumentView? _portalView;
-    // The (page, block) the portal view is currently aimed at — so a re-sync for the SAME target leaves
-    // the user's pan/zoom/rail inside the portal undisturbed; only a different target re-frames.
-    private (int Page, int Block)? _portalAimed;
+    // The (page, block, bounds) the portal view is currently aimed at — so a re-sync for the SAME target
+    // leaves the user's pan/zoom/rail inside the portal undisturbed; only a different target re-frames.
+    // Bounds is part of the key (#194): a background re-analysis can keep a target at the SAME index but
+    // shift its BBox (or widen an auto-pin's float+caption union), which must still re-frame the confined
+    // view. BBox is a record struct, so the tuple compares it by value (stable: an unchanged target yields
+    // bit-identical bounds each evaluation, so this never spuriously re-frames over the user's pan/zoom).
+    private (int Page, int Block, BBox Bounds)? _portalAimed;
 
     // Fullscreen hover reveal: show threshold < hide threshold for hysteresis
     private const double FullScreenShowThreshold = 5.0;
@@ -183,23 +187,44 @@ public partial class MainWindow : Window
     private void OnPortalViewChanged()
     {
         if (Vm is not { } vm || _portalWindow is null) return;
-        // Re-aiming an ALREADY-hosted portal view to a changed target touches only that viewport's
-        // camera/focus — never the _surfaces registry — so it's safe to run synchronously even mid-frame,
-        // and it MUST: a pin fires from EvaluatePortals inside the tick, and deferring the re-aim at
-        // Background priority starves it during continuous rail reading (the frame clock keeps the
-        // dispatcher busy above Background), freezing the pop-out on the first float until reading stops.
-        // Try the in-frame re-aim first; fall back to the deferred sync only when STRUCTURAL work
-        // (create / teardown / tab-switch) is needed, which can't safely mutate _surfaces mid-frame.
-        if (vm.IsInAnimationFrame && TryReaimHostedPortalView(vm)) return;
-        if (vm.IsInAnimationFrame) QueuePortalSync();
-        else SyncPortalView(vm);
+        // Outside an animation frame (poll / background timer / user action): aim now — it lands cleanly
+        // between frames, the way every re-aim did before the in-frame fast path was added.
+        if (!vm.IsInAnimationFrame) { SyncPortalView(vm); return; }
+
+        // Inside a frame: a pin fired from EvaluatePortals INSIDE a surface tick. Re-aiming an
+        // already-hosted portal view touches only that viewport's camera/focus (never the _surfaces
+        // registry), so it is structurally safe mid-frame — but applying it NOW would mutate the portal
+        // viewport between its slot in this frame's surface snapshot and its OWN tick later this same
+        // frame, colliding with that tick's clamp/snap (#193). Defer the re-aim to end-of-frame (after
+        // every surface, incl. the portal viewport, has ticked) — still in-frame, so it can't be starved
+        // by the frame clock the way a Background-priority post is, which would freeze the pop-out on the
+        // first float during continuous rail reading. STRUCTURAL work (create / teardown / tab-switch)
+        // can't safely mutate _surfaces mid-frame, so it still defers to the between-frames QueuePortalSync.
+        if (CanReaimHostedPortalView(vm))
+            vm.DeferPortalReaim(() => { if (!TryReaimHostedPortalView(vm)) QueuePortalSync(); });
+        else
+            QueuePortalSync();
     }
 
-    /// <summary>Fast path for <see cref="OnPortalViewChanged"/>: if the portal view is already hosted on
+    /// <summary>Read-only predicate for <see cref="OnPortalViewChanged"/>: true when the portal view is
+    /// already hosted on the active document with a resolvable live target — i.e. a pin needs only a
+    /// camera/focus re-aim, no structural surface work. Mirrors <see cref="TryReaimHostedPortalView"/>'s
+    /// guard without mutating, so the caller can DEFER the re-aim to end-of-frame rather than run it
+    /// mid-tick (#193).</summary>
+    private bool CanReaimHostedPortalView(MainWindowViewModel vm)
+    {
+        if (_portalView is not { } view || view.SurfaceViewport?.Owner is not { } owner) return false;
+        if (vm.PortalReadingDoc is not { } doc || !ReferenceEquals(owner, doc)) return false;
+        return vm.ComputePortalLiveTarget() is not null;
+    }
+
+    /// <summary>Re-aim path for <see cref="OnPortalViewChanged"/>: if the portal view is already hosted on
     /// the current target's document, re-aim it to the (possibly changed) target and return true. Returns
     /// false when STRUCTURAL work is needed instead — no view yet (create), the target was cleared
-    /// (teardown), or the active document changed (tab-switch rebuild) — which the caller defers out of
-    /// the frame. Safe mid-frame: never registers/unregisters a surface.</summary>
+    /// (teardown), or the active document changed (tab-switch rebuild) — which the caller routes to the
+    /// between-frames sync. Mid-frame this runs only as the deferred end-of-frame action (#193), after the
+    /// portal viewport has ticked, so the aim never collides with that tick; never registers/unregisters
+    /// a surface, so it is also safe to invoke directly between frames.</summary>
     private bool TryReaimHostedPortalView(MainWindowViewModel vm)
     {
         if (_portalView is not { } view || view.SurfaceViewport?.Owner is not { } owner) return false;
@@ -211,12 +236,13 @@ public partial class MainWindow : Window
     }
 
     /// <summary>Aim the hosted portal viewport at <paramref name="t"/>, but only when the target actually
-    /// changed — so a re-sync for the SAME target leaves the user's pan/zoom/rail inside the portal
-    /// undisturbed. Shared by the in-frame fast path and the deferred <see cref="SyncPortalView"/>.</summary>
-    private void ReaimPortalView(MainWindowViewModel vm, (int Page, int Block, RailReader.Core.Models.BBox Bounds) t)
+    /// changed (page, block, OR bounds — #194) — so a re-sync for the SAME target leaves the user's
+    /// pan/zoom/rail inside the portal undisturbed. Shared by the deferred end-of-frame re-aim
+    /// (<see cref="TryReaimHostedPortalView"/>) and the between-frames <see cref="SyncPortalView"/>.</summary>
+    private void ReaimPortalView(MainWindowViewModel vm, (int Page, int Block, BBox Bounds) t)
     {
-        if (_portalAimed == (t.Page, t.Block)) return;
-        _portalAimed = (t.Page, t.Block);
+        if (_portalAimed == t) return;   // bounds included (#194): a same-index BBox shift still re-frames
+        _portalAimed = t;
         vm.AimPortalViewport(t);
         vm.RequestAnimationFrame();
     }
