@@ -3,7 +3,7 @@
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
-    <Version>3.53.0.0</Version>
+    <Version>3.53.1.0</Version>
     <!-- Precompile IL to native (R2R) at publish time: cuts JIT/startup cost on
          both the AppImage and the Windows installer. Publish-only; no effect on
          dotnet build/run. -->
@@ -36,11 +36,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="RailReader.Core" Version="0.45.2" />
-    <PackageReference Include="RailReader.Core.Pdfium" Version="0.45.2" />
-    <PackageReference Include="RailReader.Core.Analysis" Version="0.45.2" />
-    <PackageReference Include="RailReader.Renderer.Skia" Version="0.45.2" />
-    <PackageReference Include="RailReader.Core.Vlm.OpenAI" Version="0.45.2" />
+    <PackageReference Include="RailReader.Core" Version="0.46.0" />
+    <PackageReference Include="RailReader.Core.Pdfium" Version="0.46.0" />
+    <PackageReference Include="RailReader.Core.Analysis" Version="0.46.0" />
+    <PackageReference Include="RailReader.Renderer.Skia" Version="0.46.0" />
+    <PackageReference Include="RailReader.Core.Vlm.OpenAI" Version="0.46.0" />
   </ItemGroup>
 
 </Project>
