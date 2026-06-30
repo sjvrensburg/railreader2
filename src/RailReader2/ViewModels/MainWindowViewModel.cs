@@ -734,6 +734,11 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         }
         _tickScratch.Clear();
 
+        // Apply any live-portal re-aim requested by a pin DURING this frame's ticks now — after every
+        // surface (including the portal viewport) has ticked — so the aim's camera/focus mutation can't
+        // collide with the portal viewport's own same-frame clamp/snap (#193).
+        ApplyDeferredPortalReaim();
+
         // Semi-auto scroll parks mid-Tick (no StateChanged for it), so watch the edge here and
         // surface it so the "parked — press D" affordance and status bar update.
         bool parked = _controller.AutoScrollParked;

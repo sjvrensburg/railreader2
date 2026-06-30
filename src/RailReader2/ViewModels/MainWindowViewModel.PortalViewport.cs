@@ -82,6 +82,27 @@ public sealed partial class MainWindowViewModel
     /// <summary>MainWindow flips this as it hosts/tears down the live DocumentView.</summary>
     internal void UpdatePortalLive(bool live) => IsPortalLive = live;
 
+    // A re-aim of the live portal viewport requested DURING an animation frame (a pin fired from inside a
+    // surface tick). Applied once at the END of the frame — after every surface, INCLUDING the portal
+    // viewport itself, has ticked — so the aim's camera/focus mutation can't collide with the portal
+    // viewport's own same-frame clamp/snap (#193). Last-write-wins: the action re-computes the target, so
+    // collapsing several requests in one frame to the final one is correct.
+    private Action? _deferredPortalReaim;
+
+    /// <summary>Queue a portal-viewport re-aim to run at the end of the current animation frame (see
+    /// <see cref="_deferredPortalReaim"/>). The host supplies the re-aim work; the frame loop drains it
+    /// via <see cref="ApplyDeferredPortalReaim"/> once all surfaces have ticked this frame.</summary>
+    internal void DeferPortalReaim(Action reaim) => _deferredPortalReaim = reaim;
+
+    /// <summary>Run and clear any re-aim queued by <see cref="DeferPortalReaim"/> this frame. Called by
+    /// the frame loop after the per-surface tick + render passes complete.</summary>
+    private void ApplyDeferredPortalReaim()
+    {
+        if (_deferredPortalReaim is not { } reaim) return;
+        _deferredPortalReaim = null;
+        reaim();
+    }
+
     /// <summary>The document the portal viewport must live on (the active/focused viewport's owner).</summary>
     internal DocumentModel? PortalReadingDoc => _controller.FocusedViewport?.Owner;
 
