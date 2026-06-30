@@ -494,9 +494,8 @@ public partial class DocumentView : UserControl, IViewportSurface
     /// for a clean inspection view; they snap back when the pan ends (Ctrl release / barrel-up).
     /// RailPaused is a single focused-viewport flag in Core, so scope it to the focused surface.
     /// </summary>
-    private bool IsFreePanningThisViewport()
-        => _shared is { } vm && vm.RailPaused
-           && ReferenceEquals(_viewport, vm.Controller.FocusedViewport);
+    private bool IsFreePanningThisViewport(MainWindowViewModel vm)
+        => vm.RailPaused && ReferenceEquals(_viewport, vm.Controller.FocusedViewport);
 
     private PdfPageRenderState BuildPageState(TabViewModel? tab)
     {
@@ -526,7 +525,7 @@ public partial class DocumentView : UserControl, IViewportSurface
             ZoomSpeed: (float)(_viewport?.Camera.ZoomSpeed ?? 0),
             MotionBlur: vm.AppConfig.MotionBlur,
             MotionBlurIntensity: (float)vm.AppConfig.MotionBlurIntensity,
-            LineFocusBlur: !IsFreePanningThisViewport() && (tab?.LineFocusBlur ?? false),
+            LineFocusBlur: !IsFreePanningThisViewport(vm) && (tab?.LineFocusBlur ?? false),
             LineFocusIntensity: (float)vm.AppConfig.LineFocusBlurIntensity,
             LinePadding: (float)vm.AppConfig.LinePadding,
             LineY: lineY,
@@ -543,7 +542,7 @@ public partial class DocumentView : UserControl, IViewportSurface
         LineInfo currentLine = default;
         // Suppress the whole rail overlay (block dim + outline + line highlight) while free-panning
         // this viewport, so the page is clean for inspecting something outside the active block.
-        if (!IsFreePanningThisViewport()
+        if (!IsFreePanningThisViewport(vm)
             && _viewport?.Rail is { Active: true, HasAnalysis: true } rail && rail.NavigableCount > 0)
         {
             currentBlock = rail.CurrentNavigableBlock;
