@@ -486,6 +486,18 @@ public partial class DocumentView : UserControl, IViewportSurface
             zoom, zoom, (float)vp.Camera.OffsetX, (float)vp.Camera.OffsetY);
     }
 
+    /// <summary>
+    /// True when this view's viewport is the one currently being free-panned (Ctrl+drag or stylus
+    /// barrel button). Free-pan pauses the rail on the focused viewport but leaves Rail.Active true,
+    /// so the rail overlay (block dim/outline/line highlight) and the line-focus dim would otherwise
+    /// keep darkening the page while the user pans away to inspect something elsewhere. Suppress them
+    /// for a clean inspection view; they snap back when the pan ends (Ctrl release / barrel-up).
+    /// RailPaused is a single focused-viewport flag in Core, so scope it to the focused surface.
+    /// </summary>
+    private bool IsFreePanningThisViewport()
+        => _shared is { } vm && vm.RailPaused
+           && ReferenceEquals(_viewport, vm.Controller.FocusedViewport);
+
     private PdfPageRenderState BuildPageState(TabViewModel? tab)
     {
         var vm = _shared!;
@@ -514,7 +526,7 @@ public partial class DocumentView : UserControl, IViewportSurface
             ZoomSpeed: (float)(_viewport?.Camera.ZoomSpeed ?? 0),
             MotionBlur: vm.AppConfig.MotionBlur,
             MotionBlurIntensity: (float)vm.AppConfig.MotionBlurIntensity,
-            LineFocusBlur: tab?.LineFocusBlur ?? false,
+            LineFocusBlur: !IsFreePanningThisViewport() && (tab?.LineFocusBlur ?? false),
             LineFocusIntensity: (float)vm.AppConfig.LineFocusBlurIntensity,
             LinePadding: (float)vm.AppConfig.LinePadding,
             LineY: lineY,
@@ -529,7 +541,10 @@ public partial class DocumentView : UserControl, IViewportSurface
         var vm = _shared!;
         LayoutBlock? currentBlock = null;
         LineInfo currentLine = default;
-        if (_viewport?.Rail is { Active: true, HasAnalysis: true } rail && rail.NavigableCount > 0)
+        // Suppress the whole rail overlay (block dim + outline + line highlight) while free-panning
+        // this viewport, so the page is clean for inspecting something outside the active block.
+        if (!IsFreePanningThisViewport()
+            && _viewport?.Rail is { Active: true, HasAnalysis: true } rail && rail.NavigableCount > 0)
         {
             currentBlock = rail.CurrentNavigableBlock;
             currentLine = rail.CurrentLineInfo;
