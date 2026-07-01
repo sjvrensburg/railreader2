@@ -37,12 +37,16 @@
                           IsVisible="{Binding ShowMinimap}" />
 
         <!-- Annotation toolbar overlay (always-on Browse/Select/Copy + Annotate,
-             expanding to the tool set when annotation mode is active) -->
+             expanding to the tool set when annotation mode is active). While a freeze placement is
+             armed it dims and stops hit-testing so it doesn't block the viewport click that drops
+             the split (it often overlaps the guide line near the top/left of the page). -->
         <v:ToolBarView Name="ToolBar"
                        VerticalAlignment="Top"
                        HorizontalAlignment="Left"
                        Margin="16,4,0,0"
-                       IsVisible="{Binding Tabs.Count}" />
+                       IsVisible="{Binding Tabs.Count}"
+                       IsHitTestVisible="{Binding !FreezePlacementArmed}"
+                       Opacity="{Binding ToolBarOpacity}" />
 
         <!-- Semi-auto scroll parked: a clear bottom-centre "press D" affordance so a stop on an
              equation / table / figure / heading (or a column / page break) never reads as a freeze.
@@ -94,7 +98,15 @@
                 Background="{DynamicResource SystemControlHighlightAccentBrush}"
                 Foreground="White" CornerRadius="6"
                 Content="❄ Frozen — Unfreeze"
-                ToolTip.Tip="Clear this view's frozen panes" />
+                ToolTip.Tip="Clear this view's frozen panes">
+            <Button.Styles>
+                <!-- The default theme swaps in a near-transparent PointerOver background, leaving the
+                     white text illegible; keep the chip's own accent background on hover. -->
+                <Style Selector="Button:pointerover /template/ ContentPresenter">
+                    <Setter Property="Background" Value="{DynamicResource SystemControlHighlightAccentBrush}" />
+                </Style>
+            </Button.Styles>
+        </Button>
 
         <!-- Focused-pane affordance: an accent border drawn over the surface (no layout shift,
              never hit-tested). Only made visible by SetFocusedVisual when more than one viewport
