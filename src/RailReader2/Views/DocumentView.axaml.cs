@@ -631,7 +631,8 @@ public partial class DocumentView : UserControl, IViewportSurface
         return new FreezePaneRenderState(
             corner, top, left, cornerDst, topDst, leftDst,
             vm.Controller.ActiveColourEffect, vm.Controller.ActiveColourIntensity, vm.ColourEffects,
-            showGuide, guideH, guideV, guideX, guideY);
+            showGuide, guideH, guideV, guideX, guideY,
+            (float)Viewport.Bounds.Width, (float)Viewport.Bounds.Height);
 
         static SKRect Dst(BBox box, float zoom, float x, float y)
             => SKRect.Create(x, y, box.W * zoom, box.H * zoom);

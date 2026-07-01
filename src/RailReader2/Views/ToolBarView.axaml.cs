@@ -19,7 +19,6 @@ public partial class ToolBarView : UserControl
     // to the same VM. Freeze is page-wide and table-independent, so the button is always available.
     private readonly Flyout _freezeFlyout = new();
     private readonly FreezePanesView _freezeView = new();
-    private bool _freezeFlyoutOpen;
 
     public MainWindowViewModel? ViewModel
     {
@@ -68,11 +67,9 @@ public partial class ToolBarView : UserControl
         // with the toolbar's bottom-left edge, regardless of where the Freeze button sits in the row.
         // Button.Flyout would anchor to the button itself instead, so this is wired manually.
         _freezeFlyout.Placement = PlacementMode.BottomEdgeAlignedLeft;
-        _freezeFlyout.Opened += (_, _) => _freezeFlyoutOpen = true;
-        _freezeFlyout.Closed += (_, _) => _freezeFlyoutOpen = false;
         FreezeButton.Click += (_, _) =>
         {
-            if (_freezeFlyoutOpen) _freezeFlyout.Hide();
+            if (_freezeFlyout.IsOpen) _freezeFlyout.Hide();
             else _freezeFlyout.ShowAt(RootBorder);
         };
     }
