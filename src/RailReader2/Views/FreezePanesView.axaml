@@ -1,24 +1,41 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:RailReader2.ViewModels"
+             xmlns:c="using:RailReader2.Controls"
              x:Class="RailReader2.Views.FreezePanesView"
              x:DataType="vm:MainWindowViewModel">
     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-        <StackPanel Margin="8,6" Spacing="6" MinWidth="200">
+        <StackPanel Name="RootPanel" Margin="8,6" Spacing="6" HorizontalAlignment="Stretch">
             <TextBlock Text="Freeze panes" FontWeight="SemiBold" />
-            <TextBlock Text="Pin rows / columns in place while the rest of the page scrolls — works on any page."
-                       TextWrapping="Wrap" FontSize="11" Opacity="0.7" />
-            <UniformGrid Columns="3">
-                <ToggleButton Name="FreezeRowsButton" Content="Rows" Margin="0,0,2,0"
-                              HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
-                              ToolTip.Tip="Then click in the page to freeze everything above a horizontal line." />
-                <ToggleButton Name="FreezeColumnsButton" Content="Columns" Margin="2,0"
-                              HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
-                              ToolTip.Tip="Then click in the page to freeze everything left of a vertical line." />
-                <ToggleButton Name="FreezeBothButton" Content="Both" Margin="2,0,0,0"
-                              HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
-                              ToolTip.Tip="Then click to freeze above and left of a crossing point. Shortcut: Z" />
-            </UniformGrid>
+            <TextBlock Name="CaptionText"
+                       Text="Pin rows / columns in place while the rest of the page scrolls."
+                       TextWrapping="Wrap" Opacity="0.7" />
+            <StackPanel Spacing="4">
+                <ToggleButton Name="FreezeRowsButton"
+                              HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                              ToolTip.Tip="Then click in the page to freeze everything above a horizontal line.">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <c:Icon Data="{StaticResource IconFreezeRows}" VerticalAlignment="Center" />
+                        <TextBlock Name="RowsLabel" Text="Rows" VerticalAlignment="Center" />
+                    </StackPanel>
+                </ToggleButton>
+                <ToggleButton Name="FreezeColumnsButton"
+                              HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                              ToolTip.Tip="Then click in the page to freeze everything left of a vertical line.">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <c:Icon Data="{StaticResource IconFreezeColumns}" VerticalAlignment="Center" />
+                        <TextBlock Name="ColumnsLabel" Text="Columns" VerticalAlignment="Center" />
+                    </StackPanel>
+                </ToggleButton>
+                <ToggleButton Name="FreezeBothButton"
+                              HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                              ToolTip.Tip="Then click to freeze above and left of a crossing point. Shortcut: Z">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <c:Icon Data="{StaticResource IconFreezeBoth}" VerticalAlignment="Center" />
+                        <TextBlock Name="BothLabel" Text="Both" VerticalAlignment="Center" />
+                    </StackPanel>
+                </ToggleButton>
+            </StackPanel>
             <Button Name="UnfreezeButton" HorizontalAlignment="Stretch" Content="Unfreeze"
                     ToolTip.Tip="Clear this view's freeze." />
         </StackPanel>

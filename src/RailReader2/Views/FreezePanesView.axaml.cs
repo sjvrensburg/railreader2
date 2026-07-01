@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using RailReader2.ViewModels;
@@ -29,6 +30,31 @@ public partial class FreezePanesView : UserControl
         // Hosted in the toolbar's Freeze flyout, so this control is loaded/unloaded on every open/close.
         // (Re)wire to the VM on both DataContext change and load so re-opening the flyout stays live.
         DataContextChanged += (_, _) => Rewire();
+
+        RescaleText(); // seed from the default FontSize before ToolBarView pushes the scaled one
+    }
+
+    // ToolBarView sets our FontSize to the scaled UI font size (this flyout is a popup in its own
+    // visual root, so it doesn't inherit Window.FontSize / UiFontScale on its own — see
+    // ToolBarView.UpdateFreezeFontScale). The caption and mode labels are deliberately smaller than the
+    // header, so they can't just inherit FontSize outright — instead they're kept at the same ratio to
+    // it as the original fixed-px design (11px / 10px against a 14px base), so they scale in step.
+    private const double CaptionSizeRatio = 11.0 / 14.0;
+    private const double LabelSizeRatio = 10.0 / 14.0;
+
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
+        if (change.Property == FontSizeProperty)
+            RescaleText();
+    }
+
+    private void RescaleText()
+    {
+        CaptionText.FontSize = FontSize * CaptionSizeRatio;
+        RowsLabel.FontSize = FontSize * LabelSizeRatio;
+        ColumnsLabel.FontSize = FontSize * LabelSizeRatio;
+        BothLabel.FontSize = FontSize * LabelSizeRatio;
     }
 
     protected override void OnLoaded(RoutedEventArgs e)

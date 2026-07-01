@@ -110,7 +110,12 @@ public class ViewportPanel : Panel
         // viewport context menu (block actions + Annotation Mode toggle).
         if (point.Properties.IsRightButtonPressed && ViewModel is { } vm)
         {
-            if (vm.ActiveTool == AnnotationTool.TextSelect && vm.SelectedText is not null)
+            if (vm.FreezeArmMode != FreezeMode.None)
+            {
+                vm.FreezeArmMode = FreezeMode.None;
+                ClearFreezeGuide();
+            }
+            else if (vm.ActiveTool == AnnotationTool.TextSelect && vm.SelectedText is not null)
             {
                 ShowTextSelectionContextMenu();
             }
@@ -189,12 +194,7 @@ public class ViewportPanel : Panel
                 _freezeGuidePushed = true;
                 return;
             }
-            if (_freezeGuidePushed)
-            {
-                OwnerView?.SetFreezeGuide(FreezeMode.None, 0, 0);
-                Cursor = Cursor.Default; // the link/annotation cursor logic re-applies on the next move
-                _freezeGuidePushed = false;
-            }
+            ClearFreezeGuide(); // the link/annotation cursor logic re-applies on the next move, below
 
             // Not dragging — update cursor for link hover (only in browse mode)
             if (!ViewModel.IsAnnotating)
@@ -256,18 +256,24 @@ public class ViewportPanel : Panel
         // Pointer left this pane: drop its armed guide line so it doesn't stay painted here while the
         // pointer (and a fresh guide) moves onto a different split pane. The move handler re-pushes it on
         // re-entry. (OnPointerMoved only clears the guide once disarmed, never on a plain cross-pane exit.)
-        if (_freezeGuidePushed)
-        {
-            OwnerView?.SetFreezeGuide(FreezeMode.None, 0, 0);
-            Cursor = Cursor.Default;
-            _freezeGuidePushed = false;
-        }
+        ClearFreezeGuide();
     }
 
     private bool _showingLinkCursor;
     // True while this pane is pushing a freeze-mode guide line, so it can be cleared once disarmed.
     private bool _freezeGuidePushed;
     private static readonly Cursor s_crossCursor = new(StandardCursorType.Cross);
+
+    /// <summary>Drop this pane's armed freeze-mode guide line and restore the normal cursor. No-op
+    /// unless a guide is currently pushed. Shared by every place a freeze placement gets cancelled or
+    /// committed: pointer-move disarm, pointer-exit, right-click cancel, and commit-on-click.</summary>
+    private void ClearFreezeGuide()
+    {
+        if (!_freezeGuidePushed) return;
+        OwnerView?.SetFreezeGuide(FreezeMode.None, 0, 0);
+        Cursor = Cursor.Default;
+        _freezeGuidePushed = false;
+    }
 
     private void UpdateLinkCursor(bool overLink)
     {
@@ -309,12 +315,7 @@ public class ViewportPanel : Panel
             {
                 var (pageX, pageY) = ScreenToPage(pos);
                 ViewModel.PlaceFreeze(OwnerView?.SurfaceViewport, pageX, pageY);
-                OwnerView?.SetFreezeGuide(FreezeMode.None, 0, 0); // commit clears the guide
-                _freezeGuidePushed = false;
-                // Restore the normal cursor here: clearing _freezeGuidePushed disables OnPointerMoved's
-                // disarm reset, so without this the crosshair would stick. Link/annotation cursor logic
-                // re-applies on the next move.
-                Cursor = Cursor.Default;
+                ClearFreezeGuide(); // commit clears the guide; link/annotation cursor re-applies on the next move
             }
             // "Start rail here": when armed, a single click force-activates rail at the click point
             // (any zoom). Checked before markers/block-framing so it wins regardless of what's under it.
