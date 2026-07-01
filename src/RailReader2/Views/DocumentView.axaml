@@ -37,15 +37,16 @@
                           IsVisible="{Binding ShowMinimap}" />
 
         <!-- Annotation toolbar overlay (always-on Browse/Select/Copy + Annotate,
-             expanding to the tool set when annotation mode is active). While a freeze placement is
-             armed it dims and stops hit-testing so it doesn't block the viewport click that drops
-             the split (it often overlaps the guide line near the top/left of the page). -->
+             expanding to the tool set when annotation mode is active). While a viewport-placement
+             gesture is armed (freeze split, or "start rail here") it dims and stops hit-testing so
+             it doesn't block the click that drops the split/point (both can land near the toolbar's
+             top-left corner). -->
         <v:ToolBarView Name="ToolBar"
                        VerticalAlignment="Top"
                        HorizontalAlignment="Left"
                        Margin="16,4,0,0"
                        IsVisible="{Binding Tabs.Count}"
-                       IsHitTestVisible="{Binding !FreezePlacementArmed}"
+                       IsHitTestVisible="{Binding !ViewportPlacementArmed}"
                        Opacity="{Binding ToolBarOpacity}" />
 
         <!-- Semi-auto scroll parked: a clear bottom-centre "press D" affordance so a stop on an

@@ -69,12 +69,17 @@ public sealed partial class MainWindowViewModel
     /// page-wide and needs no table, so this is just "a document/page is available".</summary>
     public bool CanFreeze => FreezeVp is { PageWidth: > 0 };
 
-    /// <summary>True while a freeze placement is armed. The toolbar overlay dims and stops hit-testing
-    /// during this window so it doesn't block the viewport click that drops the split.</summary>
+    /// <summary>True while a freeze placement is armed.</summary>
     public bool FreezePlacementArmed => FreezeArmMode != FreezeMode.None;
 
-    /// <summary>Toolbar opacity: dimmed while a freeze placement is armed, opaque otherwise.</summary>
-    public double ToolBarOpacity => FreezePlacementArmed ? 0.35 : 1.0;
+    /// <summary>True while any viewport-placement gesture is armed — freeze or "start rail here" both
+    /// consume the next viewport click. The toolbar overlay dims and stops hit-testing during this
+    /// window so it doesn't block that click (both gestures can pick a point near the toolbar's
+    /// top-left corner).</summary>
+    public bool ViewportPlacementArmed => FreezePlacementArmed || ArmActivateRailClick;
+
+    /// <summary>Toolbar opacity: dimmed while a viewport placement is armed, opaque otherwise.</summary>
+    public double ToolBarOpacity => ViewportPlacementArmed ? 0.35 : 1.0;
 
     /// <summary>Arm (or toggle off) a freeze placement in <paramref name="mode"/>. While armed the
     /// pointer shows the matching guide line(s); the next viewport click drops the split there.</summary>
@@ -368,8 +373,6 @@ public sealed partial class MainWindowViewModel
     /// camera path or a SetFreezeGuide change).</summary>
     partial void OnFreezeArmModeChanged(FreezeMode value)
     {
-        OnPropertyChanged(nameof(FreezePlacementArmed));
-        OnPropertyChanged(nameof(ToolBarOpacity));
         foreach (var s in _surfaces)
             s.RenderFreezePanes();
     }
