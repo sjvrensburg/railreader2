@@ -13,7 +13,8 @@
         </Style>
     </UserControl.Styles>
 
-    <Border Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}"
+    <Border Name="RootBorder"
+            Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}"
             BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
             BorderThickness="1"
             CornerRadius="5"

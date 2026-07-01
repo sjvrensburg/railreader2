@@ -19,7 +19,9 @@ internal sealed record FreezePaneRenderState(
     ColourEffect Effect, float EffectIntensity, ColourEffectShaders? Effects,
     // Armed freeze-mode guide line(s) at the pointer (screen-space): a horizontal line (rows → freeze
     // above), a vertical line (columns → freeze left), or both. Drawn full-length as accent guides so
-    // the user aims before clicking.
+    // the user aims before clicking; a translucent tint covers the region that would be frozen (above
+    // the horizontal guide / left of the vertical guide) — the canvas is already clipped to this
+    // surface's bounds, so a full-length fill is enough without needing the surface size.
     bool ShowGuide = false, bool GuideH = false, bool GuideV = false, float GuideX = 0, float GuideY = 0);
 
 /// <summary>Hosts a CompositionCustomVisual that draws Excel-style frozen table panes (the rows above
@@ -39,6 +41,7 @@ internal sealed class FreezePaneVisualHandler : CompositionCustomVisualHandler
     [ThreadStatic] private static float s_effectIntensity;
     [ThreadStatic] private static SKPaint? s_paint;
     [ThreadStatic] private static SKPaint? s_guidePaint;
+    [ThreadStatic] private static SKPaint? s_shadePaint;
 
     private FreezePaneRenderState? _state;
 
@@ -100,9 +103,20 @@ internal sealed class FreezePaneVisualHandler : CompositionCustomVisualHandler
         s_paint.ColorFilter = null;
 
         // Armed freeze-mode guide: full-length line(s) at the pointer, so the user aims the page-wide
-        // split before clicking. Drawn last, over everything, in an accent colour.
+        // split before clicking. Drawn last, over everything, in an accent colour. A translucent tint
+        // is painted first over the region that WOULD be frozen (above/left of the guide) so the user
+        // sees exactly what a click commits, not just a bare line.
         if (state.ShowGuide)
         {
+            const float far = 100000f;
+            var shade = s_shadePaint ??= new SKPaint
+            {
+                Color = new SKColor(0x29, 0x9D, 0xF5, 0x28), // accent blue, ~15% alpha
+                IsStroke = false,
+            };
+            if (state.GuideH) canvas.DrawRect(SKRect.Create(-far, -far, 2 * far, far + state.GuideY), shade);
+            if (state.GuideV) canvas.DrawRect(SKRect.Create(-far, -far, far + state.GuideX, 2 * far), shade);
+
             var line = s_guidePaint ??= new SKPaint
             {
                 Color = new SKColor(0x29, 0x9D, 0xF5), // accent blue
@@ -110,7 +124,6 @@ internal sealed class FreezePaneVisualHandler : CompositionCustomVisualHandler
                 StrokeWidth = 2f,
                 IsAntialias = true,
             };
-            const float far = 100000f;
             if (state.GuideH) canvas.DrawLine(-far, state.GuideY, far, state.GuideY, line); // freeze above
             if (state.GuideV) canvas.DrawLine(state.GuideX, -far, state.GuideX, far, line); // freeze left
         }

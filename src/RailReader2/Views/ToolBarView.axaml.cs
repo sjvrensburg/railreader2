@@ -19,6 +19,7 @@ public partial class ToolBarView : UserControl
     // to the same VM. Freeze is page-wide and table-independent, so the button is always available.
     private readonly Flyout _freezeFlyout = new();
     private readonly FreezePanesView _freezeView = new();
+    private bool _freezeFlyoutOpen;
 
     public MainWindowViewModel? ViewModel
     {
@@ -33,6 +34,7 @@ public partial class ToolBarView : UserControl
             {
                 _vm.PropertyChanged += OnVmPropertyChanged;
                 RefreshAll();
+                UpdateFreezeFontScale();
             }
         }
     }
@@ -62,7 +64,17 @@ public partial class ToolBarView : UserControl
         ThicknessButton.Flyout = _thicknessFlyout;
 
         _freezeFlyout.Content = _freezeView;
-        FreezeButton.Flyout = _freezeFlyout;
+        // Anchored to the toolbar's own border (not the button) so the flyout's top-left lines up
+        // with the toolbar's bottom-left edge, regardless of where the Freeze button sits in the row.
+        // Button.Flyout would anchor to the button itself instead, so this is wired manually.
+        _freezeFlyout.Placement = PlacementMode.BottomEdgeAlignedLeft;
+        _freezeFlyout.Opened += (_, _) => _freezeFlyoutOpen = true;
+        _freezeFlyout.Closed += (_, _) => _freezeFlyoutOpen = false;
+        FreezeButton.Click += (_, _) =>
+        {
+            if (_freezeFlyoutOpen) _freezeFlyout.Hide();
+            else _freezeFlyout.ShowAt(RootBorder);
+        };
     }
 
     private void OnVmPropertyChanged(object? sender, PropertyChangedEventArgs args)
@@ -95,7 +107,17 @@ public partial class ToolBarView : UserControl
             case "SelectedText":
                 UpdateCopyVisibility();
                 break;
+            case nameof(MainWindowViewModel.CurrentFontSize):
+                UpdateFreezeFontScale();
+                break;
         }
+    }
+
+    // The freeze flyout is a popup in its own visual root, so it doesn't inherit the window's
+    // UiFontScale (same reason viewport context menus set FontSize explicitly) — apply it here too.
+    private void UpdateFreezeFontScale()
+    {
+        if (_vm is not null) _freezeView.FontSize = _vm.CurrentFontSize;
     }
 
     private void RefreshAll()

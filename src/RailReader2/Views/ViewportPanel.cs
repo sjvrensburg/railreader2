@@ -110,7 +110,17 @@ public class ViewportPanel : Panel
         // viewport context menu (block actions + Annotation Mode toggle).
         if (point.Properties.IsRightButtonPressed && ViewModel is { } vm)
         {
-            if (vm.ActiveTool == AnnotationTool.TextSelect && vm.SelectedText is not null)
+            if (vm.FreezeArmMode != FreezeMode.None)
+            {
+                vm.FreezeArmMode = FreezeMode.None;
+                if (_freezeGuidePushed)
+                {
+                    OwnerView?.SetFreezeGuide(FreezeMode.None, 0, 0);
+                    Cursor = Cursor.Default;
+                    _freezeGuidePushed = false;
+                }
+            }
+            else if (vm.ActiveTool == AnnotationTool.TextSelect && vm.SelectedText is not null)
             {
                 ShowTextSelectionContextMenu();
             }
