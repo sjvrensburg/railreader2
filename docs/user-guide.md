@@ -123,7 +123,7 @@ Rail mode is the core feature of railreader2. When you zoom past the threshold (
 
 ### Free pan
 
-Hold `Ctrl` and drag to temporarily pan freely, even zooming out below the rail threshold. This lets you quickly check a figure, equation, or footnote elsewhere on the same page without losing your place. Release `Ctrl` to snap back to your original reading position and zoom level.
+Hold `Ctrl` and drag to temporarily pan freely, even zooming out below the rail threshold. While you pan, the page is drawn clean — the rail dim and line overlay are suppressed so nothing obscures the figure you're inspecting. This lets you quickly check a figure, equation, or footnote elsewhere on the same page without losing your place. Release `Ctrl` to snap back to your original reading position and zoom level.
 
 ### Zoom position preservation
 
@@ -444,7 +444,7 @@ Subtle, always-on markers show where portals are anchored on the current page: a
 
 ### Pop-out window
 
-Click **Pop out ↗** in the Portals pane (or click the docked preview) to detach the target into a floating, borderless, always-on-top window — useful on a multi-monitor setup. Drag its top bar to move it, the corner grip to resize; scroll to zoom and drag to pan inside it, double-click to fit. The **Pin** toggle controls always-on-top, **Lock** freezes the current target so reading on (or an auto-pin) won't replace it until you unlock, and **Dock** returns it to the panel. Its size and position are remembered between pop-outs.
+Click **Pop out ↗** in the Portals pane (or click the docked preview) to detach the target into a floating, borderless, always-on-top window — useful on a multi-monitor setup. The window hosts a **live viewport** of the target rather than a still image, so you can rail-read, freeze panes, and annotate inside it just like the main view; it follows the reading position and re-aims as you cross new references. Drag its top bar to move it, the corner grip to resize; scroll to zoom and drag to pan inside it, double-click to fit. The **Pin** toggle controls always-on-top, **Lock** freezes the current target so reading on (or an auto-pin) won't replace it until you unlock, and **Dock** returns it to the panel. Its size and position are remembered between pop-outs.
 
 ### Temporary peek
 

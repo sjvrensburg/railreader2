@@ -319,10 +319,11 @@
       <h3>Free pan (Ctrl+Drag)</h3>
       <p>
         Hold <code>Ctrl</code> in rail mode to temporarily break out of rail constraints. While
-        <code>Ctrl</code> is held, you can pan and zoom freely as if rail mode were inactive. When
-        you release <code>Ctrl</code>, the view snaps back to the nearest rail position. This is
-        useful for quickly checking a figure, footnote, or other element outside the current
-        reading flow without losing your place.
+        <code>Ctrl</code> is held, you can pan and zoom freely as if rail mode were inactive, and the
+        page is drawn <strong>clean</strong> &mdash; the rail dim and line overlay are suppressed so
+        nothing obscures the figure you're inspecting. When you release <code>Ctrl</code>, the view snaps
+        back to the exact rail position you left. This is useful for quickly checking a figure, footnote,
+        or other element outside the current reading flow without losing your place.
       </p>
 
       <h3>Zoom position preservation</h3>
@@ -815,6 +816,8 @@
       <p>
         The linked target appears in the side panel's <strong>Portals</strong> section, and &mdash;
         optionally &mdash; in a detachable, always-on-top pop-out window you can drag to a second monitor.
+        That pop-out is a <strong>live viewport</strong>, not a still image &mdash; rail reading, freeze
+        panes, and annotation all work inside it, and it re-aims itself as you read on.
       </p>
       <h3>Creating a portal</h3>
       <p>
@@ -841,11 +844,13 @@
       <p>
         Click <strong>Pop out&nbsp;&#8599;</strong> in the Portals pane (or click the docked preview) to
         detach the target into a floating, borderless, always-on-top window &mdash; useful on a
-        multi-monitor setup. Drag its top bar to move it, the corner grip to resize; scroll to zoom and
-        drag to pan inside it, double-click to fit. The <strong>Pin</strong> toggle controls
-        always-on-top, <strong>Lock</strong> freezes the current target so reading on (or an auto-pin)
-        won't replace it until you unlock, and <strong>Dock</strong> returns it to the panel. Its size
-        and position are remembered.
+        multi-monitor setup. The window hosts a <strong>live viewport</strong> of the target, so you can
+        rail-read, freeze panes, and annotate inside it just like the main view; it follows the reading
+        position, re-aiming as you cross new references. Drag its top bar to move it, the corner grip to
+        resize; scroll to zoom and drag to pan inside it, double-click to fit. The <strong>Pin</strong>
+        toggle controls always-on-top, <strong>Lock</strong> freezes the current target so reading on (or
+        an auto-pin) won't replace it until you unlock, and <strong>Dock</strong> returns it to the panel.
+        Its size and position are remembered.
       </p>
       <h3>Temporary peek</h3>
       <p>
