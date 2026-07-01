@@ -11,6 +11,13 @@
             <Setter Property="Margin" Value="3,2" />
             <Setter Property="Background" Value="{DynamicResource SystemControlForegroundBaseMediumLowBrush}" />
         </Style>
+        <!-- The default FlyoutPresenter adds its own theme padding around content, so a content Width
+             set to match the toolbar's width still renders a wider popup than the toolbar. Zeroed here
+             (FreezePanesView supplies its own Margin) so the freeze flyout's Width maps 1:1 to what's
+             actually on screen. -->
+        <Style Selector="FlyoutPresenter.noPad">
+            <Setter Property="Padding" Value="0" />
+        </Style>
     </UserControl.Styles>
 
     <Border Name="RootBorder"

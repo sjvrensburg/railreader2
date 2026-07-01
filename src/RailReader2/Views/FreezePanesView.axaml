@@ -5,10 +5,10 @@
              x:Class="RailReader2.Views.FreezePanesView"
              x:DataType="vm:MainWindowViewModel">
     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-        <StackPanel Margin="8,6" Spacing="6" MinWidth="200">
+        <StackPanel Name="RootPanel" Margin="8,6" Spacing="6" HorizontalAlignment="Stretch">
             <TextBlock Text="Freeze panes" FontWeight="SemiBold" />
             <TextBlock Name="CaptionText"
-                       Text="Pin rows / columns in place while the rest of the page scrolls — works on any page."
+                       Text="Pin rows / columns in place while the rest of the page scrolls."
                        TextWrapping="Wrap" Opacity="0.7" />
             <StackPanel Spacing="4">
                 <ToggleButton Name="FreezeRowsButton"

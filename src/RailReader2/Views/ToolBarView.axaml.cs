@@ -67,12 +67,23 @@ public partial class ToolBarView : UserControl
         // with the toolbar's bottom-left edge, regardless of where the Freeze button sits in the row.
         // Button.Flyout would anchor to the button itself instead, so this is wired manually.
         _freezeFlyout.Placement = PlacementMode.BottomEdgeAlignedLeft;
+        _freezeFlyout.FlyoutPresenterClasses.Add("noPad");
+        // Track the toolbar's width whenever the annotation tools aren't shown (its "base" width — the
+        // common case, since freeze is unrelated to annotation mode), so the flyout matches it exactly
+        // even if opened while the annotation section happens to be expanded.
+        RootBorder.LayoutUpdated += (_, _) =>
+        {
+            if (!AnnotationSection.IsVisible) _baseToolbarWidth = RootBorder.Bounds.Width;
+        };
         FreezeButton.Click += (_, _) =>
         {
-            if (_freezeFlyout.IsOpen) _freezeFlyout.Hide();
-            else _freezeFlyout.ShowAt(RootBorder);
+            if (_freezeFlyout.IsOpen) { _freezeFlyout.Hide(); return; }
+            _freezeView.Width = _baseToolbarWidth > 0 ? _baseToolbarWidth : RootBorder.Bounds.Width;
+            _freezeFlyout.ShowAt(RootBorder);
         };
     }
+
+    private double _baseToolbarWidth;
 
     private void OnVmPropertyChanged(object? sender, PropertyChangedEventArgs args)
     {
