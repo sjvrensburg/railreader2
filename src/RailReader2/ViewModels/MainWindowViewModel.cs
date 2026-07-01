@@ -131,13 +131,22 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
     /// <summary>When armed (via the toolbar's "Start rail here" toggle), the next viewport click
     /// force-activates rail mode at that point regardless of zoom — see <see cref="ActivateRailAtClick"/>.
-    /// Consumed (reset to false) by that click, by Escape, or by toggling the button off.</summary>
-    [ObservableProperty] private bool _armActivateRailClick;
+    /// Consumed (reset to false) by that click, by Escape, or by toggling the button off. Mutually
+    /// exclusive with <see cref="FreezeArmMode"/> — both are viewport-placement gestures, so both
+    /// notify <see cref="ViewportPlacementArmed"/>.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ViewportPlacementArmed))]
+    [NotifyPropertyChangedFor(nameof(ToolBarOpacity))]
+    private bool _armActivateRailClick;
 
     /// <summary>When set (via a Freeze-mode control), the pointer shows the matching guide line(s) and
     /// the next viewport click drops the freeze split there — see <see cref="PlaceFreeze"/>. Cleared by
     /// that click, by Escape, by re-picking the same mode, or on tab switch.</summary>
-    [ObservableProperty] private FreezeMode _freezeArmMode;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(FreezePlacementArmed))]
+    [NotifyPropertyChangedFor(nameof(ViewportPlacementArmed))]
+    [NotifyPropertyChangedFor(nameof(ToolBarOpacity))]
+    private FreezeMode _freezeArmMode;
 
     [ObservableProperty] private bool _showSettings;
     [ObservableProperty] private bool _showAbout;
