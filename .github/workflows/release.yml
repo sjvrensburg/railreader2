@@ -30,6 +30,7 @@ jobs:
         with:
           name: onnx-model
           path: models/${{ env.MODEL_NAME }}
+          retention-days: 1
 
   build-linux:
     needs: download-model
@@ -107,6 +108,7 @@ jobs:
         with:
           name: linux-appimage
           path: railreader2-linux-x86_64.AppImage
+          retention-days: 1
 
       # FUSE-free alternative: the same self-contained publish as a plain tarball.
       # Extracting and running ./railreader2-linux-x64/RailReader2 avoids squashfs
@@ -124,6 +126,7 @@ jobs:
         with:
           name: linux-tarball
           path: railreader2-linux-x64.tar.gz
+          retention-days: 1
 
   build-windows:
     needs: download-model
@@ -166,6 +169,7 @@ jobs:
         with:
           name: windows-setup
           path: installer/output/railreader2-setup-x64.exe
+          retention-days: 1
 
   build-msix:
     needs: download-model
@@ -220,6 +224,7 @@ jobs:
         with:
           name: windows-msix
           path: railreader2-win-x64.msix
+          retention-days: 1
 
   build-cli-linux:
     needs: download-model
@@ -254,6 +259,7 @@ jobs:
         with:
           name: linux-cli
           path: railreader2-cli-linux-x64.tar.gz
+          retention-days: 1
 
   build-cli-windows:
     needs: download-model
@@ -286,6 +292,7 @@ jobs:
         with:
           name: windows-cli
           path: railreader2-cli-win-x64.zip
+          retention-days: 1
 
   release:
     needs: [build-linux, build-windows, build-cli-linux, build-cli-windows]
