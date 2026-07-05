@@ -131,6 +131,16 @@
                 <TextBlock Grid.Row="2" Grid.Column="1" Text="Start rail here at the current zoom (press again or Escape to exit)" Margin="0,2" />
             </Grid>
 
+            <TextBlock Text="View Rotation" FontWeight="Bold" />
+            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" Margin="8,0">
+                <TextBlock Grid.Row="0" Grid.Column="0" Text="Ctrl+R" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="0" Grid.Column="1" Text="Rotate view clockwise (sideways scans/tables; annotations pause while rotated)" Margin="0,2" />
+                <TextBlock Grid.Row="1" Grid.Column="0" Text="Ctrl+Shift+R" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="1" Grid.Column="1" Text="Rotate view counter-clockwise" Margin="0,2" />
+                <TextBlock Grid.Row="2" Grid.Column="0" Text="U" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="2" Grid.Column="1" Text="Rotate to read the current sideways block (press again to reset)" Margin="0,2" />
+            </Grid>
+
             <TextBlock Text="Annotations" FontWeight="Bold" />
             <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" Margin="8,0">
                 <TextBlock Grid.Row="0" Grid.Column="0" Text="Ctrl+E" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />

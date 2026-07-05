@@ -98,6 +98,7 @@ public partial class ToolBarView : UserControl
                 UpdateColorThicknessEnabled();
                 break;
             case nameof(MainWindowViewModel.IsAnnotationMode):
+            case nameof(MainWindowViewModel.IsViewRotated):
                 UpdateModeState();
                 break;
             case nameof(MainWindowViewModel.ArmActivateRailClick):
@@ -163,6 +164,13 @@ public partial class ToolBarView : UserControl
         bool on = _vm?.IsAnnotationMode ?? false;
         AnnotationSection.IsVisible = on;
         AnnotateButton.IsChecked = on;
+        // Annotation authoring is refused while the view is rotated (stored geometry is the
+        // rotation-0 frame — Core 0.47.0) and display is hidden, so grey the entry point out.
+        bool rotated = _vm?.IsViewRotated ?? false;
+        AnnotateButton.IsEnabled = !rotated;
+        ToolTip.SetTip(AnnotateButton, rotated
+            ? "Annotations are unavailable while the view is rotated"
+            : "Annotation Mode (Ctrl+E)");
     }
 
     private void UpdateRailHereState()
