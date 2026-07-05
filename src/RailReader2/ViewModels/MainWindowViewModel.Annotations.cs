@@ -11,10 +11,28 @@ namespace RailReader2.ViewModels;
 // Annotations: mode, tools, markup, pointer handlers, browse mode, undo/redo, review state, export/import
 public sealed partial class MainWindowViewModel
 {
-    public void ToggleAnnotationMode() => IsAnnotationMode = !IsAnnotationMode;
+    public void ToggleAnnotationMode()
+    {
+        // Core refuses annotation authoring while the view is rotated (stored geometry is the
+        // rotation-0 frame — Core 0.47.0), and the shell hides annotation display too. Refuse the
+        // mode up front with an explanation instead of offering tools that can't work.
+        if (!IsAnnotationMode && IsViewRotated)
+        {
+            ShowStatusToast("Annotations are unavailable while the view is rotated");
+            return;
+        }
+        IsAnnotationMode = !IsAnnotationMode;
+    }
 
     public void SetAnnotationTool(AnnotationTool tool)
     {
+        // As in ToggleAnnotationMode: no annotation tools while the view is rotated.
+        if (tool is not AnnotationTool.None and not AnnotationTool.TextSelect && IsViewRotated)
+        {
+            ShowStatusToast("Annotations are unavailable while the view is rotated");
+            return;
+        }
+
         // Picking a real annotation tool implies annotation mode; Browse/TextSelect do not.
         if (tool is not AnnotationTool.None and not AnnotationTool.TextSelect)
             IsAnnotationMode = true;
@@ -98,6 +116,9 @@ public sealed partial class MainWindowViewModel
 
     public void HandleAnnotationPointerDown(double pageX, double pageY)
     {
+        // Belt-and-braces: annotation mode can't be entered while rotated, and rotating exits it,
+        // but Core would also refuse the resulting AddAnnotation — don't start a doomed gesture.
+        if (IsViewRotated) return;
         var (needsDialog, isEdit, existingNote, px, py) = _controller.Annotations.HandleAnnotationPointerDown(_controller.FocusedViewport, pageX, pageY);
 
         if (needsDialog)
@@ -186,6 +207,9 @@ public sealed partial class MainWindowViewModel
     /// </summary>
     public bool HandleBrowsePointerDown(float pageX, float pageY)
     {
+        // Annotations are hidden while the view is rotated (their stored geometry is the rotation-0
+        // frame) — don't let clicks select/move what isn't drawn.
+        if (IsViewRotated) return false;
         bool hit = _controller.Annotations.HandleBrowsePointerDown(_controller.FocusedViewport, pageX, pageY);
         OnPropertyChanged(nameof(SelectedAnnotation));
         InvalidateAnnotations();

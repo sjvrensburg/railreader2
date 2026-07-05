@@ -42,6 +42,13 @@
             <MenuItem Header="Fit _Width" Command="{Binding FitWidthCommand}" IsEnabled="{Binding HasDocument}" />
             <MenuItem Header="_Reset Zoom" InputGesture="Ctrl+D0" Click="OnResetZoom" IsEnabled="{Binding HasDocument}" />
             <Separator />
+            <MenuItem Header="Ro_tate" IsEnabled="{Binding HasDocument}">
+                <MenuItem Header="Rotate _Clockwise" InputGesture="Ctrl+R" Click="OnRotateClockwise" />
+                <MenuItem Header="Rotate C_ounter-clockwise" InputGesture="Ctrl+Shift+R" Click="OnRotateCounterClockwise" />
+                <Separator />
+                <MenuItem Header="_Reset Rotation" Click="OnResetRotation" IsEnabled="{Binding IsViewRotated}" />
+            </MenuItem>
+            <Separator />
             <MenuItem Header="Side _Panel" IsEnabled="{Binding HasDocument}">
                 <MenuItem Header="_Outline" InputGesture="Ctrl+Shift+O" Click="OnShowOutlinePane" />
                 <MenuItem Header="_Bookmarks" Click="OnShowBookmarksPane" />
@@ -75,6 +82,7 @@
         </MenuItem>
         <MenuItem Header="_Rail" IsEnabled="{Binding HasDocument}">
             <MenuItem Header="Start Rail _Here" InputGesture="R" Click="OnStartRailHere" />
+            <MenuItem Header="Rotate to Read Bloc_k" InputGesture="U" Click="OnRotateToReadBlock" />
             <Separator />
             <MenuItem Header="_Auto-Scroll" InputGesture="P" Click="OnToggleAutoScroll" />
             <MenuItem Header="_Jump Mode" InputGesture="J" Click="OnToggleJumpMode" />

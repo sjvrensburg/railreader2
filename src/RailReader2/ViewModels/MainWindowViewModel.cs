@@ -466,6 +466,8 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         // Freeze is per-viewport — the toolbar Freeze button's state/enable reflects the newly-focused view.
         OnPropertyChanged(nameof(IsFrozen));
         OnPropertyChanged(nameof(CanFreeze));
+        // View rotation is per-document — the focused document may carry a different one.
+        NotifyViewRotationChanged();
     }
 
     /// <summary>Focus the registered surface that currently renders <paramref name="vp"/> — used on a
@@ -483,6 +485,8 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         _controller.FocusedViewport = vp;
         WireFocusedSignals(vp);
         UpdateSurfaceFocusVisuals();
+        // The focused document may carry a different view rotation than the previous one.
+        NotifyViewRotationChanged();
     }
 
     /// <summary>Keep each tab's own viewport live only while its tab is the active one (shown in the
@@ -584,6 +588,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         // (IsFrozen auto-clears in GetFreezeTiles) — keep the Freeze toggle's label/enable in sync.
         OnPropertyChanged(nameof(IsFrozen));
         OnPropertyChanged(nameof(CanFreeze));
+        MaybeHintSidewaysBlock();
     }
 
     // --- Poll timer & animation ---

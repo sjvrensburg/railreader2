@@ -606,6 +606,11 @@ public partial class MainWindow : Window
                 vm.ShowGoToPage = true; e.Handled = true; return true;
             case Key.E:
                 vm.ToggleAnnotationMode(); e.Handled = true; return true;
+            // View rotation (Core 0.47.0): quarter-turn the displayed page for sideways scans/tables.
+            case Key.R when shift:
+                vm.RotateViewCounterClockwise(); e.Handled = true; return true;
+            case Key.R:
+                vm.RotateViewClockwise(); e.Handled = true; return true;
             case Key.Z when shift:
                 vm.RedoAnnotation(); e.Handled = true; return true;
             case Key.Z:
@@ -664,6 +669,9 @@ public partial class MainWindow : Window
             case Key.R:
                 // Click-free "start rail here" — force rail at the viewport centre (toggles off if forced).
                 vm.StartRailHere(); e.Handled = true; return true;
+            case Key.U:
+                // Rotate-to-read: make a sideways rail block upright (press again to reset).
+                vm.RotateToReadBlock(); e.Handled = true; return true;
             case Key.C:
             {
                 var effect = vm.CycleColourEffect();

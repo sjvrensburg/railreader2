@@ -641,8 +641,12 @@ public partial class DocumentView : UserControl, IViewportSurface
     private AnnotationRenderState BuildAnnotationState(TabViewModel? tab)
     {
         var vm = _shared!;
+        // While the view is rotated, stored annotation geometry (rotation-0 frame) would render
+        // misplaced — hide annotations entirely (authoring/selection are refused too). Text-selection
+        // rects stay: text geometry comes from Core's cache, which IS in the displayed frame.
+        bool rotated = tab is not null && tab.State.ViewRotation != 0;
         List<Annotation>? pageAnnotations = null;
-        if (tab is not null && _viewport is { } vp)
+        if (tab is not null && !rotated && _viewport is { } vp)
             tab.Annotations.Pages.TryGetValue(vp.CurrentPage, out pageAnnotations);
 
         // Pre-sort by z-order on the UI thread so the compositor doesn't need LINQ.
@@ -671,8 +675,8 @@ public partial class DocumentView : UserControl, IViewportSurface
         return new AnnotationRenderState(
             Camera: BuildCamera(_viewport),
             PageAnnotations: sorted,
-            SelectedAnnotation: vm.SelectedAnnotation,
-            PreviewAnnotation: vm.PreviewAnnotation,
+            SelectedAnnotation: rotated ? null : vm.SelectedAnnotation,
+            PreviewAnnotation: rotated ? null : vm.PreviewAnnotation,
             TextSelectionRects: vm.TextSelectionRects);
     }
 

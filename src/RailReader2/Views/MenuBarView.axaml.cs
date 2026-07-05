@@ -112,6 +112,11 @@ public partial class MenuBarView : UserControl
         }
     }
 
+    // View rotation (quarter-turns for sideways scans/tables — Core 0.47.0).
+    private void OnRotateClockwise(object? s, RoutedEventArgs e) => Vm?.RotateViewClockwise();
+    private void OnRotateCounterClockwise(object? s, RoutedEventArgs e) => Vm?.RotateViewCounterClockwise();
+    private void OnResetRotation(object? s, RoutedEventArgs e) => Vm?.ResetViewRotation();
+
     private void OnEffectNone(object? s, RoutedEventArgs e) => Vm?.SetColourEffect(ColourEffect.None);
     private void OnEffectHighContrast(object? s, RoutedEventArgs e) => Vm?.SetColourEffect(ColourEffect.HighContrast);
     private void OnEffectHighVisibility(object? s, RoutedEventArgs e) => Vm?.SetColourEffect(ColourEffect.HighVisibility);
@@ -173,6 +178,7 @@ public partial class MenuBarView : UserControl
     // Rail menu — rail-reading toggles + bookmark (mirror the R/P/J/F/H/B keyboard shortcuts so
     // they are discoverable and AT-SPI-actionable by name; the keys themselves are display-only here).
     private void OnStartRailHere(object? s, RoutedEventArgs e) => Vm?.StartRailHere();
+    private void OnRotateToReadBlock(object? s, RoutedEventArgs e) => Vm?.RotateToReadBlock();
     private void OnToggleAutoScroll(object? s, RoutedEventArgs e) => Vm?.ToggleAutoScrollExclusive();
     private void OnToggleJumpMode(object? s, RoutedEventArgs e) => Vm?.ToggleJumpModeExclusive();
     private void OnToggleLineFocusDim(object? s, RoutedEventArgs e) => Vm?.ToggleLineFocusBlur();

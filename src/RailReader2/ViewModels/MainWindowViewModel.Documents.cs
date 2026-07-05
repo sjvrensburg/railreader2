@@ -95,6 +95,13 @@ public sealed partial class MainWindowViewModel
             // each other (released in CloseTab).
             tab.Portals = Services.PortalSetManager.Default.Checkout(tab.FilePath);
 
+            // Restore a persisted view rotation (Core 0.47.0: persistence is the host's job). Set on
+            // the model BEFORE AddDocument so the reading-position restore + first analysis submission
+            // happen in the rotated frame (caches are still empty here, so the drop-everything setter
+            // only re-renders the first page). UI thread — the setter re-rasterises via PDFium.
+            if (Services.ViewRotationStore.Load(tab.FilePath) is not 0 and var savedTurns)
+                tab.State.ViewRotation = savedTurns;
+
             // Save sidebar state from outgoing tab before switching
             if (ActiveTab is { } oldTab)
                 SaveSidebarState(oldTab);

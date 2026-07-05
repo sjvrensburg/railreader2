@@ -55,6 +55,7 @@ public partial class StatusBarView : UserControl
             nameof(MainWindowViewModel.AutoScrollActive) or
             nameof(MainWindowViewModel.AutoScrollParked) or
             nameof(MainWindowViewModel.JumpMode) or
+            nameof(MainWindowViewModel.IsViewRotated) or
             nameof(MainWindowViewModel.StatusToast))
         {
             SubscribeToTab(_subscribedVm?.ActiveTab);
@@ -343,6 +344,15 @@ public partial class StatusBarView : UserControl
                 StatusPanel.Children.Add(MakeBoldLabel("Jump", AmberBrush));
                 StatusPanel.Children.Add(MakeDangerButton("IconClose", (_, _) => vm.JumpMode = false, "Exit jump mode (J)"));
             }
+        }
+
+        // Persistent rotation badge (the rotate toasts are transient): says why annotation tools are
+        // greyed out and offers the way back.
+        if (vm is { IsViewRotated: true })
+        {
+            AddSeparator();
+            StatusPanel.Children.Add(MakeBoldLabel($"Rotated {vm.ViewRotationDegrees}°", AmberBrush));
+            StatusPanel.Children.Add(MakeDangerButton("IconClose", (_, _) => vm.ResetViewRotation(), "Reset rotation"));
         }
 
         if (vm is { IsAnnotating: true })
