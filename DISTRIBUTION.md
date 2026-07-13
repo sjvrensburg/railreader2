@@ -9,8 +9,10 @@ All builds are triggered by pushing a `v*` tag:
 ```bash
 # 1. Bump version in src/RailReader2/RailReader2.csproj
 # 2. Update docs/index.html softwareVersion in JSON-LD
-# 3. Commit and tag
-git add src/RailReader2/RailReader2.csproj docs/index.html
+# 3. Add a <release> entry to assets/railreader2.metainfo.xml (AppStream requires this to stay
+#    current — it is NOT rewritten by CI, unlike the MSIX manifest and Inno installer version)
+# 4. Commit and tag
+git add src/RailReader2/RailReader2.csproj docs/index.html assets/railreader2.metainfo.xml
 git commit -m "chore: bump version to X.Y.Z"
 git tag vX.Y.Z
 git push && git push origin vX.Y.Z

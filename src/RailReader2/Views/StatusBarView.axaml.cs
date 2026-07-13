@@ -4,6 +4,7 @@ using Avalonia.Interactivity;
 using Avalonia.Media;
 using RailReader.Core;
 using RailReader.Core.Models;
+using RailReader.Core.Services;
 using RailReader2.ViewModels;
 
 namespace RailReader2.Views;
@@ -18,6 +19,21 @@ public partial class StatusBarView : UserControl
     private MainWindowViewModel? _subscribedVm;
     private TabViewModel? _subscribedTab;
     private TextBlock? _zoomLabel;
+    private TextBlock? _breadcrumbLabel;
+    private TextBlock? _railStatusLabel;
+
+    // Structural shape of the last full rebuild — everything that decides WHICH children exist (not
+    // their text). ActiveTab is re-raised from inside the per-frame animation tick during rail scrolling
+    // (see MainWindowViewModel.RunAnimationFrame), so UpdateStatus is a hot path there; when the shape is
+    // unchanged from last time, UpdateInPlace() patches just the mutable label text instead of a full
+    // StatusPanel.Children.Clear() + rebuild (fresh Buttons + lambda closures) every frame.
+    private readonly record struct StatusShape(
+        bool PendingRail, bool RailActive, bool AutoScrollActive, bool AutoScrollParked, bool JumpMode,
+        bool IsViewRotated, int ViewRotationDegrees, bool IsAnnotating, AnnotationTool ActiveTool,
+        bool HasBreadcrumb, bool HasToast);
+    private StatusShape? _lastShape;
+    private TabViewModel? _lastShapeTab;
+    private TextBlock? _toastLabel;
 
     public StatusBarView()
     {
@@ -145,6 +161,11 @@ public partial class StatusBarView : UserControl
         };
 
         IsEditing = true;
+        // The edit box below replaces _pageLabel's panel slot in place, without updating the field —
+        // force UpdateStatus's next call (from Commit/Escape) onto the full-rebuild path so it actually
+        // restores the label, instead of the fast path patching the now-detached _pageLabel's text and
+        // leaving this stale TextBox on screen.
+        _lastShape = null;
 
         void Commit()
         {
@@ -183,6 +204,9 @@ public partial class StatusBarView : UserControl
         };
 
         IsEditing = true;
+        // See BeginPageEdit: force the next UpdateStatus onto the full-rebuild path since this edit box
+        // replaces _zoomLabel's panel slot without updating the field.
+        _lastShape = null;
 
         void Commit()
         {
@@ -213,17 +237,23 @@ public partial class StatusBarView : UserControl
     private const int BreadcrumbMaxChars = 60;
     private const string BreadcrumbSeparator = " \u203a ";  // ›
 
-    private void AddBreadcrumb(TabViewModel tab, int currentPage)
+    /// <summary>The full (untruncated) breadcrumb path text for <paramref name="currentPage"/>, or null
+    /// when the document has no outline / the page isn't under any outline entry.</summary>
+    private static string? ComputeBreadcrumbText(TabViewModel tab, int currentPage)
     {
         var outline = tab.Outline;
-        if (outline is null || outline.Count == 0) return;
-
+        if (outline is null || outline.Count == 0) return null;
         var path = OutlineBreadcrumb.BuildPath(outline, currentPage);
-        if (path.Count == 0) return;
+        return path.Count == 0 ? null : string.Join(BreadcrumbSeparator, path.Select(e => e.Title));
+    }
 
-        var full = string.Join(BreadcrumbSeparator, path.Select(e => e.Title));
+    private void AddBreadcrumb(TabViewModel tab, int currentPage)
+    {
+        var full = ComputeBreadcrumbText(tab, currentPage);
+        if (full is null) return;
+
         AddSeparator();
-        var label = new TextBlock
+        _breadcrumbLabel = new TextBlock
         {
             Text = TruncateBreadcrumb(full, BreadcrumbMaxChars),
             FontStyle = FontStyle.Italic,
@@ -231,8 +261,8 @@ public partial class StatusBarView : UserControl
             VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
         };
         if (full.Length > BreadcrumbMaxChars)
-            ToolTip.SetTip(label, full);
-        StatusPanel.Children.Add(label);
+            ToolTip.SetTip(_breadcrumbLabel, full);
+        StatusPanel.Children.Add(_breadcrumbLabel);
     }
 
     /// <summary>
@@ -259,11 +289,13 @@ public partial class StatusBarView : UserControl
     private void UpdateStatus()
     {
         if (IsEditing) return;
-        StatusPanel.Children.Clear();
         var vm = DataContext as MainWindowViewModel;
         var tab = vm?.ActiveTab;
         if (tab is null)
         {
+            _lastShape = null;
+            _lastShapeTab = null;
+            StatusPanel.Children.Clear();
             StatusPanel.Children.Add(new TextBlock { Text = "No document open" });
             return;
         }
@@ -275,7 +307,29 @@ public partial class StatusBarView : UserControl
         double zoom = vp?.Camera.Zoom ?? tab.Camera.Zoom;
         var rail = vp?.Rail ?? tab.Rail;
         bool pendingRail = vp?.PendingRailSetup ?? tab.PendingRailSetup;
+        string? breadcrumbFull = ComputeBreadcrumbText(tab, curPage);
 
+        var shape = new StatusShape(
+            pendingRail, rail.Active, vm.AutoScrollActive, vm.AutoScrollParked, vm.JumpMode,
+            vm.IsViewRotated, vm.ViewRotationDegrees, vm.IsAnnotating, vm.ActiveTool,
+            breadcrumbFull is not null, vm.StatusToast is not null);
+
+        // Fast path: the set of children hasn't changed since the last rebuild (the overwhelmingly common
+        // case while continuously rail-reading — ActiveTab is re-raised every animation frame, see
+        // RunAnimationFrame), so just patch the mutable label text instead of Children.Clear() + rebuilding
+        // ~10 fresh Buttons/TextBlocks (with fresh lambda closures) on every frame. Requires the SAME tab
+        // instance as last time too — BeginPageEdit/BeginZoomEdit's button handlers close over `tab`, so a
+        // tab switch (ActiveTabIndex changed) that happens to keep the same shape must still rebuild, or
+        // those handlers would keep editing the previous tab.
+        if (_lastShape == shape && ReferenceEquals(_lastShapeTab, tab) && _pageLabel is not null && _zoomLabel is not null)
+        {
+            UpdateLabelsInPlace(vm, tab, curPage, zoom, rail, breadcrumbFull);
+            return;
+        }
+        _lastShape = shape;
+        _lastShapeTab = tab;
+
+        StatusPanel.Children.Clear();
         int zoomPct = (int)Math.Round(zoom * 100);
         StatusPanel.Children.Add(MakeNavButton("IconChevronLeft", (_, _) =>
         { if (vm?.Controller.FocusedViewport is { } v) vm.GoToPage(v.CurrentPage - 1); }, "Previous page (PgUp)", "PreviousPage"));
@@ -321,11 +375,8 @@ public partial class StatusBarView : UserControl
         else if (rail.Active)
         {
             AddSeparator();
-            StatusPanel.Children.Add(new TextBlock
-            {
-                Text = $"Block {rail.CurrentBlock + 1}/{rail.NavigableCount} | " +
-                       $"Line {rail.CurrentLine + 1}/{rail.CurrentLineCount}"
-            });
+            _railStatusLabel = new TextBlock { Text = RailStatusText(rail) };
+            StatusPanel.Children.Add(_railStatusLabel);
             AddSeparator();
             StatusPanel.Children.Add(MakeBoldLabel("Rail Mode", RailModeBrush));
 
@@ -375,7 +426,38 @@ public partial class StatusBarView : UserControl
         if (vm?.StatusToast is { } toast)
         {
             AddSeparator();
-            StatusPanel.Children.Add(MakeBoldLabel(toast, AmberBrush));
+            _toastLabel = MakeBoldLabel(toast, AmberBrush);
+            StatusPanel.Children.Add(_toastLabel);
         }
+    }
+
+    private static string RailStatusText(RailNav rail) =>
+        $"Block {rail.CurrentBlock + 1}/{rail.NavigableCount} | Line {rail.CurrentLine + 1}/{rail.CurrentLineCount}";
+
+    /// <summary>Fast path for UpdateStatus: the panel's children are unchanged from the last full
+    /// rebuild, so only patch the text/tooltip/automation-name of the labels that can still have changed
+    /// (page, zoom, breadcrumb, rail position, toast message) — no new controls, no Children mutation.</summary>
+    private void UpdateLabelsInPlace(
+        MainWindowViewModel vm, TabViewModel tab, int curPage, double zoom, RailNav rail, string? breadcrumbFull)
+    {
+        int zoomPct = (int)Math.Round(zoom * 100);
+
+        _pageLabel!.Text = $"Page {curPage + 1}/{tab.PageCount}";
+        Avalonia.Automation.AutomationProperties.SetName(_pageLabel, $"Page {curPage + 1} of {tab.PageCount}");
+
+        _zoomLabel!.Text = $"Zoom: {zoomPct}%";
+        Avalonia.Automation.AutomationProperties.SetName(_zoomLabel, $"Zoom {zoomPct} percent");
+
+        if (_breadcrumbLabel is not null && breadcrumbFull is not null)
+        {
+            _breadcrumbLabel.Text = TruncateBreadcrumb(breadcrumbFull, BreadcrumbMaxChars);
+            ToolTip.SetTip(_breadcrumbLabel, breadcrumbFull.Length > BreadcrumbMaxChars ? breadcrumbFull : null);
+        }
+
+        if (rail.Active && _railStatusLabel is not null)
+            _railStatusLabel.Text = RailStatusText(rail);
+
+        if (vm.StatusToast is { } toast && _toastLabel is not null)
+            _toastLabel.Text = toast;
     }
 }

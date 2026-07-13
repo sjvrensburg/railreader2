@@ -53,6 +53,16 @@ internal sealed class PortalMarkerVisualHandler : CompositionCustomVisualHandler
 
     private PortalMarkerRenderState? _state;
 
+    // Matches the ThreadStatic-cache pattern in the sibling layers (PdfPageLayer, AnnotationLayer,
+    // FreezePaneLayer, RailOverlayLayer): these paints/font never change shape frame-to-frame (only
+    // `fill`'s Color is mutated per-marker, same as before), so allocate once per composition thread
+    // instead of on every OnRender call — this layer is always-on whenever a portal exists.
+    [ThreadStatic] private static SKPaint? s_halo;
+    [ThreadStatic] private static SKPaint? s_fill;
+    [ThreadStatic] private static SKPaint? s_ring;
+    [ThreadStatic] private static SKPaint? s_glyph;
+    [ThreadStatic] private static SKFont? s_font;
+
     public override void OnMessage(object message)
     {
         if (message is PortalMarkerRenderState state)
@@ -73,11 +83,11 @@ internal sealed class PortalMarkerVisualHandler : CompositionCustomVisualHandler
 
         double zoom = state.Camera.ScaleX, ox = state.Camera.TransX, oy = state.Camera.TransY;
 
-        using var halo = new SKPaint { Style = SKPaintStyle.Stroke, StrokeWidth = 2f, Color = Halo, IsAntialias = true };
-        using var fill = new SKPaint { Style = SKPaintStyle.Fill, IsAntialias = true };
-        using var ring = new SKPaint { Style = SKPaintStyle.Stroke, StrokeWidth = 1f, Color = Ring, IsAntialias = true };
-        using var glyph = new SKPaint { Style = SKPaintStyle.Fill, Color = Glyph, IsAntialias = true };
-        using var font = new SKFont { Size = Radius * 1.25f, Embolden = true };
+        var halo = s_halo ??= new SKPaint { Style = SKPaintStyle.Stroke, StrokeWidth = 2f, Color = Halo, IsAntialias = true };
+        var fill = s_fill ??= new SKPaint { Style = SKPaintStyle.Fill, IsAntialias = true };
+        var ring = s_ring ??= new SKPaint { Style = SKPaintStyle.Stroke, StrokeWidth = 1f, Color = Ring, IsAntialias = true };
+        var glyph = s_glyph ??= new SKPaint { Style = SKPaintStyle.Fill, Color = Glyph, IsAntialias = true };
+        var font = s_font ??= new SKFont { Size = Radius * 1.25f, Embolden = true };
 
         foreach (var m in markers)
         {

@@ -1,3 +1,6 @@
+using System.Diagnostics;
+using Avalonia.Threading;
+
 namespace RailReader2.Services;
 
 /// <summary>
@@ -7,7 +10,9 @@ namespace RailReader2.Services;
 /// clobbered the other's edits (last-writer-wins). With one shared instance, every view mutates and
 /// saves the same in-memory list — no lost portals.
 ///
-/// UI-thread only (all portal authoring/eval runs on the UI thread), so no locking is needed.
+/// UI-thread only (all portal authoring/eval runs on the UI thread), so no locking is needed — enforced
+/// by a debug-only assert rather than left as an unchecked comment, since nothing else would catch a
+/// violation before it corrupted `_byPath`.
 /// </summary>
 internal sealed class PortalSetManager
 {
@@ -27,6 +32,7 @@ internal sealed class PortalSetManager
     /// from disk on first use. Each call must be paired with a <see cref="Release"/>.</summary>
     public PortalSet Checkout(string pdfPath)
     {
+        Debug.Assert(Dispatcher.UIThread.CheckAccess(), "PortalSetManager is UI-thread only.");
         string key = Key(pdfPath);
         if (!_byPath.TryGetValue(key, out var entry))
         {
@@ -40,6 +46,7 @@ internal sealed class PortalSetManager
     /// <summary>Release a checkout. The shared instance is dropped once its last holder releases.</summary>
     public void Release(string pdfPath)
     {
+        Debug.Assert(Dispatcher.UIThread.CheckAccess(), "PortalSetManager is UI-thread only.");
         string key = Key(pdfPath);
         if (!_byPath.TryGetValue(key, out var entry)) return;
         if (--entry.RefCount <= 0)

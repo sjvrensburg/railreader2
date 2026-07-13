@@ -16,9 +16,10 @@ public sealed class CommentEntryViewModel
     public bool IsReviewerComment => Annotation.Source == AnnotationSource.InPdf;
     public string SourceBadge => IsReviewerComment ? "Reviewer" : "You";
 
-    public IBrush BadgeBackground => IsReviewerComment
-        ? new SolidColorBrush(Color.Parse("#2D5B88"))   // reviewer (blue)
-        : new SolidColorBrush(Color.Parse("#555555"));   // your own (grey)
+    private static readonly IBrush ReviewerBadgeBrush = new SolidColorBrush(Color.Parse("#2D5B88"));
+    private static readonly IBrush OwnBadgeBrush = new SolidColorBrush(Color.Parse("#555555"));
+
+    public IBrush BadgeBackground => IsReviewerComment ? ReviewerBadgeBrush : OwnBadgeBrush;
 
     public string Author => string.IsNullOrWhiteSpace(Annotation.Author)
         ? (IsReviewerComment ? "Reviewer" : "You")

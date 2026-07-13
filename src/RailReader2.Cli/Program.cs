@@ -75,6 +75,13 @@ static class Program
         return args.Contains($"--{name}");
     }
 
+    /// <summary>True when the user asked for help via <c>--help</c> or <c>-h</c>. Centralised (rather
+    /// than each subcommand checking <c>HasFlag(args, "-h")</c> — which resolves to the wrong
+    /// "---h" via the long-flag convention above) so a future tweak to help-flag matching is a
+    /// one-line change instead of five identical edits.</summary>
+    internal static bool HasHelpFlag(string[] args)
+        => HasFlag(args, "help") || args.Contains("-h");
+
     internal static string GetRequiredPdf(string[] args)
     {
         var pdfPath = args.FirstOrDefault(a => !a.StartsWith('-'))

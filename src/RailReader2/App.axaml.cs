@@ -3,6 +3,7 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Avalonia.Styling;
 using Avalonia.Threading;
+using RailReader.Core;
 using RailReader.Core.Models;
 using RailReader.Core.Services;
 using RailReader2.ViewModels;
@@ -51,54 +52,92 @@ public partial class App : Application
             var args = desktop.Args;
             Dispatcher.UIThread.Post(async () =>
             {
-                // Yield once to let the splash paint
-                await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Background);
-
-                // Decide BEFORE Load (which may persist a fresh default file), so we only seed
-                // the desktop render-quality default on a true first run (no config yet).
-                bool seedRenderQuality = IsFirstRun();
-                var config = AppConfig.Load();
-                bool configDirty = false;
-                if (seedRenderQuality)
+                try
                 {
-                    config.RenderQuality = DefaultRenderQuality;
-                    configDirty = true;
+                    await BootstrapAsync(desktop, splash, args);
                 }
-                if (configDirty) config.Save();
-                Application.Current!.RequestedThemeVariant =
-                    config.DarkMode ? ThemeVariant.Dark : ThemeVariant.Light;
-                CleanupService.RunCleanup();
-
-                var vm = new MainWindowViewModel(config);
-                var window = new MainWindow { DataContext = vm };
-                vm.SetWindow(window);
-
-                window.Opened += (_, _) => splash.Close();
-                window.Closing += (_, _) => vm.Dispose();
-                desktop.MainWindow = window;
-
-                // First non-flag argument that names an existing file is the PDF to open.
-                var docPath = args?.FirstOrDefault(a => !a.StartsWith("--") && File.Exists(a));
-                if (docPath is not null)
+                catch (Exception ex)
                 {
-                    // Optional known-state startup flags (for agents / scripted launches):
-                    //   --page <n> (1-based)   --zoom <percent, e.g. 300>   --rail
-                    var (startPage, startZoom, startRail) = ParseStartupFlags(args!);
-                    window.Opened += (_, _) => vm.FireAndForget(OpenStartupDocument(), nameof(vm.OpenDocument));
-
-                    async System.Threading.Tasks.Task OpenStartupDocument()
-                    {
-                        await vm.OpenDocument(docPath);
-                        if (startPage is not null || startZoom is not null || startRail)
-                            vm.ApplyStartupView(startPage, startZoom, startRail);
-                    }
+                    // Any fault here (corrupt config, ONNX init failure, cleanup IO error) would otherwise
+                    // strand the app on a frozen splash with no error UI — this is the only user-facing
+                    // surface for a startup crash. async void: must not let the exception escape.
+                    RailReaderLogging.Logger.Error("[FATAL] Startup bootstrap failed", ex);
+                    splash.Close();
+                    var errorWindow = new StartupErrorWindow(ex.Message);
+                    desktop.MainWindow = errorWindow;
+                    // Closing (not Closed) + Environment.Exit: guarantees exit code 1 regardless of how
+                    // the window closes (Quit button, Alt+F4, taskbar) and sidesteps a race with
+                    // Avalonia's own ShutdownMode.OnLastWindowClose handling, which could otherwise call
+                    // the lifetime's Shutdown() with its own (0) exit code first.
+                    errorWindow.Closing += (_, _) => Environment.Exit(1);
+                    errorWindow.Show();
                 }
-
-                window.Show();
             }, DispatcherPriority.Background);
         }
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    private static async System.Threading.Tasks.Task BootstrapAsync(
+        IClassicDesktopStyleApplicationLifetime desktop, SplashWindow splash, string[]? args)
+    {
+        // Yield once to let the splash paint
+        await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Background);
+
+        // Decide BEFORE Load (which may persist a fresh default file), so we only seed
+        // the desktop render-quality default on a true first run (no config yet).
+        bool seedRenderQuality = IsFirstRun();
+        var config = AppConfig.Load();
+        bool configDirty = false;
+        if (seedRenderQuality)
+        {
+            config.RenderQuality = DefaultRenderQuality;
+            configDirty = true;
+        }
+        if (configDirty) config.Save();
+        Application.Current!.RequestedThemeVariant =
+            config.DarkMode ? ThemeVariant.Dark : ThemeVariant.Light;
+        CleanupService.RunCleanup();
+
+        var vm = new MainWindowViewModel(config);
+        try
+        {
+            var window = new MainWindow { DataContext = vm };
+            vm.SetWindow(window);
+
+            window.Opened += (_, _) => splash.Close();
+            window.Closing += (_, _) => vm.Dispose();
+            desktop.MainWindow = window;
+
+            // First non-flag argument that names an existing file is the PDF to open.
+            var docPath = args?.FirstOrDefault(a => !a.StartsWith("--") && File.Exists(a));
+            if (docPath is not null)
+            {
+                // Optional known-state startup flags (for agents / scripted launches):
+                //   --page <n> (1-based)   --zoom <percent, e.g. 300>   --rail
+                var (startPage, startZoom, startRail) = ParseStartupFlags(args!);
+                window.Opened += (_, _) => vm.FireAndForget(OpenStartupDocument(), nameof(vm.OpenDocument));
+
+                async System.Threading.Tasks.Task OpenStartupDocument()
+                {
+                    await vm.OpenDocument(docPath);
+                    if (startPage is not null || startZoom is not null || startRail)
+                        vm.ApplyStartupView(startPage, startZoom, startRail);
+                }
+            }
+
+            window.Show();
+        }
+        catch
+        {
+            // vm.Dispose() is normally wired to window.Closing, but a fault here (e.g. window.Show()
+            // itself throwing) means that window is never shown and never receives Closing — dispose
+            // directly so the DocumentController/PDFium handles aren't leaked for the process lifetime
+            // while the caller's StartupErrorWindow is up. Dispose() is idempotent, so this can't
+            // double-dispose if Closing somehow still fires on the orphaned window.
+            vm.Dispose();
+            throw;
+        }
     }
 
     /// <summary>Parse the optional known-state startup flags: <c>--page &lt;n&gt;</c> (1-based),
@@ -113,7 +152,9 @@ public partial class App : Application
         {
             switch (args[i])
             {
-                case "--page" when i + 1 < args.Length && int.TryParse(args[i + 1], out var p):
+                case "--page" when i + 1 < args.Length && int.TryParse(
+                        args[i + 1], System.Globalization.NumberStyles.Integer,
+                        System.Globalization.CultureInfo.InvariantCulture, out var p):
                     page = p; i++; break;
                 case "--zoom" when i + 1 < args.Length && double.TryParse(
                         args[i + 1], System.Globalization.NumberStyles.Float,

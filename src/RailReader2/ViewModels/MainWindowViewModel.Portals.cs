@@ -501,6 +501,7 @@ public sealed partial class MainWindowViewModel
 
         var pageText = doc.GetOrExtractText(srcPage);
         var lines = analysis.Blocks[srcBlock].Lines;
+        if (lines.Count == 0) return; // defensive: BlockPostProcessor guarantees >=1 line in practice
         int lineIdx = Math.Min(srcLine, lines.Count - 1);
 
         static string? LineText(PageText text, LineInfo line)
@@ -750,7 +751,12 @@ public sealed partial class MainWindowViewModel
     }
 
     /// <summary>Rasterise an arbitrary page region (e.g. a figure + its caption) and decode it to an
-    /// Avalonia <see cref="Bitmap"/>. UI thread only (PDFium).</summary>
+    /// Avalonia <see cref="Bitmap"/>. UI thread only (PDFium).
+    /// The PNG encode→decode round-trip is inherent to BlockCropRenderer's only public contract
+    /// (byte[] PNG, shared with the VLM transcription path) — avoiding it would mean duplicating its
+    /// crop/upright-rotation logic locally or adding a raw-SKBitmap overload upstream in RailReaderCore.
+    /// Not worth the risk for a call site that's already memo-gated to target changes (pin-until-different
+    /// in EvaluatePortals), not a per-frame call.</summary>
     private Bitmap? RenderRegionCrop(DocumentModel doc, int page, BBox region)
     {
         var (pageW, pageH) = PageSize(doc, page);
@@ -1099,9 +1105,13 @@ public sealed partial class MainWindowViewModel
         // portal: it gets a source/target marker, draws accented (its id matches), and naturally MERGES
         // into a saved portal's marker (shared anchor → one multi-portal chooser) instead of overlapping.
         var auto = _autoPin is not null ? BuildAutoPinPortal(doc) : null;
-        var portals = auto is null ? tab.Portals.Portals : tab.Portals.Portals.Append(auto);
         if (tab.Portals.Portals.Count == 0 && auto is null)
             return [];
+        // Materialized once (not a lazy Append) since AddMarkers below enumerates this twice
+        // (source pass, target pass) — a lazy sequence would re-evaluate Append every enumeration.
+        IReadOnlyList<Portal> portals = auto is null
+            ? tab.Portals.Portals
+            : [.. tab.Portals.Portals, auto];
 
         // This surface's own page (a split pane / tear-off can be on a different page than Primary).
         int page = vp.CurrentPage;

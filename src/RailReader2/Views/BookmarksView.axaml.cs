@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using RailReader.Core;
 using RailReader.Core.Models;
 using RailReader2.ViewModels;
 
@@ -110,17 +111,24 @@ public partial class BookmarksView : PaneRefreshView
 
     private async void OnAddBookmarkClick(object? sender, RoutedEventArgs e)
     {
-        if (_vm is not { } vm || vm.ActiveTab is not { } tab) return;
-
-        if (TopLevel.GetTopLevel(this) is not Window window) return;
-
-        var dialog = new BookmarkNameDialog(tab.CurrentPage + 1) { FontSize = vm.CurrentFontSize };
-        var name = await dialog.ShowDialog<string?>(window);
-        if (name is not null)
+        try
         {
-            bool added = vm.Controller.AddBookmark(name);
-            UpdateBookmarkSource();
-            vm.ShowStatusToast(added ? $"Bookmark: {name}" : $"Updated bookmark: {name}");
+            if (_vm is not { } vm || vm.ActiveTab is not { } tab) return;
+
+            if (TopLevel.GetTopLevel(this) is not Window window) return;
+
+            var dialog = new BookmarkNameDialog(tab.CurrentPage + 1) { FontSize = vm.CurrentFontSize };
+            var name = await dialog.ShowDialog<string?>(window);
+            if (name is not null)
+            {
+                bool added = vm.Controller.AddBookmark(name);
+                UpdateBookmarkSource();
+                vm.ShowStatusToast(added ? $"Bookmark: {name}" : $"Updated bookmark: {name}");
+            }
+        }
+        catch (Exception ex)
+        {
+            RailReaderLogging.Logger.Error("[Bookmarks] Add bookmark failed", ex);
         }
     }
 
@@ -137,17 +145,24 @@ public partial class BookmarksView : PaneRefreshView
     private async void OnRenameBookmarkClick(object? sender, RoutedEventArgs e)
     {
         e.Handled = true;
-        if (_vm is not { } vm) return;
-        if (ResolveBookmarkIndex(sender) is not (var bm, var index)) return;
-        if (TopLevel.GetTopLevel(this) is not Window window) return;
-
-        var dialog = new BookmarkNameDialog(bm.Page + 1) { FontSize = vm.CurrentFontSize };
-        dialog.SetName(bm.Name);
-        var newName = await dialog.ShowDialog<string?>(window);
-        if (newName is not null)
+        try
         {
-            vm.Controller.RenameBookmark(index, newName);
-            UpdateBookmarkSource();
+            if (_vm is not { } vm) return;
+            if (ResolveBookmarkIndex(sender) is not (var bm, var index)) return;
+            if (TopLevel.GetTopLevel(this) is not Window window) return;
+
+            var dialog = new BookmarkNameDialog(bm.Page + 1) { FontSize = vm.CurrentFontSize };
+            dialog.SetName(bm.Name);
+            var newName = await dialog.ShowDialog<string?>(window);
+            if (newName is not null)
+            {
+                vm.Controller.RenameBookmark(index, newName);
+                UpdateBookmarkSource();
+            }
+        }
+        catch (Exception ex)
+        {
+            RailReaderLogging.Logger.Error("[Bookmarks] Rename bookmark failed", ex);
         }
     }
 

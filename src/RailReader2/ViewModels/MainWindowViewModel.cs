@@ -787,8 +787,17 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(ActiveTab));
     }
 
+    private bool _disposed;
+
     public void Dispose()
     {
+        if (_disposed) return;
+        _disposed = true;
+        _pollTimer?.Stop();
+        _backgroundTimer?.Stop();
+        _scanAllTimer?.Stop();
+        _startupRailTimer?.Stop();
+        _toastTimer?.Dispose();
         UnwireFocusedSignals();
         DisposePortalImages();
         DisposeFreezeImages();

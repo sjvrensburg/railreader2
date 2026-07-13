@@ -209,12 +209,23 @@ public partial class ToolBarView : UserControl
         _ => AnnotationInteractionHandler.HighlightColors,
     };
 
+    private string? _lastSwatchColor;
+    private IBrush? _lastSwatchBrush;
+
     private void UpdateColorSwatch()
     {
         // Show the current active colour for any tool (palette colour, or the fixed
-        // markup colour Core assigns to underline/strikeout/squiggly).
+        // markup colour Core assigns to underline/strikeout/squiggly). Cache by colour string —
+        // this is called on every tool switch (not just an actual colour change), and the palette
+        // is a small fixed set reused constantly, so a plain last-value cache catches most repeats.
         if (_vm is null) return;
-        ColorSwatch.Background = new SolidColorBrush(Color.Parse(_vm.ActiveAnnotationColor));
+        var color = _vm.ActiveAnnotationColor;
+        if (color != _lastSwatchColor || _lastSwatchBrush is null)
+        {
+            _lastSwatchColor = color;
+            _lastSwatchBrush = new SolidColorBrush(Color.Parse(color));
+        }
+        ColorSwatch.Background = _lastSwatchBrush;
     }
 
     private void RebuildColorFlyout()

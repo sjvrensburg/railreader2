@@ -1,4 +1,6 @@
+using System.Diagnostics;
 using System.Text.Json.Serialization;
+using Avalonia.Threading;
 using RailReader.Core;
 using RailReader.Core.Services;
 
@@ -10,6 +12,9 @@ namespace RailReader2.Services;
 /// full path → clockwise quarter-turns) rather than a file per document — a rotation is a single int,
 /// and unlike portals/annotations there is no per-document payload worth sharding. Entries are removed
 /// when a document returns to rotation 0, so the map only ever holds the exceptions.
+///
+/// UI-thread only (rotation changes come from menu/keyboard input) — read-modify-write on the whole map,
+/// so a concurrent caller would lose an update; enforced by a debug-only assert.
 /// </summary>
 public static class ViewRotationStore
 {
@@ -18,6 +23,7 @@ public static class ViewRotationStore
     /// <summary>The saved rotation for a document in clockwise quarter-turns (0 when none saved).</summary>
     public static int Load(string pdfPath)
     {
+        Debug.Assert(Dispatcher.UIThread.CheckAccess(), "ViewRotationStore is UI-thread only.");
         var map = LoadMap();
         return map.TryGetValue(System.IO.Path.GetFullPath(pdfPath), out int turns) ? turns : 0;
     }
@@ -25,6 +31,7 @@ public static class ViewRotationStore
     /// <summary>Saves (or, at rotation 0, forgets) a document's view rotation.</summary>
     public static void Save(string pdfPath, int quarterTurns)
     {
+        Debug.Assert(Dispatcher.UIThread.CheckAccess(), "ViewRotationStore is UI-thread only.");
         var map = LoadMap();
         var key = System.IO.Path.GetFullPath(pdfPath);
         if (quarterTurns == 0)

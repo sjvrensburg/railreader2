@@ -53,6 +53,15 @@ public sealed partial class MainWindowViewModel
         public SKImage? Corner, Top, Left;
         public BBox CornerBox, TopBox, LeftBox;
         public int Dpi; // 0 = not yet rendered for this anchor
+        // Bounded negative cache: a render that throws or hits a non-Skia page increments this instead
+        // of retrying unconditionally, so GetFreezeTiles doesn't hammer a persistently-failing render on
+        // every animation frame (~60/s) while frozen. Below the cap it still retries next frame (a single
+        // transient failure — a momentary cache-eviction race, a brief IO hiccup — self-heals within a
+        // couple of frames); at the cap it gives up until re-freezing (a fresh FreezeState) or the
+        // zoom/page-change escape hatch that already clears the whole freeze in GetFreezeTiles.
+        public int FailCount;
+        public bool Failed => FailCount >= MaxFailures;
+        public const int MaxFailures = 3;
     }
 
     private readonly Dictionary<Viewport, FreezeState> _freezeByVp = new();
@@ -232,7 +241,7 @@ public sealed partial class MainWindowViewModel
                 ClearFreeze(vp);
                 RaiseFreezeStateIfFocused(vp);
             }
-            else if (f.Dpi == 0)
+            else if (f.Dpi == 0 && !f.Failed)
             {
                 // Render once at the freeze-time zoom (locked, so this never re-renders — panes never rescale).
                 RenderFreezeCrops(vp, f, Math.Clamp((int)(72f * f.Zoom), 150, 600));
@@ -274,12 +283,17 @@ public sealed partial class MainWindowViewModel
         if (!hasCorner && !hasTop && !hasLeft) { f.Dpi = dpi; return; } // nothing to pin; no retry
 
         // Render the page once and crop the regions *exactly* (no padding): the strips span a full page
-        // dimension, so any padding would accumulate into visible drift. Mark f.Dpi only on SUCCESS, so a
-        // transient render failure retries next frame instead of sticking at this DPI with null crops.
+        // dimension, so any padding would accumulate into visible drift. Mark f.Dpi only on SUCCESS; a
+        // failure below MaxFailures retries next frame (self-heals from a transient hiccup), reaching the
+        // cap negative-caches it so a persistently-failing render doesn't retry (and re-log) forever.
         try
         {
             using var page = vp.Owner.Pdf.RenderPage(vp.CurrentPage, dpi);
-            if (page is not SkiaRenderedPage skia) return; // leave f.Dpi 0 → retry next frame
+            if (page is not SkiaRenderedPage skia)
+            {
+                f.FailCount = FreezeState.MaxFailures; // non-Skia page won't become one on retry — give up now
+                return;
+            }
             var bmp = skia.Bitmap;
             float sx = bmp.Width / pageW;
             float sy = bmp.Height / pageH;
@@ -287,10 +301,12 @@ public sealed partial class MainWindowViewModel
             if (hasTop) f.Top = CropExact(bmp, f.TopBox, sx, sy);
             if (hasLeft) f.Left = CropExact(bmp, f.LeftBox, sx, sy);
             f.Dpi = dpi;
+            f.FailCount = 0;
         }
         catch (Exception ex)
         {
-            _logger.Error("[Freeze] crop render failed", ex); // leave f.Dpi 0 → retry next frame
+            f.FailCount++;
+            _logger.Error("[Freeze] crop render failed", ex);
         }
     }
 

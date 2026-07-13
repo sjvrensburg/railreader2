@@ -80,9 +80,9 @@ public class ViewportPanel : Panel
         {
             AnnotationTool.Highlight or AnnotationTool.Pen
                 or AnnotationTool.Rectangle or AnnotationTool.TextNote
-                => new Cursor(StandardCursorType.Cross),
-            AnnotationTool.Eraser => new Cursor(StandardCursorType.No),
-            AnnotationTool.TextSelect => new Cursor(StandardCursorType.Ibeam),
+                => s_crossCursor,
+            AnnotationTool.Eraser => s_noCursor,
+            AnnotationTool.TextSelect => s_ibeamCursor,
             _ => null, // inherit default from parent
         };
     }
@@ -263,6 +263,9 @@ public class ViewportPanel : Panel
     // True while this pane is pushing a freeze-mode guide line, so it can be cleared once disarmed.
     private bool _freezeGuidePushed;
     private static readonly Cursor s_crossCursor = new(StandardCursorType.Cross);
+    private static readonly Cursor s_noCursor = new(StandardCursorType.No);
+    private static readonly Cursor s_ibeamCursor = new(StandardCursorType.Ibeam);
+    private static readonly Cursor s_handCursor = new(StandardCursorType.Hand);
 
     /// <summary>Drop this pane's armed freeze-mode guide line and restore the normal cursor. No-op
     /// unless a guide is currently pushed. Shared by every place a freeze placement gets cancelled or
@@ -283,7 +286,7 @@ public class ViewportPanel : Panel
         // Only override cursor when no annotation tool is active
         if (_lastCursorTool != AnnotationTool.None) return;
 
-        Cursor = overLink ? new Cursor(StandardCursorType.Hand) : null;
+        Cursor = overLink ? s_handCursor : null;
     }
 
     protected override void OnPointerReleased(PointerReleasedEventArgs e)

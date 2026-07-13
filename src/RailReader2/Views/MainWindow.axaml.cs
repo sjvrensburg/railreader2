@@ -370,83 +370,97 @@ public partial class MainWindow : Window
         }.Save();
     }
 
+    // ActiveTab (the most common case below) is re-raised from INSIDE the per-frame animation tick
+    // (see MainWindowViewModel.RunAnimationFrame) — during continuous rail scrolling this fires on
+    // essentially every frame, so this handler is a hot path. Keep it a single async void method (not
+    // split into an outer/inner pair) to avoid a second async state-machine allocation on every tick;
+    // the try/catch wraps the whole switch directly.
     private async void OnVmPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs args)
     {
         if (Vm is not { } vm) return;
-        switch (args.PropertyName)
+        try
         {
-            case nameof(MainWindowViewModel.ActiveTab):
-                Document.SetTab(vm.ActiveTab);
-                CollapseExtrasIfDocumentChanged(vm); // split panes / tear-offs belong to one document
-                // ActiveTab is re-raised from INSIDE the animation frame (per-frame overlay/page change),
-                // not only on real tab switches — defer the structural portal-surface sync out of the
-                // frame (mirrors OnPortalViewChanged) so it can't tear down / rebuild the surface mid-tick.
-                if (vm.IsInAnimationFrame) QueuePortalSync();
-                else SyncPortalView(vm); // rebuild the portal viewport on the now-active model (or tear down)
-                UpdateRailToolBarVisibility();
-                break;
-            case nameof(MainWindowViewModel.ShowOutline):
-                UpdateSidebarColumnWidth(vm.ShowOutline);
-                break;
-            case nameof(MainWindowViewModel.ShowShortcuts) when vm.ShowShortcuts:
-                vm.ShowShortcuts = false;
-                await new ShortcutsDialog { FontSize = vm.CurrentFontSize }.ShowDialog(this);
-                break;
-            case nameof(MainWindowViewModel.ShowAbout) when vm.ShowAbout:
-                vm.ShowAbout = false;
-                var aboutDlg = new AboutDialog { FontSize = vm.CurrentFontSize };
-                aboutDlg.SetLogFilePath(vm.LogFilePath);
-                await aboutDlg.ShowDialog(this);
-                break;
-            case nameof(MainWindowViewModel.ShowSettings) when vm.ShowSettings:
-                vm.ShowSettings = false;
-                // Scan All temporarily overrides BackgroundAnalysisWindowPages and
-                // restores the captured value on teardown; editing settings mid-scan
-                // would be silently reverted, so suppress the dialog while scanning.
-                if (vm.IsScanAllActive) break;
-                await new SettingsWindow { DataContext = vm, FontSize = vm.CurrentFontSize }.ShowDialog(this);
-                break;
-            case nameof(MainWindowViewModel.ActiveTool):
-                Document.UpdateAnnotationCursor();
-                break;
-            case nameof(MainWindowViewModel.ShouldShowPortalWindow):
-                UpdatePortalWindow(vm);
-                break;
-            case nameof(MainWindowViewModel.CurrentFontSize):
-                // Live UI font-scale change from Settings — reach the open pop-out + tear-off windows too.
-                _portalWindow?.ApplyFontScale(vm.CurrentFontSize);
-                foreach (var win in _documentWindows) win.ApplyFontScale(vm.CurrentFontSize);
-                break;
-            case nameof(MainWindowViewModel.IsFullScreen):
-                WindowState = vm.IsFullScreen ? WindowState.FullScreen : WindowState.Normal;
-                WindowDecorations = vm.IsFullScreen ? WindowDecorations.None : WindowDecorations.Full;
-                break;
-            case nameof(MainWindowViewModel.ShowBookmarkDialog) when vm.ShowBookmarkDialog:
-                vm.ShowBookmarkDialog = false;
-                if (vm.ActiveTab is { } bmTab)
-                {
-                    var bmDialog = new BookmarkNameDialog(bmTab.CurrentPage + 1)
-                        { FontSize = vm.CurrentFontSize };
-                    var bmName = await bmDialog.ShowDialog<string?>(this);
-                    if (bmName is not null)
+            switch (args.PropertyName)
+            {
+                case nameof(MainWindowViewModel.ActiveTab):
+                    Document.SetTab(vm.ActiveTab);
+                    CollapseExtrasIfDocumentChanged(vm); // split panes / tear-offs belong to one document
+                    // ActiveTab is re-raised from INSIDE the animation frame (per-frame overlay/page change),
+                    // not only on real tab switches — defer the structural portal-surface sync out of the
+                    // frame (mirrors OnPortalViewChanged) so it can't tear down / rebuild the surface mid-tick.
+                    if (vm.IsInAnimationFrame) QueuePortalSync();
+                    else SyncPortalView(vm); // rebuild the portal viewport on the now-active model (or tear down)
+                    UpdateRailToolBarVisibility();
+                    break;
+                case nameof(MainWindowViewModel.ShowOutline):
+                    UpdateSidebarColumnWidth(vm.ShowOutline);
+                    break;
+                case nameof(MainWindowViewModel.ShowShortcuts) when vm.ShowShortcuts:
+                    vm.ShowShortcuts = false;
+                    await new ShortcutsDialog { FontSize = vm.CurrentFontSize }.ShowDialog(this);
+                    break;
+                case nameof(MainWindowViewModel.ShowAbout) when vm.ShowAbout:
+                    vm.ShowAbout = false;
+                    var aboutDlg = new AboutDialog { FontSize = vm.CurrentFontSize };
+                    aboutDlg.SetLogFilePath(vm.LogFilePath);
+                    await aboutDlg.ShowDialog(this);
+                    break;
+                case nameof(MainWindowViewModel.ShowSettings) when vm.ShowSettings:
+                    vm.ShowSettings = false;
+                    // Scan All temporarily overrides BackgroundAnalysisWindowPages and
+                    // restores the captured value on teardown; editing settings mid-scan
+                    // would be silently reverted, so suppress the dialog while scanning.
+                    if (vm.IsScanAllActive) break;
+                    await new SettingsWindow { DataContext = vm, FontSize = vm.CurrentFontSize }.ShowDialog(this);
+                    break;
+                case nameof(MainWindowViewModel.ActiveTool):
+                    Document.UpdateAnnotationCursor();
+                    break;
+                case nameof(MainWindowViewModel.ShouldShowPortalWindow):
+                    UpdatePortalWindow(vm);
+                    break;
+                case nameof(MainWindowViewModel.CurrentFontSize):
+                    // Live UI font-scale change from Settings — reach the open pop-out + tear-off windows too.
+                    _portalWindow?.ApplyFontScale(vm.CurrentFontSize);
+                    foreach (var win in _documentWindows) win.ApplyFontScale(vm.CurrentFontSize);
+                    break;
+                case nameof(MainWindowViewModel.IsFullScreen):
+                    WindowState = vm.IsFullScreen ? WindowState.FullScreen : WindowState.Normal;
+                    WindowDecorations = vm.IsFullScreen ? WindowDecorations.None : WindowDecorations.Full;
+                    break;
+                case nameof(MainWindowViewModel.ShowBookmarkDialog) when vm.ShowBookmarkDialog:
+                    vm.ShowBookmarkDialog = false;
+                    if (vm.ActiveTab is { } bmTab)
                     {
-                        bool added = vm.Controller.AddBookmark(bmName);
-                        vm.NotifyBookmarksChanged();
-                        vm.ShowStatusToast(added ? $"Bookmark: {bmName}" : $"Updated bookmark: {bmName}");
+                        var bmDialog = new BookmarkNameDialog(bmTab.CurrentPage + 1)
+                            { FontSize = vm.CurrentFontSize };
+                        var bmName = await bmDialog.ShowDialog<string?>(this);
+                        if (bmName is not null)
+                        {
+                            bool added = vm.Controller.AddBookmark(bmName);
+                            vm.NotifyBookmarksChanged();
+                            vm.ShowStatusToast(added ? $"Bookmark: {bmName}" : $"Updated bookmark: {bmName}");
+                        }
                     }
-                }
-                break;
-            case nameof(MainWindowViewModel.ShowGoToPage) when vm.ShowGoToPage:
-                vm.ShowGoToPage = false;
-                if (vm.ActiveTab is { } gotoTab)
-                {
-                    var dialog = new GoToPageDialog(gotoTab.CurrentPage + 1, gotoTab.PageCount)
-                        { FontSize = vm.CurrentFontSize };
-                    var result = await dialog.ShowDialog<int>(this);
-                    if (result > 0)
-                        vm.GoToPage(result - 1);
-                }
-                break;
+                    break;
+                case nameof(MainWindowViewModel.ShowGoToPage) when vm.ShowGoToPage:
+                    vm.ShowGoToPage = false;
+                    if (vm.ActiveTab is { } gotoTab)
+                    {
+                        var dialog = new GoToPageDialog(gotoTab.CurrentPage + 1, gotoTab.PageCount)
+                            { FontSize = vm.CurrentFontSize };
+                        var result = await dialog.ShowDialog<int>(this);
+                        if (result > 0)
+                            vm.GoToPage(result - 1);
+                    }
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            // async void: an unhandled exception here (e.g. ShowDialog racing window teardown)
+            // would otherwise crash the process. Log and swallow — a lost dialog isn't worth a crash.
+            RailReaderLogging.Logger.Error("[MainWindow] OnVmPropertyChanged failed", ex);
         }
     }
 
@@ -469,7 +483,7 @@ public partial class MainWindow : Window
             // so paste silently did nothing. Decode the rendered PNG into an Avalonia
             // Bitmap and hand it to SetBitmapAsync.
             using var ms = new System.IO.MemoryStream(pngBytes);
-            var bitmap = new Avalonia.Media.Imaging.Bitmap(ms);
+            using var bitmap = new Avalonia.Media.Imaging.Bitmap(ms);
             await clipboard.SetBitmapAsync(bitmap);
         };
     }
