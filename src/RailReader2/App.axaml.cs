@@ -65,7 +65,11 @@ public partial class App : Application
                     splash.Close();
                     var errorWindow = new StartupErrorWindow(ex.Message);
                     desktop.MainWindow = errorWindow;
-                    errorWindow.Closed += (_, _) => desktop.Shutdown(1);
+                    // Closing (not Closed) + Environment.Exit: guarantees exit code 1 regardless of how
+                    // the window closes (Quit button, Alt+F4, taskbar) and sidesteps a race with
+                    // Avalonia's own ShutdownMode.OnLastWindowClose handling, which could otherwise call
+                    // the lifetime's Shutdown() with its own (0) exit code first.
+                    errorWindow.Closing += (_, _) => Environment.Exit(1);
                     errorWindow.Show();
                 }
             }, DispatcherPriority.Background);
@@ -96,31 +100,44 @@ public partial class App : Application
         CleanupService.RunCleanup();
 
         var vm = new MainWindowViewModel(config);
-        var window = new MainWindow { DataContext = vm };
-        vm.SetWindow(window);
-
-        window.Opened += (_, _) => splash.Close();
-        window.Closing += (_, _) => vm.Dispose();
-        desktop.MainWindow = window;
-
-        // First non-flag argument that names an existing file is the PDF to open.
-        var docPath = args?.FirstOrDefault(a => !a.StartsWith("--") && File.Exists(a));
-        if (docPath is not null)
+        try
         {
-            // Optional known-state startup flags (for agents / scripted launches):
-            //   --page <n> (1-based)   --zoom <percent, e.g. 300>   --rail
-            var (startPage, startZoom, startRail) = ParseStartupFlags(args!);
-            window.Opened += (_, _) => vm.FireAndForget(OpenStartupDocument(), nameof(vm.OpenDocument));
+            var window = new MainWindow { DataContext = vm };
+            vm.SetWindow(window);
 
-            async System.Threading.Tasks.Task OpenStartupDocument()
+            window.Opened += (_, _) => splash.Close();
+            window.Closing += (_, _) => vm.Dispose();
+            desktop.MainWindow = window;
+
+            // First non-flag argument that names an existing file is the PDF to open.
+            var docPath = args?.FirstOrDefault(a => !a.StartsWith("--") && File.Exists(a));
+            if (docPath is not null)
             {
-                await vm.OpenDocument(docPath);
-                if (startPage is not null || startZoom is not null || startRail)
-                    vm.ApplyStartupView(startPage, startZoom, startRail);
-            }
-        }
+                // Optional known-state startup flags (for agents / scripted launches):
+                //   --page <n> (1-based)   --zoom <percent, e.g. 300>   --rail
+                var (startPage, startZoom, startRail) = ParseStartupFlags(args!);
+                window.Opened += (_, _) => vm.FireAndForget(OpenStartupDocument(), nameof(vm.OpenDocument));
 
-        window.Show();
+                async System.Threading.Tasks.Task OpenStartupDocument()
+                {
+                    await vm.OpenDocument(docPath);
+                    if (startPage is not null || startZoom is not null || startRail)
+                        vm.ApplyStartupView(startPage, startZoom, startRail);
+                }
+            }
+
+            window.Show();
+        }
+        catch
+        {
+            // vm.Dispose() is normally wired to window.Closing, but a fault here (e.g. window.Show()
+            // itself throwing) means that window is never shown and never receives Closing — dispose
+            // directly so the DocumentController/PDFium handles aren't leaked for the process lifetime
+            // while the caller's StartupErrorWindow is up. Dispose() is idempotent, so this can't
+            // double-dispose if Closing somehow still fires on the orphaned window.
+            vm.Dispose();
+            throw;
+        }
     }
 
     /// <summary>Parse the optional known-state startup flags: <c>--page &lt;n&gt;</c> (1-based),

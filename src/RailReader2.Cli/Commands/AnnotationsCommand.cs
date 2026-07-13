@@ -12,7 +12,7 @@ public static class AnnotationsCommand
 {
     public static int Execute(string[] args, IPdfServiceFactory factory, ILogger logger)
     {
-        if (Program.HasFlag(args, "help") || args.Contains("-h"))
+        if (Program.HasHelpFlag(args))
         {
             PrintHelp();
             return 0;

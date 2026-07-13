@@ -29,7 +29,8 @@ public partial class StatusBarView : UserControl
     // StatusPanel.Children.Clear() + rebuild (fresh Buttons + lambda closures) every frame.
     private readonly record struct StatusShape(
         bool PendingRail, bool RailActive, bool AutoScrollActive, bool AutoScrollParked, bool JumpMode,
-        bool IsViewRotated, bool IsAnnotating, AnnotationTool ActiveTool, bool HasBreadcrumb, bool HasToast);
+        bool IsViewRotated, int ViewRotationDegrees, bool IsAnnotating, AnnotationTool ActiveTool,
+        bool HasBreadcrumb, bool HasToast);
     private StatusShape? _lastShape;
     private TabViewModel? _lastShapeTab;
     private TextBlock? _toastLabel;
@@ -310,7 +311,8 @@ public partial class StatusBarView : UserControl
 
         var shape = new StatusShape(
             pendingRail, rail.Active, vm.AutoScrollActive, vm.AutoScrollParked, vm.JumpMode,
-            vm.IsViewRotated, vm.IsAnnotating, vm.ActiveTool, breadcrumbFull is not null, vm.StatusToast is not null);
+            vm.IsViewRotated, vm.ViewRotationDegrees, vm.IsAnnotating, vm.ActiveTool,
+            breadcrumbFull is not null, vm.StatusToast is not null);
 
         // Fast path: the set of children hasn't changed since the last rebuild (the overwhelmingly common
         // case while continuously rail-reading — ActiveTab is re-raised every animation frame, see

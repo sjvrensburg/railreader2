@@ -57,6 +57,9 @@ public static class LayoutModelDownloader
                 desc.DownloadUrl, HttpCompletionOption.ResponseHeadersRead, stallCts.Token);
             resp.EnsureSuccessStatusCode();
             long? total = resp.Content.Headers.ContentLength;
+            // Headers can legitimately eat a chunk of the stall window on a slow connection; reset
+            // it here so the first body read gets the full StallTimeout, not whatever remained.
+            stallCts.CancelAfter(StallTimeout);
 
             await using (var src = await resp.Content.ReadAsStreamAsync(stallCts.Token))
             await using (var dst = new FileStream(tmpPath, FileMode.Create, FileAccess.Write, FileShare.None))
