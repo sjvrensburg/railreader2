@@ -53,6 +53,11 @@ public sealed partial class MainWindowViewModel
         public SKImage? Corner, Top, Left;
         public BBox CornerBox, TopBox, LeftBox;
         public int Dpi; // 0 = not yet rendered for this anchor
+        // Negative cache: a render that throws or hits a non-Skia page sets this instead of leaving
+        // Dpi at 0, so GetFreezeTiles doesn't retry the same failing render on every animation frame
+        // (~60/s) while frozen. Cleared only by re-freezing (a fresh FreezeState) or the zoom/page-change
+        // escape hatch that already clears the whole freeze in GetFreezeTiles.
+        public bool Failed;
     }
 
     private readonly Dictionary<Viewport, FreezeState> _freezeByVp = new();
@@ -232,7 +237,7 @@ public sealed partial class MainWindowViewModel
                 ClearFreeze(vp);
                 RaiseFreezeStateIfFocused(vp);
             }
-            else if (f.Dpi == 0)
+            else if (f.Dpi == 0 && !f.Failed)
             {
                 // Render once at the freeze-time zoom (locked, so this never re-renders — panes never rescale).
                 RenderFreezeCrops(vp, f, Math.Clamp((int)(72f * f.Zoom), 150, 600));
@@ -279,7 +284,11 @@ public sealed partial class MainWindowViewModel
         try
         {
             using var page = vp.Owner.Pdf.RenderPage(vp.CurrentPage, dpi);
-            if (page is not SkiaRenderedPage skia) return; // leave f.Dpi 0 → retry next frame
+            if (page is not SkiaRenderedPage skia)
+            {
+                f.Failed = true; // non-Skia page won't become one on retry — stop hammering it every frame
+                return;
+            }
             var bmp = skia.Bitmap;
             float sx = bmp.Width / pageW;
             float sy = bmp.Height / pageH;
@@ -290,7 +299,10 @@ public sealed partial class MainWindowViewModel
         }
         catch (Exception ex)
         {
-            _logger.Error("[Freeze] crop render failed", ex); // leave f.Dpi 0 → retry next frame
+            // Negative-cache the failure instead of leaving Dpi at 0 — a page that consistently throws
+            // here would otherwise retry (and re-log) on every animation frame (~60/s) while frozen.
+            f.Failed = true;
+            _logger.Error("[Freeze] crop render failed", ex);
         }
     }
 

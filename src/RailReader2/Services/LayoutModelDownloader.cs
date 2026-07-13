@@ -35,29 +35,39 @@ public static class LayoutModelDownloader
 
     public readonly record struct DownloadResult(bool Ok, string? Path, string? Error);
 
+    // Read-stall watchdog: a half-open connection or a server that sends headers then stalls
+    // mid-body would otherwise hang indefinitely (HttpClient.Timeout is infinite, by design, to
+    // allow the full ~66 MB download on a slow link). Reset on every successful read, so this only
+    // fires when no bytes arrive for this long, not when the whole download is merely slow.
+    private static readonly TimeSpan StallTimeout = TimeSpan.FromSeconds(30);
+
     public static async Task<DownloadResult> DownloadAsync(
         LayoutModelDescriptor desc, IProgress<double>? progress, CancellationToken ct)
     {
         var dir = Path.Combine(AppConfig.ConfigDir, "models");
         var finalPath = Path.Combine(dir, desc.FileName);
         var tmpPath = finalPath + ".tmp";
+        using var stallCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         try
         {
             Directory.CreateDirectory(dir);
 
-            using var resp = await Http.GetAsync(desc.DownloadUrl, HttpCompletionOption.ResponseHeadersRead, ct);
+            stallCts.CancelAfter(StallTimeout);
+            using var resp = await Http.GetAsync(
+                desc.DownloadUrl, HttpCompletionOption.ResponseHeadersRead, stallCts.Token);
             resp.EnsureSuccessStatusCode();
             long? total = resp.Content.Headers.ContentLength;
 
-            await using (var src = await resp.Content.ReadAsStreamAsync(ct))
+            await using (var src = await resp.Content.ReadAsStreamAsync(stallCts.Token))
             await using (var dst = new FileStream(tmpPath, FileMode.Create, FileAccess.Write, FileShare.None))
             {
                 var buffer = new byte[81920];
                 long read = 0;
                 int n;
-                while ((n = await src.ReadAsync(buffer, ct)) > 0)
+                while ((n = await src.ReadAsync(buffer, stallCts.Token)) > 0)
                 {
-                    await dst.WriteAsync(buffer.AsMemory(0, n), ct);
+                    stallCts.CancelAfter(StallTimeout); // data arrived — reset the stall window
+                    await dst.WriteAsync(buffer.AsMemory(0, n), stallCts.Token);
                     read += n;
                     if (total is > 0) progress?.Report((double)read / total.Value);
                 }
@@ -89,7 +99,12 @@ public static class LayoutModelDownloader
         catch (OperationCanceledException)
         {
             TryDelete(tmpPath);
-            return new(false, null, "Cancelled.");
+            // The user's own token vs. the stall watchdog both surface as OperationCanceledException on
+            // stallCts.Token — ct.IsCancellationRequested distinguishes "user clicked Cancel" from "no
+            // data arrived for StallTimeout".
+            return new(false, null, ct.IsCancellationRequested
+                ? "Cancelled."
+                : $"Download stalled (no data received for {StallTimeout.TotalSeconds:N0}s).");
         }
         catch (Exception ex)
         {

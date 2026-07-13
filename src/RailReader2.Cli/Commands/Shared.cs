@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
@@ -26,7 +27,8 @@ internal static class Shared
     /// </summary>
     internal static int ParseClampedInt(string? raw, int min, int max, int @default, string optionName)
     {
-        if (raw == null || !int.TryParse(raw, out var v)) return @default;
+        if (raw == null || !int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var v))
+            return @default;
         var clamped = Math.Clamp(v, min, max);
         if (v != clamped)
             Console.Error.WriteLine($"Warning: {optionName} clamped to {clamped} (valid range: {min}-{max})");
@@ -40,7 +42,8 @@ internal static class Shared
     /// </summary>
     internal static float ParseClampedFloat(string? raw, float min, float max, float @default, string optionName)
     {
-        if (raw == null || !float.TryParse(raw, out var v)) return @default;
+        if (raw == null || !float.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out var v))
+            return @default;
         var clamped = Math.Clamp(v, min, max);
         if (v != clamped)
             Console.Error.WriteLine($"Warning: {optionName} clamped to {clamped:F1} (valid range: {min}-{max})");
@@ -53,7 +56,8 @@ internal static class Shared
     /// </summary>
     internal static int ParsePositiveInt(string? raw, int @default, int min = 1)
     {
-        if (raw == null || !int.TryParse(raw, out var v)) return @default;
+        if (raw == null || !int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var v))
+            return @default;
         return Math.Max(min, v);
     }
 

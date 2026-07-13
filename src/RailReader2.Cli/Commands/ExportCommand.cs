@@ -8,7 +8,7 @@ public static class ExportCommand
 {
     public static int Execute(string[] args, IPdfServiceFactory factory, ILogger logger)
     {
-        if (Program.HasFlag(args, "help") || Program.HasFlag(args, "-h"))
+        if (Program.HasFlag(args, "help") || args.Contains("-h"))
         {
             PrintHelp();
             return 0;
@@ -83,6 +83,12 @@ public static class ExportCommand
         if (outputPath != null)
             Console.Error.WriteLine($"Markdown exported to {Path.GetFullPath(outputPath)}");
 
+        // Unlike the sibling commands (render/structure/annotations/vlm), there's no failed-item count
+        // to check here: MarkdownExportService.ExportAsync returns plain Task with no failure signal,
+        // and a page whose VLM transcription fails still exports successfully — the error is written
+        // into the Markdown as inline text (graceful degradation, by design). ExportAsync throwing is
+        // already caught by Program.Main's top-level catch and mapped to exit 1, so 0 here correctly
+        // means "the document was exported" for the current Core API.
         return 0;
     }
 

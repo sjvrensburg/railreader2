@@ -789,6 +789,10 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
     public void Dispose()
     {
+        _pollTimer?.Stop();
+        _backgroundTimer?.Stop();
+        _scanAllTimer?.Stop();
+        _toastTimer?.Dispose();
         UnwireFocusedSignals();
         DisposePortalImages();
         DisposeFreezeImages();
