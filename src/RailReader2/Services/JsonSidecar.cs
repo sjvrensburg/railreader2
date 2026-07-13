@@ -31,19 +31,24 @@ public static class JsonSidecar
         return fallback();
     }
 
-    /// <summary>Serialise <paramref name="value"/> to <paramref name="path"/>, creating its directory.</summary>
+    /// <summary>Serialise <paramref name="value"/> to <paramref name="path"/>, creating its directory.
+    /// Writes to a temp file and renames over the target so a crash or IO error mid-write can't leave
+    /// a truncated/empty file in place (matches <see cref="LayoutModelDownloader"/>'s download pattern).</summary>
     public static void Save<T>(string path, T value, JsonTypeInfo<T> typeInfo)
     {
+        var tmpPath = path + ".tmp";
         try
         {
             var dir = Path.GetDirectoryName(path);
             if (!string.IsNullOrEmpty(dir))
                 Directory.CreateDirectory(dir);
-            File.WriteAllText(path, JsonSerializer.Serialize(value, typeInfo));
+            File.WriteAllText(tmpPath, JsonSerializer.Serialize(value, typeInfo));
+            File.Move(tmpPath, path, overwrite: true);
         }
         catch (Exception ex)
         {
             RailReaderLogging.Logger.Error($"Failed to save {Path.GetFileName(path)}", ex);
+            try { if (File.Exists(tmpPath)) File.Delete(tmpPath); } catch { /* best effort */ }
         }
     }
 }

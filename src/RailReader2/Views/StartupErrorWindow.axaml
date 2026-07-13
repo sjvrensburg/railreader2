@@ -1,0 +1,19 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="RailReader2.Views.StartupErrorWindow"
+        Title="RailReader2 failed to start"
+        Width="480" Height="220"
+        WindowStartupLocation="CenterScreen"
+        CanResize="False">
+    <DockPanel Margin="16">
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal"
+                    HorizontalAlignment="Right" Spacing="8" Margin="0,12,0,0">
+            <Button Content="Quit" Click="OnQuitClick" />
+        </StackPanel>
+        <TextBlock DockPanel.Dock="Top" Text="RailReader2 could not start."
+                   FontWeight="Bold" Margin="0,0,0,8" />
+        <ScrollViewer>
+            <TextBlock x:Name="MessageText" TextWrapping="Wrap" />
+        </ScrollViewer>
+    </DockPanel>
+</Window>
