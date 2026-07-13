@@ -365,7 +365,7 @@ public sealed partial class MainWindowViewModel
             AllowMultiple = false,
             FileTypeFilter = [new FilePickerFileType("JSON Files") { Patterns = ["*.json"] }],
         });
-        if (files.Count == 0) return;
+        if (files is not { Count: > 0 }) return;
 
         var inputPath = files[0].TryGetLocalPath() ?? files[0].Path.LocalPath;
         if (inputPath is null) return;

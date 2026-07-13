@@ -792,6 +792,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         _pollTimer?.Stop();
         _backgroundTimer?.Stop();
         _scanAllTimer?.Stop();
+        _startupRailTimer?.Stop();
         _toastTimer?.Dispose();
         UnwireFocusedSignals();
         DisposePortalImages();

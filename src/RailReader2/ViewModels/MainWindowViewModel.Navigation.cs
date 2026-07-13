@@ -209,18 +209,23 @@ public sealed partial class MainWindowViewModel
         StartBackgroundAnalysis();
         // Rail needs the current page analysed; poll briefly, then force rail if the tick hasn't already
         // engaged it (a >threshold zoom would have). Capped so a missing ONNX model can't poll forever.
+        // Stored in a field (not a bare local) so Dispose() can stop it — otherwise a window closed within
+        // the ~12s poll window would keep this ticking against a disposed controller.
         int attempts = 0;
-        var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(150) };
-        timer.Tick += (_, _) =>
+        _startupRailTimer?.Stop();
+        _startupRailTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(150) };
+        _startupRailTimer.Tick += (_, _) =>
         {
             attempts++;
-            if (ActiveTab is not { } t || attempts > 80) { timer.Stop(); return; }
+            if (ActiveTab is not { } t || attempts > 80) { _startupRailTimer?.Stop(); return; }
             if (!t.AnalysisCache.ContainsKey(t.State.CurrentPage)) return;
-            timer.Stop();
+            _startupRailTimer?.Stop();
             if (!t.Rail.Active && !ForcedRailActive) StartRailHere();
         };
-        timer.Start();
+        _startupRailTimer.Start();
     }
+
+    private DispatcherTimer? _startupRailTimer;
 
     /// <summary>True while rail is held active below the zoom threshold by a forced "start rail here"
     /// activation. Used to drive an Escape that releases it.</summary>

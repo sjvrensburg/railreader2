@@ -194,6 +194,18 @@ public partial class SearchView : UserControl
 
     private async void RunSearch()
     {
+        try
+        {
+            await RunSearchAsync();
+        }
+        catch (Exception ex)
+        {
+            RailReader.Core.RailReaderLogging.Logger.Error("[Search] RunSearch failed", ex);
+        }
+    }
+
+    private async Task RunSearchAsync()
+    {
         if (_vm is null) return;
         string query = SearchInput.Text ?? "";
 

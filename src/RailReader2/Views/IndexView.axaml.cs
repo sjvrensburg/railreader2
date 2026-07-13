@@ -358,7 +358,10 @@ public partial class IndexView : PaneRefreshView
                 result = skiaPage.Bitmap.Copy();
             rendered?.Dispose();
         }
-        catch { }
+        catch (Exception ex)
+        {
+            RailReaderLogging.Logger.Error($"[Index] Thumbnail render failed for page {pageIndex}", ex);
+        }
 
         _pageThumbCache[pageIndex] = result;
         return result;

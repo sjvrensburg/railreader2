@@ -63,13 +63,25 @@ public static class LayoutModelDownloader
             {
                 var buffer = new byte[81920];
                 long read = 0;
+                double lastReported = -1;
                 int n;
                 while ((n = await src.ReadAsync(buffer, stallCts.Token)) > 0)
                 {
                     stallCts.CancelAfter(StallTimeout); // data arrived — reset the stall window
                     await dst.WriteAsync(buffer.AsMemory(0, n), stallCts.Token);
                     read += n;
-                    if (total is > 0) progress?.Report((double)read / total.Value);
+                    // Throttle to ~1% steps — a 66 MB download in 80 KB chunks is ~830 reads, and
+                    // reporting every one of them floods the UI dispatcher with Post calls that mostly
+                    // coalesce onto the same frame anyway.
+                    if (total is > 0)
+                    {
+                        double pct = (double)read / total.Value;
+                        if (pct - lastReported >= 0.01 || read == total.Value)
+                        {
+                            lastReported = pct;
+                            progress?.Report(pct);
+                        }
+                    }
                 }
             }
 
@@ -80,7 +92,7 @@ public static class LayoutModelDownloader
                 {
                     TryDelete(tmpPath);
                     return new(false, null,
-                        $"Checksum mismatch (expected {desc.Sha256[..12]}…, got {actual[..12]}…). Not installed.");
+                        $"Checksum mismatch (expected {Truncate(desc.Sha256, 12)}…, got {Truncate(actual, 12)}…). Not installed.");
                 }
             }
             else
@@ -120,6 +132,11 @@ public static class LayoutModelDownloader
         var hash = await sha.ComputeHashAsync(fs, ct);
         return Convert.ToHexString(hash).ToLowerInvariant();
     }
+
+    // desc.Sha256 is data-driven (a published hash string); Length could theoretically be short/garbage,
+    // unlike `actual` which is always a 64-char SHA256 hex string. Avoid the mismatch-message formatting
+    // itself throwing (which would report a confusing "Index and count..." error instead of the real one).
+    private static string Truncate(string s, int length) => s.Length <= length ? s : s[..length];
 
     private static void TryDelete(string path)
     {

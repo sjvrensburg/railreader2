@@ -483,7 +483,7 @@ public partial class MainWindow : Window
             // so paste silently did nothing. Decode the rendered PNG into an Avalonia
             // Bitmap and hand it to SetBitmapAsync.
             using var ms = new System.IO.MemoryStream(pngBytes);
-            var bitmap = new Avalonia.Media.Imaging.Bitmap(ms);
+            using var bitmap = new Avalonia.Media.Imaging.Bitmap(ms);
             await clipboard.SetBitmapAsync(bitmap);
         };
     }

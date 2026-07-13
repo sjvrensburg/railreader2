@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using CommunityToolkit.Mvvm.ComponentModel;
+using RailReader.Core;
 using RailReader.Core.Models;
 using RailReader.Core.Services;
 using RailReader.Core.Vlm.OpenAI;
@@ -497,22 +498,36 @@ public partial class SettingsWindow : Window
 
     private async void OnBrowseCustomModel(object? sender, RoutedEventArgs e)
     {
-        var path = await PickFile("Select ONNX model", "ONNX", new[] { "onnx" });
-        if (path == null) return;
-        CustomModelPath.Text = path;
-        _customModel.ModelPath = path;
-        _customModel.Save();
-        UpdateCustomModelStatus();
+        try
+        {
+            var path = await PickFile("Select ONNX model", "ONNX", new[] { "onnx" });
+            if (path == null) return;
+            CustomModelPath.Text = path;
+            _customModel.ModelPath = path;
+            _customModel.Save();
+            UpdateCustomModelStatus();
+        }
+        catch (Exception ex)
+        {
+            RailReaderLogging.Logger.Error("[Settings] Browse custom model failed", ex);
+        }
     }
 
     private async void OnBrowseCustomModelMapping(object? sender, RoutedEventArgs e)
     {
-        var path = await PickFile("Select class-mapping JSON", "JSON", new[] { "json" });
-        if (path == null) return;
-        CustomModelMappingPath.Text = path;
-        _customModel.MappingPath = path;
-        _customModel.Save();
-        UpdateCustomModelStatus();
+        try
+        {
+            var path = await PickFile("Select class-mapping JSON", "JSON", new[] { "json" });
+            if (path == null) return;
+            CustomModelMappingPath.Text = path;
+            _customModel.MappingPath = path;
+            _customModel.Save();
+            UpdateCustomModelStatus();
+        }
+        catch (Exception ex)
+        {
+            RailReaderLogging.Logger.Error("[Settings] Browse custom model mapping failed", ex);
+        }
     }
 
     private async Task<string?> PickFile(string title, string typeLabel, string[] extensions)

@@ -135,7 +135,9 @@ public partial class App : Application
         {
             switch (args[i])
             {
-                case "--page" when i + 1 < args.Length && int.TryParse(args[i + 1], out var p):
+                case "--page" when i + 1 < args.Length && int.TryParse(
+                        args[i + 1], System.Globalization.NumberStyles.Integer,
+                        System.Globalization.CultureInfo.InvariantCulture, out var p):
                     page = p; i++; break;
                 case "--zoom" when i + 1 < args.Length && double.TryParse(
                         args[i + 1], System.Globalization.NumberStyles.Float,
