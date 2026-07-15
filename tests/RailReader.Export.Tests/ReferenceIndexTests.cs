@@ -106,6 +106,48 @@ public class ReferenceIndexTests
             ReferenceIndex.ParseLine("Figure 4B")[0],
             ReferenceIndex.ParseLine("figure 4b")[0]);
 
+    // --- ParseLine: chapter-dash numbering ("Figure 3-1") ---
+
+    [Theory]
+    [InlineData("see Figure 3-1 for the setup", "Figure", "3-1")]
+    [InlineData("as shown in Table 2-4 above", "Table", "2-4")]
+    public void ParseLine_RecognisesChapterDashNumbers(string line, string kind, string number)
+        => Assert.Contains(new Ref(Enum.Parse<RefKind>(kind), number), ReferenceIndex.ParseLine(line));
+
+    [Fact]
+    public void ParseLine_ChapterDashNumbersDoNotCollide()
+    {
+        // Distinct chapter-numbered figures must not all truncate to the same "3" reference.
+        var a = ReferenceIndex.ParseLine("Figure 3-1 shows the setup")[0];
+        var b = ReferenceIndex.ParseLine("Figure 3-2 shows the result")[0];
+        var c = ReferenceIndex.ParseLine("Figure 3-3 shows the residuals")[0];
+        Assert.NotEqual(a, b);
+        Assert.NotEqual(b, c);
+        Assert.NotEqual(a, c);
+    }
+
+    [Fact]
+    public void ParseLine_ChapterDashSuffixNotAppliedToPluralRanges()
+        // Plural + hyphen is still the range separator, not a chapter number.
+        => Assert.Equal(
+            [new Ref(RefKind.Figure, "3"), new Ref(RefKind.Figure, "5")],
+            ReferenceIndex.ParseLine("Figures 3-5 compare"));
+
+    // --- ParseLine: singular lettered sub-part continuations ("Fig 3a and 3b") ---
+
+    [Fact]
+    public void ParseLine_ExpandsSingularLetteredSubPartSeries()
+        => Assert.Equal(
+            [new Ref(RefKind.Figure, "3a"), new Ref(RefKind.Figure, "3b")],
+            ReferenceIndex.ParseLine("compare Fig 3a and 3b closely"));
+
+    [Fact]
+    public void ParseLine_SingularLetteredSeriesStopsAtNonLetteredNumber()
+        // "and 4" has no letter suffix, so it must not be swept in as prose safety would demand.
+        => Assert.Equal(
+            [new Ref(RefKind.Figure, "3a")],
+            ReferenceIndex.ParseLine("see Fig 3a and 4 for details"));
+
     // --- ParseCaptionLabel: caption-leading labels ---
 
     [Theory]
@@ -128,6 +170,19 @@ public class ReferenceIndexTests
     [InlineData("Figure A.4 — Residual plots", "Figure", "a.4")]
     public void ParseCaptionLabel_RecognisesRomanAndAppendixLabels(string caption, string kind, string number)
         => Assert.Equal(new Ref(Enum.Parse<RefKind>(kind), number), ReferenceIndex.ParseCaptionLabel(caption));
+
+    [Theory]
+    [InlineData("Figure 3-1: Convergence of the estimator", "Figure", "3-1")]
+    [InlineData("Table 2-4. Parameter estimates", "Table", "2-4")]
+    public void ParseCaptionLabel_RecognisesChapterDashLabels(string caption, string kind, string number)
+        => Assert.Equal(new Ref(Enum.Parse<RefKind>(kind), number), ReferenceIndex.ParseCaptionLabel(caption));
+
+    [Fact]
+    public void ParseCaptionLabel_ChapterDashLabelMatchesInTextMention()
+        // The bug this fixes: a mention and its caption must resolve to the SAME reference key.
+        => Assert.Equal(
+            ReferenceIndex.ParseLine("see Figure 3-1 for the setup")[0],
+            ReferenceIndex.ParseCaptionLabel("Figure 3-1: Convergence of the estimator"));
 
     [Theory]
     [InlineData("Figure 3: Convergence", true)]    // colon → caption-like

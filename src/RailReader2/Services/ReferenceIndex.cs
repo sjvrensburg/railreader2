@@ -50,6 +50,15 @@ internal sealed partial class ReferenceIndex
         RegexOptions.IgnoreCase)]
     private static partial Regex CaptionLabelRegex();
 
+    // Chapter-style sub-numbering ("Figure 3-1", "Table 2-4"): a hyphen immediately (no surrounding
+    // space) followed by digits, right after a reference's number. Matched separately from
+    // NumberPattern/ContinuationRegex so it never collides with the plural range syntax ("Figures
+    // 3-5" still yields two references, not one "3-5"); \G requires the hyphen to sit right at the
+    // caller-supplied offset, i.e. no space before it — a spaced/dashed range ("Fig. 2 - Sample",
+    // "Figs. 3–5") never matches here.
+    [GeneratedRegex(@"\G-(?<sub>\d+[a-z]?)")]
+    private static partial Regex ChapterDashSuffixRegex();
+
     // A detected Caption block binds to a float only when it overlaps it horizontally within this
     // vertical gap (fraction of page height) — a caption whose own float was misdetected must drop
     // its label rather than bind to an unrelated float across the page.
@@ -83,11 +92,12 @@ internal sealed partial class ReferenceIndex
     }
 
     /// <summary>All figure/table references mentioned in a text run, in reading order. Plural
-    /// mentions expand their continuations ("Figures 2 and 3" yields both); singular mentions do
-    /// not, so ordinary prose numbers after a reference stay out. Matches starting at or beyond
-    /// <paramref name="startLimit"/> are ignored — pass the current line's length when the run is
-    /// "current line + next line", so a mention split across the line break is caught without firing
-    /// early for mentions that wholly belong to the next line.</summary>
+    /// mentions expand their continuations ("Figures 2 and 3" yields both); singular mentions expand
+    /// only a lettered sub-part series ("Fig 3a and 3b" yields both, since "3b" can't be mistaken for
+    /// ordinary prose) — otherwise ordinary prose numbers after a reference stay out. Matches starting
+    /// at or beyond <paramref name="startLimit"/> are ignored — pass the current line's length when
+    /// the run is "current line + next line", so a mention split across the line break is caught
+    /// without firing early for mentions that wholly belong to the next line.</summary>
     public static List<Reference> ParseLine(string text, int startLimit = int.MaxValue)
     {
         List<Reference> refs = [];
@@ -95,20 +105,53 @@ internal sealed partial class ReferenceIndex
         {
             if (m.Index >= startLimit) break;
             string kindWord = m.Groups["kind"].Value;
-            if (!AcceptNumber(kindWord, m.Groups["num"].Value)) continue;
+            string headNumber = m.Groups["num"].Value;
+            if (!AcceptNumber(kindWord, headNumber)) continue;
+            int endIndex = m.Index + m.Length;
+            headNumber = MergeChapterDashSuffix(text, kindWord, headNumber, ref endIndex);
             var kind = char.ToLowerInvariant(kindWord[0]) == 'f' ? RefKind.Figure : RefKind.Table;
-            refs.Add(new Reference(kind, NormalizeNumber(m.Groups["num"].Value)));
+            refs.Add(new Reference(kind, NormalizeNumber(headNumber)));
 
-            if (!kindWord.EndsWith('s') && !kindWord.EndsWith('S')) continue;   // continuations: plural only
-            for (int pos = m.Index + m.Length;;)
+            bool plural = kindWord.EndsWith('s') || kindWord.EndsWith('S');
+            // Singular kind words still expand a lettered sub-part series ("Fig 3a and 3b") — the
+            // letter suffix is what makes it safe: ordinary prose numbers ("2008", "95%") never carry
+            // one, so this can't reproduce the "Table 1, 95% of cases" false positive the plural gate
+            // exists to avoid.
+            bool letterSeries = !plural && EndsWithLetterSuffix(headNumber);
+            if (!plural && !letterSeries) continue;
+
+            for (int pos = endIndex;;)
             {
                 var c = ContinuationRegex().Match(text, pos);
-                if (!c.Success || !AcceptNumber(kindWord, c.Groups["num"].Value)) break;
-                refs.Add(new Reference(kind, NormalizeNumber(c.Groups["num"].Value)));
+                if (!c.Success) break;
+                string contNumber = c.Groups["num"].Value;
+                if (letterSeries && !EndsWithLetterSuffix(contNumber)) break;
+                if (!AcceptNumber(kindWord, contNumber)) break;
+                refs.Add(new Reference(kind, NormalizeNumber(contNumber)));
                 pos = c.Index + c.Length;
             }
         }
         return refs;
+    }
+
+    /// <summary>True when a reference number's trailing character is a lowercase sub-part letter
+    /// ("3a", "4b") rather than a plain digit — roman numerals and appendix letters are always
+    /// captured uppercase (see <see cref="NumberPattern"/>), so this can't misfire on those.</summary>
+    private static bool EndsWithLetterSuffix(string number) => number.Length > 0 && char.IsLower(number[^1]);
+
+    /// <summary>Extends <paramref name="number"/> with a tight ("Figure 3-1", no surrounding space)
+    /// chapter-style hyphen suffix found at <paramref name="endIndex"/>, advancing it past the match.
+    /// Skipped for plural kind words (a hyphen there is the range separator, not a chapter number —
+    /// see <see cref="ContinuationRegex"/>) and for digitless numbers (roman numerals / appendix
+    /// letters don't take chapter sub-numbers).</summary>
+    private static string MergeChapterDashSuffix(string text, string kindWord, string number, ref int endIndex)
+    {
+        if (kindWord.EndsWith('s') || kindWord.EndsWith('S')) return number;
+        if (!number.Any(char.IsAsciiDigit)) return number;
+        var m = ChapterDashSuffixRegex().Match(text, endIndex);
+        if (!m.Success) return number;
+        endIndex = m.Index + m.Length;
+        return number + "-" + m.Groups["sub"].Value;
     }
 
     /// <summary>The reference a caption's leading label declares ("Figure 3: ..."), or null when the
@@ -120,10 +163,14 @@ internal sealed partial class ReferenceIndex
     internal static Reference? ParseCaptionLabel(string captionText, bool requirePunctuation = false)
     {
         var m = CaptionLabelRegex().Match(captionText);
-        if (!m.Success || !AcceptNumber(m.Groups["kind"].Value, m.Groups["num"].Value)) return null;
+        string kindWord = m.Groups["kind"].Value;
+        string number = m.Groups["num"].Value;
+        if (!m.Success || !AcceptNumber(kindWord, number)) return null;
+        int endIndex = m.Index + m.Length;
+        number = MergeChapterDashSuffix(captionText, kindWord, number, ref endIndex);
         if (requirePunctuation)
         {
-            int i = m.Index + m.Length;
+            int i = endIndex;
             while (i < captionText.Length && char.IsWhiteSpace(captionText[i])) i++;
             if (i < captionText.Length)
             {
@@ -134,8 +181,8 @@ internal sealed partial class ReferenceIndex
             }
         }
         return new Reference(
-            char.ToLowerInvariant(m.Groups["kind"].Value[0]) == 'f' ? RefKind.Figure : RefKind.Table,
-            NormalizeNumber(m.Groups["num"].Value));
+            char.ToLowerInvariant(kindWord[0]) == 'f' ? RefKind.Figure : RefKind.Table,
+            NormalizeNumber(number));
     }
 
     /// <summary>Digitless numbers (roman numerals, bare letters) are accepted only after a
