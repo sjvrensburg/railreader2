@@ -554,8 +554,11 @@ public class ViewportPanel : Panel
         // viewport layout (a single click on an already-pinned source marker reveals the docked
         // Portals pane), so a fresh hit-test at the new position can miss the marker the gesture is
         // actually aimed at. Falling back to what THIS gesture's first click hit keeps the pop-out
-        // working instead of silently degrading to a normal click/frame-zoom.
-        if (hit is null && popOut)
+        // working instead of silently degrading to a normal click/frame-zoom. Restricted to Source
+        // markers: popOut only changes InvokePortal's behaviour for that kind, and a Target marker's
+        // first click already navigates (GoToPortalSource) — reusing a stale Target hit here would
+        // silently re-navigate mid-animation on the second click instead of leaving it to a fresh hit.
+        if (hit is null && popOut && _lastPortalMarkerHit is { Kind: PortalMarkerKind.Source })
             hit = _lastPortalMarkerHit;
         if (hit is null)
         {

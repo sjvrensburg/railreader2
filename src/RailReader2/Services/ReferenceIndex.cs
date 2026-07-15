@@ -112,7 +112,7 @@ internal sealed partial class ReferenceIndex
             var kind = char.ToLowerInvariant(kindWord[0]) == 'f' ? RefKind.Figure : RefKind.Table;
             refs.Add(new Reference(kind, NormalizeNumber(headNumber)));
 
-            bool plural = kindWord.EndsWith('s') || kindWord.EndsWith('S');
+            bool plural = IsPluralKindWord(kindWord);
             // Singular kind words still expand a lettered sub-part series ("Fig 3a and 3b") — the
             // letter suffix is what makes it safe: ordinary prose numbers ("2008", "95%") never carry
             // one, so this can't reproduce the "Table 1, 95% of cases" false positive the plural gate
@@ -134,10 +134,16 @@ internal sealed partial class ReferenceIndex
         return refs;
     }
 
-    /// <summary>True when a reference number's trailing character is a lowercase sub-part letter
-    /// ("3a", "4b") rather than a plain digit — roman numerals and appendix letters are always
-    /// captured uppercase (see <see cref="NumberPattern"/>), so this can't misfire on those.</summary>
-    private static bool EndsWithLetterSuffix(string number) => number.Length > 0 && char.IsLower(number[^1]);
+    /// <summary>True when <paramref name="kindWord"/> is the plural form ("Figures"/"Tables", any
+    /// case) rather than singular ("Figure"/"Fig."/"Table"/"Tab.").</summary>
+    private static bool IsPluralKindWord(string kindWord) => kindWord.EndsWith('s') || kindWord.EndsWith('S');
+
+    /// <summary>True when a reference number's trailing character is a sub-part letter ("3a", "4B")
+    /// rather than a plain digit — gated on the number also containing a digit, since digitless roman
+    /// numerals / bare appendix letters (see <see cref="NumberPattern"/>) are letters throughout and
+    /// must not be mistaken for a lettered sub-part.</summary>
+    private static bool EndsWithLetterSuffix(string number) =>
+        number.Length > 0 && char.IsLetter(number[^1]) && number.Any(char.IsAsciiDigit);
 
     /// <summary>Extends <paramref name="number"/> with a tight ("Figure 3-1", no surrounding space)
     /// chapter-style hyphen suffix found at <paramref name="endIndex"/>, advancing it past the match.
@@ -146,7 +152,7 @@ internal sealed partial class ReferenceIndex
     /// letters don't take chapter sub-numbers).</summary>
     private static string MergeChapterDashSuffix(string text, string kindWord, string number, ref int endIndex)
     {
-        if (kindWord.EndsWith('s') || kindWord.EndsWith('S')) return number;
+        if (IsPluralKindWord(kindWord)) return number;
         if (!number.Any(char.IsAsciiDigit)) return number;
         var m = ChapterDashSuffixRegex().Match(text, endIndex);
         if (!m.Success) return number;

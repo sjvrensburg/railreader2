@@ -148,6 +148,14 @@ public class ReferenceIndexTests
             [new Ref(RefKind.Figure, "3a")],
             ReferenceIndex.ParseLine("see Fig 3a and 4 for details"));
 
+    [Fact]
+    public void ParseLine_ExpandsSingularUppercaseLetteredSubPartSeries()
+        // Uppercase sub-figure letters ("Fig 4A and 4B") are as valid as lowercase ("4a"/"4b") — see
+        // ParseLine_NormalisesSuffixCase, which already treats "Figure 4B" as a normal single label.
+        => Assert.Equal(
+            [new Ref(RefKind.Figure, "4a"), new Ref(RefKind.Figure, "4b")],
+            ReferenceIndex.ParseLine("compare Fig 4A and 4B closely"));
+
     // --- ParseCaptionLabel: caption-leading labels ---
 
     [Theory]
