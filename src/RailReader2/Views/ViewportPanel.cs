@@ -31,6 +31,12 @@ public class ViewportPanel : Panel
     private bool _browseAnnotationDrag;
     private int _pressClickCount;
 
+    // The marker the gesture's own first click hit, kept across the clicks of a double-click. The
+    // first click of a source-marker double-click can reveal the docked Portals pane (RevealPortalPane
+    // in ActOnPortalMarker), which resizes the viewport before the second click's release arrives — a
+    // fresh hit-test at that point can miss the marker entirely. See TryHandlePortalMarkerClick.
+    private PortalMarker? _lastPortalMarkerHit;
+
     // Track the last tool so we only update cursor when it changes
     private AnnotationTool _lastCursorTool = AnnotationTool.None;
 
@@ -139,6 +145,7 @@ public class ViewportPanel : Panel
             _dragging = true;
             _browseAnnotationDrag = false;
             _pressClickCount = e.ClickCount;
+            if (_pressClickCount <= 1) _lastPortalMarkerHit = null;   // fresh gesture: drop any stale cache
             e.Handled = true;
 
             bool isPen = e.Pointer.Type == PointerType.Pen;
@@ -525,23 +532,41 @@ public class ViewportPanel : Panel
     {
         if (ViewModel is not { } vm || vm.ActiveTab is null || ActiveCamera is not { } cam) return false;
         var markers = vm.BuildPortalMarkers(OwnerView?.SurfaceViewport);
-        if (markers.Count == 0) return false;
 
-        double zoom = cam.Zoom, ox = cam.OffsetX, oy = cam.OffsetY;
-        const double maxSq = PortalMarkerGeometry.HitRadius * PortalMarkerGeometry.HitRadius;
         PortalMarker? hit = null;
-        double bestSq = maxSq;
-        foreach (var m in markers)
+        if (markers.Count > 0)
         {
-            if (m.Portals.Count == 0) continue;   // defensive: a marker with no backing portal is inert
-            var (cx, cy) = PortalMarkerGeometry.ScreenCentre(
-                m.Kind == PortalMarkerKind.Source, m.PageX, m.PageY, zoom, ox, oy);
-            double dx = screenPos.X - cx, dy = screenPos.Y - cy;
-            double dsq = dx * dx + dy * dy;
-            if (dsq <= bestSq) { bestSq = dsq; hit = m; }
+            double zoom = cam.Zoom, ox = cam.OffsetX, oy = cam.OffsetY;
+            const double maxSq = PortalMarkerGeometry.HitRadius * PortalMarkerGeometry.HitRadius;
+            double bestSq = maxSq;
+            foreach (var m in markers)
+            {
+                if (m.Portals.Count == 0) continue;   // defensive: a marker with no backing portal is inert
+                var (cx, cy) = PortalMarkerGeometry.ScreenCentre(
+                    m.Kind == PortalMarkerKind.Source, m.PageX, m.PageY, zoom, ox, oy);
+                double dx = screenPos.X - cx, dy = screenPos.Y - cy;
+                double dsq = dx * dx + dy * dy;
+                if (dsq <= bestSq) { bestSq = dsq; hit = m; }
+            }
         }
-        if (hit is null) return false;
 
+        // The second click of a double-click can land after the first click's own action shifted the
+        // viewport layout (a single click on an already-pinned source marker reveals the docked
+        // Portals pane), so a fresh hit-test at the new position can miss the marker the gesture is
+        // actually aimed at. Falling back to what THIS gesture's first click hit keeps the pop-out
+        // working instead of silently degrading to a normal click/frame-zoom. Restricted to Source
+        // markers: popOut only changes InvokePortal's behaviour for that kind, and a Target marker's
+        // first click already navigates (GoToPortalSource) — reusing a stale Target hit here would
+        // silently re-navigate mid-animation on the second click instead of leaving it to a fresh hit.
+        if (hit is null && popOut && _lastPortalMarkerHit is { Kind: PortalMarkerKind.Source })
+            hit = _lastPortalMarkerHit;
+        if (hit is null)
+        {
+            _lastPortalMarkerHit = null;
+            return false;
+        }
+
+        _lastPortalMarkerHit = hit;
         ActOnPortalMarker(vm, hit, popOut);
         return true;
     }
