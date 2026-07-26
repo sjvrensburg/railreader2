@@ -469,6 +469,20 @@ public class ViewportPanel : Panel
         annModeItem.Click += (_, _) => vm.ToggleAnnotationMode();
         menu.Items.Add(annModeItem);
 
+        // Rotates the whole page (document-level), not the clicked block — unconditional on FindBlockAt.
+        var rotateMenu = new MenuItem { Header = "Rotate" };
+        var rotateCwItem = new MenuItem { Header = "Rotate Clockwise", InputGesture = new KeyGesture(Key.R, KeyModifiers.Control) };
+        rotateCwItem.Click += (_, _) => vm.RotateViewClockwise();
+        rotateMenu.Items.Add(rotateCwItem);
+        var rotateCcwItem = new MenuItem { Header = "Rotate Counter-clockwise", InputGesture = new KeyGesture(Key.R, KeyModifiers.Control | KeyModifiers.Shift) };
+        rotateCcwItem.Click += (_, _) => vm.RotateViewCounterClockwise();
+        rotateMenu.Items.Add(rotateCcwItem);
+        rotateMenu.Items.Add(new Separator());
+        var resetRotationItem = new MenuItem { Header = "Reset Rotation", IsEnabled = vm.IsViewRotated };
+        resetRotationItem.Click += (_, _) => vm.ResetViewRotation();
+        rotateMenu.Items.Add(resetRotationItem);
+        menu.Items.Add(rotateMenu);
+
         menu.Open(this);
     }
 
