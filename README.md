@@ -431,3 +431,20 @@ dotnet publish src/RailReader2 -c Release -r win-x64 --self-contained
 
 - **[RailReaderCore](https://github.com/sjvrensburg/RailReaderCore)** — the portable core consumed here as NuGet packages (`RailReader.Core`, `RailReader.Core.Pdfium`, `RailReader.Core.Analysis`, `RailReader.Renderer.Skia`, `RailReader.Export`): models, controllers, rail navigation, line detection, search, annotations, the SkiaSharp renderer, and the Markdown export pipeline.
 - **[railmark](https://github.com/sjvrensburg/railmark)** — CLI tool that extracts your RailReader2 annotations into structured Markdown documents, grouped by section headings with surrounding paragraph context. Useful for feeding annotated PDFs to an AI for summarisation. Uses the RailReader2 CLI's `annotations` command as its data source.
+
+## Acknowledgements
+
+RailReader2 stands on the shoulders of a lot of open-source work. Thank you to:
+
+- **[Avalonia](https://avaloniaui.net/)** — the cross-platform .NET UI framework the whole app is built on.
+- **[PDFium](https://pdfium.googlesource.com/pdfium/)** (via [bblanchon's native builds](https://github.com/bblanchon/pdfium-binaries)) and **[PDFtoImage](https://github.com/sungaila/PDFtoImage)** by David Sungaila — PDF rasterisation.
+- **[SkiaSharp](https://github.com/mono/SkiaSharp)** — GPU-accelerated 2D rendering.
+- **[ONNX Runtime](https://onnxruntime.ai/)**, **[Docling](https://github.com/docling-project/docling)** ([Heron layout model](docs/heron-layout-model.md)), and **[PaddlePaddle](https://github.com/PaddlePaddle/PaddleX)** (PP-DocLayoutV3 / PP-DocLayout-S) — the layout-detection models rail mode is built on.
+- **[RapidOCR](https://github.com/RapidAI/RapidOCR)** and **[RapidOcrNet](https://github.com/BobLd/RapidOcrNet)** by BobLd — OCR for scanned pages (opt-in, added in RailReaderCore 0.50.0).
+- **[CommunityToolkit.Mvvm](https://github.com/CommunityToolkit/dotnet)** — MVVM plumbing.
+- **[Claude Code](https://docs.anthropic.com/en/docs/claude-code)** — see [Why I built this](https://sjvrensburg.github.io/railreader2/about.html) for how AI-assisted development made this project possible.
+
+RailReader2 is one option in a small field of open-source PDF readers, each with a different focus. If it isn't the right fit for you, these are worth a look:
+
+- **[Sioyek](https://sioyek.info/)** — a keyboard-driven PDF reader built for research papers. Its **Portals** feature — pinning a linked figure or table in view while you read past the text that cites it — directly inspired [RailReader2's own Portals](docs/portals-design.md); the concept and the name are borrowed with thanks.
+- **[Caly](https://github.com/CalyPdf/Caly)** by BobLd — a cross-platform PDF reader built on [PdfPig](https://github.com/UglyToad/PdfPig) and [PdfPig.Rendering.Skia](https://github.com/BobLd/PdfPig.Rendering.Skia), from the same author behind RapidOcrNet above. If you want a lean, PdfPig-native reading experience, it's worth trying.
