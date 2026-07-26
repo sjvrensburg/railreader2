@@ -7,6 +7,7 @@ using CommunityToolkit.Mvvm.Input;
 using RailReader.Core;
 using RailReader.Core.Commands;
 using RailReader.Core.Models;
+using RailReader.Core.Ocr.RapidOcr;
 using RailReader.Core.Services;
 using RailReader.Renderer.Skia;
 using RailReader2.Services;
@@ -333,14 +334,27 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         ColourEffects = new ColourEffectShaders(_logger);
         _controller = new DocumentController(config.ToCoreSettings(), config, CompositeAnnotationStore.Default,
             new AvaloniaThreadMarshaller(), new RailReader.Renderer.Skia.SkiaPdfServiceFactory(), _logger);
+        var ocrMode = OcrPreferences.Load().Mode;
         try
         {
             var resolution = CustomLayoutModelLoader.ResolveModel(config, _logger);
             if (resolution.ModelPath != null && resolution.Capabilities != null && resolution.Factory != null)
             {
                 _logger.Debug($"[ONNX] Starting worker with model: {resolution.ModelPath}");
-                _controller.InitializeWorker(resolution.Capabilities, resolution.Factory);
+                _controller.InitializeWorker(resolution.Capabilities, resolution.Factory,
+                    ocrServiceFactory: () => new RapidOcrService(), ocrMode: ocrMode);
                 ActiveLayoutModelName = resolution.DisplayName;
+            }
+            else
+            {
+                // No ONNX model available: fall back to a model-free, pure-geometry analyzer so rail
+                // reading still works (every block comes back BlockRole.Text — no role-keyed features).
+                _logger.Debug("[ONNX] No model resolved; falling back to TextLayoutAnalyzer");
+                _controller.InitializeWorker(
+                    new LayoutModelCapabilities(TextLayoutAnalyzer.DefaultInputSize, [], ProvidesReadingOrder: false),
+                    () => new TextLayoutAnalyzer(),
+                    ocrServiceFactory: () => new RapidOcrService(), ocrMode: ocrMode);
+                ActiveLayoutModelName = "Text-only (no layout model)";
             }
         }
         catch (Exception ex) { _logger.Error("[ONNX] Worker init failed", ex); }
