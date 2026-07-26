@@ -132,6 +132,47 @@
         tracking, or system-wide magnification.
       </div>
 
+      <h2 id="acknowledgements" style="margin-top:2.5rem;">Acknowledgements</h2>
+      <div class="story">
+        <p>
+          railreader2 stands on the shoulders of a lot of open-source work. Thank you to
+          <a href="https://avaloniaui.net/">Avalonia</a> for the cross-platform UI framework;
+          <a href="https://pdfium.googlesource.com/pdfium/">PDFium</a> (via
+          <a href="https://github.com/bblanchon/pdfium-binaries">bblanchon's native builds</a>) and
+          <a href="https://github.com/sungaila/PDFtoImage">PDFtoImage</a> by David Sungaila for PDF
+          rasterisation; <a href="https://github.com/mono/SkiaSharp">SkiaSharp</a> for GPU-accelerated
+          rendering; <a href="https://onnxruntime.ai/">ONNX Runtime</a>,
+          <a href="https://github.com/docling-project/docling">Docling</a> (the
+          <a href="https://github.com/sjvrensburg/railreader2/blob/main/docs/heron-layout-model.md">Heron
+          layout model</a>), and <a href="https://github.com/PaddlePaddle/PaddleX">PaddlePaddle</a>
+          (PP-DocLayoutV3 / PP-DocLayout-S) for the layout-detection models rail mode is built on;
+          <a href="https://github.com/RapidAI/RapidOCR">RapidOCR</a> and
+          <a href="https://github.com/BobLd/RapidOcrNet">RapidOcrNet</a> by BobLd for opt-in OCR on
+          scanned pages; and <a href="https://github.com/CommunityToolkit/dotnet">CommunityToolkit.Mvvm</a>
+          for MVVM plumbing.
+        </p>
+        <p>
+          railreader2 is one option in a small field of open-source PDF readers, each with a
+          different focus. If it isn't the right fit for you, these are worth a look:
+        </p>
+        <ul class="feature-list">
+          <li>
+            <strong><a href="https://sioyek.info/">Sioyek</a></strong> — a keyboard-driven PDF reader
+            built for research papers. Its <strong>Portals</strong> feature — pinning a linked figure
+            or table in view while you read past the text that cites it — directly inspired
+            <a href="guide.html#portals">railreader2's own Portals</a>; the concept and the name are
+            borrowed with thanks.
+          </li>
+          <li>
+            <strong><a href="https://github.com/CalyPdf/Caly">Caly</a></strong> by BobLd — a
+            cross-platform PDF reader built on <a href="https://github.com/UglyToad/PdfPig">PdfPig</a>
+            and <a href="https://github.com/BobLd/PdfPig.Rendering.Skia">PdfPig.Rendering.Skia</a>,
+            from the same author behind RapidOcrNet above. If you want a lean, PdfPig-native reading
+            experience, it's worth trying.
+          </li>
+        </ul>
+      </div>
+
       <p style="margin-top:2.5rem;">
         <a href="index.html#getting-started" class="btn btn--primary">Get railreader2</a>
         &nbsp;&nbsp;<a href="index.html">&larr; Back to home</a>
@@ -146,6 +187,7 @@
       <a href="https://github.com/sjvrensburg/railreader2">source</a> &middot;
       <a href="https://github.com/sjvrensburg/railreader2/releases">releases</a> &middot;
       <a href="https://apps.microsoft.com/store/detail/9P9J8KZ6RVZP">microsoft store</a> &middot;
+      <a href="about.html#acknowledgements">acknowledgements</a> &middot;
       <a href="privacy.html">privacy</a> &middot;
       MIT License
     </p>
