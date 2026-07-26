@@ -124,6 +124,17 @@ public partial class SettingsWindow : Window
         CustomModelMappingPath.Text = _customModel.MappingPath ?? "";
         UpdateCustomModelStatus();
         PopulateBuiltinAnalyzerCombo();
+
+        OcrModeCombo.SelectedIndex = (int)vm.Controller.OcrMode;
+        UpdateOcrStatus();
+    }
+
+    private void UpdateOcrStatus()
+    {
+        var error = Vm?.Controller.Worker?.OcrStartupError;
+        OcrStatus.Text = error is not null
+            ? $"OCR model failed to load: {error} — layout analysis still works, OCR is inactive."
+            : "";
     }
 
     /// <summary>
@@ -426,6 +437,19 @@ public partial class SettingsWindow : Window
         vm.OnConfigChanged();
     }
 
+    // --- OCR ---
+
+    private void OnOcrModeChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (Vm is not { } vm || _loading) return;
+        var mode = (OcrMode)OcrModeCombo.SelectedIndex;
+        vm.Controller.OcrMode = mode;
+        var prefs = OcrPreferences.Load();
+        prefs.Mode = mode;
+        prefs.Save();
+        UpdateOcrStatus();
+    }
+
     private void OnResetDefaults(object? sender, RoutedEventArgs e)
     {
         if (Vm is not { } vm) return;
@@ -476,6 +500,10 @@ public partial class SettingsWindow : Window
         vm.AppConfig.VlmModel = defaults.VlmModel;
         vm.AppConfig.VlmApiKey = defaults.VlmApiKey;
         vm.AppConfig.VlmStructuredOutput = defaults.VlmStructuredOutput;
+        vm.Controller.OcrMode = OcrMode.Off;
+        var ocrPrefs = OcrPreferences.Load();
+        ocrPrefs.Mode = OcrMode.Off;
+        ocrPrefs.Save();
         _loading = true;
         LoadFromConfig();
         _loading = false;
