@@ -5,6 +5,7 @@ using Avalonia.Platform.Storage;
 using CommunityToolkit.Mvvm.ComponentModel;
 using RailReader.Core;
 using RailReader.Core.Models;
+using RailReader.Core.Ocr.RapidOcr;
 using RailReader.Core.Services;
 using RailReader.Core.Vlm.OpenAI;
 using RailReader2.Services;
@@ -27,6 +28,8 @@ public partial class SettingsWindow : Window
     private readonly ObservableCollection<NavigableRoleItem> _stopRoleItems = [];
     private CustomLayoutModelConfig _customModel = new();
     private CancellationTokenSource? _downloadCts;
+    private OcrPreferences? _ocrPrefs;
+    private CancellationTokenSource? _ocrDownloadCts;
 
     /// <summary>
     /// Roles offered in the settings UI. Excludes <see cref="BlockRole.Unknown"/>
@@ -127,6 +130,7 @@ public partial class SettingsWindow : Window
 
         OcrModeCombo.SelectedIndex = (int)vm.Controller.OcrMode;
         UpdateOcrStatus();
+        PopulateOcrLanguageCombo();
     }
 
     private void UpdateOcrStatus()
@@ -135,6 +139,110 @@ public partial class SettingsWindow : Window
         OcrStatus.Text = error is not null
             ? $"OCR model failed to load: {error} — layout analysis still works, OCR is inactive."
             : "";
+    }
+
+    private sealed record OcrLanguageItem(string? Id, string Label, OcrModelDescriptor? Descriptor);
+
+    /// <summary>
+    /// Populates the OCR language-pack dropdown: the bundled Latin-only default plus every
+    /// downloadable <see cref="OcrModelRegistry"/> entry. The chosen set is a startup preference
+    /// (<see cref="OcrPreferences.ModelSetId"/>, read once by <c>MainWindowViewModel</c>'s
+    /// constructor when it builds the OCR service factory), so switching it here needs a restart
+    /// to take effect — same convention as the layout-model picker above.
+    /// </summary>
+    private void PopulateOcrLanguageCombo()
+    {
+        _ocrPrefs = OcrPreferences.Load();
+        var items = new List<OcrLanguageItem> { new(null, "Default (bundled, Latin script)", null) };
+        items.AddRange(OcrModelRegistry.All.Select(d =>
+            new OcrLanguageItem(d.Id, $"{d.DisplayName} — {d.LanguageCoverage}", d)));
+        OcrLanguageCombo.ItemsSource = items;
+        OcrLanguageCombo.DisplayMemberBinding = new Avalonia.Data.Binding(nameof(OcrLanguageItem.Label));
+        OcrLanguageCombo.SelectedIndex = items.FindIndex(it => it.Id == _ocrPrefs.ModelSetId);
+        if (OcrLanguageCombo.SelectedIndex < 0) OcrLanguageCombo.SelectedIndex = 0;
+        UpdateOcrLanguageStatus();
+    }
+
+    private void UpdateOcrLanguageStatus()
+    {
+        if (OcrLanguageCombo.SelectedItem is not OcrLanguageItem item)
+        {
+            OcrLanguageStatus.Text = "";
+            return;
+        }
+        if (item.Descriptor is not { } desc)
+        {
+            DownloadOcrModelButton.IsEnabled = false;
+            OcrLanguageStatus.Text = "Bundled with the app — no download needed.";
+            return;
+        }
+        DownloadOcrModelButton.IsEnabled = true;
+        OcrLanguageStatus.Text = OcrModelDownloader.IsInstalled(desc)
+            ? $"{desc.DisplayName} installed. Restart to apply if just switched."
+            : $"{desc.DisplayName} not installed (~{desc.ApproxSizeMb} MB). Press Download, then restart to apply.";
+    }
+
+    private void OnOcrLanguageChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (_loading) return;
+        if (OcrLanguageCombo.SelectedItem is OcrLanguageItem item)
+        {
+            var prefs = _ocrPrefs ??= OcrPreferences.Load();
+            prefs.ModelSetId = item.Id;
+            prefs.Save();
+            UpdateOcrLanguageStatus();
+        }
+    }
+
+    /// <summary>Downloads the selected language pack's three files (detector/recognizer/dictionary)
+    /// to <c>ConfigDir</c>, verifying each published SHA-256. Usable after a restart.</summary>
+    private async void OnDownloadOcrModel(object? sender, RoutedEventArgs e)
+    {
+        if (OcrLanguageCombo.SelectedItem is not OcrLanguageItem { Descriptor: { } desc }) return;
+
+        _ocrDownloadCts?.Cancel();
+        _ocrDownloadCts?.Dispose();
+        var cts = _ocrDownloadCts = new CancellationTokenSource();
+
+        SetOcrDownloadUiActive(true);
+        OcrDownloadProgress.Value = 0;
+        OcrLanguageStatus.Text = $"Downloading {desc.DisplayName} (~{desc.ApproxSizeMb} MB)…";
+
+        try
+        {
+            var progress = new Progress<double>(p => OcrDownloadProgress.Value = p);
+            var result = await OcrModelDownloader.DownloadAsync(desc, progress, cts.Token);
+
+            OcrLanguageStatus.Text = result switch
+            {
+                { Ok: true } => $"Installed {desc.DisplayName}. Restart to apply.",
+                { Error: "Cancelled." } => "Download cancelled.",
+                _ => $"Download failed: {result.Error}",
+            };
+        }
+        catch (Exception ex)
+        {
+            OcrLanguageStatus.Text = $"Download failed: {ex.Message}";
+        }
+        finally
+        {
+            SetOcrDownloadUiActive(false);
+            if (ReferenceEquals(_ocrDownloadCts, cts))
+            {
+                _ocrDownloadCts = null;
+            }
+            cts.Dispose();
+        }
+    }
+
+    private void OnCancelOcrDownload(object? sender, RoutedEventArgs e) => _ocrDownloadCts?.Cancel();
+
+    private void SetOcrDownloadUiActive(bool active)
+    {
+        OcrDownloadProgress.IsVisible = active;
+        CancelOcrDownloadButton.IsVisible = active;
+        DownloadOcrModelButton.IsEnabled = !active;
+        OcrLanguageCombo.IsEnabled = !active;
     }
 
     /// <summary>
@@ -256,6 +364,9 @@ public partial class SettingsWindow : Window
         _downloadCts?.Cancel();
         _downloadCts?.Dispose();
         _downloadCts = null;
+        _ocrDownloadCts?.Cancel();
+        _ocrDownloadCts?.Dispose();
+        _ocrDownloadCts = null;
         base.OnClosed(e);
     }
 
@@ -503,6 +614,7 @@ public partial class SettingsWindow : Window
         vm.Controller.OcrMode = OcrMode.Off;
         var ocrPrefs = OcrPreferences.Load();
         ocrPrefs.Mode = OcrMode.Off;
+        ocrPrefs.ModelSetId = null;
         ocrPrefs.Save();
         _loading = true;
         LoadFromConfig();
