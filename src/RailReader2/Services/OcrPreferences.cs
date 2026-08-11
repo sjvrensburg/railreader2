@@ -14,6 +14,14 @@ public sealed class OcrPreferences
     /// <summary>Off (default, no OCR cost) / Lines (detection only) / Full (detection + recognition).</summary>
     public OcrMode Mode { get; set; } = OcrMode.Off;
 
+    /// <summary>
+    /// <see cref="RailReader.Core.Ocr.RapidOcr.OcrModelDescriptor.Id"/> of the recognition model
+    /// set to use, or null for the bundled default (PP-OCRv5, Latin script only). Read once at
+    /// startup (<see cref="ViewModels.MainWindowViewModel"/> constructor) — like the layout model
+    /// choice, changing it takes effect on next launch, not live.
+    /// </summary>
+    public string? ModelSetId { get; set; }
+
     public static string Path => System.IO.Path.Combine(AppConfig.ConfigDir, "ocr_prefs.json");
 
     public static OcrPreferences Load()

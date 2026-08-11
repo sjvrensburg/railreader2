@@ -334,7 +334,13 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         ColourEffects = new ColourEffectShaders(_logger);
         _controller = new DocumentController(config.ToCoreSettings(), config, CompositeAnnotationStore.Default,
             new AvaloniaThreadMarshaller(), new RailReader.Renderer.Skia.SkiaPdfServiceFactory(), _logger);
-        var ocrMode = OcrPreferences.Load().Mode;
+        var ocrPrefs = OcrPreferences.Load();
+        var ocrMode = ocrPrefs.Mode;
+        // A non-default choice takes effect on next launch, not live — AnalysisWorker constructs
+        // the OCR service once, eagerly, at worker-thread startup (mirrors the layout-model
+        // "Restart to apply" convention). Null falls back to RapidOcrService's own bundled default
+        // (PP-OCRv5, Latin-only, no download needed).
+        var ocrModelSet = ocrPrefs.ModelSetId is { } id ? OcrModelRegistry.ById(id)?.ModelSet : null;
         try
         {
             var resolution = CustomLayoutModelLoader.ResolveModel(config, _logger);
@@ -342,7 +348,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             {
                 _logger.Debug($"[ONNX] Starting worker with model: {resolution.ModelPath}");
                 _controller.InitializeWorker(resolution.Capabilities, resolution.Factory,
-                    ocrServiceFactory: () => new RapidOcrService(), ocrMode: ocrMode);
+                    ocrServiceFactory: () => new RapidOcrService(ocrModelSet), ocrMode: ocrMode);
                 ActiveLayoutModelName = resolution.DisplayName;
             }
             else
@@ -353,7 +359,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
                 _controller.InitializeWorker(
                     new LayoutModelCapabilities(TextLayoutAnalyzer.DefaultInputSize, [], ProvidesReadingOrder: false),
                     () => new TextLayoutAnalyzer(),
-                    ocrServiceFactory: () => new RapidOcrService(), ocrMode: ocrMode);
+                    ocrServiceFactory: () => new RapidOcrService(ocrModelSet), ocrMode: ocrMode);
                 ActiveLayoutModelName = "Text-only (no layout model)";
             }
         }

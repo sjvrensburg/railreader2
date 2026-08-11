@@ -653,11 +653,8 @@ public partial class DocumentView : UserControl, IViewportSurface
         // Cache the result: z-order only changes when the page's annotation set
         // changes, so pan/zoom frames (which re-send camera every tick) reuse it.
         List<Annotation>? sorted;
-        if (pageAnnotations is not { Count: > 1 })
-        {
-            sorted = pageAnnotations;
-        }
-        else if (ReferenceEquals(pageAnnotations, _annoSortSource)
+        if (pageAnnotations is { Count: > 1 }
+            && ReferenceEquals(pageAnnotations, _annoSortSource)
             && pageAnnotations.Count == _annoSortCount
             && _viewport!.CurrentPage == _annoSortPage)
         {
@@ -665,10 +662,16 @@ public partial class DocumentView : UserControl, IViewportSurface
         }
         else
         {
-            sorted = AnnotationRenderer.SortByZOrder(pageAnnotations);
+            // Covers both the recompute path (Count > 1, cache miss) and the Count <= 1
+            // path (0 or 1 annotations need no sorting). Both must update the cache fields —
+            // Core mutates pageAnnotations in place, so its reference survives an add/delete,
+            // and a stale _annoSortCount left over from before a delete can spuriously match
+            // again after a later add brings the count back up, resurrecting a stale
+            // _annoSortResult that still has the deleted annotation and lacks the new one.
+            sorted = pageAnnotations is { Count: > 1 } ? AnnotationRenderer.SortByZOrder(pageAnnotations) : pageAnnotations;
             _annoSortSource = pageAnnotations;
-            _annoSortCount = pageAnnotations.Count;
-            _annoSortPage = _viewport!.CurrentPage;
+            _annoSortCount = pageAnnotations?.Count ?? -1;
+            _annoSortPage = _viewport?.CurrentPage ?? -1;
             _annoSortResult = sorted;
         }
 

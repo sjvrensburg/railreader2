@@ -291,6 +291,27 @@
                         <TextBlock Name="OcrStatus" TextWrapping="Wrap" Opacity="0.7" FontSize="11"
                                    Margin="0,2,0,0" />
 
+                        <TextBlock Text="OCR Language Pack" FontWeight="Bold" Margin="0,12,0,0" />
+                        <Separator />
+                        <TextBlock TextWrapping="Wrap" Opacity="0.7"
+                                   Text="The bundled OCR recognizer only reads Latin-script text well. Optional PP-OCRv6 language packs add broader multilingual coverage (Latin + CJK and more), trading off size and speed for accuracy. Downloads are saved to your config folder. Switching packs needs a restart to take effect." />
+                        <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto" Margin="0,4,0,0">
+                            <TextBlock Grid.Column="0" Text="Language pack:" VerticalAlignment="Center" />
+                            <ComboBox Grid.Column="2" Name="OcrLanguageCombo"
+                                      Width="280" HorizontalAlignment="Left"
+                                      SelectionChanged="OnOcrLanguageChanged" />
+                        </Grid>
+                        <Grid ColumnDefinitions="Auto,8,Auto,8,*" Margin="0,6,0,0">
+                            <Button Grid.Column="0" Name="DownloadOcrModelButton" Content="Download language pack"
+                                    Click="OnDownloadOcrModel" />
+                            <Button Grid.Column="2" Name="CancelOcrDownloadButton" Content="Cancel"
+                                    Click="OnCancelOcrDownload" IsVisible="False" />
+                            <ProgressBar Grid.Column="4" Name="OcrDownloadProgress" Minimum="0" Maximum="1"
+                                         IsVisible="False" VerticalAlignment="Center" Height="6" />
+                        </Grid>
+                        <TextBlock Name="OcrLanguageStatus" TextWrapping="Wrap" Opacity="0.7" FontSize="11"
+                                   Margin="0,2,0,0" />
+
                         <TextBlock Text="Navigable Block Roles" FontWeight="Bold" Margin="0,12,0,0" />
                         <Separator />
                         <TextBlock Text="Rail mode will navigate through the semantic roles you check below. Roles are model-independent — they work the same whether you use the bundled PP-DocLayoutV3 model or a custom one."
