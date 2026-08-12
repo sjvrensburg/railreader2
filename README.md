@@ -82,6 +82,12 @@ At high zoom levels, navigation switches to "rail mode" — the viewer locks ont
 
 - **Freeze panes** — pin part of a page in place, like Excel's *Freeze Panes*, so a header row, a label column, or both stay visible while the rest of the page scrolls. Open the **Freeze** button (snowflake) on the toolbar and pick a mode — **Rows** (freeze everything above a horizontal guide line), **Columns** (everything left of a vertical line), or **Both** (a crossing pair; `Z` arms "both" directly). Click to drop the split exactly where you point — no snapping to detected boundaries, and no dependence on table detection: it is page-wide and works on any page. Zoom is locked while frozen so the panes and body can't drift. Each split pane and tear-off window freezes independently; a freeze clears when its view leaves the page. Release via **Unfreeze** in the flyout, the **❄ Frozen — Unfreeze** chip in the pane's corner, or `Z`
 
+#### Scanned documents (OCR)
+
+- **OCR for scanned pages** — a scan is a picture of text, with no text layer for rail reading, search, selection, table cells, Markdown export, or VLM grounding to work from. Opt-in OCR recovers one so those features behave as they do on a born-digital page. Three modes in Settings → OCR: **Off** (default, no cost), **Lines** (line geometry only — enough to restore line-by-line rail reading), and **Full** (also recognises the text). Changing the mode re-analyses affected pages immediately, no restart
+- **Automatic skew correction** — scans are rarely square on the glass, and line grouping is exactly the step a tilt defeats: well under a degree is enough to fragment a paragraph into a couple of huge rail lines, or fuse neighbouring lines into one. The page's tilt is measured from the OCR results and compensated for when grouping text into lines (no pixels are rotated, and square pages are left untouched). On by default
+- **Multilingual language packs** — the bundled recogniser reads Latin-script text; optional PP-OCRv6 packs add broad coverage (Latin + CJK and more) in three size/accuracy tiers, downloaded in-app to the config folder so they work from a read-only AppImage. Recognition cost varies sharply across the tiers, and the settings panel states each one's cost before you commit to it
+
 #### Visual comfort
 
 - **Colour effects** — GPU-accelerated accessibility filters (High Contrast, High Visibility, Amber, Invert) with adjustable intensity. Per-document: each tab keeps its own effect, persisted across sessions
@@ -138,7 +144,7 @@ At high zoom levels, navigation switches to "rail mode" — the viewer locks ont
 - **Menu bar** — File, Edit, View, Rail, Navigation, Help menus. Every command is reachable by name (the **Rail** menu surfaces the rail toggles, the **Edit** menu the block-copy actions), items **grey out when unavailable** (e.g. *Export with Annotations* on an encrypted PDF), and each carries an `Alt`+letter access key (mnemonic) for keyboard and assistive navigation
 - **Vector icons** — the toolbar, radial menu, and panel controls use crisp Lucide SVG icons that inherit the theme text colour and scale with the UI font-size setting
 - **Settings panel** — live-editable rail reading parameters with persistence
-- **Tabbed settings** — organised settings panel with Appearance, Rendering, Rail Reading, Auto-Scroll, Advanced, and VLM tabs
+- **Tabbed settings** — organised settings panel with Appearance, Rendering, Rail Reading, Auto-Scroll, Advanced, OCR, and VLM tabs
 - **Keyboard shortcuts dialog** — press F1 or Help → Keyboard Shortcuts for a complete reference
 - **Tooltips** — all interactive controls have descriptive tooltips
 - **Splash screen** — startup splash while ONNX model loads
@@ -304,7 +310,8 @@ Rail reading parameters are editable via the Settings panel (gear icon in menu b
     "footnote", "text"
   ],
   "auto_scroll_trigger_enabled": false,
-  "auto_scroll_trigger_delay_ms": 2000.0
+  "auto_scroll_trigger_delay_ms": 2000.0,
+  "deskew_ocr_lines": true
 }
 ```
 
@@ -336,6 +343,7 @@ Rail reading parameters are editable via the Settings panel (gear icon in menu b
 | `centering_classes` | Which block types are horizontally centered when narrower than the viewport (array of class names). Excludes headings by default. Configurable via Settings → Advanced. |
 | `auto_scroll_trigger_enabled` | Auto-start auto-scroll after holding D/Right for the trigger delay (`true`/`false`, default `false`) |
 | `auto_scroll_trigger_delay_ms` | Delay before auto-scroll triggers from hold (ms, default 2000) |
+| `deskew_ocr_lines` | Correct page tilt when grouping OCR'd text into lines on scanned pages (`true`/`false`, default `true`). Needs OCR; configurable via Settings → OCR. |
 
 ## Architecture
 

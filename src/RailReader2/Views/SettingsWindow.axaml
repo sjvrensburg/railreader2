@@ -275,43 +275,6 @@
                         <TextBlock Text="Lookahead: pages pre-analysed ahead of the current page. Background analysis range: pages analysed either side of the current page (higher = more pre-analysis, more CPU; 0 = whole document). Page cache range: pages of text kept in memory (lower = less RAM on large documents; 0 = no eviction)."
                                    TextWrapping="Wrap" Opacity="0.5" />
 
-                        <TextBlock Text="Scanned Pages (OCR)" FontWeight="Bold" Margin="0,12,0,0" />
-                        <Separator />
-                        <TextBlock TextWrapping="Wrap" Opacity="0.7"
-                                   Text="A scanned page has no text layer, so it loses line detection, search, table cells, Markdown export, and VLM grounding. OCR recovers a text layer so those features work. Off costs nothing. Lines detects line geometry only. Full also recognises the text — pair with PP-DocLayout-S at 1920 for best accuracy. Changing this drops cached analysis for affected pages." />
-                        <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto" Margin="0,4,0,0">
-                            <TextBlock Grid.Column="0" Text="OCR mode:" VerticalAlignment="Center" />
-                            <ComboBox Grid.Column="2" Name="OcrModeCombo" Width="150"
-                                      HorizontalAlignment="Left" SelectionChanged="OnOcrModeChanged">
-                                <ComboBoxItem Content="Off" />
-                                <ComboBoxItem Content="Lines" />
-                                <ComboBoxItem Content="Full" />
-                            </ComboBox>
-                        </Grid>
-                        <TextBlock Name="OcrStatus" TextWrapping="Wrap" Opacity="0.7" FontSize="11"
-                                   Margin="0,2,0,0" />
-
-                        <TextBlock Text="OCR Language Pack" FontWeight="Bold" Margin="0,12,0,0" />
-                        <Separator />
-                        <TextBlock TextWrapping="Wrap" Opacity="0.7"
-                                   Text="The bundled OCR recognizer only reads Latin-script text well. Optional PP-OCRv6 language packs add broader multilingual coverage (Latin + CJK and more), trading off size and speed for accuracy. Downloads are saved to your config folder. Switching packs needs a restart to take effect." />
-                        <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto" Margin="0,4,0,0">
-                            <TextBlock Grid.Column="0" Text="Language pack:" VerticalAlignment="Center" />
-                            <ComboBox Grid.Column="2" Name="OcrLanguageCombo"
-                                      Width="280" HorizontalAlignment="Left"
-                                      SelectionChanged="OnOcrLanguageChanged" />
-                        </Grid>
-                        <Grid ColumnDefinitions="Auto,8,Auto,8,*" Margin="0,6,0,0">
-                            <Button Grid.Column="0" Name="DownloadOcrModelButton" Content="Download language pack"
-                                    Click="OnDownloadOcrModel" />
-                            <Button Grid.Column="2" Name="CancelOcrDownloadButton" Content="Cancel"
-                                    Click="OnCancelOcrDownload" IsVisible="False" />
-                            <ProgressBar Grid.Column="4" Name="OcrDownloadProgress" Minimum="0" Maximum="1"
-                                         IsVisible="False" VerticalAlignment="Center" Height="6" />
-                        </Grid>
-                        <TextBlock Name="OcrLanguageStatus" TextWrapping="Wrap" Opacity="0.7" FontSize="11"
-                                   Margin="0,2,0,0" />
-
                         <TextBlock Text="Navigable Block Roles" FontWeight="Bold" Margin="0,12,0,0" />
                         <Separator />
                         <TextBlock Text="Rail mode will navigate through the semantic roles you check below. Roles are model-independent — they work the same whether you use the bundled PP-DocLayoutV3 model or a custom one."
@@ -393,6 +356,62 @@
   ]
 }</TextBlock>
                         </Expander>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- OCR Tab — everything about recovering a text layer from scanned pages -->
+            <TabItem Header="OCR">
+                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Spacing="8" Margin="16">
+                        <TextBlock Text="Scanned Pages (OCR)" FontWeight="Bold" />
+                        <Separator />
+                        <TextBlock TextWrapping="Wrap" Opacity="0.7"
+                                   Text="A scanned page has no text layer, so it loses line detection, search, table cells, Markdown export, and VLM grounding. OCR recovers a text layer so those features work. Off costs nothing. Lines detects line geometry only. Full also recognises the text — pair with PP-DocLayout-S at 1920 for best accuracy. Changing this drops cached analysis for affected pages." />
+                        <TextBlock TextWrapping="Wrap" Opacity="0.7"
+                                   Text="Full recognition is CPU-heavy and runs on the same single worker thread as layout analysis, so a scanned page can hold up analysis of every open document while it works. How long depends mostly on the language pack below." />
+                        <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto" Margin="0,4,0,0">
+                            <TextBlock Grid.Column="0" Text="OCR mode:" VerticalAlignment="Center" />
+                            <ComboBox Grid.Column="2" Name="OcrModeCombo" Width="150"
+                                      HorizontalAlignment="Left" SelectionChanged="OnOcrModeChanged">
+                                <ComboBoxItem Content="Off" />
+                                <ComboBoxItem Content="Lines" />
+                                <ComboBoxItem Content="Full" />
+                            </ComboBox>
+                        </Grid>
+                        <TextBlock Name="OcrStatus" TextWrapping="Wrap" Opacity="0.7" FontSize="11"
+                                   Margin="0,2,0,0" />
+
+                        <TextBlock Text="Skew Correction" FontWeight="Bold" Margin="0,12,0,0" />
+                        <Separator />
+                        <TextBlock TextWrapping="Wrap" Opacity="0.7"
+                                   Text="A scan lifted crookedly off the glass groups badly into lines: even a fraction of a degree can fragment a paragraph into a few giant rail units, or fuse neighbouring lines together. This measures the page's tilt from the OCR detections and corrects for it when grouping text into lines — no pixels are rotated. Pages that are already square are left exactly as they were. Needs OCR, so it does nothing while OCR mode is Off." />
+                        <CheckBox Name="OcrDeskewCheck" Content="Correct page skew when detecting lines"
+                                  IsCheckedChanged="OnOcrDeskewChanged" Margin="0,4,0,0" />
+                        <TextBlock Name="OcrDeskewStatus" TextWrapping="Wrap" Opacity="0.7" FontSize="11"
+                                   Margin="0,2,0,0" />
+
+                        <TextBlock Text="OCR Language Pack" FontWeight="Bold" Margin="0,12,0,0" />
+                        <Separator />
+                        <TextBlock TextWrapping="Wrap" Opacity="0.7"
+                                   Text="The bundled OCR recognizer only reads Latin-script text well. Optional PP-OCRv6 language packs add broader multilingual coverage (Latin + CJK and more), trading off size and speed for accuracy. Downloads are saved to your config folder. Switching packs needs a restart to take effect." />
+                        <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto" Margin="0,4,0,0">
+                            <TextBlock Grid.Column="0" Text="Language pack:" VerticalAlignment="Center" />
+                            <ComboBox Grid.Column="2" Name="OcrLanguageCombo"
+                                      Width="280" HorizontalAlignment="Left"
+                                      SelectionChanged="OnOcrLanguageChanged" />
+                        </Grid>
+                        <Grid ColumnDefinitions="Auto,8,Auto,8,*" Margin="0,6,0,0">
+                            <Button Grid.Column="0" Name="DownloadOcrModelButton" Content="Download language pack"
+                                    Click="OnDownloadOcrModel" />
+                            <Button Grid.Column="2" Name="CancelOcrDownloadButton" Content="Cancel"
+                                    Click="OnCancelOcrDownload" IsVisible="False" />
+                            <ProgressBar Grid.Column="4" Name="OcrDownloadProgress" Minimum="0" Maximum="1"
+                                         IsVisible="False" VerticalAlignment="Center" Height="6" />
+                        </Grid>
+                        <TextBlock Name="OcrLanguageStatus" TextWrapping="Wrap" Opacity="0.7" FontSize="11"
+                                   Margin="0,2,0,0" />
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>
