@@ -26,6 +26,13 @@ public static class OcrModelDownloader
 
     private static readonly TimeSpan StallTimeout = TimeSpan.FromSeconds(30);
 
+    // OcrModelRegistry's URLs resolve through ModelScope's CDN, whose Tengine front-end 403s
+    // any request with no User-Agent ("denied by UA ACL = blacklist") — HttpClient sends none
+    // by default. A browser-shaped UA is enough to clear the ACL (railreader2#209).
+    static OcrModelDownloader()
+        => Http.DefaultRequestHeaders.UserAgent.ParseAdd(
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36");
+
     public readonly record struct DownloadResult(bool Ok, string? Error);
 
     /// <summary>True when all three files of <paramref name="desc"/> are already resolvable
