@@ -1158,6 +1158,52 @@ railreader2-cli export paper.pdf --figure-dir ./figures --output paper.md</code>
         <li><strong>Analysis Lookahead:</strong> Number of pages to pre-analyze ahead (0 to disable).</li>
       </ul>
 
+      <h3>OCR</h3>
+      <p>
+        A scanned page is a picture of text. It carries no text layer, so everything built on one
+        stops working: line-by-line rail reading, search, text selection, table cells, Markdown
+        export, and VLM grounding. OCR reads the text back off the image so those features behave
+        as they would on a born-digital page. It is off by default and costs nothing until you
+        turn it on.
+      </p>
+      <ul>
+        <li><strong>OCR mode:</strong> <strong>Off</strong> (default) does nothing.
+          <strong>Lines</strong> detects where the lines of text are without reading them &mdash;
+          enough to restore rail mode's line-by-line movement on a scan, though search and
+          selection still have nothing to work with. <strong>Full</strong> detects
+          <em>and</em> recognises the text, restoring every text-dependent feature; pair it with
+          the PP-DocLayout-S layout model at 1920 for the best results. Changing the mode drops
+          cached analysis for affected pages, so open scans re-analyse immediately.</li>
+        <li><strong>Skew correction:</strong> Scans are rarely square on the glass, and line
+          detection is exactly the step a tilt breaks &mdash; under a degree is enough to fragment
+          a paragraph into a couple of huge rail lines, or to fuse neighbouring lines into one.
+          This measures the page's tilt from the OCR results and compensates when grouping text
+          into lines; square pages are left untouched. On by default, and disabled while OCR mode
+          is Off since the tilt is measured from the OCR results.</li>
+        <li><strong>OCR language pack:</strong> The bundled recogniser reads Latin-script text well
+          and little else. The optional PP-OCRv6 packs add broad multilingual coverage (Latin +
+          CJK and more) in three tiers. Press <strong>Download language pack</strong> &mdash; files
+          are saved to your config folder, so this works from a read-only AppImage &mdash; then
+          restart.</li>
+      </ul>
+      <table class="shortcuts-table">
+        <thead class="sr-only">
+          <tr><th>Pack</th><th>Download</th><th>Recognition speed</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>Tiny</strong></td><td>~6 MB</td><td>Fastest</td></tr>
+          <tr><td><strong>Small</strong></td><td>~31 MB</td><td>Moderate</td></tr>
+          <tr><td><strong>Medium</strong></td><td>~138 MB</td><td>Slowest &mdash; a minute or more per scanned page is normal</td></tr>
+        </tbody>
+      </table>
+      <p>
+        <strong>Tiny or Small are the right default for reading.</strong> Full recognition is
+        CPU-heavy and shares a single worker thread with layout analysis, so while a scanned page
+        is being recognised, analysis of every open document waits behind it. On the Medium pack
+        that can look like the app has frozen &mdash; it hasn't, and the session log records each
+        page as it completes.
+      </p>
+
       <h3>Config file</h3>
       <p>
         Configuration is stored at <code>~/.config/railreader2/config.json</code> (Linux) or
@@ -1173,6 +1219,34 @@ railreader2-cli export paper.pdf --figure-dir ./figures --output paper.md</code>
         RailReader2 writes a diagnostic log during each session. If you encounter a problem,
         the log helps developers understand what happened.
       </p>
+      <h3>The app seems to freeze on a scanned page</h3>
+      <p>
+        Almost always OCR working, not a crash. Full recognition shares one worker thread with
+        layout analysis, so a scanned page holds up analysis of every open document until it
+        finishes &mdash; and with the <strong>Medium</strong> language pack a single page can take
+        a minute or more. Switch to the <strong>Tiny</strong> or <strong>Small</strong> pack
+        (Settings &rarr; OCR), or set OCR mode to <strong>Lines</strong>, which restores rail
+        reading on scans without the recognition cost.
+      </p>
+
+      <h3>&ldquo;OCR model failed to load&rdquo;</h3>
+      <p>
+        The selected language pack isn't installed. Open Settings &rarr; OCR, press
+        <strong>Download language pack</strong>, and restart. Recent versions fall back to the
+        bundled recogniser instead of disabling OCR, so this message means only that your chosen
+        pack is unavailable &mdash; not that OCR is broken.
+      </p>
+
+      <h3>A scan reads as one giant rail line</h3>
+      <p>
+        Line grouping is being defeated by page tilt. Check that <strong>Skew correction</strong>
+        is enabled (Settings &rarr; OCR) and that OCR mode is <strong>Lines</strong> or
+        <strong>Full</strong> &mdash; skew is measured from the OCR results, so it can do nothing
+        with OCR off. If it is already on, the page may exceed the &plusmn;5&deg; correction limit,
+        or carry two differently-tilted columns, which the correction deliberately declines to
+        guess at.
+      </p>
+
       <h3>Exporting the log</h3>
       <ul>
         <li><strong>Help &rarr; Export Diagnostic Log&hellip;</strong> opens a save dialog to export a copy of the current session log.</li>

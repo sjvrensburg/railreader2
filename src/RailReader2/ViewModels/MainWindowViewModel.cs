@@ -11,6 +11,7 @@ using RailReader.Core.Ocr.RapidOcr;
 using RailReader.Core.Services;
 using RailReader.Renderer.Skia;
 using RailReader2.Services;
+using RapidOcrNet; // RapidOcrModelSet — the model-set type OcrModelDescriptor wraps
 
 namespace RailReader2.ViewModels;
 
@@ -327,6 +328,34 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     /// <summary>Path to the current session log file, or null if file logging unavailable.</summary>
     public string? LogFilePath => _logger.LogFilePath;
 
+    /// <summary>
+    /// Resolves the persisted OCR language-pack choice to a model set for <c>RapidOcrService</c>,
+    /// or null for the bundled PP-OCRv5-Latin default. Null is also the answer for a pack that is
+    /// selected but not on disk — see the call site for why that must not be an error.
+    /// </summary>
+    private static RapidOcrModelSet? ResolveOcrModelSet(string? modelSetId, ILogger logger)
+    {
+        if (modelSetId is null) return null;
+
+        if (OcrModelRegistry.ById(modelSetId) is not { } desc)
+        {
+            logger.Debug($"[OCR] Unknown language pack '{modelSetId}' in prefs; using the bundled default.");
+            return null;
+        }
+
+        // Locate() probes the same paths the downloader writes to and returns null unless every
+        // file of the set (detector, recognizer, dictionary) is present.
+        if (OcrModelLocator.Locate(desc.ModelSet) is null)
+        {
+            logger.Debug(
+                $"[OCR] Language pack '{desc.DisplayName}' is selected but not installed; " +
+                "using the bundled default. Download it in Settings ▸ OCR, then restart.");
+            return null;
+        }
+
+        return desc.ModelSet;
+    }
+
     public MainWindowViewModel(AppConfig config, ILogger? logger = null)
     {
         _appConfig = config;
@@ -340,7 +369,15 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         // the OCR service once, eagerly, at worker-thread startup (mirrors the layout-model
         // "Restart to apply" convention). Null falls back to RapidOcrService's own bundled default
         // (PP-OCRv5, Latin-only, no download needed).
-        var ocrModelSet = ocrPrefs.ModelSetId is { } id ? OcrModelRegistry.ById(id)?.ModelSet : null;
+        //
+        // The choice is persisted the moment it is picked in the settings dropdown, which is well
+        // before its ~138 MB of weights finish downloading (and the download may never happen at
+        // all). Resolving it blindly would hand RapidOcrService a set whose files aren't on disk;
+        // it throws FileNotFoundException, and OCR is then dead for the entire session — losing the
+        // bundled recognizer too, which would have worked fine. So verify the set is actually
+        // locatable and otherwise fall back to the bundled default; the settings status line already
+        // tells the user the pack is uninstalled, and downloading it later just starts working.
+        var ocrModelSet = ResolveOcrModelSet(ocrPrefs.ModelSetId, _logger);
         try
         {
             var resolution = CustomLayoutModelLoader.ResolveModel(config, _logger);

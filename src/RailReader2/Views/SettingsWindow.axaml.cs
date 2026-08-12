@@ -129,6 +129,7 @@ public partial class SettingsWindow : Window
         PopulateBuiltinAnalyzerCombo();
 
         OcrModeCombo.SelectedIndex = (int)vm.Controller.OcrMode;
+        OcrDeskewCheck.IsChecked = c.DeskewOcrLines;
         UpdateOcrStatus();
         PopulateOcrLanguageCombo();
     }
@@ -139,6 +140,30 @@ public partial class SettingsWindow : Window
         OcrStatus.Text = error is not null
             ? $"OCR model failed to load: {error} — layout analysis still works, OCR is inactive."
             : "";
+        UpdateOcrDeskewStatus();
+    }
+
+    /// <summary>
+    /// Deskew is estimated from the OCR detector's own line quads, so it is inert with OCR off
+    /// (Core 0.56.0 leaves the pixel-projection fallback uncorrected). Say so rather than letting
+    /// a ticked box imply an effect it can't have.
+    /// </summary>
+    private void UpdateOcrDeskewStatus()
+    {
+        bool ocrOn = OcrModeCombo.SelectedIndex > 0;
+        OcrDeskewCheck.IsEnabled = ocrOn;
+        OcrDeskewStatus.Text = ocrOn
+            ? ""
+            : "Inactive while OCR mode is Off — the tilt is measured from the OCR detections.";
+    }
+
+    private void OnOcrDeskewChanged(object? sender, RoutedEventArgs e)
+    {
+        if (Vm is not { } vm || _loading) return;
+        // Persisted in AppConfig; OnConfigChanged pushes it to the controller, whose setter drops
+        // the cached analysis of the scanned pages already grouped under the old value.
+        vm.AppConfig.DeskewOcrLines = OcrDeskewCheck.IsChecked == true;
+        vm.OnConfigChanged();
     }
 
     private sealed record OcrLanguageItem(string? Id, string Label, OcrModelDescriptor? Descriptor);
@@ -177,10 +202,25 @@ public partial class SettingsWindow : Window
             return;
         }
         DownloadOcrModelButton.IsEnabled = true;
-        OcrLanguageStatus.Text = OcrModelDownloader.IsInstalled(desc)
+        var state = OcrModelDownloader.IsInstalled(desc)
             ? $"{desc.DisplayName} installed. Restart to apply if just switched."
             : $"{desc.DisplayName} not installed (~{desc.ApproxSizeMb} MB). Press Download, then restart to apply.";
+        OcrLanguageStatus.Text = state + RecognitionCostHint(desc);
     }
+
+    /// <summary>
+    /// The pack names describe accuracy ("most accurate") and download size, neither of which
+    /// hints at recognition cost — and the tiers differ by more than an order of magnitude there.
+    /// Measured: Medium takes ~2 minutes to recognise one 43-line scanned page on a desktop CPU,
+    /// during which the single analysis worker thread serves nothing else, so every open
+    /// document's layout analysis waits behind it and the app looks hung. Say so up front.
+    /// </summary>
+    private static string RecognitionCostHint(OcrModelDescriptor desc) => desc.ApproxSizeMb switch
+    {
+        >= 100 => "\nSlowest to run: expect a minute or more per scanned page on a typical CPU, and layout analysis for other pages pauses while it works. Prefer Tiny or Small unless you need the extra accuracy.",
+        >= 20 => "\nModerate cost — noticeably slower per scanned page than Tiny.",
+        _ => "\nFastest of the multilingual packs.",
+    };
 
     private void OnOcrLanguageChanged(object? sender, SelectionChangedEventArgs e)
     {
@@ -612,6 +652,7 @@ public partial class SettingsWindow : Window
         vm.AppConfig.VlmApiKey = defaults.VlmApiKey;
         vm.AppConfig.VlmStructuredOutput = defaults.VlmStructuredOutput;
         vm.Controller.OcrMode = OcrMode.Off;
+        vm.AppConfig.DeskewOcrLines = defaults.DeskewOcrLines;
         var ocrPrefs = OcrPreferences.Load();
         ocrPrefs.Mode = OcrMode.Off;
         ocrPrefs.ModelSetId = null;
