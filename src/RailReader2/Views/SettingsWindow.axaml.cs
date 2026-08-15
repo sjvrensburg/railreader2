@@ -214,11 +214,12 @@ public partial class SettingsWindow : Window
     /// Measured: Medium takes ~2 minutes to recognise one 43-line scanned page on a desktop CPU,
     /// during which the single analysis worker thread serves nothing else, so every open
     /// document's layout analysis waits behind it and the app looks hung. Say so up front.
+    /// Thresholds are against <see cref="OcrModelDescriptor.RelativeFullCost"/> (Tiny = 1).
     /// </summary>
-    private static string RecognitionCostHint(OcrModelDescriptor desc) => desc.ApproxSizeMb switch
+    private static string RecognitionCostHint(OcrModelDescriptor desc) => desc.RelativeFullCost switch
     {
-        >= 100 => "\nSlowest to run: expect a minute or more per scanned page on a typical CPU, and layout analysis for other pages pauses while it works. Prefer Tiny or Small unless you need the extra accuracy.",
-        >= 20 => "\nModerate cost — noticeably slower per scanned page than Tiny.",
+        >= 10 => "\nSlowest to run: expect a minute or more per scanned page on a typical CPU, and layout analysis for other pages pauses while it works. Prefer Tiny or Small unless you need the extra accuracy.",
+        >= 1.5 => "\nModerate cost — noticeably slower per scanned page than Tiny.",
         _ => "\nFastest of the multilingual packs.",
     };
 
