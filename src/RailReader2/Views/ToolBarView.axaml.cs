@@ -189,11 +189,11 @@ public partial class ToolBarView : UserControl
     private void UpdateCopyVisibility()
         => CopyButton.IsVisible = _vm?.SelectedText is not null;
 
-    // Colour/thickness apply to the palette tools only. Highlight/Pen/Rectangle have colour
-    // palettes; Pen/Rectangle additionally have thickness presets. Other tools use fixed
-    // colours (e.g. underline=green, strikeout=red) set by Core on activation.
+    // Colour/thickness apply to the colour-capable tools (Core 0.59.0: all eight markup/drawing
+    // tools share one 5-colour palette — Eraser/None/TextSelect are the only ones excluded).
+    // Pen/Rectangle additionally have thickness presets.
     private static bool HasColorPalette(AnnotationTool t)
-        => t is AnnotationTool.Highlight or AnnotationTool.Pen or AnnotationTool.Rectangle;
+        => AnnotationInteractionHandler.ColorCapableTools.Contains(t);
 
     private void UpdateColorThicknessEnabled()
     {
@@ -201,13 +201,6 @@ public partial class ToolBarView : UserControl
         ColorButton.IsEnabled = HasColorPalette(t);
         ThicknessButton.IsEnabled = t is AnnotationTool.Pen or AnnotationTool.Rectangle;
     }
-
-    private static (string Color, float Opacity)[] PaletteFor(AnnotationTool tool) => tool switch
-    {
-        AnnotationTool.Pen => AnnotationInteractionHandler.PenColors,
-        AnnotationTool.Rectangle => AnnotationInteractionHandler.RectColors,
-        _ => AnnotationInteractionHandler.HighlightColors,
-    };
 
     private string? _lastSwatchColor;
     private IBrush? _lastSwatchBrush;
@@ -234,7 +227,7 @@ public partial class ToolBarView : UserControl
         var tool = _vm.ActiveTool;
         if (!HasColorPalette(tool)) { _colorFlyout.Content = null; return; }
 
-        var palette = PaletteFor(tool);
+        var palette = AnnotationInteractionHandler.AnnotationColors;
         var panel = new WrapPanel { MaxWidth = 170 };
         for (int i = 0; i < palette.Length; i++)
         {
@@ -244,7 +237,7 @@ public partial class ToolBarView : UserControl
                 Width = 28,
                 Height = 28,
                 Margin = new Thickness(2),
-                Background = new SolidColorBrush(Color.Parse(palette[i].Color)),
+                Background = new SolidColorBrush(Color.Parse(palette[i])),
                 BorderBrush = Brushes.Gray,
                 BorderThickness = new Thickness(1),
             };
@@ -255,6 +248,9 @@ public partial class ToolBarView : UserControl
                 _vm.SetAnnotationTool(tool);
                 UpdateColorSwatch();
                 _colorFlyout.Hide();
+                // Persist immediately (Core 0.59.0: selection is opt-in wiring, not automatic).
+                _vm.AppConfig.SetAnnotationColorIndices(_vm.Controller.Annotations.ColorIndices);
+                _vm.AppConfig.Save();
             };
             panel.Children.Add(swatch);
         }
