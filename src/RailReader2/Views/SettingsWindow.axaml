@@ -328,6 +328,8 @@
                         <Separator />
                         <TextBlock TextWrapping="Wrap" Opacity="0.7"
                                    Text="Experimental: runs layout inference on the GPU via ONNX Runtime's native WebGPU execution provider (Dawn → D3D12/Vulkan/Metal). Only Docling Heron and PP-DocLayoutV3 have a GPU (FP16) model — PP-DocLayout-S always runs on CPU. Automatically falls back to CPU if no compatible GPU is found, the FP16 model isn't downloaded, or the GPU session fails to start. Takes effect after a restart." />
+                        <TextBlock TextWrapping="Wrap" Opacity="0.7" FontWeight="Bold"
+                                   Text="Known issue: the WebGPU execution provider (Microsoft.ML.OnnxRuntime.EP.WebGpu, an early 0.x package) can fail mid-session on specific pages with an ONNX Runtime kernel error, silently losing layout detection for that page only — not a crash, and other pages/documents keep working. If a page is missing paragraphs or blocks you'd expect to see, try disabling GPU acceleration and restarting before reporting a detection bug." />
                         <CheckBox Name="GpuAccelerationCheck" Content="Use GPU acceleration"
                                   IsCheckedChanged="OnGpuAccelerationChanged" Margin="0,4,0,4" />
                         <Grid ColumnDefinitions="Auto,8,Auto,8,*" Margin="0,6,0,0">
