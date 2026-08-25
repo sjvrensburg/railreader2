@@ -1,6 +1,7 @@
 using System.Text.Json;
 using RailReader.Core;
 using RailReader.Core.Analysis;
+using RailReader.Core.Analysis.WebGpu;
 using RailReader.Core.Models;
 using RailReader.Core.Services;
 
@@ -66,13 +67,16 @@ public static class CustomLayoutModelLoader
             }
         }
 
-        return ResolveBuiltin(custom.BuiltinAnalyzer, logger);
+        return ResolveBuiltin(custom.BuiltinAnalyzer, custom.Accelerator, logger);
     }
 
-    private static Resolution ResolveBuiltin(BuiltinAnalyzer choice, ILogger logger)
+    private static Resolution ResolveBuiltin(BuiltinAnalyzer choice, AcceleratorPreference accelerator, ILogger logger)
     {
         if (choice == BuiltinAnalyzer.Heron)
         {
+            if (TryResolveGpu(LayoutModelArchitecture.Heron, accelerator, logger) is { } gpuHeron)
+                return gpuHeron;
+
             var heronPath = HeronModelLocator.FindModelPath();
             if (heronPath != null)
             {
@@ -87,6 +91,7 @@ public static class CustomLayoutModelLoader
         }
         else if (choice == BuiltinAnalyzer.PpDocLayoutS)
         {
+            // No GPU/FP16 variant exists for this architecture — always CPU.
             var ppsPath = PPDocLayoutSModelLocator.FindModelPath();
             if (ppsPath != null)
             {
@@ -100,6 +105,9 @@ public static class CustomLayoutModelLoader
             // fall through to PP
         }
 
+        if (TryResolveGpu(LayoutModelArchitecture.PPDocLayoutV3, accelerator, logger) is { } gpuV3)
+            return gpuV3;
+
         // Final fallback: PP-DocLayoutV3 (bundled)
         var v3Desc = LayoutModelRegistry.PPDocLayoutV3;
         var bundled = LayoutModelLocator.FindModelPath(v3Desc);
@@ -112,6 +120,75 @@ public static class CustomLayoutModelLoader
             LayoutAnalyzerFactory.CapabilitiesFor(v3Desc.Architecture),
             () => LayoutAnalyzerFactory.Create(v3Desc, bundled),
             v3Desc.DisplayName);
+    }
+
+    /// <summary>
+    /// Resolves <paramref name="architecture"/> against its GPU (FP16) model descriptor when the
+    /// user opted into GPU acceleration, a compatible device is present, and the FP16 file is on
+    /// disk. Returns null (fall through to the caller's CPU resolution) for any other case,
+    /// including an architecture with no GPU/FP16 variant (<see cref="LayoutModelRegistry.Resolve"/>
+    /// then just returns the CPU descriptor, which this treats as "no GPU path").
+    ///
+    /// The returned <see cref="Resolution.Factory"/> is invoked lazily on the analysis worker's
+    /// own thread (<c>AnalysisWorker.LayoutLoop</c>), not here — so the actual
+    /// enable/construct/disable sequence around <see cref="WebGpuAccelerator.ConstructionLock"/>
+    /// lives inside that deferred delegate, not at resolve time (Core's execution-provider hook
+    /// is a static field consumed only at <c>InferenceSession</c> construction, which must not
+    /// happen until the factory runs). Also retries CPU inline if GPU construction throws at that
+    /// point, so a driver/runtime hiccup degrades gracefully instead of killing the whole worker
+    /// (<see cref="AnalysisWorker.StartupError"/> is fatal for the session).
+    /// </summary>
+    private static Resolution? TryResolveGpu(LayoutModelArchitecture architecture, AcceleratorPreference accelerator, ILogger logger)
+    {
+        if (accelerator != AcceleratorPreference.Gpu) return null;
+
+        var gpuDesc = LayoutModelRegistry.Resolve(architecture, AcceleratorPreference.Gpu);
+        var cpuDesc = LayoutModelRegistry.Resolve(architecture, AcceleratorPreference.Cpu);
+        if (gpuDesc.Id == cpuDesc.Id) return null; // no GPU/FP16 variant for this architecture
+
+        if (!WebGpuAccelerator.IsAvailable)
+        {
+            logger.Warn("[WebGPU] No compatible GPU device found — using CPU.");
+            return null;
+        }
+
+        var gpuPath = LayoutModelLocator.FindModelPath(gpuDesc);
+        if (gpuPath == null)
+        {
+            logger.Warn($"[WebGPU] {gpuDesc.DisplayName} not found on disk ({gpuDesc.FileName}) — using CPU. Download it in Settings.");
+            return null;
+        }
+
+        var cpuPath = LayoutModelLocator.FindModelPath(cpuDesc);
+
+        ILayoutAnalyzer Construct()
+        {
+            lock (WebGpuAccelerator.ConstructionLock)
+            {
+                if (WebGpuAccelerator.TryEnable(architecture))
+                {
+                    try
+                    {
+                        return LayoutAnalyzerFactory.Create(gpuDesc, gpuPath);
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.Warn($"[WebGPU] GPU analyzer construction failed, falling back to CPU: {ex.Message}");
+                    }
+                    finally
+                    {
+                        WebGpuAccelerator.Disable(architecture);
+                    }
+                }
+
+                if (cpuPath == null)
+                    throw new InvalidOperationException(
+                        $"No usable {architecture} model found (GPU construction failed and no CPU model is on disk).");
+                return LayoutAnalyzerFactory.Create(cpuDesc, cpuPath);
+            }
+        }
+
+        return new Resolution(gpuPath, LayoutAnalyzerFactory.CapabilitiesFor(architecture), Construct, gpuDesc.DisplayName);
     }
 
     /// <summary>

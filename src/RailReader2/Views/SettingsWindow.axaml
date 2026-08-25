@@ -324,6 +324,23 @@
                         <TextBlock Name="BuiltinAnalyzerStatus" TextWrapping="Wrap" Opacity="0.7" FontSize="11"
                                    Margin="0,2,0,0" />
 
+                        <TextBlock Text="GPU Acceleration" FontWeight="Bold" Margin="0,16,0,0" />
+                        <Separator />
+                        <TextBlock TextWrapping="Wrap" Opacity="0.7"
+                                   Text="Experimental: runs layout inference on the GPU via ONNX Runtime's native WebGPU execution provider (Dawn → D3D12/Vulkan/Metal). Only Docling Heron and PP-DocLayoutV3 have a GPU (FP16) model — PP-DocLayout-S always runs on CPU. Automatically falls back to CPU if no compatible GPU is found, the FP16 model isn't downloaded, or the GPU session fails to start. Takes effect after a restart." />
+                        <CheckBox Name="GpuAccelerationCheck" Content="Use GPU acceleration"
+                                  IsCheckedChanged="OnGpuAccelerationChanged" Margin="0,4,0,4" />
+                        <Grid ColumnDefinitions="Auto,8,Auto,8,*" Margin="0,6,0,0">
+                            <Button Grid.Column="0" Name="DownloadGpuModelButton" Content="Download GPU model"
+                                    Click="OnDownloadGpuModel" />
+                            <Button Grid.Column="2" Name="CancelGpuDownloadButton" Content="Cancel"
+                                    Click="OnCancelGpuDownload" IsVisible="False" />
+                            <ProgressBar Grid.Column="4" Name="GpuDownloadProgress" Minimum="0" Maximum="1"
+                                         IsVisible="False" VerticalAlignment="Center" Height="6" />
+                        </Grid>
+                        <TextBlock Name="GpuAccelerationStatus" TextWrapping="Wrap" Opacity="0.7" FontSize="11"
+                                   Margin="0,2,0,0" />
+
                         <TextBlock Text="Custom Layout Model" FontWeight="Bold" Margin="0,16,0,0" />
                         <Separator />
                         <TextBlock TextWrapping="Wrap" Opacity="0.7"
