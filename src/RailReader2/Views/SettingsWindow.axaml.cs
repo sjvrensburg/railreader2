@@ -4,6 +4,7 @@ using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using CommunityToolkit.Mvvm.ComponentModel;
 using RailReader.Core;
+using RailReader.Core.Analysis.WebGpu;
 using RailReader.Core.Models;
 using RailReader.Core.Ocr.RapidOcr;
 using RailReader.Core.Services;
@@ -28,6 +29,7 @@ public partial class SettingsWindow : Window
     private readonly ObservableCollection<NavigableRoleItem> _stopRoleItems = [];
     private CustomLayoutModelConfig _customModel = new();
     private CancellationTokenSource? _downloadCts;
+    private CancellationTokenSource? _gpuDownloadCts;
     private OcrPreferences? _ocrPrefs;
     private CancellationTokenSource? _ocrDownloadCts;
 
@@ -127,6 +129,8 @@ public partial class SettingsWindow : Window
         CustomModelMappingPath.Text = _customModel.MappingPath ?? "";
         UpdateCustomModelStatus();
         PopulateBuiltinAnalyzerCombo();
+        GpuAccelerationCheck.IsChecked = _customModel.Accelerator == AcceleratorPreference.Gpu;
+        UpdateGpuAccelerationStatus();
 
         OcrModeCombo.SelectedIndex = (int)vm.Controller.OcrMode;
         OcrDeskewCheck.IsChecked = c.DeskewOcrLines;
@@ -348,7 +352,101 @@ public partial class SettingsWindow : Window
             _customModel.BuiltinAnalyzer = item.Value;
             _customModel.Save();
             UpdateBuiltinAnalyzerStatus();
+            UpdateGpuAccelerationStatus();
         }
+    }
+
+    /// <summary>
+    /// GPU model status for whichever architecture <see cref="BuiltinAnalyzerCombo"/> currently
+    /// selects. PP-DocLayout-S has no GPU-routed export, so the checkbox is disabled for it rather than
+    /// silently doing nothing when checked.
+    /// </summary>
+    private void UpdateGpuAccelerationStatus()
+    {
+        if (LayoutModelDownloader.GpuDescriptorFor(_customModel.BuiltinAnalyzer) is not { } gpuDesc)
+        {
+            GpuAccelerationCheck.IsEnabled = false;
+            DownloadGpuModelButton.IsEnabled = false;
+            GpuAccelerationStatus.Text = "PP-DocLayout-S has no GPU model — it always runs on CPU.";
+            return;
+        }
+        GpuAccelerationCheck.IsEnabled = true;
+        DownloadGpuModelButton.IsEnabled = true;
+
+        // Probes for a WebGPU-capable device on first call (cached after); safe to call repeatedly.
+        var deviceLine = WebGpuAccelerator.IsAvailable
+            ? $"GPU device detected: {WebGpuAccelerator.DeviceDescription}."
+            : "No compatible GPU device detected — will fall back to CPU.";
+
+        var gpuPath = LayoutModelLocator.FindModelPath(gpuDesc);
+        var modelLine = gpuPath != null
+            ? $"{gpuDesc.DisplayName} installed: {gpuPath}"
+            : $"{gpuDesc.DisplayName} not installed (~{gpuDesc.ApproxSizeMb} MB). Press Download GPU model to install it.";
+
+        var restartNote = GpuAccelerationCheck.IsChecked == true ? "  Restart to apply." : "";
+        GpuAccelerationStatus.Text = $"{deviceLine}\n{modelLine}{restartNote}";
+    }
+
+    private void OnGpuAccelerationChanged(object? sender, RoutedEventArgs e)
+    {
+        if (_loading) return;
+        _customModel.Accelerator = GpuAccelerationCheck.IsChecked == true
+            ? AcceleratorPreference.Gpu
+            : AcceleratorPreference.Cpu;
+        _customModel.Save();
+        UpdateGpuAccelerationStatus();
+    }
+
+    /// <summary>Downloads the GPU model for whichever architecture is currently selected
+    /// in <see cref="BuiltinAnalyzerCombo"/>, to the same writable <c>ConfigDir/models</c> location
+    /// as <see cref="OnDownloadModel"/>. Usable after a restart.</summary>
+    private async void OnDownloadGpuModel(object? sender, RoutedEventArgs e)
+    {
+        if (LayoutModelDownloader.GpuDescriptorFor(_customModel.BuiltinAnalyzer) is not { } desc)
+            return;
+
+        _gpuDownloadCts?.Cancel();
+        _gpuDownloadCts?.Dispose();
+        var cts = _gpuDownloadCts = new CancellationTokenSource();
+
+        SetGpuDownloadUiActive(true);
+        GpuDownloadProgress.Value = 0;
+        GpuAccelerationStatus.Text = $"Downloading {desc.DisplayName} (~{desc.ApproxSizeMb} MB)…";
+
+        try
+        {
+            var progress = new Progress<double>(p => GpuDownloadProgress.Value = p);
+            var result = await LayoutModelDownloader.DownloadAsync(desc, progress, cts.Token);
+
+            GpuAccelerationStatus.Text = result switch
+            {
+                { Ok: true } => $"Installed {desc.DisplayName} → {result.Path}  Restart to apply.",
+                { Error: "Cancelled." } => "Download cancelled.",
+                _ => $"Download failed: {result.Error}",
+            };
+        }
+        catch (Exception ex)
+        {
+            GpuAccelerationStatus.Text = $"Download failed: {ex.Message}";
+        }
+        finally
+        {
+            SetGpuDownloadUiActive(false);
+            if (ReferenceEquals(_gpuDownloadCts, cts))
+            {
+                _gpuDownloadCts = null;
+            }
+            cts.Dispose();
+        }
+    }
+
+    private void OnCancelGpuDownload(object? sender, RoutedEventArgs e) => _gpuDownloadCts?.Cancel();
+
+    private void SetGpuDownloadUiActive(bool active)
+    {
+        GpuDownloadProgress.IsVisible = active;
+        CancelGpuDownloadButton.IsVisible = active;
+        DownloadGpuModelButton.IsEnabled = !active;
     }
 
     /// <summary>
@@ -405,6 +503,9 @@ public partial class SettingsWindow : Window
         _downloadCts?.Cancel();
         _downloadCts?.Dispose();
         _downloadCts = null;
+        _gpuDownloadCts?.Cancel();
+        _gpuDownloadCts?.Dispose();
+        _gpuDownloadCts = null;
         _ocrDownloadCts?.Cancel();
         _ocrDownloadCts?.Dispose();
         _ocrDownloadCts = null;

@@ -42,6 +42,16 @@ public sealed class CustomLayoutModelConfig
     public string? MappingPath { get; set; }
     /// <summary>Which shipped analyzer to use when the custom model is disabled or unavailable.</summary>
     public BuiltinAnalyzer BuiltinAnalyzer { get; set; } = BuiltinAnalyzer.Heron;
+    /// <summary>
+    /// GPU acceleration preference for the built-in analyzer (Docling Heron / PP-DocLayoutV3
+    /// only — PP-DocLayout-S and the custom-model path have no GPU/FP16 variant and always run
+    /// on CPU). Experimental; routed through <c>RailReader.Core.Analysis.WebGpu</c>'s native
+    /// WebGPU execution provider. Takes effect on next launch — the execution provider is fixed
+    /// at analyzer construction, so switching it needs a restart, same convention as the
+    /// layout-model picker and the OCR language pack.
+    /// </summary>
+    [JsonConverter(typeof(JsonStringEnumConverter<AcceleratorPreference>))]
+    public AcceleratorPreference Accelerator { get; set; } = AcceleratorPreference.Cpu;
 
     public static string Path => System.IO.Path.Combine(AppConfig.ConfigDir, "custom_layout_model.json");
 
