@@ -2,15 +2,24 @@
 # Download ONNX models from HuggingFace.
 #
 # With no arguments, downloads the two bundled-by-default models (Heron INT8 +
-# PP-DocLayoutV3), same as before. Pass heron-fp16 / ppdoc-fp16 to additionally
-# fetch the GPU (FP16) variants used by RailReader.Core.Analysis.WebGpu's
-# native WebGPU execution provider (Settings ▸ Advanced ▸ GPU Acceleration).
+# PP-DocLayoutV3), same as before.
+#
+# GPU (RailReader.Core.Analysis.WebGpu's native WebGPU execution provider,
+# Settings ▸ Advanced ▸ GPU Acceleration) now routes to the plain FP32 model
+# for both architectures (RailReaderCore 0.60.2, issue #109 — the FP16 GPU
+# exports had a real correctness bug: TopK query-selection instability at the
+# decoder's confidence cutoff). PP-DocLayoutV3's GPU path reuses the same file
+# already downloaded above — nothing extra needed. Heron's GPU path needs the
+# separate plain-FP32 Heron export (`heron`), since Heron's CPU default is the
+# INT8 build. The old heron-fp16/ppdoc-fp16 FP16 exports are still downloadable
+# for direct/manual use but are no longer what GPU acceleration actually uses.
 #
 # Usage:
 #   ./download-model.sh             # Heron INT8 + PP-DocLayoutV3 (default)
-#   ./download-model.sh heron-fp16  # Docling Heron FP16, for GPU (~86 MB)
-#   ./download-model.sh ppdoc-fp16  # PP-DocLayoutV3 FP16, for GPU (~68 MB)
-#   ./download-model.sh all         # all of the above
+#   ./download-model.sh heron-gpu   # Docling Heron FP32, for GPU (~164 MB)
+#   ./download-model.sh heron-fp16  # Docling Heron FP16 (legacy, manual use only, ~86 MB)
+#   ./download-model.sh ppdoc-fp16  # PP-DocLayoutV3 FP16 (legacy, manual use only, ~68 MB)
+#   ./download-model.sh all         # everything above
 set -e
 
 MODEL_DIR="$(dirname "$0")/../models"
@@ -37,6 +46,21 @@ download_ppdoc() {
     echo "Downloading PP-DocLayoutV3 (~50 MB)..."
     curl -L -o "$path" \
         "https://huggingface.co/alex-dinh/PP-DocLayoutV3-ONNX/resolve/main/PP-DocLayoutV3.onnx"
+    echo "Downloaded to $path ($(du -h "$path" | cut -f1))"
+}
+
+download_heron_gpu() {
+    # Plain FP32 Heron — the actual GPU model since RailReaderCore 0.60.2
+    # (LayoutModelRegistry.Resolve routes GPU requests here, not to the FP16
+    # export). Distinct from download_heron_int8's CPU-optimal file.
+    local path="$MODEL_DIR/docling-layout-heron.onnx"
+    if [ -f "$path" ]; then
+        echo "Docling Heron FP32 already exists at $path"
+        return
+    fi
+    echo "Downloading Docling Heron FP32, for GPU (~164 MB)..."
+    curl -L -o "$path" \
+        "https://huggingface.co/docling-project/docling-layout-heron-onnx/resolve/main/model.onnx"
     echo "Downloaded to $path ($(du -h "$path" | cut -f1))"
 }
 
@@ -74,6 +98,9 @@ case "${1:-default}" in
         download_heron_int8
         download_ppdoc
         ;;
+    heron-gpu|herongpu)
+        download_heron_gpu
+        ;;
     heron-fp16|heronfp16)
         download_heron_fp16
         ;;
@@ -83,12 +110,13 @@ case "${1:-default}" in
     all)
         download_heron_int8
         download_ppdoc
+        download_heron_gpu
         download_heron_fp16
         download_ppdoc_fp16
         ;;
     *)
         echo "Unknown model: $1" >&2
-        echo "Usage: $0 [heron-fp16|ppdoc-fp16|all]" >&2
+        echo "Usage: $0 [heron-gpu|heron-fp16|ppdoc-fp16|all]" >&2
         exit 1
         ;;
 esac

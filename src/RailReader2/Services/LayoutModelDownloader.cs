@@ -29,12 +29,18 @@ public static class LayoutModelDownloader
         _ => null,
     };
 
-    /// <summary>Maps a built-in analyzer choice to its GPU (FP16) model descriptor, or null if
-    /// that architecture has no GPU variant (currently PP-DocLayout-S).</summary>
+    /// <summary>Maps a built-in analyzer choice to the model descriptor
+    /// <see cref="LayoutModelRegistry.Resolve"/> actually hands the WebGPU execution
+    /// provider, or null if that architecture has no GPU variant (currently
+    /// PP-DocLayout-S). Since RailReaderCore 0.60.2 this is the plain FP32 model for
+    /// both architectures (issue #109 — the FP16 GPU exports had a correctness bug),
+    /// not the <c>*Fp16</c> descriptors, which are kept in the registry for direct/manual
+    /// use only. For PP-DocLayoutV3 this is the same file <see cref="DescriptorFor"/>
+    /// already downloads for CPU — the GPU checkbox needs no separate download there.</summary>
     public static LayoutModelDescriptor? GpuDescriptorFor(BuiltinAnalyzer choice) => choice switch
     {
-        BuiltinAnalyzer.PpDocLayoutV3 => LayoutModelRegistry.PPDocLayoutV3Fp16,
-        BuiltinAnalyzer.Heron => LayoutModelRegistry.HeronFp16,
+        BuiltinAnalyzer.PpDocLayoutV3 => LayoutModelRegistry.PPDocLayoutV3,
+        BuiltinAnalyzer.Heron => LayoutModelRegistry.Heron,
         _ => null,
     };
 

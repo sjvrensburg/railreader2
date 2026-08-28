@@ -357,8 +357,8 @@ public partial class SettingsWindow : Window
     }
 
     /// <summary>
-    /// GPU (FP16) status for whichever architecture <see cref="BuiltinAnalyzerCombo"/> currently
-    /// selects. PP-DocLayout-S has no FP16 export, so the checkbox is disabled for it rather than
+    /// GPU model status for whichever architecture <see cref="BuiltinAnalyzerCombo"/> currently
+    /// selects. PP-DocLayout-S has no GPU-routed export, so the checkbox is disabled for it rather than
     /// silently doing nothing when checked.
     /// </summary>
     private void UpdateGpuAccelerationStatus()
@@ -397,7 +397,7 @@ public partial class SettingsWindow : Window
         UpdateGpuAccelerationStatus();
     }
 
-    /// <summary>Downloads the GPU (FP16) model for whichever architecture is currently selected
+    /// <summary>Downloads the GPU model for whichever architecture is currently selected
     /// in <see cref="BuiltinAnalyzerCombo"/>, to the same writable <c>ConfigDir/models</c> location
     /// as <see cref="OnDownloadModel"/>. Usable after a restart.</summary>
     private async void OnDownloadGpuModel(object? sender, RoutedEventArgs e)
