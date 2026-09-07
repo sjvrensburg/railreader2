@@ -7,6 +7,7 @@ using RailReader.Core.Models;
 using RailReader2.Services;
 using RailReader2.ViewModels;
 using static RailReader.Core.Services.VlmService;
+using CoreViewport = RailReader.Core.Viewport;
 
 namespace RailReader2.Views;
 
@@ -22,6 +23,11 @@ public class ViewportPanel : Panel
     /// <summary>This panel's viewport camera (its DocumentView's), falling back to the active tab's
     /// primary camera before the owner is wired or when there is no document.</summary>
     private Camera? ActiveCamera => OwnerView?.SurfaceViewport?.Camera ?? ViewModel?.ActiveTab?.Camera;
+
+    /// <summary>This panel's own Core viewport, falling back to the active tab's primary before the
+    /// owner is wired. Used for continuous-scroll-aware screen↔page resolution and the wheel
+    /// scroll/zoom decision (<see cref="CoreViewport.ContinuousScroll"/>).</summary>
+    private CoreViewport? ActiveViewport => OwnerView?.SurfaceViewport ?? ViewModel?.ActiveTab?.Viewport;
 
     private bool _dragging;
     private Point _lastPos;
@@ -51,6 +57,12 @@ public class ViewportPanel : Panel
     // (a per-page link scan) on every event without a perceptible cursor lag.
     private Point _lastLinkHitTestPos = new(double.NegativeInfinity, double.NegativeInfinity);
     private const double LinkHitTestMinMoveSq = 9.0; // 3px squared
+
+    // The page the current annotation/browse gesture is pinned to, set by ScreenToPage at press
+    // time and reused (without re-anchoring) by every move/release event of that same gesture — see
+    // ScreenToGesturePage. Per the continuous-scroll host contract: "a drag that crosses a page
+    // boundary stays on its start page."
+    private int? _gesturePage;
 
     public ViewportPanel()
     {
@@ -101,6 +113,20 @@ public class ViewportPanel : Panel
         double scrollY = e.Delta.Y * 30.0;
         var pos = e.GetPosition(this);
         bool ctrl = e.KeyModifiers.HasFlag(KeyModifiers.Control);
+
+        // Continuous scrolling: plain wheel scrolls the document (the usual convention for a
+        // continuous viewer), Ctrl+wheel still zooms. This only applies in BROWSE mode — rail mode
+        // already owns its own reading-position navigation and, at rail zoom, the reader still wants
+        // plain wheel to zoom (rail's line advance is keyboard/auto-scroll driven, not wheel-driven).
+        // Outside continuous mode, in rail mode, or in a confined view (portal / FocusBlock, where
+        // Viewport.ContinuousScroll is always false) — wheel always zooms, unchanged.
+        if (!ctrl && ActiveViewport is { ContinuousScroll: true, Rail.Active: false })
+        {
+            ViewModel.HandlePan(0, scrollY);
+            e.Handled = true;
+            return;
+        }
+
         ViewModel.HandleZoom(scrollY, pos.X, pos.Y, ctrl);
         e.Handled = true;
     }
@@ -212,8 +238,7 @@ public class ViewportPanel : Panel
                 if (mdx * mdx + mdy * mdy >= LinkHitTestMinMoveSq)
                 {
                     _lastLinkHitTestPos = pos;
-                    var (pageX, pageY) = ScreenToPage(pos);
-                    bool overLink = ViewModel.IsOverLink(pageX, pageY);
+                    bool overLink = ResolveHoverPoint(pos) is { } p && ViewModel.IsOverLink(p.PageX, p.PageY);
                     UpdateLinkCursor(overLink);
                 }
             }
@@ -234,13 +259,13 @@ public class ViewportPanel : Panel
 
         if (ViewModel.IsAnnotating && !_barrelPan)
         {
-            var (pageX, pageY) = ScreenToPage(dragPos);
+            var (pageX, pageY) = ScreenToGesturePage(dragPos);
             bool shift = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
             ViewModel.HandleAnnotationPointerMove(pageX, pageY, shift);
         }
         else if (_browseAnnotationDrag)
         {
-            var (pageX, pageY) = ScreenToPage(dragPos);
+            var (pageX, pageY) = ScreenToGesturePage(dragPos);
             ViewModel.HandleBrowsePointerMove((float)pageX, (float)pageY);
         }
         else
@@ -308,12 +333,12 @@ public class ViewportPanel : Panel
 
             if (ViewModel.IsAnnotating)
             {
-                var (pageX, pageY) = ScreenToPage(pos);
+                var (pageX, pageY) = ScreenToGesturePage(pos);
                 ViewModel.HandleAnnotationPointerUp(pageX, pageY);
             }
             else if (_browseAnnotationDrag)
             {
-                var (pageX, pageY) = ScreenToPage(pos);
+                var (pageX, pageY) = ScreenToGesturePage(pos);
                 if (isClick)
                     ViewModel.HandleBrowseClick((float)pageX, (float)pageY, _pressClickCount >= 2);
                 else
@@ -373,6 +398,7 @@ public class ViewportPanel : Panel
         _dragging = false;
         _browseAnnotationDrag = false;
         _barrelPan = false;
+        _gesturePage = null;
     }
 
     // Context menus are popups in their own visual root, so they don't inherit the window's UiFontScale
@@ -523,7 +549,9 @@ public class ViewportPanel : Panel
     private bool TryFrameBlockAt(Point screenPos)
     {
         if (ViewModel is not { } vm) return false;
-        var (pageX, pageY) = ScreenToPage(screenPos);
+        // Release-time hit-test for the SAME press/release gesture ScreenToPage pinned at press —
+        // stay on that page rather than re-resolving (and potentially re-anchoring) at release.
+        var (pageX, pageY) = ScreenToGesturePage(screenPos);
         int index = vm.FindBlockIndexAt(pageX, pageY);
         if (index < 0) return false;
         // A gentler ease than the native 180ms zoom — a double-click is a deliberate framing
@@ -531,13 +559,81 @@ public class ViewportPanel : Panel
         return vm.SmoothlyFrameBlock(index, durationMs: FrameZoomDurationMs);
     }
 
+    /// <summary>Resolves a screen point to page-local coordinates for an actual interaction dispatch
+    /// (click, drag, freeze placement, context menu, block framing) — NOT for passive hover, which
+    /// uses <see cref="ResolveHoverPoint"/> instead so mere mouse movement never re-anchors. In
+    /// continuous mode the point may resolve to a neighbouring page (<c>Viewport.ResolvePoint</c>);
+    /// when it does, this re-anchors the focused viewport there first (Core's
+    /// <see cref="DocumentController.AnchorToPage"/>) so the annotation/browse/freeze/click handlers
+    /// that follow — all page-local by construction — act on the right page, and remembers the
+    /// resolved page as <see cref="_gesturePage"/> for any move/release events of the SAME gesture
+    /// (see <see cref="ScreenToGesturePage"/>) to reuse. Safe to call from every gesture-START dispatch
+    /// site: by the time any of them runs, a prior PointerPressed tunnel
+    /// (<c>DocumentView.OnViewportPressedForFocus</c>) has already focused this pane, so
+    /// <c>Controller.FocusedViewport</c> is this panel's own viewport.</summary>
     private (double PageX, double PageY) ScreenToPage(Point screenPos)
     {
+        if (ActiveViewport is { } vp)
+        {
+            var (page, pageX, pageY) = vp.ResolvePoint(screenPos.X, screenPos.Y);
+            if (page != vp.CurrentPage)
+            {
+                ViewModel?.Controller.AnchorToPage(page);
+                // AnchorToPage silently no-ops on a render failure (mirrors GoToPage's own contract —
+                // the same guard Core's own HandleClick/ActivateRailAt apply internally). When the
+                // anchor didn't actually move, resolve against the page that IS current instead of
+                // trusting `page`'s now-mismatched coordinates.
+                if (vp.CurrentPage != page)
+                {
+                    _gesturePage = vp.CurrentPage;
+                    return ScreenToPageOnPage(screenPos, vp, vp.CurrentPage);
+                }
+            }
+            _gesturePage = page;
+            return (pageX, pageY);
+        }
         if (ActiveCamera is not { } cam)
             return (screenPos.X, screenPos.Y);
-        double pageX = (screenPos.X - cam.OffsetX) / cam.Zoom;
-        double pageY = (screenPos.Y - cam.OffsetY) / cam.Zoom;
-        return (pageX, pageY);
+        double legacyX = (screenPos.X - cam.OffsetX) / cam.Zoom;
+        double legacyY = (screenPos.Y - cam.OffsetY) / cam.Zoom;
+        return (legacyX, legacyY);
+    }
+
+    /// <summary>Resolves a screen point against the page the CURRENT gesture is pinned to
+    /// (<see cref="_gesturePage"/>, set by <see cref="ScreenToPage"/> at press time) — never
+    /// re-anchors mid-gesture. Per the continuous-scroll host contract: "a drag that crosses a page
+    /// boundary stays on its start page" — a highlight/freehand stroke or a browse drag must resolve
+    /// every one of its points in the SAME page's coordinate frame it started in, even if the pointer
+    /// strays over a neighbouring page. Falls back to <see cref="ScreenToPage"/> (defensive — every
+    /// real move/release call site is preceded by a press that sets <see cref="_gesturePage"/>).</summary>
+    private (double PageX, double PageY) ScreenToGesturePage(Point screenPos)
+    {
+        if (ActiveViewport is { } vp && _gesturePage is { } page)
+            return ScreenToPageOnPage(screenPos, vp, page);
+        return ScreenToPage(screenPos);
+    }
+
+    private static (double PageX, double PageY) ScreenToPageOnPage(Point screenPos, CoreViewport vp, int page)
+    {
+        var (offsetX, offsetY) = vp.PageOffset(page);
+        double zoom = vp.Camera.Zoom;
+        return ((screenPos.X - offsetX) / zoom, (screenPos.Y - offsetY) / zoom);
+    }
+
+    /// <summary>Resolves a screen point to page-local coordinates for a passive hover check (link
+    /// cursor) — never anchors. In continuous mode a point over a neighbouring page reports "no page"
+    /// (the caller should treat it as no link there); the link cursor catches up once the reader
+    /// scrolls that page into anchor position, matching the "scrolling drives the anchor, not hover"
+    /// rule the click/drag paths follow.</summary>
+    private (double PageX, double PageY)? ResolveHoverPoint(Point screenPos)
+    {
+        if (ActiveViewport is { } vp)
+        {
+            var (page, pageX, pageY) = vp.ResolvePoint(screenPos.X, screenPos.Y);
+            return page == vp.CurrentPage ? (pageX, pageY) : null;
+        }
+        if (ActiveCamera is not { } cam) return (screenPos.X, screenPos.Y);
+        return ((screenPos.X - cam.OffsetX) / cam.Zoom, (screenPos.Y - cam.OffsetY) / cam.Zoom);
     }
 
     /// <summary>Hit-test the always-on portal markers (screen-space, fixed pixel radius). Returns true if

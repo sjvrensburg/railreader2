@@ -103,6 +103,26 @@ public partial class MinimapControl : UserControl
         // Resolve the window client size here (UI thread) rather than inside the
         // composition-thread draw op via Application.Current.
         var win = TopLevel.GetTopLevel(this);
+        double winW = win?.ClientSize.Width ?? 1200;
+        double winH = win?.ClientSize.Height ?? 900;
+
+        // Continuous scrolling: a thin document-wide position indicator alongside the existing
+        // page-local thumbnail (which keeps showing the anchor page as always — §7 host contract).
+        // Computed here on the UI thread (PageLayout/DocumentOffsetY are cheap reads) so the
+        // composition-thread draw op stays a pure snapshot.
+        bool continuous = false;
+        double docCentreFraction = 0, docViewFraction = 1;
+        if (PaneViewport is { } cvp && cvp.ContinuousScroll && cvp.Owner.PageLayout is { TotalHeight: > 0 } layout
+            && cvp.Camera.Zoom > 0)
+        {
+            continuous = true;
+            double zoom = cvp.Camera.Zoom;
+            double docYTop = -cvp.DocumentOffsetY / zoom;
+            double docYBottom = (winH - cvp.DocumentOffsetY) / zoom;
+            docViewFraction = Math.Clamp((docYBottom - docYTop) / layout.TotalHeight, 0, 1);
+            docCentreFraction = Math.Clamp((docYTop + docYBottom) / 2.0 / layout.TotalHeight, 0, 1);
+        }
+
         // Snapshot THIS pane's viewport + its own image wraps on the UI thread (a split pane / tear-off
         // reflects its own page/camera, not the primary's).
         context.Custom(new MinimapDrawOperation(
@@ -114,8 +134,11 @@ public partial class MinimapControl : UserControl
             showChrome: _hover || dragging,
             drag: dragging,
             resizeCorner: ResizeCornerInside(),
-            winW: win?.ClientSize.Width ?? 1200,
-            winH: win?.ClientSize.Height ?? 900));
+            winW: winW,
+            winH: winH,
+            continuousScroll: continuous,
+            docCentreFraction: docCentreFraction,
+            docViewFraction: docViewFraction));
     }
 
     /// <summary>
@@ -372,11 +395,15 @@ public partial class MinimapControl : UserControl
         private readonly Corner _resizeCorner;
         private readonly double _winW;
         private readonly double _winH;
+        private readonly bool _continuousScroll;
+        private readonly double _docCentreFraction;
+        private readonly double _docViewFraction;
 
         // Snapshot for Equals — quantised to avoid per-pixel redraws.
         private readonly SKImage? _thumbImage;
         private readonly SKImage? _primaryImage;
         private readonly int _oxQ, _oyQ, _zoomQ;
+        private readonly int _docFractionQ;
 
         [ThreadStatic] private static SKPaint? s_bgPaint;
         [ThreadStatic] private static SKPaint? s_vpFill;
@@ -385,6 +412,8 @@ public partial class MinimapControl : UserControl
         [ThreadStatic] private static SKPaint? s_chromeFill;
         [ThreadStatic] private static SKPaint? s_gripDot;
         [ThreadStatic] private static SKPaint? s_hashLine;
+        [ThreadStatic] private static SKPaint? s_docTrackPaint;
+        [ThreadStatic] private static SKPaint? s_docThumbPaint;
 
         // Mitchell at rest for crisp thumbnails; Linear during drag for cheapness.
         private static readonly SKSamplingOptions s_samplingRest =
@@ -395,7 +424,8 @@ public partial class MinimapControl : UserControl
         public MinimapDrawOperation(Rect bounds, MinimapControl control,
             Viewport? vp, SKImage? thumbImage, SKImage? primaryImage,
             bool showChrome, bool drag, Corner resizeCorner,
-            double winW, double winH)
+            double winW, double winH,
+            bool continuousScroll, double docCentreFraction, double docViewFraction)
         {
             _bounds = bounds;
             _control = control;
@@ -405,11 +435,15 @@ public partial class MinimapControl : UserControl
             _resizeCorner = resizeCorner;
             _winW = winW;
             _winH = winH;
+            _continuousScroll = continuousScroll;
+            _docCentreFraction = docCentreFraction;
+            _docViewFraction = docViewFraction;
             _thumbImage = thumbImage;
             _primaryImage = primaryImage;
             _oxQ = (int)(vp?.Camera.OffsetX ?? 0) / 16;
             _oyQ = (int)(vp?.Camera.OffsetY ?? 0) / 16;
             _zoomQ = (int)((vp?.Camera.Zoom ?? 1.0) * 50);
+            _docFractionQ = (int)(docCentreFraction * 500);
         }
 
         public Rect Bounds => _bounds;
@@ -427,7 +461,9 @@ public partial class MinimapControl : UserControl
             && _oyQ == op._oyQ
             && _zoomQ == op._zoomQ
             && _winW == op._winW
-            && _winH == op._winH;
+            && _winH == op._winH
+            && _continuousScroll == op._continuousScroll
+            && _docFractionQ == op._docFractionQ;
         public bool HitTest(Point p) => _bounds.Contains(p);
 
         public void Render(ImmediateDrawingContext context)
@@ -496,6 +532,9 @@ public partial class MinimapControl : UserControl
             };
             canvas.DrawRect(vpRect, vpStroke);
 
+            if (_continuousScroll)
+                DrawDocumentScrollStrip(canvas, controlW, controlH);
+
             if (_showChrome)
             {
                 DrawMoveStripe(canvas, controlW);
@@ -509,6 +548,33 @@ public partial class MinimapControl : UserControl
                 StrokeWidth = 1,
             };
             canvas.DrawRoundRect(controlRect, borderPaint);
+        }
+
+        // Document-wide position indicator: a thin track along the minimap's right edge, distinct
+        // from the page-local thumbnail's own blue viewport rect (which keeps showing the anchor
+        // page, per §7 of the continuous-scroll host contract — "the existing page-local minimap
+        // keeps working for the anchor page"). Read-only: no drag-to-navigate, to keep this addition
+        // small and safe (the thumbnail click/drag above already navigates within the anchor page).
+        private void DrawDocumentScrollStrip(SKCanvas canvas, float controlW, float controlH)
+        {
+            const float trackWidth = 3f;
+            const float inset = 2f;
+            const float minThumb = 6f;
+
+            float trackH = controlH - inset * 2;
+            if (trackH <= minThumb) return;
+            var trackRect = SKRect.Create(controlW - inset - trackWidth, inset, trackWidth, trackH);
+
+            var trackPaint = s_docTrackPaint ??= new SKPaint { Color = new SKColor(255, 255, 255, 40) };
+            canvas.DrawRect(trackRect, trackPaint);
+
+            float thumbH = Math.Max(minThumb, (float)_docViewFraction * trackH);
+            float thumbCentreY = inset + (float)_docCentreFraction * trackH;
+            float thumbY = Math.Clamp(thumbCentreY - thumbH / 2f, inset, inset + trackH - thumbH);
+            var thumbRect = SKRect.Create(controlW - inset - trackWidth, thumbY, trackWidth, thumbH);
+
+            var thumbPaint = s_docThumbPaint ??= new SKPaint { Color = new SKColor(100, 180, 255, 220), IsAntialias = true };
+            canvas.DrawRoundRect(new SKRoundRect(thumbRect, trackWidth / 2f), thumbPaint);
         }
 
         private static void DrawMoveStripe(SKCanvas canvas, float controlW)

@@ -17,11 +17,19 @@ namespace RailReader2.Views;
 /// </summary>
 internal sealed record RetireImage(SKImage Image);
 
+/// <summary>
+/// One visible page's own draw: its rasterised image (null while its render is still in flight —
+/// draw the gap colour, which is simply the ViewportPanel's own background showing through) and its
+/// page-anchored camera matrix (see <c>Viewport.PageOffset</c>/<c>VisiblePages</c>). In single-page
+/// mode there is always exactly one <see cref="PageDraw"/>, with <see cref="IsAnchor"/> true — the
+/// draw loop below then behaves identically to the old single-image path.
+/// </summary>
+internal readonly record struct PageDraw(
+    int Page, bool IsAnchor, SKImage? Image, float PageW, float PageH, SKMatrix Camera);
+
 internal sealed record PdfPageRenderState(
-    SKImage? Image,
-    float PageW,
-    float PageH,
-    SKMatrix Camera,
+    IReadOnlyList<PageDraw> Pages,
+    float Zoom,
     float ScrollSpeed,
     float ZoomSpeed,
     bool MotionBlur,
@@ -55,6 +63,13 @@ internal sealed class PdfPageVisualHandler : CompositionCustomVisualHandler
     private const double MinSpeedThreshold = 0.1;
     private const float DimFeatherFraction = 0.08f;
 
+    // Continuous-scroll line-focus blur (non-anchor visible pages): sigma-per-intensity-unit, in
+    // page-point-times-zoom canvas units (the canvas here is already scaled by the camera concat) —
+    // mirrors RailReaderCore's ScreenshotCompositor.RenderPageContinuous reference implementation so
+    // the live viewport and an offline continuous screenshot agree on the same math.
+    private const float NeighborFocusSigmaPerIntensity = 4.0f;
+    private const float MinBlurSigma = 0.5f;
+
     // Skip the mipmap chain only when the texture is clearly being *magnified* — the
     // on-screen footprint is at least this factor larger than the source image. That is the
     // high-magnification reading range (zoom above the DPI cap), where the mip chain is never
@@ -65,12 +80,18 @@ internal sealed class PdfPageVisualHandler : CompositionCustomVisualHandler
     private const float MipmapSkipMagnifyFactor = 1.25f;
 
     // ThreadStatic caches: one per composition thread (typically one per renderer)
-    [ThreadStatic] private static SKImageFilter? s_cachedBlurFilter;
-    [ThreadStatic] private static float s_cachedSigmaX, s_cachedSigmaY;
     [ThreadStatic] private static SKPaint? s_imagePaint;
     [ThreadStatic] private static SKColorFilter? s_cachedEffectFilter;
     [ThreadStatic] private static ColourEffect s_cachedEffectType;
     [ThreadStatic] private static float s_cachedEffectIntensity;
+
+    // Motion blur (anchor page — identical to single-page mode's only blur before continuous scroll).
+    [ThreadStatic] private static SKImageFilter? s_cachedBlurFilter;
+    [ThreadStatic] private static float s_cachedSigmaX, s_cachedSigmaY;
+    // Combined motion + line-focus blur, shared by every NON-anchor visible page (they all share the
+    // same zoom/scroll/focus sigma, so one cached filter serves the whole window).
+    [ThreadStatic] private static SKImageFilter? s_cachedNeighborBlurFilter;
+    [ThreadStatic] private static float s_cachedNeighborSigmaX, s_cachedNeighborSigmaY;
 
     private record struct DimCacheKey(
         float LineY, float LineH, float PageH,
@@ -88,11 +109,12 @@ internal sealed class PdfPageVisualHandler : CompositionCustomVisualHandler
 
     private PdfPageRenderState? _state;
 
-    // GPU texture cache with mipmaps for alias-free downsampling.
-    // The source SKImage from TabViewModel is a raster image without mipmaps;
-    // ToTextureImage uploads it to the GPU with a full mip chain.
-    private SKImage? _gpuTexture;
-    private SKImage? _gpuTextureSource; // tracks which raster image was uploaded
+    // GPU texture cache with mipmaps for alias-free downsampling, one entry per currently-visible
+    // page (single-page mode: at most one entry — the anchor). The source SKImage from
+    // ViewportImages is a raster image without mipmaps; ToTextureImage uploads it to the GPU with a
+    // full mip chain. Pruned in OnMessage whenever a page drops out of the new state's Pages list;
+    // an entry whose source image changed (DPI upgrade) is re-uploaded lazily in OnRender.
+    private readonly Dictionary<int, (SKImage Texture, SKImage Source)> _gpuTextures = new();
 
     public override void OnMessage(object message)
     {
@@ -106,12 +128,19 @@ internal sealed class PdfPageVisualHandler : CompositionCustomVisualHandler
 
         if (message is PdfPageRenderState state)
         {
-            // Invalidate GPU texture cache when source image changes
-            if (!ReferenceEquals(state.Image, _gpuTextureSource))
+            if (_gpuTextures.Count > 0)
             {
-                _gpuTexture?.Dispose();
-                _gpuTexture = null;
-                _gpuTextureSource = null;
+                var wanted = new HashSet<int>();
+                foreach (var p in state.Pages) wanted.Add(p.Page);
+                List<int>? stale = null;
+                foreach (var key in _gpuTextures.Keys)
+                    if (!wanted.Contains(key)) (stale ??= new List<int>()).Add(key);
+                if (stale is not null)
+                    foreach (var key in stale)
+                    {
+                        _gpuTextures[key].Texture.Dispose();
+                        _gpuTextures.Remove(key);
+                    }
             }
 
             _state = state;
@@ -122,42 +151,18 @@ internal sealed class PdfPageVisualHandler : CompositionCustomVisualHandler
     public override void OnRender(ImmediateDrawingContext context)
     {
         var state = _state;
-        if (state?.Image is not { } image) return;
+        if (state is null || state.Pages.Count == 0) return;
 
         if (context.TryGetFeature(typeof(ISkiaSharpApiLeaseFeature)) is not ISkiaSharpApiLeaseFeature leaseFeature)
             return;
         using var lease = leaseFeature.Lease();
         var canvas = lease.SkCanvas;
-
-        // Upload raster image as a GPU texture. A mip chain fixes texel-hop aliasing while the
-        // texture is minified, but it costs upload time and ~33% VRAM and is never sampled while
-        // the texture is magnified (upscaled). Skip it only when this image is clearly being
-        // magnified; build it for near-1:1 and minified uploads so a later zoom-out doesn't
-        // shimmer before Core re-rasters. canvas.TotalMatrix here (before the camera concat
-        // below) carries the compositor's DPI scale; × the camera zoom gives
-        // device-pixels-per-page-unit, which against image.Width tells us magnification.
         var grContext = lease.GrContext;
-        if (grContext is not null && !ReferenceEquals(image, _gpuTextureSource))
-        {
-            float deviceWidth = state.PageW * canvas.TotalMatrix.ScaleX * state.Camera.ScaleX;
-            bool magnified = deviceWidth > image.Width * MipmapSkipMagnifyFactor;
-            _gpuTexture?.Dispose();
-            _gpuTexture = image.ToTextureImage(grContext, mipmapped: !magnified);
-            _gpuTextureSource = image;
-        }
-        var drawImage = _gpuTexture ?? image;
-
-        // Apply camera transform on top of the compositor's existing matrix
-        // (which already contains DPI scaling). This is the key architectural
-        // difference from the old design: camera + draw are atomic in one
-        // compositor pass, so there is no stale-draw/new-transform frame mismatch.
-        canvas.Save();
-        canvas.Concat(state.Camera);
 
         bool animating = state.ScrollSpeed > MinSpeedThreshold || state.ZoomSpeed > MinSpeedThreshold;
         var sampling = animating ? s_samplingFast : s_sampling;
 
-        // Colour effect filter
+        // Colour effect filter — shared across every visible page.
         SKColorFilter? effectFilter = null;
         if (state.Effects?.HasActiveEffect(state.Effect) == true)
         {
@@ -173,112 +178,178 @@ internal sealed class PdfPageVisualHandler : CompositionCustomVisualHandler
             effectFilter = s_cachedEffectFilter;
         }
 
-        // Motion blur: horizontal during rail scroll, uniform during zoom.
-        // Camera.ScaleX == zoom factor. Dividing sigma by zoom keeps screen-pixel
-        // blur constant regardless of zoom level (sigma is in page/canvas units).
-        float sigmaX = 0, sigmaY = 0;
+        // Motion blur: horizontal during rail scroll, uniform during zoom. Camera zoom is shared by
+        // every visible page (they're all views of the same viewport), so this sigma is document-wide.
+        float motionSigmaX = 0, motionSigmaY = 0;
         if (state.MotionBlur && state.MotionBlurIntensity > 0)
         {
             float maxSigma = state.MotionBlurIntensity * MaxBlurSigma;
-            float zoom = Math.Max(state.Camera.ScaleX, 0.01f);
+            float zoom = Math.Max(state.Zoom, 0.01f);
 
             if (state.ScrollSpeed > MinSpeedThreshold)
             {
                 double s = state.ScrollSpeed;
-                sigmaX = (float)(s * s * s * maxSigma) / zoom;
+                motionSigmaX = (float)(s * s * s * maxSigma) / zoom;
             }
             if (state.ZoomSpeed > MinSpeedThreshold)
             {
                 double z = state.ZoomSpeed;
                 float zSigma = (float)(z * z * z * maxSigma) / zoom;
-                sigmaX = Math.Max(sigmaX, zSigma);
-                sigmaY = Math.Max(sigmaY, zSigma);
+                motionSigmaX = Math.Max(motionSigmaX, zSigma);
+                motionSigmaY = Math.Max(motionSigmaY, zSigma);
             }
         }
+        var motionBlurFilter = GetCachedBlurFilter(motionSigmaX, motionSigmaY);
 
-        SKImageFilter? blurFilter = null;
-        if (sigmaX > 0 || sigmaY > 0)
-        {
-            if (s_cachedBlurFilter is null
-                || Math.Abs(sigmaX - s_cachedSigmaX) > 0.05f
-                || Math.Abs(sigmaY - s_cachedSigmaY) > 0.05f)
-            {
-                s_cachedBlurFilter?.Dispose();
-                s_cachedBlurFilter = SKImageFilter.CreateBlur(sigmaX, sigmaY);
-                s_cachedSigmaX = sigmaX;
-                s_cachedSigmaY = sigmaY;
-            }
-            blurFilter = s_cachedBlurFilter;
-        }
-
-        var destRect = SKRect.Create(0, 0, state.PageW, state.PageH);
-
-        // Apply the colour effect and/or motion blur directly on the DrawImage paint rather
-        // than through canvas.SaveLayer(). A SaveLayer allocates a viewport-sized offscreen
-        // buffer every animation frame — the dominant per-frame GPU cost on large/ultrawide
-        // displays — whereas setting the filters on the image paint lets Skia filter just the
-        // image primitive. Visually identical: one image draw, then the unblurred dim gradient
-        // below (drawn after, with no filters, exactly as the post-Restore draw did before).
-        if (effectFilter is not null || blurFilter is not null)
-        {
-            s_imagePaint ??= new SKPaint();
-            s_imagePaint.ColorFilter = effectFilter;
-            s_imagePaint.ImageFilter = blurFilter;
-            var srcRect = SKRect.Create(drawImage.Width, drawImage.Height);
-            canvas.DrawImage(drawImage, srcRect, destRect, sampling, s_imagePaint);
-            // Don't let the cached paint retain refs to filters that may be disposed
-            // (effect/intensity or blur sigma change) before the next frame reassigns them.
-            s_imagePaint.ColorFilter = null;
-            s_imagePaint.ImageFilter = null;
-        }
-        else
-        {
-            canvas.DrawImage(drawImage, destRect, sampling);
-        }
-
-        // Line focus dim: feathered gradient outside the active line.
-        // Drawn after the image (and with its own filter-free paint) so it isn't blurred itself.
-        // The colour effect is baked into the dim colour to avoid applying a
-        // colour filter to the gradient paint (premultiplied alpha corruption).
+        // Non-anchor visible pages have no seated line to keep sharp, so line-focus mode blurs them
+        // in full instead of dimming (the anchor's own treatment, applied below via the feathered
+        // gradient). Composed with motion blur (independent Gaussians combine as sqrt(sum of squares))
+        // rather than SaveLayer-stacking two passes — SaveLayer allocates a viewport-sized offscreen
+        // buffer every frame (see railreader2's rendering-performance notes), so every filter here is
+        // applied directly on the DrawImage paint instead, same as the motion-blur-only path always
+        // has been.
+        SKImageFilter? neighborBlurFilter = motionBlurFilter;
         if (state.LineFocusBlur && state.LineFocusIntensity > 0 && state.LineH > 0)
         {
-            float h = state.PageH;
-            var activeEffect = effectFilter is not null ? state.Effect : ColourEffect.None;
-            float activeIntensity = effectFilter is not null ? state.EffectIntensity : 0f;
-
-            var dimKey = new DimCacheKey(state.LineY, state.LineH, h,
-                state.LineFocusIntensity, state.LinePadding, activeEffect, activeIntensity);
-            if (s_cachedDimPaint is null || s_cachedDimKey != dimKey)
+            float focusSigma = NeighborFocusSigmaPerIntensity * state.LineFocusIntensity;
+            if (focusSigma >= MinBlurSigma)
             {
-                s_cachedDimGradient?.Dispose();
-                s_cachedDimPaint?.Dispose();
-
-                float pad = state.LineH * state.LinePadding;
-                float lineTop = state.LineY - state.LineH / 2f - pad;
-                float lineBottom = state.LineY + state.LineH / 2f + pad;
-                float feather = state.LineH * DimFeatherFraction;
-
-                float featherTop = Math.Max(0, lineTop - feather) / h;
-                float featherBottom = Math.Min(h, lineBottom + feather) / h;
-                float normTop = Math.Clamp(lineTop / h, 0f, 1f);
-                float normBottom = Math.Clamp(lineBottom / h, 0f, 1f);
-
-                var dimColor = ComputeDimColor(activeEffect, activeIntensity, state.LineFocusIntensity);
-                var clear = SKColors.Transparent;
-
-                s_cachedDimGradient = SKShader.CreateLinearGradient(
-                    new SKPoint(0, 0), new SKPoint(0, h),
-                    [dimColor, dimColor, clear, clear, dimColor, dimColor],
-                    [0f, featherTop, normTop, normBottom, featherBottom, 1f],
-                    SKShaderTileMode.Clamp);
-                s_cachedDimPaint = new SKPaint { Shader = s_cachedDimGradient };
-                s_cachedDimKey = dimKey;
+                float nSigmaX = MathF.Sqrt(motionSigmaX * motionSigmaX + focusSigma * focusSigma);
+                float nSigmaY = MathF.Sqrt(motionSigmaY * motionSigmaY + focusSigma * focusSigma);
+                neighborBlurFilter = GetCachedNeighborBlurFilter(nSigmaX, nSigmaY);
             }
-
-            canvas.DrawRect(destRect, s_cachedDimPaint);
         }
 
-        canvas.Restore(); // undo camera concat
+        foreach (var page in state.Pages)
+        {
+            if (page.Image is null) continue; // render in flight — the panel's own background is the gap colour
+
+            var image = page.Image;
+            float deviceWidth = page.PageW * canvas.TotalMatrix.ScaleX * state.Zoom;
+            var drawImage = GetOrUploadTexture(page.Page, image, grContext, deviceWidth);
+
+            canvas.Save();
+            canvas.Concat(page.Camera);
+
+            var destRect = SKRect.Create(0, 0, page.PageW, page.PageH);
+            var blurFilter = page.IsAnchor ? motionBlurFilter : neighborBlurFilter;
+
+            // Apply the colour effect and/or blur directly on the DrawImage paint rather than through
+            // canvas.SaveLayer() — see the comment above; one image draw, then the anchor's unblurred
+            // dim gradient (below), exactly as the single-page path always did.
+            if (effectFilter is not null || blurFilter is not null)
+            {
+                s_imagePaint ??= new SKPaint();
+                s_imagePaint.ColorFilter = effectFilter;
+                s_imagePaint.ImageFilter = blurFilter;
+                var srcRect = SKRect.Create(drawImage.Width, drawImage.Height);
+                canvas.DrawImage(drawImage, srcRect, destRect, sampling, s_imagePaint);
+                // Don't let the cached paint retain refs to filters that may be disposed
+                // (effect/intensity or blur sigma change) before the next frame reassigns them.
+                s_imagePaint.ColorFilter = null;
+                s_imagePaint.ImageFilter = null;
+            }
+            else
+            {
+                canvas.DrawImage(drawImage, destRect, sampling);
+            }
+
+            // Line focus dim: feathered gradient outside the active line, anchor page only (the seated
+            // rail line only ever exists there — every other visible page was already blurred in full
+            // above). Drawn after the image (and with its own filter-free paint) so it isn't blurred
+            // itself. The colour effect is baked into the dim colour to avoid applying a colour filter
+            // to the gradient paint (premultiplied alpha corruption).
+            if (page.IsAnchor && state.LineFocusBlur && state.LineFocusIntensity > 0 && state.LineH > 0)
+            {
+                float h = page.PageH;
+                var activeEffect = effectFilter is not null ? state.Effect : ColourEffect.None;
+                var activeIntensity = effectFilter is not null ? state.EffectIntensity : 0f;
+
+                var dimKey = new DimCacheKey(state.LineY, state.LineH, h,
+                    state.LineFocusIntensity, state.LinePadding, activeEffect, activeIntensity);
+                if (s_cachedDimPaint is null || s_cachedDimKey != dimKey)
+                {
+                    s_cachedDimGradient?.Dispose();
+                    s_cachedDimPaint?.Dispose();
+
+                    float pad = state.LineH * state.LinePadding;
+                    float lineTop = state.LineY - state.LineH / 2f - pad;
+                    float lineBottom = state.LineY + state.LineH / 2f + pad;
+                    float feather = state.LineH * DimFeatherFraction;
+
+                    float featherTop = Math.Max(0, lineTop - feather) / h;
+                    float featherBottom = Math.Min(h, lineBottom + feather) / h;
+                    float normTop = Math.Clamp(lineTop / h, 0f, 1f);
+                    float normBottom = Math.Clamp(lineBottom / h, 0f, 1f);
+
+                    var dimColor = ComputeDimColor(activeEffect, activeIntensity, state.LineFocusIntensity);
+                    var clear = SKColors.Transparent;
+
+                    s_cachedDimGradient = SKShader.CreateLinearGradient(
+                        new SKPoint(0, 0), new SKPoint(0, h),
+                        [dimColor, dimColor, clear, clear, dimColor, dimColor],
+                        [0f, featherTop, normTop, normBottom, featherBottom, 1f],
+                        SKShaderTileMode.Clamp);
+                    s_cachedDimPaint = new SKPaint { Shader = s_cachedDimGradient };
+                    s_cachedDimKey = dimKey;
+                }
+
+                canvas.DrawRect(destRect, s_cachedDimPaint);
+            }
+
+            canvas.Restore(); // undo camera concat
+        }
+    }
+
+    private SKImage GetOrUploadTexture(int page, SKImage source, GRContext? grContext, float deviceWidth)
+    {
+        if (_gpuTextures.TryGetValue(page, out var cached) && ReferenceEquals(cached.Source, source))
+            return cached.Texture;
+
+        if (grContext is null) return source;
+
+        // Upload raster image as a GPU texture. A mip chain fixes texel-hop aliasing while the
+        // texture is minified, but it costs upload time and ~33% VRAM and is never sampled while the
+        // texture is magnified (upscaled). Skip it only when this image is clearly being magnified;
+        // build it for near-1:1 and minified uploads so a later zoom-out doesn't shimmer before Core
+        // re-rasters. deviceWidth (device-pixels-per-page-width) against source.Width tells us
+        // magnification.
+        bool magnified = deviceWidth > source.Width * MipmapSkipMagnifyFactor;
+        if (_gpuTextures.TryGetValue(page, out var old))
+            old.Texture.Dispose();
+        var texture = source.ToTextureImage(grContext, mipmapped: !magnified);
+        _gpuTextures[page] = (texture, source);
+        return texture;
+    }
+
+    private static SKImageFilter? GetCachedBlurFilter(float sigmaX, float sigmaY)
+    {
+        if (sigmaX <= 0 && sigmaY <= 0) return null;
+        if (s_cachedBlurFilter is null
+            || Math.Abs(sigmaX - s_cachedSigmaX) > 0.05f
+            || Math.Abs(sigmaY - s_cachedSigmaY) > 0.05f)
+        {
+            s_cachedBlurFilter?.Dispose();
+            s_cachedBlurFilter = SKImageFilter.CreateBlur(sigmaX, sigmaY);
+            s_cachedSigmaX = sigmaX;
+            s_cachedSigmaY = sigmaY;
+        }
+        return s_cachedBlurFilter;
+    }
+
+    private static SKImageFilter? GetCachedNeighborBlurFilter(float sigmaX, float sigmaY)
+    {
+        if (sigmaX <= 0 && sigmaY <= 0) return null;
+        if (s_cachedNeighborBlurFilter is null
+            || Math.Abs(sigmaX - s_cachedNeighborSigmaX) > 0.05f
+            || Math.Abs(sigmaY - s_cachedNeighborSigmaY) > 0.05f)
+        {
+            s_cachedNeighborBlurFilter?.Dispose();
+            s_cachedNeighborBlurFilter = SKImageFilter.CreateBlur(sigmaX, sigmaY);
+            s_cachedNeighborSigmaX = sigmaX;
+            s_cachedNeighborSigmaY = sigmaY;
+        }
+        return s_cachedNeighborBlurFilter;
     }
 
     private static SKColor ComputeDimColor(ColourEffect effect, float effectIntensity, float focusIntensity)

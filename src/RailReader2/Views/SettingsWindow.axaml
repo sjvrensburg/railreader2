@@ -109,6 +109,13 @@
                                        TextWrapping="Wrap" FontSize="11" Opacity="0.7"
                                        Text="Max DPI is clamped to 150–1200; tier step to ≥ 1. Smaller tier steps render more crisply at intermediate zoom but re-raster more often." />
                         </Grid>
+
+                        <TextBlock Text="Continuous Scrolling" FontWeight="Bold" Margin="0,12,0,0" />
+                        <Separator />
+                        <TextBlock TextWrapping="Wrap" FontSize="11" Opacity="0.7"
+                                   Text="Treats every page as one continuous document instead of a single page at a time: scrolling past the bottom of a page slides straight into the next one, in and out of rail mode, with no page-cut jump. Off by default." />
+                        <CheckBox Name="ContinuousScrollCheck" Content="Continuous scrolling"
+                                  IsCheckedChanged="OnContinuousScrollChanged" Margin="0,4,0,0" />
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>

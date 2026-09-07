@@ -336,9 +336,10 @@ public partial class DocumentView : UserControl, IViewportSurface
     {
         var state = BuildPageState(_tab);
         PageLayer.UpdateState(state);
-        if (!ReferenceEquals(state.Image, _lastMinimapImage))
+        var anchorImage = _images?.CachedImage;
+        if (!ReferenceEquals(anchorImage, _lastMinimapImage))
         {
-            _lastMinimapImage = state.Image;
+            _lastMinimapImage = anchorImage;
             Minimap.InvalidateVisual();
         }
         RenderPortalMarkers();   // a rail page cross changes which page's markers apply
@@ -486,6 +487,15 @@ public partial class DocumentView : UserControl, IViewportSurface
             zoom, zoom, (float)vp.Camera.OffsetX, (float)vp.Camera.OffsetY);
     }
 
+    /// <summary>The camera matrix for one <see cref="VisiblePage"/> entry — same zoom as the anchor
+    /// (they're all views of the same viewport), page-anchored offset from <c>Viewport.PageOffset</c>
+    /// (already baked into the entry by Core). Single-page mode's one entry equals <see cref="BuildCamera"/>.</summary>
+    private static SKMatrix PageCamera(CoreViewport vp, VisiblePage page)
+    {
+        float zoom = (float)vp.Camera.Zoom;
+        return SKMatrix.CreateScaleTranslation(zoom, zoom, (float)page.OffsetX, (float)page.OffsetY);
+    }
+
     private PdfPageRenderState BuildPageState(TabViewModel? tab)
     {
         var vm = _shared!;
@@ -496,20 +506,48 @@ public partial class DocumentView : UserControl, IViewportSurface
             lineY = line.Y;
             lineH = line.Height;
         }
-        var (image, retired) = _images?.GetCachedImage() ?? (null, null);
-        if (retired is not null)
+
+        var pages = new List<PageDraw>();
+        if (_viewport is { } vp)
         {
-            // Send the retired image to the composition thread for safe disposal.
-            // If the layer is detached (visual gone), the message is silently dropped,
-            // so dispose immediately on the UI thread as a fallback.
-            if (!PageLayer.TrySendMessage(new RetireImage(retired)))
-                retired.Dispose();
+            var visible = vp.VisiblePages;
+
+            if (_images is { } imgs)
+            {
+                var retiredWindow = imgs.SyncWindowImages(visible, vp.CurrentPage);
+                foreach (var retired in retiredWindow)
+                    if (!PageLayer.TrySendMessage(new RetireImage(retired)))
+                        retired.Dispose();
+            }
+
+            foreach (var vpg in visible)
+            {
+                bool isAnchor = vpg.Page == vp.CurrentPage;
+                SKImage? image;
+                if (isAnchor)
+                {
+                    var (cur, retired) = _images?.GetCachedImage() ?? (null, null);
+                    image = cur;
+                    if (retired is not null)
+                    {
+                        // Send the retired image to the composition thread for safe disposal.
+                        // If the layer is detached (visual gone), the message is silently dropped,
+                        // so dispose immediately on the UI thread as a fallback.
+                        if (!PageLayer.TrySendMessage(new RetireImage(retired)))
+                            retired.Dispose();
+                    }
+                }
+                else
+                {
+                    image = _images?.GetWindowImage(vpg.Page);
+                }
+                pages.Add(new PageDraw(vpg.Page, isAnchor, image, (float)vpg.Width, (float)vpg.Height, PageCamera(vp, vpg)));
+            }
         }
+
         return new PdfPageRenderState(
-            Image: image,
-            PageW: (float)(_viewport?.PageWidth ?? 0),
-            PageH: (float)(_viewport?.PageHeight ?? 0),
-            Camera: BuildCamera(_viewport),
+            Pages: pages,
+            Zoom: (float)(_viewport?.Camera.Zoom ?? 1.0),
             ScrollSpeed: (float)(_viewport?.Rail.ScrollSpeed ?? 0),
             ZoomSpeed: (float)(_viewport?.Camera.ZoomSpeed ?? 0),
             MotionBlur: vm.AppConfig.MotionBlur,
@@ -564,11 +602,11 @@ public partial class DocumentView : UserControl, IViewportSurface
     private static readonly FreezePaneRenderState EmptyFreeze =
         new(null, null, null, default, default, default, ColourEffect.None, 0f, null);
 
-    // A page state carrying no image: pushed to PageLayer to drop its reference to (and GPU upload of)
-    // a page texture about to be freed, before the texture is retired on the composition thread
-    // (railreader2#191). All other fields are inert — OnRender early-returns on a null image.
+    // A page state carrying no pages: pushed to PageLayer to drop its reference to (and GPU upload of)
+    // any page texture about to be freed, before the texture is retired on the composition thread
+    // (railreader2#191). All other fields are inert — OnRender early-returns on an empty Pages list.
     private static readonly PdfPageRenderState BlankPage = new(
-        Image: null, PageW: 0f, PageH: 0f, Camera: SKMatrix.Identity,
+        Pages: [], Zoom: 1f,
         ScrollSpeed: 0f, ZoomSpeed: 0f, MotionBlur: false, MotionBlurIntensity: 0f,
         LineFocusBlur: false, LineFocusIntensity: 0f, LinePadding: 0f,
         LineY: 0f, LineH: 0f, Effect: ColourEffect.None, EffectIntensity: 0f, Effects: null);
@@ -645,39 +683,57 @@ public partial class DocumentView : UserControl, IViewportSurface
         // misplaced — hide annotations entirely (authoring/selection are refused too). Text-selection
         // rects stay: text geometry comes from Core's cache, which IS in the displayed frame.
         bool rotated = tab is not null && tab.State.ViewRotation != 0;
-        List<Annotation>? pageAnnotations = null;
-        if (tab is not null && !rotated && _viewport is { } vp)
-            tab.Annotations.Pages.TryGetValue(vp.CurrentPage, out pageAnnotations);
 
-        // Pre-sort by z-order on the UI thread so the compositor doesn't need LINQ.
-        // Cache the result: z-order only changes when the page's annotation set
-        // changes, so pan/zoom frames (which re-send camera every tick) reuse it.
-        List<Annotation>? sorted;
-        if (pageAnnotations is { Count: > 1 }
-            && ReferenceEquals(pageAnnotations, _annoSortSource)
-            && pageAnnotations.Count == _annoSortCount
-            && _viewport!.CurrentPage == _annoSortPage)
+        var pages = new List<AnnotationPageState>();
+        if (tab is not null && !rotated && _viewport is { } vp)
         {
-            sorted = _annoSortResult;
-        }
-        else
-        {
-            // Covers both the recompute path (Count > 1, cache miss) and the Count <= 1
-            // path (0 or 1 annotations need no sorting). Both must update the cache fields —
-            // Core mutates pageAnnotations in place, so its reference survives an add/delete,
-            // and a stale _annoSortCount left over from before a delete can spuriously match
-            // again after a later add brings the count back up, resurrecting a stale
-            // _annoSortResult that still has the deleted annotation and lacks the new one.
-            sorted = pageAnnotations is { Count: > 1 } ? AnnotationRenderer.SortByZOrder(pageAnnotations) : pageAnnotations;
-            _annoSortSource = pageAnnotations;
-            _annoSortCount = pageAnnotations?.Count ?? -1;
-            _annoSortPage = _viewport?.CurrentPage ?? -1;
-            _annoSortResult = sorted;
+            foreach (var vpg in vp.VisiblePages)
+            {
+                bool isAnchor = vpg.Page == vp.CurrentPage;
+                tab.Annotations.Pages.TryGetValue(vpg.Page, out var pageAnnotations);
+
+                // Pre-sort by z-order on the UI thread so the compositor doesn't need LINQ. Cache the
+                // result for the anchor page only: z-order only changes when the page's annotation
+                // set changes, so pan/zoom frames (which re-send camera every tick) reuse it.
+                // Non-anchor pages (continuous-scroll neighbours) sort fresh each frame — cheap for
+                // the small annotation counts a visible neighbour page typically carries.
+                List<Annotation>? sorted;
+                if (isAnchor)
+                {
+                    if (pageAnnotations is { Count: > 1 }
+                        && ReferenceEquals(pageAnnotations, _annoSortSource)
+                        && pageAnnotations.Count == _annoSortCount
+                        && vp.CurrentPage == _annoSortPage)
+                    {
+                        sorted = _annoSortResult;
+                    }
+                    else
+                    {
+                        // Covers both the recompute path (Count > 1, cache miss) and the Count <= 1
+                        // path (0 or 1 annotations need no sorting). Both must update the cache
+                        // fields — Core mutates pageAnnotations in place, so its reference survives
+                        // an add/delete, and a stale _annoSortCount left over from before a delete
+                        // can spuriously match again after a later add brings the count back up,
+                        // resurrecting a stale _annoSortResult that still has the deleted annotation
+                        // and lacks the new one.
+                        sorted = pageAnnotations is { Count: > 1 } ? AnnotationRenderer.SortByZOrder(pageAnnotations) : pageAnnotations;
+                        _annoSortSource = pageAnnotations;
+                        _annoSortCount = pageAnnotations?.Count ?? -1;
+                        _annoSortPage = vp.CurrentPage;
+                        _annoSortResult = sorted;
+                    }
+                }
+                else
+                {
+                    sorted = pageAnnotations is { Count: > 1 } ? AnnotationRenderer.SortByZOrder(pageAnnotations) : pageAnnotations;
+                }
+
+                pages.Add(new AnnotationPageState(vpg.Page, isAnchor, PageCamera(vp, vpg), sorted));
+            }
         }
 
         return new AnnotationRenderState(
-            Camera: BuildCamera(_viewport),
-            PageAnnotations: sorted,
+            Pages: pages,
             SelectedAnnotation: rotated ? null : vm.SelectedAnnotation,
             PreviewAnnotation: rotated ? null : vm.PreviewAnnotation,
             TextSelectionRects: vm.TextSelectionRects);
@@ -686,46 +742,54 @@ public partial class DocumentView : UserControl, IViewportSurface
     private SearchRenderState BuildSearchState(TabViewModel? tab)
     {
         var vm = _shared!;
-        // Render THIS surface's own page matches: a split pane / tear-off can sit on a different page
-        // than the focused view, so key the highlights by this viewport's page (MatchesForPage) rather
-        // than the focused view's CurrentPageSearchMatches.
-        var matches = _viewport is { } mvp ? vm.MatchesForPage(mvp.CurrentPage) : null;
-        int activeLocalIndex = -1;
-        if (matches is { Count: > 0 } && _viewport is { } vp)
-        {
-            // The active local index only changes on match navigation or page
-            // change — not while the camera moves. Cache across camera-only frames.
-            if (ReferenceEquals(matches, _searchIdxMatches)
-                && vm.ActiveMatchIndex == _searchIdxActive
-                && vp.CurrentPage == _searchIdxPage)
-            {
-                activeLocalIndex = _searchIdxResult;
-            }
-            else
-            {
-                activeLocalIndex = OverlayRenderer.ComputeActiveLocalIndex(
-                    vm.SearchMatches, matches, vm.ActiveMatchIndex, vp.CurrentPage);
-                _searchIdxMatches = matches;
-                _searchIdxActive = vm.ActiveMatchIndex;
-                _searchIdxPage = vp.CurrentPage;
-                _searchIdxResult = activeLocalIndex;
-            }
-        }
-
-        // Compute viewport in page space for search highlight culling.
-        var camera = BuildCamera(_viewport);
-        SKRect viewport = SKRect.Empty;
-        if (camera.TryInvert(out var inv))
+        var pages = new List<SearchPageState>();
+        if (_viewport is { } vp)
         {
             var bounds = Bounds;
-            viewport = inv.MapRect(new SKRect(0, 0, (float)bounds.Width, (float)bounds.Height));
+            foreach (var vpg in vp.VisiblePages)
+            {
+                // Render THIS surface's own page matches: a split pane / tear-off can sit on a
+                // different page than the focused view, so key the highlights by this viewport's
+                // (visible) page (MatchesForPage) rather than the focused view's CurrentPageSearchMatches.
+                var matches = vm.MatchesForPage(vpg.Page);
+                int activeLocalIndex = -1;
+                bool isAnchor = vpg.Page == vp.CurrentPage;
+                if (matches is { Count: > 0 })
+                {
+                    // The active local index only changes on match navigation or page change — not
+                    // while the camera moves. Cache across camera-only frames, anchor page only (the
+                    // same rationale as the annotation z-order cache above).
+                    if (isAnchor && ReferenceEquals(matches, _searchIdxMatches)
+                        && vm.ActiveMatchIndex == _searchIdxActive
+                        && vpg.Page == _searchIdxPage)
+                    {
+                        activeLocalIndex = _searchIdxResult;
+                    }
+                    else
+                    {
+                        activeLocalIndex = OverlayRenderer.ComputeActiveLocalIndex(
+                            vm.SearchMatches, matches, vm.ActiveMatchIndex, vpg.Page);
+                        if (isAnchor)
+                        {
+                            _searchIdxMatches = matches;
+                            _searchIdxActive = vm.ActiveMatchIndex;
+                            _searchIdxPage = vpg.Page;
+                            _searchIdxResult = activeLocalIndex;
+                        }
+                    }
+                }
+
+                // Compute viewport in THIS page's space for search highlight culling.
+                var camera = PageCamera(vp, vpg);
+                SKRect viewportRect = SKRect.Empty;
+                if (camera.TryInvert(out var inv))
+                    viewportRect = inv.MapRect(new SKRect(0, 0, (float)bounds.Width, (float)bounds.Height));
+
+                pages.Add(new SearchPageState(camera, matches, activeLocalIndex, viewportRect));
+            }
         }
 
-        return new SearchRenderState(
-            Camera: camera,
-            Matches: matches,
-            ActiveLocalIndex: activeLocalIndex,
-            ViewportInPageSpace: viewport);
+        return new SearchRenderState(pages);
     }
 
     private PortalMarkerRenderState BuildPortalMarkerState(TabViewModel? tab)
