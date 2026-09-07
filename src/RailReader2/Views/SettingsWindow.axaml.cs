@@ -93,6 +93,7 @@ public partial class SettingsWindow : Window
         CustomMaxDpi.Value = c.CustomMaxRenderDpi;
         CustomTierStep.Value = c.CustomRenderTierStep;
         UpdateCustomRenderPanel(c.RenderQuality);
+        ContinuousScrollCheck.IsChecked = c.ContinuousScroll;
         PixelSnappingCheck.IsChecked = c.PixelSnapping;
         MarginCroppingCheck.IsChecked = c.MarginCropping;
         LineFocusBlurCheck.IsChecked = c.LineFocusBlur;
@@ -690,6 +691,16 @@ public partial class SettingsWindow : Window
         vm.OnConfigChanged();
     }
 
+    private void OnContinuousScrollChanged(object? sender, RoutedEventArgs e)
+    {
+        if (Vm is not { } vm || _loading) return;
+        // Persisted in AppConfig; OnConfigChanged → ToCoreSettings → controller.OnConfigChanged
+        // reaches Viewport.OnScrollModeChanged for every open viewport, so this applies live —
+        // no restart needed.
+        vm.AppConfig.ContinuousScroll = ContinuousScrollCheck.IsChecked == true;
+        vm.OnConfigChanged();
+    }
+
     // --- OCR ---
 
     private void OnOcrModeChanged(object? sender, SelectionChangedEventArgs e)
@@ -723,6 +734,7 @@ public partial class SettingsWindow : Window
         vm.AppConfig.RenderQuality = App.DefaultRenderQuality; // desktop ships High, not Core's Quality
         vm.AppConfig.CustomMaxRenderDpi = defaults.CustomMaxRenderDpi;
         vm.AppConfig.CustomRenderTierStep = defaults.CustomRenderTierStep;
+        vm.AppConfig.ContinuousScroll = defaults.ContinuousScroll;
         vm.AppConfig.MotionBlur = defaults.MotionBlur;
         vm.AppConfig.MotionBlurIntensity = defaults.MotionBlurIntensity;
         vm.AppConfig.NavigableRoles = new HashSet<BlockRole>(DefaultRoleSets.Navigable);

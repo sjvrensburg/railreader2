@@ -8,11 +8,19 @@ using SkiaSharp;
 namespace RailReader2.Views;
 
 /// <summary>
-/// Immutable snapshot of all state needed to render annotations for one frame.
+/// One visible page's own annotation set + camera. In single-page mode there is always exactly one
+/// entry (<see cref="IsAnchor"/> true).
+/// </summary>
+internal readonly record struct AnnotationPageState(
+    int Page, bool IsAnchor, SKMatrix Camera, List<Annotation>? Annotations);
+
+/// <summary>
+/// Immutable snapshot of all state needed to render annotations for one frame. Preview annotation
+/// (mid-authoring) and text-selection rects are always on the anchor page — annotation authoring
+/// stays page-local and anchored per the continuous-scroll host contract.
 /// </summary>
 internal sealed record AnnotationRenderState(
-    SKMatrix Camera,
-    List<Annotation>? PageAnnotations,
+    IReadOnlyList<AnnotationPageState> Pages,
     Annotation? SelectedAnnotation,
     Annotation? PreviewAnnotation,
     List<HighlightRect>? TextSelectionRects);
@@ -43,7 +51,10 @@ internal sealed class AnnotationVisualHandler : CompositionCustomVisualHandler
         var state = _state;
         if (state is null) return;
 
-        bool hasContent = state.PageAnnotations is { Count: > 0 }
+        bool hasAnyAnnotations = false;
+        foreach (var p in state.Pages)
+            if (p.Annotations is { Count: > 0 }) { hasAnyAnnotations = true; break; }
+        bool hasContent = hasAnyAnnotations
             || state.PreviewAnnotation is not null
             || state.TextSelectionRects is { Count: > 0 };
         if (!hasContent) return;
@@ -53,26 +64,36 @@ internal sealed class AnnotationVisualHandler : CompositionCustomVisualHandler
         using var lease = leaseFeature.Lease();
         var canvas = lease.SkCanvas;
 
-        canvas.Save();
-        canvas.Concat(state.Camera);
-
-        if (state.PageAnnotations is { } annotations)
-            AnnotationRenderer.DrawAnnotations(canvas, annotations, state.SelectedAnnotation);
-
-        if (state.PreviewAnnotation is { } preview)
-            AnnotationRenderer.DrawPreviewAnnotation(canvas, preview);
-
-        if (state.TextSelectionRects is { Count: > 0 } selRects)
+        foreach (var page in state.Pages)
         {
-            var selPaint = s_selPaint ??= new SKPaint
-            {
-                Color = new SKColor(0x33, 0x90, 0xFF, 77),
-                IsAntialias = true,
-            };
-            foreach (var r in selRects)
-                canvas.DrawRect(SKRect.Create(r.X, r.Y, r.W, r.H), selPaint);
-        }
+            bool hasPageContent = page.Annotations is { Count: > 0 }
+                || (page.IsAnchor && (state.PreviewAnnotation is not null || state.TextSelectionRects is { Count: > 0 }));
+            if (!hasPageContent) continue;
 
-        canvas.Restore();
+            canvas.Save();
+            canvas.Concat(page.Camera);
+
+            if (page.Annotations is { } annotations)
+                AnnotationRenderer.DrawAnnotations(canvas, annotations, state.SelectedAnnotation);
+
+            if (page.IsAnchor)
+            {
+                if (state.PreviewAnnotation is { } preview)
+                    AnnotationRenderer.DrawPreviewAnnotation(canvas, preview);
+
+                if (state.TextSelectionRects is { Count: > 0 } selRects)
+                {
+                    var selPaint = s_selPaint ??= new SKPaint
+                    {
+                        Color = new SKColor(0x33, 0x90, 0xFF, 77),
+                        IsAntialias = true,
+                    };
+                    foreach (var r in selRects)
+                        canvas.DrawRect(SKRect.Create(r.X, r.Y, r.W, r.H), selPaint);
+                }
+            }
+
+            canvas.Restore();
+        }
     }
 }

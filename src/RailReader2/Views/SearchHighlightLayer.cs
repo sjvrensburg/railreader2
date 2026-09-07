@@ -8,15 +8,17 @@ using SkiaSharp;
 namespace RailReader2.Views;
 
 /// <summary>
-/// Immutable snapshot of all state needed to render search highlights for one frame.
-/// The active-match local index is pre-computed on the UI thread to keep the
-/// composition thread free of search-list traversal.
+/// One visible page's own search matches + camera. In single-page mode there is always exactly one
+/// entry. The active-match local index is pre-computed on the UI thread to keep the composition
+/// thread free of search-list traversal.
 /// </summary>
-internal sealed record SearchRenderState(
-    SKMatrix Camera,
-    IReadOnlyList<SearchMatch>? Matches,
-    int ActiveLocalIndex,
-    SKRect ViewportInPageSpace);
+internal readonly record struct SearchPageState(
+    SKMatrix Camera, IReadOnlyList<SearchMatch>? Matches, int ActiveLocalIndex, SKRect ViewportInPageSpace);
+
+/// <summary>
+/// Immutable snapshot of all state needed to render search highlights for one frame.
+/// </summary>
+internal sealed record SearchRenderState(IReadOnlyList<SearchPageState> Pages);
 
 /// <summary>
 /// Hosts a CompositionCustomVisual for search highlight rendering.
@@ -40,20 +42,30 @@ internal sealed class SearchVisualHandler : CompositionCustomVisualHandler
     public override void OnRender(ImmediateDrawingContext context)
     {
         var state = _state;
-        if (state?.Matches is not { Count: > 0 } matches) return;
+        if (state is null || state.Pages.Count == 0) return;
+
+        bool hasAnyMatches = false;
+        foreach (var p in state.Pages)
+            if (p.Matches is { Count: > 0 }) { hasAnyMatches = true; break; }
+        if (!hasAnyMatches) return;
 
         if (context.TryGetFeature(typeof(ISkiaSharpApiLeaseFeature)) is not ISkiaSharpApiLeaseFeature leaseFeature)
             return;
         using var lease = leaseFeature.Lease();
         var canvas = lease.SkCanvas;
 
-        canvas.Save();
-        canvas.Concat(state.Camera);
+        foreach (var page in state.Pages)
+        {
+            if (page.Matches is not { Count: > 0 } matches) continue;
 
-        OverlayRenderer.DrawSearchHighlights(canvas, matches, state.ActiveLocalIndex,
-            OverlayRenderer.GetHighlightPaint(), OverlayRenderer.GetActivePaint(),
-            state.ViewportInPageSpace);
+            canvas.Save();
+            canvas.Concat(page.Camera);
 
-        canvas.Restore();
+            OverlayRenderer.DrawSearchHighlights(canvas, matches, page.ActiveLocalIndex,
+                OverlayRenderer.GetHighlightPaint(), OverlayRenderer.GetActivePaint(),
+                page.ViewportInPageSpace);
+
+            canvas.Restore();
+        }
     }
 }
