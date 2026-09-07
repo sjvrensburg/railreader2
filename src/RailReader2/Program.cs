@@ -74,7 +74,10 @@ internal sealed class Program
         //
         // But the real trigger turned out to be indeterminate ProgressBars left attached to the
         // visual tree (their infinite animation kept Avalonia's animation clock — and thus a
-        // low-priority job — armed forever); that's fixed in the views. The native dispatcher no
+        // low-priority job — armed forever); that's fixed in the views. The splash screen's bar was
+        // the last one standing (Avalonia does not cancel the animation when the splash window is
+        // closed — see SplashWindow.OnClosing), and with it running the UI thread spun at 100% under
+        // BOTH dispatchers, so the GLib fallback was never a fix for this class of bug. The native dispatcher no
         // longer spins AND paces animation (zoom / rail horizontal-scroll) noticeably more smoothly
         // than the GLib loop, so it's the default again. GLib stays as an opt-in fallback
         // (RR_X11_GLIB=1|true|on|yes), probe-guarded so a stray opt-in on a glib-less system can't
