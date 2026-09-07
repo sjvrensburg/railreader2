@@ -20,7 +20,13 @@
                        FontSize="13"
                        Foreground="#585B70"
                        HorizontalAlignment="Center" />
-            <ProgressBar IsIndeterminate="True"
+            <!-- Named so the code-behind can stop the indeterminate animation in OnClosing: Avalonia
+                 does not cancel a looping style animation when its window closes (AvaloniaUI/Avalonia
+                 #16648, #13139), and a still-subscribed animation keeps MediaContext's 16 ms render
+                 timer armed for the life of the process — which the X11 dispatcher turns into a
+                 100%-CPU spin of the UI thread. -->
+            <ProgressBar Name="Bar"
+                         IsIndeterminate="True"
                          Width="120" Height="3"
                          Margin="0,8,0,0" />
         </StackPanel>
