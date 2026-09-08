@@ -247,13 +247,56 @@ internal sealed class PdfPageVisualHandler : CompositionCustomVisualHandler
             }
         }
 
+        // Per-frame upload budget (#222): the draw always maps the whole source image to the whole
+        // page rect, so a texture from a different DPI tier still draws to the geometrically correct
+        // place — just softer for a frame or two. That makes it safe to defer a non-anchor page's
+        // upload and keep drawing its stale resident texture (or skip it if it has none yet) rather
+        // than stalling this frame on every visible page's upload at once (continuous scroll).
+        int nonAnchorUploadBudget = 1;
+        bool deferredUpload = false;
+
         foreach (var page in state.Pages)
         {
             if (page.Image is null) continue; // render in flight — the panel's own background is the gap colour
 
             var image = page.Image;
             float deviceWidth = page.PageW * canvas.TotalMatrix.ScaleX * state.Zoom;
-            var drawImage = GetOrUploadTexture(page.Page, image, grContext, deviceWidth);
+
+            SKImage drawImage;
+            if (grContext is null)
+            {
+                // No GPU context available (e.g. software fallback) — draw the raster source directly,
+                // same as always; texture caching/budgeting doesn't apply.
+                drawImage = image;
+            }
+            else
+            {
+                bool haveCurrent = _gpuTextures.TryGetValue(page.Page, out var cached) && ReferenceEquals(cached.Source, image);
+                if (haveCurrent)
+                {
+                    drawImage = cached.Texture;
+                }
+                else if (page.IsAnchor || nonAnchorUploadBudget > 0)
+                {
+                    // The anchor always gets its upload — it's what the user is reading. A budgeted
+                    // non-anchor upload consumes the frame's single slot.
+                    if (!page.IsAnchor) nonAnchorUploadBudget--;
+                    drawImage = UploadTexture(page.Page, image, grContext, deviceWidth);
+                }
+                else if (_gpuTextures.TryGetValue(page.Page, out var stale))
+                {
+                    // Out of budget this frame: draw the stale resident texture (still geometrically
+                    // correct) and try again next frame.
+                    drawImage = stale.Texture;
+                    deferredUpload = true;
+                }
+                else
+                {
+                    // No resident texture at all yet — nothing to draw this frame.
+                    deferredUpload = true;
+                    continue;
+                }
+            }
 
             canvas.Save();
             canvas.Concat(page.Camera);
@@ -326,15 +369,15 @@ internal sealed class PdfPageVisualHandler : CompositionCustomVisualHandler
 
             canvas.Restore(); // undo camera concat
         }
+
+        // A page was left with a stale or missing texture this frame — schedule another frame so the
+        // deferred upload(s) drain at one per frame. Termination is guaranteed because every such
+        // frame uploads at least one texture (the budgeted slot, or the anchor's own).
+        if (deferredUpload) Invalidate();
     }
 
-    private SKImage GetOrUploadTexture(int page, SKImage source, GRContext? grContext, float deviceWidth)
+    private SKImage UploadTexture(int page, SKImage source, GRContext grContext, float deviceWidth)
     {
-        if (_gpuTextures.TryGetValue(page, out var cached) && ReferenceEquals(cached.Source, source))
-            return cached.Texture;
-
-        if (grContext is null) return source;
-
         // Upload raster image as a GPU texture. A mip chain fixes texel-hop aliasing while the
         // texture is minified, but it costs upload time and ~33% VRAM and is never sampled while the
         // texture is magnified (upscaled). Skip it only when this image is clearly being magnified;
