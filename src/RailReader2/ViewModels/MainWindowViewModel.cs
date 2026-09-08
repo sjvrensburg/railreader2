@@ -830,19 +830,27 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
         if (anyAnimating)
             RequestAnimationFrame();
-        else if (_pollTimer is { IsEnabled: false } && _controller.Worker is { IsIdle: false })
-            _pollTimer.Start(); // analysis still in flight after the last animating frame
+        else
+            StartPollTimerIfWorkerBusy(); // analysis still in flight after the last animating frame
+    }
+
+    // The poll timer only needs to run while the analysis worker actually has in-flight work to
+    // drain -- its tick body no-ops (returns before even reaching _pollTimer.Stop()) for the whole
+    // inter-frame window while an animation is in progress, so starting it unconditionally meant a
+    // 100ms DispatcherTimer ran continuously through all rail reading, auto-scroll and zoom
+    // animation at ~19% of a core on X11 for no work (#224). Shared by both call sites so the two
+    // conditions can't drift apart: RequestAnimationFrame (a submission is about to be scheduled)
+    // and RunAnimationFrame's tail (a submission made mid-frame, e.g. by PumpAnalysis, needs a
+    // timer to drain it once nothing is left animating).
+    private void StartPollTimerIfWorkerBusy()
+    {
+        if (_pollTimer is { IsEnabled: false } && _controller.Worker is { IsIdle: false })
+            _pollTimer.Start();
     }
 
     public void RequestAnimationFrame()
     {
-        // The poll timer only needs to run while the analysis worker actually has in-flight work to
-        // drain -- its tick body no-ops (returns before even reaching _pollTimer.Stop()) for the whole
-        // inter-frame window while an animation is in progress, so starting it unconditionally here
-        // meant a 100ms DispatcherTimer ran continuously through all rail reading, auto-scroll and
-        // zoom animation at ~19% of a core on X11 for no work (#224).
-        if (_pollTimer is { IsEnabled: false } && _controller.Worker is { IsIdle: false })
-            _pollTimer.Start();
+        StartPollTimerIfWorkerBusy();
 
         if (_animationRequested) return;
         _animationRequested = true;

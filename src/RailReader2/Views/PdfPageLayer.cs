@@ -198,10 +198,13 @@ internal sealed class PdfPageVisualHandler : CompositionCustomVisualHandler
         if (state.MotionBlur && state.MotionBlurIntensity > 0)
         {
             float zoom = Math.Max(state.Zoom, 0.01f);
-            // canvas.TotalMatrix is read BEFORE the per-page camera concat, so ScaleX is the compositor's
-            // DPI scale; the camera adds `zoom` on top. Skia maps the filter sigma through the full CTM,
-            // so divide the wanted device sigma by both to get the local-space value to hand the filter.
-            float ctmScale = Math.Max(canvas.TotalMatrix.ScaleX * zoom, 0.0001f);
+            // canvas.TotalMatrix is read BEFORE the per-page camera concat, so ScaleX/ScaleY are the
+            // compositor's DPI scale; the camera adds `zoom` on top. Skia maps the filter sigma through
+            // the full CTM, so divide the wanted device sigma by both to get the local-space value to
+            // hand the filter. Computed per-axis (not a single shared scale) in case the compositor CTM
+            // is ever anisotropic (e.g. non-uniform display scaling).
+            float ctmScaleX = Math.Max(canvas.TotalMatrix.ScaleX * zoom, 0.0001f);
+            float ctmScaleY = Math.Max(canvas.TotalMatrix.ScaleY * zoom, 0.0001f);
             float maxDevice = state.MotionBlurIntensity * MotionBlurMaxDeviceSigma;
 
             float deviceX = 0, deviceY = 0;
@@ -222,8 +225,8 @@ internal sealed class PdfPageVisualHandler : CompositionCustomVisualHandler
             // pass over the visible region — skip it entirely (#223).
             if (deviceX >= MinBlurSigma || deviceY >= MinBlurSigma)
             {
-                motionSigmaX = deviceX / ctmScale;
-                motionSigmaY = deviceY / ctmScale;
+                motionSigmaX = deviceX / ctmScaleX;
+                motionSigmaY = deviceY / ctmScaleY;
             }
         }
         var motionBlurFilter = GetCachedBlurFilter(motionSigmaX, motionSigmaY);
@@ -266,12 +269,17 @@ internal sealed class PdfPageVisualHandler : CompositionCustomVisualHandler
             if (grContext is null)
             {
                 // No GPU context available (e.g. software fallback) — draw the raster source directly,
-                // same as always; texture caching/budgeting doesn't apply.
+                // same as always; texture caching/budgeting doesn't apply. Deliberately does NOT fall
+                // back to a previously-uploaded GPU texture for this page even if one is still resident
+                // in _gpuTextures: a texture created under a GPU context can be invalidated by the very
+                // loss of that context, so drawing the raw raster source here is the safe choice, not
+                // just the simple one.
                 drawImage = image;
             }
             else
             {
-                bool haveCurrent = _gpuTextures.TryGetValue(page.Page, out var cached) && ReferenceEquals(cached.Source, image);
+                bool haveEntry = _gpuTextures.TryGetValue(page.Page, out var cached);
+                bool haveCurrent = haveEntry && ReferenceEquals(cached.Source, image);
                 if (haveCurrent)
                 {
                     drawImage = cached.Texture;
@@ -283,11 +291,12 @@ internal sealed class PdfPageVisualHandler : CompositionCustomVisualHandler
                     if (!page.IsAnchor) nonAnchorUploadBudget--;
                     drawImage = UploadTexture(page.Page, image, grContext, deviceWidth);
                 }
-                else if (_gpuTextures.TryGetValue(page.Page, out var stale))
+                else if (haveEntry)
                 {
-                    // Out of budget this frame: draw the stale resident texture (still geometrically
-                    // correct) and try again next frame.
-                    drawImage = stale.Texture;
+                    // Out of budget this frame: draw the stale resident texture (`cached`, still
+                    // geometrically correct — see the OnRender-level comment above) and try again next
+                    // frame.
+                    drawImage = cached.Texture;
                     deferredUpload = true;
                 }
                 else
@@ -385,14 +394,21 @@ internal sealed class PdfPageVisualHandler : CompositionCustomVisualHandler
         // re-rasters. deviceWidth (device-pixels-per-page-width) against source.Width tells us
         // magnification.
         bool magnified = deviceWidth > source.Width * MipmapSkipMagnifyFactor;
-        if (_gpuTextures.TryGetValue(page, out var old))
-            old.Texture.Dispose();
+        _gpuTextures.TryGetValue(page, out var old);
 
+        // Upload before disposing the old texture: ToTextureImage can throw (e.g. GPU OOM — the exact
+        // pressure this budgeting exists to reduce), and disposing `old` first would leave a
+        // now-invalid SKImage keyed in _gpuTextures, double-disposed on the next retry. Keeping `old`
+        // alive until the new texture is resident also means a throw here leaves the page's existing
+        // (still-valid, still-drawable) texture in place rather than the page going dark.
+        // The upload call itself stays a single call site — only the Stopwatch/logging around it are
+        // conditional on the diagnostic flag, so a future change to the call (parameters, try/catch)
+        // can't land in only one of two copies.
         SKImage texture;
-        if (s_gpuUploadTimingEnabled)
+        Stopwatch? sw = s_gpuUploadTimingEnabled ? Stopwatch.StartNew() : null;
+        texture = source.ToTextureImage(grContext, mipmapped: !magnified);
+        if (sw is not null)
         {
-            var sw = Stopwatch.StartNew();
-            texture = source.ToTextureImage(grContext, mipmapped: !magnified);
             sw.Stop();
             if (sw.Elapsed.TotalMilliseconds >= GpuUploadTimingLogThresholdMs)
             {
@@ -402,11 +418,8 @@ internal sealed class PdfPageVisualHandler : CompositionCustomVisualHandler
                     $"mipmapped={!magnified}, {sw.Elapsed.TotalMilliseconds:F1} ms");
             }
         }
-        else
-        {
-            texture = source.ToTextureImage(grContext, mipmapped: !magnified);
-        }
 
+        old.Texture?.Dispose();
         _gpuTextures[page] = (texture, source);
         return texture;
     }
