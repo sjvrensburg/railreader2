@@ -819,12 +819,20 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             OnPropertyChanged(nameof(AutoScrollParked));
         }
 
-        if (anyAnimating) RequestAnimationFrame();
+        if (anyAnimating)
+            RequestAnimationFrame();
+        else if (_pollTimer is { IsEnabled: false } && _controller.Worker is { IsIdle: false })
+            _pollTimer.Start(); // analysis still in flight after the last animating frame
     }
 
     public void RequestAnimationFrame()
     {
-        if (_pollTimer is not null && !_pollTimer.IsEnabled)
+        // The poll timer only needs to run while the analysis worker actually has in-flight work to
+        // drain -- its tick body no-ops (returns before even reaching _pollTimer.Stop()) for the whole
+        // inter-frame window while an animation is in progress, so starting it unconditionally here
+        // meant a 100ms DispatcherTimer ran continuously through all rail reading, auto-scroll and
+        // zoom animation at ~19% of a core on X11 for no work (#224).
+        if (_pollTimer is { IsEnabled: false } && _controller.Worker is { IsIdle: false })
             _pollTimer.Start();
 
         if (_animationRequested) return;
