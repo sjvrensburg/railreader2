@@ -213,11 +213,14 @@ public sealed partial class MainWindowViewModel
         // the ~12s poll window would keep this ticking against a disposed controller.
         int attempts = 0;
         _startupRailTimer?.Stop();
-        _startupRailTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(150) };
+        // 250ms * 48 attempts = same ~12s window as the old 150ms * 80 (DispatcherTimer overhead is
+        // proportionally worse at faster intervals on X11 — see #224 — and this timer, though
+        // short-lived, needn't poll any faster than that).
+        _startupRailTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
         _startupRailTimer.Tick += (_, _) =>
         {
             attempts++;
-            if (ActiveTab is not { } t || attempts > 80) { _startupRailTimer?.Stop(); return; }
+            if (ActiveTab is not { } t || attempts > 48) { _startupRailTimer?.Stop(); return; }
             if (!t.AnalysisCache.ContainsKey(t.State.CurrentPage)) return;
             _startupRailTimer?.Stop();
             if (!t.Rail.Active && !ForcedRailActive) StartRailHere();

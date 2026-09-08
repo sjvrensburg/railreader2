@@ -198,7 +198,8 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     // ~30s of stalled progress (no page completed) before we give up — long
     // enough to ride out a slow page on a weak CPU, short enough to recover
     // from a wedged analysis worker without locking the UI indefinitely.
-    private const int ScanAllStallTickLimit = 600;
+    // 150 ticks * 200ms _scanAllTimer interval = 30s (was 600 * 50ms — keep in sync with the interval).
+    private const int ScanAllStallTickLimit = 150;
 
     /// <summary>True when the tab bar should be visible (not fullscreen, or hovering at top edge).</summary>
     public bool IsTabBarVisible => !IsFullScreen || ShowFullScreenHeader;
@@ -698,6 +699,14 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
             if (!hasWork)
                 _backgroundTimer?.Stop();
+
+            // While rail is active this tick can never submit (the guard above), so the 500ms cadence
+            // is pure DispatcherTimer overhead on top of the poll timer's own cost (#224). Read-ahead
+            // runs at full speed when the reader is idle, where it belongs, and backs off to a quarter
+            // speed during rail reading; results still drain on the slower cadence either way.
+            var wanted = railActive ? TimeSpan.FromMilliseconds(2000) : TimeSpan.FromMilliseconds(500);
+            if (_backgroundTimer is not null && _backgroundTimer.Interval != wanted)
+                _backgroundTimer.Interval = wanted;
         };
     }
 
@@ -985,8 +994,11 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         // Reset background queue to start from page 0
         doc.QueueLookahead(0);
 
-        // Fast scan timer: polls results + submits next page at ~20 Hz
-        _scanAllTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
+        // Scan timer: polls results + submits next page at 5 Hz. A single ONNX layout inference takes
+        // 100ms-1s per page, so a faster poll buys nothing but steals UI-thread time from the sweep
+        // it's driving via DispatcherTimer's per-tick cost on X11 (#224); progress text at 5x/s is
+        // still smooth for a per-page counter, and it runs behind a modal overlay the user is watching.
+        _scanAllTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(200) };
         _scanAllTimer.Tick += OnScanAllTick;
         _scanAllTimer.Start();
 
