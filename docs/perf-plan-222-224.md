@@ -204,6 +204,43 @@ mode; (b) continuous scroll through a 15-page document at 300 % zoom; (c) the sa
 window budget lowered. **Record the numbers in this file (or the issue) before implementing Phase 2** —
 they decide whether Phase 3 is worth it.
 
+#### Phase 1 results (2026-09-08, live-driven via xdotool, `experiments/PDFs/Attention_is_all_you_need.pdf`, 15 pages, `render_quality=High`/525 DPI cap)
+
+Zoom settle on page 0/1, `RR_GPU_UPLOAD_TIMING=1`, real `ToTextureImage` timings from `session.log`:
+
+| Source size | Megapixels | Mipmapped | Elapsed |
+|---|---|---|---|
+| 1275×1649 | 2.1 MP | true | 33.0–49.8 ms |
+| 2550×3299 | 8.4 MP | true | 188.4 ms |
+| 3187×4125 | 13.1 MP | false (magnified) | 119.6 ms |
+| 4462×5775 | 25.8 MP | false (magnified) | 216.0 ms |
+| 5100×6599 | 33.7 MP | false (magnified) | 269.7 ms |
+
+The 4462×5775/25.8 MP row is exactly this document's own reference case from this plan's §2 intro
+(Letter page at the 525 DPI cap, ≈103 MB before mips) — **confirmed at 216 ms**, a single-frame stall
+~13× a 16 ms frame budget. This settles the Phase 3 question: **yes, the anchor upload is the hitch**,
+and Phase 3 (upload only the visible sub-rect) is worth doing on a future pass. Not implemented in this
+branch — out of scope for this session's budget-only fix (§Phase 2).
+
+CPU comparison, `perf/render-hitches-222-224` (post-#224 fix) vs `main` @ `c1518ff` (pre-fix), same PDF,
+same interaction (zoom to 939%, engage rail, hold Right for a sustained scroll, sampled via
+`top -H -d 0.15`, 3 runs each): the compositor/render thread cost is unchanged (~27–29% avg either
+branch — inherent Skia draw cost, not a regression target). The **main dispatcher thread** (where
+`DispatcherTimer` ticks run) dropped from **~20–21% avg / ~33–47% max (main)** to **~7–9% avg / ~19–64%
+max (fixed)** — directly confirms the #224 poll-timer fix removes real, measurable UI-thread cost during
+sustained animation, not just a theoretical one.
+
+Continuous-scroll RSS (browse mode, 197% zoom — the highest zoom reliably below `rail_zoom_threshold=3`
+for this window size, so continuous scroll's neighbour-page path stays engaged; scrolled start to end of
+the 15-page doc): both branches held steady around 900 MB–1.05 GB through the bulk of the document, well
+under the ~1.25 GB Core #115 baseline this plan cites. **Inconclusive as a Core-0.61.3-specific
+comparison** — the branch under test (with the Core bump) actually spiked slightly *higher* at the very
+last page (~1.35 GB vs ~1.06 GB on main), but that page has a complex vector attention-diagram figure and
+the spike lines up with `[Analyzing...]` (background ONNX layout analysis of the final pages) rather than
+the render-texture path the neighbour-DPI reduction touches — the two effects aren't well separated by
+this test. Re-measure at the full 300% with a wider window (or with analysis pre-warmed) if a tighter
+before/after on the render-texture memory specifically is wanted later.
+
 ### Phase 2 — cheap structural wins
 
 #### 2a. Per-frame upload budget with stale-texture fallback
