@@ -1,6 +1,8 @@
+using System.Diagnostics;
 using Avalonia.Media;
 using Avalonia.Rendering.Composition;
 using Avalonia.Skia;
+using RailReader.Core;
 using RailReader.Core.Models;
 using RailReader.Renderer.Skia;
 using SkiaSharp;
@@ -82,6 +84,14 @@ internal sealed class PdfPageVisualHandler : CompositionCustomVisualHandler
     // reintroduce texel-hop aliasing during the transient before Core re-rasters at lower DPI.
     // Defaulting to mips (the !magnified branch) is the quality-safe direction.
     private const float MipmapSkipMagnifyFactor = 1.25f;
+
+    // Diagnostic-only: times GetOrUploadTexture's ToTextureImage call and logs it when it exceeds
+    // GpuUploadTimingLogThresholdMs. Off by default — gated behind RR_GPU_UPLOAD_TIMING=1 so we never
+    // pay a synchronous, flushing ConsoleLogger write on the composition thread in normal use (#222
+    // Phase 1). Parsed once; the field itself is the only per-frame cost when disabled.
+    private static readonly bool s_gpuUploadTimingEnabled =
+        Environment.GetEnvironmentVariable("RR_GPU_UPLOAD_TIMING") == "1";
+    private const double GpuUploadTimingLogThresholdMs = 3.0;
 
     // ThreadStatic caches: one per composition thread (typically one per renderer)
     [ThreadStatic] private static SKPaint? s_imagePaint;
@@ -334,7 +344,26 @@ internal sealed class PdfPageVisualHandler : CompositionCustomVisualHandler
         bool magnified = deviceWidth > source.Width * MipmapSkipMagnifyFactor;
         if (_gpuTextures.TryGetValue(page, out var old))
             old.Texture.Dispose();
-        var texture = source.ToTextureImage(grContext, mipmapped: !magnified);
+
+        SKImage texture;
+        if (s_gpuUploadTimingEnabled)
+        {
+            var sw = Stopwatch.StartNew();
+            texture = source.ToTextureImage(grContext, mipmapped: !magnified);
+            sw.Stop();
+            if (sw.Elapsed.TotalMilliseconds >= GpuUploadTimingLogThresholdMs)
+            {
+                double mp = source.Width * (double)source.Height / 1_000_000.0;
+                RailReaderLogging.Logger.Debug(
+                    $"[GPU upload] page {page}: {source.Width}x{source.Height} ({mp:F1} MP), " +
+                    $"mipmapped={!magnified}, {sw.Elapsed.TotalMilliseconds:F1} ms");
+            }
+        }
+        else
+        {
+            texture = source.ToTextureImage(grContext, mipmapped: !magnified);
+        }
+
         _gpuTextures[page] = (texture, source);
         return texture;
     }
