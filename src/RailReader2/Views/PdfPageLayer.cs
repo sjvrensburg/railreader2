@@ -66,8 +66,11 @@ internal sealed class PdfPageVisualHandler : CompositionCustomVisualHandler
 
     // Motion-blur sigma at full speed, in DEVICE pixels at intensity 1.0. The old constant (0.35, in
     // page units, divided by zoom) worked out to <= intensity * 0.35 px on screen — invisible, but still
-    // a full Gaussian pass every animating frame (#223).
-    private const float MotionBlurMaxDeviceSigma = 3.0f;
+    // a full Gaussian pass every animating frame (#223). 3.0f (the first tuning) turned out to still be
+    // imperceptible at the shipped default intensity (0.33 -> <= ~1px, only right at the end of a
+    // sustained ~1.5s scroll/zoom hold) — raised to 6.0f so a full-speed hold reaches ~2px, a real,
+    // visible smear rather than a rounding error.
+    private const float MotionBlurMaxDeviceSigma = 6.0f;
 
     // Continuous-scroll line-focus blur (non-anchor visible pages): sigma-per-intensity-unit, in
     // page-point-times-zoom canvas units (the canvas here is already scaled by the camera concat) —
