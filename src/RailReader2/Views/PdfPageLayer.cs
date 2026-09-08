@@ -59,9 +59,13 @@ internal class PdfPageLayer : CompositionLayerControl<PdfPageVisualHandler>;
 /// </summary>
 internal sealed class PdfPageVisualHandler : CompositionCustomVisualHandler
 {
-    private const float MaxBlurSigma = 0.35f;
     private const double MinSpeedThreshold = 0.1;
     private const float DimFeatherFraction = 0.08f;
+
+    // Motion-blur sigma at full speed, in DEVICE pixels at intensity 1.0. The old constant (0.35, in
+    // page units, divided by zoom) worked out to <= intensity * 0.35 px on screen — invisible, but still
+    // a full Gaussian pass every animating frame (#223).
+    private const float MotionBlurMaxDeviceSigma = 3.0f;
 
     // Continuous-scroll line-focus blur (non-anchor visible pages): sigma-per-intensity-unit, in
     // page-point-times-zoom canvas units (the canvas here is already scaled by the camera concat) —
@@ -183,20 +187,33 @@ internal sealed class PdfPageVisualHandler : CompositionCustomVisualHandler
         float motionSigmaX = 0, motionSigmaY = 0;
         if (state.MotionBlur && state.MotionBlurIntensity > 0)
         {
-            float maxSigma = state.MotionBlurIntensity * MaxBlurSigma;
             float zoom = Math.Max(state.Zoom, 0.01f);
+            // canvas.TotalMatrix is read BEFORE the per-page camera concat, so ScaleX is the compositor's
+            // DPI scale; the camera adds `zoom` on top. Skia maps the filter sigma through the full CTM,
+            // so divide the wanted device sigma by both to get the local-space value to hand the filter.
+            float ctmScale = Math.Max(canvas.TotalMatrix.ScaleX * zoom, 0.0001f);
+            float maxDevice = state.MotionBlurIntensity * MotionBlurMaxDeviceSigma;
 
+            float deviceX = 0, deviceY = 0;
             if (state.ScrollSpeed > MinSpeedThreshold)
             {
                 double s = state.ScrollSpeed;
-                motionSigmaX = (float)(s * s * s * maxSigma) / zoom;
+                deviceX = (float)(s * s * s * maxDevice);
             }
             if (state.ZoomSpeed > MinSpeedThreshold)
             {
                 double z = state.ZoomSpeed;
-                float zSigma = (float)(z * z * z * maxSigma) / zoom;
-                motionSigmaX = Math.Max(motionSigmaX, zSigma);
-                motionSigmaY = Math.Max(motionSigmaY, zSigma);
+                float zDevice = (float)(z * z * z * maxDevice);
+                deviceX = Math.Max(deviceX, zDevice);
+                deviceY = Math.Max(deviceY, zDevice);
+            }
+
+            // Below half a device pixel the blur is imperceptible but still costs a full image-filter
+            // pass over the visible region — skip it entirely (#223).
+            if (deviceX >= MinBlurSigma || deviceY >= MinBlurSigma)
+            {
+                motionSigmaX = deviceX / ctmScale;
+                motionSigmaY = deviceY / ctmScale;
             }
         }
         var motionBlurFilter = GetCachedBlurFilter(motionSigmaX, motionSigmaY);
