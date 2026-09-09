@@ -347,6 +347,27 @@ just the anchor) — the mechanism is general and makes even a budgeted non-anch
   source uploaded only a 3087×2133 (6.6 MP) sub-rect in ~9 ms (vs 269.7 ms for the full page
   pre-Phase-3), and the hysteresis margin held through a 2.5s rail-scroll hold with only one re-upload.
 
+- **Second crash found by the user's own smoke test** after this branch was pushed — same SIGSEGV
+  signature (`sk_image_get_width`, same fault offset), confirmed via `dmesg`. The first fix (keeping the
+  subset alive) only closed *this file's own* premature dispose; it didn't account for the framework's
+  **existing** `RetireImage` mechanism disposing `source` itself once a newer DPI-tier bitmap replaces it
+  — a routine event on essentially every zoom, previously always safe because the old (pre-Phase-3) code
+  uploaded the whole page directly with no intermediate subset. Since the subset shares `source`'s pixel
+  memory, and the GPU upload from a raster subset is not fully resolved synchronously, that disposal
+  corrupts the still-in-flight upload even with the subset kept alive. Reproduced twice under `gdb`
+  (zoom in → sustained rail-scroll hold → rapid zoom oscillation), both times replaying the same sequence
+  that crashed for the user. **Fix**: `GRContext.Flush(submit: true, synchronous: false)` right after
+  `ToTextureImage`, forcing Skia to actually submit the pending GPU work (so it stops depending on the
+  CPU-side subset/source) before `UploadTexture` returns. Verified the flush itself is cheap (~0.3–2 ms
+  in nearly all measured cases via split upload/flush timing) — the 550–780 ms full-page-mipmapped
+  uploads seen while testing this are the inherent cost of a full mip chain for a ~30 MP texture, present
+  with or without the flush, not a regression from this fix. Re-verified crash-free across two more
+  independent `gdb` sessions replaying the full smoke-test sequence, cross-checked against `dmesg` rather
+  than relying solely on process-liveness checks (one such check gave a false negative mid-session).
+  **Lesson for next time**: a subset/derived-image upload's completion can't be assumed just because the
+  immediate call returns and its metadata reads back correctly — verify against *every* path that can
+  dispose the objects involved, not just the one this file's own code controls.
+
 **Upload only the visible sub-rect of the anchor page.** This is the real structural fix and the only
 one that removes the zoom-settle stall.
 
