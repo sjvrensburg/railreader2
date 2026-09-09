@@ -305,6 +305,69 @@ change (which would be a Core change, not a shell one) if the data supports it.
 
 ### Phase 3 — only if Phase 1 says the anchor upload is the hitch
 
+**IMPLEMENTED** on branch `perf/gpu-upload-subrect` (2026-09-09), following the Phase 1 verdict above
+(216 ms measured on the plan's own 25.8 MP reference case). Applied uniformly to every visible page (not
+just the anchor) — the mechanism is general and makes even a budgeted non-anchor upload cheaper too.
+
+- `SKImage.Subset(SKRectI)` (verified via `ilspycmd` against SkiaSharp 3.119.4: `sk_image_make_subset_raster`)
+  is the raster-only overload — a cheap shared-pixel view, no GPU context needed, safe because Core marks
+  rendered page bitmaps immutable. `PdfPageVisualHandler._gpuTextures` now stores `(Texture, Subset,
+  Source, CoveredRect)`; `CoveredRect` is the source-image-pixel sub-rect actually uploaded. `Subset` is
+  kept alive alongside `Texture` (see the crash finding below — it can't be disposed once the upload
+  call returns).
+- Margin is one required-rect's worth of image pixels on every side (`ExpandForMargin`) — scales with
+  viewport size and zoom rather than a fixed pixel count, comfortably exceeding the mip footprint the
+  plan flagged as a concern.
+- Hysteresis: re-upload only when the *unpadded* visible rect (`requiredImageRect`) escapes the cached
+  `CoveredRect`, not on every frame within the margin.
+- Correctness edge case found and fixed in review: the existing per-frame upload-budget's "stale texture"
+  fallback (one non-anchor upload/frame) must map `cached.CoveredRect` back to page space using
+  `cached.Source`'s own pixel dimensions, not the current frame's `image` — otherwise a DPI-tier swap
+  that happens *while* a page sits deferred would place the stale sub-image at the wrong page position
+  (page.PageW/PageH, in points, are tier-independent; pixel density isn't).
+- **Regression check**: `RenderHarness.Headless --only rail_mode` output is byte-identical (ImageMagick
+  `compare -metric AE` = 0) against `main` pre-Phase-3 for the whole-page-visible case — expected, since
+  a fully-visible page's required rect is the whole image, so `coveredRect` reduces to the full source
+  bounds exactly as before.
+- **Live-tested (2026-09-09)**, this time verifying window identity by PID before every xdotool
+  interaction (see `feedback_no_gui_spawning`-adjacent lesson from the earlier aborted attempt). The
+  first live run **crashed immediately** — SIGSEGV in `libSkiaSharp.so` on the very first real render.
+  Root-caused with `gdb`: `source.Subset(coveredRect).ToTextureImage(...)` disposed the subset inside a
+  `using` block right after the upload call returned, but the GPU upload from a raster subset is **not**
+  fully resolved synchronously — a later frame's draw call dereferences the freed subset and segfaults in
+  `sk_image_get_width`. Confirmed via a `gdb` backtrace with temporary trace logging: execution ran
+  cleanly through `Subset()`/`ToTextureImage()` (both returned non-null, dimensions read back correctly)
+  and crashed in the *next* frame's draw call, not inside the upload itself. **Fix**: don't dispose the
+  subset when the upload returns — `_gpuTextures` now stores `(Texture, Subset, Source, CoveredRect)` and
+  disposes `Subset` alongside `Texture` when the entry is replaced/evicted. Also added a defensive guard
+  against a degenerate (zero-area) required rect ever reaching `Subset()` (native Skia doesn't validate
+  that and would segfault too). After the fix: rail zoom, a sustained rail-scroll hold, zoom in/out
+  through multiple DPI tiers, and continuous-scroll page-2 pan all ran cleanly, no crash, no visible
+  artifacts at any sub-rect boundary. GPU upload log confirmed the payoff live: a 5100×6599 (33.7 MP)
+  source uploaded only a 3087×2133 (6.6 MP) sub-rect in ~9 ms (vs 269.7 ms for the full page
+  pre-Phase-3), and the hysteresis margin held through a 2.5s rail-scroll hold with only one re-upload.
+
+- **Second crash found by the user's own smoke test** after this branch was pushed — same SIGSEGV
+  signature (`sk_image_get_width`, same fault offset), confirmed via `dmesg`. The first fix (keeping the
+  subset alive) only closed *this file's own* premature dispose; it didn't account for the framework's
+  **existing** `RetireImage` mechanism disposing `source` itself once a newer DPI-tier bitmap replaces it
+  — a routine event on essentially every zoom, previously always safe because the old (pre-Phase-3) code
+  uploaded the whole page directly with no intermediate subset. Since the subset shares `source`'s pixel
+  memory, and the GPU upload from a raster subset is not fully resolved synchronously, that disposal
+  corrupts the still-in-flight upload even with the subset kept alive. Reproduced twice under `gdb`
+  (zoom in → sustained rail-scroll hold → rapid zoom oscillation), both times replaying the same sequence
+  that crashed for the user. **Fix**: `GRContext.Flush(submit: true, synchronous: false)` right after
+  `ToTextureImage`, forcing Skia to actually submit the pending GPU work (so it stops depending on the
+  CPU-side subset/source) before `UploadTexture` returns. Verified the flush itself is cheap (~0.3–2 ms
+  in nearly all measured cases via split upload/flush timing) — the 550–780 ms full-page-mipmapped
+  uploads seen while testing this are the inherent cost of a full mip chain for a ~30 MP texture, present
+  with or without the flush, not a regression from this fix. Re-verified crash-free across two more
+  independent `gdb` sessions replaying the full smoke-test sequence, cross-checked against `dmesg` rather
+  than relying solely on process-liveness checks (one such check gave a false negative mid-session).
+  **Lesson for next time**: a subset/derived-image upload's completion can't be assumed just because the
+  immediate call returns and its metadata reads back correctly — verify against *every* path that can
+  dispose the objects involved, not just the one this file's own code controls.
+
 **Upload only the visible sub-rect of the anchor page.** This is the real structural fix and the only
 one that removes the zoom-settle stall.
 

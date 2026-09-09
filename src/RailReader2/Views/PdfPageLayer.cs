@@ -128,11 +128,28 @@ internal sealed class PdfPageVisualHandler : CompositionCustomVisualHandler
     private PdfPageRenderState? _state;
 
     // GPU texture cache with mipmaps for alias-free downsampling, one entry per currently-visible
-    // page (single-page mode: at most one entry — the anchor). The source SKImage from
-    // ViewportImages is a raster image without mipmaps; ToTextureImage uploads it to the GPU with a
-    // full mip chain. Pruned in OnMessage whenever a page drops out of the new state's Pages list;
-    // an entry whose source image changed (DPI upgrade) is re-uploaded lazily in OnRender.
-    private readonly Dictionary<int, (SKImage Texture, SKImage Source)> _gpuTextures = new();
+    // page (single-page mode: at most one entry — the anchor). Each entry holds only the SUB-RECT
+    // of the source image currently needed on screen (plus a generous margin), not the whole page
+    // (#222 Phase 3) — at rail-reading zoom a ~25 MP page texture is mostly off-screen, so
+    // uploading the whole thing costs a 200+ ms single-frame stall for pixels nobody sees (measured
+    // in docs/perf-plan-222-224.md). CoveredRect is in SOURCE IMAGE pixel coordinates. The source
+    // SKImage from ViewportImages is a raster image without mipmaps; ToTextureImage uploads a
+    // SUBSET of it (SKImage.Subset — a cheap shared-pixel view, safe because Core marks rendered
+    // page bitmaps immutable) to the GPU with a full mip chain. Subset is kept alive alongside
+    // Texture (not disposed once the upload call returns) — live-tested (twice, via gdb) and confirmed
+    // that ToTextureImage's GPU upload from a raster subset is NOT fully resolved synchronously:
+    // disposing the subset right after the call segfaults (sk_image_get_width) on a later frame, and
+    // separately, the framework's OWN RetireImage mechanism disposing `source` once a newer DPI-tier
+    // bitmap replaces it crashes the same way (the subset shares source's pixel memory). See
+    // UploadTexture's own comment for the fix (an explicit GRContext.Flush after the upload). Pruned in
+    // OnMessage whenever a page drops out of the new state's Pages list; an entry whose source image
+    // changed (DPI upgrade) or whose CoveredRect no longer contains the visible region is re-uploaded
+    // lazily in OnRender.
+    // SourceWidth/SourceHeight are captured at upload time rather than read from Source later: the
+    // framework's RetireImage mechanism can dispose Source (a DPI-tier upgrade) while this page's
+    // upload sits deferred (out of the per-frame budget), and Source.Width/Height on a disposed
+    // SKImage reads through a freed native handle — the exact crash class documented on UploadTexture.
+    private readonly Dictionary<int, (SKImage Texture, SKImage Subset, SKImage Source, SKRectI CoveredRect, int SourceWidth, int SourceHeight)> _gpuTextures = new();
 
     public override void OnMessage(object message)
     {
@@ -157,6 +174,7 @@ internal sealed class PdfPageVisualHandler : CompositionCustomVisualHandler
                     foreach (var key in stale)
                     {
                         _gpuTextures[key].Texture.Dispose();
+                        _gpuTextures[key].Subset.Dispose();
                         _gpuTextures.Remove(key);
                     }
             }
@@ -269,52 +287,113 @@ internal sealed class PdfPageVisualHandler : CompositionCustomVisualHandler
             var image = page.Image;
             float deviceWidth = page.PageW * canvas.TotalMatrix.ScaleX * state.Zoom;
 
+            canvas.Save();
+            canvas.Concat(page.Camera);
+
+            var pageRect = SKRect.Create(0, 0, page.PageW, page.PageH);
+
             SKImage drawImage;
-            if (grContext is null)
+            SKRect imageDestRect;
+            if (grContext is null || image.Width <= 0 || image.Height <= 0 || page.PageW <= 0f || page.PageH <= 0f)
             {
                 // No GPU context available (e.g. software fallback) — draw the raster source directly,
-                // same as always; texture caching/budgeting doesn't apply. Deliberately does NOT fall
-                // back to a previously-uploaded GPU texture for this page even if one is still resident
-                // in _gpuTextures: a texture created under a GPU context can be invalidated by the very
-                // loss of that context, so drawing the raw raster source here is the safe choice, not
-                // just the simple one.
+                // same as always; texture caching/budgeting/sub-rects don't apply. Deliberately does NOT
+                // fall back to a previously-uploaded GPU texture for this page even if one is still
+                // resident in _gpuTextures: a texture created under a GPU context can be invalidated by
+                // the very loss of that context, so drawing the raw raster source here is the safe
+                // choice, not just the simple one.
+                //
+                // The same fallback covers degenerate page/image geometry (e.g. a corrupt PDF page whose
+                // FPDF_LoadPage failed, leaving PageW/PageH at 0 while a bitmap still renders): the
+                // page-to-image scale math below divides by PageW/PageH and feeds the result to
+                // SKImage.Subset, which segfaults natively on a zero-area rect rather than throwing.
                 drawImage = image;
+                imageDestRect = pageRect;
             }
             else
             {
+                // Sub-rect upload (#222 Phase 3): map the visible clip — in LOCAL (page) space, i.e.
+                // AFTER the camera concat above — to source-image pixel coordinates, so a texture only
+                // ever needs to cover what's actually on screen instead of the whole (often ~25 MP)
+                // page. Intersect with the page bounds first: a viewport larger than the page, or the
+                // camera not yet settled this frame, must not inflate the required rect past the page.
+                var visiblePageRect = canvas.LocalClipBounds;
+                visiblePageRect.Intersect(pageRect);
+                if (visiblePageRect.IsEmpty) visiblePageRect = pageRect;
+
+                float scaleX = image.Width / page.PageW;
+                float scaleY = image.Height / page.PageH;
+                var imageBounds = SKRectI.Create(image.Width, image.Height);
+                var visibleImageRect = new SKRect(
+                    visiblePageRect.Left * scaleX, visiblePageRect.Top * scaleY,
+                    visiblePageRect.Right * scaleX, visiblePageRect.Bottom * scaleY);
+                var requiredImageRect = SKRectI.Intersect(SKRectI.Ceiling(visibleImageRect, outwards: true), imageBounds);
+                // A degenerate (zero-area) required rect — e.g. the very first frame, before the
+                // camera/layout has settled and LocalClipBounds is still meaningless — must never reach
+                // SKImage.Subset(): native Skia doesn't validate a zero-area subset and segfaults rather
+                // than throwing a catchable exception (observed live). Fall back to the whole page for
+                // that one frame; a real clip rect arrives within a frame or two.
+                if (requiredImageRect.Width <= 0 || requiredImageRect.Height <= 0)
+                    requiredImageRect = imageBounds;
+
                 bool haveEntry = _gpuTextures.TryGetValue(page.Page, out var cached);
-                bool haveCurrent = haveEntry && ReferenceEquals(cached.Source, image);
-                if (haveCurrent)
+                bool sourceMatches = haveEntry && ReferenceEquals(cached.Source, image);
+                // Hysteresis: only re-upload once the required (unpadded) rect escapes what's already
+                // resident — otherwise a pan/rail-advance within the margin re-uploads every frame.
+                bool stillCovers = sourceMatches && cached.CoveredRect.Contains(requiredImageRect);
+
+                if (stillCovers)
                 {
                     drawImage = cached.Texture;
+                    imageDestRect = MapImageRectToPage(cached.CoveredRect, scaleX, scaleY);
                 }
                 else if (page.IsAnchor || nonAnchorUploadBudget > 0)
                 {
                     // The anchor always gets its upload — it's what the user is reading. A budgeted
                     // non-anchor upload consumes the frame's single slot.
                     if (!page.IsAnchor) nonAnchorUploadBudget--;
-                    drawImage = UploadTexture(page.Page, image, grContext, deviceWidth);
+                    var coveredRect = ExpandForMargin(requiredImageRect, imageBounds);
+                    drawImage = UploadTexture(page.Page, image, grContext, deviceWidth, coveredRect);
+                    imageDestRect = MapImageRectToPage(coveredRect, scaleX, scaleY);
                 }
                 else if (haveEntry)
                 {
-                    // Out of budget this frame: draw the stale resident texture (`cached`, still
-                    // geometrically correct — see the OnRender-level comment above) and try again next
-                    // frame.
-                    drawImage = cached.Texture;
+                    // Out of budget this frame: draw the stale resident texture and try again next
+                    // frame. Map its CoveredRect through cached.Source's OWN scale (captured at upload
+                    // time — see the SourceWidth/SourceHeight comment on the field), not the current
+                    // frame's scaleX/scaleY — those are derived from `image`, which can already be a
+                    // newer DPI-tier bitmap than the one `cached.Texture` was uploaded from while this
+                    // page sat deferred, and the two tiers have different pixel-per-page-point density.
+                    // page.PageW/PageH (page size in POINTS) don't change with DPI tier, so this still
+                    // places the sub-image at the geometrically correct page position either way.
+                    if (cached.CoveredRect.Contains(requiredImageRect))
+                    {
+                        drawImage = cached.Texture;
+                        float staleScaleX = cached.SourceWidth / page.PageW;
+                        float staleScaleY = cached.SourceHeight / page.PageH;
+                        imageDestRect = MapImageRectToPage(cached.CoveredRect, staleScaleX, staleScaleY);
+                    }
+                    else
+                    {
+                        // The stale texture's covered region no longer contains what's on screen (e.g.
+                        // sustained panning while this page's upload keeps losing the per-frame budget
+                        // to another page). Draw the raw CPU-side source for this one frame instead of
+                        // leaving a gap where the panel background would show through — softer/uncached
+                        // but geometrically complete, matching the pre-Phase-3 whole-page fallback.
+                        drawImage = image;
+                        imageDestRect = pageRect;
+                    }
                     deferredUpload = true;
                 }
                 else
                 {
                     // No resident texture at all yet — nothing to draw this frame.
                     deferredUpload = true;
+                    canvas.Restore();
                     continue;
                 }
             }
 
-            canvas.Save();
-            canvas.Concat(page.Camera);
-
-            var destRect = SKRect.Create(0, 0, page.PageW, page.PageH);
             var blurFilter = page.IsAnchor ? motionBlurFilter : neighborBlurFilter;
 
             // Apply the colour effect and/or blur directly on the DrawImage paint rather than through
@@ -326,7 +405,7 @@ internal sealed class PdfPageVisualHandler : CompositionCustomVisualHandler
                 s_imagePaint.ColorFilter = effectFilter;
                 s_imagePaint.ImageFilter = blurFilter;
                 var srcRect = SKRect.Create(drawImage.Width, drawImage.Height);
-                canvas.DrawImage(drawImage, srcRect, destRect, sampling, s_imagePaint);
+                canvas.DrawImage(drawImage, srcRect, imageDestRect, sampling, s_imagePaint);
                 // Don't let the cached paint retain refs to filters that may be disposed
                 // (effect/intensity or blur sigma change) before the next frame reassigns them.
                 s_imagePaint.ColorFilter = null;
@@ -334,7 +413,7 @@ internal sealed class PdfPageVisualHandler : CompositionCustomVisualHandler
             }
             else
             {
-                canvas.DrawImage(drawImage, destRect, sampling);
+                canvas.DrawImage(drawImage, imageDestRect, sampling);
             }
 
             // Line focus dim: feathered gradient outside the active line, anchor page only (the seated
@@ -377,7 +456,7 @@ internal sealed class PdfPageVisualHandler : CompositionCustomVisualHandler
                     s_cachedDimKey = dimKey;
                 }
 
-                canvas.DrawRect(destRect, s_cachedDimPaint);
+                canvas.DrawRect(pageRect, s_cachedDimPaint);
             }
 
             canvas.Restore(); // undo camera concat
@@ -389,14 +468,32 @@ internal sealed class PdfPageVisualHandler : CompositionCustomVisualHandler
         if (deferredUpload) Invalidate();
     }
 
-    private SKImage UploadTexture(int page, SKImage source, GRContext grContext, float deviceWidth)
+    /// <summary>
+    /// Pads <paramref name="required"/> (the unexpanded on-screen rect, in source-image pixels) by
+    /// its own width/height on every side — a full extra "viewport" of buffer — then clamps to
+    /// <paramref name="imageBounds"/>. This is the rect actually uploaded; the margin is what makes
+    /// panning or advancing a rail line cheap (no re-upload) until the required rect escapes it
+    /// (#222 Phase 3). A margin sized off the required rect itself (rather than a fixed pixel count)
+    /// scales naturally with viewport size and zoom level.
+    /// </summary>
+    private static SKRectI ExpandForMargin(SKRectI required, SKRectI imageBounds)
+        => SKRectI.Intersect(SKRectI.Inflate(required, required.Width, required.Height), imageBounds);
+
+    /// <summary>Maps a rect in source-image pixel coordinates back to page-space coordinates, the
+    /// inverse of the page-to-image scale used to compute it.</summary>
+    private static SKRect MapImageRectToPage(SKRectI imageRect, float scaleX, float scaleY)
+        => SKRect.Create(imageRect.Left / scaleX, imageRect.Top / scaleY,
+            imageRect.Width / scaleX, imageRect.Height / scaleY);
+
+    private SKImage UploadTexture(int page, SKImage source, GRContext grContext, float deviceWidth, SKRectI coveredRect)
     {
         // Upload raster image as a GPU texture. A mip chain fixes texel-hop aliasing while the
         // texture is minified, but it costs upload time and ~33% VRAM and is never sampled while the
         // texture is magnified (upscaled). Skip it only when this image is clearly being magnified;
         // build it for near-1:1 and minified uploads so a later zoom-out doesn't shimmer before Core
-        // re-rasters. deviceWidth (device-pixels-per-page-width) against source.Width tells us
-        // magnification.
+        // re-rasters. deviceWidth (device-pixels-per-page-width) against the FULL source.Width tells
+        // us magnification — this is a pixel-density comparison, unaffected by only uploading a
+        // sub-rect of that same-density source.
         bool magnified = deviceWidth > source.Width * MipmapSkipMagnifyFactor;
         _gpuTextures.TryGetValue(page, out var old);
 
@@ -408,23 +505,73 @@ internal sealed class PdfPageVisualHandler : CompositionCustomVisualHandler
         // The upload call itself stays a single call site — only the Stopwatch/logging around it are
         // conditional on the diagnostic flag, so a future change to the call (parameters, try/catch)
         // can't land in only one of two copies.
-        SKImage texture;
-        Stopwatch? sw = s_gpuUploadTimingEnabled ? Stopwatch.StartNew() : null;
-        texture = source.ToTextureImage(grContext, mipmapped: !magnified);
-        if (sw is not null)
+        //
+        // source.Subset(coveredRect) (#222 Phase 3) is a cheap shared-pixel raster view — no copy —
+        // because Core marks rendered page bitmaps immutable, so ToTextureImage only ever uploads the
+        // covered sub-rect's pixels to the GPU rather than the whole (often ~25 MP) page.
+        //
+        // ToTextureImage's GPU upload from a raster subset is NOT fully resolved by the time the call
+        // returns (confirmed via gdb: disposing the subset immediately segfaults — sk_image_get_width —
+        // on a later frame when Skia actually reads from it to finish the upload/mip generation). A
+        // second, separate crash (also confirmed via gdb/dmesg, same signature) came from the EXISTING
+        // RetireImage mechanism disposing `source` itself once a newer DPI-tier bitmap replaces it — the
+        // subset shares source's pixel memory, so that disposal corrupts the still-in-flight upload too,
+        // even with the subset itself kept alive. Neither the subset nor its source can be assumed safe
+        // to dispose right after this call.
+        //
+        // grContext.Flush(submit: true, synchronous: false) below only SUBMITS the pending GPU command
+        // buffer — with synchronous: false it does NOT block until the GPU has actually finished reading
+        // the CPU-side pixels, so it is not by itself a completion guarantee. The actual safety here
+        // comes from keeping both `subset` and `source` alive (in _gpuTextures / owned by the caller)
+        // for as long as anything might still be reading them, not from this Flush call. The Flush is
+        // still worth doing — it keeps the GPU making progress on the upload promptly rather than
+        // batching it behind whatever Skia would otherwise coalesce it with — but do not read this line
+        // as "safe to dispose subset/source immediately after".
+        var subset = source.Subset(coveredRect);
+        if (subset is null)
         {
-            sw.Stop();
-            if (sw.Elapsed.TotalMilliseconds >= GpuUploadTimingLogThresholdMs)
+            // Observed only in theory (a native Skia edge case), never live — but a null here would
+            // otherwise NRE on the next line. Skip this frame's upload rather than crash; the caller's
+            // deferred-upload retry loop will try again next frame.
+            RailReaderLogging.Logger.Error(
+                $"[GPU upload] SKImage.Subset returned null for page {page}, rect {coveredRect} — skipping this upload.");
+            return old.Texture ?? source;
+        }
+
+        SKImage texture;
+        try
+        {
+            Stopwatch? sw = s_gpuUploadTimingEnabled ? Stopwatch.StartNew() : null;
+            texture = subset.ToTextureImage(grContext, mipmapped: !magnified);
+            double uploadMs = sw?.Elapsed.TotalMilliseconds ?? 0;
+            grContext.Flush(submit: true, synchronous: false);
+            if (sw is not null)
             {
-                double mp = source.Width * (double)source.Height / 1_000_000.0;
-                RailReaderLogging.Logger.Debug(
-                    $"[GPU upload] page {page}: {source.Width}x{source.Height} ({mp:F1} MP), " +
-                    $"mipmapped={!magnified}, {sw.Elapsed.TotalMilliseconds:F1} ms");
+                sw.Stop();
+                if (sw.Elapsed.TotalMilliseconds >= GpuUploadTimingLogThresholdMs)
+                {
+                    double mp = coveredRect.Width * (double)coveredRect.Height / 1_000_000.0;
+                    RailReaderLogging.Logger.Debug(
+                        $"[GPU upload] page {page}: {coveredRect.Width}x{coveredRect.Height} sub-rect of " +
+                        $"{source.Width}x{source.Height} ({mp:F1} MP), mipmapped={!magnified}, " +
+                        $"upload={uploadMs:F1}ms flush={sw.Elapsed.TotalMilliseconds - uploadMs:F1}ms " +
+                        $"total={sw.Elapsed.TotalMilliseconds:F1}ms");
+                }
             }
+        }
+        catch
+        {
+            // ToTextureImage can throw (e.g. GPU OOM — the exact pressure this budgeting exists to
+            // reduce). `subset` is a freshly created object nothing else references yet, so it must be
+            // disposed here or it leaks; `old`/`source` are untouched, leaving the page's existing
+            // (still-valid) texture in place rather than going dark.
+            subset.Dispose();
+            throw;
         }
 
         old.Texture?.Dispose();
-        _gpuTextures[page] = (texture, source);
+        old.Subset?.Dispose();
+        _gpuTextures[page] = (texture, subset, source, coveredRect, source.Width, source.Height);
         return texture;
     }
 
