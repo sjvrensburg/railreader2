@@ -311,8 +311,10 @@ just the anchor) — the mechanism is general and makes even a budgeted non-anch
 
 - `SKImage.Subset(SKRectI)` (verified via `ilspycmd` against SkiaSharp 3.119.4: `sk_image_make_subset_raster`)
   is the raster-only overload — a cheap shared-pixel view, no GPU context needed, safe because Core marks
-  rendered page bitmaps immutable. `PdfPageVisualHandler._gpuTextures` now stores `(Texture, Source,
-  CoveredRect)`; `CoveredRect` is the source-image-pixel sub-rect actually uploaded.
+  rendered page bitmaps immutable. `PdfPageVisualHandler._gpuTextures` now stores `(Texture, Subset,
+  Source, CoveredRect)`; `CoveredRect` is the source-image-pixel sub-rect actually uploaded. `Subset` is
+  kept alive alongside `Texture` (see the crash finding below — it can't be disposed once the upload
+  call returns).
 - Margin is one required-rect's worth of image pixels on every side (`ExpandForMargin`) — scales with
   viewport size and zoom rather than a fixed pixel count, comfortably exceeding the mip footprint the
   plan flagged as a concern.
@@ -327,13 +329,23 @@ just the anchor) — the mechanism is general and makes even a budgeted non-anch
   `compare -metric AE` = 0) against `main` pre-Phase-3 for the whole-page-visible case — expected, since
   a fully-visible page's required rect is the whole image, so `coveredRect` reduces to the full source
   bounds exactly as before.
-- **Not live-tested** in this pass — a GUI-automation mishap (a stale/reused X11 window ID caused a
-  screenshot + keystrokes to land on an unrelated terminal window) caused the live-verification session to
-  be abandoned rather than risk further cross-window interference. Correctness was instead verified via
-  the SkiaSharp API surface check, the byte-identical static regression, and careful review of the
-  DPI-tier/deferred-upload interaction above. **Live-test before merging**: pan around at rail zoom
-  (check for edge artifacts at the subset boundary), zoom-settle timing (should now be a fraction of the
-  216 ms measured pre-Phase-3), and continuous scroll (neighbour pages now also subset).
+- **Live-tested (2026-09-09)**, this time verifying window identity by PID before every xdotool
+  interaction (see `feedback_no_gui_spawning`-adjacent lesson from the earlier aborted attempt). The
+  first live run **crashed immediately** — SIGSEGV in `libSkiaSharp.so` on the very first real render.
+  Root-caused with `gdb`: `source.Subset(coveredRect).ToTextureImage(...)` disposed the subset inside a
+  `using` block right after the upload call returned, but the GPU upload from a raster subset is **not**
+  fully resolved synchronously — a later frame's draw call dereferences the freed subset and segfaults in
+  `sk_image_get_width`. Confirmed via a `gdb` backtrace with temporary trace logging: execution ran
+  cleanly through `Subset()`/`ToTextureImage()` (both returned non-null, dimensions read back correctly)
+  and crashed in the *next* frame's draw call, not inside the upload itself. **Fix**: don't dispose the
+  subset when the upload returns — `_gpuTextures` now stores `(Texture, Subset, Source, CoveredRect)` and
+  disposes `Subset` alongside `Texture` when the entry is replaced/evicted. Also added a defensive guard
+  against a degenerate (zero-area) required rect ever reaching `Subset()` (native Skia doesn't validate
+  that and would segfault too). After the fix: rail zoom, a sustained rail-scroll hold, zoom in/out
+  through multiple DPI tiers, and continuous-scroll page-2 pan all ran cleanly, no crash, no visible
+  artifacts at any sub-rect boundary. GPU upload log confirmed the payoff live: a 5100×6599 (33.7 MP)
+  source uploaded only a 3087×2133 (6.6 MP) sub-rect in ~9 ms (vs 269.7 ms for the full page
+  pre-Phase-3), and the hysteresis margin held through a 2.5s rail-scroll hold with only one re-upload.
 
 **Upload only the visible sub-rect of the anchor page.** This is the real structural fix and the only
 one that removes the zoom-settle stall.
