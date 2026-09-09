@@ -305,6 +305,36 @@ change (which would be a Core change, not a shell one) if the data supports it.
 
 ### Phase 3 — only if Phase 1 says the anchor upload is the hitch
 
+**IMPLEMENTED** on branch `perf/gpu-upload-subrect` (2026-09-09), following the Phase 1 verdict above
+(216 ms measured on the plan's own 25.8 MP reference case). Applied uniformly to every visible page (not
+just the anchor) — the mechanism is general and makes even a budgeted non-anchor upload cheaper too.
+
+- `SKImage.Subset(SKRectI)` (verified via `ilspycmd` against SkiaSharp 3.119.4: `sk_image_make_subset_raster`)
+  is the raster-only overload — a cheap shared-pixel view, no GPU context needed, safe because Core marks
+  rendered page bitmaps immutable. `PdfPageVisualHandler._gpuTextures` now stores `(Texture, Source,
+  CoveredRect)`; `CoveredRect` is the source-image-pixel sub-rect actually uploaded.
+- Margin is one required-rect's worth of image pixels on every side (`ExpandForMargin`) — scales with
+  viewport size and zoom rather than a fixed pixel count, comfortably exceeding the mip footprint the
+  plan flagged as a concern.
+- Hysteresis: re-upload only when the *unpadded* visible rect (`requiredImageRect`) escapes the cached
+  `CoveredRect`, not on every frame within the margin.
+- Correctness edge case found and fixed in review: the existing per-frame upload-budget's "stale texture"
+  fallback (one non-anchor upload/frame) must map `cached.CoveredRect` back to page space using
+  `cached.Source`'s own pixel dimensions, not the current frame's `image` — otherwise a DPI-tier swap
+  that happens *while* a page sits deferred would place the stale sub-image at the wrong page position
+  (page.PageW/PageH, in points, are tier-independent; pixel density isn't).
+- **Regression check**: `RenderHarness.Headless --only rail_mode` output is byte-identical (ImageMagick
+  `compare -metric AE` = 0) against `main` pre-Phase-3 for the whole-page-visible case — expected, since
+  a fully-visible page's required rect is the whole image, so `coveredRect` reduces to the full source
+  bounds exactly as before.
+- **Not live-tested** in this pass — a GUI-automation mishap (a stale/reused X11 window ID caused a
+  screenshot + keystrokes to land on an unrelated terminal window) caused the live-verification session to
+  be abandoned rather than risk further cross-window interference. Correctness was instead verified via
+  the SkiaSharp API surface check, the byte-identical static regression, and careful review of the
+  DPI-tier/deferred-upload interaction above. **Live-test before merging**: pan around at rail zoom
+  (check for edge artifacts at the subset boundary), zoom-settle timing (should now be a fraction of the
+  216 ms measured pre-Phase-3), and continuous scroll (neighbour pages now also subset).
+
 **Upload only the visible sub-rect of the anchor page.** This is the real structural fix and the only
 one that removes the zoom-settle stall.
 
