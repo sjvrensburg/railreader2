@@ -136,12 +136,15 @@ internal sealed class PdfPageVisualHandler : CompositionCustomVisualHandler
     // SKImage from ViewportImages is a raster image without mipmaps; ToTextureImage uploads a
     // SUBSET of it (SKImage.Subset — a cheap shared-pixel view, safe because Core marks rendered
     // page bitmaps immutable) to the GPU with a full mip chain. Subset is kept alive alongside
-    // Texture (not disposed once the upload call returns) — live-tested and confirmed that
-    // ToTextureImage's GPU upload from a raster subset is NOT fully resolved synchronously; disposing
-    // the subset immediately after the call crashes (SIGSEGV in sk_image_get_width, confirmed via
-    // gdb) on a later frame when Skia actually reads from it. Pruned in OnMessage whenever a page
-    // drops out of the new state's Pages list; an entry whose source image changed (DPI upgrade) or
-    // whose CoveredRect no longer contains the visible region is re-uploaded lazily in OnRender.
+    // Texture (not disposed once the upload call returns) — live-tested (twice, via gdb) and confirmed
+    // that ToTextureImage's GPU upload from a raster subset is NOT fully resolved synchronously:
+    // disposing the subset right after the call segfaults (sk_image_get_width) on a later frame, and
+    // separately, the framework's OWN RetireImage mechanism disposing `source` once a newer DPI-tier
+    // bitmap replaces it crashes the same way (the subset shares source's pixel memory). See
+    // UploadTexture's own comment for the fix (an explicit GRContext.Flush after the upload). Pruned in
+    // OnMessage whenever a page drops out of the new state's Pages list; an entry whose source image
+    // changed (DPI upgrade) or whose CoveredRect no longer contains the visible region is re-uploaded
+    // lazily in OnRender.
     private readonly Dictionary<int, (SKImage Texture, SKImage Subset, SKImage Source, SKRectI CoveredRect)> _gpuTextures = new();
 
     public override void OnMessage(object message)
@@ -482,15 +485,24 @@ internal sealed class PdfPageVisualHandler : CompositionCustomVisualHandler
         //
         // source.Subset(coveredRect) (#222 Phase 3) is a cheap shared-pixel raster view — no copy —
         // because Core marks rendered page bitmaps immutable, so ToTextureImage only ever uploads the
-        // covered sub-rect's pixels to the GPU rather than the whole (often ~25 MP) page. The subset is
-        // NOT disposed here (no `using`) — confirmed via gdb that ToTextureImage's GPU upload from a
-        // raster subset is not fully resolved by the time the call returns; disposing the subset
-        // immediately segfaults (sk_image_get_width) on a later frame when Skia actually reads from it.
-        // It's kept alive in _gpuTextures alongside the texture and disposed together with it.
+        // covered sub-rect's pixels to the GPU rather than the whole (often ~25 MP) page.
+        //
+        // ToTextureImage's GPU upload from a raster subset is NOT fully resolved by the time the call
+        // returns (confirmed via gdb: disposing the subset immediately segfaults — sk_image_get_width —
+        // on a later frame when Skia actually reads from it to finish the upload/mip generation). A
+        // second, separate crash (also confirmed via gdb/dmesg, same signature) came from the EXISTING
+        // RetireImage mechanism disposing `source` itself once a newer DPI-tier bitmap replaces it — the
+        // subset shares source's pixel memory, so that disposal corrupts the still-in-flight upload too,
+        // even with the subset itself kept alive. Neither the subset nor its source can be assumed safe
+        // to dispose right after this call. Force the upload (and any deferred mip generation) to
+        // actually complete before returning, so the resulting texture is fully GPU-resident and
+        // independent of both CPU-side objects by the time either could be disposed.
         var subset = source.Subset(coveredRect);
         SKImage texture;
         Stopwatch? sw = s_gpuUploadTimingEnabled ? Stopwatch.StartNew() : null;
         texture = subset.ToTextureImage(grContext, mipmapped: !magnified);
+        double uploadMs = sw?.Elapsed.TotalMilliseconds ?? 0;
+        grContext.Flush(submit: true, synchronous: false);
         if (sw is not null)
         {
             sw.Stop();
@@ -500,7 +512,8 @@ internal sealed class PdfPageVisualHandler : CompositionCustomVisualHandler
                 RailReaderLogging.Logger.Debug(
                     $"[GPU upload] page {page}: {coveredRect.Width}x{coveredRect.Height} sub-rect of " +
                     $"{source.Width}x{source.Height} ({mp:F1} MP), mipmapped={!magnified}, " +
-                    $"{sw.Elapsed.TotalMilliseconds:F1} ms");
+                    $"upload={uploadMs:F1}ms flush={sw.Elapsed.TotalMilliseconds - uploadMs:F1}ms " +
+                    $"total={sw.Elapsed.TotalMilliseconds:F1}ms");
             }
         }
 
