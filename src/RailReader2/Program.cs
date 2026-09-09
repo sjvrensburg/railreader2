@@ -85,6 +85,12 @@ internal sealed class Program
         if (OperatingSystem.IsLinux() && ShouldUseGLibMainLoop())
             builder = builder.With(new X11PlatformOptions { UseGLibMainLoop = true });
 
+        // Avalonia's default Skia GPU resource budget is 28 MiB — smaller than one page texture at our
+        // reading DPI tiers, so Skia's scratch allocations (blur passes, mip scratch) thrash against it
+        // during exactly the frames that also blur. Live page textures are owned by their SKImage and are
+        // not purged against this budget; raising it only buys headroom for scratch. (#222)
+        builder = builder.With(new SkiaOptions { MaxGpuResourceSizeBytes = 256L * 1024 * 1024 });
+
         return builder
             .WithInterFont()
             .LogToTrace();

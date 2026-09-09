@@ -1,6 +1,8 @@
+using System.Diagnostics;
 using Avalonia.Media;
 using Avalonia.Rendering.Composition;
 using Avalonia.Skia;
+using RailReader.Core;
 using RailReader.Core.Models;
 using RailReader.Renderer.Skia;
 using SkiaSharp;
@@ -59,9 +61,17 @@ internal class PdfPageLayer : CompositionLayerControl<PdfPageVisualHandler>;
 /// </summary>
 internal sealed class PdfPageVisualHandler : CompositionCustomVisualHandler
 {
-    private const float MaxBlurSigma = 0.35f;
     private const double MinSpeedThreshold = 0.1;
     private const float DimFeatherFraction = 0.08f;
+
+    // Motion-blur sigma at full speed, in DEVICE pixels at intensity 1.0. The old constant (0.35, in
+    // page units, divided by zoom) worked out to <= intensity * 0.35 px on screen — invisible, but still
+    // a full Gaussian pass every animating frame (#223). 3.0f (the first tuning) turned out to still be
+    // imperceptible at the shipped default intensity (0.33 -> <= ~1px, only right at the end of a
+    // sustained ~1.5s scroll/zoom hold). 6.0f made it clearly visible but assumed users crank the
+    // intensity slider to max; settled on 4.5f (~1.5px at default intensity) since intensity 1.0 is an
+    // edge case, not the expected usage.
+    private const float MotionBlurMaxDeviceSigma = 4.5f;
 
     // Continuous-scroll line-focus blur (non-anchor visible pages): sigma-per-intensity-unit, in
     // page-point-times-zoom canvas units (the canvas here is already scaled by the camera concat) —
@@ -78,6 +88,14 @@ internal sealed class PdfPageVisualHandler : CompositionCustomVisualHandler
     // reintroduce texel-hop aliasing during the transient before Core re-rasters at lower DPI.
     // Defaulting to mips (the !magnified branch) is the quality-safe direction.
     private const float MipmapSkipMagnifyFactor = 1.25f;
+
+    // Diagnostic-only: times GetOrUploadTexture's ToTextureImage call and logs it when it exceeds
+    // GpuUploadTimingLogThresholdMs. Off by default — gated behind RR_GPU_UPLOAD_TIMING=1 so we never
+    // pay a synchronous, flushing ConsoleLogger write on the composition thread in normal use (#222
+    // Phase 1). Parsed once; the field itself is the only per-frame cost when disabled.
+    private static readonly bool s_gpuUploadTimingEnabled =
+        Environment.GetEnvironmentVariable("RR_GPU_UPLOAD_TIMING") == "1";
+    private const double GpuUploadTimingLogThresholdMs = 3.0;
 
     // ThreadStatic caches: one per composition thread (typically one per renderer)
     [ThreadStatic] private static SKPaint? s_imagePaint;
@@ -183,20 +201,36 @@ internal sealed class PdfPageVisualHandler : CompositionCustomVisualHandler
         float motionSigmaX = 0, motionSigmaY = 0;
         if (state.MotionBlur && state.MotionBlurIntensity > 0)
         {
-            float maxSigma = state.MotionBlurIntensity * MaxBlurSigma;
             float zoom = Math.Max(state.Zoom, 0.01f);
+            // canvas.TotalMatrix is read BEFORE the per-page camera concat, so ScaleX/ScaleY are the
+            // compositor's DPI scale; the camera adds `zoom` on top. Skia maps the filter sigma through
+            // the full CTM, so divide the wanted device sigma by both to get the local-space value to
+            // hand the filter. Computed per-axis (not a single shared scale) in case the compositor CTM
+            // is ever anisotropic (e.g. non-uniform display scaling).
+            float ctmScaleX = Math.Max(canvas.TotalMatrix.ScaleX * zoom, 0.0001f);
+            float ctmScaleY = Math.Max(canvas.TotalMatrix.ScaleY * zoom, 0.0001f);
+            float maxDevice = state.MotionBlurIntensity * MotionBlurMaxDeviceSigma;
 
+            float deviceX = 0, deviceY = 0;
             if (state.ScrollSpeed > MinSpeedThreshold)
             {
                 double s = state.ScrollSpeed;
-                motionSigmaX = (float)(s * s * s * maxSigma) / zoom;
+                deviceX = (float)(s * s * s * maxDevice);
             }
             if (state.ZoomSpeed > MinSpeedThreshold)
             {
                 double z = state.ZoomSpeed;
-                float zSigma = (float)(z * z * z * maxSigma) / zoom;
-                motionSigmaX = Math.Max(motionSigmaX, zSigma);
-                motionSigmaY = Math.Max(motionSigmaY, zSigma);
+                float zDevice = (float)(z * z * z * maxDevice);
+                deviceX = Math.Max(deviceX, zDevice);
+                deviceY = Math.Max(deviceY, zDevice);
+            }
+
+            // Below half a device pixel the blur is imperceptible but still costs a full image-filter
+            // pass over the visible region — skip it entirely (#223).
+            if (deviceX >= MinBlurSigma || deviceY >= MinBlurSigma)
+            {
+                motionSigmaX = deviceX / ctmScaleX;
+                motionSigmaY = deviceY / ctmScaleY;
             }
         }
         var motionBlurFilter = GetCachedBlurFilter(motionSigmaX, motionSigmaY);
@@ -220,13 +254,62 @@ internal sealed class PdfPageVisualHandler : CompositionCustomVisualHandler
             }
         }
 
+        // Per-frame upload budget (#222): the draw always maps the whole source image to the whole
+        // page rect, so a texture from a different DPI tier still draws to the geometrically correct
+        // place — just softer for a frame or two. That makes it safe to defer a non-anchor page's
+        // upload and keep drawing its stale resident texture (or skip it if it has none yet) rather
+        // than stalling this frame on every visible page's upload at once (continuous scroll).
+        int nonAnchorUploadBudget = 1;
+        bool deferredUpload = false;
+
         foreach (var page in state.Pages)
         {
             if (page.Image is null) continue; // render in flight — the panel's own background is the gap colour
 
             var image = page.Image;
             float deviceWidth = page.PageW * canvas.TotalMatrix.ScaleX * state.Zoom;
-            var drawImage = GetOrUploadTexture(page.Page, image, grContext, deviceWidth);
+
+            SKImage drawImage;
+            if (grContext is null)
+            {
+                // No GPU context available (e.g. software fallback) — draw the raster source directly,
+                // same as always; texture caching/budgeting doesn't apply. Deliberately does NOT fall
+                // back to a previously-uploaded GPU texture for this page even if one is still resident
+                // in _gpuTextures: a texture created under a GPU context can be invalidated by the very
+                // loss of that context, so drawing the raw raster source here is the safe choice, not
+                // just the simple one.
+                drawImage = image;
+            }
+            else
+            {
+                bool haveEntry = _gpuTextures.TryGetValue(page.Page, out var cached);
+                bool haveCurrent = haveEntry && ReferenceEquals(cached.Source, image);
+                if (haveCurrent)
+                {
+                    drawImage = cached.Texture;
+                }
+                else if (page.IsAnchor || nonAnchorUploadBudget > 0)
+                {
+                    // The anchor always gets its upload — it's what the user is reading. A budgeted
+                    // non-anchor upload consumes the frame's single slot.
+                    if (!page.IsAnchor) nonAnchorUploadBudget--;
+                    drawImage = UploadTexture(page.Page, image, grContext, deviceWidth);
+                }
+                else if (haveEntry)
+                {
+                    // Out of budget this frame: draw the stale resident texture (`cached`, still
+                    // geometrically correct — see the OnRender-level comment above) and try again next
+                    // frame.
+                    drawImage = cached.Texture;
+                    deferredUpload = true;
+                }
+                else
+                {
+                    // No resident texture at all yet — nothing to draw this frame.
+                    deferredUpload = true;
+                    continue;
+                }
+            }
 
             canvas.Save();
             canvas.Concat(page.Camera);
@@ -299,15 +382,15 @@ internal sealed class PdfPageVisualHandler : CompositionCustomVisualHandler
 
             canvas.Restore(); // undo camera concat
         }
+
+        // A page was left with a stale or missing texture this frame — schedule another frame so the
+        // deferred upload(s) drain at one per frame. Termination is guaranteed because every such
+        // frame uploads at least one texture (the budgeted slot, or the anchor's own).
+        if (deferredUpload) Invalidate();
     }
 
-    private SKImage GetOrUploadTexture(int page, SKImage source, GRContext? grContext, float deviceWidth)
+    private SKImage UploadTexture(int page, SKImage source, GRContext grContext, float deviceWidth)
     {
-        if (_gpuTextures.TryGetValue(page, out var cached) && ReferenceEquals(cached.Source, source))
-            return cached.Texture;
-
-        if (grContext is null) return source;
-
         // Upload raster image as a GPU texture. A mip chain fixes texel-hop aliasing while the
         // texture is minified, but it costs upload time and ~33% VRAM and is never sampled while the
         // texture is magnified (upscaled). Skip it only when this image is clearly being magnified;
@@ -315,9 +398,32 @@ internal sealed class PdfPageVisualHandler : CompositionCustomVisualHandler
         // re-rasters. deviceWidth (device-pixels-per-page-width) against source.Width tells us
         // magnification.
         bool magnified = deviceWidth > source.Width * MipmapSkipMagnifyFactor;
-        if (_gpuTextures.TryGetValue(page, out var old))
-            old.Texture.Dispose();
-        var texture = source.ToTextureImage(grContext, mipmapped: !magnified);
+        _gpuTextures.TryGetValue(page, out var old);
+
+        // Upload before disposing the old texture: ToTextureImage can throw (e.g. GPU OOM — the exact
+        // pressure this budgeting exists to reduce), and disposing `old` first would leave a
+        // now-invalid SKImage keyed in _gpuTextures, double-disposed on the next retry. Keeping `old`
+        // alive until the new texture is resident also means a throw here leaves the page's existing
+        // (still-valid, still-drawable) texture in place rather than the page going dark.
+        // The upload call itself stays a single call site — only the Stopwatch/logging around it are
+        // conditional on the diagnostic flag, so a future change to the call (parameters, try/catch)
+        // can't land in only one of two copies.
+        SKImage texture;
+        Stopwatch? sw = s_gpuUploadTimingEnabled ? Stopwatch.StartNew() : null;
+        texture = source.ToTextureImage(grContext, mipmapped: !magnified);
+        if (sw is not null)
+        {
+            sw.Stop();
+            if (sw.Elapsed.TotalMilliseconds >= GpuUploadTimingLogThresholdMs)
+            {
+                double mp = source.Width * (double)source.Height / 1_000_000.0;
+                RailReaderLogging.Logger.Debug(
+                    $"[GPU upload] page {page}: {source.Width}x{source.Height} ({mp:F1} MP), " +
+                    $"mipmapped={!magnified}, {sw.Elapsed.TotalMilliseconds:F1} ms");
+            }
+        }
+
+        old.Texture?.Dispose();
         _gpuTextures[page] = (texture, source);
         return texture;
     }
