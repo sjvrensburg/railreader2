@@ -792,6 +792,17 @@ public partial class MainWindow : Window
             // Escape should always cancel it rather than being shadowed by the other Escape handlers.
             case Key.Escape when vm.FreezeArmMode != FreezeMode.None:
                 vm.FreezeArmMode = FreezeMode.None; e.Handled = true; return true;
+            // An ACTIVE freeze (not just an armed-but-unplaced one, handled above) needs its own Escape
+            // path here in HandleGlobalKey — not HandleNavigationKey's plain 'Z' shortcut — because it's
+            // the only exit that still works when keyboard focus is in a text field (the search box, the
+            // status-bar zoom/page editor): HandleNavigationKey is skipped whenever textInputFocused is
+            // true, so 'Z' just gets typed as a literal character instead of unfreezing, and every other
+            // modal-ish state in this app (fullscreen, annotating, forced rail, search) already exits on
+            // Escape from anywhere. Frozen zoom-lock is exactly that kind of stuck state, so it gets the
+            // same guarantee. Checked before the "search active" case below so a frozen+searching view
+            // unfreezes first (the more blocking state); a second Escape then closes search as usual.
+            case Key.Escape when vm.IsFrozen:
+                vm.Unfreeze(); e.Handled = true; return true;
             case Key.Escape when vm.ArmActivateRailClick:
                 vm.ArmActivateRailClick = false; e.Handled = true; return true;
             case Key.Escape when vm.AutoScrollActive:
