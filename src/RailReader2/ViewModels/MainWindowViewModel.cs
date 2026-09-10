@@ -665,14 +665,24 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         _controller.ResultAvailable = OnAnalysisResultAvailable;
 
         // Separate low-frequency timer for background read-ahead submission. Result draining no
-        // longer needs it (ResultAvailable above handles that push-driven), so this only decides when
-        // to submit the *next* read-ahead page while the worker is idle — still needs a periodic check
-        // since going idle isn't itself a pushed event. Runs independently of the animation loop to
+        // longer needs it as its primary path (ResultAvailable above handles that push-driven), so
+        // this mainly decides when to submit the *next* read-ahead page while the worker is idle —
+        // still needs a periodic check since going idle isn't itself a pushed event. It also keeps a
+        // cheap PollAnalysisResults() safety-net drain: ResultAvailable is a NuGet-consumed Core
+        // callback this repo can't verify fires for every edge case, and this timer already runs on
+        // its own cadence whenever there's background work, so re-draining here costs nothing extra
+        // in DispatcherTimer overhead beyond what already existed (#224) — it's idempotent when
+        // ResultAvailable already drained everything. Runs independently of the animation loop to
         // avoid interfering with zoom/scroll performance.
         _backgroundTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
         _backgroundTimer.Tick += (_, _) =>
         {
             if (_controller.Worker is null) return;
+
+            var (gotResults, _, _) = _controller.PollAnalysisResults();
+            if (gotResults)
+                InvalidateOverlay();
+            EvaluatePortals(forceRender: gotResults && PortalResolvePending);
 
             bool hasWork = _controller.HasBackgroundAnalysisWork;
             bool railActive = _controller.FocusedViewport?.Owner?.Rail.Active == true;
