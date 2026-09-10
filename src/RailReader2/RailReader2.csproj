@@ -36,13 +36,13 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="RailReader.Core" Version="0.61.3" />
-    <PackageReference Include="RailReader.Core.Pdfium" Version="0.61.3" />
-    <PackageReference Include="RailReader.Core.Analysis" Version="0.61.3" />
-    <PackageReference Include="RailReader.Core.Analysis.WebGpu" Version="0.61.3" />
-    <PackageReference Include="RailReader.Renderer.Skia" Version="0.61.3" />
-    <PackageReference Include="RailReader.Core.Vlm.OpenAI" Version="0.61.3" />
-    <PackageReference Include="RailReader.Core.Ocr.RapidOcr" Version="0.61.3" />
+    <PackageReference Include="RailReader.Core" Version="0.61.5" />
+    <PackageReference Include="RailReader.Core.Pdfium" Version="0.61.5" />
+    <PackageReference Include="RailReader.Core.Analysis" Version="0.61.5" />
+    <PackageReference Include="RailReader.Core.Analysis.WebGpu" Version="0.61.5" />
+    <PackageReference Include="RailReader.Renderer.Skia" Version="0.61.5" />
+    <PackageReference Include="RailReader.Core.Vlm.OpenAI" Version="0.61.5" />
+    <PackageReference Include="RailReader.Core.Ocr.RapidOcr" Version="0.61.5" />
   </ItemGroup>
 
 </Project>
