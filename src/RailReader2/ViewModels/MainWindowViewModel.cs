@@ -27,7 +27,6 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     private readonly DocumentController _controller;
     private readonly ILogger _logger;
     private Window? _window;
-    private DispatcherTimer? _pollTimer;
     private DispatcherTimer? _backgroundTimer;
     private InvalidationCallbacks? _invalidation;
     private bool _animationRequested;
@@ -410,7 +409,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         // per-viewport on the FOCUSED view (in WireFocusedSignals, re-pointed by FocusSurface) — the
         // old facade only ever fired for the focused view, so this is equivalent.
         WireAnnotationStoreSignals();
-        SetupPollTimer();
+        SetupAnalysisResultSignal();
     }
 
     // Last-published menu-gating values, so a spurious ActiveTab raise re-publishes nothing.
@@ -649,48 +648,31 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         MaybeHintSidewaysBlock();
     }
 
-    // --- Poll timer & animation ---
+    // --- Analysis result signal & animation ---
 
-    private void SetupPollTimer()
+    /// <summary>
+    /// Wire up push-based analysis draining (RailReaderCore #118) and the low-frequency background
+    /// read-ahead timer. Before Core 0.61.4, nothing told the host when <c>AnalysisWorker</c> had a
+    /// result sitting in its channel while no animation frame was running to drain it, so a ~100ms
+    /// <c>_pollTimer</c> ran continuously whenever any analysis request was in flight just to notice —
+    /// costing ~19% of a core on Avalonia 12 / X11 for the whole time it ran (#224). Core 0.61.4 added
+    /// <see cref="DocumentController.ResultAvailable"/>, fired on the UI thread the instant a result is
+    /// written to the worker's channel, so the poll timer is gone entirely: this reacts to the signal
+    /// instead of discovering it on the next 100ms tick.
+    /// </summary>
+    private void SetupAnalysisResultSignal()
     {
-        _pollTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
-        _pollTimer.Tick += (_, _) =>
-        {
-            if (_animationRequested) return;
+        _controller.ResultAvailable = OnAnalysisResultAvailable;
 
-            var (gotResults, needsAnim, _) = _controller.PollAnalysisResults();
-            var tab = ActiveTab;
-            if (tab is not null && !_animationRequested)
-                tab.SubmitPendingLookahead(_controller.Worker);
-            if (gotResults)
-                InvalidateOverlay();
-            // Only force a portal re-evaluation when something is still waiting on analysis (a pinned
-            // target's page, or an automatic reference's caption page) — otherwise the
-            // reading-position callbacks + memo already cover the steady case, and forcing on every
-            // unrelated analysis result would defeat the fast path.
-            EvaluatePortals(forceRender: gotResults && PortalResolvePending);
-            if (needsAnim)
-                RequestAnimationFrame();
-            bool workerBusy = _controller.Worker is not null && !_controller.Worker.IsIdle;
-            if (!workerBusy) _pollTimer?.Stop();
-        };
-
-        // Separate low-frequency timer for background analysis.
-        // Runs independently of the animation loop to avoid interfering with
-        // zoom/scroll performance. Polls at 500ms — fast enough to keep
-        // the pipeline fed, slow enough to be invisible.
+        // Separate low-frequency timer for background read-ahead submission. Result draining no
+        // longer needs it (ResultAvailable above handles that push-driven), so this only decides when
+        // to submit the *next* read-ahead page while the worker is idle — still needs a periodic check
+        // since going idle isn't itself a pushed event. Runs independently of the animation loop to
+        // avoid interfering with zoom/scroll performance.
         _backgroundTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
         _backgroundTimer.Tick += (_, _) =>
         {
             if (_controller.Worker is null) return;
-
-            // Poll results even if no animation frame is running
-            var (gotResults, _, _) = _controller.PollAnalysisResults();
-            if (gotResults)
-                InvalidateOverlay();
-            // As above: force only when a pinned target or auto reference is still resolving, so
-            // background read-ahead (one result per analysed page) doesn't bypass the memo on every page.
-            EvaluatePortals(forceRender: gotResults && PortalResolvePending);
 
             bool hasWork = _controller.HasBackgroundAnalysisWork;
             bool railActive = _controller.FocusedViewport?.Owner?.Rail.Active == true;
@@ -701,13 +683,38 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
                 _backgroundTimer?.Stop();
 
             // While rail is active this tick can never submit (the guard above), so the 500ms cadence
-            // is pure DispatcherTimer overhead on top of the poll timer's own cost (#224). Read-ahead
-            // runs at full speed when the reader is idle, where it belongs, and backs off to a quarter
-            // speed during rail reading; results still drain on the slower cadence either way.
+            // is pure DispatcherTimer overhead (#224). Read-ahead runs at full speed when the reader is
+            // idle, where it belongs, and backs off to a quarter speed during rail reading.
             var wanted = railActive ? TimeSpan.FromMilliseconds(2000) : TimeSpan.FromMilliseconds(500);
             if (_backgroundTimer is not null && _backgroundTimer.Interval != wanted)
                 _backgroundTimer.Interval = wanted;
         };
+    }
+
+    /// <summary>
+    /// Fired by <see cref="DocumentController.ResultAvailable"/> on the UI thread as soon as the
+    /// analysis worker has a result sitting in its channel — before anything drains it. Mirrors the
+    /// old <c>_pollTimer</c> tick body, minus the timer: while an animation frame is already requested,
+    /// <see cref="RunAnimationFrame"/>'s own <c>PumpAnalysis</c> call will drain it on the next tick, so
+    /// this is a no-op then (same gate the poll timer used).
+    /// </summary>
+    private void OnAnalysisResultAvailable()
+    {
+        if (_animationRequested) return;
+
+        var (gotResults, needsAnim, _) = _controller.PollAnalysisResults();
+        var tab = ActiveTab;
+        if (tab is not null && !_animationRequested)
+            tab.SubmitPendingLookahead(_controller.Worker);
+        if (gotResults)
+            InvalidateOverlay();
+        // Only force a portal re-evaluation when something is still waiting on analysis (a pinned
+        // target's page, or an automatic reference's caption page) — otherwise the reading-position
+        // callbacks + memo already cover the steady case, and forcing on every unrelated analysis
+        // result would defeat the fast path.
+        EvaluatePortals(forceRender: gotResults && PortalResolvePending);
+        if (needsAnim)
+            RequestAnimationFrame();
     }
 
     /// <summary>
@@ -830,28 +837,12 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
         if (anyAnimating)
             RequestAnimationFrame();
-        else
-            StartPollTimerIfWorkerBusy(); // analysis still in flight after the last animating frame
-    }
-
-    // The poll timer only needs to run while the analysis worker actually has in-flight work to
-    // drain -- its tick body no-ops (returns before even reaching _pollTimer.Stop()) for the whole
-    // inter-frame window while an animation is in progress, so starting it unconditionally meant a
-    // 100ms DispatcherTimer ran continuously through all rail reading, auto-scroll and zoom
-    // animation at ~19% of a core on X11 for no work (#224). Shared by both call sites so the two
-    // conditions can't drift apart: RequestAnimationFrame (a submission is about to be scheduled)
-    // and RunAnimationFrame's tail (a submission made mid-frame, e.g. by PumpAnalysis, needs a
-    // timer to drain it once nothing is left animating).
-    private void StartPollTimerIfWorkerBusy()
-    {
-        if (_pollTimer is { IsEnabled: false } && _controller.Worker is { IsIdle: false })
-            _pollTimer.Start();
+        // else: any analysis still in flight after the last animating frame drains itself via
+        // ResultAvailable (#118) — no poll timer needed to notice it.
     }
 
     public void RequestAnimationFrame()
     {
-        StartPollTimerIfWorkerBusy();
-
         if (_animationRequested) return;
         _animationRequested = true;
         // RequestAnimationFrame is deprecated in Avalonia 12 in favour of compositor-based
@@ -875,7 +866,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     {
         if (_disposed) return;
         _disposed = true;
-        _pollTimer?.Stop();
+        _controller.ResultAvailable = null;
         _backgroundTimer?.Stop();
         _scanAllTimer?.Stop();
         _startupRailTimer?.Stop();
