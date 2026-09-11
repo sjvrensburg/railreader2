@@ -42,27 +42,27 @@ public static class CustomLayoutModelLoader
         bool IsGpu);
 
     /// <summary>
-    /// Whether <paramref name="custom"/>'s current configuration would actually try to route
-    /// through GPU — i.e. <em>not</em> the custom-model path (always CPU, regardless of
-    /// <see cref="CustomLayoutModelConfig.Accelerator"/> — see <see cref="ResolveModel"/>'s
-    /// precedence) and <em>not</em> PP-DocLayout-S (no GPU/FP16 variant exists for it; see
-    /// <see cref="ResolveBuiltin"/>'s PP-DocLayout-S branch, which ignores <c>accelerator</c>
-    /// entirely).
+    /// A narrow, <em>in-memory-only</em> heuristic — true when <paramref name="custom"/>'s raw
+    /// field shape doesn't outright preclude GPU (not the custom-model path, not PP-DocLayout-S)
+    /// AND <see cref="CustomLayoutModelConfig.Accelerator"/> says GPU.
     ///
     /// <para>
-    /// This is a config-shape check, not a resolve-time or device-availability one — it answers
-    /// "would this configuration even attempt GPU", not "will it get GPU" (that also needs
-    /// <see cref="WebGpuAccelerator.IsAvailable"/> and the GPU model file on disk, as
-    /// <see cref="TryResolveGpu"/> checks). It exists specifically so a caller deciding whether
-    /// OCR is allowed to claim the (mutually-exclusive) GPU slot doesn't wrongly treat a stale or
-    /// simply-irrelevant <c>Accelerator == Gpu</c> as "layout has it" — e.g. a user who had Heron
-    /// + GPU, then switched to PP-DocLayout-S or enabled a custom model, without ever touching the
-    /// accelerator checkbox again. <c>Accelerator</c> isn't reset when switching into either of
-    /// those states (nothing needs it to be, for layout's own resolution to behave correctly), so
-    /// checking it in isolation elsewhere is a bug, not just imprecise.
+    /// <b>This is not the GPU mutual-exclusion gate — do not use it to decide whether OCR may
+    /// claim the GPU slot.</b> It doesn't know about <see cref="ResolveModel"/>'s fallback
+    /// behavior: a custom model whose files are missing/invalid falls through to
+    /// <see cref="ResolveBuiltin"/>, which can still land on GPU; PP-DocLayout-S with a missing
+    /// file falls through to PP-DocLayoutV3, same story. A caller that needs the real answer —
+    /// "would layout actually end up on GPU" — must call <see cref="ResolveModel"/> itself and
+    /// read <see cref="Resolution.IsGpu"/>, the single source of truth every such decision now
+    /// uses (the worker-init gate, and Settings' equivalent checks/status text). This heuristic
+    /// exists only for callers that need to clear an about-to-become-stale <c>Accelerator</c>
+    /// <em>before</em> saving a config change (so <see cref="ResolveModel"/>, which always reads
+    /// the saved file, isn't safe to call yet) — see <c>SettingsWindow.ClearStaleGpuAcceleratorIfIncompatible</c>.
+    /// Getting this heuristic wrong only leaves a harmless stale checkbox/flag, since it no longer
+    /// feeds the actual gate — that's what makes it safe to keep this loose.
     /// </para>
     /// </summary>
-    public static bool WouldTryGpu(CustomLayoutModelConfig custom)
+    public static bool CanConfigShapeUseGpu(CustomLayoutModelConfig custom)
         => custom.Accelerator == AcceleratorPreference.Gpu
            && !custom.Enabled
            && custom.BuiltinAnalyzer is BuiltinAnalyzer.Heron or BuiltinAnalyzer.PpDocLayoutV3;

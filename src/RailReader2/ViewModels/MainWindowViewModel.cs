@@ -409,6 +409,20 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     /// <summary>Path to the current session log file, or null if file logging unavailable.</summary>
     public string? LogFilePath => _logger.LogFilePath;
 
+    /// <summary>Suboptimal-combo check (issue #232), shared by this constructor's startup toast and
+    /// <c>SettingsWindow.UpdateModelsOverview</c>'s Models-tab panel — a single definition so the
+    /// two can't silently diverge. Plain-FP32 PP-DocLayoutV3 on CPU is a materially worse CPU
+    /// experience than Docling Heron's INT8 quantization; see the constructor's advisory block for
+    /// the full rationale (why CPU, not just "which architecture").</summary>
+    public static bool IsLayoutFp32V3OnCpu(LayoutModelArchitecture? architecture, AcceleratorPreference accelerator)
+        => architecture == LayoutModelArchitecture.PPDocLayoutV3 && accelerator == AcceleratorPreference.Cpu;
+
+    /// <summary>Suboptimal-combo check (issue #232), shared the same way as <see cref="IsLayoutFp32V3OnCpu"/>
+    /// — OCR GPU acceleration on with the PP-OCRv6 Tiny pack, which the issue's own benchmark
+    /// corpus measured no speedup from (confirmed twice).</summary>
+    public static bool IsOcrGpuWastedOnTinyPack(AcceleratorPreference accelerator, string? modelSetId)
+        => accelerator == AcceleratorPreference.Gpu && modelSetId == OcrModelRegistry.PPOCRv6Tiny.Id;
+
     /// <summary>
     /// Resolves the persisted OCR language-pack choice to a model set for <c>RapidOcrService</c>
     /// plus the display name actually in effect (the bundled default's, when <paramref name="modelSetId"/>
@@ -464,16 +478,38 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         ActiveOcrModelName = ocrModelName;
         ActiveOcrModelSetId = ocrModelId;
 
+        // Resolve layout FIRST — before deciding OCR's GPU eligibility — so that decision can be
+        // gated on resolution.IsGpu, the actual answer, rather than a prediction from raw config
+        // shape. A prediction can diverge from what ResolveModel really does whenever one of its
+        // fallback paths kicks in (a custom model enabled but its files are missing/invalid falls
+        // through to a GPU-eligible built-in; PP-DocLayout-S selected but its file is missing falls
+        // through to GPU-eligible PP-DocLayoutV3) — and a diverged prediction here is exactly the
+        // shape that causes the onnxruntime#32561 crash: OCR grabs the GPU slot believing layout
+        // won't use it, while layout's real fallback lands on GPU too.
+        CustomLayoutModelLoader.Resolution resolution;
+        try
+        {
+            resolution = CustomLayoutModelLoader.ResolveModel(config, _logger);
+        }
+        catch (Exception ex)
+        {
+            _logger.Error("[ONNX] Layout model resolution failed", ex);
+            resolution = default; // every field null/false — treated as "no model" below
+        }
+        ActiveLayoutAccelerator = resolution.IsGpu ? AcceleratorPreference.Gpu : AcceleratorPreference.Cpu;
+        ActiveLayoutArchitecture = resolution.Architecture;
+
         // GPU for OCR and GPU for layout are mutually exclusive — running two WebGPU-backed
         // sessions' Session.Run() concurrently (exactly AnalysisWorker's two-stage-thread shape)
         // segfaults the process (onnxruntime#32561). Settings enforces "only one at a time" by
         // unchecking whichever wasn't just turned on, but a hand-edited sidecar file could still
         // have both set — reconcile defensively here too, with layout winning the tie (it's the
-        // longer-standing feature). See OcrPreferences.Accelerator's doc comment.
+        // longer-standing feature, and its resolution is already computed above). See
+        // OcrPreferences.Accelerator's doc comment.
         Action<Microsoft.ML.OnnxRuntime.SessionOptions>? ocrGpuHook = null;
         if (ocrPrefs.Accelerator == AcceleratorPreference.Gpu)
         {
-            if (CustomLayoutModelLoader.WouldTryGpu(CustomLayoutModelConfig.Load()))
+            if (resolution.IsGpu)
             {
                 _logger.Warn("[WebGPU] OCR GPU acceleration requested but layout GPU acceleration " +
                     "is also enabled — only one can run on GPU at a time (onnxruntime#32561). Using CPU for OCR.");
@@ -492,9 +528,6 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
         try
         {
-            var resolution = CustomLayoutModelLoader.ResolveModel(config, _logger);
-            ActiveLayoutAccelerator = resolution.IsGpu ? AcceleratorPreference.Gpu : AcceleratorPreference.Cpu;
-            ActiveLayoutArchitecture = resolution.Architecture;
             if (resolution.ModelPath != null && resolution.Capabilities != null && resolution.Factory != null)
             {
                 _logger.Debug($"[ONNX] Starting worker with model: {resolution.ModelPath}");
@@ -514,7 +547,14 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
                 ActiveLayoutModelName = "Text-only (no layout model)";
             }
         }
-        catch (Exception ex) { _logger.Error("[ONNX] Worker init failed", ex); }
+        catch (Exception ex)
+        {
+            _logger.Error("[ONNX] Worker init failed", ex);
+            // Keep ActiveLayoutModelName non-null even on failure — the debug badge/advisories
+            // already read ActiveLayoutAccelerator/Architecture unconditionally (set above), so a
+            // null name here would be the only inconsistent piece of an otherwise-valid snapshot.
+            ActiveLayoutModelName ??= "Unavailable (worker init failed)";
+        }
 
         // Suboptimal-combo advisories (issue #232). Both are also shown persistently in Settings ▸
         // Models (SettingsWindow.UpdateModelsOverview), so this toast is a one-time-per-session
@@ -526,15 +566,13 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         //    Heron's INT8 quantization — most likely right after picking the "Faster scanned OCR"
         //    preset (forces layout to CPU) while BuiltinAnalyzer was still V3 from an earlier
         //    "Faster page navigation" session.
-        bool layoutSuboptimal = ActiveLayoutArchitecture == LayoutModelArchitecture.PPDocLayoutV3
-            && ActiveLayoutAccelerator == AcceleratorPreference.Cpu;
+        bool layoutSuboptimal = IsLayoutFp32V3OnCpu(ActiveLayoutArchitecture, ActiveLayoutAccelerator);
         // 2. OCR GPU acceleration measured NO speedup with the Tiny language pack (confirmed twice
         //    in the issue's own benchmark corpus — Tiny's recognition pass is too small to hide GPU
         //    dispatch overhead) — so having it on with Tiny just burns the exclusive GPU slot for
         //    nothing, when layout could be using it instead (~8x, on every page rather than only
         //    scanned ones).
-        bool ocrGpuWastedOnTiny = ActiveOcrAccelerator == AcceleratorPreference.Gpu
-            && ActiveOcrModelSetId == OcrModelRegistry.PPOCRv6Tiny.Id;
+        bool ocrGpuWastedOnTiny = IsOcrGpuWastedOnTinyPack(ActiveOcrAccelerator, ActiveOcrModelSetId);
 
         if (layoutSuboptimal && ocrGpuWastedOnTiny)
         {

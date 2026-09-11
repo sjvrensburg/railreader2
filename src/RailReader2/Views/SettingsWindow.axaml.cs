@@ -141,21 +141,25 @@ public partial class SettingsWindow : Window
 
         _customModel = CustomLayoutModelConfig.Load();
         _ocrPrefs = OcrPreferences.Load();
-        // Layout and OCR GPU acceleration are mutually exclusive (see OcrPreferences.Accelerator's
-        // doc comment) — reconcile a hand-edited sidecar that somehow has both set to Gpu before
-        // either status block renders. Layout wins the tie, matching MainWindowViewModel's startup
-        // reconciliation.
-        if (_customModel.Accelerator == AcceleratorPreference.Gpu && _ocrPrefs.Accelerator == AcceleratorPreference.Gpu)
-        {
-            _ocrPrefs.Accelerator = AcceleratorPreference.Cpu;
-            _ocrPrefs.Save();
-        }
         CustomModelEnabled.IsChecked = _customModel.Enabled;
         CustomModelPath.Text = _customModel.ModelPath ?? "";
         CustomModelMappingPath.Text = _customModel.MappingPath ?? "";
         UpdateCustomModelStatus();
         PopulateBuiltinAnalyzerCombo();
         GpuAccelerationCheck.IsChecked = _customModel.Accelerator == AcceleratorPreference.Gpu;
+
+        // Layout and OCR GPU acceleration are mutually exclusive (see OcrPreferences.Accelerator's
+        // doc comment) — reconcile a hand-edited sidecar that somehow has both set to Gpu before
+        // either status block renders. Layout wins the tie, matching MainWindowViewModel's startup
+        // reconciliation. Uses the real WouldLayoutUseGpu (not the raw Accelerator flag) so this
+        // reconciliation can't itself be fooled by a config shape that never reaches GPU anyway —
+        // BuiltinAnalyzerCombo/CustomModelEnabled above are already populated, so this reads the
+        // same on-disk state WouldLayoutUseGpu resolves.
+        if (WouldLayoutUseGpu() && _ocrPrefs.Accelerator == AcceleratorPreference.Gpu)
+        {
+            _ocrPrefs.Accelerator = AcceleratorPreference.Cpu;
+            _ocrPrefs.Save();
+        }
         UpdateGpuAccelerationStatus();
 
         OcrModeCombo.SelectedIndex = (int)vm.Controller.OcrMode;
@@ -391,18 +395,22 @@ public partial class SettingsWindow : Window
     }
 
     /// <summary>
-    /// Resets <c>_customModel.Accelerator</c> to CPU when the current shape (just-changed
-    /// <see cref="CustomLayoutModelConfig.BuiltinAnalyzer"/> or <see cref="CustomLayoutModelConfig.Enabled"/>)
-    /// no longer supports GPU at all — PP-DocLayout-S has no GPU/FP16 variant, the custom-model path
-    /// always runs CPU. Otherwise the preference would silently linger set to GPU for a
-    /// configuration that can never use it, which <see cref="CustomLayoutModelLoader.WouldTryGpu"/>
-    /// already accounts for everywhere it's read — this additionally stops it accumulating as dead
-    /// state in <c>custom_layout_model.json</c> and unchecks <c>GpuAccelerationCheck</c> to match
-    /// (guarded, so its own change handler doesn't re-fire). Caller still saves and refreshes status.
+    /// Resets <c>_customModel.Accelerator</c> to CPU when the current in-memory shape (just-changed
+    /// <see cref="CustomLayoutModelConfig.BuiltinAnalyzer"/> or <see cref="CustomLayoutModelConfig.Enabled"/>,
+    /// <em>not yet saved</em>) no longer supports GPU at all — PP-DocLayout-S has no GPU/FP16
+    /// variant, the custom-model path always runs CPU. Uses
+    /// <see cref="CustomLayoutModelLoader.CanConfigShapeUseGpu"/> rather than the real
+    /// <see cref="CustomLayoutModelLoader.ResolveModel"/> deliberately: this runs <em>before</em>
+    /// <c>_customModel.Save()</c>, so a real resolve here would read the stale on-disk config, not
+    /// the change about to be made. This is pure hygiene — stops an irrelevant <c>Accelerator ==
+    /// Gpu</c> accumulating as dead state in <c>custom_layout_model.json</c> and keeps
+    /// <c>GpuAccelerationCheck</c> (unchecked here, guarded so its own change handler doesn't
+    /// re-fire) from looking checked-but-disabled — not the actual GPU mutual-exclusion gate, which
+    /// is <see cref="WouldLayoutUseGpu"/> below. Caller still saves and refreshes status.
     /// </summary>
     private void ClearStaleGpuAcceleratorIfIncompatible()
     {
-        if (CustomLayoutModelLoader.WouldTryGpu(_customModel) || _customModel.Accelerator != AcceleratorPreference.Gpu)
+        if (CustomLayoutModelLoader.CanConfigShapeUseGpu(_customModel) || _customModel.Accelerator != AcceleratorPreference.Gpu)
             return;
         _customModel.Accelerator = AcceleratorPreference.Cpu;
 
@@ -413,10 +421,24 @@ public partial class SettingsWindow : Window
     }
 
     /// <summary>
+    /// The actual answer to "would layout use the GPU slot right now" — calls the real
+    /// <see cref="CustomLayoutModelLoader.ResolveModel"/> (which always reads the config fresh from
+    /// disk) rather than predicting from raw field shape, so it can never diverge from what a
+    /// restart would really do — including through <c>ResolveModel</c>'s fallback paths (a custom
+    /// model whose files are missing/invalid, or PP-DocLayout-S with a missing file, both of which
+    /// can still land on a GPU-eligible built-in). Every call site that decides whether OCR may
+    /// claim the mutually-exclusive GPU slot must use this, not
+    /// <see cref="CustomLayoutModelLoader.CanConfigShapeUseGpu"/> — getting this one wrong risks the
+    /// onnxruntime#32561 concurrent-WebGPU-session crash, not just a stale checkbox.
+    /// </summary>
+    private bool WouldLayoutUseGpu()
+        => Vm is { } vm && CustomLayoutModelLoader.ResolveModel(vm.AppConfig, RailReaderLogging.Logger).IsGpu;
+
+    /// <summary>
     /// GPU model status for whichever architecture <see cref="BuiltinAnalyzerCombo"/> currently
     /// selects. Disabled (with an explanation) whenever the current configuration can never use
     /// GPU at all — a custom model is enabled, or PP-DocLayout-S is selected (neither has a
-    /// GPU/FP16 variant; see <see cref="CustomLayoutModelLoader.WouldTryGpu"/>) — rather than
+    /// GPU/FP16 variant; see <see cref="CustomLayoutModelLoader.CanConfigShapeUseGpu"/>) — rather than
     /// silently doing nothing when checked. Also disabled while OCR GPU acceleration is on — the
     /// two are mutually exclusive, see <see cref="OcrPreferences.Accelerator"/>'s doc comment.
     /// </summary>
@@ -470,12 +492,12 @@ public partial class SettingsWindow : Window
         _customModel.Save();
 
         // Mutually exclusive with OCR GPU acceleration — see OnOcrGpuAccelerationChanged and
-        // OcrPreferences.Accelerator's doc comment. WouldTryGpu, not a raw Accelerator check: a
-        // custom model or PP-DocLayout-S never uses GPU regardless of this checkbox, so checking
-        // it alone would wrongly steal the GPU slot from OCR for a configuration that can't use it
-        // (though this specific checkbox is normally disabled for PP-DocLayout-S — see
-        // UpdateGpuAccelerationStatus — the custom-model path isn't, today).
-        if (CustomLayoutModelLoader.WouldTryGpu(_customModel))
+        // OcrPreferences.Accelerator's doc comment. WouldLayoutUseGpu (the real resolve), not a raw
+        // Accelerator check or CanConfigShapeUseGpu's shape heuristic — _customModel.Save() just
+        // ran, so this reads the real just-saved state including any fallback ResolveModel would
+        // actually take (a custom model whose files are missing, PP-DocLayout-S with a missing
+        // file — both can still land on GPU via a built-in fallback despite the raw shape saying no).
+        if (WouldLayoutUseGpu())
         {
             var ocrPrefs = _ocrPrefs ??= OcrPreferences.Load();
             if (ocrPrefs.Accelerator == AcceleratorPreference.Gpu)
@@ -818,8 +840,10 @@ public partial class SettingsWindow : Window
         prefs.Save();
 
         // Mutually exclusive with layout-model GPU acceleration — see OnGpuAccelerationChanged and
-        // OcrPreferences.Accelerator's doc comment.
-        if (prefs.Accelerator == AcceleratorPreference.Gpu && _customModel.Accelerator == AcceleratorPreference.Gpu)
+        // OcrPreferences.Accelerator's doc comment. WouldLayoutUseGpu (the real resolve), same
+        // reasoning as OnGpuAccelerationChanged's mirror check — a raw Accelerator==Gpu check would
+        // wrongly steal/refuse the slot for a layout config that can't actually use it.
+        if (prefs.Accelerator == AcceleratorPreference.Gpu && WouldLayoutUseGpu())
         {
             _customModel.Accelerator = AcceleratorPreference.Cpu;
             _customModel.Save();
@@ -839,7 +863,7 @@ public partial class SettingsWindow : Window
     /// </summary>
     private void UpdateOcrGpuAccelerationStatus()
     {
-        if (CustomLayoutModelLoader.WouldTryGpu(_customModel))
+        if (WouldLayoutUseGpu())
         {
             OcrGpuAccelerationCheck.IsEnabled = false;
             OcrGpuAccelerationStatus.Text = "Disabled — layout-model GPU acceleration is already using the GPU slot (only one of the two can run on GPU at a time).";
@@ -995,10 +1019,11 @@ public partial class SettingsWindow : Window
 
         var ocrPrefs = _ocrPrefs ??= OcrPreferences.Load();
         var (_, pendingOcrName, _) = MainWindowViewModel.ResolveOcrModelSet(ocrPrefs.ModelSetId, RailReaderLogging.Logger);
-        // Mirrors MainWindowViewModel's own (now WouldTryGpu-based) gate exactly: layout claims
-        // the GPU slot first, but only if its config would actually try to use it.
+        // Mirrors MainWindowViewModel's own gate exactly: layout claims the GPU slot first, but only
+        // if its config would actually resolve to GPU — reuses pendingLayout (above) rather than a
+        // second, separately-computed check, so the two can't disagree with each other.
         bool pendingOcrGpu = ocrPrefs.Accelerator == AcceleratorPreference.Gpu
-            && !CustomLayoutModelLoader.WouldTryGpu(_customModel)
+            && !pendingLayout.IsGpu
             && WebGpuAccelerator.IsAvailable;
 
         // ResolveOcrModelSet already silently falls back to the bundled pack when the selected one
@@ -1030,8 +1055,7 @@ public partial class SettingsWindow : Window
         // --- Advisory: FP32 PP-DocLayoutV3 on CPU, when Heron (INT8) would be materially faster
         // there (see MainWindowViewModel's matching startup check + toast). Evaluated against the
         // ACTIVE state, per design — not the pending selection. ---
-        bool showAdvisory = vm.ActiveLayoutArchitecture == LayoutModelArchitecture.PPDocLayoutV3
-            && vm.ActiveLayoutAccelerator == AcceleratorPreference.Cpu;
+        bool showAdvisory = MainWindowViewModel.IsLayoutFp32V3OnCpu(vm.ActiveLayoutArchitecture, vm.ActiveLayoutAccelerator);
         ModelsAdvisoryPanel.IsVisible = showAdvisory;
         if (showAdvisory)
         {
@@ -1051,8 +1075,7 @@ public partial class SettingsWindow : Window
         // --- Advisory: OCR GPU acceleration on with the Tiny pack, which measured no GPU speedup
         // (see MainWindowViewModel's matching startup check + toast for the full rationale).
         // Evaluated against the ACTIVE state, per design — not the pending selection. ---
-        ModelsOcrAdvisoryPanel.IsVisible = vm.ActiveOcrAccelerator == AcceleratorPreference.Gpu
-            && vm.ActiveOcrModelSetId == OcrModelRegistry.PPOCRv6Tiny.Id;
+        ModelsOcrAdvisoryPanel.IsVisible = MainWindowViewModel.IsOcrGpuWastedOnTinyPack(vm.ActiveOcrAccelerator, vm.ActiveOcrModelSetId);
     }
 
     /// <summary>One-click fix for the FP32-V3-on-CPU advisory above — mirrors
