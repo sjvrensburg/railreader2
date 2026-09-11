@@ -140,18 +140,36 @@ public partial class SettingsWindow : Window
         VlmStructuredOutput.IsChecked = c.VlmStructuredOutput;
 
         _customModel = CustomLayoutModelConfig.Load();
+        _ocrPrefs = OcrPreferences.Load();
         CustomModelEnabled.IsChecked = _customModel.Enabled;
         CustomModelPath.Text = _customModel.ModelPath ?? "";
         CustomModelMappingPath.Text = _customModel.MappingPath ?? "";
         UpdateCustomModelStatus();
         PopulateBuiltinAnalyzerCombo();
         GpuAccelerationCheck.IsChecked = _customModel.Accelerator == AcceleratorPreference.Gpu;
+
+        // Layout and OCR GPU acceleration are mutually exclusive (see OcrPreferences.Accelerator's
+        // doc comment) — reconcile a hand-edited sidecar that somehow has both set to Gpu before
+        // either status block renders. Layout wins the tie, matching MainWindowViewModel's startup
+        // reconciliation. Uses the real WouldLayoutUseGpu (not the raw Accelerator flag) so this
+        // reconciliation can't itself be fooled by a config shape that never reaches GPU anyway —
+        // BuiltinAnalyzerCombo/CustomModelEnabled above are already populated, so this reads the
+        // same on-disk state WouldLayoutUseGpu resolves.
+        if (WouldLayoutUseGpu() && _ocrPrefs.Accelerator == AcceleratorPreference.Gpu)
+        {
+            _ocrPrefs.Accelerator = AcceleratorPreference.Cpu;
+            _ocrPrefs.Save();
+        }
         UpdateGpuAccelerationStatus();
 
         OcrModeCombo.SelectedIndex = (int)vm.Controller.OcrMode;
         OcrDeskewCheck.IsChecked = c.DeskewOcrLines;
         UpdateOcrStatus();
         PopulateOcrLanguageCombo();
+        OcrGpuAccelerationCheck.IsChecked = _ocrPrefs.Accelerator == AcceleratorPreference.Gpu;
+        UpdateOcrGpuAccelerationStatus();
+        UpdatePresetRadios();
+        UpdateModelsOverview();
     }
 
     private void UpdateOcrStatus()
@@ -198,7 +216,7 @@ public partial class SettingsWindow : Window
     private void PopulateOcrLanguageCombo()
     {
         _ocrPrefs = OcrPreferences.Load();
-        var items = new List<OcrLanguageItem> { new(null, "Default (bundled, Latin script)", null) };
+        var items = new List<OcrLanguageItem> { new(null, MainWindowViewModel.BundledOcrPackDisplayName, null) };
         items.AddRange(OcrModelRegistry.All.Select(d =>
             new OcrLanguageItem(d.Id, $"{d.DisplayName} — {d.LanguageCoverage}", d)));
         OcrLanguageCombo.ItemsSource = items;
@@ -252,6 +270,8 @@ public partial class SettingsWindow : Window
             prefs.ModelSetId = item.Id;
             prefs.Save();
             UpdateOcrLanguageStatus();
+            UpdatePresetRadios(); // pack choice decides whether "Faster scanned OCR" still matches
+            UpdateModelsOverview();
         }
     }
 
@@ -366,19 +386,79 @@ public partial class SettingsWindow : Window
         if (BuiltinAnalyzerCombo.SelectedItem is BuiltinAnalyzerItem item)
         {
             _customModel.BuiltinAnalyzer = item.Value;
+            ClearStaleGpuAcceleratorIfIncompatible();
             _customModel.Save();
             UpdateBuiltinAnalyzerStatus();
             UpdateGpuAccelerationStatus();
+            UpdateModelsOverview();
         }
     }
 
     /// <summary>
+    /// Resets <c>_customModel.Accelerator</c> to CPU when the current in-memory shape (just-changed
+    /// <see cref="CustomLayoutModelConfig.BuiltinAnalyzer"/> or <see cref="CustomLayoutModelConfig.Enabled"/>,
+    /// <em>not yet saved</em>) no longer supports GPU at all — PP-DocLayout-S has no GPU/FP16
+    /// variant, the custom-model path always runs CPU. Uses
+    /// <see cref="CustomLayoutModelLoader.CanConfigShapeUseGpu"/> rather than the real
+    /// <see cref="CustomLayoutModelLoader.ResolveModel"/> deliberately: this runs <em>before</em>
+    /// <c>_customModel.Save()</c>, so a real resolve here would read the stale on-disk config, not
+    /// the change about to be made. This is pure hygiene — stops an irrelevant <c>Accelerator ==
+    /// Gpu</c> accumulating as dead state in <c>custom_layout_model.json</c> and keeps
+    /// <c>GpuAccelerationCheck</c> (unchecked here, guarded so its own change handler doesn't
+    /// re-fire) from looking checked-but-disabled — not the actual GPU mutual-exclusion gate, which
+    /// is <see cref="WouldLayoutUseGpu"/> below. Caller still saves and refreshes status.
+    /// </summary>
+    private void ClearStaleGpuAcceleratorIfIncompatible()
+    {
+        if (CustomLayoutModelLoader.CanConfigShapeUseGpu(_customModel) || _customModel.Accelerator != AcceleratorPreference.Gpu)
+            return;
+        _customModel.Accelerator = AcceleratorPreference.Cpu;
+
+        bool wasLoading = _loading;
+        _loading = true;
+        try { GpuAccelerationCheck.IsChecked = false; }
+        finally { _loading = wasLoading; }
+    }
+
+    /// <summary>
+    /// The actual answer to "would layout use the GPU slot right now" — calls the real
+    /// <see cref="CustomLayoutModelLoader.ResolveModel"/> (which always reads the config fresh from
+    /// disk) rather than predicting from raw field shape, so it can never diverge from what a
+    /// restart would really do — including through <c>ResolveModel</c>'s fallback paths (a custom
+    /// model whose files are missing/invalid, or PP-DocLayout-S with a missing file, both of which
+    /// can still land on a GPU-eligible built-in). Every call site that decides whether OCR may
+    /// claim the mutually-exclusive GPU slot must use this, not
+    /// <see cref="CustomLayoutModelLoader.CanConfigShapeUseGpu"/> — getting this one wrong risks the
+    /// onnxruntime#32561 concurrent-WebGPU-session crash, not just a stale checkbox.
+    /// </summary>
+    private bool WouldLayoutUseGpu()
+        => Vm is { } vm && CustomLayoutModelLoader.ResolveModel(vm.AppConfig, RailReaderLogging.Logger).IsGpu;
+
+    /// <summary>
     /// GPU model status for whichever architecture <see cref="BuiltinAnalyzerCombo"/> currently
-    /// selects. PP-DocLayout-S has no GPU-routed export, so the checkbox is disabled for it rather than
-    /// silently doing nothing when checked.
+    /// selects. Disabled (with an explanation) whenever the current configuration can never use
+    /// GPU at all — a custom model is enabled, or PP-DocLayout-S is selected (neither has a
+    /// GPU/FP16 variant; see <see cref="CustomLayoutModelLoader.CanConfigShapeUseGpu"/>) — rather than
+    /// silently doing nothing when checked. Also disabled while OCR GPU acceleration is on — the
+    /// two are mutually exclusive, see <see cref="OcrPreferences.Accelerator"/>'s doc comment.
     /// </summary>
     private void UpdateGpuAccelerationStatus()
     {
+        var ocrPrefs = _ocrPrefs ??= OcrPreferences.Load();
+        if (ocrPrefs.Accelerator == AcceleratorPreference.Gpu)
+        {
+            GpuAccelerationCheck.IsEnabled = false;
+            DownloadGpuModelButton.IsEnabled = false;
+            GpuAccelerationStatus.Text = "Disabled — OCR GPU acceleration is already using the GPU slot (only one of the two can run on GPU at a time).";
+            return;
+        }
+        if (_customModel.Enabled)
+        {
+            GpuAccelerationCheck.IsEnabled = false;
+            DownloadGpuModelButton.IsEnabled = false;
+            GpuAccelerationStatus.Text = "A custom layout model is in use — it always runs on CPU, no GPU path exists for a user-supplied model.";
+            return;
+        }
         if (LayoutModelDownloader.GpuDescriptorFor(_customModel.BuiltinAnalyzer) is not { } gpuDesc)
         {
             GpuAccelerationCheck.IsEnabled = false;
@@ -410,7 +490,27 @@ public partial class SettingsWindow : Window
             ? AcceleratorPreference.Gpu
             : AcceleratorPreference.Cpu;
         _customModel.Save();
+
+        // Mutually exclusive with OCR GPU acceleration — see OnOcrGpuAccelerationChanged and
+        // OcrPreferences.Accelerator's doc comment. WouldLayoutUseGpu (the real resolve), not a raw
+        // Accelerator check or CanConfigShapeUseGpu's shape heuristic — _customModel.Save() just
+        // ran, so this reads the real just-saved state including any fallback ResolveModel would
+        // actually take (a custom model whose files are missing, PP-DocLayout-S with a missing
+        // file — both can still land on GPU via a built-in fallback despite the raw shape saying no).
+        if (WouldLayoutUseGpu())
+        {
+            var ocrPrefs = _ocrPrefs ??= OcrPreferences.Load();
+            if (ocrPrefs.Accelerator == AcceleratorPreference.Gpu)
+            {
+                ocrPrefs.Accelerator = AcceleratorPreference.Cpu;
+                ocrPrefs.Save();
+                OcrGpuAccelerationCheck.IsChecked = false;
+                UpdateOcrGpuAccelerationStatus();
+            }
+        }
         UpdateGpuAccelerationStatus();
+        UpdatePresetRadios();
+        UpdateModelsOverview();
     }
 
     /// <summary>Downloads the GPU model for whichever architecture is currently selected
@@ -727,6 +827,309 @@ public partial class SettingsWindow : Window
         prefs.Mode = mode;
         prefs.Save();
         UpdateOcrStatus();
+        UpdateModelsOverview(); // OCR mode itself is live, unlike pack/accelerator — reflects immediately
+    }
+
+    private void OnOcrGpuAccelerationChanged(object? sender, RoutedEventArgs e)
+    {
+        if (_loading) return;
+        var prefs = _ocrPrefs ??= OcrPreferences.Load();
+        prefs.Accelerator = OcrGpuAccelerationCheck.IsChecked == true
+            ? AcceleratorPreference.Gpu
+            : AcceleratorPreference.Cpu;
+        prefs.Save();
+
+        // Mutually exclusive with layout-model GPU acceleration — see OnGpuAccelerationChanged and
+        // OcrPreferences.Accelerator's doc comment. WouldLayoutUseGpu (the real resolve), same
+        // reasoning as OnGpuAccelerationChanged's mirror check — a raw Accelerator==Gpu check would
+        // wrongly steal/refuse the slot for a layout config that can't actually use it.
+        if (prefs.Accelerator == AcceleratorPreference.Gpu && WouldLayoutUseGpu())
+        {
+            _customModel.Accelerator = AcceleratorPreference.Cpu;
+            _customModel.Save();
+            GpuAccelerationCheck.IsChecked = false;
+            UpdateGpuAccelerationStatus();
+        }
+        UpdateOcrGpuAccelerationStatus();
+        UpdatePresetRadios();
+        UpdateModelsOverview();
+    }
+
+    /// <summary>
+    /// Disabled while layout-model GPU acceleration is on — the two are mutually exclusive
+    /// (concurrent WebGPU <c>Session.Run()</c> across two sessions crashes the process, and
+    /// <c>AnalysisWorker</c> runs OCR and layout inference concurrently). See
+    /// <see cref="OcrPreferences.Accelerator"/>'s doc comment.
+    /// </summary>
+    private void UpdateOcrGpuAccelerationStatus()
+    {
+        if (WouldLayoutUseGpu())
+        {
+            OcrGpuAccelerationCheck.IsEnabled = false;
+            OcrGpuAccelerationStatus.Text = "Disabled — layout-model GPU acceleration is already using the GPU slot (only one of the two can run on GPU at a time).";
+            return;
+        }
+        OcrGpuAccelerationCheck.IsEnabled = true;
+
+        // Probes for a WebGPU-capable device on first call (cached after); safe to call repeatedly.
+        var deviceLine = WebGpuAccelerator.IsAvailable
+            ? $"GPU device detected: {WebGpuAccelerator.DeviceDescription}."
+            : "No compatible GPU device detected — will fall back to CPU.";
+        var restartNote = OcrGpuAccelerationCheck.IsChecked == true ? "  Restart to apply." : "";
+        OcrGpuAccelerationStatus.Text = $"{deviceLine}{restartNote}";
+    }
+
+    // --- GPU acceleration presets (issue #232) ---
+    //
+    // A preset is a convenience writer over the same three fields the checkboxes/combo below
+    // already own (CustomLayoutModelConfig.Accelerator, OcrPreferences.Accelerator,
+    // OcrPreferences.ModelSetId) — there is deliberately no separate persisted "preset" value,
+    // so it can never drift from the actual configuration. Toggling a checkbox by hand
+    // re-derives which preset (if any) the resulting state matches (UpdatePresetRadios).
+
+    /// <summary>
+    /// Applies a preset by writing <see cref="CustomLayoutModelConfig.Accelerator"/> and
+    /// <see cref="OcrPreferences.Accelerator"/>/<see cref="OcrPreferences.ModelSetId"/> directly —
+    /// once, together — rather than routing through <see cref="OnGpuAccelerationChanged"/>/
+    /// <see cref="OnOcrGpuAccelerationChanged"/>. Those two exist for a <i>manual</i> checkbox
+    /// toggle, where only one side changes and the other must react to it; a preset always sets
+    /// both sides in one shot, and cascading through the checkboxes' own change handlers would
+    /// mean each intermediate step computes state (including <see cref="UpdatePresetRadios"/>'s
+    /// preset match) against a partially-updated configuration — order-dependent by construction,
+    /// and one more preset or a reordered branch away from showing a stale radio selection. The
+    /// checkboxes/combo below are updated afterwards purely for display, guarded so their change
+    /// handlers don't re-fire and redo the writes this method already made.
+    /// </summary>
+    private void OnPresetChanged(object? sender, RoutedEventArgs e)
+    {
+        if (_loading) return;
+        if (sender is not RadioButton { IsChecked: true } rb) return;
+
+        var ocrPrefs = _ocrPrefs ??= OcrPreferences.Load();
+        AcceleratorPreference layoutAccel;
+        AcceleratorPreference ocrAccel;
+        string? ocrModelSetId = ocrPrefs.ModelSetId; // unchanged unless overridden below
+
+        if (ReferenceEquals(rb, PresetCpuOnly))
+        {
+            layoutAccel = AcceleratorPreference.Cpu;
+            ocrAccel = AcceleratorPreference.Cpu;
+        }
+        else if (ReferenceEquals(rb, PresetFasterNavigation))
+        {
+            layoutAccel = AcceleratorPreference.Gpu;
+            ocrAccel = AcceleratorPreference.Cpu;
+        }
+        else if (ReferenceEquals(rb, PresetFasterScannedOcr))
+        {
+            layoutAccel = AcceleratorPreference.Cpu;
+            ocrAccel = AcceleratorPreference.Gpu;
+            ocrModelSetId = OcrModelRegistry.PPOCRv6Medium.Id;
+        }
+        else
+        {
+            return; // unrecognised radio — nothing to apply
+        }
+
+        _customModel.Accelerator = layoutAccel;
+        _customModel.Save();
+        ocrPrefs.Accelerator = ocrAccel;
+        ocrPrefs.ModelSetId = ocrModelSetId;
+        ocrPrefs.Save();
+
+        bool wasLoading = _loading;
+        _loading = true;
+        try
+        {
+            GpuAccelerationCheck.IsChecked = layoutAccel == AcceleratorPreference.Gpu;
+            OcrGpuAccelerationCheck.IsChecked = ocrAccel == AcceleratorPreference.Gpu;
+            PopulateOcrLanguageCombo(); // re-reads _ocrPrefs, refreshes the combo/status to match
+        }
+        finally { _loading = wasLoading; }
+
+        UpdateGpuAccelerationStatus();
+        UpdateOcrGpuAccelerationStatus();
+        UpdatePresetRadios();
+        UpdateModelsOverview();
+    }
+
+    /// <summary>
+    /// Reflects the current layout/OCR accelerator + OCR pack state back onto the preset radio
+    /// buttons — checking the one that matches, or none (with <c>PresetCustomStatus</c> shown)
+    /// when the current configuration doesn't match any preset exactly. Called after every change
+    /// to the underlying checkboxes/combo, from whichever direction (preset click or manual toggle).
+    /// </summary>
+    private void UpdatePresetRadios()
+    {
+        bool layoutGpu = _customModel.Accelerator == AcceleratorPreference.Gpu;
+        var ocrPrefs = _ocrPrefs ??= OcrPreferences.Load();
+        bool ocrGpu = ocrPrefs.Accelerator == AcceleratorPreference.Gpu;
+        bool ocrMedium = ocrPrefs.ModelSetId == OcrModelRegistry.PPOCRv6Medium.Id;
+
+        bool matchesCpuOnly = !layoutGpu && !ocrGpu;
+        bool matchesFasterNav = layoutGpu && !ocrGpu;
+        bool matchesFasterOcr = !layoutGpu && ocrGpu && ocrMedium;
+
+        bool wasLoading = _loading;
+        _loading = true; // suppress OnPresetChanged while setting IsChecked programmatically
+        try
+        {
+            PresetCpuOnly.IsChecked = matchesCpuOnly;
+            PresetFasterNavigation.IsChecked = matchesFasterNav;
+            PresetFasterScannedOcr.IsChecked = matchesFasterOcr;
+        }
+        finally { _loading = wasLoading; }
+
+        PresetCustomStatus.IsVisible = !(matchesCpuOnly || matchesFasterNav || matchesFasterOcr);
+    }
+
+    // --- Models tab: what's actually running (issue #232) ---
+
+    /// <summary>
+    /// Refreshes the Models tab's "Active" rows from <see cref="MainWindowViewModel"/>'s startup-
+    /// resolved <c>Active*</c> properties — deliberately NOT from <c>_customModel</c>/<c>_ocrPrefs</c>,
+    /// which reflect the current (possibly not-yet-applied) Settings selection. OCR mode is the one
+    /// exception: <c>DocumentController.OcrMode</c> applies live, so it's read straight off the
+    /// controller rather than frozen at startup. "Pending" rows re-resolve the current on-disk
+    /// config through the same resolution logic <see cref="MainWindowViewModel"/>'s constructor
+    /// uses (<see cref="CustomLayoutModelLoader.ResolveModel"/> / <see cref="MainWindowViewModel.ResolveOcrModelSet"/>),
+    /// so they can never drift from what a restart would actually produce.
+    /// </summary>
+    private void UpdateModelsOverview()
+    {
+        if (Vm is not { } vm) return;
+
+        // --- Layout ---
+        var activeLayoutAccel = vm.ActiveLayoutAccelerator == AcceleratorPreference.Gpu ? "GPU" : "CPU";
+        ModelsLayoutActiveText.Text = $"{vm.ActiveLayoutModelName} · {activeLayoutAccel}";
+
+        var pendingLayout = CustomLayoutModelLoader.ResolveModel(vm.AppConfig, RailReaderLogging.Logger);
+        bool layoutPending = pendingLayout.DisplayName != vm.ActiveLayoutModelName
+            || pendingLayout.IsGpu != (vm.ActiveLayoutAccelerator == AcceleratorPreference.Gpu);
+        ModelsLayoutPendingText.Text = layoutPending
+            ? $"{pendingLayout.DisplayName} · {(pendingLayout.IsGpu ? "GPU" : "CPU")} (restart to apply)"
+            : "";
+
+        // --- OCR ---
+        var ocrMode = vm.Controller.OcrMode; // live — applies immediately, no "pending" concept
+        var activeOcrAccel = vm.ActiveOcrAccelerator == AcceleratorPreference.Gpu ? "GPU" : "CPU";
+        ModelsOcrActiveText.Text = ocrMode == OcrMode.Off
+            ? "Off"
+            : $"{ocrMode} · {vm.ActiveOcrModelName} · {activeOcrAccel}";
+
+        var ocrPrefs = _ocrPrefs ??= OcrPreferences.Load();
+        var (_, pendingOcrName, _) = MainWindowViewModel.ResolveOcrModelSet(ocrPrefs.ModelSetId, RailReaderLogging.Logger);
+        // Mirrors MainWindowViewModel's own gate exactly: layout claims the GPU slot first, but only
+        // if its config would actually resolve to GPU — reuses pendingLayout (above) rather than a
+        // second, separately-computed check, so the two can't disagree with each other.
+        bool pendingOcrGpu = ocrPrefs.Accelerator == AcceleratorPreference.Gpu
+            && !pendingLayout.IsGpu
+            && WebGpuAccelerator.IsAvailable;
+
+        // ResolveOcrModelSet already silently falls back to the bundled pack when the selected one
+        // isn't installed — which is exactly right for computing what a restart would actually
+        // produce, but it also means a preset (or manual pick) that names an uninstalled pack shows
+        // as "nothing pending" here, hiding *why* nothing changed. Call that out explicitly instead
+        // of leaving it silent — this is the "optimal model isn't installed" case.
+        bool selectedOcrPackMissing = ocrPrefs.ModelSetId is { } selectedId
+            && OcrModelRegistry.ById(selectedId) is { } candidateDesc
+            && OcrModelLocator.Locate(candidateDesc.ModelSet) is null;
+
+        if (ocrMode == OcrMode.Off)
+        {
+            ModelsOcrPendingText.Text = "";
+        }
+        else if (selectedOcrPackMissing)
+        {
+            var selDesc = OcrModelRegistry.ById(ocrPrefs.ModelSetId!)!;
+            ModelsOcrPendingText.Text = $"{selDesc.DisplayName} selected but not downloaded — using {pendingOcrName} until it is. Download it in the OCR tab.";
+        }
+        else
+        {
+            bool ocrPending = pendingOcrName != vm.ActiveOcrModelName || pendingOcrGpu != (vm.ActiveOcrAccelerator == AcceleratorPreference.Gpu);
+            ModelsOcrPendingText.Text = ocrPending
+                ? $"{pendingOcrName} · {(pendingOcrGpu ? "GPU" : "CPU")} (restart to apply)"
+                : "";
+        }
+
+        // --- Advisory: FP32 PP-DocLayoutV3 on CPU, when Heron (INT8) would be materially faster
+        // there (see MainWindowViewModel's matching startup check + toast). Evaluated against the
+        // ACTIVE state, per design — not the pending selection. ---
+        bool showAdvisory = MainWindowViewModel.IsLayoutFp32V3OnCpu(vm.ActiveLayoutArchitecture, vm.ActiveLayoutAccelerator);
+        ModelsAdvisoryPanel.IsVisible = showAdvisory;
+        if (showAdvisory)
+        {
+            bool heronInstalled = HeronModelLocator.FindModelPath() != null;
+            if (heronInstalled)
+            {
+                ModelsAdvisoryText.Text = "Layout is running the heavier FP32 PP-DocLayoutV3 model on CPU. Docling Heron (INT8, already installed) is quantized for CPU and will be noticeably faster.";
+                ModelsAdvisoryFixButton.Content = "Switch to Heron (INT8)";
+            }
+            else
+            {
+                ModelsAdvisoryText.Text = "Layout is running the heavier FP32 PP-DocLayoutV3 model on CPU. Docling Heron (INT8) would be faster here, but isn't downloaded yet.";
+                ModelsAdvisoryFixButton.Content = "Switch to Heron & open download";
+            }
+        }
+
+        // --- Advisory: OCR GPU acceleration on with the Tiny pack, which measured no GPU speedup
+        // (see MainWindowViewModel's matching startup check + toast for the full rationale).
+        // Evaluated against the ACTIVE state, per design — not the pending selection. ---
+        ModelsOcrAdvisoryPanel.IsVisible = MainWindowViewModel.IsOcrGpuWastedOnTinyPack(vm.ActiveOcrAccelerator, vm.ActiveOcrModelSetId);
+    }
+
+    /// <summary>One-click fix for the FP32-V3-on-CPU advisory above — mirrors
+    /// <see cref="MainWindowViewModel.SwitchToHeronLayoutModel"/>'s live-toast equivalent, but from
+    /// inside Settings: switches the built-in layout model to Docling Heron (INT8) and refreshes
+    /// every affected control. Takes effect next launch, same convention as every other layout-model
+    /// setting.</summary>
+    private void OnFixLayoutModelAdvisory(object? sender, RoutedEventArgs e)
+    {
+        // Switching the preference alone only fixes anything if Heron's file is actually on disk —
+        // otherwise CustomLayoutModelLoader's existing fallback just lands back on V3 next launch
+        // (logged, not an error) and this same advisory would fire again having "fixed" nothing.
+        // When it isn't installed, apply the switch anyway (so it's ready the moment the download
+        // finishes) but land the user on Advanced, where the file-missing status line and the
+        // already-built Download button are waiting — reusing that download/progress machinery
+        // rather than duplicating it in this small panel.
+        bool heronInstalled = HeronModelLocator.FindModelPath() != null;
+
+        _customModel.BuiltinAnalyzer = BuiltinAnalyzer.Heron;
+        _customModel.Save();
+
+        bool wasLoading = _loading;
+        _loading = true;
+        try { PopulateBuiltinAnalyzerCombo(); }
+        finally { _loading = wasLoading; }
+
+        UpdateBuiltinAnalyzerStatus();
+        UpdateGpuAccelerationStatus();
+        UpdateModelsOverview();
+
+        if (!heronInstalled) SelectTab("Advanced");
+    }
+
+    /// <summary>
+    /// One-click (partial) fix for the OCR-GPU-with-Tiny advisory: turns off OCR GPU acceleration,
+    /// freeing the GPU slot. Unlike <see cref="OnFixLayoutModelAdvisory"/> this doesn't try to also
+    /// decide the "right" replacement — switching to Medium would need a ~138 MB download the user
+    /// hasn't asked for, and giving the freed slot to layout is a separate opt-in choice — so this
+    /// only undoes the wasted part and leaves the rest to the user (Performance tab, right there).
+    /// </summary>
+    private void OnFixOcrGpuAdvisory(object? sender, RoutedEventArgs e)
+    {
+        bool wasLoading = _loading;
+        _loading = true;
+        try { OcrGpuAccelerationCheck.IsChecked = false; }
+        finally { _loading = wasLoading; }
+
+        var ocrPrefs = _ocrPrefs ??= OcrPreferences.Load();
+        ocrPrefs.Accelerator = AcceleratorPreference.Cpu;
+        ocrPrefs.Save();
+
+        UpdateOcrGpuAccelerationStatus();
+        UpdatePresetRadios();
+        UpdateModelsOverview();
     }
 
     private void OnResetDefaults(object? sender, RoutedEventArgs e)
@@ -785,6 +1188,7 @@ public partial class SettingsWindow : Window
         var ocrPrefs = OcrPreferences.Load();
         ocrPrefs.Mode = OcrMode.Off;
         ocrPrefs.ModelSetId = null;
+        ocrPrefs.Accelerator = AcceleratorPreference.Cpu;
         ocrPrefs.Save();
         _loading = true;
         LoadFromConfig();
@@ -802,8 +1206,11 @@ public partial class SettingsWindow : Window
     {
         if (_loading) return;
         _customModel.Enabled = CustomModelEnabled.IsChecked == true;
+        ClearStaleGpuAcceleratorIfIncompatible();
         _customModel.Save();
         UpdateCustomModelStatus();
+        UpdateGpuAccelerationStatus();
+        UpdateModelsOverview();
     }
 
     private async void OnBrowseCustomModel(object? sender, RoutedEventArgs e)

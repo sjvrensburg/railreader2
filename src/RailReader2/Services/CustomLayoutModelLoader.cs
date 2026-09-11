@@ -26,11 +26,46 @@ namespace RailReader2.Services;
 /// </summary>
 public static class CustomLayoutModelLoader
 {
+    /// <param name="Architecture">Null for the custom-model path (no registry entry) and for "no
+    /// model found" — otherwise the resolved built-in architecture, for callers that need more than
+    /// the display string (e.g. the debug overlay / Models tab's suboptimal-combo advisory).</param>
+    /// <param name="IsGpu">True only when this resolution actually went through <see cref="TryResolveGpu"/>
+    /// — i.e. GPU was requested, a device was found, and the GPU model file is on disk. A rare
+    /// construction-time failure inside the deferred <c>Factory</c> can still fall back to CPU
+    /// (logged, not reflected here) — this is a resolve-time signal, not a live one.</param>
     public readonly record struct Resolution(
         string? ModelPath,
         LayoutModelCapabilities? Capabilities,
         Func<ILayoutAnalyzer>? Factory,
-        string? DisplayName);
+        string? DisplayName,
+        LayoutModelArchitecture? Architecture,
+        bool IsGpu);
+
+    /// <summary>
+    /// A narrow, <em>in-memory-only</em> heuristic — true when <paramref name="custom"/>'s raw
+    /// field shape doesn't outright preclude GPU (not the custom-model path, not PP-DocLayout-S)
+    /// AND <see cref="CustomLayoutModelConfig.Accelerator"/> says GPU.
+    ///
+    /// <para>
+    /// <b>This is not the GPU mutual-exclusion gate — do not use it to decide whether OCR may
+    /// claim the GPU slot.</b> It doesn't know about <see cref="ResolveModel"/>'s fallback
+    /// behavior: a custom model whose files are missing/invalid falls through to
+    /// <see cref="ResolveBuiltin"/>, which can still land on GPU; PP-DocLayout-S with a missing
+    /// file falls through to PP-DocLayoutV3, same story. A caller that needs the real answer —
+    /// "would layout actually end up on GPU" — must call <see cref="ResolveModel"/> itself and
+    /// read <see cref="Resolution.IsGpu"/>, the single source of truth every such decision now
+    /// uses (the worker-init gate, and Settings' equivalent checks/status text). This heuristic
+    /// exists only for callers that need to clear an about-to-become-stale <c>Accelerator</c>
+    /// <em>before</em> saving a config change (so <see cref="ResolveModel"/>, which always reads
+    /// the saved file, isn't safe to call yet) — see <c>SettingsWindow.ClearStaleGpuAcceleratorIfIncompatible</c>.
+    /// Getting this heuristic wrong only leaves a harmless stale checkbox/flag, since it no longer
+    /// feeds the actual gate — that's what makes it safe to keep this loose.
+    /// </para>
+    /// </summary>
+    public static bool CanConfigShapeUseGpu(CustomLayoutModelConfig custom)
+        => custom.Accelerator == AcceleratorPreference.Gpu
+           && !custom.Enabled
+           && custom.BuiltinAnalyzer is BuiltinAnalyzer.Heron or BuiltinAnalyzer.PpDocLayoutV3;
 
     public static Resolution ResolveModel(AppConfig appConfig, ILogger logger)
     {
@@ -62,7 +97,7 @@ public static class CustomLayoutModelLoader
                     var customName = $"Custom: {Path.GetFileName(customPath)}";
                     return new Resolution(customPath, customCaps,
                         () => new LayoutAnalyzer(customPath, customCaps),
-                        customName);
+                        customName, Architecture: null, IsGpu: false);
                 }
             }
         }
@@ -84,7 +119,7 @@ public static class CustomLayoutModelLoader
                 return new Resolution(heronPath,
                     LayoutAnalyzerFactory.CapabilitiesFor(desc.Architecture),
                     () => LayoutAnalyzerFactory.Create(desc, heronPath),
-                    desc.DisplayName);
+                    desc.DisplayName, desc.Architecture, IsGpu: false);
             }
             logger.Warn($"[ONNX] Docling Heron model not found ({HeronModelLocator.FileName}) — falling back to PP-DocLayoutV3. See docs/heron-layout-model.md.");
             // fall through to PP
@@ -99,7 +134,7 @@ public static class CustomLayoutModelLoader
                 return new Resolution(ppsPath,
                     LayoutAnalyzerFactory.CapabilitiesFor(desc.Architecture),
                     () => LayoutAnalyzerFactory.Create(desc, ppsPath),
-                    desc.DisplayName);
+                    desc.DisplayName, desc.Architecture, IsGpu: false);
             }
             logger.Warn($"[ONNX] PP-DocLayout-S model not found ({PPDocLayoutSModelLocator.FileName}) — falling back to PP-DocLayoutV3. See docs/pp-doclayout-s.md.");
             // fall through to PP
@@ -114,12 +149,12 @@ public static class CustomLayoutModelLoader
         if (bundled == null)
         {
             logger.Warn("[ONNX] Bundled PP-DocLayoutV3 model not found.");
-            return new Resolution(null, null, null, null);
+            return new Resolution(null, null, null, null, Architecture: null, IsGpu: false);
         }
         return new Resolution(bundled,
             LayoutAnalyzerFactory.CapabilitiesFor(v3Desc.Architecture),
             () => LayoutAnalyzerFactory.Create(v3Desc, bundled),
-            v3Desc.DisplayName);
+            v3Desc.DisplayName, v3Desc.Architecture, IsGpu: false);
     }
 
     /// <summary>
@@ -188,7 +223,7 @@ public static class CustomLayoutModelLoader
             }
         }
 
-        return new Resolution(gpuPath, LayoutAnalyzerFactory.CapabilitiesFor(architecture), Construct, gpuDesc.DisplayName);
+        return new Resolution(gpuPath, LayoutAnalyzerFactory.CapabilitiesFor(architecture), Construct, gpuDesc.DisplayName, architecture, IsGpu: true);
     }
 
     /// <summary>
