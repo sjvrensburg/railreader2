@@ -114,6 +114,7 @@
         <li><a href="#getting-started">Getting Started</a></li>
         <li><a href="#navigation">Basic Navigation</a></li>
         <li><a href="#rail-mode">Rail Mode</a></li>
+        <li><a href="#view-rotation">View Rotation</a></li>
         <li><a href="#auto-scroll">Auto-Scroll</a></li>
         <li><a href="#jump-mode">Jump Mode</a></li>
         <li><a href="#line-focus-highlight">Line Focus &amp; Highlight</a></li>
@@ -229,10 +230,10 @@
         high-DPI page bitmap so it stays crisp.
       </p>
       <p>
-        The <strong>side panel</strong> is a single-open accordion with five sections &mdash;
+        The <strong>side panel</strong> is a single-open accordion with six sections &mdash;
         <strong>Outline</strong>, <strong>Bookmarks</strong>, <strong>Index</strong>,
-        <strong>Search</strong>, and <strong>Comments</strong>. Opening one section collapses the
-        others, so the open section fills the panel. Toggle the whole panel with the
+        <strong>Search</strong>, <strong>Comments</strong>, and <strong>Portals</strong>. Opening one
+        section collapses the others, so the open section fills the panel. Toggle the whole panel with the
         <strong>sidebar button</strong>
         <svg class="ricon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5,3 H19 A2,2 0 0 1 21,5 V19 A2,2 0 0 1 19,21 H5 A2,2 0 0 1 3,19 V5 A2,2 0 0 1 5,3 Z M0 0 M9,3 V21"/></svg>
         at the left of the tab strip, or jump straight to a section: <code>Ctrl+Shift+O</code> opens
@@ -271,6 +272,34 @@
       <p>
         Switching tabs automatically exits any active annotation mode to prevent accidental edits
         on the wrong document.
+      </p>
+
+      <h3>Split panes &amp; tear-off windows</h3>
+      <p>
+        View one document at several positions at once. Press <code>Ctrl+\</code> (or
+        <strong>View &rarr; Split Editor &rarr; Split Right</strong>) to split the editor, adding a
+        new pane to the right of the focused one; panes are resizable by dragging the splitter
+        between them. <code>Ctrl+Shift+\</code> closes the focused pane, and <strong>View &rarr;
+        Split Editor &rarr; Close All Extra Panes</strong> collapses back to one.
+      </p>
+      <p>
+        A pane's context menu also has <strong>Move Pane to New Window</strong>, which tears it off
+        into its own floating, always-on-top window &mdash; handy for a second monitor. Each pane or
+        window is an independent viewport with its own page, zoom, and rail state, but if it's
+        showing a file that's already open elsewhere, it shares that document's PDF handle, caches,
+        and annotations &mdash; no duplicate analysis work. Click a pane or window to focus it: an
+        accent border shows which one has focus, and that's the one keyboard shortcuts, the mouse
+        wheel, and menu commands act on.
+      </p>
+
+      <h3>Continuous scrolling</h3>
+      <p>
+        Off by default. Turn on <strong>Continuous scrolling</strong> in Settings &rarr; Rendering
+        to let plain mouse-wheel scrolling in browse mode flow smoothly across page boundaries
+        instead of jumping page to page &mdash; <code>Ctrl</code>+wheel still zooms. The minimap
+        gains a thin document-position strip along its right edge while it's on. Rail mode is
+        unaffected: it stays page-local, and the wheel still zooms at rail zoom regardless of this
+        setting. Takes effect immediately, no restart.
       </p>
     </section>
 
@@ -337,6 +366,32 @@
         all detected layout blocks with their class labels, confidence scores, and reading order.
         Useful for understanding why rail navigation behaves a certain way.
       </div>
+    </section>
+
+    <!-- View Rotation -->
+    <section class="guide-section" id="view-rotation">
+      <h2>View Rotation</h2>
+      <p>
+        Quarter-turn the whole displayed page &mdash; useful for sideways scans or a wide table laid
+        out in landscape. Rotate with <code>Ctrl+R</code> (clockwise) / <code>Ctrl+Shift+R</code>
+        (counter-clockwise), from the <strong>View &rarr; Rotate</strong> menu, or from a block's
+        right-click context menu. Rotation is per-document (shared by every tab or pane viewing the
+        same file) and persists across sessions.
+      </p>
+      <p>
+        In rail mode, if the current line lands on a block that's sideways relative to the page's
+        rotation, a one-time toast points you at <code>U</code> (&ldquo;Rotate to Read Block&rdquo;)
+        &mdash; pressing it rotates the whole page just enough to make that block upright and
+        re-runs layout analysis on it, so you get real per-line detection instead of guessed
+        geometry. Press <code>U</code> again once it's upright to reset rotation back to 0. A status
+        bar badge shows the current rotation (e.g. &ldquo;Rotated 90&deg;&rdquo;) with a one-click
+        reset button.
+      </p>
+      <p>
+        <strong>Annotations can't be authored while rotated</strong> &mdash; the toolbar's Annotate
+        button is greyed out and existing annotations aren't shown, because their stored geometry is
+        always in the page's unrotated frame. Rotate back to 0&deg; to see and edit them again.
+      </p>
     </section>
 
     <!-- 4. Auto-Scroll -->
@@ -557,7 +612,9 @@
     <section class="guide-section" id="annotations">
       <h2>Annotations</h2>
       <p>
-        Right-click anywhere on the page to open the <strong>radial menu</strong> with five annotation tools:
+        Toggle <strong>Annotation Mode</strong> from the toolbar's Annotate button (or
+        <code>Ctrl+E</code>, the Edit menu, or a block's right-click context menu) to reveal the
+        annotation tool row.
       </p>
 
       <figure class="guide-screenshot">
@@ -566,42 +623,48 @@
       </figure>
 
       <ul>
-        <li><strong>Highlight</strong> (<code>1</code>) &mdash; Click and drag over text to highlight. Uses character-level detection for precise selection. Choose from yellow, green, or pink via the colour ring.</li>
-        <li><strong>Pen</strong> (<code>2</code>) &mdash; Freehand drawing. Choose stroke thickness (thin/normal/thick) via the thickness ring, and colour (red/blue/black) via the colour ring.</li>
-        <li><strong>Rectangle</strong> (<code>3</code>) &mdash; Draw rectangular outlines or filled regions. Choose stroke thickness and colour (blue/red/black) via the radial menu rings.</li>
+        <li><strong>Highlight</strong> (<code>1</code>) &mdash; Drag over text to highlight. Uses character-level detection for precise selection.</li>
+        <li><strong>Underline</strong>, <strong>Strikethrough</strong>, and <strong>Squiggly</strong> &mdash; text-markup tools, same drag-over-text gesture as Highlight.</li>
+        <li><strong>Pen</strong> (<code>2</code>) &mdash; Freehand drawing.</li>
+        <li><strong>Rectangle</strong> (<code>3</code>) &mdash; Draw rectangular outlines or filled regions.</li>
         <li><strong>Text Note</strong> (<code>4</code>) &mdash; Click to place a note. Shows as a small folded-corner icon; click the icon in browse mode to expand/collapse the popup. Click an existing note in Text Note mode to edit.</li>
+        <li><strong>Text Box</strong> &mdash; typewriter-style free text; drag a box, then type into it.</li>
         <li><strong>Eraser</strong> (<code>5</code>) &mdash; Click on an annotation to remove it.</li>
       </ul>
+      <p>
+        Number keys <code>1</code>&ndash;<code>5</code> jump straight to Highlight, Pen, Rectangle,
+        Text Note, and Eraser respectively; Underline, Strikethrough, Squiggly, and Text Box have no
+        numeric shortcut &mdash; pick them from the toolbar.
+      </p>
 
       <h3>Tool cursors</h3>
       <p>
         Each annotation tool shows a distinct mouse cursor so you always know the active mode:
       </p>
       <ul>
-        <li><strong>Highlight, Pen, Rectangle, Text Note</strong> &mdash; crosshair cursor</li>
+        <li><strong>Highlight, Underline, Strikethrough, Squiggly, Pen, Rectangle, Text Note, Text Box</strong> &mdash; crosshair cursor</li>
         <li><strong>Eraser</strong> &mdash; no-entry cursor</li>
         <li><strong>Text Select</strong> &mdash; I-beam cursor</li>
         <li><strong>Browse (no tool)</strong> &mdash; default arrow cursor</li>
       </ul>
 
-      <h3>Radial menu rings</h3>
+      <h3>Annotation toolbar: colour &amp; thickness</h3>
       <p>
-        The radial menu has up to three rings:
+        In annotation mode, the toolbar's <strong>Colour</strong> button opens a flyout with one
+        shared five-colour palette &mdash; Yellow, Green, Red, Blue, and Black &mdash; used by every
+        colour-capable tool (Highlight, Underline, Squiggly, Strikethrough, Pen, Rectangle, Text
+        Note, and Text Box). Each tool remembers its own last-picked colour independently, so
+        switching tools doesn't change another tool's colour.
       </p>
-      <ul>
-        <li><strong>Inner ring</strong> &mdash; tool selection (always visible)</li>
-        <li><strong>Middle ring</strong> &mdash; stroke thickness: thin, normal, thick (shown for Pen and Rectangle). Displayed as size-varied circles.</li>
-        <li><strong>Outer ring</strong> &mdash; colour selection (shown for Highlight, Pen, and Rectangle)</li>
-      </ul>
       <p>
-        Tap a segment to expand its rings. <strong>Selecting a thickness</strong> keeps the menu open so you can also pick a colour.
-        <strong>Selecting a colour</strong> or clicking outside the rings activates the tool and closes the menu.
-        A small indicator dot on the segment shows the currently active colour.
+        The <strong>Thickness</strong> button opens a flyout with three stroke presets &mdash; thin,
+        normal, thick &mdash; but only applies to <strong>Pen</strong> and <strong>Rectangle</strong>;
+        it's disabled for every other tool.
       </p>
 
       <h3>Annotation z-order</h3>
       <p>
-        Annotations are drawn in a fixed z-order: highlights appear below freehand strokes and rectangles, which appear below text notes.
+        Annotations are drawn in a fixed z-order: highlights appear below freehand strokes and rectangles, which appear below text notes and text boxes.
         Within each tier, annotations are drawn in the order they were created.
       </p>
 
@@ -1121,6 +1184,10 @@ railreader2-cli export paper.pdf --figure-dir ./figures --output paper.md</code>
         <li><strong>Custom (Max render DPI / Tier step):</strong> When Custom is selected, set your
           own maximum DPI (150&ndash;1200) and tier step (the DPI granularity at which the page
           re-rasterises). Values are clamped to the supported range.</li>
+        <li><strong>Continuous scrolling:</strong> Off by default. Lets browse-mode mouse-wheel
+          scrolling flow smoothly across page boundaries instead of jumping page to page &mdash;
+          see <a href="#navigation">Split panes &amp; tear-off windows / Continuous scrolling</a>
+          under Basic Navigation for the full behaviour. Takes effect immediately.</li>
       </ul>
 
       <h3>Rail Reading</h3>
@@ -1156,6 +1223,13 @@ railreader2-cli export paper.pdf --figure-dir ./figures --output paper.md</code>
           are excluded so they stay left-aligned with surrounding text, while formulae and body text
           are centered.</li>
         <li><strong>Analysis Lookahead:</strong> Number of pages to pre-analyze ahead (0 to disable).</li>
+        <li><strong>GPU Acceleration:</strong> Off by default. Runs the ONNX layout model on your
+          GPU via WebGPU instead of the CPU &mdash; roughly 8&ndash;10&times; faster on supported
+          hardware. Applies only to Docling Heron and PP-DocLayoutV3 (PP-DocLayout-S and any custom
+          model always run on CPU); falls back to CPU automatically if no compatible GPU is found.
+          <strong>Needs a restart</strong> to take effect. Heron's GPU model is a separate one-time
+          download (run <code>./scripts/download-model.sh heron-gpu</code> or use the in-app
+          &ldquo;Download GPU model&rdquo; button); PP-DocLayoutV3 needs no extra download.</li>
       </ul>
 
       <h3>OCR</h3>
@@ -1198,10 +1272,11 @@ railreader2-cli export paper.pdf --figure-dir ./figures --output paper.md</code>
       </table>
       <p>
         <strong>Tiny or Small are the right default for reading.</strong> Full recognition is
-        CPU-heavy and shares a single worker thread with layout analysis, so while a scanned page
-        is being recognised, analysis of every open document waits behind it. On the Medium pack
-        that can look like the app has frozen &mdash; it hasn't, and the session log records each
-        page as it completes.
+        CPU-heavy and runs on its own worker thread, separate from layout analysis, so a scanned
+        page's recognition no longer blocks layout analysis of other open documents. It still
+        queues behind any other scanned page already being recognised, though, since OCR itself
+        runs on a single thread. On the Medium pack a page can still take a minute or more &mdash;
+        it isn't frozen, and the session log records each page as it completes.
       </p>
 
       <h3>Config file</h3>
@@ -1221,9 +1296,10 @@ railreader2-cli export paper.pdf --figure-dir ./figures --output paper.md</code>
       </p>
       <h3>The app seems to freeze on a scanned page</h3>
       <p>
-        Almost always OCR working, not a crash. Full recognition shares one worker thread with
-        layout analysis, so a scanned page holds up analysis of every open document until it
-        finishes &mdash; and with the <strong>Medium</strong> language pack a single page can take
+        Almost always OCR working, not a crash. Full recognition runs on its own worker thread
+        (separate from layout analysis, so it no longer blocks other open documents), but a second
+        scanned page still queues behind one already being recognised &mdash; and with the
+        <strong>Medium</strong> language pack a single page can take
         a minute or more. Switch to the <strong>Tiny</strong> or <strong>Small</strong> pack
         (Settings &rarr; OCR), or set OCR mode to <strong>Lines</strong>, which restores rail
         reading on scans without the recognition cost.
@@ -1268,7 +1344,7 @@ railreader2-cli export paper.pdf --figure-dir ./figures --output paper.md</code>
     <section class="guide-section" id="icons">
       <h2>Controls &amp; Icons</h2>
       <p>
-        The toolbar, the right-click annotation menu, and the panel controls use a set of crisp
+        The toolbar and the panel controls use a set of crisp
         Lucide vector icons that inherit the theme text colour and scale with the UI font size.
         Here is what each one does.
       </p>
@@ -1284,13 +1360,18 @@ railreader2-cli export paper.pdf --figure-dir ./figures --output paper.md</code>
           <tr><td><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7 M0 0 M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z"/></svg></td><td>Annotate</td><td>Enter annotation mode (<code>Ctrl+E</code>)</td></tr>
         </tbody>
         <tbody>
-          <tr><th colspan="3" scope="rowgroup">Annotation tools (right-click radial menu)</th></tr>
-          <tr><td><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 11-6 6v3h9l3-3 M0 0 m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"/></svg></td><td>Highlight</td><td>Highlight text (yellow / green / pink)</td></tr>
-          <tr><td><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/></svg></td><td>Pen</td><td>Freehand drawing (red / blue / black)</td></tr>
+          <tr><th colspan="3" scope="rowgroup">Annotation tools (toolbar, shown in Annotation Mode)</th></tr>
+          <tr><td><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 11-6 6v3h9l3-3 M0 0 m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"/></svg></td><td>Highlight</td><td>Drag over text to highlight</td></tr>
+          <tr><td><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4v6a6 6 0 0 0 12 0V4 M0 0 M4,20 L20,20"/></svg></td><td>Underline</td><td>Drag over text to underline</td></tr>
+          <tr><td><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 4H9a3 3 0 0 0-2.83 4 M0 0 M14 12a4 4 0 0 1 0 8H6 M0 0 M4,12 L20,12"/></svg></td><td>Strikethrough</td><td>Drag over text to strike through</td></tr>
+          <tr><td><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12q2.5 2 5 0t5 0 5 0 5 0 M0 0 M2 19q2.5 2 5 0t5 0 5 0 5 0 M0 0 M2 5q2.5 2 5 0t5 0 5 0 5 0"/></svg></td><td>Squiggly</td><td>Drag over text for a squiggly underline</td></tr>
+          <tr><td><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/></svg></td><td>Pen</td><td>Freehand drawing</td></tr>
           <tr><td><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5,3 H19 A2,2 0 0 1 21,5 V19 A2,2 0 0 1 19,21 H5 A2,2 0 0 1 3,19 V5 A2,2 0 0 1 5,3 Z"/></svg></td><td>Rectangle</td><td>Draw a rectangle outline</td></tr>
           <tr><td><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 9a2.4 2.4 0 0 0-.706-1.706l-3.588-3.588A2.4 2.4 0 0 0 15 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2z M0 0 M15 3v5a1 1 0 0 0 1 1h5"/></svg></td><td>Text note</td><td>Drop a collapsible popup note</td></tr>
+          <tr><td><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v16 M0 0 M4 7V5a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v2 M0 0 M9 20h6"/></svg></td><td>Text box</td><td>Drag a box, then type into it (typewriter-style)</td></tr>
           <tr><td><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 21H8a2 2 0 0 1-1.42-.587l-3.994-3.999a2 2 0 0 1 0-2.828l10-10a2 2 0 0 1 2.829 0l5.999 6a2 2 0 0 1 0 2.828L12.834 21 M0 0 m5.082 11.09 8.828 8.828"/></svg></td><td>Eraser</td><td>Erase annotations under the cursor</td></tr>
-          <tr><td><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 21h8 M0 0 m15 5 4 4 M0 0 M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/></svg></td><td>Thickness</td><td>Stroke thickness for the pen and rectangle (thin / normal / thick)</td></tr>
+          <tr><td><span style="display:inline-block;width:16px;height:16px;border-radius:2px;background:#FFFF00;border:1px solid #888" aria-hidden="true"></span></td><td>Colour</td><td>Shared 5-colour palette (yellow/green/red/blue/black) for every colour-capable tool</td></tr>
+          <tr><td><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 21h8 M0 0 m15 5 4 4 M0 0 M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/></svg></td><td>Thickness</td><td>Stroke thickness for the pen and rectangle only (thin / normal / thick)</td></tr>
         </tbody>
         <tbody>
           <tr><th colspan="3" scope="rowgroup">Panel &amp; navigation</th></tr>
@@ -1326,8 +1407,12 @@ railreader2-cli export paper.pdf --figure-dir ./figures --output paper.md</code>
           <tr><td>Ctrl+Shift+O</td><td>Open Outline section</td></tr>
           <tr><td>Ctrl+Shift+B</td><td>Open Bookmarks section</td></tr>
           <tr><td>Ctrl+Shift+I</td><td>Open Index section (figures / tables / equations)</td></tr>
+          <tr><td>Ctrl+Shift+H / G / T / E</td><td>Jump to next heading / figure / table / equation</td></tr>
           <tr><td>Ctrl+L</td><td>Copy block as LaTeX (VLM)</td></tr>
           <tr><td>Ctrl+G</td><td>Go to page</td></tr>
+          <tr><td>Ctrl+\</td><td>Split editor (add a pane to the right)</td></tr>
+          <tr><td>Ctrl+Shift+\</td><td>Close the focused pane</td></tr>
+          <tr><td>Ctrl+R / Ctrl+Shift+R</td><td>Rotate view clockwise / counter-clockwise</td></tr>
           <tr><td>F1</td><td>Keyboard shortcuts dialog</td></tr>
           <tr><td>F11</td><td>Toggle fullscreen</td></tr>
         </tbody>
@@ -1339,6 +1424,7 @@ railreader2-cli export paper.pdf --figure-dir ./figures --output paper.md</code>
           <tr><td>+ / -</td><td>Zoom in / out</td></tr>
           <tr><td>0</td><td>Fit page to window</td></tr>
           <tr><td>Shift+D</td><td>Toggle debug overlay</td></tr>
+          <tr><td>U</td><td>Rotate to read the current sideways rail block (press again to reset)</td></tr>
         </tbody>
         <tbody>
           <tr><th colspan="2" scope="rowgroup">Rail Mode</th></tr>
@@ -1367,8 +1453,9 @@ railreader2-cli export paper.pdf --figure-dir ./figures --output paper.md</code>
           <tr><th colspan="2" scope="rowgroup">Search &amp; Annotations</th></tr>
           <tr><td>Ctrl+F</td><td>Open search panel</td></tr>
           <tr><td>F3 / Shift+F3</td><td>Next / previous match</td></tr>
+          <tr><td>Ctrl+E</td><td>Toggle annotation mode</td></tr>
           <tr><td>1 / 2 / 3 / 4 / 5</td><td>Highlight / Pen / Rectangle / Text Note / Eraser</td></tr>
-          <tr><td>Right-click</td><td>Open radial menu (thickness + colour rings)</td></tr>
+          <tr><td>Right-click</td><td>Block actions (Copy as LaTeX / Markdown / Description / Image) + toggle Annotation Mode</td></tr>
           <tr><td>Ctrl+Z</td><td>Undo</td></tr>
           <tr><td>Ctrl+Y</td><td>Redo</td></tr>
           <tr><td>Delete / Backspace</td><td>Delete selected annotation (browse mode)</td></tr>
