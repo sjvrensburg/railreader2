@@ -331,23 +331,6 @@
                         <TextBlock Name="BuiltinAnalyzerStatus" TextWrapping="Wrap" Opacity="0.7" FontSize="11"
                                    Margin="0,2,0,0" />
 
-                        <TextBlock Text="GPU Acceleration" FontWeight="Bold" Margin="0,16,0,0" />
-                        <Separator />
-                        <TextBlock TextWrapping="Wrap" Opacity="0.7"
-                                   Text="Experimental: runs layout inference on the GPU via ONNX Runtime's native WebGPU execution provider (Dawn → D3D12/Vulkan/Metal). Only Docling Heron and PP-DocLayoutV3 have a GPU model — PP-DocLayout-S always runs on CPU. Automatically falls back to CPU if no compatible GPU is found, the GPU model isn't downloaded, or the GPU session fails to start. Takes effect after a restart." />
-                        <CheckBox Name="GpuAccelerationCheck" Content="Use GPU acceleration"
-                                  IsCheckedChanged="OnGpuAccelerationChanged" Margin="0,4,0,4" />
-                        <Grid ColumnDefinitions="Auto,8,Auto,8,*" Margin="0,6,0,0">
-                            <Button Grid.Column="0" Name="DownloadGpuModelButton" Content="Download GPU model"
-                                    Click="OnDownloadGpuModel" />
-                            <Button Grid.Column="2" Name="CancelGpuDownloadButton" Content="Cancel"
-                                    Click="OnCancelGpuDownload" IsVisible="False" />
-                            <ProgressBar Grid.Column="4" Name="GpuDownloadProgress" Minimum="0" Maximum="1"
-                                         IsVisible="False" VerticalAlignment="Center" Height="6" />
-                        </Grid>
-                        <TextBlock Name="GpuAccelerationStatus" TextWrapping="Wrap" Opacity="0.7" FontSize="11"
-                                   Margin="0,2,0,0" />
-
                         <TextBlock Text="Custom Layout Model" FontWeight="Bold" Margin="0,16,0,0" />
                         <Separator />
                         <TextBlock TextWrapping="Wrap" Opacity="0.7"
@@ -380,6 +363,63 @@
   ]
 }</TextBlock>
                         </Expander>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- Performance Tab — GPU acceleration presets, and the two individual GPU toggles they
+                 drive. Layout and OCR GPU acceleration are mutually exclusive (concurrent WebGPU
+                 Session.Run() across two sessions crashes the process), so this consolidates both
+                 into one place instead of leaving them scattered across Advanced and OCR. -->
+            <TabItem Header="Performance">
+                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Spacing="8" Margin="16">
+                        <TextBlock Text="GPU Acceleration Preset" FontWeight="Bold" />
+                        <Separator />
+                        <TextBlock TextWrapping="Wrap" Opacity="0.7"
+                                   Text="Experimental: ONNX Runtime's WebGPU execution provider can accelerate layout analysis or OCR — but not both at once (running two GPU-backed models concurrently is a confirmed ONNX Runtime crash). Pick whichever side benefits your documents more, or configure layout and OCR acceleration individually below." />
+                        <RadioButton Name="PresetCpuOnly" GroupName="AccelerationPreset"
+                                     Content="CPU only" IsCheckedChanged="OnPresetChanged" Margin="0,4,0,0" />
+                        <TextBlock Text="No GPU acceleration — today's default. Always available."
+                                   TextWrapping="Wrap" Opacity="0.6" FontSize="11" Margin="20,0,0,4" />
+                        <RadioButton Name="PresetFasterNavigation" GroupName="AccelerationPreset"
+                                     Content="Faster page navigation (layout GPU)" IsCheckedChanged="OnPresetChanged" />
+                        <TextBlock Text="Layout analysis on GPU (~8x faster per page measured), OCR stays on CPU. Best for born-digital PDFs, where OCR rarely runs anyway."
+                                   TextWrapping="Wrap" Opacity="0.6" FontSize="11" Margin="20,0,0,4" />
+                        <RadioButton Name="PresetFasterScannedOcr" GroupName="AccelerationPreset"
+                                     Content="Faster scanned-document OCR (OCR GPU)" IsCheckedChanged="OnPresetChanged" />
+                        <TextBlock Text="OCR on GPU with the PP-OCRv6 Medium multilingual pack (~38s/page measured, vs. minutes on CPU) — the pack that makes Medium's accuracy actually practical to use. Layout stays on CPU."
+                                   TextWrapping="Wrap" Opacity="0.6" FontSize="11" Margin="20,0,0,4" />
+                        <TextBlock Name="PresetCustomStatus" IsVisible="False"
+                                   Text="Custom configuration — layout and OCR acceleration are set individually below, not matching a preset."
+                                   TextWrapping="Wrap" Opacity="0.7" FontSize="11" FontStyle="Italic" Margin="0,4,0,4" />
+
+                        <TextBlock Text="Layout Model GPU Acceleration" FontWeight="Bold" Margin="0,16,0,0" />
+                        <Separator />
+                        <TextBlock TextWrapping="Wrap" Opacity="0.7"
+                                   Text="Runs layout inference on the GPU via ONNX Runtime's native WebGPU execution provider (Dawn → D3D12/Vulkan/Metal). Only Docling Heron and PP-DocLayoutV3 have a GPU model — PP-DocLayout-S always runs on CPU. Mutually exclusive with OCR GPU acceleration below (see the preset picker above) — automatically falls back to CPU if no compatible GPU is found, the GPU model isn't downloaded, or the GPU session fails to start. Takes effect after a restart." />
+                        <CheckBox Name="GpuAccelerationCheck" Content="Use GPU acceleration for layout analysis"
+                                  IsCheckedChanged="OnGpuAccelerationChanged" Margin="0,4,0,4" />
+                        <Grid ColumnDefinitions="Auto,8,Auto,8,*" Margin="0,6,0,0">
+                            <Button Grid.Column="0" Name="DownloadGpuModelButton" Content="Download GPU model"
+                                    Click="OnDownloadGpuModel" />
+                            <Button Grid.Column="2" Name="CancelGpuDownloadButton" Content="Cancel"
+                                    Click="OnCancelGpuDownload" IsVisible="False" />
+                            <ProgressBar Grid.Column="4" Name="GpuDownloadProgress" Minimum="0" Maximum="1"
+                                         IsVisible="False" VerticalAlignment="Center" Height="6" />
+                        </Grid>
+                        <TextBlock Name="GpuAccelerationStatus" TextWrapping="Wrap" Opacity="0.7" FontSize="11"
+                                   Margin="0,2,0,0" />
+
+                        <TextBlock Text="OCR GPU Acceleration" FontWeight="Bold" Margin="0,16,0,0" />
+                        <Separator />
+                        <TextBlock TextWrapping="Wrap" Opacity="0.7"
+                                   Text="Runs OCR detection/recognition on the GPU via ONNX Runtime's native WebGPU execution provider — the same model weights run either way, no separate download. Speeds up the larger language packs substantially (Medium measured ~13x faster on one GPU, byte-identical output in spot-checks). Mutually exclusive with layout GPU acceleration above (see the preset picker above) — automatically falls back to CPU if no compatible GPU is found. Takes effect after a restart." />
+                        <CheckBox Name="OcrGpuAccelerationCheck" Content="Use GPU acceleration for OCR"
+                                  IsCheckedChanged="OnOcrGpuAccelerationChanged" Margin="0,4,0,4" />
+                        <TextBlock Name="OcrGpuAccelerationStatus" TextWrapping="Wrap" Opacity="0.7" FontSize="11"
+                                   Margin="0,2,0,0" />
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>
@@ -435,15 +475,6 @@
                                          IsVisible="False" VerticalAlignment="Center" Height="6" />
                         </Grid>
                         <TextBlock Name="OcrLanguageStatus" TextWrapping="Wrap" Opacity="0.7" FontSize="11"
-                                   Margin="0,2,0,0" />
-
-                        <TextBlock Text="OCR GPU Acceleration" FontWeight="Bold" Margin="0,12,0,0" />
-                        <Separator />
-                        <TextBlock TextWrapping="Wrap" Opacity="0.7"
-                                   Text="Experimental: runs OCR detection/recognition on the GPU via ONNX Runtime's native WebGPU execution provider — the same model weights run either way, no separate download. Speeds up the larger language packs substantially (Medium measured ~13x faster on one GPU, byte-identical output in spot-checks) but ONNX Runtime's WebGPU provider crashes the whole app if two GPU-backed models run inference at the same time, and layout analysis and OCR run concurrently — so only one of the two can use the GPU at once. Enabling this disables layout GPU acceleration in the Advanced tab, and vice versa. Automatically falls back to CPU if no compatible GPU is found. Takes effect after a restart." />
-                        <CheckBox Name="OcrGpuAccelerationCheck" Content="Use GPU acceleration for OCR"
-                                  IsCheckedChanged="OnOcrGpuAccelerationChanged" Margin="0,4,0,4" />
-                        <TextBlock Name="OcrGpuAccelerationStatus" TextWrapping="Wrap" Opacity="0.7" FontSize="11"
                                    Margin="0,2,0,0" />
                     </StackPanel>
                 </ScrollViewer>

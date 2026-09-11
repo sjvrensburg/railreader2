@@ -164,6 +164,7 @@ public partial class SettingsWindow : Window
         PopulateOcrLanguageCombo();
         OcrGpuAccelerationCheck.IsChecked = _ocrPrefs.Accelerator == AcceleratorPreference.Gpu;
         UpdateOcrGpuAccelerationStatus();
+        UpdatePresetRadios();
     }
 
     private void UpdateOcrStatus()
@@ -264,6 +265,7 @@ public partial class SettingsWindow : Window
             prefs.ModelSetId = item.Id;
             prefs.Save();
             UpdateOcrLanguageStatus();
+            UpdatePresetRadios(); // pack choice decides whether "Faster scanned OCR" still matches
         }
     }
 
@@ -446,6 +448,7 @@ public partial class SettingsWindow : Window
             }
         }
         UpdateGpuAccelerationStatus();
+        UpdatePresetRadios();
     }
 
     /// <summary>Downloads the GPU model for whichever architecture is currently selected
@@ -783,6 +786,7 @@ public partial class SettingsWindow : Window
             UpdateGpuAccelerationStatus();
         }
         UpdateOcrGpuAccelerationStatus();
+        UpdatePresetRadios();
     }
 
     /// <summary>
@@ -807,6 +811,81 @@ public partial class SettingsWindow : Window
             : "No compatible GPU device detected — will fall back to CPU.";
         var restartNote = OcrGpuAccelerationCheck.IsChecked == true ? "  Restart to apply." : "";
         OcrGpuAccelerationStatus.Text = $"{deviceLine}{restartNote}";
+    }
+
+    // --- GPU acceleration presets (issue #232) ---
+    //
+    // A preset is a convenience writer over the same three fields the checkboxes/combo below
+    // already own (CustomLayoutModelConfig.Accelerator, OcrPreferences.Accelerator,
+    // OcrPreferences.ModelSetId) — there is deliberately no separate persisted "preset" value,
+    // so it can never drift from the actual configuration. Selecting a preset flips those
+    // checkboxes (reusing their existing mutual-exclusion logic); toggling a checkbox by hand
+    // re-derives which preset (if any) the resulting state matches.
+
+    private void SetLayoutAccelerator(AcceleratorPreference pref)
+        => GpuAccelerationCheck.IsChecked = pref == AcceleratorPreference.Gpu;
+
+    private void SetOcrAccelerator(AcceleratorPreference pref)
+        => OcrGpuAccelerationCheck.IsChecked = pref == AcceleratorPreference.Gpu;
+
+    private void OnPresetChanged(object? sender, RoutedEventArgs e)
+    {
+        if (_loading) return;
+        if (sender is not RadioButton { IsChecked: true } rb) return;
+
+        if (ReferenceEquals(rb, PresetCpuOnly))
+        {
+            SetLayoutAccelerator(AcceleratorPreference.Cpu);
+            SetOcrAccelerator(AcceleratorPreference.Cpu);
+        }
+        else if (ReferenceEquals(rb, PresetFasterNavigation))
+        {
+            SetLayoutAccelerator(AcceleratorPreference.Gpu);
+            SetOcrAccelerator(AcceleratorPreference.Cpu);
+        }
+        else if (ReferenceEquals(rb, PresetFasterScannedOcr))
+        {
+            SetLayoutAccelerator(AcceleratorPreference.Cpu);
+            var ocrPrefs = _ocrPrefs ??= OcrPreferences.Load();
+            ocrPrefs.ModelSetId = OcrModelRegistry.PPOCRv6Medium.Id;
+            ocrPrefs.Save();
+            // Refresh the language-pack combo/status without re-triggering OnOcrLanguageChanged's
+            // own (redundant but harmless) save — this method already just saved the same value.
+            bool wasLoading = _loading;
+            _loading = true;
+            try { PopulateOcrLanguageCombo(); } finally { _loading = wasLoading; }
+            SetOcrAccelerator(AcceleratorPreference.Gpu);
+        }
+    }
+
+    /// <summary>
+    /// Reflects the current layout/OCR accelerator + OCR pack state back onto the preset radio
+    /// buttons — checking the one that matches, or none (with <c>PresetCustomStatus</c> shown)
+    /// when the current configuration doesn't match any preset exactly. Called after every change
+    /// to the underlying checkboxes/combo, from whichever direction (preset click or manual toggle).
+    /// </summary>
+    private void UpdatePresetRadios()
+    {
+        bool layoutGpu = _customModel.Accelerator == AcceleratorPreference.Gpu;
+        var ocrPrefs = _ocrPrefs ??= OcrPreferences.Load();
+        bool ocrGpu = ocrPrefs.Accelerator == AcceleratorPreference.Gpu;
+        bool ocrMedium = ocrPrefs.ModelSetId == OcrModelRegistry.PPOCRv6Medium.Id;
+
+        bool matchesCpuOnly = !layoutGpu && !ocrGpu;
+        bool matchesFasterNav = layoutGpu && !ocrGpu;
+        bool matchesFasterOcr = !layoutGpu && ocrGpu && ocrMedium;
+
+        bool wasLoading = _loading;
+        _loading = true; // suppress OnPresetChanged while setting IsChecked programmatically
+        try
+        {
+            PresetCpuOnly.IsChecked = matchesCpuOnly;
+            PresetFasterNavigation.IsChecked = matchesFasterNav;
+            PresetFasterScannedOcr.IsChecked = matchesFasterOcr;
+        }
+        finally { _loading = wasLoading; }
+
+        PresetCustomStatus.IsVisible = !(matchesCpuOnly || matchesFasterNav || matchesFasterOcr);
     }
 
     private void OnResetDefaults(object? sender, RoutedEventArgs e)
