@@ -20,6 +20,14 @@ public partial class AboutDialog : Window
     }
 
     /// <summary>
+    /// Sets the layout-detection model name displayed in the dialog. Call before ShowDialog.
+    /// </summary>
+    public void SetActiveLayoutModel(string? name)
+    {
+        ActiveModelText.Text = $"Layout detection: {name ?? "unknown"}";
+    }
+
+    /// <summary>
     /// Sets the log file path displayed in the dialog. Call before ShowDialog.
     /// </summary>
     public void SetLogFilePath(string? path)

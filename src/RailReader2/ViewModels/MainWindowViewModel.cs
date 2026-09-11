@@ -152,6 +152,20 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     [ObservableProperty] private bool _showSettings;
     [ObservableProperty] private bool _showAbout;
     [ObservableProperty] private bool _showShortcuts;
+
+    /// <summary>Header of the Settings tab to select on next open, or null for whatever tab was
+    /// last shown. Set by <see cref="OpenSettingsTab"/>, consumed (and cleared) by MainWindow when
+    /// it constructs the <c>SettingsWindow</c>.</summary>
+    [ObservableProperty] private string? _settingsInitialTab;
+
+    /// <summary>Opens Settings pre-scrolled to a specific tab (matched by its <c>TabItem.Header</c>
+    /// text, e.g. "OCR") — used by toast actions that point the user at the setting that unblocks
+    /// them, rather than just describing it in text.</summary>
+    public void OpenSettingsTab(string tabHeader)
+    {
+        SettingsInitialTab = tabHeader;
+        ShowSettings = true;
+    }
     [ObservableProperty] private bool _showGoToPage;
     [ObservableProperty] private string? _cleanupMessage;
 
@@ -904,6 +918,8 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     // --- Status toast ---
 
     [ObservableProperty] private string? _statusToast;
+    [ObservableProperty] private string? _statusToastActionLabel;
+    private Action? _statusToastAction;
     private Timer? _toastTimer;
 
     // How long a status toast stays on screen. Long enough to read a short sentence to completion
@@ -911,17 +927,40 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     // toggles still just show the latest.
     private const int ToastDurationMs = 4000;
 
-    public void ShowStatusToast(string message)
+    public void ShowStatusToast(string message) => ShowStatusToast(message, null, null);
+
+    /// <summary>Shows a toast with an optional clickable action (e.g. "Open OCR Settings") rendered
+    /// next to the message in the status bar — see <see cref="StatusBarView"/> and
+    /// <see cref="InvokeStatusToastAction"/>.</summary>
+    public void ShowStatusToast(string message, string? actionLabel, Action? action)
     {
         // Already showing this exact message → keep it as-is. Without this, a repeated trigger (e.g. every
         // scroll-wheel notch while zoom is frozen-locked) would dispose+recreate the timer on each call,
         // churning timers and re-arming the same toast indefinitely.
-        if (message == StatusToast) return;
+        if (message == StatusToast && actionLabel == StatusToastActionLabel) return;
         StatusToast = message;
+        StatusToastActionLabel = actionLabel;
+        _statusToastAction = action;
         _toastTimer?.Dispose();
         _toastTimer = new Timer(_ =>
-            Dispatcher.UIThread.Post(() => StatusToast = null),
+            Dispatcher.UIThread.Post(() =>
+            {
+                StatusToast = null;
+                StatusToastActionLabel = null;
+                _statusToastAction = null;
+            }),
             null, ToastDurationMs, Timeout.Infinite);
+    }
+
+    /// <summary>Invoked by <see cref="StatusBarView"/> when the user clicks a toast's action link.</summary>
+    public void InvokeStatusToastAction()
+    {
+        var action = _statusToastAction;
+        _toastTimer?.Dispose();
+        StatusToast = null;
+        StatusToastActionLabel = null;
+        _statusToastAction = null;
+        action?.Invoke();
     }
 
     // CompositeAnnotationStore.Default is a process-global singleton and its two signals are

@@ -119,6 +119,24 @@ public sealed partial class MainWindowViewModel
         // Belt-and-braces: annotation mode can't be entered while rotated, and rotating exits it,
         // but Core would also refuse the resulting AddAnnotation — don't start a doomed gesture.
         if (IsViewRotated) return;
+
+        // The drag-over-text markup tools (Highlight/Underline/StrikeOut/Squiggly) hit-test against
+        // the page's extracted characters and are a silent no-op when there are none (a scanned page
+        // with OCR off or in Lines-only mode) — Core has no text to anchor to, so it never builds a
+        // preview annotation and the drag produces nothing, with no error. Catch it here so the user
+        // gets an explanation instead of a tool that looks broken; Pen/Rectangle/TextNote/FreeText/
+        // Eraser don't need a text layer and are unaffected.
+        if (_controller.FocusedViewport is { } vp &&
+            AnnotationInteractionHandler.IsTextMarkupTool(ActiveTool) &&
+            vp.Owner.GetOrExtractText(vp.CurrentPage).CharBoxes.Count == 0)
+        {
+            ShowStatusToast(
+                "No selectable text on this page — try Pen/Rectangle, or",
+                "set OCR Mode to Full",
+                () => OpenSettingsTab("OCR"));
+            return;
+        }
+
         var (needsDialog, isEdit, existingNote, px, py) = _controller.Annotations.HandleAnnotationPointerDown(_controller.FocusedViewport, pageX, pageY);
 
         if (needsDialog)

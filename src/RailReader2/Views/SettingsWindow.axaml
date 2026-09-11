@@ -14,7 +14,7 @@
                 BorderThickness="0,1,0,0">
             <Button Content="Reset All to Defaults" Click="OnResetDefaults" />
         </Border>
-        <TabControl Margin="8,8,8,0">
+        <TabControl x:Name="MainTabControl" Margin="8,8,8,0">
             <!-- Appearance Tab -->
             <TabItem Header="Appearance">
                 <ScrollViewer VerticalScrollBarVisibility="Auto"
