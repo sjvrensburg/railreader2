@@ -818,44 +818,72 @@ public partial class SettingsWindow : Window
     // A preset is a convenience writer over the same three fields the checkboxes/combo below
     // already own (CustomLayoutModelConfig.Accelerator, OcrPreferences.Accelerator,
     // OcrPreferences.ModelSetId) — there is deliberately no separate persisted "preset" value,
-    // so it can never drift from the actual configuration. Selecting a preset flips those
-    // checkboxes (reusing their existing mutual-exclusion logic); toggling a checkbox by hand
-    // re-derives which preset (if any) the resulting state matches.
+    // so it can never drift from the actual configuration. Toggling a checkbox by hand
+    // re-derives which preset (if any) the resulting state matches (UpdatePresetRadios).
 
-    private void SetLayoutAccelerator(AcceleratorPreference pref)
-        => GpuAccelerationCheck.IsChecked = pref == AcceleratorPreference.Gpu;
-
-    private void SetOcrAccelerator(AcceleratorPreference pref)
-        => OcrGpuAccelerationCheck.IsChecked = pref == AcceleratorPreference.Gpu;
-
+    /// <summary>
+    /// Applies a preset by writing <see cref="CustomLayoutModelConfig.Accelerator"/> and
+    /// <see cref="OcrPreferences.Accelerator"/>/<see cref="OcrPreferences.ModelSetId"/> directly —
+    /// once, together — rather than routing through <see cref="OnGpuAccelerationChanged"/>/
+    /// <see cref="OnOcrGpuAccelerationChanged"/>. Those two exist for a <i>manual</i> checkbox
+    /// toggle, where only one side changes and the other must react to it; a preset always sets
+    /// both sides in one shot, and cascading through the checkboxes' own change handlers would
+    /// mean each intermediate step computes state (including <see cref="UpdatePresetRadios"/>'s
+    /// preset match) against a partially-updated configuration — order-dependent by construction,
+    /// and one more preset or a reordered branch away from showing a stale radio selection. The
+    /// checkboxes/combo below are updated afterwards purely for display, guarded so their change
+    /// handlers don't re-fire and redo the writes this method already made.
+    /// </summary>
     private void OnPresetChanged(object? sender, RoutedEventArgs e)
     {
         if (_loading) return;
         if (sender is not RadioButton { IsChecked: true } rb) return;
 
+        var ocrPrefs = _ocrPrefs ??= OcrPreferences.Load();
+        AcceleratorPreference layoutAccel;
+        AcceleratorPreference ocrAccel;
+        string? ocrModelSetId = ocrPrefs.ModelSetId; // unchanged unless overridden below
+
         if (ReferenceEquals(rb, PresetCpuOnly))
         {
-            SetLayoutAccelerator(AcceleratorPreference.Cpu);
-            SetOcrAccelerator(AcceleratorPreference.Cpu);
+            layoutAccel = AcceleratorPreference.Cpu;
+            ocrAccel = AcceleratorPreference.Cpu;
         }
         else if (ReferenceEquals(rb, PresetFasterNavigation))
         {
-            SetLayoutAccelerator(AcceleratorPreference.Gpu);
-            SetOcrAccelerator(AcceleratorPreference.Cpu);
+            layoutAccel = AcceleratorPreference.Gpu;
+            ocrAccel = AcceleratorPreference.Cpu;
         }
         else if (ReferenceEquals(rb, PresetFasterScannedOcr))
         {
-            SetLayoutAccelerator(AcceleratorPreference.Cpu);
-            var ocrPrefs = _ocrPrefs ??= OcrPreferences.Load();
-            ocrPrefs.ModelSetId = OcrModelRegistry.PPOCRv6Medium.Id;
-            ocrPrefs.Save();
-            // Refresh the language-pack combo/status without re-triggering OnOcrLanguageChanged's
-            // own (redundant but harmless) save — this method already just saved the same value.
-            bool wasLoading = _loading;
-            _loading = true;
-            try { PopulateOcrLanguageCombo(); } finally { _loading = wasLoading; }
-            SetOcrAccelerator(AcceleratorPreference.Gpu);
+            layoutAccel = AcceleratorPreference.Cpu;
+            ocrAccel = AcceleratorPreference.Gpu;
+            ocrModelSetId = OcrModelRegistry.PPOCRv6Medium.Id;
         }
+        else
+        {
+            return; // unrecognised radio — nothing to apply
+        }
+
+        _customModel.Accelerator = layoutAccel;
+        _customModel.Save();
+        ocrPrefs.Accelerator = ocrAccel;
+        ocrPrefs.ModelSetId = ocrModelSetId;
+        ocrPrefs.Save();
+
+        bool wasLoading = _loading;
+        _loading = true;
+        try
+        {
+            GpuAccelerationCheck.IsChecked = layoutAccel == AcceleratorPreference.Gpu;
+            OcrGpuAccelerationCheck.IsChecked = ocrAccel == AcceleratorPreference.Gpu;
+            PopulateOcrLanguageCombo(); // re-reads _ocrPrefs, refreshes the combo/status to match
+        }
+        finally { _loading = wasLoading; }
+
+        UpdateGpuAccelerationStatus();
+        UpdateOcrGpuAccelerationStatus();
+        UpdatePresetRadios();
     }
 
     /// <summary>
