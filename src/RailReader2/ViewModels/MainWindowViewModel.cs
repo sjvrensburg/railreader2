@@ -369,6 +369,13 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     /// <see cref="ActiveLayoutModelName"/>.</summary>
     public string? ActiveOcrModelName { get; private set; }
 
+    /// <summary><see cref="RailReader.Core.Ocr.RapidOcr.OcrModelDescriptor.Id"/> of the OCR
+    /// language pack actually in use this session, or null for the bundled default — the
+    /// structured counterpart to <see cref="ActiveOcrModelName"/>, for callers that need to test
+    /// against a specific pack (e.g. the OCR-GPU-with-Tiny-pack advisory) rather than compare
+    /// display strings.</summary>
+    public string? ActiveOcrModelSetId { get; private set; }
+
     /// <summary>The accelerator actually resolved for OCR this session — see
     /// <see cref="ActiveLayoutAccelerator"/>'s doc comment (same "frozen at startup" caveat).</summary>
     public AcceleratorPreference ActiveOcrAccelerator { get; private set; }
@@ -409,14 +416,14 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     /// cases too, so the display name is the only way to tell them apart from "a real pack, verified
     /// on disk").
     /// </summary>
-    internal static (RapidOcrModelSet? ModelSet, string DisplayName) ResolveOcrModelSet(string? modelSetId, ILogger logger)
+    internal static (RapidOcrModelSet? ModelSet, string DisplayName, string? Id) ResolveOcrModelSet(string? modelSetId, ILogger logger)
     {
-        if (modelSetId is null) return (null, BundledOcrPackDisplayName);
+        if (modelSetId is null) return (null, BundledOcrPackDisplayName, null);
 
         if (OcrModelRegistry.ById(modelSetId) is not { } desc)
         {
             logger.Debug($"[OCR] Unknown language pack '{modelSetId}' in prefs; using the bundled default.");
-            return (null, BundledOcrPackDisplayName);
+            return (null, BundledOcrPackDisplayName, null);
         }
 
         // Locate() probes the same paths the downloader writes to and returns null unless every
@@ -426,10 +433,10 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             logger.Debug(
                 $"[OCR] Language pack '{desc.DisplayName}' is selected but not installed; " +
                 "using the bundled default. Download it in Settings ▸ OCR, then restart.");
-            return (null, BundledOcrPackDisplayName);
+            return (null, BundledOcrPackDisplayName, null);
         }
 
-        return (desc.ModelSet, desc.DisplayName);
+        return (desc.ModelSet, desc.DisplayName, desc.Id);
     }
 
     public MainWindowViewModel(AppConfig config, ILogger? logger = null)
@@ -453,8 +460,9 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         // bundled recognizer too, which would have worked fine. So verify the set is actually
         // locatable and otherwise fall back to the bundled default; the settings status line already
         // tells the user the pack is uninstalled, and downloading it later just starts working.
-        var (ocrModelSet, ocrModelName) = ResolveOcrModelSet(ocrPrefs.ModelSetId, _logger);
+        var (ocrModelSet, ocrModelName, ocrModelId) = ResolveOcrModelSet(ocrPrefs.ModelSetId, _logger);
         ActiveOcrModelName = ocrModelName;
+        ActiveOcrModelSetId = ocrModelId;
 
         // GPU for OCR and GPU for layout are mutually exclusive — running two WebGPU-backed
         // sessions' Session.Run() concurrently (exactly AnalysisWorker's two-stage-thread shape)
@@ -465,7 +473,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         Action<Microsoft.ML.OnnxRuntime.SessionOptions>? ocrGpuHook = null;
         if (ocrPrefs.Accelerator == AcceleratorPreference.Gpu)
         {
-            if (CustomLayoutModelConfig.Load().Accelerator == AcceleratorPreference.Gpu)
+            if (CustomLayoutModelLoader.WouldTryGpu(CustomLayoutModelConfig.Load()))
             {
                 _logger.Warn("[WebGPU] OCR GPU acceleration requested but layout GPU acceleration " +
                     "is also enabled — only one can run on GPU at a time (onnxruntime#32561). Using CPU for OCR.");
@@ -508,13 +516,36 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         }
         catch (Exception ex) { _logger.Error("[ONNX] Worker init failed", ex); }
 
-        // Advisory (issue #232): the plain-FP32 PP-DocLayoutV3 model on CPU is a materially worse
-        // CPU experience than Docling Heron's INT8 quantization — the combo most likely to happen
-        // right after picking the "Faster scanned OCR" preset (which forces layout to CPU) while
-        // BuiltinAnalyzer was still V3 from an earlier "Faster page navigation" session. Warn +
-        // one-click fix rather than silently overriding an explicit model choice.
-        if (ActiveLayoutArchitecture == LayoutModelArchitecture.PPDocLayoutV3 && ActiveLayoutAccelerator == AcceleratorPreference.Cpu)
+        // Suboptimal-combo advisories (issue #232). Both are also shown persistently in Settings ▸
+        // Models (SettingsWindow.UpdateModelsOverview), so this toast is a one-time-per-session
+        // heads-up, not the only place to see it — which matters because ShowStatusToast replaces
+        // whatever's currently shown, so firing two of these back to back would mean only the
+        // second is ever actually seen. Combine into one toast when both apply rather than lose one.
+        //
+        // 1. Plain-FP32 PP-DocLayoutV3 on CPU is a materially worse CPU experience than Docling
+        //    Heron's INT8 quantization — most likely right after picking the "Faster scanned OCR"
+        //    preset (forces layout to CPU) while BuiltinAnalyzer was still V3 from an earlier
+        //    "Faster page navigation" session.
+        bool layoutSuboptimal = ActiveLayoutArchitecture == LayoutModelArchitecture.PPDocLayoutV3
+            && ActiveLayoutAccelerator == AcceleratorPreference.Cpu;
+        // 2. OCR GPU acceleration measured NO speedup with the Tiny language pack (confirmed twice
+        //    in the issue's own benchmark corpus — Tiny's recognition pass is too small to hide GPU
+        //    dispatch overhead) — so having it on with Tiny just burns the exclusive GPU slot for
+        //    nothing, when layout could be using it instead (~8x, on every page rather than only
+        //    scanned ones).
+        bool ocrGpuWastedOnTiny = ActiveOcrAccelerator == AcceleratorPreference.Gpu
+            && ActiveOcrModelSetId == OcrModelRegistry.PPOCRv6Tiny.Id;
+
+        if (layoutSuboptimal && ocrGpuWastedOnTiny)
         {
+            _logger.Warn("[Advisory] Both layout (FP32 V3 on CPU) and OCR (GPU with the no-win Tiny pack) acceleration look suboptimal this session — see Settings ▸ Models.");
+            ShowStatusToast(
+                "Layout and OCR acceleration both look suboptimal this session —",
+                "review in Settings", () => OpenSettingsTab("Models"));
+        }
+        else if (layoutSuboptimal)
+        {
+            // Warn + one-click fix rather than silently overriding an explicit model choice.
             if (HeronModelLocator.FindModelPath() != null)
             {
                 _logger.Warn("[Advisory] Running FP32 PP-DocLayoutV3 on CPU — Docling Heron (INT8, already installed) would be faster here.");
@@ -530,6 +561,17 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
                     "review layout settings", () => OpenSettingsTab("Advanced"));
             }
         }
+        else if (ocrGpuWastedOnTiny)
+        {
+            // No single obviously-correct fix (disable OCR GPU? switch to Medium and download it?
+            // give the slot to layout instead?), so this points at Settings rather than acting —
+            // unlike the layout advisory above, which has one unambiguous fix.
+            _logger.Warn("[Advisory] OCR GPU acceleration is on with the Tiny pack, which measured no GPU speedup — the slot would help layout analysis more.");
+            ShowStatusToast(
+                "OCR GPU acceleration is on with the Tiny pack, which sees no measurable speedup on GPU — the slot would help layout analysis more —",
+                "review Performance settings", () => OpenSettingsTab("Performance"));
+        }
+
         _controller.StateChanged += OnControllerStateChanged;
         _controller.StatusMessage += ShowStatusToast;
         // Push-based reading-context updates: Core fires these (on the UI thread) the moment the page

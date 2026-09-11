@@ -41,6 +41,32 @@ public static class CustomLayoutModelLoader
         LayoutModelArchitecture? Architecture,
         bool IsGpu);
 
+    /// <summary>
+    /// Whether <paramref name="custom"/>'s current configuration would actually try to route
+    /// through GPU — i.e. <em>not</em> the custom-model path (always CPU, regardless of
+    /// <see cref="CustomLayoutModelConfig.Accelerator"/> — see <see cref="ResolveModel"/>'s
+    /// precedence) and <em>not</em> PP-DocLayout-S (no GPU/FP16 variant exists for it; see
+    /// <see cref="ResolveBuiltin"/>'s PP-DocLayout-S branch, which ignores <c>accelerator</c>
+    /// entirely).
+    ///
+    /// <para>
+    /// This is a config-shape check, not a resolve-time or device-availability one — it answers
+    /// "would this configuration even attempt GPU", not "will it get GPU" (that also needs
+    /// <see cref="WebGpuAccelerator.IsAvailable"/> and the GPU model file on disk, as
+    /// <see cref="TryResolveGpu"/> checks). It exists specifically so a caller deciding whether
+    /// OCR is allowed to claim the (mutually-exclusive) GPU slot doesn't wrongly treat a stale or
+    /// simply-irrelevant <c>Accelerator == Gpu</c> as "layout has it" — e.g. a user who had Heron
+    /// + GPU, then switched to PP-DocLayout-S or enabled a custom model, without ever touching the
+    /// accelerator checkbox again. <c>Accelerator</c> isn't reset when switching into either of
+    /// those states (nothing needs it to be, for layout's own resolution to behave correctly), so
+    /// checking it in isolation elsewhere is a bug, not just imprecise.
+    /// </para>
+    /// </summary>
+    public static bool WouldTryGpu(CustomLayoutModelConfig custom)
+        => custom.Accelerator == AcceleratorPreference.Gpu
+           && !custom.Enabled
+           && custom.BuiltinAnalyzer is BuiltinAnalyzer.Heron or BuiltinAnalyzer.PpDocLayoutV3;
+
     public static Resolution ResolveModel(AppConfig appConfig, ILogger logger)
     {
         var custom = CustomLayoutModelConfig.Load();

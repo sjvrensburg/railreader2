@@ -456,11 +456,20 @@
                         </Grid>
 
                         <StackPanel Name="ModelsAdvisoryPanel" Spacing="6" IsVisible="False" Margin="0,16,0,0">
-                            <TextBlock Text="Advisory" FontWeight="Bold" />
+                            <TextBlock Text="Layout Advisory" FontWeight="Bold" />
                             <Separator />
                             <TextBlock Name="ModelsAdvisoryText" TextWrapping="Wrap" Opacity="0.85" />
                             <Button Name="ModelsAdvisoryFixButton" Content="Switch to Heron (INT8)"
                                     Click="OnFixLayoutModelAdvisory" HorizontalAlignment="Left" />
+                        </StackPanel>
+
+                        <StackPanel Name="ModelsOcrAdvisoryPanel" Spacing="6" IsVisible="False" Margin="0,16,0,0">
+                            <TextBlock Text="OCR Advisory" FontWeight="Bold" />
+                            <Separator />
+                            <TextBlock Name="ModelsOcrAdvisoryText" TextWrapping="Wrap" Opacity="0.85"
+                                       Text="OCR GPU acceleration is on with the Tiny language pack, which measured no speedup on GPU — the exclusive GPU slot would help layout analysis more (every page, not just scanned ones). No single right fix here — switch to a pack GPU actually helps (Medium), or give the slot to layout instead." />
+                            <Button Name="ModelsOcrAdvisoryFixButton" Content="Turn off OCR GPU acceleration"
+                                    Click="OnFixOcrGpuAdvisory" HorizontalAlignment="Left" />
                         </StackPanel>
                     </StackPanel>
                 </ScrollViewer>
