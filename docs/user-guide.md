@@ -9,24 +9,26 @@ Everything you need to know to get the most out of railreader2.
 1. [Getting Started](#getting-started)
 2. [Basic Navigation](#basic-navigation)
 3. [Rail Mode](#rail-mode)
-4. [Auto-Scroll](#auto-scroll)
-5. [Jump Mode](#jump-mode)
-6. [Line Focus & Highlight](#line-focus--highlight)
-7. [Freeze Panes](#freeze-panes)
-8. [Colour Effects](#colour-effects)
-9. [Search](#search)
-10. [Annotations](#annotations)
-11. [PDF Links](#pdf-links)
-12. [Text Selection](#text-selection)
-13. [Bookmarks](#bookmarks)
-14. [Index Pane](#index-pane)
-15. [Portals](#portals)
-16. [Copy as LaTeX (VLM)](#copy-as-latex-vlm)
-17. [CLI Tool](#cli-tool)
-18. [Settings](#settings)
-19. [Troubleshooting](#troubleshooting)
-20. [Keyboard Shortcuts](#keyboard-shortcuts)
-21. [Menu Bar](#menu-bar)
+4. [View Rotation](#view-rotation)
+5. [Auto-Scroll](#auto-scroll)
+6. [Jump Mode](#jump-mode)
+7. [Line Focus & Highlight](#line-focus--highlight)
+8. [Freeze Panes](#freeze-panes)
+9. [Colour Effects](#colour-effects)
+10. [Search](#search)
+11. [Annotations](#annotations)
+12. [PDF Links](#pdf-links)
+13. [Text Selection](#text-selection)
+14. [Bookmarks](#bookmarks)
+15. [Index Pane](#index-pane)
+16. [Comments](#comments)
+17. [Portals](#portals)
+18. [Copy as LaTeX (VLM)](#copy-as-latex-vlm)
+19. [CLI Tool](#cli-tool)
+20. [Settings](#settings)
+21. [Troubleshooting](#troubleshooting)
+22. [Keyboard Shortcuts](#keyboard-shortcuts)
+23. [Menu Bar](#menu-bar)
 
 ---
 
@@ -85,7 +87,7 @@ Press `Ctrl+M` to toggle the **minimap** — a page thumbnail in the corner. Cli
 
 When you enlarge the minimap past its thumbnail resolution, it transparently switches to rendering from the primary view's high-DPI page bitmap so the enlarged thumbnail stays crisp.
 
-The **side panel** is a single-open accordion with five sections — **Outline**, **Bookmarks**, **Index**, **Search**, and **Comments**. Opening one section collapses the others, so the open section always fills the panel. Toggle the whole panel with the **sidebar button** (the panel icon at the left of the tab strip), or jump straight to a section: `Ctrl+Shift+O` opens **Outline** (table of contents — click entries to jump to sections), `Ctrl+Shift+B` opens **Bookmarks** (see [Bookmarks](#bookmarks)), `Ctrl+Shift+I` opens the **Index** pane (a browsable index of all detected figures, tables, and equations — see [Index Pane](#index-pane)), and `Ctrl+F` opens **Search**.
+The **side panel** is a single-open accordion with six sections — **Outline**, **Bookmarks**, **Index**, **Search**, **Comments**, and **Portals**. Opening one section collapses the others, so the open section always fills the panel. Toggle the whole panel with the **sidebar button** (the panel icon at the left of the tab strip), or jump straight to a section: `Ctrl+Shift+O` opens **Outline** (table of contents — click entries to jump to sections), `Ctrl+Shift+B` opens **Bookmarks** (see [Bookmarks](#bookmarks)), `Ctrl+Shift+I` opens the **Index** pane (a browsable index of all detected figures, tables, and equations — see [Index Pane](#index-pane)), and `Ctrl+F` opens **Search**.
 
 When you click an entry in any section — an outline heading, a search result, a bookmark, a figure — keyboard focus moves to the page, so scrolling immediately drives the document rather than the list. (In the Outline, arrow keys still browse the tree; only a mouse click hands focus to the page.)
 
@@ -111,6 +113,10 @@ To see one document at several positions at once — for example, keeping a figu
 - **Move Pane to New Window** (in the same menu) tears the focused pane off into its own floating, always-on-top window for a second monitor.
 
 Every pane and window is an independent viewport showing the same document with its own page, zoom, and rail position. **Click a pane to focus it** — keyboard, scroll, and menu commands then act on the focused pane. Closing all extra panes returns to a single view.
+
+### Continuous scrolling
+
+Off by default. Turn on **Continuous scrolling** in Settings > Rendering to let plain mouse-wheel scrolling in browse mode flow smoothly across page boundaries instead of jumping page to page — `Ctrl`+wheel still zooms. The minimap gains a thin document-position strip along its right edge while it's on. Rail mode is unaffected: it stays page-local, and the wheel still zooms at rail zoom regardless of this setting. Takes effect immediately, no restart.
 
 ---
 
@@ -154,6 +160,16 @@ Holding `Right`/`D` scrolls horizontally along the current line with speed rampi
 ### Rail toolbar
 
 When rail mode is active, a floating toolbar appears with **P** (auto-scroll), **J** (jump mode), **F** (line focus dim), and **H** (line highlight) toggle buttons, plus a speed/distance slider.
+
+---
+
+## View Rotation
+
+Quarter-turn the whole displayed page — useful for sideways scans or a wide table laid out in landscape. Rotate with `Ctrl+R` (clockwise) / `Ctrl+Shift+R` (counter-clockwise), from the **View > Rotate** menu, or from a block's right-click context menu. Rotation is per-document (shared by every tab or pane viewing the same file) and persists across sessions.
+
+In rail mode, if the current line lands on a block that's sideways relative to the page's rotation, a one-time toast points you at `U` ("Rotate to Read Block") — pressing it rotates the whole page just enough to make that block upright and re-runs layout analysis on it, so you get real per-line detection instead of guessed geometry. Press `U` again once it's upright to reset rotation back to 0. A status bar badge shows the current rotation (e.g. "Rotated 90°") with a one-click reset button.
+
+**Annotations can't be authored while rotated** — the toolbar's Annotate button is greyed out and existing annotations aren't shown, because their stored geometry is always in the page's unrotated frame. Rotate back to 0° to see and edit them again.
 
 ---
 
@@ -274,40 +290,42 @@ Press `Ctrl+F` to open the **Search** section of the side panel (one of the acco
 
 ## Annotations
 
-Right-click anywhere on the page to open the **radial menu** with five annotation tools:
+Toggle **Annotation Mode** from the toolbar's Annotate button (or `Ctrl+E`, the Edit menu, or a block's right-click context menu) to reveal the annotation tool row.
 
 ![Annotations](img/annotations.png)
 *Annotations — highlights and text notes on a PDF page*
 
 | Tool | Key | Description |
 |------|-----|-------------|
-| **Highlight** | `1` | Click and drag over text to highlight. Uses character-level detection. Choose from yellow, green, or pink via the colour ring. |
-| **Pen** | `2` | Freehand drawing. Choose stroke thickness (thin/normal/thick) via the thickness ring, and colour (red/blue/black) via the colour ring. |
-| **Rectangle** | `3` | Draw rectangular outlines or filled regions. Choose stroke thickness and colour (blue/red/black) via the radial menu rings. |
+| **Highlight** | `1` | Drag over text to highlight. Uses character-level detection for precise selection. |
+| **Underline** | — | Drag over text to underline. |
+| **Strikethrough** | — | Drag over text to strike through. |
+| **Squiggly** | — | Drag over text for a squiggly underline. |
+| **Pen** | `2` | Freehand drawing. |
+| **Rectangle** | `3` | Draw rectangular outlines or filled regions. |
 | **Text Note** | `4` | Click to place a note. Shows as a small folded-corner icon; click the icon in browse mode to expand/collapse the popup. Click an existing note in Text Note mode to edit. |
+| **Text Box** | — | Typewriter-style free text; drag a box, then type into it. |
 | **Eraser** | `5` | Click on an annotation to remove it. |
+
+Underline, Strikethrough, Squiggly, and Text Box have no numeric shortcut — pick them from the toolbar.
 
 ### Tool cursors
 
 Each annotation tool shows a distinct mouse cursor so you always know the active mode:
-- **Highlight, Pen, Rectangle, Text Note** — crosshair cursor
+- **Highlight, Underline, Strikethrough, Squiggly, Pen, Rectangle, Text Note, Text Box** — crosshair cursor
 - **Eraser** — no-entry cursor
 - **Text Select** — I-beam cursor
 - **Browse (no tool)** — default arrow cursor
 
-### Radial menu rings
+### Annotation toolbar: colour & thickness
 
-The radial menu has up to three rings:
+In annotation mode, the toolbar's **Colour** button opens a flyout with one shared five-colour palette — Yellow, Green, Red, Blue, and Black — used by every colour-capable tool (Highlight, Underline, Squiggly, Strikethrough, Pen, Rectangle, Text Note, and Text Box). Each tool remembers its own last-picked colour independently, so switching tools doesn't change another tool's colour.
 
-- **Inner ring** — tool selection (always visible)
-- **Middle ring** — stroke thickness: thin, normal, thick (shown for Pen and Rectangle). Displayed as size-varied circles.
-- **Outer ring** — colour selection (shown for Highlight, Pen, and Rectangle)
-
-Tap a segment to expand its rings. **Selecting a thickness** keeps the menu open so you can also pick a colour. **Selecting a colour** or clicking outside the rings activates the tool and closes the menu. A small indicator dot on the segment shows the currently active colour.
+The **Thickness** button opens a flyout with three stroke presets — thin, normal, thick — but only applies to **Pen** and **Rectangle**; it's disabled for every other tool.
 
 ### Annotation z-order
 
-Annotations are drawn in a fixed z-order: highlights appear below freehand strokes and rectangles, which appear below text notes. Within each tier, annotations are drawn in the order they were created.
+Annotations are drawn in a fixed z-order: highlights appear below freehand strokes and rectangles, which appear below text notes and text boxes. Within each tier, annotations are drawn in the order they were created.
 
 ### Popup notes
 
@@ -336,15 +354,6 @@ Use **File > Export with Annotations** to create a new PDF with annotations rend
 Use **File > Export Annotations as JSON** to save all annotations and bookmarks for the current document to a JSON file. This is useful for backup, scripting, or sharing with other RailReader2 users.
 
 Use **File > Import Annotations...** to import annotations from a JSON file. Imported annotations are merged with any existing annotations on the active document — your annotations are preserved, and the imported ones are added alongside them. Duplicate bookmarks (same name and page) are skipped.
-
-### Comments pane
-
-The side panel's **Comments** section gathers every text note and reviewer comment in the document into one scrollable list, so you can read or jump between them without scrolling the pages.
-
-- **Sources:** your own text-note annotations and **in-PDF reviewer comments** — comments authored in other PDF tools (Acrobat, Preview, etc.) and embedded in the file — are shown together.
-- **Filter:** use the **All / Reviewer / Yours** filter at the top to narrow the list by source.
-- **Jump:** click any entry to navigate to its page; focus returns to the page so you can keep scrolling.
-- **Review state:** for in-PDF reviewer comments, you can change the review state inline from the list.
 
 ---
 
@@ -425,6 +434,17 @@ Each entry shows:
 - **Equations** — the extracted text content from the PDF text layer (e.g., Unicode math symbols)
 
 Use the **Figures**, **Tables**, and **Equations** toggle buttons at the top to filter by category. Click any entry to navigate to that page (focus returns to the page so you can scroll straight away). **Right-click** an entry instead to open it in the [portal pop-out window](#pop-out-window) — a quick way to park a figure on a second monitor while you keep reading; **Lock** it there to keep it pinned.
+
+---
+
+## Comments
+
+The side panel's **Comments** section gathers every text note and reviewer comment in the document into one scrollable list, so you can read or jump between them without scrolling the pages.
+
+- **Sources:** your own text-note annotations and **in-PDF reviewer comments** — comments authored in other PDF tools (Acrobat, Preview, etc.) and embedded in the file — are shown together.
+- **Filter:** use the **All / Reviewer / Yours** filter at the top to narrow the list by source.
+- **Jump:** click any entry to navigate to its page; focus returns to the page so you can keep scrolling.
+- **Review state:** for in-PDF reviewer comments, you can change the review state inline from the list.
 
 ---
 
@@ -716,6 +736,7 @@ Press `Ctrl+,` or use the menu to open Settings. Changes take effect immediately
 ### Rendering
 - **Render Quality:** Pick a render-DPI preset — **Ultra** (800 DPI), **Quality** (600), **High** (525, the default), **Balanced** (450), **Medium** (400), **Performance** (350), or **Custom**. Higher presets re-rasterise pages at a greater DPI cap for sharper text and deeper zoom, at the cost of more memory and more frequent re-renders; lower presets favour fluidity. The change applies to the open page immediately — no restart.
 - **Custom (Max render DPI / Tier step):** When **Custom** is selected, set your own maximum DPI (150–1200) and tier step (the DPI granularity at which the page re-rasterises; smaller steps render more crisply at intermediate zoom but re-raster more often). Values are clamped to the supported range.
+- **Continuous scrolling:** Off by default. Lets browse-mode mouse-wheel scrolling flow smoothly across page boundaries instead of jumping page to page — see [Continuous scrolling](#continuous-scrolling) under Basic Navigation for the full behaviour. Takes effect immediately.
 
 ### Rail Reading
 - **Zoom Threshold:** Zoom level at which rail mode activates (default 3.0x).
@@ -738,6 +759,7 @@ Press `Ctrl+,` or use the menu to open Settings. Changes take effect immediately
 - **Navigable Block Types:** Choose which block types are navigable in rail mode. Roles are model-independent.
 - **Centered Block Types:** Choose which block types are horizontally centered when they are narrower than the viewport. By default, headings (paragraph_title, doc_title) are excluded so they stay left-aligned with surrounding text, while formulae and body text are centered.
 - **Analysis Lookahead:** Number of pages to pre-analyze ahead (0 to disable).
+- **GPU Acceleration:** Off by default. Runs the ONNX layout model on your GPU via WebGPU instead of the CPU — roughly 8–10x faster on supported hardware. Applies only to Docling Heron and PP-DocLayoutV3 (PP-DocLayout-S and any custom model always run on CPU); falls back to CPU automatically if no compatible GPU is found. **Needs a restart** to take effect. Heron's GPU model is a separate one-time download (run `./scripts/download-model.sh heron-gpu` or use the in-app "Download GPU model" button); PP-DocLayoutV3 needs no extra download.
 
 ### OCR
 
@@ -750,7 +772,7 @@ A scanned page is a picture of text. It carries no text layer, so everything bui
 
   Changing the mode drops cached analysis for affected pages, so open scans re-analyse immediately — no restart.
 
-  **Full recognition is CPU-heavy**, and it shares a single worker thread with layout analysis. While a scanned page is being recognised, analysis of *every* open document waits behind it. On a slow language pack this looks like the app has frozen; it hasn't, and the session log records each page as it completes.
+  **Full recognition is CPU-heavy**, and it runs on its own worker thread, separate from layout analysis — so a scanned page's recognition no longer blocks layout analysis of other open documents. It still queues behind any other scanned page already being recognised, since OCR itself runs on a single thread. On a slow language pack a page can still take a while; it isn't frozen, and the session log records each page as it completes.
 
 - **Skew correction:** Scans are rarely square on the glass, and line detection is exactly the step that a tilt breaks — under a degree is enough to fragment a paragraph into a couple of huge rail lines, or to fuse neighbouring lines into one. This measures the page's tilt from the OCR results and compensates for it when grouping text into lines. Pages that are already square are left untouched. On by default; it needs OCR, so the checkbox is disabled while OCR mode is Off.
 
@@ -782,7 +804,7 @@ RailReader2 writes a diagnostic log during each session. If you encounter a prob
 
 ### The app seems to freeze on a scanned page
 
-Almost always OCR working, not a crash. Full recognition shares one worker thread with layout analysis, so a scanned page holds up analysis of every open document until it finishes — and with the **Medium** language pack a single page can take a minute or more. Switch to the **Tiny** or **Small** pack (Settings ▸ OCR), or set OCR mode to **Lines**, which restores rail reading on scans without the recognition cost. The session log records each page as it completes, so you can confirm progress.
+Almost always OCR working, not a crash. Full recognition runs on its own worker thread (separate from layout analysis, so it no longer blocks other open documents), but a second scanned page still queues behind one already being recognised — and with the **Medium** language pack a single page can take a minute or more. Switch to the **Tiny** or **Small** pack (Settings ▸ OCR), or set OCR mode to **Lines**, which restores rail reading on scans without the recognition cost. The session log records each page as it completes, so you can confirm progress.
 
 ### "OCR model failed to load"
 
@@ -824,7 +846,10 @@ The log is overwritten at the start of each session. Old `.log` files are automa
 | `Ctrl+Shift+O` | Open Outline section |
 | `Ctrl+Shift+B` | Open Bookmarks section |
 | `Ctrl+Shift+I` | Open Index section (figures / tables / equations) |
+| `Ctrl+Shift+H` / `G` / `T` / `E` | Jump to next heading / figure / table / equation |
 | `Ctrl+G` | Go to page |
+| `Ctrl+E` | Toggle annotation mode |
+| `Ctrl+R` / `Ctrl+Shift+R` | Rotate view clockwise / counter-clockwise |
 | `F1` | Keyboard shortcuts dialog |
 | `F11` | Toggle fullscreen |
 
@@ -844,6 +869,7 @@ The log is overwritten at the start of each session. Old `.log` files are automa
 | Key | Action |
 |-----|--------|
 | `R` | Start rail here — then click where to begin (rail-reads at the current zoom) |
+| `U` | Rotate to read the current sideways rail block (press again to reset) |
 | `Z` | Freeze panes (both axes) / unfreeze |
 | `Down` / `S` | Next line |
 | `Up` / `W` | Previous line |
@@ -871,7 +897,7 @@ The log is overwritten at the start of each session. Old `.log` files are automa
 | `Ctrl+F` | Open search panel |
 | `F3` / `Shift+F3` | Next / previous match |
 | `1` / `2` / `3` / `4` / `5` | Highlight / Pen / Rectangle / Text Note / Eraser |
-| Right-click | Open radial menu (thickness + colour rings for Pen/Rect, colour ring for Highlight) |
+| Right-click | Block actions (Copy as LaTeX / Markdown / Description / Image) + toggle Annotation Mode |
 | `Ctrl+Z` | Undo |
 | `Ctrl+Y` | Redo |
 | `Delete` / `Backspace` | Delete selected annotation (browse mode) |

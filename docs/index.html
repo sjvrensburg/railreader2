@@ -205,7 +205,7 @@
         <div class="feature-row__text">
           <p class="feature-row__eyebrow label-sm">Mark it up</p>
           <h3>Highlights, notes, and ink</h3>
-          <p>Highlight, underline, pen, rectangles, and sticky notes from a radial menu — saved as native PDF annotations or a sidecar. Select, move, resize, undo; export or import as JSON or a flattened PDF.</p>
+          <p>Highlight, underline, strikethrough, squiggly, pen, rectangles, sticky notes, and text boxes from the annotation toolbar — saved as native PDF annotations or a sidecar. Select, move, resize, undo; export or import as JSON or a flattened PDF.</p>
         </div>
         <div class="feature-row__media">
           <figure class="frame"><img src="img/annotations.png" alt="railreader2 annotation tools — highlights, freehand pen, rectangles, and text notes on a PDF page" loading="lazy" width="1500" height="1040" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}"></figure>
@@ -241,6 +241,24 @@
         <h3>Split &amp; Tear-off Views</h3>
         <p>
           See one document at several positions at once: split the editor into side-by-side panes (<code>Ctrl+\</code>) or tear a pane off into its own floating window for a second monitor. Each view has its own page, zoom, and rail &mdash; keep a figure in sight while you read the text that discusses it.
+        </p>
+      </div>
+      <div class="feature" data-reveal>
+        <h3>View Rotation</h3>
+        <p>
+          Quarter-turn a sideways scan or a wide landscape table (<code>Ctrl+R</code>). In rail mode, press <code>U</code> to make just the current sideways block upright and re-analysed for real per-line detection &mdash; press again to reset.
+        </p>
+      </div>
+      <div class="feature" data-reveal>
+        <h3>Continuous Scrolling</h3>
+        <p>
+          Opt in from Settings &rarr; Rendering to let the mouse wheel flow smoothly across page boundaries in browse mode, instead of jumping page to page. Rail mode stays page-local either way.
+        </p>
+      </div>
+      <div class="feature" data-reveal>
+        <h3>GPU-Accelerated Analysis</h3>
+        <p>
+          Optional WebGPU execution for the layout model &mdash; roughly 8&ndash;10&times; faster than CPU on supported hardware, with an automatic CPU fallback. Toggle in Settings &rarr; Advanced.
         </p>
       </div>
       <div class="feature" data-reveal>
@@ -411,7 +429,10 @@
         <tr><td>Ctrl+Shift+O</td><td>Open Outline section</td></tr>
         <tr><td>Ctrl+Shift+B</td><td>Open Bookmarks section</td></tr>
         <tr><td>Ctrl+Shift+I</td><td>Open Index section (figures / tables / equations)</td></tr>
+        <tr><td>Ctrl+Shift+H / G / T / E</td><td>Jump to next heading / figure / table / equation</td></tr>
         <tr><td>Ctrl+L</td><td>Copy block as LaTeX (VLM)</td></tr>
+        <tr><td>Ctrl+\ / Ctrl+Shift+\</td><td>Split editor / close focused pane</td></tr>
+        <tr><td>Ctrl+R / Ctrl+Shift+R</td><td>Rotate view clockwise / counter-clockwise</td></tr>
         <tr><td>F1</td><td>Keyboard shortcuts</td></tr>
       </tbody>
       <tbody>
@@ -442,6 +463,7 @@
         <tr><td>C</td><td>Cycle colour effect on active tab</td></tr>
         <tr><td>F</td><td>Toggle line focus dim</td></tr>
         <tr><td>H</td><td>Toggle line highlight</td></tr>
+        <tr><td>U</td><td>Rotate to read the current sideways rail block (press again to reset)</td></tr>
         <tr><td>Ctrl+Drag</td><td>Free pan/zoom in rail mode (release to snap back)</td></tr>
         <tr><td>Escape</td><td>Stop auto-scroll</td></tr>
         <tr><td>[ / ]</td><td>Adjust scroll speed or jump distance (&plusmn;5)</td></tr>
@@ -454,7 +476,8 @@
         <tr><td>Ctrl+F</td><td>Open search panel</td></tr>
         <tr><td>F3 / Shift+F3</td><td>Next / previous match</td></tr>
         <tr><td>Escape</td><td>Stop auto-scroll / close search / cancel tool / exit fullscreen</td></tr>
-        <tr><td>Right-click</td><td>Open annotation radial menu (thickness + colour rings)</td></tr>
+        <tr><td>Ctrl+E</td><td>Toggle annotation mode</td></tr>
+        <tr><td>Right-click</td><td>Block actions (Copy as LaTeX / Markdown / Description / Image) + toggle Annotation Mode</td></tr>
         <tr><td>Ctrl+Z</td><td>Undo annotation</td></tr>
         <tr><td>Ctrl+Y</td><td>Redo annotation</td></tr>
         <tr><td>Delete</td><td>Delete selected annotation (browse mode)</td></tr>

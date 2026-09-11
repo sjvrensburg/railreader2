@@ -77,6 +77,8 @@ At high zoom levels, navigation switches to "rail mode" — the viewer locks ont
 - **Analysis lookahead** — pre-analyzes upcoming pages in the background for instant navigation
 - **Analysis indicator** — status bar shows "Analyzing..." during layout inference
 - **Configurable navigation** — choose which block types are navigable in rail mode via Settings → Advanced
+- **GPU-accelerated layout analysis** — optional WebGPU execution for the ONNX layout model (Docling Heron or PP-DocLayoutV3) on supported GPUs, roughly an order of magnitude faster than CPU inference. Toggle via Settings → Advanced → GPU Acceleration (falls back to CPU automatically if unavailable; needs a restart to apply). Heron's GPU model is a separate one-time download
+- **View rotation** — quarter-turn the displayed page for sideways scans or wide tables (`Ctrl+R` / `Ctrl+Shift+R`, or View → Rotate). When rail mode reaches a sideways block, a one-time toast points at **Rotate to Read** (`U`) to make just that block upright and re-run analysis on it; press `U` again to reset. A status bar badge shows the current rotation with a one-click reset. Annotation authoring is disabled while rotated (stored annotation geometry is always in the unrotated frame)
 
 #### Freeze panes
 
@@ -105,6 +107,7 @@ At high zoom levels, navigation switches to "rail mode" — the viewer locks ont
 - **Multi-tab support** — open multiple PDFs with independent per-tab state. Right-click a tab to duplicate or close. Opening the same file twice (or duplicating a tab) shares one underlying document — the PDF handle, layout/text caches, and annotations are shared (no duplicate analysis work), while each tab keeps its own page, zoom, and rail position
 - **Tab bar overflow** — tabs shrink with ellipsis when many are open. Horizontal mouse wheel scrolls the tab bar. Overflow dropdown button lists all tabs
 - **Split panes & tear-off windows** — view one document at several positions at once: split the editor into N side-by-side resizable panes (View ▸ Split Editor ▸ Split Right, Ctrl+\) or move a pane into its own floating always-on-top window. Each pane/window is an independent viewport with its own page, zoom, and rail; click a pane to focus it so keyboard, scroll, and menu commands act on it
+- **Continuous scrolling** — optional page-anchored camera that lets you scroll smoothly across page boundaries in browse mode instead of jumping page-to-page. Off by default; enable via Settings → Rendering → Continuous scrolling (no restart). The minimap gains a thin document-position strip while enabled. Rail mode is unaffected — it stays page-local and wheel still zooms at rail zoom
 - **Side panel (accordion)** — a single-open accordion: opening one section collapses the others, and the open section fills the panel. Sections are **Outline** (table of contents, Ctrl+Shift+O), **Bookmarks** (named bookmarks, Ctrl+Shift+B), **Index** (figures/tables/equations browser with thumbnails and extracted equation text, Ctrl+Shift+I), **Search** (full-document text search, Ctrl+F), **Comments** (a list of annotation notes and in-PDF reviewer comments), and **Portals** (linked context viewports — keep a referenced figure/table/equation in view while you read; see below). Toggle the whole panel with the sidebar button at the left of the tab strip
 - **Whole-document figure scan** — the Index section's **Scan All** button sweeps every page for figures, tables, and equations (beyond the background lookahead), building a complete browsable index with thumbnails
 - **Focus follows navigation** — clicking an entry in any side-panel section (an outline heading, search result, bookmark, or figure) moves keyboard focus back to the page, so scrolling immediately drives the document rather than the list
@@ -118,7 +121,7 @@ At high zoom levels, navigation switches to "rail mode" — the viewer locks ont
 #### Annotations & text
 
 - **PDF links** — click internal cross-references (citations, figure refs, TOC entries) to navigate to the exact target position, or external URLs to open in the browser with a confirmation prompt. Back/forward history with `Alt+Left`/`Alt+Right`. Hand cursor on hover
-- **Annotations** — highlight, freehand pen, rectangles, text notes, and eraser via a three-ring radial menu (right-click): tool selection (inner), stroke thickness — thin/normal/thick (middle, for pen and rectangle), and colour picker (outer). Colour options: highlight (yellow/green/pink), pen (red/blue/black), rectangle (blue/red/black). Annotations render in z-order: highlights below strokes and rectangles, text notes on top. Collapsible popup notes with folded-corner icon. Select, move, and resize annotations in browse mode. Delete selected annotations with the Delete key.
+- **Annotations** — toggle Annotation Mode from the toolbar (or `Ctrl+E`) to reveal the tool row: text-markup tools **Highlight**, **Underline**, **Strikethrough**, and **Squiggly** (drag over text, sticky), plus **Pen**, **Rectangle**, **Text Note**, **Text Box** (typewriter-style FreeText, drag a box), and **Eraser**. A shared five-colour palette (Yellow/Green/Red/Blue/Black) applies to every colour-capable tool via the toolbar's **Colour** flyout; a **Thickness** flyout (thin/normal/thick) applies to Pen and Rectangle. Annotations render in z-order: highlights below strokes/rectangles, text notes and text boxes on top. Collapsible popup notes with folded-corner icon. Select, move, and resize annotations in browse mode. Delete selected annotations with the Delete key.
 - **Comments pane** — the side panel's Comments section lists every annotation note and imported / in-PDF reviewer comment across the document; click an entry to jump to it, filter by source (all / reviewer / yours), and change a reviewer comment's review state inline
 - **Text selection** — select and copy text from PDF pages via the toolbar
 - **Toolbar** — floating Browse/Text Select/Copy toolbar for quick mode switching
@@ -142,7 +145,7 @@ At high zoom levels, navigation switches to "rail mode" — the viewer locks ont
 #### General
 
 - **Menu bar** — File, Edit, View, Rail, Navigation, Help menus. Every command is reachable by name (the **Rail** menu surfaces the rail toggles, the **Edit** menu the block-copy actions), items **grey out when unavailable** (e.g. *Export with Annotations* on an encrypted PDF), and each carries an `Alt`+letter access key (mnemonic) for keyboard and assistive navigation
-- **Vector icons** — the toolbar, radial menu, and panel controls use crisp Lucide SVG icons that inherit the theme text colour and scale with the UI font-size setting
+- **Vector icons** — the toolbar and panel controls use crisp Lucide SVG icons that inherit the theme text colour and scale with the UI font-size setting
 - **Settings panel** — live-editable rail reading parameters with persistence
 - **Tabbed settings** — organised settings panel with Appearance, Rendering, Rail Reading, Auto-Scroll, Advanced, OCR, and VLM tabs
 - **Keyboard shortcuts dialog** — press F1 or Help → Keyboard Shortcuts for a complete reference
@@ -231,6 +234,10 @@ Run `railreader2-cli --help` or `railreader2-cli <command> --help` for all optio
 | Ctrl+\ | Split editor (add a pane to the right) |
 | Ctrl+Shift+\ | Close the focused pane |
 | Ctrl+Q | Quit |
+| Ctrl+E | Toggle annotation mode |
+| Ctrl+R / Ctrl+Shift+R | Rotate view clockwise / counter-clockwise |
+| U | Rotate to read the current sideways rail block (press again to reset) |
+| Ctrl+Shift+H / G / T / E | Jump to next heading / figure / table / equation |
 | PgDown / PgUp | Next / previous page |
 | Home / End | First / last page |
 | Ctrl+Home / Ctrl+End | First / last page |
@@ -265,7 +272,7 @@ Run `railreader2-cli --help` or `railreader2-cli <command> --help` for all optio
 | Ctrl+L | Copy current block as LaTeX / Markdown / description (VLM) |
 | Ctrl+F | Open Search section |
 | F3 / Shift+F3 | Next / previous search match |
-| Right-click | Open annotation radial menu |
+| Right-click | Block actions (Copy as LaTeX / Markdown / Description / Image) + toggle Annotation Mode |
 | Ctrl+Z / Ctrl+Y | Undo / redo annotation |
 | Delete / Backspace | Delete selected annotation (browse mode) |
 | Ctrl+C | Copy selected text |
@@ -311,7 +318,8 @@ Rail reading parameters are editable via the Settings panel (gear icon in menu b
   ],
   "auto_scroll_trigger_enabled": false,
   "auto_scroll_trigger_delay_ms": 2000.0,
-  "deskew_ocr_lines": true
+  "deskew_ocr_lines": true,
+  "continuous_scroll": false
 }
 ```
 
@@ -344,6 +352,7 @@ Rail reading parameters are editable via the Settings panel (gear icon in menu b
 | `auto_scroll_trigger_enabled` | Auto-start auto-scroll after holding D/Right for the trigger delay (`true`/`false`, default `false`) |
 | `auto_scroll_trigger_delay_ms` | Delay before auto-scroll triggers from hold (ms, default 2000) |
 | `deskew_ocr_lines` | Correct page tilt when grouping OCR'd text into lines on scanned pages (`true`/`false`, default `true`). Needs OCR; configurable via Settings → OCR. |
+| `continuous_scroll` | Page-anchored camera lets browse-mode scrolling flow smoothly across page boundaries (`true`/`false`, default `false`). Configurable via Settings → Rendering. |
 
 ## Architecture
 
