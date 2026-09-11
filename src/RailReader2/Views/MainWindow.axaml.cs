@@ -402,6 +402,7 @@ public partial class MainWindow : Window
                 case nameof(MainWindowViewModel.ShowAbout) when vm.ShowAbout:
                     vm.ShowAbout = false;
                     var aboutDlg = new AboutDialog { FontSize = vm.CurrentFontSize };
+                    aboutDlg.SetActiveLayoutModel(vm.ActiveLayoutModelName);
                     aboutDlg.SetLogFilePath(vm.LogFilePath);
                     await aboutDlg.ShowDialog(this);
                     break;
@@ -411,7 +412,13 @@ public partial class MainWindow : Window
                     // restores the captured value on teardown; editing settings mid-scan
                     // would be silently reverted, so suppress the dialog while scanning.
                     if (vm.IsScanAllActive) break;
-                    await new SettingsWindow { DataContext = vm, FontSize = vm.CurrentFontSize }.ShowDialog(this);
+                    var settingsWin = new SettingsWindow { DataContext = vm, FontSize = vm.CurrentFontSize };
+                    if (vm.SettingsInitialTab is { } initialTab)
+                    {
+                        settingsWin.SelectTab(initialTab);
+                        vm.SettingsInitialTab = null;
+                    }
+                    await settingsWin.ShowDialog(this);
                     break;
                 case nameof(MainWindowViewModel.ActiveTool):
                     Document.UpdateAnnotationCursor();

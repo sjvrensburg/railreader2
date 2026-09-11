@@ -62,6 +62,21 @@ public partial class SettingsWindow : Window
         InitializeComponent();
     }
 
+    /// <summary>Selects the tab whose <c>TabItem.Header</c> matches <paramref name="header"/>
+    /// (e.g. "OCR"). Call any time after construction — the tabs exist as soon as
+    /// <c>InitializeComponent</c> has run. No-op if no tab matches.</summary>
+    public void SelectTab(string header)
+    {
+        foreach (var item in MainTabControl.Items)
+        {
+            if (item is TabItem { Header: string h } ti && h == header)
+            {
+                MainTabControl.SelectedItem = ti;
+                return;
+            }
+        }
+    }
+
     protected override void OnLoaded(RoutedEventArgs e)
     {
         base.OnLoaded(e);

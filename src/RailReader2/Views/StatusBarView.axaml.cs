@@ -30,10 +30,11 @@ public partial class StatusBarView : UserControl
     private readonly record struct StatusShape(
         bool PendingRail, bool RailActive, bool AutoScrollActive, bool AutoScrollParked, bool JumpMode,
         bool IsViewRotated, int ViewRotationDegrees, bool IsAnnotating, AnnotationTool ActiveTool,
-        bool HasBreadcrumb, bool HasToast);
+        bool HasBreadcrumb, bool HasToast, bool HasToastAction);
     private StatusShape? _lastShape;
     private TabViewModel? _lastShapeTab;
     private TextBlock? _toastLabel;
+    private TextBlock? _toastActionLabel;
 
     public StatusBarView()
     {
@@ -312,7 +313,7 @@ public partial class StatusBarView : UserControl
         var shape = new StatusShape(
             pendingRail, rail.Active, vm.AutoScrollActive, vm.AutoScrollParked, vm.JumpMode,
             vm.IsViewRotated, vm.ViewRotationDegrees, vm.IsAnnotating, vm.ActiveTool,
-            breadcrumbFull is not null, vm.StatusToast is not null);
+            breadcrumbFull is not null, vm.StatusToast is not null, vm.StatusToastActionLabel is not null);
 
         // Fast path: the set of children hasn't changed since the last rebuild (the overwhelmingly common
         // case while continuously rail-reading — ActiveTab is re-raised every animation frame, see
@@ -428,6 +429,30 @@ public partial class StatusBarView : UserControl
             AddSeparator();
             _toastLabel = MakeBoldLabel(toast, AmberBrush);
             StatusPanel.Children.Add(_toastLabel);
+
+            if (vm.StatusToastActionLabel is { } actionLabel)
+            {
+                _toastActionLabel = new TextBlock
+                {
+                    Text = actionLabel,
+                    Foreground = RailModeBrush,
+                    TextDecorations = Avalonia.Media.TextDecorations.Underline,
+                    Cursor = new Cursor(StandardCursorType.Hand),
+                    VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+                    Margin = new Avalonia.Thickness(6, 0, 0, 0),
+                };
+                Avalonia.Automation.AutomationProperties.SetName(_toastActionLabel, actionLabel);
+                _toastActionLabel.Tapped += (_, _) => vm.InvokeStatusToastAction();
+                StatusPanel.Children.Add(_toastActionLabel);
+            }
+            else
+            {
+                _toastActionLabel = null;
+            }
+        }
+        else
+        {
+            _toastActionLabel = null;
         }
     }
 
@@ -459,5 +484,11 @@ public partial class StatusBarView : UserControl
 
         if (vm.StatusToast is { } toast && _toastLabel is not null)
             _toastLabel.Text = toast;
+
+        if (vm.StatusToastActionLabel is { } actionLabel && _toastActionLabel is not null)
+        {
+            _toastActionLabel.Text = actionLabel;
+            Avalonia.Automation.AutomationProperties.SetName(_toastActionLabel, actionLabel);
+        }
     }
 }
