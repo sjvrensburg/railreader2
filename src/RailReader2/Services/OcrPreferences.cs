@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using RailReader.Core.Models;
 using RailReader.Core.Services;
 
 namespace RailReader2.Services;
@@ -21,6 +22,23 @@ public sealed class OcrPreferences
     /// choice, changing it takes effect on next launch, not live.
     /// </summary>
     public string? ModelSetId { get; set; }
+
+    /// <summary>
+    /// GPU acceleration preference for OCR detection/recognition, via
+    /// <c>RailReader.Core.Analysis.WebGpu</c>'s native WebGPU execution provider — the same OCR
+    /// model weights run under either backend, no separate download. <b>Mutually exclusive with
+    /// <see cref="CustomLayoutModelConfig.Accelerator"/></b>: calling <c>Session.Run()</c> on two
+    /// WebGPU-backed sessions from two threads at once segfaults the process (confirmed,
+    /// cross-device and same-device — see <c>WebGpuAccelerator</c>'s doc comment and
+    /// <see href="https://github.com/microsoft/onnxruntime/issues/32561">microsoft/onnxruntime#32561</see>),
+    /// and <c>AnalysisWorker</c> runs OCR and layout inference on two independent, genuinely
+    /// concurrent threads — exactly that shape. Settings enforces "only one of the two on GPU at
+    /// a time" by unchecking whichever wasn't just turned on; <see cref="ViewModels.MainWindowViewModel"/>
+    /// enforces it again defensively at startup in case a sidecar file was hand-edited. Takes
+    /// effect on next launch, like <see cref="Mode"/> and <see cref="ModelSetId"/>.
+    /// </summary>
+    [JsonConverter(typeof(JsonStringEnumConverter<AcceleratorPreference>))]
+    public AcceleratorPreference Accelerator { get; set; } = AcceleratorPreference.Cpu;
 
     public static string Path => System.IO.Path.Combine(AppConfig.ConfigDir, "ocr_prefs.json");
 

@@ -5,6 +5,7 @@ using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using RailReader.Core;
+using RailReader.Core.Analysis.WebGpu;
 using RailReader.Core.Commands;
 using RailReader.Core.Models;
 using RailReader.Core.Ocr.RapidOcr;
@@ -392,6 +393,32 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         // locatable and otherwise fall back to the bundled default; the settings status line already
         // tells the user the pack is uninstalled, and downloading it later just starts working.
         var ocrModelSet = ResolveOcrModelSet(ocrPrefs.ModelSetId, _logger);
+
+        // GPU for OCR and GPU for layout are mutually exclusive — running two WebGPU-backed
+        // sessions' Session.Run() concurrently (exactly AnalysisWorker's two-stage-thread shape)
+        // segfaults the process (onnxruntime#32561). Settings enforces "only one at a time" by
+        // unchecking whichever wasn't just turned on, but a hand-edited sidecar file could still
+        // have both set — reconcile defensively here too, with layout winning the tie (it's the
+        // longer-standing feature). See OcrPreferences.Accelerator's doc comment.
+        Action<Microsoft.ML.OnnxRuntime.SessionOptions>? ocrGpuHook = null;
+        if (ocrPrefs.Accelerator == AcceleratorPreference.Gpu)
+        {
+            if (CustomLayoutModelConfig.Load().Accelerator == AcceleratorPreference.Gpu)
+            {
+                _logger.Warn("[WebGPU] OCR GPU acceleration requested but layout GPU acceleration " +
+                    "is also enabled — only one can run on GPU at a time (onnxruntime#32561). Using CPU for OCR.");
+                ShowStatusToast(
+                    "OCR GPU acceleration was skipped because layout GPU acceleration is already using the GPU slot —",
+                    "review OCR settings", () => OpenSettingsTab("OCR"));
+            }
+            else
+            {
+                ocrGpuHook = WebGpuAccelerator.TryBuildSessionHook();
+                if (ocrGpuHook is null)
+                    _logger.Warn("[WebGPU] No compatible GPU device found for OCR — using CPU.");
+            }
+        }
+
         try
         {
             var resolution = CustomLayoutModelLoader.ResolveModel(config, _logger);
@@ -399,7 +426,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             {
                 _logger.Debug($"[ONNX] Starting worker with model: {resolution.ModelPath}");
                 _controller.InitializeWorker(resolution.Capabilities, resolution.Factory,
-                    ocrServiceFactory: () => new RapidOcrService(ocrModelSet), ocrMode: ocrMode);
+                    ocrServiceFactory: () => new RapidOcrService(ocrModelSet, configureSession: ocrGpuHook), ocrMode: ocrMode);
                 ActiveLayoutModelName = resolution.DisplayName;
             }
             else
@@ -410,7 +437,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
                 _controller.InitializeWorker(
                     new LayoutModelCapabilities(TextLayoutAnalyzer.DefaultInputSize, [], ProvidesReadingOrder: false),
                     () => new TextLayoutAnalyzer(),
-                    ocrServiceFactory: () => new RapidOcrService(ocrModelSet), ocrMode: ocrMode);
+                    ocrServiceFactory: () => new RapidOcrService(ocrModelSet, configureSession: ocrGpuHook), ocrMode: ocrMode);
                 ActiveLayoutModelName = "Text-only (no layout model)";
             }
         }

@@ -140,6 +140,16 @@ public partial class SettingsWindow : Window
         VlmStructuredOutput.IsChecked = c.VlmStructuredOutput;
 
         _customModel = CustomLayoutModelConfig.Load();
+        _ocrPrefs = OcrPreferences.Load();
+        // Layout and OCR GPU acceleration are mutually exclusive (see OcrPreferences.Accelerator's
+        // doc comment) — reconcile a hand-edited sidecar that somehow has both set to Gpu before
+        // either status block renders. Layout wins the tie, matching MainWindowViewModel's startup
+        // reconciliation.
+        if (_customModel.Accelerator == AcceleratorPreference.Gpu && _ocrPrefs.Accelerator == AcceleratorPreference.Gpu)
+        {
+            _ocrPrefs.Accelerator = AcceleratorPreference.Cpu;
+            _ocrPrefs.Save();
+        }
         CustomModelEnabled.IsChecked = _customModel.Enabled;
         CustomModelPath.Text = _customModel.ModelPath ?? "";
         CustomModelMappingPath.Text = _customModel.MappingPath ?? "";
@@ -152,6 +162,8 @@ public partial class SettingsWindow : Window
         OcrDeskewCheck.IsChecked = c.DeskewOcrLines;
         UpdateOcrStatus();
         PopulateOcrLanguageCombo();
+        OcrGpuAccelerationCheck.IsChecked = _ocrPrefs.Accelerator == AcceleratorPreference.Gpu;
+        UpdateOcrGpuAccelerationStatus();
     }
 
     private void UpdateOcrStatus()
@@ -375,10 +387,19 @@ public partial class SettingsWindow : Window
     /// <summary>
     /// GPU model status for whichever architecture <see cref="BuiltinAnalyzerCombo"/> currently
     /// selects. PP-DocLayout-S has no GPU-routed export, so the checkbox is disabled for it rather than
-    /// silently doing nothing when checked.
+    /// silently doing nothing when checked. Also disabled while OCR GPU acceleration is on — the two
+    /// are mutually exclusive, see <see cref="OcrPreferences.Accelerator"/>'s doc comment.
     /// </summary>
     private void UpdateGpuAccelerationStatus()
     {
+        var ocrPrefs = _ocrPrefs ??= OcrPreferences.Load();
+        if (ocrPrefs.Accelerator == AcceleratorPreference.Gpu)
+        {
+            GpuAccelerationCheck.IsEnabled = false;
+            DownloadGpuModelButton.IsEnabled = false;
+            GpuAccelerationStatus.Text = "Disabled — OCR GPU acceleration is already using the GPU slot (only one of the two can run on GPU at a time).";
+            return;
+        }
         if (LayoutModelDownloader.GpuDescriptorFor(_customModel.BuiltinAnalyzer) is not { } gpuDesc)
         {
             GpuAccelerationCheck.IsEnabled = false;
@@ -410,6 +431,20 @@ public partial class SettingsWindow : Window
             ? AcceleratorPreference.Gpu
             : AcceleratorPreference.Cpu;
         _customModel.Save();
+
+        // Mutually exclusive with OCR GPU acceleration — see OnOcrGpuAccelerationChanged and
+        // OcrPreferences.Accelerator's doc comment.
+        if (_customModel.Accelerator == AcceleratorPreference.Gpu)
+        {
+            var ocrPrefs = _ocrPrefs ??= OcrPreferences.Load();
+            if (ocrPrefs.Accelerator == AcceleratorPreference.Gpu)
+            {
+                ocrPrefs.Accelerator = AcceleratorPreference.Cpu;
+                ocrPrefs.Save();
+                OcrGpuAccelerationCheck.IsChecked = false;
+                UpdateOcrGpuAccelerationStatus();
+            }
+        }
         UpdateGpuAccelerationStatus();
     }
 
@@ -729,6 +764,51 @@ public partial class SettingsWindow : Window
         UpdateOcrStatus();
     }
 
+    private void OnOcrGpuAccelerationChanged(object? sender, RoutedEventArgs e)
+    {
+        if (_loading) return;
+        var prefs = _ocrPrefs ??= OcrPreferences.Load();
+        prefs.Accelerator = OcrGpuAccelerationCheck.IsChecked == true
+            ? AcceleratorPreference.Gpu
+            : AcceleratorPreference.Cpu;
+        prefs.Save();
+
+        // Mutually exclusive with layout-model GPU acceleration — see OnGpuAccelerationChanged and
+        // OcrPreferences.Accelerator's doc comment.
+        if (prefs.Accelerator == AcceleratorPreference.Gpu && _customModel.Accelerator == AcceleratorPreference.Gpu)
+        {
+            _customModel.Accelerator = AcceleratorPreference.Cpu;
+            _customModel.Save();
+            GpuAccelerationCheck.IsChecked = false;
+            UpdateGpuAccelerationStatus();
+        }
+        UpdateOcrGpuAccelerationStatus();
+    }
+
+    /// <summary>
+    /// Disabled while layout-model GPU acceleration is on — the two are mutually exclusive
+    /// (concurrent WebGPU <c>Session.Run()</c> across two sessions crashes the process, and
+    /// <c>AnalysisWorker</c> runs OCR and layout inference concurrently). See
+    /// <see cref="OcrPreferences.Accelerator"/>'s doc comment.
+    /// </summary>
+    private void UpdateOcrGpuAccelerationStatus()
+    {
+        if (_customModel.Accelerator == AcceleratorPreference.Gpu)
+        {
+            OcrGpuAccelerationCheck.IsEnabled = false;
+            OcrGpuAccelerationStatus.Text = "Disabled — layout-model GPU acceleration is already using the GPU slot (only one of the two can run on GPU at a time).";
+            return;
+        }
+        OcrGpuAccelerationCheck.IsEnabled = true;
+
+        // Probes for a WebGPU-capable device on first call (cached after); safe to call repeatedly.
+        var deviceLine = WebGpuAccelerator.IsAvailable
+            ? $"GPU device detected: {WebGpuAccelerator.DeviceDescription}."
+            : "No compatible GPU device detected — will fall back to CPU.";
+        var restartNote = OcrGpuAccelerationCheck.IsChecked == true ? "  Restart to apply." : "";
+        OcrGpuAccelerationStatus.Text = $"{deviceLine}{restartNote}";
+    }
+
     private void OnResetDefaults(object? sender, RoutedEventArgs e)
     {
         if (Vm is not { } vm) return;
@@ -785,6 +865,7 @@ public partial class SettingsWindow : Window
         var ocrPrefs = OcrPreferences.Load();
         ocrPrefs.Mode = OcrMode.Off;
         ocrPrefs.ModelSetId = null;
+        ocrPrefs.Accelerator = AcceleratorPreference.Cpu;
         ocrPrefs.Save();
         _loading = true;
         LoadFromConfig();
