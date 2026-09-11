@@ -424,6 +424,48 @@
                 </ScrollViewer>
             </TabItem>
 
+            <!-- Models Tab — read-only overview of what's actually running this session (not what's
+                 currently selected — model/accelerator choices are restart-to-apply, so a change made
+                 elsewhere in Settings shows here as "Pending" until relaunch), plus advisories for a
+                 model/accelerator combo that's working against itself (issue #232). -->
+            <TabItem Header="Models">
+                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Spacing="8" Margin="16">
+                        <TextBlock Text="What's Actually Running" FontWeight="Bold" />
+                        <Separator />
+                        <TextBlock TextWrapping="Wrap" Opacity="0.7"
+                                   Text="Model and accelerator choices elsewhere in Settings take effect on next launch. This shows what's active THIS session, not what's currently selected — if you've just changed something, look for a 'Pending' note below." />
+
+                        <TextBlock Text="Layout Analysis" FontWeight="Bold" Margin="0,12,0,0" />
+                        <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto,4,Auto">
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Active:" Opacity="0.7" VerticalAlignment="Top" />
+                            <TextBlock Grid.Row="0" Grid.Column="2" Name="ModelsLayoutActiveText" TextWrapping="Wrap" />
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Pending:" Opacity="0.7" VerticalAlignment="Top" />
+                            <TextBlock Grid.Row="2" Grid.Column="2" Name="ModelsLayoutPendingText"
+                                       TextWrapping="Wrap" Opacity="0.7" FontStyle="Italic" />
+                        </Grid>
+
+                        <TextBlock Text="OCR" FontWeight="Bold" Margin="0,12,0,0" />
+                        <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto,4,Auto">
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Active:" Opacity="0.7" VerticalAlignment="Top" />
+                            <TextBlock Grid.Row="0" Grid.Column="2" Name="ModelsOcrActiveText" TextWrapping="Wrap" />
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Pending:" Opacity="0.7" VerticalAlignment="Top" />
+                            <TextBlock Grid.Row="2" Grid.Column="2" Name="ModelsOcrPendingText"
+                                       TextWrapping="Wrap" Opacity="0.7" FontStyle="Italic" />
+                        </Grid>
+
+                        <StackPanel Name="ModelsAdvisoryPanel" Spacing="6" IsVisible="False" Margin="0,16,0,0">
+                            <TextBlock Text="Advisory" FontWeight="Bold" />
+                            <Separator />
+                            <TextBlock Name="ModelsAdvisoryText" TextWrapping="Wrap" Opacity="0.85" />
+                            <Button Name="ModelsAdvisoryFixButton" Content="Switch to Heron (INT8)"
+                                    Click="OnFixLayoutModelAdvisory" HorizontalAlignment="Left" />
+                        </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
             <!-- OCR Tab — everything about recovering a text layer from scanned pages -->
             <TabItem Header="OCR">
                 <ScrollViewer VerticalScrollBarVisibility="Auto"

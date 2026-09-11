@@ -108,22 +108,25 @@ internal sealed class RailOverlayVisualHandler : CompositionCustomVisualHandler
     }
 
     /// <summary>
-    /// Renders a small "Model: <name>" badge in the top-left of the page so
-    /// users can tell at a glance which layout analyzer they're looking at.
-    /// Reuses the same Skia primitives the rest of the debug overlay uses
-    /// (so the badge inherits any future restyling). Drawn inside the camera
-    /// transform, in page coordinates — pinned to (8, 8) in page space.
+    /// Renders a small "what's actually running" badge in the top-left of the page — layout
+    /// model + accelerator, and OCR mode/pack/accelerator when OCR is on (see
+    /// <see cref="ViewModels.MainWindowViewModel.DebugModelBadgeText"/>, one "\n"-separated line
+    /// per subsystem). Reuses the same Skia primitives the rest of the debug overlay uses (so the
+    /// badge inherits any future restyling). Drawn inside the camera transform, in page
+    /// coordinates — pinned to (8, 8) in page space.
     /// </summary>
     private static void DrawModelBadge(SKCanvas canvas, string label)
     {
-        var text = $"Model: {label}";
+        var lines = label.Split('\n');
         var font = OverlayRenderer.GetDebugFont();
         var textPaint = OverlayRenderer.GetDebugTextPaint();
         var bgPaint = OverlayRenderer.GetDebugBgPaint();
 
-        var width = font.MeasureText(text);
         var metrics = font.Metrics;
         var lineHeight = metrics.Descent - metrics.Ascent;
+        float width = 0;
+        foreach (var line in lines)
+            width = Math.Max(width, font.MeasureText(line));
 
         const float padX = 6f, padY = 3f;
         const float originX = 8f, originY = 8f;
@@ -132,9 +135,13 @@ internal sealed class RailOverlayVisualHandler : CompositionCustomVisualHandler
             originX,
             originY,
             originX + width + 2 * padX,
-            originY + lineHeight + 2 * padY);
+            originY + lines.Length * lineHeight + 2 * padY);
 
         canvas.DrawRect(bgRect, bgPaint);
-        canvas.DrawText(text, originX + padX, originY + padY - metrics.Ascent, font, textPaint);
+        for (int i = 0; i < lines.Length; i++)
+        {
+            var baselineY = originY + padY - metrics.Ascent + i * lineHeight;
+            canvas.DrawText(lines[i], originX + padX, baselineY, font, textPaint);
+        }
     }
 }

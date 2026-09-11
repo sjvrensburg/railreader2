@@ -165,6 +165,7 @@ public partial class SettingsWindow : Window
         OcrGpuAccelerationCheck.IsChecked = _ocrPrefs.Accelerator == AcceleratorPreference.Gpu;
         UpdateOcrGpuAccelerationStatus();
         UpdatePresetRadios();
+        UpdateModelsOverview();
     }
 
     private void UpdateOcrStatus()
@@ -211,7 +212,7 @@ public partial class SettingsWindow : Window
     private void PopulateOcrLanguageCombo()
     {
         _ocrPrefs = OcrPreferences.Load();
-        var items = new List<OcrLanguageItem> { new(null, "Default (bundled, Latin script)", null) };
+        var items = new List<OcrLanguageItem> { new(null, MainWindowViewModel.BundledOcrPackDisplayName, null) };
         items.AddRange(OcrModelRegistry.All.Select(d =>
             new OcrLanguageItem(d.Id, $"{d.DisplayName} — {d.LanguageCoverage}", d)));
         OcrLanguageCombo.ItemsSource = items;
@@ -266,6 +267,7 @@ public partial class SettingsWindow : Window
             prefs.Save();
             UpdateOcrLanguageStatus();
             UpdatePresetRadios(); // pack choice decides whether "Faster scanned OCR" still matches
+            UpdateModelsOverview();
         }
     }
 
@@ -383,6 +385,7 @@ public partial class SettingsWindow : Window
             _customModel.Save();
             UpdateBuiltinAnalyzerStatus();
             UpdateGpuAccelerationStatus();
+            UpdateModelsOverview();
         }
     }
 
@@ -449,6 +452,7 @@ public partial class SettingsWindow : Window
         }
         UpdateGpuAccelerationStatus();
         UpdatePresetRadios();
+        UpdateModelsOverview();
     }
 
     /// <summary>Downloads the GPU model for whichever architecture is currently selected
@@ -765,6 +769,7 @@ public partial class SettingsWindow : Window
         prefs.Mode = mode;
         prefs.Save();
         UpdateOcrStatus();
+        UpdateModelsOverview(); // OCR mode itself is live, unlike pack/accelerator — reflects immediately
     }
 
     private void OnOcrGpuAccelerationChanged(object? sender, RoutedEventArgs e)
@@ -787,6 +792,7 @@ public partial class SettingsWindow : Window
         }
         UpdateOcrGpuAccelerationStatus();
         UpdatePresetRadios();
+        UpdateModelsOverview();
     }
 
     /// <summary>
@@ -884,6 +890,7 @@ public partial class SettingsWindow : Window
         UpdateGpuAccelerationStatus();
         UpdateOcrGpuAccelerationStatus();
         UpdatePresetRadios();
+        UpdateModelsOverview();
     }
 
     /// <summary>
@@ -914,6 +921,126 @@ public partial class SettingsWindow : Window
         finally { _loading = wasLoading; }
 
         PresetCustomStatus.IsVisible = !(matchesCpuOnly || matchesFasterNav || matchesFasterOcr);
+    }
+
+    // --- Models tab: what's actually running (issue #232) ---
+
+    /// <summary>
+    /// Refreshes the Models tab's "Active" rows from <see cref="MainWindowViewModel"/>'s startup-
+    /// resolved <c>Active*</c> properties — deliberately NOT from <c>_customModel</c>/<c>_ocrPrefs</c>,
+    /// which reflect the current (possibly not-yet-applied) Settings selection. OCR mode is the one
+    /// exception: <c>DocumentController.OcrMode</c> applies live, so it's read straight off the
+    /// controller rather than frozen at startup. "Pending" rows re-resolve the current on-disk
+    /// config through the same resolution logic <see cref="MainWindowViewModel"/>'s constructor
+    /// uses (<see cref="CustomLayoutModelLoader.ResolveModel"/> / <see cref="MainWindowViewModel.ResolveOcrModelSet"/>),
+    /// so they can never drift from what a restart would actually produce.
+    /// </summary>
+    private void UpdateModelsOverview()
+    {
+        if (Vm is not { } vm) return;
+
+        // --- Layout ---
+        var activeLayoutAccel = vm.ActiveLayoutAccelerator == AcceleratorPreference.Gpu ? "GPU" : "CPU";
+        ModelsLayoutActiveText.Text = $"{vm.ActiveLayoutModelName} · {activeLayoutAccel}";
+
+        var pendingLayout = CustomLayoutModelLoader.ResolveModel(vm.AppConfig, RailReaderLogging.Logger);
+        bool layoutPending = pendingLayout.DisplayName != vm.ActiveLayoutModelName
+            || pendingLayout.IsGpu != (vm.ActiveLayoutAccelerator == AcceleratorPreference.Gpu);
+        ModelsLayoutPendingText.Text = layoutPending
+            ? $"{pendingLayout.DisplayName} · {(pendingLayout.IsGpu ? "GPU" : "CPU")} (restart to apply)"
+            : "";
+
+        // --- OCR ---
+        var ocrMode = vm.Controller.OcrMode; // live — applies immediately, no "pending" concept
+        var activeOcrAccel = vm.ActiveOcrAccelerator == AcceleratorPreference.Gpu ? "GPU" : "CPU";
+        ModelsOcrActiveText.Text = ocrMode == OcrMode.Off
+            ? "Off"
+            : $"{ocrMode} · {vm.ActiveOcrModelName} · {activeOcrAccel}";
+
+        var ocrPrefs = _ocrPrefs ??= OcrPreferences.Load();
+        var (_, pendingOcrName) = MainWindowViewModel.ResolveOcrModelSet(ocrPrefs.ModelSetId, RailReaderLogging.Logger);
+        // Mirrors MainWindowViewModel's own gate exactly: layout claims the GPU slot first.
+        bool pendingOcrGpu = ocrPrefs.Accelerator == AcceleratorPreference.Gpu
+            && _customModel.Accelerator != AcceleratorPreference.Gpu
+            && WebGpuAccelerator.IsAvailable;
+
+        // ResolveOcrModelSet already silently falls back to the bundled pack when the selected one
+        // isn't installed — which is exactly right for computing what a restart would actually
+        // produce, but it also means a preset (or manual pick) that names an uninstalled pack shows
+        // as "nothing pending" here, hiding *why* nothing changed. Call that out explicitly instead
+        // of leaving it silent — this is the "optimal model isn't installed" case.
+        bool selectedOcrPackMissing = ocrPrefs.ModelSetId is { } selectedId
+            && OcrModelRegistry.ById(selectedId) is { } candidateDesc
+            && OcrModelLocator.Locate(candidateDesc.ModelSet) is null;
+
+        if (ocrMode == OcrMode.Off)
+        {
+            ModelsOcrPendingText.Text = "";
+        }
+        else if (selectedOcrPackMissing)
+        {
+            var selDesc = OcrModelRegistry.ById(ocrPrefs.ModelSetId!)!;
+            ModelsOcrPendingText.Text = $"{selDesc.DisplayName} selected but not downloaded — using {pendingOcrName} until it is. Download it in the OCR tab.";
+        }
+        else
+        {
+            bool ocrPending = pendingOcrName != vm.ActiveOcrModelName || pendingOcrGpu != (vm.ActiveOcrAccelerator == AcceleratorPreference.Gpu);
+            ModelsOcrPendingText.Text = ocrPending
+                ? $"{pendingOcrName} · {(pendingOcrGpu ? "GPU" : "CPU")} (restart to apply)"
+                : "";
+        }
+
+        // --- Advisory: FP32 PP-DocLayoutV3 on CPU, when Heron (INT8) would be materially faster
+        // there (see MainWindowViewModel's matching startup check + toast). Evaluated against the
+        // ACTIVE state, per design — not the pending selection. ---
+        bool showAdvisory = vm.ActiveLayoutArchitecture == LayoutModelArchitecture.PPDocLayoutV3
+            && vm.ActiveLayoutAccelerator == AcceleratorPreference.Cpu;
+        ModelsAdvisoryPanel.IsVisible = showAdvisory;
+        if (showAdvisory)
+        {
+            bool heronInstalled = HeronModelLocator.FindModelPath() != null;
+            if (heronInstalled)
+            {
+                ModelsAdvisoryText.Text = "Layout is running the heavier FP32 PP-DocLayoutV3 model on CPU. Docling Heron (INT8, already installed) is quantized for CPU and will be noticeably faster.";
+                ModelsAdvisoryFixButton.Content = "Switch to Heron (INT8)";
+            }
+            else
+            {
+                ModelsAdvisoryText.Text = "Layout is running the heavier FP32 PP-DocLayoutV3 model on CPU. Docling Heron (INT8) would be faster here, but isn't downloaded yet.";
+                ModelsAdvisoryFixButton.Content = "Switch to Heron & open download";
+            }
+        }
+    }
+
+    /// <summary>One-click fix for the FP32-V3-on-CPU advisory above — mirrors
+    /// <see cref="MainWindowViewModel.SwitchToHeronLayoutModel"/>'s live-toast equivalent, but from
+    /// inside Settings: switches the built-in layout model to Docling Heron (INT8) and refreshes
+    /// every affected control. Takes effect next launch, same convention as every other layout-model
+    /// setting.</summary>
+    private void OnFixLayoutModelAdvisory(object? sender, RoutedEventArgs e)
+    {
+        // Switching the preference alone only fixes anything if Heron's file is actually on disk —
+        // otherwise CustomLayoutModelLoader's existing fallback just lands back on V3 next launch
+        // (logged, not an error) and this same advisory would fire again having "fixed" nothing.
+        // When it isn't installed, apply the switch anyway (so it's ready the moment the download
+        // finishes) but land the user on Advanced, where the file-missing status line and the
+        // already-built Download button are waiting — reusing that download/progress machinery
+        // rather than duplicating it in this small panel.
+        bool heronInstalled = HeronModelLocator.FindModelPath() != null;
+
+        _customModel.BuiltinAnalyzer = BuiltinAnalyzer.Heron;
+        _customModel.Save();
+
+        bool wasLoading = _loading;
+        _loading = true;
+        try { PopulateBuiltinAnalyzerCombo(); }
+        finally { _loading = wasLoading; }
+
+        UpdateBuiltinAnalyzerStatus();
+        UpdateGpuAccelerationStatus();
+        UpdateModelsOverview();
+
+        if (!heronInstalled) SelectTab("Advanced");
     }
 
     private void OnResetDefaults(object? sender, RoutedEventArgs e)
@@ -992,6 +1119,7 @@ public partial class SettingsWindow : Window
         _customModel.Enabled = CustomModelEnabled.IsChecked == true;
         _customModel.Save();
         UpdateCustomModelStatus();
+        UpdateModelsOverview();
     }
 
     private async void OnBrowseCustomModel(object? sender, RoutedEventArgs e)

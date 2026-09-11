@@ -26,11 +26,20 @@ namespace RailReader2.Services;
 /// </summary>
 public static class CustomLayoutModelLoader
 {
+    /// <param name="Architecture">Null for the custom-model path (no registry entry) and for "no
+    /// model found" — otherwise the resolved built-in architecture, for callers that need more than
+    /// the display string (e.g. the debug overlay / Models tab's suboptimal-combo advisory).</param>
+    /// <param name="IsGpu">True only when this resolution actually went through <see cref="TryResolveGpu"/>
+    /// — i.e. GPU was requested, a device was found, and the GPU model file is on disk. A rare
+    /// construction-time failure inside the deferred <c>Factory</c> can still fall back to CPU
+    /// (logged, not reflected here) — this is a resolve-time signal, not a live one.</param>
     public readonly record struct Resolution(
         string? ModelPath,
         LayoutModelCapabilities? Capabilities,
         Func<ILayoutAnalyzer>? Factory,
-        string? DisplayName);
+        string? DisplayName,
+        LayoutModelArchitecture? Architecture,
+        bool IsGpu);
 
     public static Resolution ResolveModel(AppConfig appConfig, ILogger logger)
     {
@@ -62,7 +71,7 @@ public static class CustomLayoutModelLoader
                     var customName = $"Custom: {Path.GetFileName(customPath)}";
                     return new Resolution(customPath, customCaps,
                         () => new LayoutAnalyzer(customPath, customCaps),
-                        customName);
+                        customName, Architecture: null, IsGpu: false);
                 }
             }
         }
@@ -84,7 +93,7 @@ public static class CustomLayoutModelLoader
                 return new Resolution(heronPath,
                     LayoutAnalyzerFactory.CapabilitiesFor(desc.Architecture),
                     () => LayoutAnalyzerFactory.Create(desc, heronPath),
-                    desc.DisplayName);
+                    desc.DisplayName, desc.Architecture, IsGpu: false);
             }
             logger.Warn($"[ONNX] Docling Heron model not found ({HeronModelLocator.FileName}) — falling back to PP-DocLayoutV3. See docs/heron-layout-model.md.");
             // fall through to PP
@@ -99,7 +108,7 @@ public static class CustomLayoutModelLoader
                 return new Resolution(ppsPath,
                     LayoutAnalyzerFactory.CapabilitiesFor(desc.Architecture),
                     () => LayoutAnalyzerFactory.Create(desc, ppsPath),
-                    desc.DisplayName);
+                    desc.DisplayName, desc.Architecture, IsGpu: false);
             }
             logger.Warn($"[ONNX] PP-DocLayout-S model not found ({PPDocLayoutSModelLocator.FileName}) — falling back to PP-DocLayoutV3. See docs/pp-doclayout-s.md.");
             // fall through to PP
@@ -114,12 +123,12 @@ public static class CustomLayoutModelLoader
         if (bundled == null)
         {
             logger.Warn("[ONNX] Bundled PP-DocLayoutV3 model not found.");
-            return new Resolution(null, null, null, null);
+            return new Resolution(null, null, null, null, Architecture: null, IsGpu: false);
         }
         return new Resolution(bundled,
             LayoutAnalyzerFactory.CapabilitiesFor(v3Desc.Architecture),
             () => LayoutAnalyzerFactory.Create(v3Desc, bundled),
-            v3Desc.DisplayName);
+            v3Desc.DisplayName, v3Desc.Architecture, IsGpu: false);
     }
 
     /// <summary>
@@ -188,7 +197,7 @@ public static class CustomLayoutModelLoader
             }
         }
 
-        return new Resolution(gpuPath, LayoutAnalyzerFactory.CapabilitiesFor(architecture), Construct, gpuDesc.DisplayName);
+        return new Resolution(gpuPath, LayoutAnalyzerFactory.CapabilitiesFor(architecture), Construct, gpuDesc.DisplayName, architecture, IsGpu: true);
     }
 
     /// <summary>

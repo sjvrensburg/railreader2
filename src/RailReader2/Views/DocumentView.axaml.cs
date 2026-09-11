@@ -590,7 +590,7 @@ public partial class DocumentView : UserControl, IViewportSurface
             CurrentLine: currentLine,
             DebugOverlay: tab?.DebugOverlay ?? false,
             DebugAnalysis: debugAnalysis,
-            DebugModelLabel: vm.ActiveLayoutModelName,
+            DebugModelLabel: vm.DebugModelBadgeText,
             Effect: vm.Controller.ActiveColourEffect,
             LineFocusBlur: tab?.LineFocusBlur ?? false,
             LineHighlightEnabled: tab?.LineHighlightEnabled ?? true,
