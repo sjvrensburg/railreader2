@@ -208,7 +208,7 @@ public sealed partial class MainWindowViewModel
     private async Task EditTextNote(TextNoteAnnotation note)
     {
         if (_window is null) return;
-        var dialog = new TextNoteDialog(note.Text) { FontSize = CurrentFontSize };
+        var dialog = new TextNoteDialog(note.EffectiveContents) { FontSize = CurrentFontSize };
         var result = await dialog.ShowDialog<string?>(_window);
         if (result is null) return;
 
