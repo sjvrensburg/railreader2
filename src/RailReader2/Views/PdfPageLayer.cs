@@ -89,6 +89,12 @@ internal sealed class PdfPageVisualHandler : CompositionCustomVisualHandler
     // Defaulting to mips (the !magnified branch) is the quality-safe direction.
     private const float MipmapSkipMagnifyFactor = 1.25f;
 
+    // Use the trilinear (mipmapped) sampler during motion only when the on-screen footprint is below
+    // this fraction of the source image's width. Core's DPI tiers keep a rail page within roughly ±15% of
+    // 1:1 (or magnified above the DPI cap), so rail reading stays on Mitchell throughout; a zoom
+    // animation well below the current tier still gets the alias-free path.
+    private const float FastSamplingMinifyFactor = 0.75f;
+
     // Diagnostic-only: times GetOrUploadTexture's ToTextureImage call and logs it when it exceeds
     // GpuUploadTimingLogThresholdMs. Off by default — gated behind RR_GPU_UPLOAD_TIMING=1 so we never
     // pay a synchronous, flushing ConsoleLogger write on the composition thread in normal use (#222
@@ -119,8 +125,11 @@ internal sealed class PdfPageVisualHandler : CompositionCustomVisualHandler
     [ThreadStatic] private static SKShader? s_cachedDimGradient;
     [ThreadStatic] private static DimCacheKey s_cachedDimKey;
 
-    // Mitchell cubic for crisp text at rest; trilinear for smooth downsampling
-    // at low zoom during animation (mip chain eliminates texel-hop aliasing).
+    // Mitchell cubic for crisp text; trilinear only for a texture that is being clearly MINIFIED while
+    // the camera moves (low-zoom zoom animation), where the mip chain eliminates texel-hop aliasing that
+    // cubic sampling would show. Choosing by motion alone flipped a 1:1/magnified rail page between the
+    // two filters at every auto-scroll line start and stop — a visible sharpness "pop" twice per line
+    // that read as stutter, and more so the more the texture is magnified.
     private static readonly SKSamplingOptions s_sampling = new(SKCubicResampler.Mitchell);
     private static readonly SKSamplingOptions s_samplingFast =
         new(SKFilterMode.Linear, SKMipmapMode.Linear);
@@ -196,7 +205,6 @@ internal sealed class PdfPageVisualHandler : CompositionCustomVisualHandler
         var grContext = lease.GrContext;
 
         bool animating = state.ScrollSpeed > MinSpeedThreshold || state.ZoomSpeed > MinSpeedThreshold;
-        var sampling = animating ? s_samplingFast : s_sampling;
 
         // Colour effect filter — shared across every visible page.
         SKColorFilter? effectFilter = null;
@@ -395,6 +403,10 @@ internal sealed class PdfPageVisualHandler : CompositionCustomVisualHandler
             }
 
             var blurFilter = page.IsAnchor ? motionBlurFilter : neighborBlurFilter;
+            // Minification is a pixel-density comparison against the FULL source width (as in
+            // UploadTexture), so it holds whether drawImage is the source or a sub-rect texture.
+            bool minified = deviceWidth < image.Width * FastSamplingMinifyFactor;
+            var sampling = animating && minified ? s_samplingFast : s_sampling;
 
             // Apply the colour effect and/or blur directly on the DrawImage paint rather than through
             // canvas.SaveLayer() — see the comment above; one image draw, then the anchor's unblurred
