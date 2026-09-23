@@ -103,6 +103,15 @@ internal sealed class PdfPageVisualHandler : CompositionCustomVisualHandler
         Environment.GetEnvironmentVariable("RR_GPU_UPLOAD_TIMING") == "1";
     private const double GpuUploadTimingLogThresholdMs = 3.0;
 
+    // Diagnostic-only per-frame draw timing, shared with the frame loop's RR_FRAME_TIMING=1 switch:
+    // logs this layer's CPU time (a GPU upload shows up here), the anchor's texture/scale/sampler and
+    // Skia's GPU resource-cache usage per frame, batched into one log write per 120 frames.
+    private static readonly bool s_drawTiming =
+        Environment.GetEnvironmentVariable("RR_FRAME_TIMING") == "1";
+    private readonly System.Text.StringBuilder _drawTimingBuffer = new();
+    private int _drawTimingLines;
+    private string _drawTimingAnchor = "";
+
     // ThreadStatic caches: one per composition thread (typically one per renderer)
     [ThreadStatic] private static SKPaint? s_imagePaint;
     [ThreadStatic] private static SKColorFilter? s_cachedEffectFilter;
@@ -203,6 +212,8 @@ internal sealed class PdfPageVisualHandler : CompositionCustomVisualHandler
         using var lease = leaseFeature.Lease();
         var canvas = lease.SkCanvas;
         var grContext = lease.GrContext;
+        long drawStart = s_drawTiming ? Stopwatch.GetTimestamp() : 0;
+        _drawTimingAnchor = "none";
 
         bool animating = state.ScrollSpeed > MinSpeedThreshold || state.ZoomSpeed > MinSpeedThreshold;
 
@@ -407,6 +418,9 @@ internal sealed class PdfPageVisualHandler : CompositionCustomVisualHandler
             // UploadTexture), so it holds whether drawImage is the source or a sub-rect texture.
             bool minified = deviceWidth < image.Width * FastSamplingMinifyFactor;
             var sampling = animating && minified ? s_samplingFast : s_sampling;
+            if (s_drawTiming && page.IsAnchor)
+                _drawTimingAnchor = string.Create(System.Globalization.CultureInfo.InvariantCulture,
+                    $"{drawImage.Width}x{drawImage.Height}{(drawImage.IsTextureBacked ? "/gpu" : "/raster")} src={image.Width}x{image.Height} scale={deviceWidth / image.Width:F2} {(animating && minified ? "trilinear" : "mitchell")}");
 
             // Apply the colour effect and/or blur directly on the DrawImage paint rather than through
             // canvas.SaveLayer() — see the comment above; one image draw, then the anchor's unblurred
@@ -474,10 +488,33 @@ internal sealed class PdfPageVisualHandler : CompositionCustomVisualHandler
             canvas.Restore(); // undo camera concat
         }
 
+        if (s_drawTiming)
+            LogDrawTiming(grContext, drawStart, animating, motionBlurFilter is not null);
+
         // A page was left with a stale or missing texture this frame — schedule another frame so the
         // deferred upload(s) drain at one per frame. Termination is guaranteed because every such
         // frame uploads at least one texture (the budgeted slot, or the anchor's own).
         if (deferredUpload) Invalidate();
+    }
+
+    private void LogDrawTiming(GRContext? grContext, long drawStart, bool animating, bool blur)
+    {
+        double cpuMs = Stopwatch.GetElapsedTime(drawStart).TotalMilliseconds;
+        long cacheBytes = 0, cacheLimit = 0;
+        int cacheCount = 0;
+        if (grContext is not null)
+        {
+            grContext.GetResourceCacheUsage(out cacheCount, out cacheBytes);
+            cacheLimit = grContext.GetResourceCacheLimit();
+        }
+        _drawTimingBuffer.Append(System.Globalization.CultureInfo.InvariantCulture,
+            $"[draw] cpu={cpuMs:F2}ms anchor={_drawTimingAnchor} animating={animating} blur={blur} cache={cacheBytes / 1048576.0:F1}/{cacheLimit / 1048576.0:F0}MB n={cacheCount}\n");
+        if (++_drawTimingLines >= 120)
+        {
+            RailReaderLogging.Logger.Debug(_drawTimingBuffer.ToString().TrimEnd('\n'));
+            _drawTimingBuffer.Clear();
+            _drawTimingLines = 0;
+        }
     }
 
     /// <summary>

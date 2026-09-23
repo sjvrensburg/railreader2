@@ -21,12 +21,20 @@ namespace RailReader2.ViewModels;
 /// would leak straight back into the step size, hence the extra exponential smoothing on top
 /// (simulated at ±4 ms stamp jitter: raw steps 0.77–1.94 frames → paced steps within ±2%, drifting
 /// only slowly, with missed frames still paced as two).
+///
+/// Two guards for a render-bound compositor (e.g. a full-screen viewport whose frames take ~45 ms):
+/// such frames are presented when rendering finishes, not on whole ticks, so an interval that isn't
+/// close to a whole number of periods is passed through unpaced; and a sudden regime change (say
+/// 16.7 ms → 45 ms) snaps the estimate straight to the new median instead of easing towards it,
+/// which otherwise swung the step size for over a second (seen in a real frame log).
 /// </summary>
 internal sealed class FramePacer
 {
-    private const int WindowSize = 61;   // ~1 s at 60 Hz
+    private const int WindowSize = 31;   // ~0.5 s at 60 Hz
     private const int MinSamples = 5;
     private const double Smoothing = 0.05;
+    private const double RegimeChange = 0.25;   // median this far (relative) from Period → snap to it
+    private const double MultipleTolerance = 0.25; // raw within this many periods of n·Period → pace
     private const double MinPeriod = 1.0 / 240.0;
     private const double MaxPeriod = 1.0 / 20.0;
 
@@ -39,7 +47,7 @@ internal sealed class FramePacer
     public double Period { get; private set; } = 1.0 / 60.0;
 
     /// <summary>Returns <paramref name="rawDt"/> rounded to a whole number (at least one) of frame
-    /// periods. Non-positive input returns 0.</summary>
+    /// periods, or unchanged when it isn't close to one. Non-positive input returns 0.</summary>
     public double Pace(double rawDt)
     {
         if (rawDt <= 0) return 0;
@@ -52,13 +60,20 @@ internal sealed class FramePacer
             _next = (_next + 1) % WindowSize;
             if (_count < WindowSize) _count++;
             if (_count >= MinSamples)
-                Period = _count == MinSamples ? Median() : Period + Smoothing * (Median() - Period);
+            {
+                double median = Median();
+                Period = _count == MinSamples || Math.Abs(median - Period) > RegimeChange * Period
+                    ? median
+                    : Period + Smoothing * (median - Period);
+            }
         }
 
         if (_count < MinSamples) return rawDt; // no estimate yet — pass through rather than guess a period
 
         int frames = Math.Max(1, (int)Math.Round(rawDt / Period));
-        return frames * Period;
+        double paced = frames * Period;
+        // Not a whole number of ticks: the frame was presented when rendering finished — raw is truth.
+        return Math.Abs(rawDt - paced) <= MultipleTolerance * Period ? paced : rawDt;
     }
 
     private double Median()
