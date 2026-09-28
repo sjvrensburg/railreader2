@@ -32,10 +32,20 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     private InvalidationCallbacks? _invalidation;
     private bool _animationRequested;
 
-    // Avalonia passes a compositor-synchronized TimeSpan to RequestAnimationFrame
-    // callbacks. We use successive timestamps to compute dt. A null value means
-    // the next callback is the first of a new animation sequence (after idle).
+    // Avalonia passes a UI-thread Stopwatch reading (taken when the render op runs — NOT a
+    // presentation time) to RequestAnimationFrame callbacks. We use successive timestamps to compute
+    // dt, then round it to whole frame periods via _framePacer. A null value means the next callback
+    // is the first of a new animation sequence (after idle).
     private TimeSpan? _lastFrameTime;
+    private readonly FramePacer _framePacer = new();
+
+    // Diagnostic (opt-in, read once): RR_FRAME_TIMING=1 logs per-frame raw/paced dt and the focused
+    // view's horizontal step, batched into one log write per ~2 s so the logging itself doesn't
+    // disturb the frame timing it measures.
+    private static readonly bool s_frameTimingLog =
+        Environment.GetEnvironmentVariable("RR_FRAME_TIMING") == "1";
+    private readonly System.Text.StringBuilder _frameTimingBuffer = new();
+    private int _frameTimingLines;
 
     // Last observed semi-auto park state, to fire AutoScrollParked notifications on transitions.
     // Core parks mid-Tick without raising StateChanged, so the poll loop watches for the edge.
@@ -636,6 +646,8 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         base.OnPropertyChanged(e);
         if (e.PropertyName != nameof(ActiveTab)) return;
 
+        ResumeReadAheadAfterRail();
+
         if (HasDocument is var hasDoc && hasDoc != _gateHasDocument)
         { _gateHasDocument = hasDoc; OnPropertyChanged(nameof(HasDocument)); }
         if (IsActiveDocumentEncrypted is var enc && enc != _gateEncrypted)
@@ -894,20 +906,49 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             EvaluatePortals(forceRender: gotResults && PortalResolvePending);
 
             bool hasWork = _controller.HasBackgroundAnalysisWork;
-            bool railActive = _controller.FocusedViewport?.Owner?.Rail.Active == true;
-            if (!railActive && _controller.Worker.IsIdle && hasWork)
-                _controller.TrySubmitBackgroundReadAhead();
-
             if (!hasWork)
+            {
                 _backgroundTimer?.Stop();
+                return;
+            }
 
-            // While rail is active this tick can never submit (the guard above), so the 500ms cadence
-            // is pure DispatcherTimer overhead (#224). Read-ahead runs at full speed when the reader is
-            // idle, where it belongs, and backs off to a quarter speed during rail reading.
-            var wanted = railActive ? TimeSpan.FromMilliseconds(2000) : TimeSpan.FromMilliseconds(500);
-            if (_backgroundTimer is not null && _backgroundTimer.Interval != wanted)
-                _backgroundTimer.Interval = wanted;
+            // Rail reading never submits read-ahead (PDFium contention), so a tick here is pure
+            // DispatcherTimer overhead — ~16–19 ms of UI thread on X11 (#224), i.e. a dropped frame,
+            // which during auto-scroll is a visible hitch of speed × zoom × frame. Stop outright rather
+            // than slowing the cadence; ResumeReadAheadAfterRail restarts it once rail ends.
+            if (IsRailReading)
+            {
+                PauseReadAheadForRail();
+                return;
+            }
+
+            if (_controller.Worker.IsIdle)
+                _controller.TrySubmitBackgroundReadAhead();
         };
+    }
+
+    // True while the background timer is stopped only because rail reading is in progress (with work
+    // still pending), so ResumeReadAheadAfterRail knows to restart it.
+    private bool _readAheadPausedForRail;
+
+    private bool IsRailReading => _controller.FocusedViewport?.Owner?.Rail.Active == true;
+
+    private void PauseReadAheadForRail()
+    {
+        _backgroundTimer?.Stop();
+        _readAheadPausedForRail = true;
+    }
+
+    /// <summary>
+    /// Restart background read-ahead that was paused for rail reading, once rail has ended. Called from
+    /// the frame loop and on every <see cref="ActiveTab"/> change (tab switch, overlay refresh) — the
+    /// paths rail deactivation arrives through. A bool check when nothing is paused.
+    /// </summary>
+    private void ResumeReadAheadAfterRail()
+    {
+        if (!_readAheadPausedForRail || IsRailReading) return;
+        _readAheadPausedForRail = false;
+        StartBackgroundAnalysis();
     }
 
     /// <summary>
@@ -942,8 +983,12 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     /// </summary>
     public void StartBackgroundAnalysis()
     {
-        if (_backgroundTimer is not null && !_backgroundTimer.IsEnabled
-            && _controller.HasBackgroundAnalysisWork)
+        if (_backgroundTimer is null || _backgroundTimer.IsEnabled
+            || !_controller.HasBackgroundAnalysisWork)
+            return;
+        if (IsRailReading)
+            PauseReadAheadForRail(); // don't tick during rail reading; resumes when rail ends
+        else
             _backgroundTimer.Start();
     }
 
@@ -971,15 +1016,19 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     {
         _animationRequested = false;
 
-        // Raw dt from Avalonia's compositor-synchronized timestamp.
-        // Capped at 33ms (one frame at 30 fps) so a stall (app backgrounded,
-        // system waking from sleep) doesn't produce a huge position jump in
-        // snap and zoom animations. Autoscroll is wall-clock based and ignores
-        // this value, so the cap only affects those short-lived animations.
-        double dt = _lastFrameTime is { } last
-            ? Math.Min((frameTime - last).TotalSeconds, 1.0 / 30.0)
+        // Raw dt from Avalonia's compositor-synchronized timestamp — never a timer read inside this
+        // callback: since Core 0.62.2 auto-scroll integrates exactly this dt, so a callback-time clock
+        // would reintroduce the tick-latency judder it fixed. Deliberately UNcapped: Core applies its
+        // own per-animation caps (33 ms for snap/zoom, 250 ms for auto-scroll, 1/30 s on a scroll
+        // restart), and a host-side 1/30 s cap would make auto-scroll run slow below 30 fps.
+        double rawDt = _lastFrameTime is { } last
+            ? (frameTime - last).TotalSeconds
             : 1.0 / 60.0;
         _lastFrameTime = frameTime;
+        // Round to whole compositor frames: the timestamp carries dispatcher latency, and auto-scroll
+        // turns any dt jitter into position jitter (see FramePacer).
+        double dt = _framePacer.Pace(rawDt);
+        double timingOffsetXBefore = s_frameTimingLog ? _controller.FocusedViewport?.Camera.OffsetX ?? 0 : 0;
 
         // Multi-viewport frame: drain the analysis worker ONCE for the whole document (not per
         // view), then advance each live surface's own viewport and apply its own TickResult to that
@@ -1045,6 +1094,10 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         // collide with the portal viewport's own same-frame clamp/snap (#193).
         ApplyDeferredPortalReaim();
 
+        // Rail may have ended this frame (zoom-out below the threshold, page change) — restart any
+        // read-ahead paused for it.
+        ResumeReadAheadAfterRail();
+
         // Semi-auto scroll parks mid-Tick (no StateChanged for it), so watch the edge here and
         // surface it so the "parked — press D" affordance and status bar update.
         bool parked = _controller.AutoScrollParked;
@@ -1054,10 +1107,32 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             OnPropertyChanged(nameof(AutoScrollParked));
         }
 
+        if (s_frameTimingLog)
+            LogFrameTiming(rawDt, dt, timingOffsetXBefore, anyAnimating);
+
         if (anyAnimating)
             RequestAnimationFrame();
-        // else: any analysis still in flight after the last animating frame drains itself via
-        // ResultAvailable (#118) — no poll timer needed to notice it.
+        else
+        {
+            // The loop goes idle: the next frame starts fresh (1/60 s) rather than handing Core the
+            // whole idle gap as dt. Any analysis still in flight after the last animating frame drains
+            // itself via ResultAvailable (#118) — no poll timer needed to notice it.
+            _lastFrameTime = null;
+        }
+    }
+
+    private void LogFrameTiming(double rawDt, double dt, double offsetXBefore, bool animating)
+    {
+        var vp = _controller.FocusedViewport;
+        double dx = (vp?.Camera.OffsetX ?? 0) - offsetXBefore;
+        _frameTimingBuffer.Append(System.Globalization.CultureInfo.InvariantCulture,
+            $"[frame] raw={rawDt * 1000:F2}ms paced={dt * 1000:F2}ms period={_framePacer.Period * 1000:F2}ms dx={dx:F3}px zoom={vp?.Camera.Zoom ?? 0:F2} auto={_controller.AutoScrollActive}\n");
+        if (++_frameTimingLines >= 120 || !animating)
+        {
+            RailReaderLogging.Logger.Debug(_frameTimingBuffer.ToString().TrimEnd('\n'));
+            _frameTimingBuffer.Clear();
+            _frameTimingLines = 0;
+        }
     }
 
     public void RequestAnimationFrame()

@@ -170,6 +170,32 @@ public partial class SettingsWindow : Window
         UpdateOcrGpuAccelerationStatus();
         UpdatePresetRadios();
         UpdateModelsOverview();
+        LoadDisplayGpu();
+    }
+
+    private void LoadDisplayGpu()
+    {
+        DisplayGpuPanel.IsVisible = OperatingSystem.IsLinux();
+        if (!OperatingSystem.IsLinux()) return;
+        PreferDiscreteGpuCheck.IsChecked = DisplayGpuPreferences.Load().PreferDiscreteGpu;
+
+        var gpus = DisplayGpu.DetectGpus();
+        var lines = new List<string>
+        {
+            gpus.Count == 0 ? "GPUs found: none detected" : $"GPUs found: {string.Join(", ", gpus)}",
+            $"Drawing on: {DisplayGpu.Renderer ?? "unknown"}",
+        };
+        if (DisplayGpu.AppliedNote is { } note) lines.Add(note);
+        if (gpus.Count < 2) lines.Add("Only one GPU was found, so this setting has no effect here.");
+        DisplayGpuStatus.Text = string.Join("\n", lines);
+    }
+
+    private void OnPreferDiscreteGpuChanged(object? sender, RoutedEventArgs e)
+    {
+        if (_loading) return;
+        var prefs = DisplayGpuPreferences.Load();
+        prefs.PreferDiscreteGpu = PreferDiscreteGpuCheck.IsChecked == true;
+        prefs.Save();
     }
 
     private void UpdateOcrStatus()

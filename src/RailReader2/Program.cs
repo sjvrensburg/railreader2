@@ -3,6 +3,7 @@ using Avalonia;
 using RailReader.Core;
 using RailReader.Core.Services;
 using RailReader.Renderer.Skia;
+using RailReader2.Services;
 
 namespace RailReader2;
 
@@ -44,6 +45,9 @@ internal sealed class Program
         FirstChanceCrashTracer.Install(logger);
         if (!OperatingSystem.IsWindows())
             NativeSignalTrap.Install(logger);
+
+        // Before Avalonia creates its GL context — the GPU is picked when the GL driver loads.
+        DisplayGpu.Apply(logger);
 
         try
         {
