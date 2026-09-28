@@ -420,6 +420,18 @@
                                   IsCheckedChanged="OnOcrGpuAccelerationChanged" Margin="0,4,0,4" />
                         <TextBlock Name="OcrGpuAccelerationStatus" TextWrapping="Wrap" Opacity="0.7" FontSize="11"
                                    Margin="0,2,0,0" />
+
+                        <!-- Linux hybrid laptops: which GPU draws the window (display, not analysis). -->
+                        <StackPanel Name="DisplayGpuPanel" Spacing="8" IsVisible="False">
+                            <TextBlock Text="Display GPU" FontWeight="Bold" Margin="0,16,0,0" />
+                            <Separator />
+                            <TextBlock TextWrapping="Wrap" Opacity="0.7"
+                                       Text="On a laptop with both an integrated and a discrete GPU, the window is drawn on the integrated one by default. That saves battery, but on a large or high-resolution window scrolling can stutter because each frame takes too long to draw. Turn this on to draw on the discrete GPU instead. Takes effect after a restart." />
+                            <CheckBox Name="PreferDiscreteGpuCheck" Content="Prefer the discrete GPU for drawing"
+                                      IsCheckedChanged="OnPreferDiscreteGpuChanged" Margin="0,4,0,4" />
+                            <TextBlock Name="DisplayGpuStatus" TextWrapping="Wrap" Opacity="0.7" FontSize="11"
+                                       Margin="0,2,0,0" />
+                        </StackPanel>
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>
