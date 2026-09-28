@@ -10,6 +10,14 @@ namespace RailReader2.Views;
 /// dispose on detach, sync size) and provides <see cref="UpdateState"/> to send
 /// immutable state snapshots to the composition thread.
 /// </summary>
+/// <summary>Sent to a handler when its control leaves the visual tree. Handlers that own native
+/// resources dispose them; the rest ignore it.</summary>
+internal sealed class ReleaseResources
+{
+    public static readonly ReleaseResources Instance = new();
+    private ReleaseResources() { }
+}
+
 internal class CompositionLayerControl<THandler> : Control
     where THandler : CompositionCustomVisualHandler, new()
 {
@@ -34,6 +42,9 @@ internal class CompositionLayerControl<THandler> : Control
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
+        // The handler has no detach callback of its own, and a fresh handler is created on the next
+        // attach — tell this one to free what it holds (GPU textures) on the composition thread.
+        _visual?.SendHandlerMessage(ReleaseResources.Instance);
         ElementComposition.SetElementChildVisual(this, null);
         _visual = null;
         base.OnDetachedFromVisualTree(e);
