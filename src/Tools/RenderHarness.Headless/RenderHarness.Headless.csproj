@@ -8,10 +8,10 @@
     <AssemblyName>RailReader2.RenderHarness.Headless</AssemblyName>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Avalonia.Headless" Version="12.0.4" />
+    <PackageReference Include="Avalonia.Headless" Version="12.1.3" />
     <!-- Real Skia drawing so captured frames contain actual pixels, not the
          no-op headless drawing backend. -->
-    <PackageReference Include="Avalonia.Skia" Version="12.0.4" />
+    <PackageReference Include="Avalonia.Skia" Version="12.1.3" />
   </ItemGroup>
   <ItemGroup>
     <None Update="screenshots.json" CopyToOutputDirectory="PreserveNewest" />

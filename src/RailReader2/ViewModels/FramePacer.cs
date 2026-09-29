@@ -27,6 +27,12 @@ namespace RailReader2.ViewModels;
 /// close to a whole number of periods is passed through unpaced; and a sudden regime change (say
 /// 16.7 ms → 45 ms) snaps the estimate straight to the new median instead of easing towards it,
 /// which otherwise swung the step size for over a second (seen in a real frame log).
+///
+/// Only intervals ending a frame that actually presented something may feed the estimate. When a
+/// frame invalidates nothing (e.g. an auto-scroll line pause), the compositor has nothing to present
+/// and Avalonia paces the loop off its fallback ~60 Hz timer instead of the display: on a 75 Hz
+/// monitor those idle intervals are ~16 ms against a 13.3 ms period, and letting them in dragged the
+/// estimate ~7% high by the end of every line pause, so each line then started visibly too fast.
 /// </summary>
 internal sealed class FramePacer
 {
@@ -47,10 +53,14 @@ internal sealed class FramePacer
     public double Period { get; private set; } = 1.0 / 60.0;
 
     /// <summary>Returns <paramref name="rawDt"/> rounded to a whole number (at least one) of frame
-    /// periods, or unchanged when it isn't close to one. Non-positive input returns 0.</summary>
-    public double Pace(double rawDt)
+    /// periods, or unchanged when it isn't close to one. Non-positive input returns 0.
+    /// <paramref name="presented"/> is false when the interval followed a frame that drew nothing: it
+    /// then neither feeds the estimate nor gets rounded (no motion to keep even, and timers such as a
+    /// line pause should see real time).</summary>
+    public double Pace(double rawDt, bool presented = true)
     {
         if (rawDt <= 0) return 0;
+        if (!presented) return rawDt;
 
         // Only plausible single-frame-ish intervals feed the estimate; a multi-second idle gap or a
         // stall must not drag the median.

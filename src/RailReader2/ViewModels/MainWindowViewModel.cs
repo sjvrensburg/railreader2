@@ -38,6 +38,9 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     // is the first of a new animation sequence (after idle).
     private TimeSpan? _lastFrameTime;
     private readonly FramePacer _framePacer = new();
+    // Whether the previous frame invalidated anything — if not, the interval ending this frame wasn't
+    // paced by the display (see FramePacer) and must not feed its period estimate.
+    private bool _lastFrameDrew = true;
 
     // Diagnostic (opt-in, read once): RR_FRAME_TIMING=1 logs per-frame raw/paced dt and the focused
     // view's horizontal step, batched into one log write per ~2 s so the logging itself doesn't
@@ -1027,7 +1030,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         _lastFrameTime = frameTime;
         // Round to whole compositor frames: the timestamp carries dispatcher latency, and auto-scroll
         // turns any dt jitter into position jitter (see FramePacer).
-        double dt = _framePacer.Pace(rawDt);
+        double dt = _framePacer.Pace(rawDt, presented: _lastFrameDrew);
         double timingOffsetXBefore = s_frameTimingLog ? _controller.FocusedViewport?.Camera.OffsetX ?? 0 : 0;
 
         // Multi-viewport frame: drain the analysis worker ONCE for the whole document (not per
@@ -1036,6 +1039,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         // Viewport.Width/Height (kept current by DocumentView's vp.SetSize), so no ambient-size swap
         // is needed here — the single-surface path is byte-identical to the old Tick(dt).
         bool anyAnimating = false;
+        bool anyDrew = false;
         var focused = _controller.FocusedViewport;
         _tickScratch.Clear();
         // Iterate a snapshot: TickViewport fires ReadingPositionChanged → EvaluatePortals, which can
@@ -1075,6 +1079,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
                 surface.RenderSearch();
                 surface.RenderAnnotations();
             }
+            anyDrew |= pageChanged || overlayChanged || r.AnnotationsChanged || r.CameraChanged;
             if (overlayChanged) surface.RenderOverlay();
             if (r.AnnotationsChanged) surface.RenderAnnotations();
             if (r.CameraChanged)
@@ -1109,6 +1114,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
         if (s_frameTimingLog)
             LogFrameTiming(rawDt, dt, timingOffsetXBefore, anyAnimating);
+        _lastFrameDrew = anyDrew;
 
         if (anyAnimating)
             RequestAnimationFrame();

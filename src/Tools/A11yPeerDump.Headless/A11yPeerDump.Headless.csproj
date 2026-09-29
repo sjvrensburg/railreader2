@@ -8,11 +8,11 @@
     <AssemblyName>RailReader2.A11yPeerDump.Headless</AssemblyName>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Avalonia.Headless" Version="12.0.4" />
+    <PackageReference Include="Avalonia.Headless" Version="12.1.3" />
     <!-- Real Skia drawing so the genuine MainWindow / composition layers boot
          exactly as in the screenshot harness (the peer tree we audit is the real
          one, not a no-op-drawing reconstruction). -->
-    <PackageReference Include="Avalonia.Skia" Version="12.0.4" />
+    <PackageReference Include="Avalonia.Skia" Version="12.1.3" />
   </ItemGroup>
   <ItemGroup>
     <!-- Reference the real GUI so we audit the genuine automation-peer tree

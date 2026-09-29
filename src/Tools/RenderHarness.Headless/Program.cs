@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
+using Avalonia.Media.Imaging;
 using Avalonia.Styling;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
@@ -330,7 +331,7 @@ foreach (var shot in config.Shots)
             ?? throw new InvalidOperationException("CaptureRenderedFrame returned null.");
         var outPath = Path.Combine(outDir, shot.Name + ".png");
         using (var fs = File.Create(outPath))
-            frame.Save(fs);
+            frame.Save(fs, PngBitmapEncoderOptions.Default);
 
         ok++;
         Console.Error.WriteLine(
