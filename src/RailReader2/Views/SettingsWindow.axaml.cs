@@ -171,6 +171,7 @@ public partial class SettingsWindow : Window
         UpdatePresetRadios();
         UpdateModelsOverview();
         LoadDisplayGpu();
+        LoadSpelling();
     }
 
     private void LoadDisplayGpu()
@@ -228,6 +229,89 @@ public partial class SettingsWindow : Window
         // the cached analysis of the scanned pages already grouped under the old value.
         vm.AppConfig.DeskewOcrLines = OcrDeskewCheck.IsChecked == true;
         vm.OnConfigChanged();
+    }
+
+    // --- Spelling ---
+
+    private sealed record SpellLanguageItem(string Name, string Label);
+
+    private void LoadSpelling()
+    {
+        var service = SpellCheckService.Shared;
+        SpellCheckEnabledCheck.IsChecked = service.Enabled;
+        SpellDictionariesFolder.Text = SpellCheckService.UserDictionariesDir;
+
+        var items = SpellCheckService.AvailableLanguages()
+            .Select(name => new SpellLanguageItem(name, SpellLanguageLabel(name)))
+            .ToList();
+        SpellLanguageCombo.ItemsSource = items;
+        SpellLanguageCombo.DisplayMemberBinding = new Avalonia.Data.Binding(nameof(SpellLanguageItem.Label));
+        SpellLanguageCombo.SelectedIndex = items.FindIndex(it => it.Name == service.Language);
+        SpellLanguageCombo.IsEnabled = service.Enabled;
+
+        RefreshPersonalWords();
+    }
+
+    /// <summary>"en_GB" → "English (United Kingdom) — en_GB"; just the file name when .NET doesn't
+    /// recognise it as a culture (e.g. a hand-named custom dictionary).</summary>
+    private static string SpellLanguageLabel(string name)
+    {
+        try
+        {
+            var culture = System.Globalization.CultureInfo.GetCultureInfo(name.Replace('_', '-'), predefinedOnly: true);
+            return $"{culture.DisplayName} \u2014 {name}";
+        }
+        catch (System.Globalization.CultureNotFoundException)
+        {
+            return name;
+        }
+    }
+
+    private void RefreshPersonalWords()
+    {
+        PersonalWordsList.ItemsSource = SpellCheckService.Shared.PersonalWords;
+        RemovePersonalWordsButton.IsEnabled = false;
+    }
+
+    private void OnSpellCheckEnabledChanged(object? sender, RoutedEventArgs e)
+    {
+        if (_loading) return;
+        var enabled = SpellCheckEnabledCheck.IsChecked == true;
+        SpellCheckService.Shared.Enabled = enabled;
+        SpellLanguageCombo.IsEnabled = enabled;
+    }
+
+    private void OnSpellLanguageChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (_loading || SpellLanguageCombo.SelectedItem is not SpellLanguageItem item) return;
+        SpellCheckService.Shared.Language = item.Name;
+    }
+
+    private void OnAddPersonalWord(object? sender, RoutedEventArgs e)
+    {
+        var word = PersonalWordInput.Text?.Trim();
+        if (string.IsNullOrEmpty(word)) return;
+        SpellCheckService.Shared.AddToPersonalDictionary(word);
+        PersonalWordInput.Text = "";
+        RefreshPersonalWords();
+    }
+
+    private void OnPersonalWordInputKeyDown(object? sender, Avalonia.Input.KeyEventArgs e)
+    {
+        if (e.Key != Avalonia.Input.Key.Enter) return;
+        OnAddPersonalWord(sender, e);
+        e.Handled = true;
+    }
+
+    private void OnPersonalWordsSelectionChanged(object? sender, SelectionChangedEventArgs e)
+        => RemovePersonalWordsButton.IsEnabled = PersonalWordsList.SelectedItems?.Count > 0;
+
+    private void OnRemovePersonalWords(object? sender, RoutedEventArgs e)
+    {
+        if (PersonalWordsList.SelectedItems is not { Count: > 0 } selected) return;
+        foreach (var word in selected.OfType<string>().ToList())
+            SpellCheckService.Shared.RemoveFromPersonalDictionary(word);
+        RefreshPersonalWords();
     }
 
     private sealed record OcrLanguageItem(string? Id, string Label, OcrModelDescriptor? Descriptor);

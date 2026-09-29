@@ -255,6 +255,44 @@
                 </ScrollViewer>
             </TabItem>
 
+            <!-- Spelling Tab — spell checking in annotation note text (SpellCheckService) -->
+            <TabItem Header="Spelling">
+                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Spacing="8" Margin="16">
+                        <TextBlock Text="Spell Checking" FontWeight="Bold" />
+                        <Separator />
+                        <TextBlock TextWrapping="Wrap" Opacity="0.7"
+                                   Text="Underlines misspelled words while you write text notes and free-text annotations. Right-click an underlined word for suggestions, or press F7 in the note editor to step through them from the keyboard. Checking runs entirely on this computer." />
+                        <CheckBox Name="SpellCheckEnabledCheck" Content="Check spelling in notes"
+                                  IsCheckedChanged="OnSpellCheckEnabledChanged" />
+                        <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto" Margin="0,4,0,0">
+                            <TextBlock Grid.Column="0" Text="Dictionary:" VerticalAlignment="Center" />
+                            <ComboBox Grid.Column="2" Name="SpellLanguageCombo" Width="280"
+                                      HorizontalAlignment="Left" SelectionChanged="OnSpellLanguageChanged" />
+                        </Grid>
+                        <TextBlock TextWrapping="Wrap" Opacity="0.7" FontSize="11"
+                                   Text="British and American English are included. To add another language or variety (for example South African English), save its Hunspell .aff and .dic files — LibreOffice's dictionaries work — into this folder, then reopen Settings:" />
+                        <SelectableTextBlock Name="SpellDictionariesFolder" TextWrapping="Wrap" FontSize="11" />
+
+                        <TextBlock Text="Personal Dictionary" FontWeight="Bold" Margin="0,12,0,0" />
+                        <Separator />
+                        <TextBlock TextWrapping="Wrap" Opacity="0.7"
+                                   Text="Words you've added with &quot;Add to Dictionary&quot; — technical terms, names, abbreviations. They're accepted whichever dictionary is selected." />
+                        <Grid ColumnDefinitions="*,8,Auto">
+                            <TextBox Grid.Column="0" Name="PersonalWordInput" PlaceholderText="Add a word"
+                                     KeyDown="OnPersonalWordInputKeyDown" />
+                            <Button Grid.Column="2" Content="Add" Click="OnAddPersonalWord" />
+                        </Grid>
+                        <ListBox Name="PersonalWordsList" Height="180" SelectionMode="Multiple"
+                                 SelectionChanged="OnPersonalWordsSelectionChanged"
+                                 AutomationProperties.Name="Personal dictionary words" />
+                        <Button Name="RemovePersonalWordsButton" Content="Remove Selected"
+                                IsEnabled="False" Click="OnRemovePersonalWords" />
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
             <!-- Advanced Tab -->
             <TabItem Header="Advanced">
                 <ScrollViewer VerticalScrollBarVisibility="Auto"

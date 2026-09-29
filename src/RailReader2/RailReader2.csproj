@@ -23,6 +23,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Hunspell dictionaries for note spell checking (SpellCheckService), from LibreOffice's
+         dictionaries repo — see the README_* files beside them for their licences. -->
+    <None Update="Dictionaries/**" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- Lets the test project exercise internal shell helpers (e.g. ReferenceIndex parsing). -->
     <InternalsVisibleTo Include="RailReader.Export.Tests" />
   </ItemGroup>
@@ -33,6 +39,7 @@
     <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.3" />
     <PackageReference Include="Avalonia.Fonts.Inter" Version="12.1.3" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <PackageReference Include="WeCantSpell.Hunspell" Version="7.0.1" />
   </ItemGroup>
 
   <ItemGroup>
