@@ -36,6 +36,8 @@ public sealed class SpellCheckService
 {
     private const int MaxSuggestions = 7;
 
+    private static readonly SemaphoreSlim s_prefetchGate = new(Math.Max(1, Environment.ProcessorCount / 2));
+
     private static readonly Lazy<SpellCheckService> s_shared = new(() => new SpellCheckService());
 
     /// <summary>The app-wide instance, backed by <see cref="SpellCheckPreferences"/>.</summary>
@@ -105,6 +107,9 @@ public sealed class SpellCheckService
         {
             if (_language == value) return;
             _language = value;
+            // A failure belongs to the language that failed; switching back to an already-loaded
+            // one makes EnsureLoaded return early, so clear it here rather than there.
+            LoadError = null;
             if (_prefs is not null)
             {
                 _prefs.Language = value;
@@ -193,7 +198,14 @@ public sealed class SpellCheckService
         {
             if (dictionary.Suggestions.ContainsKey(word)) continue;
             var lazy = SuggestionsFor(dictionary, word);
-            _ = Task.Run(() => lazy.Value);
+            // Each search is 70-250 ms of CPU; cap concurrency so pasting a paragraph of technical
+            // terms doesn't flood the thread pool the page renderer also relies on.
+            _ = Task.Run(async () =>
+            {
+                await s_prefetchGate.WaitAsync().ConfigureAwait(false);
+                try { _ = lazy.Value; }
+                finally { s_prefetchGate.Release(); }
+            });
         }
     }
 
@@ -298,7 +310,10 @@ public sealed class SpellCheckService
                 int end = j;
                 while (end > start && IsApostrophe(text[end - 1])) end--;
 
-                if (rejected || (start > 0 && text[start - 1] is '\\' or '@' or '#')) continue;
+                // A letter run glued to a preceding digit/underscore is part of the same token
+                // ("2nd", "10th", "_foo"), so it is skipped like one containing them.
+                if (rejected || (start > chunkStart && (char.IsDigit(text[start - 1]) || text[start - 1] == '_'))
+                    || (start > 0 && text[start - 1] is '\\' or '@' or '#')) continue;
                 var word = text.AsSpan(start, end - start);
                 if (CountLetters(word) < 2 || HasInnerCapital(word)) continue;
                 yield return (start, end - start);
@@ -366,7 +381,7 @@ public sealed class SpellCheckService
             foreach (var line in File.ReadLines(_personalWordsPath, Encoding.UTF8))
             {
                 var word = line.Trim();
-                if (word.Length > 0) _personal.Add(word);
+                if (word.Length > 0) _personal.Add(Normalize(word));
             }
         }
         catch (Exception ex)

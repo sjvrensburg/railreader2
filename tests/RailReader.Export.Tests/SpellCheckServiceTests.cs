@@ -51,7 +51,14 @@ public sealed class SpellCheckServiceTests : IDisposable
         // Every token left over is an ordinary word — none of the technical fragments survive.
         var words = Words(text);
         Assert.DoesNotContain(words, w => w is "pathh" or "someone" or "H0" or "x_i" or "2nd"
-            or "x" or "ANOVA" or "OLS" or "LaTeX" or "SciPy" or "alpha" or "hat" or "beta");
+            or "x" or "ANOVA" or "OLS" or "LaTeX" or "SciPy" or "alpha" or "hat" or "beta"
+            or "nd" or "th");
+    }
+
+    [Fact]
+    public void Tokenize_SkipsOrdinalSuffixes()
+    {
+        Assert.Equal(["the", "and", "items"], Words("the 2nd and 10th items"));
     }
 
     [Fact]
