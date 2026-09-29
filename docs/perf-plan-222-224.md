@@ -274,13 +274,15 @@ honest about this in the commit message.
 
 #### 2b. Raise `SkiaOptions.MaxGpuResourceSizeBytes`
 
-Avalonia 12.0.4's default is 28 MiB — smaller than a single page texture. Textures owned by a live
+Avalonia 12.0.4's default was 28 MiB — smaller than a single page texture. Textures owned by a live
 `SKImage` are not purged against this budget, but Skia's scratch allocations (blur passes, layers,
 mip scratch) are, so a too-small budget causes churn exactly during the frames that also blur.
 
-Verified against Avalonia 12.0.4 by reflection: the type is **`Avalonia.SkiaOptions`** (namespace
-`Avalonia`, not `Avalonia.Skia` — `Program.cs` already has `using Avalonia;`), with members
-`long? MaxGpuResourceSizeBytes` and `bool UseOpacitySaveLayer`. Leave `UseOpacitySaveLayer` alone.
+Verified against Avalonia 12.0.4 by reflection, and re-checked on 12.1.3: the type is
+**`Avalonia.SkiaOptions`** (namespace `Avalonia`, not `Avalonia.Skia` — `Program.cs` already has
+`using Avalonia;`), with members `long? MaxGpuResourceSizeBytes` and `bool UseOpacitySaveLayer`; 12.1
+adds `bool? UseStencilBuffers` (turned on by default in 12.1.0, back to opt-in in 12.1.2 after an
+anti-aliasing regression). Leave `UseOpacitySaveLayer` and `UseStencilBuffers` alone.
 
 In `Program.BuildAvaloniaApp()` (`src/RailReader2/Program.cs`), alongside the existing
 `X11PlatformOptions` block:
@@ -391,7 +393,7 @@ sub-rect in page coords.
 **Also investigated and expected to be dead ends** — record the outcome rather than silently dropping:
 
 - *Async upload on a shared GL context.* Would need Avalonia to hand out a second context
-  (`IOpenGlTextureSharingRenderInterfaceContextFeature` or equivalent). Check whether Avalonia 12.0.4
+  (`IOpenGlTextureSharingRenderInterfaceContextFeature` or equivalent). Check whether Avalonia (12.0.4 when written)
   exposes it at all; if not, close this option in the issue with that finding.
 - *Split the upload across frames (no mips first, mips later).* SkiaSharp has no "add mips to an existing
   texture" call, so this means uploading twice — it only helps if the base upload is much cheaper than
