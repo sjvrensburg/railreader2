@@ -44,7 +44,7 @@ jobs:
           dotnet-version: "10.0.x"
 
       - name: Install AppImage dependencies
-        run: sudo apt-get update && sudo apt-get install -y fuse libfuse2
+        run: sudo apt-get update && sudo apt-get install -y fuse libfuse2 zsync
 
       - name: Download model artifact
         uses: actions/download-artifact@v8
@@ -77,9 +77,10 @@ jobs:
           # Rewrite the desktop file's Icon= to match the new icon basename.
           sed "s/^Icon=.*/Icon=${APP_ID}/" assets/railreader2.desktop > "AppDir/usr/share/applications/${APP_ID}.desktop"
           cp assets/railreader2.png "AppDir/usr/share/icons/hicolor/256x256/apps/${APP_ID}.png"
-          # Install metainfo under both .appdata.xml (appimagetool looks for the legacy
-          # name) and .metainfo.xml (modern AppStream convention).
-          cp assets/railreader2.metainfo.xml "AppDir/usr/share/metainfo/${APP_ID}.appdata.xml"
+          # One metainfo file only, under the modern .metainfo.xml name. appimagetool
+          # only looks for the legacy .appdata.xml name and warns that it is missing;
+          # that warning is harmless. Shipping both names makes consumers see the
+          # component twice (the AppImage catalog read the licence as "MITMIT").
           cp assets/railreader2.metainfo.xml "AppDir/usr/share/metainfo/${APP_ID}.metainfo.xml"
           # Top-level copies are what appimagetool embeds into the AppImage runtime.
           cp "AppDir/usr/share/applications/${APP_ID}.desktop" "AppDir/${APP_ID}.desktop"
@@ -99,15 +100,25 @@ jobs:
           # so demand-paging the ~138 MB bundled .NET runtime through FUSE on
           # launch is cheaper. Level 19 keeps the file small (zstd decompression
           # speed is ~constant across levels, so this is a build-time cost only).
+          #
+          # -u embeds update information so AppImageUpdate (and AppImage catalog
+          # tooling) can find new releases; with zsyncmake installed, appimagetool
+          # also writes the matching .zsync, which must be published next to the
+          # AppImage on every release. The file name carries no "linux": all
+          # AppImages are for Linux (AppImage catalog naming rule).
           ARCH=x86_64 ./appimagetool --comp zstd \
             --mksquashfs-opt -Xcompression-level --mksquashfs-opt 19 \
-            AppDir railreader2-linux-x86_64.AppImage
+            -u "gh-releases-zsync|sjvrensburg|railreader2|latest|railreader2-x86_64.AppImage.zsync" \
+            AppDir railreader2-x86_64.AppImage
+          test -s railreader2-x86_64.AppImage.zsync || { echo "zsync file was not generated"; exit 1; }
 
       - name: Upload artifact
         uses: actions/upload-artifact@v7
         with:
           name: linux-appimage
-          path: railreader2-linux-x86_64.AppImage
+          path: |
+            railreader2-x86_64.AppImage
+            railreader2-x86_64.AppImage.zsync
           retention-days: 1
 
       # FUSE-free alternative: the same self-contained publish as a plain tarball.
@@ -309,7 +320,8 @@ jobs:
           generate_release_notes: true
           make_latest: true
           files: |
-            railreader2-linux-x86_64.AppImage
+            railreader2-x86_64.AppImage
+            railreader2-x86_64.AppImage.zsync
             railreader2-linux-x64.tar.gz
             railreader2-setup-x64.exe
             railreader2-cli-linux-x64.tar.gz

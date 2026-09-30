@@ -38,7 +38,7 @@ Everything you need to know to get the most out of railreader2.
 
 The AI layout model is bundled in all packages.
 
-- **Linux:** Download `railreader2-linux-x86_64.AppImage` from [GitHub Releases](https://github.com/sjvrensburg/railreader2/releases/latest), make it executable (`chmod +x railreader2-linux-x86_64.AppImage`), and run it.
+- **Linux:** Download `railreader2-x86_64.AppImage` from [GitHub Releases](https://github.com/sjvrensburg/railreader2/releases/latest), make it executable (`chmod +x railreader2-x86_64.AppImage`), and run it.
 - **Windows (Microsoft Store):** Install directly from the [Microsoft Store](https://apps.microsoft.com/store/detail/9P9J8KZ6RVZP) for automatic updates, no SmartScreen warnings, and clean install/uninstall. The Store release may lag behind the GitHub release by a few days due to certification review.
 - **Windows (standalone installer):** Download `railreader2-setup-x64.exe` from [GitHub Releases](https://github.com/sjvrensburg/railreader2/releases/latest) and run it. Optionally associate `.pdf` files during setup. This always has the latest version immediately.
 
