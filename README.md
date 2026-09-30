@@ -164,11 +164,11 @@ Download the latest release from [GitHub Releases](https://github.com/sjvrensbur
 
 ### Linux
 
-Download `railreader2-linux-x86_64.AppImage`, make it executable, and run it:
+Download `railreader2-x86_64.AppImage`, make it executable, and run it:
 
 ```bash
-chmod +x railreader2-linux-x86_64.AppImage
-./railreader2-linux-x86_64.AppImage
+chmod +x railreader2-x86_64.AppImage
+./railreader2-x86_64.AppImage
 ```
 
 ### Windows

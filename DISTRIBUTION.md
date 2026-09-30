@@ -22,7 +22,7 @@ The release workflow (`.github/workflows/release.yml`) runs five jobs:
 
 | Job | Runner | Output | Destination |
 |-----|--------|--------|-------------|
-| `build-linux` | ubuntu-24.04 | `railreader2-linux-x86_64.AppImage` | GitHub Release |
+| `build-linux` | ubuntu-24.04 | `railreader2-x86_64.AppImage` (+ `.zsync` for AppImageUpdate) | GitHub Release |
 | `build-windows` | windows-latest | `railreader2-setup-x64.exe` | GitHub Release |
 | `build-msix` | windows-latest | `railreader2-win-x64.msix` | CI artifact only (not in release) |
 | `build-cli-linux` | ubuntu-24.04 | `railreader2-cli-linux-x64` | GitHub Release |
