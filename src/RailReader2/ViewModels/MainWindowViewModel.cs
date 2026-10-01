@@ -905,7 +905,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
             var (gotResults, _, _) = _controller.PollAnalysisResults();
             if (gotResults)
-                InvalidateOverlay();
+                OnAnalysisDrainedOutsideFrame();
             EvaluatePortals(forceRender: gotResults && PortalResolvePending);
 
             bool hasWork = _controller.HasBackgroundAnalysisWork;
@@ -955,6 +955,19 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>
+    /// A result drained outside <see cref="RunAnimationFrame"/> can seat a view's rail — e.g. a document
+    /// reopened at its saved rail zoom engages rail the moment its first analysis lands. Redraw the
+    /// overlay and re-raise <see cref="ActiveTab"/>, as the frame loop does when its own pump gets
+    /// results: the rail toolbar, status bar and menu gating key off it, and the snap animation that
+    /// follows only reports camera changes, so without this they stay stale until the next line move.
+    /// </summary>
+    private void OnAnalysisDrainedOutsideFrame()
+    {
+        InvalidateOverlay();
+        OnPropertyChanged(nameof(ActiveTab));
+    }
+
+    /// <summary>
     /// Fired by <see cref="DocumentController.ResultAvailable"/> on the UI thread as soon as the
     /// analysis worker has a result sitting in its channel — before anything drains it. Mirrors the
     /// old <c>_pollTimer</c> tick body, minus the timer: while an animation frame is already requested,
@@ -970,7 +983,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         if (tab is not null && !_animationRequested)
             tab.SubmitPendingLookahead(_controller.Worker);
         if (gotResults)
-            InvalidateOverlay();
+            OnAnalysisDrainedOutsideFrame();
         // Only force a portal re-evaluation when something is still waiting on analysis (a pinned
         // target's page, or an automatic reference's caption page) — otherwise the reading-position
         // callbacks + memo already cover the steady case, and forcing on every unrelated analysis
