@@ -1,9 +1,10 @@
 [Desktop Entry]
 Type=Application
-Name=railreader2
+Name=RailReader2
 Comment=AI-guided rail reading PDF viewer
 Exec=RailReader2 %f
 Icon=railreader2
 Categories=Office;Viewer;
+Keywords=PDF;reader;viewer;rail reading;annotations;magnification;
 MimeType=application/pdf;
 Terminal=false

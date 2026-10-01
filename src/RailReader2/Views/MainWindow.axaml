@@ -67,14 +67,50 @@
                         <v:DocumentView Name="Document" Grid.Column="0" />
                     </Grid>
 
-                    <!-- Welcome text overlay when no document open -->
-                    <TextBlock Name="WelcomeText"
-                               Text="Open a PDF file (Ctrl+O)"
-                               HorizontalAlignment="Center"
-                               VerticalAlignment="Center"
-                               FontSize="18"
-                               Foreground="White"
-                               IsVisible="{Binding !Tabs.Count}" />
+                    <!-- Welcome panel when no document is open (also the AppImage catalogue's
+                         automatic screenshot, which launches with no arguments) -->
+                    <Border Name="WelcomePanel"
+                            Background="{DynamicResource SystemControlBackgroundAltHighBrush}"
+                            IsVisible="{Binding !Tabs.Count}">
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center"
+                                    Spacing="10" MaxWidth="520">
+                            <!-- The logo is black on transparent, so it sits on a light tile to stay
+                                 visible in the dark theme -->
+                            <Border Background="White" CornerRadius="22" Padding="10"
+                                    HorizontalAlignment="Center">
+                                <Image Source="avares://RailReader2/Assets/railreader2.png"
+                                       Width="96" Height="96" />
+                            </Border>
+                            <TextBlock Text="railreader2" FontSize="32" FontWeight="SemiBold"
+                                       HorizontalAlignment="Center" />
+                            <TextBlock Text="AI-guided rail reading for comfortable high-magnification PDF reading"
+                                       FontSize="15" Opacity="0.7" TextWrapping="Wrap"
+                                       TextAlignment="Center" HorizontalAlignment="Center" />
+                            <Button Content="Open a PDF…" Command="{Binding OpenFileCommand}"
+                                    HorizontalAlignment="Center" Margin="0,14,0,6"
+                                    Padding="24,8" FontSize="15"
+                                    a:AutomationProperties.Name="Open a PDF"
+                                    a:AutomationProperties.AutomationId="WelcomeOpenButton" />
+                            <TextBlock Text="or press Ctrl+O" Opacity="0.55"
+                                       HorizontalAlignment="Center" />
+                            <Border Height="1" Opacity="0.2" Margin="0,16,0,6"
+                                    Background="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
+                            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto"
+                                  ColumnSpacing="16" RowSpacing="6" HorizontalAlignment="Center"
+                                  Opacity="0.75">
+                                <TextBlock Grid.Row="0" Text="Zoom in" FontWeight="SemiBold" />
+                                <TextBlock Grid.Row="0" Grid.Column="1" Text="Past 3× the page locks to one text block at a time" />
+                                <TextBlock Grid.Row="1" Text="Read" FontWeight="SemiBold" />
+                                <TextBlock Grid.Row="1" Grid.Column="1" Text="Down or S advances line by line; P auto-scrolls" />
+                                <TextBlock Grid.Row="2" Text="R" FontWeight="SemiBold" />
+                                <TextBlock Grid.Row="2" Grid.Column="1" Text="Start rail reading at any zoom" />
+                                <TextBlock Grid.Row="3" Text="Ctrl+E" FontWeight="SemiBold" />
+                                <TextBlock Grid.Row="3" Grid.Column="1" Text="Annotate: highlight, draw, add notes" />
+                                <TextBlock Grid.Row="4" Text="C" FontWeight="SemiBold" />
+                                <TextBlock Grid.Row="4" Grid.Column="1" Text="Cycle colour effects for comfort" />
+                            </Grid>
+                        </StackPanel>
+                    </Border>
                 </Panel>
             </DockPanel>
         </Grid>
