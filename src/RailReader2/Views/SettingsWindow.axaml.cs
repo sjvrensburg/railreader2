@@ -1185,7 +1185,7 @@ public partial class SettingsWindow : Window
         // otherwise CustomLayoutModelLoader's existing fallback just lands back on V3 next launch
         // (logged, not an error) and this same advisory would fire again having "fixed" nothing.
         // When it isn't installed, apply the switch anyway (so it's ready the moment the download
-        // finishes) but land the user on Advanced, where the file-missing status line and the
+        // finishes) but land the user on Layout Model, where the file-missing status line and the
         // already-built Download button are waiting — reusing that download/progress machinery
         // rather than duplicating it in this small panel.
         bool heronInstalled = HeronModelLocator.FindModelPath() != null;

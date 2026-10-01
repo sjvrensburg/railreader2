@@ -173,7 +173,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     [ObservableProperty] private string? _settingsInitialTab;
 
     /// <summary>Opens Settings pre-scrolled to a specific tab (matched by its <c>TabItem.Header</c>
-    /// text, e.g. "OCR") — used by toast actions that point the user at the setting that unblocks
+    /// text, e.g. "Scanned Pages") — used by toast actions that point the user at the setting that unblocks
     /// them, rather than just describing it in text.</summary>
     public void OpenSettingsTab(string tabHeader)
     {

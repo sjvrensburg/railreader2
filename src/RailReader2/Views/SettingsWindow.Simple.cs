@@ -82,14 +82,7 @@ public partial class SettingsWindow
 
     // Normal is Core's AppConfig defaults; the others move every timing the same direction.
     private static readonly PacePreset s_paceRelaxed = new(650, 10, 28, 2.0, 700);
-    private static PacePreset NormalPace
-    {
-        get
-        {
-            var d = new AppConfig();
-            return new(d.SnapDurationMs, d.ScrollSpeedStart, d.ScrollSpeedMax, d.ScrollRampTime, d.AutoScrollLinePauseMs);
-        }
-    }
+    private static readonly PacePreset s_paceNormal = CurrentPace(new AppConfig());
     private static readonly PacePreset s_paceBrisk = new(300, 20, 60, 1.0, 200);
 
     private static PacePreset CurrentPace(AppConfig c)
@@ -107,18 +100,15 @@ public partial class SettingsWindow
         if (Vm is not { } vm) return;
         var current = CurrentPace(vm.AppConfig);
         bool relaxed = PaceMatches(current, s_paceRelaxed);
-        bool normal = PaceMatches(current, NormalPace);
+        bool normal = PaceMatches(current, s_paceNormal);
         bool brisk = PaceMatches(current, s_paceBrisk);
 
-        bool wasLoading = _loading;
-        _loading = true; // suppress OnPaceChanged while reflecting state
-        try
+        WhileLoading(() => // suppress OnPaceChanged while reflecting state
         {
             PaceRelaxed.IsChecked = relaxed;
             PaceNormal.IsChecked = normal;
             PaceBrisk.IsChecked = brisk;
-        }
-        finally { _loading = wasLoading; }
+        });
 
         PaceCustomStatus.IsVisible = !(relaxed || normal || brisk);
     }
@@ -130,7 +120,7 @@ public partial class SettingsWindow
 
         var preset = ReferenceEquals(rb, PaceRelaxed) ? s_paceRelaxed
             : ReferenceEquals(rb, PaceBrisk) ? s_paceBrisk
-            : NormalPace;
+            : s_paceNormal;
 
         var c = vm.AppConfig;
         c.SnapDurationMs = preset.SnapMs;
@@ -142,11 +132,18 @@ public partial class SettingsWindow
 
         // Mirror into the advanced fields for display only — their own handler would write the
         // same values back one field at a time, re-deriving the preset against half-updated state.
+        WhileLoading(() => LoadPaceFields(c));
+        UpdatePaceRadios();
+    }
+
+    /// <summary>Runs <paramref name="action"/> with the change handlers suppressed, for reflecting
+    /// state onto controls without their handlers writing it straight back.</summary>
+    private void WhileLoading(Action action)
+    {
         bool wasLoading = _loading;
         _loading = true;
-        try { LoadPaceFields(c); }
+        try { action(); }
         finally { _loading = wasLoading; }
-        UpdatePaceRadios();
     }
 
     private void LoadPaceFields(AppConfig c)
@@ -183,7 +180,8 @@ public partial class SettingsWindow
         LineHighlightTintCombo.IsEnabled = highlight;
         LineHighlightOpacitySlider.IsEnabled = highlight;
         LineFocusBlurSlider.IsEnabled = dim;
-        LinePaddingSlider.IsEnabled = dim;
+        // Padding sizes both the highlight bar and the dim's clear zone (OverlayRenderer).
+        LinePaddingSlider.IsEnabled = highlight || dim;
     }
 
     private void OnLineStyleChanged(object? sender, SelectionChangedEventArgs e)
@@ -238,15 +236,9 @@ public partial class SettingsWindow
     }
 
     /// <summary>Reflects a stop-role set onto both lists without re-firing their change handlers.</summary>
-    private void SyncStopRoleItems(IReadOnlySet<BlockRole> set)
+    private void SyncStopRoleItems(IReadOnlySet<BlockRole> set) => WhileLoading(() =>
     {
-        bool wasLoading = _loading;
-        _loading = true;
-        try
-        {
-            foreach (var item in _stopRoleItems) item.IsChecked = set.Contains(item.Role);
-            foreach (var group in _stopRoleGroups) group.IsChecked = group.Roles.All(set.Contains);
-        }
-        finally { _loading = wasLoading; }
-    }
+        foreach (var item in _stopRoleItems) item.IsChecked = set.Contains(item.Role);
+        foreach (var group in _stopRoleGroups) group.IsChecked = group.Roles.All(set.Contains);
+    });
 }
