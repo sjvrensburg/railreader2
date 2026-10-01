@@ -103,7 +103,11 @@ public partial class SettingsWindow : Window
         Lookahead.Value = c.AnalysisLookaheadPages;
         AnalysisWindow.Value = c.BackgroundAnalysisWindowPages;
         PageCacheRadius.Value = c.PageCacheRadius;
-        EffectCombo.SelectedIndex = (int)c.ColourEffect;
+        // Colour effect, margin cropping and the current-line style are per document/tab — the C,
+        // F and H keys and the View/Rail menus change only the open one, and AppConfig holds the
+        // default for documents opened later. Show what the reader is actually looking at; the
+        // change handlers write both.
+        EffectCombo.SelectedIndex = (int)vm.Controller.ActiveColourEffect;
         IntensitySlider.Value = c.ColourEffectIntensity;
         RenderQualityCombo.SelectedIndex = (int)c.RenderQuality;
         CustomMaxDpi.Value = c.CustomMaxRenderDpi;
@@ -111,7 +115,7 @@ public partial class SettingsWindow : Window
         UpdateCustomRenderPanel(c.RenderQuality);
         ContinuousScrollCheck.IsChecked = c.ContinuousScroll;
         PixelSnappingCheck.IsChecked = c.PixelSnapping;
-        MarginCroppingCheck.IsChecked = c.MarginCropping;
+        MarginCroppingCheck.IsChecked = vm.ActiveTab?.MarginCropping ?? c.MarginCropping;
         LineFocusBlurSlider.Value = c.LineFocusBlurIntensity;
         LinePaddingSlider.Value = c.LinePadding;
         AutoScrollTriggerCheck.IsChecked = c.AutoScrollTriggerEnabled;
@@ -121,7 +125,7 @@ public partial class SettingsWindow : Window
         LineHighlightTintCombo.ItemsSource = Enum.GetNames<LineHighlightTint>();
         LineHighlightTintCombo.SelectedIndex = (int)c.LineHighlightTint;
         LineHighlightOpacitySlider.Value = c.LineHighlightOpacity;
-        LoadLineStyle(c);
+        LoadLineStyle(c, vm.ActiveTab);
 
         BuildRoleCheckboxes(_roleItems, c.NavigableRoles,
             set => { vm.AppConfig.NavigableRoles = set; vm.OnConfigChanged(); },

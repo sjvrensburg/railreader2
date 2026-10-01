@@ -202,7 +202,7 @@
                         <TextBlock Classes="section" Text="Page Colours" />
                         <Separator />
                         <TextBlock Classes="hint"
-                                   Text="Recolours the page itself, not the menus. Press C while reading to cycle through them." />
+                                   Text="Recolours the page itself, not the menus. Changing it here sets the open document and the default for new ones; pressing C changes only the open document." />
                         <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto,8,Auto">
                             <TextBlock Grid.Row="0" Grid.Column="0" Text="Colour effect:" VerticalAlignment="Center" />
                             <ComboBox Grid.Row="0" Grid.Column="2" Name="EffectCombo" Width="150"

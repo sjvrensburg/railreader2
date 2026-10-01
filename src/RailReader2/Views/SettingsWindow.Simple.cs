@@ -7,6 +7,7 @@ using RailReader.Core;
 using RailReader.Core.Models;
 using RailReader.Core.Services;
 using RailReader2.Services;
+using RailReader2.ViewModels;
 
 namespace RailReader2.Views;
 
@@ -166,9 +167,11 @@ public partial class SettingsWindow
     // --- Current line (highlight / dim) ---
 
     // Index layout of LineStyleCombo: bit 0 = highlight, bit 1 = dim.
-    private void LoadLineStyle(AppConfig c)
+    private void LoadLineStyle(AppConfig c, TabViewModel? tab)
     {
-        LineStyleCombo.SelectedIndex = (c.LineHighlightEnabled ? 1 : 0) | (c.LineFocusBlur ? 2 : 0);
+        bool highlight = tab?.LineHighlightEnabled ?? c.LineHighlightEnabled;
+        bool dim = tab?.LineFocusBlur ?? c.LineFocusBlur;
+        LineStyleCombo.SelectedIndex = (highlight ? 1 : 0) | (dim ? 2 : 0);
         UpdateLineStyleDependents();
     }
 
