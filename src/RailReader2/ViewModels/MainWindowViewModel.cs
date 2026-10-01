@@ -1276,6 +1276,10 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             dark ? Avalonia.Styling.ThemeVariant.Dark : Avalonia.Styling.ThemeVariant.Light;
     }
 
+    /// <summary>Raised after <see cref="OnConfigChanged"/> applies a config edit (Settings, Reset to
+    /// Defaults) — lets chrome that caches config values, like the rail toolbar's sliders, re-read them.</summary>
+    public event Action? ConfigChanged;
+
     public void OnConfigChanged()
     {
         _controller.OnConfigChanged(_appConfig.ToCoreSettings());
@@ -1283,6 +1287,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         ApplyFontScale();
         InvalidateAll();
         OnPropertyChanged(nameof(ActiveTab));
+        ConfigChanged?.Invoke();
     }
 
     public void OnSliderChanged() => _controller.OnSliderChanged(_appConfig.ToCoreSettings());

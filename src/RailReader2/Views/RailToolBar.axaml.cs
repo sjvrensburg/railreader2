@@ -15,6 +15,9 @@ public partial class RailToolBar : UserControl
     private Slider? _blurSlider;
     private TextBlock? _speedLabel;
     private bool _jumpMode;
+    // True while sliders are being set FROM config: the slider range is narrower than Settings'
+    // (speed tops out at 160, Settings allows 500), so a coerced value must not be written back.
+    private bool _syncing;
 
     private Button? _autoScrollBtn;
     private Button? _jumpBtn;
@@ -192,7 +195,7 @@ public partial class RailToolBar : UserControl
 
     private void OnSpeedSliderPropertyChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
     {
-        if (e.Property == RangeBase.ValueProperty && ViewModel is { } vm && _speedSlider is not null)
+        if (e.Property == RangeBase.ValueProperty && !_syncing && ViewModel is { } vm && _speedSlider is not null)
         {
             if (_jumpMode)
                 vm.AppConfig.JumpPercentage = _speedSlider.Value;
@@ -204,7 +207,7 @@ public partial class RailToolBar : UserControl
 
     private void OnBlurSliderPropertyChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
     {
-        if (e.Property == RangeBase.ValueProperty && ViewModel is { } vm && _blurSlider is not null)
+        if (e.Property == RangeBase.ValueProperty && !_syncing && ViewModel is { } vm && _blurSlider is not null)
         {
             vm.AppConfig.MotionBlurIntensity = _blurSlider.Value;
             vm.OnSliderChanged();
@@ -233,7 +236,9 @@ public partial class RailToolBar : UserControl
         if (_speedSlider is null || _speedLabel is null || ViewModel is not { } vm) return;
 
         _speedLabel.Text = jumpMode ? "Jmp" : "Spd";
-        _speedSlider.Value = jumpMode ? vm.AppConfig.JumpPercentage : vm.AppConfig.ScrollSpeedMax;
+        _syncing = true;
+        try { _speedSlider.Value = jumpMode ? vm.AppConfig.JumpPercentage : vm.AppConfig.ScrollSpeedMax; }
+        finally { _syncing = false; }
         ToolTip.SetTip(_speedSlider, jumpMode
             ? "Jump distance % ([ / ] keys)"
             : "Scroll speed ([ / ] keys)");
@@ -246,10 +251,15 @@ public partial class RailToolBar : UserControl
     public void SyncFromConfig()
     {
         if (ViewModel is not { } vm) return;
-        if (_speedSlider is not null)
-            _speedSlider.Value = _jumpMode ? vm.AppConfig.JumpPercentage : vm.AppConfig.ScrollSpeedMax;
-        if (_blurSlider is not null)
-            _blurSlider.Value = vm.AppConfig.MotionBlurIntensity;
+        _syncing = true;
+        try
+        {
+            if (_speedSlider is not null)
+                _speedSlider.Value = _jumpMode ? vm.AppConfig.JumpPercentage : vm.AppConfig.ScrollSpeedMax;
+            if (_blurSlider is not null)
+                _blurSlider.Value = vm.AppConfig.MotionBlurIntensity;
+        }
+        finally { _syncing = false; }
     }
 
     /// <summary>Adjust scroll speed by a delta. Used by keyboard shortcuts.</summary>
