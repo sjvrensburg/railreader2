@@ -133,7 +133,7 @@ public sealed partial class MainWindowViewModel
             ShowStatusToast(
                 "No selectable text on this page — try Pen/Rectangle, or",
                 "set OCR Mode to Full",
-                () => OpenSettingsTab("OCR"));
+                () => OpenSettingsTab("Scanned Pages"));
             return;
         }
 

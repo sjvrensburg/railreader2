@@ -5,48 +5,206 @@
         x:Class="RailReader2.Views.SettingsWindow"
         x:DataType="vm:MainWindowViewModel"
         Title="Settings"
-        Width="480" Height="680"
+        Width="760" Height="640" MinWidth="560" MinHeight="420"
         WindowStartupLocation="CenterOwner"
         CanResize="True">
+    <!-- Two views of one window. Simple (the default) shows the handful of settings most readers
+         change; "Show advanced settings" reveals the fine-tuning knobs and the engine pages. A
+         control marked .adv only exists in the advanced view, one marked .simple-only only in the
+         simple view. The classes are toggled on the window (SettingsWindow.SetAdvanced), so a
+         control whose IsVisible is also set from code must not carry either class — wrap it. -->
+    <Window.Styles>
+        <Style Selector="Window:not(.advanced) :is(Control).adv">
+            <Setter Property="IsVisible" Value="False" />
+        </Style>
+        <Style Selector="Window.advanced :is(Control).simple-only">
+            <Setter Property="IsVisible" Value="False" />
+        </Style>
+        <Style Selector="TextBlock.section">
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Margin" Value="0,14,0,0" />
+        </Style>
+        <Style Selector="TextBlock.section.first">
+            <Setter Property="Margin" Value="0" />
+        </Style>
+        <Style Selector="TextBlock.hint">
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Opacity" Value="0.7" />
+        </Style>
+        <!-- Inherits the window's (UI-scaled) font size rather than a fixed 11 px, which was
+             unreadably small at the larger UI scales this app is often run at. -->
+        <Style Selector="TextBlock.status">
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Opacity" Value="0.6" />
+        </Style>
+        <Style Selector="TabControl#MainTabControl > TabItem">
+            <Setter Property="Padding" Value="12,6" />
+            <Setter Property="MinHeight" Value="0" />
+        </Style>
+        <!-- Advanced-view block inside a simple page: indented and tinted so it reads as
+             "extra detail" rather than more of the same. -->
+        <Style Selector="Border.advblock">
+            <Setter Property="BorderBrush" Value="{DynamicResource SystemControlForegroundBaseLowBrush}" />
+            <Setter Property="BorderThickness" Value="2,0,0,0" />
+            <Setter Property="Padding" Value="12,0,0,0" />
+            <Setter Property="Margin" Value="0,10,0,0" />
+        </Style>
+    </Window.Styles>
+
     <DockPanel>
         <Border DockPanel.Dock="Bottom" Padding="16,8"
                 BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
                 BorderThickness="0,1,0,0">
-            <Button Content="Reset All to Defaults" Click="OnResetDefaults" />
+            <Grid ColumnDefinitions="*,Auto">
+                <ToggleSwitch Grid.Column="0" Name="AdvancedToggle"
+                              OnContent="Show advanced settings" OffContent="Show advanced settings"
+                              IsCheckedChanged="OnAdvancedToggled"
+                              AutomationProperties.Name="Show advanced settings" />
+                <Button Grid.Column="1" Content="Reset All to Defaults" Click="OnResetDefaults"
+                        VerticalAlignment="Center" />
+            </Grid>
         </Border>
-        <TabControl x:Name="MainTabControl" Margin="8,8,8,0">
-            <!-- Appearance Tab -->
-            <TabItem Header="Appearance">
-                <ScrollViewer VerticalScrollBarVisibility="Auto"
-                              HorizontalScrollBarVisibility="Disabled">
+
+        <TabControl x:Name="MainTabControl" TabStripPlacement="Left" Margin="8,8,8,0">
+
+            <!-- ================= Reading ================= -->
+            <TabItem Header="Reading">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                     <StackPanel Spacing="8" Margin="16">
-                        <TextBlock Text="General" FontWeight="Bold" />
+                        <TextBlock Classes="section first" Text="Rail Reading" />
                         <Separator />
+                        <TextBlock Classes="hint"
+                                   Text="When you zoom in past this level, the view locks onto lines of text and moves along them line by line." />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="Start rail reading at" VerticalAlignment="Center" />
+                            <NumericUpDown Name="ZoomThreshold" Value="3.0"
+                                           Minimum="1.0" Maximum="15.0" Increment="0.5"
+                                           FormatString="F1" Width="130"
+                                           ValueChanged="OnSettingChanged" />
+                            <TextBlock Text="× zoom" VerticalAlignment="Center" />
+                        </StackPanel>
+
+                        <TextBlock Classes="section" Text="Reading Pace" />
+                        <Separator />
+                        <TextBlock Classes="hint"
+                                   Text="How quickly the view glides from line to line, how fast it scrolls while you hold a key, and how long auto-scroll rests at the end of each line." />
+                        <StackPanel Orientation="Horizontal" Spacing="16">
+                            <RadioButton Name="PaceRelaxed" GroupName="ReadingPace" Content="Relaxed"
+                                         IsCheckedChanged="OnPaceChanged" />
+                            <RadioButton Name="PaceNormal" GroupName="ReadingPace" Content="Normal"
+                                         IsCheckedChanged="OnPaceChanged" />
+                            <RadioButton Name="PaceBrisk" GroupName="ReadingPace" Content="Brisk"
+                                         IsCheckedChanged="OnPaceChanged" />
+                        </StackPanel>
+                        <TextBlock Name="PaceCustomStatus" Classes="status" FontStyle="Italic" IsVisible="False"
+                                   Text="Custom — you've tuned the pace by hand. Pick a preset to replace it." />
+                        <Border Classes="advblock adv">
+                            <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto,4,Auto,4,Auto,4,Auto,4,Auto">
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Line-to-line glide (ms):" VerticalAlignment="Center" />
+                                <NumericUpDown Grid.Row="0" Grid.Column="2" Name="SnapDuration" Value="450"
+                                               Minimum="50" Maximum="1000" Increment="10"
+                                               FormatString="F0" Width="130" HorizontalAlignment="Left"
+                                               ValueChanged="OnPaceValueChanged" />
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Hold-to-scroll start speed:" VerticalAlignment="Center" />
+                                <NumericUpDown Grid.Row="2" Grid.Column="2" Name="ScrollStart" Value="10"
+                                               Minimum="10" Maximum="500" Increment="5"
+                                               FormatString="F0" Width="130" HorizontalAlignment="Left"
+                                               ValueChanged="OnPaceValueChanged" />
+                                <TextBlock Grid.Row="4" Grid.Column="0" Text="Hold-to-scroll top speed:" VerticalAlignment="Center" />
+                                <NumericUpDown Grid.Row="4" Grid.Column="2" Name="ScrollMax" Value="30"
+                                               Minimum="10" Maximum="500" Increment="5"
+                                               FormatString="F0" Width="130" HorizontalAlignment="Left"
+                                               ValueChanged="OnPaceValueChanged" />
+                                <TextBlock Grid.Row="6" Grid.Column="0" Text="Time to reach top speed (s):" VerticalAlignment="Center" />
+                                <NumericUpDown Grid.Row="6" Grid.Column="2" Name="RampTime" Value="1.5"
+                                               Minimum="0.1" Maximum="5.0" Increment="0.1"
+                                               FormatString="F1" Width="130" HorizontalAlignment="Left"
+                                               ValueChanged="OnPaceValueChanged" />
+                                <TextBlock Grid.Row="8" Grid.Column="0" Text="Auto-scroll line pause (ms):" VerticalAlignment="Center" />
+                                <NumericUpDown Grid.Row="8" Grid.Column="2" Name="AutoScrollLinePause" Value="400"
+                                               Minimum="0" Maximum="2000" Increment="50"
+                                               FormatString="F0" Width="130" HorizontalAlignment="Left"
+                                               ValueChanged="OnPaceValueChanged" />
+                            </Grid>
+                        </Border>
+
+                        <TextBlock Classes="section" Text="Current Line" />
+                        <Separator />
+                        <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto,8,Auto">
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Mark the line you're on:" VerticalAlignment="Center" />
+                            <ComboBox Grid.Row="0" Grid.Column="2" Name="LineStyleCombo" Width="220"
+                                      HorizontalAlignment="Left" SelectionChanged="OnLineStyleChanged">
+                                <ComboBoxItem Content="Don't mark it" />
+                                <ComboBoxItem Content="Highlight it" />
+                                <ComboBoxItem Content="Dim the other lines" />
+                                <ComboBoxItem Content="Highlight and dim" />
+                            </ComboBox>
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Highlight colour:" VerticalAlignment="Center" />
+                            <ComboBox Grid.Row="2" Grid.Column="2" Name="LineHighlightTintCombo"
+                                      Width="150" HorizontalAlignment="Left"
+                                      SelectionChanged="OnLineHighlightTintChanged" />
+                        </Grid>
+                        <Border Classes="advblock adv">
+                            <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto,8,Auto,8,Auto">
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Highlight opacity:" VerticalAlignment="Center" />
+                                <Slider Grid.Row="0" Grid.Column="2" Name="LineHighlightOpacitySlider"
+                                        Minimum="0.05" Maximum="1" Value="0.25" MinWidth="120"
+                                        PropertyChanged="OnLineHighlightOpacityChanged" />
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Dim amount:" VerticalAlignment="Center" />
+                                <Slider Grid.Row="2" Grid.Column="2" Name="LineFocusBlurSlider" Minimum="0" Maximum="1"
+                                        Value="0.5" MinWidth="120"
+                                        PropertyChanged="OnLineFocusBlurIntensityChanged" />
+                                <TextBlock Grid.Row="4" Grid.Column="0" Text="Space around the line:" VerticalAlignment="Center" />
+                                <Slider Grid.Row="4" Grid.Column="2" Name="LinePaddingSlider" Minimum="0" Maximum="0.5"
+                                        Value="0.2" MinWidth="120"
+                                        PropertyChanged="OnLinePaddingChanged" />
+                            </Grid>
+                        </Border>
+
+                        <TextBlock Classes="section" Text="Pages" />
+                        <Separator />
+                        <CheckBox Name="MarginCroppingCheck" Content="Crop page margins (fit to the text)"
+                                  IsCheckedChanged="OnMarginCroppingChanged" />
+                        <CheckBox Name="ContinuousScrollCheck" Content="Scroll continuously from page to page"
+                                  IsCheckedChanged="OnContinuousScrollChanged" />
+
+                        <StackPanel Classes="adv" Spacing="8">
+                            <TextBlock Classes="section" Text="Jump Mode" />
+                            <Separator />
+                            <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto">
+                                <TextBlock Grid.Column="0" Text="Jump distance (% of screen):" VerticalAlignment="Center" />
+                                <NumericUpDown Grid.Column="2" Name="JumpPercentage" Value="25"
+                                               Minimum="5" Maximum="80" Increment="5"
+                                               FormatString="F0" Width="130" HorizontalAlignment="Left"
+                                               ValueChanged="OnSettingChanged" />
+                            </Grid>
+                        </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ================= Appearance ================= -->
+            <TabItem Header="Appearance">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Spacing="8" Margin="16">
+                        <TextBlock Classes="section first" Text="Window" />
+                        <Separator />
+                        <CheckBox Name="DarkModeCheck" Content="Dark mode"
+                                  IsCheckedChanged="OnDarkModeChanged" />
                         <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto">
-                            <TextBlock Grid.Column="0" Text="UI Font Scale:" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="0" Text="Menu and panel text size:" VerticalAlignment="Center" />
                             <NumericUpDown Grid.Column="2" Name="FontScale" Value="1.25"
                                            Minimum="0.75" Maximum="2.0" Increment="0.05"
                                            FormatString="F2" Width="130" HorizontalAlignment="Left"
                                            ValueChanged="OnSettingChanged" />
                         </Grid>
-                        <CheckBox Name="DarkModeCheck" Content="Dark mode"
-                                  IsCheckedChanged="OnDarkModeChanged" />
 
-                        <TextBlock Text="Motion Blur" FontWeight="Bold" Margin="0,12,0,0" />
+                        <TextBlock Classes="section" Text="Page Colours" />
                         <Separator />
-                        <CheckBox Name="MotionBlurCheck" Content="Motion blur during scroll and zoom"
-                                  IsCheckedChanged="OnMotionBlurChanged" />
-                        <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto">
-                            <TextBlock Grid.Column="0" Text="Blur amount:" VerticalAlignment="Center" />
-                            <Slider Grid.Column="2" Name="BlurIntensitySlider" Minimum="0" Maximum="1"
-                                    Value="0.33" MinWidth="120"
-                                    PropertyChanged="OnBlurIntensityChanged" />
-                        </Grid>
-
-                        <TextBlock Text="Colour Effects" FontWeight="Bold" Margin="0,12,0,0" />
-                        <Separator />
+                        <TextBlock Classes="hint"
+                                   Text="Recolours the page itself, not the menus. Press C while reading to cycle through them." />
                         <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto,8,Auto">
-                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Effect:" VerticalAlignment="Center" />
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Colour effect:" VerticalAlignment="Center" />
                             <ComboBox Grid.Row="0" Grid.Column="2" Name="EffectCombo" Width="150"
                                       HorizontalAlignment="Left" SelectionChanged="OnEffectChanged">
                                 <ComboBoxItem Content="None" />
@@ -55,23 +213,180 @@
                                 <ComboBoxItem Content="Amber Filter" />
                                 <ComboBoxItem Content="Invert" />
                             </ComboBox>
-                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Intensity:" VerticalAlignment="Center" />
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Strength:" VerticalAlignment="Center" />
                             <Slider Grid.Row="2" Grid.Column="2" Name="IntensitySlider" Minimum="0" Maximum="1"
                                     Value="1.0" MinWidth="120"
                                     PropertyChanged="OnIntensityChanged" />
                         </Grid>
+
+                        <StackPanel Classes="adv" Spacing="8">
+                            <TextBlock Classes="section" Text="Motion" />
+                            <Separator />
+                            <CheckBox Name="MotionBlurCheck" Content="Motion blur during scroll and zoom"
+                                      IsCheckedChanged="OnMotionBlurChanged" />
+                            <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto">
+                                <TextBlock Grid.Column="0" Text="Blur amount:" VerticalAlignment="Center" />
+                                <Slider Grid.Column="2" Name="BlurIntensitySlider" Minimum="0" Maximum="1"
+                                        Value="0.33" MinWidth="120"
+                                        PropertyChanged="OnBlurIntensityChanged" />
+                            </Grid>
+                            <CheckBox Name="PixelSnappingCheck" Content="Pixel snapping (reduces text shimmer while moving)"
+                                      IsCheckedChanged="OnPixelSnappingChanged" />
+                        </StackPanel>
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>
 
-            <!-- Rendering Tab -->
-            <TabItem Header="Rendering">
-                <ScrollViewer VerticalScrollBarVisibility="Auto"
-                              HorizontalScrollBarVisibility="Disabled">
+            <!-- ================= Auto-Scroll ================= -->
+            <TabItem Header="Auto-Scroll">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                     <StackPanel Spacing="8" Margin="16">
-                        <TextBlock Text="Render Quality" FontWeight="Bold" />
+                        <TextBlock Classes="hint"
+                                   Text="Press P while rail reading to start auto-scroll. It flows through ordinary text and stops at the things below, waiting until you press D (or S to go back). It always stops at column and page breaks." />
+
+                        <TextBlock Classes="section" Text="Stop and Wait At" />
                         <Separator />
-                        <TextBlock TextWrapping="Wrap" FontSize="11" Opacity="0.7"
+                        <ItemsControl Name="StopRoleGroupsList" Classes="simple-only">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="v:RoleGroupItem">
+                                    <CheckBox Content="{Binding Label}"
+                                              IsChecked="{Binding IsChecked}"
+                                              Margin="0,1" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <ItemsControl Name="StopRolesList" Classes="adv">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="v:NavigableRoleItem">
+                                    <CheckBox Content="{Binding Label}"
+                                              IsChecked="{Binding IsChecked}"
+                                              Margin="0,1" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <TextBlock Classes="section" Text="Starting Auto-Scroll" />
+                        <Separator />
+                        <CheckBox Name="AutoScrollTriggerCheck"
+                                  Content="Also start it by holding D or → for a moment"
+                                  IsCheckedChanged="OnAutoScrollTriggerChanged" />
+                        <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto" Classes="adv">
+                            <TextBlock Grid.Column="0" Text="Hold time (ms):" VerticalAlignment="Center" />
+                            <NumericUpDown Grid.Column="2" Name="AutoScrollTriggerDelay" Value="2000"
+                                           Minimum="500" Maximum="10000" Increment="250"
+                                           FormatString="F0" Width="130" HorizontalAlignment="Left"
+                                           ValueChanged="OnSettingChanged" />
+                        </Grid>
+                        <TextBlock Classes="status" Margin="0,8,0,0"
+                                   Text="Scroll speed is set with the slider on the rail toolbar while reading. The pause at the end of each line follows Reading ▸ Reading Pace." />
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ================= Scanned Pages (OCR) ================= -->
+            <TabItem Header="Scanned Pages">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Spacing="8" Margin="16">
+                        <TextBlock Classes="section first" Text="Text Recognition" />
+                        <Separator />
+                        <TextBlock Classes="hint"
+                                   Text="Scanned pages are pictures of text, so rail reading, search and copying can't see the words. Text recognition reads them so those features work. It can be slow on large scans." />
+                        <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto" Margin="0,4,0,0">
+                            <TextBlock Grid.Column="0" Text="On scanned pages:" VerticalAlignment="Center" />
+                            <ComboBox Grid.Column="2" Name="OcrModeCombo" Width="240"
+                                      HorizontalAlignment="Left" SelectionChanged="OnOcrModeChanged">
+                                <ComboBoxItem Content="Do nothing" />
+                                <ComboBoxItem Content="Find the lines only" />
+                                <ComboBoxItem Content="Read the text" />
+                            </ComboBox>
+                        </Grid>
+                        <TextBlock Name="OcrStatus" Classes="status" Margin="0,2,0,0" />
+
+                        <StackPanel Classes="adv" Spacing="8">
+                            <TextBlock Classes="hint"
+                                       Text="'Find the lines only' recovers line geometry for rail reading without recognising words. 'Read the text' also recognises them, so search, table cells, Markdown export and VLM grounding work too — pair it with PP-DocLayout-S for best accuracy. Changing this drops cached analysis for affected pages." />
+
+                            <TextBlock Classes="section" Text="Skew Correction" />
+                            <Separator />
+                            <TextBlock Classes="hint"
+                                       Text="Corrects for a crookedly-scanned page when grouping text into lines (even a fraction of a degree can fuse or split lines). No pixels are rotated; square pages are untouched." />
+                            <CheckBox Name="OcrDeskewCheck" Content="Correct page skew when detecting lines"
+                                      IsCheckedChanged="OnOcrDeskewChanged" Margin="0,4,0,0" />
+                            <TextBlock Name="OcrDeskewStatus" Classes="status" Margin="0,2,0,0" />
+
+                            <TextBlock Classes="section" Text="Language Pack" />
+                            <Separator />
+                            <TextBlock Classes="hint"
+                                       Text="The bundled recogniser reads Latin-script text. Optional PP-OCRv6 packs add broader coverage (Latin + CJK and more), trading size and speed for accuracy. Switching packs needs a restart." />
+                            <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto" Margin="0,4,0,0">
+                                <TextBlock Grid.Column="0" Text="Language pack:" VerticalAlignment="Center" />
+                                <ComboBox Grid.Column="2" Name="OcrLanguageCombo"
+                                          Width="280" HorizontalAlignment="Left"
+                                          SelectionChanged="OnOcrLanguageChanged" />
+                            </Grid>
+                            <Grid ColumnDefinitions="Auto,8,Auto,8,*" Margin="0,6,0,0">
+                                <Button Grid.Column="0" Name="DownloadOcrModelButton" Content="Download language pack"
+                                        Click="OnDownloadOcrModel" />
+                                <Button Grid.Column="2" Name="CancelOcrDownloadButton" Content="Cancel"
+                                        Click="OnCancelOcrDownload" IsVisible="False" />
+                                <ProgressBar Grid.Column="4" Name="OcrDownloadProgress" Minimum="0" Maximum="1"
+                                             IsVisible="False" VerticalAlignment="Center" Height="6" />
+                            </Grid>
+                            <TextBlock Name="OcrLanguageStatus" Classes="status" Margin="0,2,0,0" />
+                        </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ================= Spelling ================= -->
+            <TabItem Header="Spelling">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Spacing="8" Margin="16">
+                        <TextBlock Classes="section first" Text="Spell Checking" />
+                        <Separator />
+                        <TextBlock Classes="hint"
+                                   Text="Underlines misspelled words in your notes. Right-click a word for suggestions, or press F7 in the note editor." />
+                        <CheckBox Name="SpellCheckEnabledCheck" Content="Check spelling in notes"
+                                  IsCheckedChanged="OnSpellCheckEnabledChanged" />
+                        <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto" Margin="0,4,0,0">
+                            <TextBlock Grid.Column="0" Text="Dictionary:" VerticalAlignment="Center" />
+                            <ComboBox Grid.Column="2" Name="SpellLanguageCombo" Width="360"
+                                      HorizontalAlignment="Left" SelectionChanged="OnSpellLanguageChanged" />
+                        </Grid>
+
+                        <StackPanel Classes="adv" Spacing="8">
+                            <TextBlock Classes="status"
+                                       Text="To add another language or variety (for example South African English), save its Hunspell .aff and .dic files — LibreOffice's dictionaries work — into this folder, then reopen Settings:" />
+                            <SelectableTextBlock Name="SpellDictionariesFolder" TextWrapping="Wrap" FontSize="11" />
+
+                            <TextBlock Classes="section" Text="Personal Dictionary" />
+                            <Separator />
+                            <TextBlock Classes="hint"
+                                       Text="Words you've added with &quot;Add to Dictionary&quot; — technical terms, names, abbreviations. They're accepted whichever dictionary is selected." />
+                            <Grid ColumnDefinitions="*,8,Auto">
+                                <TextBox Grid.Column="0" Name="PersonalWordInput" PlaceholderText="Add a word"
+                                         KeyDown="OnPersonalWordInputKeyDown" />
+                                <Button Grid.Column="2" Content="Add" Click="OnAddPersonalWord" />
+                            </Grid>
+                            <ListBox Name="PersonalWordsList" Height="180" SelectionMode="Multiple"
+                                     SelectionChanged="OnPersonalWordsSelectionChanged"
+                                     AutomationProperties.Name="Personal dictionary words" />
+                            <Button Name="RemovePersonalWordsButton" Content="Remove Selected"
+                                    IsEnabled="False" Click="OnRemovePersonalWords" />
+                        </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ======== Advanced-only pages below: hidden entirely in the simple view ======== -->
+
+            <!-- ================= Rendering ================= -->
+            <TabItem Header="Rendering" Classes="adv">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Spacing="8" Margin="16">
+                        <TextBlock Classes="section first" Text="Render Quality" />
+                        <Separator />
+                        <TextBlock Classes="status"
                                    Text="Higher presets re-rasterise pages at a greater DPI cap for sharper text and deeper zoom, at the cost of more memory and more frequent re-renders. Changes apply to the open page immediately." />
                         <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto">
                             <TextBlock Grid.Column="0" Text="Preset:" VerticalAlignment="Center" />
@@ -105,200 +420,18 @@
                                            Minimum="1" Maximum="300" Increment="5"
                                            FormatString="F0" Width="130" HorizontalAlignment="Left"
                                            ValueChanged="OnCustomRenderChanged" />
-                            <TextBlock Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="3"
-                                       TextWrapping="Wrap" FontSize="11" Opacity="0.7"
+                            <TextBlock Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="3" Classes="status"
                                        Text="Max DPI is clamped to 150–1200; tier step to ≥ 1. Smaller tier steps render more crisply at intermediate zoom but re-raster more often." />
                         </Grid>
-
-                        <TextBlock Text="Continuous Scrolling" FontWeight="Bold" Margin="0,12,0,0" />
-                        <Separator />
-                        <TextBlock TextWrapping="Wrap" FontSize="11" Opacity="0.7"
-                                   Text="Treats every page as one continuous document instead of a single page at a time: scrolling past the bottom of a page slides straight into the next one, in and out of rail mode, with no page-cut jump. Off by default." />
-                        <CheckBox Name="ContinuousScrollCheck" Content="Continuous scrolling"
-                                  IsCheckedChanged="OnContinuousScrollChanged" Margin="0,4,0,0" />
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>
 
-            <!-- Rail Reading Tab -->
-            <TabItem Header="Rail Reading">
-                <ScrollViewer VerticalScrollBarVisibility="Auto"
-                              HorizontalScrollBarVisibility="Disabled">
+            <!-- ================= Analysis ================= -->
+            <TabItem Header="Analysis" Classes="adv">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                     <StackPanel Spacing="8" Margin="16">
-                        <TextBlock Text="Navigation" FontWeight="Bold" />
-                        <Separator />
-                        <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto,4,Auto,4,Auto,4,Auto,4,Auto">
-                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Zoom threshold:" VerticalAlignment="Center" />
-                            <NumericUpDown Grid.Row="0" Grid.Column="2" Name="ZoomThreshold" Value="3.0"
-                                           Minimum="1.0" Maximum="15.0" Increment="0.1"
-                                           FormatString="F1" Width="130" HorizontalAlignment="Left"
-                                           ValueChanged="OnSettingChanged" />
-                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Snap duration (ms):" VerticalAlignment="Center" />
-                            <NumericUpDown Grid.Row="2" Grid.Column="2" Name="SnapDuration" Value="450"
-                                           Minimum="50" Maximum="1000" Increment="10"
-                                           FormatString="F0" Width="130" HorizontalAlignment="Left"
-                                           ValueChanged="OnSettingChanged" />
-                            <TextBlock Grid.Row="4" Grid.Column="0" Text="Scroll speed start:" VerticalAlignment="Center" />
-                            <NumericUpDown Grid.Row="4" Grid.Column="2" Name="ScrollStart" Value="10"
-                                           Minimum="10" Maximum="500" Increment="5"
-                                           FormatString="F0" Width="130" HorizontalAlignment="Left"
-                                           ValueChanged="OnSettingChanged" />
-                            <TextBlock Grid.Row="6" Grid.Column="0" Text="Scroll speed max:" VerticalAlignment="Center" />
-                            <NumericUpDown Grid.Row="6" Grid.Column="2" Name="ScrollMax" Value="30"
-                                           Minimum="10" Maximum="500" Increment="5"
-                                           FormatString="F0" Width="130" HorizontalAlignment="Left"
-                                           ValueChanged="OnSettingChanged" />
-                            <TextBlock Grid.Row="8" Grid.Column="0" Text="Ramp time (s):" VerticalAlignment="Center" />
-                            <NumericUpDown Grid.Row="8" Grid.Column="2" Name="RampTime" Value="1.5"
-                                           Minimum="0.1" Maximum="5.0" Increment="0.1"
-                                           FormatString="F1" Width="130" HorizontalAlignment="Left"
-                                           ValueChanged="OnSettingChanged" />
-                        </Grid>
-
-                        <TextBlock Text="Visual" FontWeight="Bold" Margin="0,12,0,0" />
-                        <Separator />
-                        <CheckBox Name="PixelSnappingCheck" Content="Pixel snapping (reduces text shimmer)"
-                                  IsCheckedChanged="OnPixelSnappingChanged" />
-                        <CheckBox Name="MarginCroppingCheck" Content="Crop page margins (fit to detected content)"
-                                  IsCheckedChanged="OnMarginCroppingChanged" />
-                        <CheckBox Name="LineFocusBlurCheck" Content="Blur non-active lines in rail mode"
-                                  IsCheckedChanged="OnLineFocusBlurChanged" />
-                        <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto,8,Auto">
-                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Focus dim amount:" VerticalAlignment="Center" />
-                            <Slider Grid.Row="0" Grid.Column="2" Name="LineFocusBlurSlider" Minimum="0" Maximum="1"
-                                    Value="0.5" MinWidth="120"
-                                    PropertyChanged="OnLineFocusBlurIntensityChanged" />
-                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Line padding:" VerticalAlignment="Center" />
-                            <Slider Grid.Row="2" Grid.Column="2" Name="LinePaddingSlider" Minimum="0" Maximum="0.5"
-                                    Value="0.2" MinWidth="120"
-                                    PropertyChanged="OnLinePaddingChanged" />
-                        </Grid>
-
-                        <TextBlock Text="Line Highlight" FontWeight="Bold" Margin="0,12,0,0" />
-                        <Separator />
-                        <CheckBox Name="LineHighlightCheck" Content="Show line highlight in rail mode"
-                                  IsCheckedChanged="OnLineHighlightEnabledChanged" />
-                        <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto,8,Auto">
-                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Colour:" VerticalAlignment="Center" />
-                            <ComboBox Grid.Row="0" Grid.Column="2" Name="LineHighlightTintCombo"
-                                      Width="150" HorizontalAlignment="Left"
-                                      SelectionChanged="OnLineHighlightTintChanged" />
-                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Opacity:" VerticalAlignment="Center" />
-                            <Slider Grid.Row="2" Grid.Column="2" Name="LineHighlightOpacitySlider"
-                                    Minimum="0.05" Maximum="1" Value="0.25" MinWidth="120"
-                                    PropertyChanged="OnLineHighlightOpacityChanged" />
-                        </Grid>
-
-                        <TextBlock Text="Jump Mode" FontWeight="Bold" Margin="0,12,0,0" />
-                        <Separator />
-                        <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto">
-                            <TextBlock Grid.Column="0" Text="Jump distance (%):" VerticalAlignment="Center" />
-                            <NumericUpDown Grid.Column="2" Name="JumpPercentage" Value="25"
-                                           Minimum="5" Maximum="80" Increment="5"
-                                           FormatString="F0" Width="130" HorizontalAlignment="Left"
-                                           ValueChanged="OnSettingChanged" />
-                        </Grid>
-                    </StackPanel>
-                </ScrollViewer>
-            </TabItem>
-
-            <!-- Auto-Scroll Tab -->
-            <TabItem Header="Auto-Scroll">
-                <ScrollViewer VerticalScrollBarVisibility="Auto"
-                              HorizontalScrollBarVisibility="Disabled">
-                    <StackPanel Spacing="8" Margin="16">
-                        <TextBlock Text="Auto-scroll flows through prose automatically and parks (waits for you to press D or S) when it reaches a non-prose block — an equation, table, figure, or heading — and at column and page breaks. Pan and zoom stay live while parked, so you can study what you've stopped on for as long as you like."
-                                   TextWrapping="Wrap" Opacity="0.7" />
-
-                        <TextBlock Text="Reading Beat" FontWeight="Bold" Margin="0,12,0,0" />
-                        <Separator />
-                        <TextBlock Text="Brief rest held at the end of every line before moving to the next, giving your eyes time to settle. Raise the Snap duration (Rail Reading tab) if the move between lines feels too quick."
-                                   TextWrapping="Wrap" Opacity="0.7" />
-                        <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto">
-                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Line pause (ms):" VerticalAlignment="Center" />
-                            <NumericUpDown Grid.Row="0" Grid.Column="2" Name="AutoScrollLinePause" Value="400"
-                                           Minimum="0" Maximum="2000" Increment="50"
-                                           FormatString="F0" Width="130" HorizontalAlignment="Left"
-                                           ValueChanged="OnSettingChanged" />
-                        </Grid>
-                        <TextBlock Text="Set to 0 to disable the per-line pause. Speed is controlled via the rail toolbar sliders."
-                                   TextWrapping="Wrap" Opacity="0.5" Margin="0,8,0,0" />
-
-                        <TextBlock Text="Park On" FontWeight="Bold" Margin="0,12,0,0" />
-                        <Separator />
-                        <TextBlock Text="Which block types auto-scroll parks on when it reaches them. Unchecked types flow through like prose. (Column and page breaks always park.)"
-                                   TextWrapping="Wrap" Opacity="0.7" />
-                        <ItemsControl Name="StopRolesList">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate x:DataType="v:NavigableRoleItem">
-                                    <CheckBox Content="{Binding Label}"
-                                              IsChecked="{Binding IsChecked}"
-                                              Margin="0,1" />
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-
-                        <TextBlock Text="Auto-Scroll Trigger" FontWeight="Bold" Margin="0,12,0,0" />
-                        <Separator />
-                        <TextBlock Text="Automatically start auto-scroll after holding the scroll key (D / Right Arrow) for a set duration."
-                                   TextWrapping="Wrap" Opacity="0.7" />
-                        <CheckBox Name="AutoScrollTriggerCheck" Content="Enable auto-scroll trigger"
-                                  IsCheckedChanged="OnAutoScrollTriggerChanged" />
-                        <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto">
-                            <TextBlock Grid.Column="0" Text="Trigger delay (ms):" VerticalAlignment="Center" />
-                            <NumericUpDown Grid.Column="2" Name="AutoScrollTriggerDelay" Value="2000"
-                                           Minimum="500" Maximum="10000" Increment="250"
-                                           FormatString="F0" Width="130" HorizontalAlignment="Left"
-                                           ValueChanged="OnSettingChanged" />
-                        </Grid>
-                    </StackPanel>
-                </ScrollViewer>
-            </TabItem>
-
-            <!-- Spelling Tab — spell checking in annotation note text (SpellCheckService) -->
-            <TabItem Header="Spelling">
-                <ScrollViewer VerticalScrollBarVisibility="Auto"
-                              HorizontalScrollBarVisibility="Disabled">
-                    <StackPanel Spacing="8" Margin="16">
-                        <TextBlock Text="Spell Checking" FontWeight="Bold" />
-                        <Separator />
-                        <TextBlock TextWrapping="Wrap" Opacity="0.7"
-                                   Text="Underlines misspelled words while you write text notes and free-text annotations. Right-click an underlined word for suggestions, or press F7 in the note editor to step through them from the keyboard. Checking runs entirely on this computer." />
-                        <CheckBox Name="SpellCheckEnabledCheck" Content="Check spelling in notes"
-                                  IsCheckedChanged="OnSpellCheckEnabledChanged" />
-                        <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto" Margin="0,4,0,0">
-                            <TextBlock Grid.Column="0" Text="Dictionary:" VerticalAlignment="Center" />
-                            <ComboBox Grid.Column="2" Name="SpellLanguageCombo" Width="280"
-                                      HorizontalAlignment="Left" SelectionChanged="OnSpellLanguageChanged" />
-                        </Grid>
-                        <TextBlock TextWrapping="Wrap" Opacity="0.7" FontSize="11"
-                                   Text="British and American English are included. To add another language or variety (for example South African English), save its Hunspell .aff and .dic files — LibreOffice's dictionaries work — into this folder, then reopen Settings:" />
-                        <SelectableTextBlock Name="SpellDictionariesFolder" TextWrapping="Wrap" FontSize="11" />
-
-                        <TextBlock Text="Personal Dictionary" FontWeight="Bold" Margin="0,12,0,0" />
-                        <Separator />
-                        <TextBlock TextWrapping="Wrap" Opacity="0.7"
-                                   Text="Words you've added with &quot;Add to Dictionary&quot; — technical terms, names, abbreviations. They're accepted whichever dictionary is selected." />
-                        <Grid ColumnDefinitions="*,8,Auto">
-                            <TextBox Grid.Column="0" Name="PersonalWordInput" PlaceholderText="Add a word"
-                                     KeyDown="OnPersonalWordInputKeyDown" />
-                            <Button Grid.Column="2" Content="Add" Click="OnAddPersonalWord" />
-                        </Grid>
-                        <ListBox Name="PersonalWordsList" Height="180" SelectionMode="Multiple"
-                                 SelectionChanged="OnPersonalWordsSelectionChanged"
-                                 AutomationProperties.Name="Personal dictionary words" />
-                        <Button Name="RemovePersonalWordsButton" Content="Remove Selected"
-                                IsEnabled="False" Click="OnRemovePersonalWords" />
-                    </StackPanel>
-                </ScrollViewer>
-            </TabItem>
-
-            <!-- Advanced Tab -->
-            <TabItem Header="Advanced">
-                <ScrollViewer VerticalScrollBarVisibility="Auto"
-                              HorizontalScrollBarVisibility="Disabled">
-                    <StackPanel Spacing="8" Margin="16">
-                        <TextBlock Text="Document Analysis" FontWeight="Bold" />
+                        <TextBlock Classes="section first" Text="Document Analysis" />
                         <Separator />
                         <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto,4,Auto,4,Auto">
                             <TextBlock Grid.Row="0" Grid.Column="0" Text="Lookahead pages:" VerticalAlignment="Center" />
@@ -317,13 +450,13 @@
                                            FormatString="F0" Width="130" HorizontalAlignment="Left"
                                            ValueChanged="OnSettingChanged" />
                         </Grid>
-                        <TextBlock Text="Lookahead: pages pre-analysed ahead of the current page. Background analysis range: pages analysed either side of the current page (higher = more pre-analysis, more CPU; 0 = whole document). Page cache range: pages of text kept in memory (lower = less RAM on large documents; 0 = no eviction)."
-                                   TextWrapping="Wrap" Opacity="0.5" />
+                        <TextBlock Classes="status"
+                                   Text="Lookahead: pages pre-analysed ahead of the current page. Background analysis range: pages analysed either side of the current page (higher = more pre-analysis, more CPU; 0 = whole document). Page cache range: pages of text kept in memory (lower = less RAM on large documents; 0 = no eviction)." />
 
-                        <TextBlock Text="Navigable Block Roles" FontWeight="Bold" Margin="0,12,0,0" />
+                        <TextBlock Classes="section" Text="Rail Stops On" />
                         <Separator />
-                        <TextBlock Text="Rail mode will navigate through the semantic roles you check below. Roles are model-independent — they work the same whether you use the bundled PP-DocLayoutV3 model or a custom one."
-                                   TextWrapping="Wrap" Opacity="0.7" />
+                        <TextBlock Classes="hint"
+                                   Text="Block types rail reading moves through. Unchecked types are skipped." />
                         <ItemsControl Name="NavigableRolesList">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="v:NavigableRoleItem">
@@ -334,10 +467,10 @@
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
 
-                        <TextBlock Text="Centered Block Roles" FontWeight="Bold" Margin="0,12,0,0" />
+                        <TextBlock Classes="section" Text="Centred Block Types" />
                         <Separator />
-                        <TextBlock Text="Roles to horizontally center when narrower than the viewport (headings are usually left-aligned):"
-                                   TextWrapping="Wrap" Opacity="0.7" />
+                        <TextBlock Classes="hint"
+                                   Text="Block types centred horizontally when narrower than the window (headings usually look better left-aligned)." />
                         <ItemsControl Name="CenteringRolesList">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="v:NavigableRoleItem">
@@ -347,10 +480,17 @@
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
 
-                        <TextBlock Text="Layout Model" FontWeight="Bold" Margin="0,16,0,0" />
+            <!-- ================= Layout Model ================= -->
+            <TabItem Header="Layout Model" Classes="adv">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Spacing="8" Margin="16">
+                        <TextBlock Classes="section first" Text="Layout Model" />
                         <Separator />
-                        <TextBlock TextWrapping="Wrap" Opacity="0.7"
+                        <TextBlock Classes="hint"
                                    Text="Docling Heron (INT8, ~66 MB) is the default model with 17 layout classes and ships with the app. PP-DocLayoutV3 (~125 MB, model-supplied reading order) and PP-DocLayout-S (lightweight) are optional — select one below and press Download to install it. Downloads are saved to your config folder, so they work even from a read-only AppImage." />
                         <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto" Margin="0,4,0,0">
                             <TextBlock Grid.Column="0" Text="Model:" VerticalAlignment="Center" />
@@ -366,12 +506,11 @@
                             <ProgressBar Grid.Column="4" Name="DownloadProgress" Minimum="0" Maximum="1"
                                          IsVisible="False" VerticalAlignment="Center" Height="6" />
                         </Grid>
-                        <TextBlock Name="BuiltinAnalyzerStatus" TextWrapping="Wrap" Opacity="0.7" FontSize="11"
-                                   Margin="0,2,0,0" />
+                        <TextBlock Name="BuiltinAnalyzerStatus" Classes="status" Margin="0,2,0,0" />
 
-                        <TextBlock Text="Custom Layout Model" FontWeight="Bold" Margin="0,16,0,0" />
+                        <TextBlock Classes="section" Text="Custom Layout Model" />
                         <Separator />
-                        <TextBlock TextWrapping="Wrap" Opacity="0.7"
+                        <TextBlock Classes="hint"
                                    Text="Optionally replace the built-in model with your own ONNX. The model must follow PP-DocLayoutV3's I/O contract (im_shape/image/scale_factor inputs, [N, 6+] detection tensor). Pair it with a JSON file that maps each model class id to a BlockRole. When enabled, this takes precedence over the model selected above." />
                         <CheckBox Name="CustomModelEnabled" Content="Use custom layout model"
                                   IsCheckedChanged="OnCustomModelEnabledChanged" Margin="0,4,0,4" />
@@ -385,8 +524,7 @@
                             <Button  Grid.Row="2" Grid.Column="2" Content="Browse…"
                                      Click="OnBrowseCustomModelMapping" />
                         </Grid>
-                        <TextBlock Name="CustomModelStatus" TextWrapping="Wrap" Opacity="0.7" FontSize="11"
-                                   Margin="0,6,0,0" />
+                        <TextBlock Name="CustomModelStatus" Classes="status" Margin="0,6,0,0" />
                         <Expander Header="Example mapping JSON" Margin="0,6,0,0">
                             <TextBlock FontFamily="Consolas, Menlo, monospace" FontSize="11" TextWrapping="Wrap"
                                        xml:space="preserve">{
@@ -405,38 +543,37 @@
                 </ScrollViewer>
             </TabItem>
 
-            <!-- Performance Tab — GPU acceleration presets, and the two individual GPU toggles they
-                 drive. Layout and OCR GPU acceleration are mutually exclusive (concurrent WebGPU
-                 Session.Run() across two sessions crashes the process), so this consolidates both
-                 into one place instead of leaving them scattered across Advanced and OCR. -->
-            <TabItem Header="Performance">
-                <ScrollViewer VerticalScrollBarVisibility="Auto"
-                              HorizontalScrollBarVisibility="Disabled">
+            <!-- ================= Performance ================= -->
+            <!-- GPU acceleration presets, and the two individual GPU toggles they drive. Layout and
+                 OCR GPU acceleration are mutually exclusive (concurrent WebGPU Session.Run() across
+                 two sessions crashes the process), so both live here in one place. -->
+            <TabItem Header="Performance" Classes="adv">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                     <StackPanel Spacing="8" Margin="16">
-                        <TextBlock Text="GPU Acceleration Preset" FontWeight="Bold" />
+                        <TextBlock Classes="section first" Text="GPU Acceleration Preset" />
                         <Separator />
-                        <TextBlock TextWrapping="Wrap" Opacity="0.7"
+                        <TextBlock Classes="hint"
                                    Text="Experimental: ONNX Runtime's WebGPU execution provider can accelerate layout analysis or OCR — but not both at once (running two GPU-backed models concurrently is a confirmed ONNX Runtime crash). Pick whichever side benefits your documents more, or configure layout and OCR acceleration individually below." />
                         <RadioButton Name="PresetCpuOnly" GroupName="AccelerationPreset"
                                      Content="CPU only" IsCheckedChanged="OnPresetChanged" Margin="0,4,0,0" />
                         <TextBlock Text="No GPU acceleration — today's default. Always available."
-                                   TextWrapping="Wrap" Opacity="0.6" FontSize="11" Margin="20,0,0,4" />
+                                   Classes="status" Margin="20,0,0,4" />
                         <RadioButton Name="PresetFasterNavigation" GroupName="AccelerationPreset"
                                      Content="Faster page navigation (layout GPU)" IsCheckedChanged="OnPresetChanged" />
                         <TextBlock Text="Layout analysis on GPU (~8x faster per page measured), OCR stays on CPU. Best for born-digital PDFs, where OCR rarely runs anyway."
-                                   TextWrapping="Wrap" Opacity="0.6" FontSize="11" Margin="20,0,0,4" />
+                                   Classes="status" Margin="20,0,0,4" />
                         <RadioButton Name="PresetFasterScannedOcr" GroupName="AccelerationPreset"
                                      Content="Faster scanned-document OCR (OCR GPU)" IsCheckedChanged="OnPresetChanged" />
                         <TextBlock Text="OCR on GPU with the PP-OCRv6 Medium multilingual pack (~38s/page measured, vs. minutes on CPU) — the pack that makes Medium's accuracy actually practical to use. Layout stays on CPU."
-                                   TextWrapping="Wrap" Opacity="0.6" FontSize="11" Margin="20,0,0,4" />
-                        <TextBlock Name="PresetCustomStatus" IsVisible="False"
+                                   Classes="status" Margin="20,0,0,4" />
+                        <TextBlock Name="PresetCustomStatus" IsVisible="False" Classes="status"
                                    Text="Custom configuration — layout and OCR acceleration are set individually below, not matching a preset."
-                                   TextWrapping="Wrap" Opacity="0.7" FontSize="11" FontStyle="Italic" Margin="0,4,0,4" />
+                                   FontStyle="Italic" Margin="0,4,0,4" />
 
-                        <TextBlock Text="Layout Model GPU Acceleration" FontWeight="Bold" Margin="0,16,0,0" />
+                        <TextBlock Classes="section" Text="Layout Model GPU Acceleration" />
                         <Separator />
-                        <TextBlock TextWrapping="Wrap" Opacity="0.7"
-                                   Text="Runs layout inference on the GPU via ONNX Runtime's native WebGPU execution provider (Dawn → D3D12/Vulkan/Metal). Only Docling Heron and PP-DocLayoutV3 have a GPU model — PP-DocLayout-S always runs on CPU. Mutually exclusive with OCR GPU acceleration below (see the preset picker above) — automatically falls back to CPU if no compatible GPU is found, the GPU model isn't downloaded, or the GPU session fails to start. Takes effect after a restart." />
+                        <TextBlock Classes="hint"
+                                   Text="Runs layout inference on the GPU via ONNX Runtime's native WebGPU execution provider (Dawn → D3D12/Vulkan/Metal). Only Docling Heron and PP-DocLayoutV3 have a GPU model — PP-DocLayout-S always runs on CPU. Mutually exclusive with OCR GPU acceleration below — automatically falls back to CPU if no compatible GPU is found, the GPU model isn't downloaded, or the GPU session fails to start. Takes effect after a restart." />
                         <CheckBox Name="GpuAccelerationCheck" Content="Use GPU acceleration for layout analysis"
                                   IsCheckedChanged="OnGpuAccelerationChanged" Margin="0,4,0,4" />
                         <Grid ColumnDefinitions="Auto,8,Auto,8,*" Margin="0,6,0,0">
@@ -447,47 +584,44 @@
                             <ProgressBar Grid.Column="4" Name="GpuDownloadProgress" Minimum="0" Maximum="1"
                                          IsVisible="False" VerticalAlignment="Center" Height="6" />
                         </Grid>
-                        <TextBlock Name="GpuAccelerationStatus" TextWrapping="Wrap" Opacity="0.7" FontSize="11"
-                                   Margin="0,2,0,0" />
+                        <TextBlock Name="GpuAccelerationStatus" Classes="status" Margin="0,2,0,0" />
 
-                        <TextBlock Text="OCR GPU Acceleration" FontWeight="Bold" Margin="0,16,0,0" />
+                        <TextBlock Classes="section" Text="OCR GPU Acceleration" />
                         <Separator />
-                        <TextBlock TextWrapping="Wrap" Opacity="0.7"
-                                   Text="Runs OCR detection/recognition on the GPU via ONNX Runtime's native WebGPU execution provider — the same model weights run either way, no separate download. Speeds up the larger language packs substantially (Medium measured ~13x faster on one GPU, byte-identical output in spot-checks). Mutually exclusive with layout GPU acceleration above (see the preset picker above) — automatically falls back to CPU if no compatible GPU is found. Takes effect after a restart." />
+                        <TextBlock Classes="hint"
+                                   Text="Runs OCR detection/recognition on the GPU via ONNX Runtime's native WebGPU execution provider — the same model weights run either way, no separate download. Speeds up the larger language packs substantially (Medium measured ~13x faster on one GPU, byte-identical output in spot-checks). Mutually exclusive with layout GPU acceleration above — automatically falls back to CPU if no compatible GPU is found. Takes effect after a restart." />
                         <CheckBox Name="OcrGpuAccelerationCheck" Content="Use GPU acceleration for OCR"
                                   IsCheckedChanged="OnOcrGpuAccelerationChanged" Margin="0,4,0,4" />
-                        <TextBlock Name="OcrGpuAccelerationStatus" TextWrapping="Wrap" Opacity="0.7" FontSize="11"
-                                   Margin="0,2,0,0" />
+                        <TextBlock Name="OcrGpuAccelerationStatus" Classes="status" Margin="0,2,0,0" />
 
                         <!-- Linux hybrid laptops: which GPU draws the window (display, not analysis). -->
                         <StackPanel Name="DisplayGpuPanel" Spacing="8" IsVisible="False">
-                            <TextBlock Text="Display GPU" FontWeight="Bold" Margin="0,16,0,0" />
+                            <TextBlock Classes="section" Text="Display GPU" />
                             <Separator />
-                            <TextBlock TextWrapping="Wrap" Opacity="0.7"
+                            <TextBlock Classes="hint"
                                        Text="On a laptop with both an integrated and a discrete GPU, the window is drawn on the integrated one by default. That saves battery, but on a large or high-resolution window scrolling can stutter because each frame takes too long to draw. Turn this on to draw on the discrete GPU instead. Takes effect after a restart." />
                             <CheckBox Name="PreferDiscreteGpuCheck" Content="Prefer the discrete GPU for drawing"
                                       IsCheckedChanged="OnPreferDiscreteGpuChanged" Margin="0,4,0,4" />
-                            <TextBlock Name="DisplayGpuStatus" TextWrapping="Wrap" Opacity="0.7" FontSize="11"
-                                       Margin="0,2,0,0" />
+                            <TextBlock Name="DisplayGpuStatus" Classes="status" Margin="0,2,0,0" />
                         </StackPanel>
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>
 
-            <!-- Models Tab — read-only overview of what's actually running this session (not what's
-                 currently selected — model/accelerator choices are restart-to-apply, so a change made
-                 elsewhere in Settings shows here as "Pending" until relaunch), plus advisories for a
+            <!-- ================= Models (status) ================= -->
+            <!-- Read-only overview of what's actually running this session (not what's currently
+                 selected — model/accelerator choices are restart-to-apply, so a change made elsewhere
+                 in Settings shows here as "Pending" until relaunch), plus advisories for a
                  model/accelerator combo that's working against itself (issue #232). -->
-            <TabItem Header="Models">
-                <ScrollViewer VerticalScrollBarVisibility="Auto"
-                              HorizontalScrollBarVisibility="Disabled">
+            <TabItem Header="Models" Classes="adv">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                     <StackPanel Spacing="8" Margin="16">
-                        <TextBlock Text="What's Actually Running" FontWeight="Bold" />
+                        <TextBlock Classes="section first" Text="What's Actually Running" />
                         <Separator />
-                        <TextBlock TextWrapping="Wrap" Opacity="0.7"
+                        <TextBlock Classes="hint"
                                    Text="Model and accelerator choices elsewhere in Settings take effect on next launch. This shows what's active THIS session, not what's currently selected — if you've just changed something, look for a 'Pending' note below." />
 
-                        <TextBlock Text="Layout Analysis" FontWeight="Bold" Margin="0,12,0,0" />
+                        <TextBlock Classes="section" Text="Layout Analysis" />
                         <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto,4,Auto">
                             <TextBlock Grid.Row="0" Grid.Column="0" Text="Active:" Opacity="0.7" VerticalAlignment="Top" />
                             <TextBlock Grid.Row="0" Grid.Column="2" Name="ModelsLayoutActiveText" TextWrapping="Wrap" />
@@ -496,7 +630,7 @@
                                        TextWrapping="Wrap" Opacity="0.7" FontStyle="Italic" />
                         </Grid>
 
-                        <TextBlock Text="OCR" FontWeight="Bold" Margin="0,12,0,0" />
+                        <TextBlock Classes="section" Text="OCR" />
                         <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto,4,Auto">
                             <TextBlock Grid.Row="0" Grid.Column="0" Text="Active:" Opacity="0.7" VerticalAlignment="Top" />
                             <TextBlock Grid.Row="0" Grid.Column="2" Name="ModelsOcrActiveText" TextWrapping="Wrap" />
@@ -525,71 +659,16 @@
                 </ScrollViewer>
             </TabItem>
 
-            <!-- OCR Tab — everything about recovering a text layer from scanned pages -->
-            <TabItem Header="OCR">
-                <ScrollViewer VerticalScrollBarVisibility="Auto"
-                              HorizontalScrollBarVisibility="Disabled">
+            <!-- ================= AI (VLM) ================= -->
+            <TabItem Header="AI Assistant" Classes="adv">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                     <StackPanel Spacing="8" Margin="16">
-                        <TextBlock Text="Scanned Pages (OCR)" FontWeight="Bold" />
+                        <TextBlock Classes="section first" Text="Vision Language Model" />
                         <Separator />
-                        <TextBlock TextWrapping="Wrap" Opacity="0.7"
-                                   Text="A scanned page has no text layer, so it loses line detection, search, table cells, Markdown export, and VLM grounding. OCR recovers a text layer so those features work. Off costs nothing. Lines detects line geometry only. Full also recognises the text — pair with PP-DocLayout-S at 1920 for best accuracy. Changing this drops cached analysis for affected pages." />
-                        <TextBlock TextWrapping="Wrap" Opacity="0.7"
-                                   Text="Full recognition is CPU-heavy and runs on the same single worker thread as layout analysis, so a scanned page can hold up analysis of every open document while it works. How long depends mostly on the language pack below." />
-                        <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto" Margin="0,4,0,0">
-                            <TextBlock Grid.Column="0" Text="OCR mode:" VerticalAlignment="Center" />
-                            <ComboBox Grid.Column="2" Name="OcrModeCombo" Width="150"
-                                      HorizontalAlignment="Left" SelectionChanged="OnOcrModeChanged">
-                                <ComboBoxItem Content="Off" />
-                                <ComboBoxItem Content="Lines" />
-                                <ComboBoxItem Content="Full" />
-                            </ComboBox>
-                        </Grid>
-                        <TextBlock Name="OcrStatus" TextWrapping="Wrap" Opacity="0.7" FontSize="11"
-                                   Margin="0,2,0,0" />
+                        <TextBlock Classes="hint"
+                                   Text="Configure an OpenAI-compatible API endpoint to enable Copy as LaTeX (Ctrl+L). Works with Ollama, vLLM, LMStudio, or cloud APIs." />
 
-                        <TextBlock Text="Skew Correction" FontWeight="Bold" Margin="0,12,0,0" />
-                        <Separator />
-                        <TextBlock TextWrapping="Wrap" Opacity="0.7"
-                                   Text="A scan lifted crookedly off the glass groups badly into lines: even a fraction of a degree can fragment a paragraph into a few giant rail units, or fuse neighbouring lines together. This measures the page's tilt from the OCR detections and corrects for it when grouping text into lines — no pixels are rotated. Pages that are already square are left exactly as they were. Needs OCR, so it does nothing while OCR mode is Off." />
-                        <CheckBox Name="OcrDeskewCheck" Content="Correct page skew when detecting lines"
-                                  IsCheckedChanged="OnOcrDeskewChanged" Margin="0,4,0,0" />
-                        <TextBlock Name="OcrDeskewStatus" TextWrapping="Wrap" Opacity="0.7" FontSize="11"
-                                   Margin="0,2,0,0" />
-
-                        <TextBlock Text="OCR Language Pack" FontWeight="Bold" Margin="0,12,0,0" />
-                        <Separator />
-                        <TextBlock TextWrapping="Wrap" Opacity="0.7"
-                                   Text="The bundled OCR recognizer only reads Latin-script text well. Optional PP-OCRv6 language packs add broader multilingual coverage (Latin + CJK and more), trading off size and speed for accuracy. Downloads are saved to your config folder. Switching packs needs a restart to take effect." />
-                        <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto" Margin="0,4,0,0">
-                            <TextBlock Grid.Column="0" Text="Language pack:" VerticalAlignment="Center" />
-                            <ComboBox Grid.Column="2" Name="OcrLanguageCombo"
-                                      Width="280" HorizontalAlignment="Left"
-                                      SelectionChanged="OnOcrLanguageChanged" />
-                        </Grid>
-                        <Grid ColumnDefinitions="Auto,8,Auto,8,*" Margin="0,6,0,0">
-                            <Button Grid.Column="0" Name="DownloadOcrModelButton" Content="Download language pack"
-                                    Click="OnDownloadOcrModel" />
-                            <Button Grid.Column="2" Name="CancelOcrDownloadButton" Content="Cancel"
-                                    Click="OnCancelOcrDownload" IsVisible="False" />
-                            <ProgressBar Grid.Column="4" Name="OcrDownloadProgress" Minimum="0" Maximum="1"
-                                         IsVisible="False" VerticalAlignment="Center" Height="6" />
-                        </Grid>
-                        <TextBlock Name="OcrLanguageStatus" TextWrapping="Wrap" Opacity="0.7" FontSize="11"
-                                   Margin="0,2,0,0" />
-                    </StackPanel>
-                </ScrollViewer>
-            </TabItem>
-
-            <TabItem Header="VLM">
-                <ScrollViewer>
-                    <StackPanel Margin="12">
-                        <TextBlock Text="Vision Language Model" FontWeight="Bold" />
-                        <Separator />
-                        <TextBlock Text="Configure an OpenAI-compatible API endpoint to enable Copy as LaTeX (Ctrl+L). Works with Ollama, vLLM, LMStudio, or cloud APIs."
-                                   TextWrapping="Wrap" Opacity="0.7" Margin="0,0,0,8" />
-
-                        <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto,8,Auto,8,Auto" Margin="0,0,0,8">
+                        <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto,8,Auto,8,Auto" Margin="0,4,0,0">
                             <TextBlock Grid.Row="0" Grid.Column="0" Text="Endpoint" VerticalAlignment="Center" />
                             <TextBox Grid.Row="0" Grid.Column="2" Name="VlmEndpoint"
                                      PlaceholderText="http://localhost:11434/v1"
@@ -608,19 +687,18 @@
                         </Grid>
 
                         <TextBlock Text="The API key is stored locally in your config file."
-                                   Opacity="0.5" FontSize="11" Margin="0,0,0,8" />
+                                   Classes="status" />
 
                         <CheckBox Name="VlmStructuredOutput"
                                   Content="Use structured JSON schema responses"
-                                  IsCheckedChanged="OnVlmCheckChanged"
-                                  Margin="0,0,0,4" />
-                        <TextBlock TextWrapping="Wrap" Opacity="0.6" FontSize="11" Margin="0,0,0,8"
+                                  IsCheckedChanged="OnVlmCheckChanged" />
+                        <TextBlock Classes="status"
                                    Text="Forces the model to return a JSON object matching a strict schema. Produces cleaner LaTeX/Markdown on capable models (GPT-4o, Qwen2.5-VL, Gemini, etc.). Some local or OCR-specialised models may not support JSON schema and will fail or return truncated output — disable this if you see errors." />
 
                         <Button Name="TestVlmButton" Content="Test Connection"
                                 HorizontalAlignment="Left"
                                 Click="OnTestVlmConnection" />
-                        <TextBlock Name="VlmTestResult" Opacity="0.7" Margin="0,4,0,0" />
+                        <TextBlock Name="VlmTestResult" Opacity="0.7" />
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>

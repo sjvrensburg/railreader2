@@ -459,7 +459,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         {
             logger.Debug(
                 $"[OCR] Language pack '{desc.DisplayName}' is selected but not installed; " +
-                "using the bundled default. Download it in Settings ▸ OCR, then restart.");
+                "using the bundled default. Download it in Settings ▸ Scanned Pages (advanced view), then restart.");
             return (null, BundledOcrPackDisplayName, null);
         }
 
@@ -609,7 +609,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
                 _logger.Warn("[Advisory] Running FP32 PP-DocLayoutV3 on CPU — Docling Heron (INT8) would be faster here but isn't downloaded.");
                 ShowStatusToast(
                     "Layout is running the heavier FP32 model on CPU — Docling Heron (INT8) would be faster here —",
-                    "review layout settings", () => OpenSettingsTab("Advanced"));
+                    "review layout settings", () => OpenSettingsTab("Layout Model"));
             }
         }
         else if (ocrGpuWastedOnTiny)
