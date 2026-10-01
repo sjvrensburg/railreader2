@@ -78,6 +78,14 @@
       "page": 1, "zoom": 5.75,
       "theme": "light", "width": 1600, "height": 1000,
       "search": "ECG", "railLineFraction": 0.33
+    },
+    {
+      "name": "multiple_tabs",
+      "pdf": "experiments/PDFs/Attention_is_all_you_need.pdf",
+      "extraTabs": ["experiments/PDFs/CoGenT.pdf", "experiments/PDFs/MOMENT.pdf"],
+      "page": 3, "zoom": 1.5,
+      "theme": "light", "width": 1600, "height": 900,
+      "sidebar": "outline"
     }
   ]
 }

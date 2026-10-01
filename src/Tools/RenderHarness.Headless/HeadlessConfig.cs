@@ -44,6 +44,10 @@ public sealed class ShotSpec
     /// <summary>Source PDF path, relative to repo root.</summary>
     public string Pdf { get; set; } = "";
 
+    /// <summary>Further PDFs (relative to repo root) to have open as background tabs. They are
+    /// opened before <see cref="Pdf"/>, which stays the active tab.</summary>
+    public List<string> ExtraTabs { get; set; } = [];
+
     /// <summary>1-based page number.</summary>
     public int Page { get; set; } = 1;
 

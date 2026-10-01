@@ -92,7 +92,6 @@ appConfig.LineFocusBlurIntensity = 0.8;
 // per shot WITHOUT rebuilding the window — so the analysis cache and loaded ONNX
 // model survive, which a rebuild would reset (and risk a PDFium teardown crash).
 const double BaseFontSize = 14.0;
-string? loadedPdf = null;
 
 appConfig.UiFontScale = config.UiScale > 0 ? config.UiScale : 1.0f;
 var vm = new MainWindowViewModel(appConfig);
@@ -192,6 +191,31 @@ void CenterSearchMatch(TabViewModel t, float fracY)
     Pump(10);
 }
 
+// Make `pdf` the active tab: select its tab if it's already open, otherwise open it.
+string EnsureOpen(string pdf)
+{
+    var path = Path.IsPathRooted(pdf) ? pdf : Path.Combine(repoRoot, pdf);
+    if (!File.Exists(path))
+        throw new FileNotFoundException($"PDF not found: {path}");
+
+    int existing = vm.Tabs.ToList().FindIndex(t => string.Equals(t.FilePath, path, StringComparison.Ordinal));
+    if (existing >= 0)
+    {
+        if (vm.ActiveTab != vm.Tabs[existing])
+        {
+            vm.SelectTab(existing);
+            Pump(10);
+        }
+        return path;
+    }
+
+    var open = vm.OpenDocument(path);
+    PumpUntil(() => open.IsCompleted, 1500);
+    if (open.IsFaulted) throw open.Exception!;
+    Pump(20);
+    return path;
+}
+
 int ok = 0, fail = 0;
 
 foreach (var shot in config.Shots)
@@ -210,18 +234,10 @@ foreach (var shot in config.Shots)
         window.Height = shot.Height > 0 ? shot.Height : config.Height;
         Pump(10);
 
-        var pdfPath = Path.IsPathRooted(shot.Pdf) ? shot.Pdf : Path.Combine(repoRoot, shot.Pdf);
-        if (!File.Exists(pdfPath))
-            throw new FileNotFoundException($"PDF not found: {pdfPath}");
-
-        if (!string.Equals(loadedPdf, pdfPath, StringComparison.Ordinal))
-        {
-            var open = vm.OpenDocument(pdfPath);
-            PumpUntil(() => open.IsCompleted, 1500);
-            if (open.IsFaulted) throw open.Exception!;
-            loadedPdf = pdfPath;
-            Pump(20);
-        }
+        // Extra tabs open first so the shot's own PDF ends up as the active tab.
+        foreach (var extra in shot.ExtraTabs)
+            EnsureOpen(extra);
+        var pdfPath = EnsureOpen(shot.Pdf);
 
         tab = vm.ActiveTab ?? throw new InvalidOperationException("No active tab after open.");
         int pageIdx = Math.Clamp(shot.Page - 1, 0, tab.PageCount - 1);

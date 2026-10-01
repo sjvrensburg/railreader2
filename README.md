@@ -5,8 +5,8 @@
 <h1 align="center">railreader2</h1>
 
 <p align="center">
-  Desktop PDF viewer optimised for high magnification viewing with AI-guided "rail reading".<br>
-  Built with .NET/Avalonia, PDFtoImage (PDFium) for PDF rasterisation, SkiaSharp for GPU-accelerated rendering, and Docling Heron-INT8 (ONNX) for layout detection.
+  <strong>A PDF reader built for comfortable reading at high magnification.</strong><br>
+  It finds the text on each page and carries you through it line by line, so you never lose your place when zoomed in.
 </p>
 
 <p align="center">
@@ -18,6 +18,7 @@
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License"></a>
+  <a href="https://github.com/sjvrensburg/railreader2/releases/latest"><img src="https://img.shields.io/github/v/release/sjvrensburg/railreader2" alt="Latest release"></a>
   <a href="https://claude.ai/code"><img src="https://img.shields.io/badge/built%20with-Claude%20Code-blueviolet?logo=claude" alt="Built with Claude Code"></a>
 </p>
 
@@ -25,442 +26,227 @@
   <a href="https://apps.microsoft.com/store/detail/9P9J8KZ6RVZP"><img src="https://get.microsoft.com/images/en-us%20dark.svg" alt="Get it from Microsoft" width="200"></a>
 </p>
 
----
-
 <p align="center">
-  <img src="docs/img/full_page_view_with_analysis.png" alt="Layout analysis overlay" width="45%">
-  &nbsp;
-  <img src="docs/img/rail_mode.png" alt="Rail mode" width="45%">
+  <img src="docs/img/rail_mode.png" alt="Rail mode: the current line is highlighted and the rest of the page is dimmed" width="90%">
 </p>
 
-## License
+## What is rail reading?
 
-RailReader2 is licensed under the [MIT License](LICENSE).
+Zoom in far enough on an ordinary PDF and reading becomes a chore: you scroll right to the end of a line, hunt for the start of the next one, and drift into the wrong column or paragraph. RailReader2 removes the hunting.
 
-Versions prior to 3.0.0 were released under the GNU General Public License v3 (GPLv3). Starting with version 3.0.0, the project is licensed under the MIT License. As the sole author and copyright holder, this relicensing applies to all new releases going forward. Previous releases remain available under the terms of the GPLv3.
+When you open a page, an AI layout model works out where the paragraphs, headings, equations, tables and figures are, and in what order they should be read. Once you zoom past about 300%, the view locks onto that text like a train on a rail:
 
-## Why I built this
+- **Down** moves to the next line, and the view glides to its start, like a typewriter carriage return.
+- **Right** scrolls along the line, speeding up the longer you hold it.
+- Paragraphs, columns and pages follow each other in reading order, and figures and margins are skipped.
+- Optionally, the lines around the one you are reading are dimmed or highlighted so your eye stays put.
 
-As a visually impaired user, I need a PDF viewer that works comfortably at high magnification for sustained reading. The tech industry rarely builds for this "missing middle": the market is too niche for standard software companies, and tools designed for full blindness aren't appropriate when you have poor-but-usable vision.
+Everything runs on your own computer. The layout model is included in the download, and nothing is sent anywhere unless you set up the optional AI features yourself.
 
-High magnification introduces real navigation challenges: context loss, inefficient scrolling, and UI elements that break at zoom. RailReader2 addresses these by using AI layout analysis to guide line-by-line reading through detected text blocks, like a typewriter carriage return across the page.
+<p align="center">
+  <img src="docs/img/full_page_view_with_analysis.png" alt="The blocks RailReader2 detected on a page, numbered in reading order" width="45%">
+  &nbsp;
+  <img src="docs/img/line_focus_blur.png" alt="Line focus: everything except the current line is dimmed" width="45%">
+</p>
 
-RailReader2 was built with [Claude Code](https://docs.anthropic.com/en/docs/claude-code). It is an example of how AI-assisted development can enable niche accessibility tools that would otherwise never exist.
+## Highlights
 
-## How it works
+**Reading at high zoom**
+- Line-by-line rail reading through paragraphs, columns and pages, in reading order.
+- Semi-automatic scrolling (`P`): flows through prose on its own and stops at equations, tables, figures and headings until you press a key to continue.
+- Jump mode (`J`) for reading in short hops instead of a continuous scroll.
+- Line focus (`F`) and line highlight (`H`) keep your eye on the current line.
+- Freeze panes (toolbar snowflake): pin a table's header row or label column while the rest scrolls, like in a spreadsheet.
+- Portals: keep a figure or table in view while you read the paragraph that refers to it. "See Figure 3" can pin Figure 3 automatically.
+- Hold `Ctrl` and drag to look around freely, then let go to snap back to where you were.
 
-PDF pages are rasterised by PDFium (via PDFtoImage) at a DPI proportional to the current zoom level — from a 150 DPI floor up to a cap set by the chosen **render-quality preset** (default *High* caps at 525 DPI; presets range from 350 to 800 DPI, with a Custom option up to 1200). The resulting bitmap is uploaded to the GPU as a mipmapped `SKImage` and drawn on Avalonia's composition thread via a `CompositionCustomVisual`. Camera pan and zoom are applied atomically inside the Skia draw call (not via an Avalonia `MatrixTransform`), which keeps panning jitter-free across platforms; the bitmap only re-renders when the DPI tier changes, not on every pan/zoom frame.
+**Easy on the eyes**
+- Colour filters (high contrast, high visibility, amber, invert), cycled with `C` and remembered per document.
+- Dark mode, larger interface text, and sharp rendering at any zoom.
+- Margin cropping, so blank margins don't waste screen space.
 
-### Rail reading
+**Finding your way around**
+- Tabs, side-by-side split views (`Ctrl+\`), and views that can be torn off into their own window.
+- Outline, named bookmarks, full-text search, and a browsable index of every figure, table and equation.
+- Jump straight to the next heading, figure, table or equation.
+- Clickable links and citations, with back and forward history.
+- Optional continuous scrolling from page to page.
 
-At high zoom levels, navigation switches to "rail mode" — the viewer locks onto detected text blocks and advances line-by-line, like a typewriter carriage return. This is powered by ONNX layout detection models: **[Docling Heron-INT8](docs/heron-layout-model.md)** (default, detects document regions with broad class coverage) or **[PP-DocLayoutV3](https://huggingface.co/PaddlePaddle/PP-DocLayoutV3)** (alternative, optimised for academic papers and includes native reading order). When using Heron or PP-S, reading order is determined via the XY-Cut++ algorithm. Non-active regions are dimmed so you can focus on the current block and line. See the [layout model guide](docs/heron-layout-model.md) for details and model selection.
+**Scanned documents**
+- Optional text recognition (OCR) for pages that are only a picture of text, so rail reading, search and highlighting work on them too.
+- Automatic correction for slightly crooked scans, and downloadable language packs for non-Latin scripts.
+- Rotate sideways pages and tables (`Ctrl+R`).
 
-### Features
+**Notes and highlights**
+- Highlight, underline, strike out, draw, add text notes and text boxes, with undo.
+- Spell checking in notes (British and American English included, and you can add other Hunspell dictionaries).
+- Annotations save automatically. You can export them into a copy of the PDF or share them as a file, and comments already in a PDF (from a reviewer, say) appear in the comments list alongside your own.
 
-#### Rail reading
+**Equations, tables and figures**
+- Copy an equation as LaTeX, a table as Markdown, or a figure as a description, using an AI vision model of your choice: a cloud service, or a local one through Ollama or vLLM. This is optional and off until you configure it.
+- Command-line tool to turn a whole PDF into structured Markdown, or extract its annotations and structure as JSON.
 
-- **Rail toolbar** — docked vertical toolbar with toggle buttons (P/J/F/H) for auto-scroll, jump mode, line focus dim, and line highlight, plus sliders for scroll speed (or jump distance) and motion blur intensity; auto-scroll and jump mode are mutually exclusive
-- **Semi-automatic auto-scroll** — flows through prose line by line in rail mode (P key) and **parks** (waits for a keypress) on arrival at a non-prose unit — equation, table, figure, heading — and at column/page breaks; press D/S to continue. Pan/zoom stay live while parked, and a "Parked — press D" affordance shows in the status bar + on-page. A brief reading beat is held on every line; which block types park is configurable (Settings > Auto-Scroll > Stop and wait at)
-- **Auto-scroll trigger** — optionally auto-start auto-scroll after holding D/Right for a configurable delay (default 2s). Off by default, configurable in Settings > Auto-Scroll
-- **Jump mode** — saccade-style reading (J key) that advances by a configurable percentage of the visible width; Shift+Right/Left for half-distance short jumps
-- **Line focus dim** — smooth feathered dimming of non-active lines to reduce peripheral distraction, with configurable intensity and padding
-- **Line highlight toggle** — independently toggle line highlight tint (H key); works with or without line focus blur
-- **Line highlight tint** — configurable colour tint on the active line in rail mode (Auto, Yellow, Cyan, Green, or None) with adjustable opacity. Auto adapts to the active colour effect
-- **Click-to-select block** — click on any detected block in rail mode to jump to it
-- **Free pan in rail mode** — hold Ctrl while dragging to pan and zoom freely (even below rail threshold) to inspect images or equations. The page draws clean while you pan — the rail dim and overlay are suppressed — and release Ctrl to snap back to your original reading position and zoom level
-- **Zoom position preservation** — zooming in rail mode no longer snaps to line start; horizontal scroll position and line screen position are preserved
-- **Vertical position preservation** — maintains your panned vertical offset when navigating lines in rail mode
-- **Line snap shortcuts** — Home/End keys snap to the start/end of the current line in rail mode
-- **Pixel snapping** — quantises camera positions to the pixel grid to eliminate sub-pixel text shimmer at high zoom
-- **Edge-hold page navigation** — in non-rail mode, hold Down/S at the page bottom for 400ms to advance to the next page. Same for Up/W at the top edge
-- **Margin cropping** — fit/centre operations target the detected content area instead of the full page, so whitespace margins don't waste screen space at high zoom. Toggle with Ctrl+Shift+M or via Settings. Capped just below the rail zoom threshold so cropping never accidentally switches you into rail mode
-- **Analysis lookahead** — pre-analyzes upcoming pages in the background for instant navigation
-- **Analysis indicator** — status bar shows "Analyzing..." during layout inference
-- **Configurable navigation** — choose which block types are navigable in rail mode via Settings → Analysis (advanced view)
-- **GPU-accelerated layout analysis** — optional WebGPU execution for the ONNX layout model (Docling Heron or PP-DocLayoutV3) on supported GPUs, roughly an order of magnitude faster than CPU inference. Toggle via Settings → Performance (advanced view) (falls back to CPU automatically if unavailable; needs a restart to apply). Heron's GPU model is a separate one-time download
-- **View rotation** — quarter-turn the displayed page for sideways scans or wide tables (`Ctrl+R` / `Ctrl+Shift+R`, or View → Rotate). When rail mode reaches a sideways block, a one-time toast points at **Rotate to Read** (`U`) to make just that block upright and re-run analysis on it; press `U` again to reset. A status bar badge shows the current rotation with a one-click reset. Annotation authoring is disabled while rotated (stored annotation geometry is always in the unrotated frame)
+<p align="center">
+  <img src="docs/img/colour_effect_high_contrast.png" alt="High-contrast colour filter in rail mode" width="45%">
+  &nbsp;
+  <img src="docs/img/annotations.png" alt="Highlights, underlines and a drawing on a page in annotation mode" width="45%">
+</p>
 
-#### Freeze panes
+## Install
 
-- **Freeze panes** — pin part of a page in place, like Excel's *Freeze Panes*, so a header row, a label column, or both stay visible while the rest of the page scrolls. Open the **Freeze** button (snowflake) on the toolbar and pick a mode — **Rows** (freeze everything above a horizontal guide line), **Columns** (everything left of a vertical line), or **Both** (a crossing pair; `Z` arms "both" directly). Click to drop the split exactly where you point — no snapping to detected boundaries, and no dependence on table detection: it is page-wide and works on any page. Zoom is locked while frozen so the panes and body can't drift. Each split pane and tear-off window freezes independently; a freeze clears when its view leaves the page. Release via **Unfreeze** in the flyout, the **❄ Frozen — Unfreeze** chip in the pane's corner, or `Z`
+The download includes everything you need, including the layout model.
 
-#### Scanned documents (OCR)
+### Windows
 
-- **OCR for scanned pages** — a scan is a picture of text, with no text layer for rail reading, search, selection, table cells, Markdown export, or VLM grounding to work from. Opt-in OCR recovers one so those features behave as they do on a born-digital page. Three modes in Settings → Scanned Pages: **Do nothing** (default, no cost), **Find the lines only** (line geometry only — enough to restore line-by-line rail reading), and **Read the text** (also recognises the text). Changing the mode re-analyses affected pages immediately, no restart
-- **Automatic skew correction** — scans are rarely square on the glass, and line grouping is exactly the step a tilt defeats: well under a degree is enough to fragment a paragraph into a couple of huge rail lines, or fuse neighbouring lines into one. The page's tilt is measured from the OCR results and compensated for when grouping text into lines (no pixels are rotated, and square pages are left untouched). On by default
-- **Multilingual language packs** — the bundled recogniser reads Latin-script text; optional PP-OCRv6 packs add broad coverage (Latin + CJK and more) in three size/accuracy tiers, downloaded in-app to the config folder so they work from a read-only AppImage. Recognition cost varies sharply across the tiers, and the settings panel states each one's cost before you commit to it
+- **[Microsoft Store](https://apps.microsoft.com/store/detail/9P9J8KZ6RVZP)** (recommended): automatic updates and no security warnings. New versions can arrive a few days after the GitHub release while the Store reviews them.
+- **Installer**: download `railreader2-setup-x64.exe` from the [latest release](https://github.com/sjvrensburg/railreader2/releases/latest).
 
-#### Visual comfort
+<details>
+<summary>Windows says "Windows protected your PC"</summary>
 
-- **Colour effects** — GPU-accelerated accessibility filters (High Contrast, High Visibility, Amber, Invert) with adjustable intensity. Per-document: each tab keeps its own effect, persisted across sessions
-- **Colour effect cycling** — press `C` to cycle through colour effects on the active tab, with a brief status bar toast showing the current effect
-- **Dark mode** — toggle via Settings → Appearance; switches the Avalonia Fluent theme to dark variant
-- **UI font scaling** — adjustable font size via Settings for high-DPI or accessibility use
-- **Render quality** — choose a render-DPI preset in Settings → Rendering (advanced view) (Ultra / Quality / High / Balanced / Medium / Performance, or Custom with your own max-DPI and tier-step). Higher presets re-rasterise at a greater DPI cap for sharper text and deeper zoom; lower ones favour fluidity and lower memory. Changes apply to the open page immediately — no restart. *High* is the default
-- **Smooth zoom** — scroll wheel and +/- key zooms animate over 180ms with cubic ease-out; rapid scrolling accumulates smoothly
-- **Motion blur** — subtle directional blur during horizontal scroll and zoom for perceptual smoothness, with configurable intensity
-- **Fullscreen mode** — F11 hides all chrome for distraction-free reading; Escape exits
-- **Colorblind-safe colors** — status bar, link indicators, debug overlay, and annotation highlights use a colorblind-safe palette
-
-#### Navigation & document management
-
-- **Multi-tab support** — open multiple PDFs with independent per-tab state. Right-click a tab to duplicate or close. Opening the same file twice (or duplicating a tab) shares one underlying document — the PDF handle, layout/text caches, and annotations are shared (no duplicate analysis work), while each tab keeps its own page, zoom, and rail position
-- **Tab bar overflow** — tabs shrink with ellipsis when many are open. Horizontal mouse wheel scrolls the tab bar. Overflow dropdown button lists all tabs
-- **Split panes & tear-off windows** — view one document at several positions at once: split the editor into N side-by-side resizable panes (View ▸ Split Editor ▸ Split Right, Ctrl+\) or move a pane into its own floating always-on-top window. Each pane/window is an independent viewport with its own page, zoom, and rail; click a pane to focus it so keyboard, scroll, and menu commands act on it
-- **Continuous scrolling** — optional page-anchored camera that lets you scroll smoothly across page boundaries in browse mode instead of jumping page-to-page. Off by default; enable via Settings → Reading → Scroll continuously from page to page (no restart). The minimap gains a thin document-position strip while enabled. Rail mode is unaffected — it stays page-local and wheel still zooms at rail zoom
-- **Side panel (accordion)** — a single-open accordion: opening one section collapses the others, and the open section fills the panel. Sections are **Outline** (table of contents, Ctrl+Shift+O), **Bookmarks** (named bookmarks, Ctrl+Shift+B), **Index** (figures/tables/equations browser with thumbnails and extracted equation text, Ctrl+Shift+I), **Search** (full-document text search, Ctrl+F), **Comments** (a list of annotation notes and in-PDF reviewer comments), and **Portals** (linked context viewports — keep a referenced figure/table/equation in view while you read; see below). Toggle the whole panel with the sidebar button at the left of the tab strip
-- **Whole-document figure scan** — the Index section's **Scan All** button sweeps every page for figures, tables, and equations (beyond the background lookahead), building a complete browsable index with thumbnails
-- **Focus follows navigation** — clicking an entry in any side-panel section (an outline heading, search result, bookmark, or figure) moves keyboard focus back to the page, so scrolling immediately drives the document rather than the list
-- **Named bookmarks** — bookmark any page with a custom name (B key or + button in the Bookmarks section). Navigate to bookmarks with a single click. Rename and delete inline. "Back to previous location" button for quick return after jumping. Bookmarks persist in the document's annotation store (keyed by the PDF's path)
-- **Interactive minimap** — click or drag inside to navigate. Drag the top-edge grip to move; drag the inner corner to resize. Switches to the primary's high-DPI bitmap when enlarged so it stays crisp. Position and size persist
-- **On-screen nav buttons** — ◀/▶ buttons in the status bar for mouse-only page navigation
-- **Search** — full-document text search in the side panel's Search section, with results grouped by page, text snippets with highlighted match terms, regex and case sensitivity toggles, and match highlighting on the page (Ctrl+F)
-- **Copy as LaTeX** — send any detected equation, table, or figure to a Vision Language Model and copy the result to clipboard. Equations → LaTeX, tables → Markdown, figures → description. Access via `Ctrl+L` (current block), `Ctrl+right-click` (context menu), or the **Edit menu** (Copy Block as LaTeX / Markdown / Description / Image). Works with cloud APIs (OpenAI `gpt-5.4-nano-2026-03-17` recommended) or local models ([Ollama](https://ollama.com), [vLLM](docs/vllm-guide.md)). Configure in Settings > AI Assistant (advanced view). See the [VLM setup guide](docs/vllm-guide.md) for all options
-- **Portals (linked context viewports)** — link a reference in the text ("see Figure 3") to the figure, table, or equation it points to, and the target stays in view as you rail-read past the reference. The linked target shows in a docked **Portals** side-panel section and, optionally, a detachable always-on-top pop-out window for multi-monitor setups. The pop-out is a **live viewport** — not a static thumbnail — so rail reading, freeze panes, and annotation all work *inside* it, and it re-aims itself as the reading position moves. Author a link by right-clicking a detected block; line-precise sources mean several references in one paragraph each surface their own target in turn. Always-on **on-page markers** (a gutter dot at the source line, a corner badge on the target block) show where portals are anchored — click one to show its target or jump to its source. **Open in Portal (Temporary)** peeks any block in the pop-out without saving a link (right-click a detected block or an Index entry), auto-dismissing as you read on unless you **Lock** it. Portals persist per-document in a sidecar (keyed by the PDF's path). The concept — and the name — is borrowed from [Sioyek](https://sioyek.info/), whose Portals feature inspired this
-
-#### Annotations & text
-
-- **PDF links** — click internal cross-references (citations, figure refs, TOC entries) to navigate to the exact target position, or external URLs to open in the browser with a confirmation prompt. Back/forward history with `Alt+Left`/`Alt+Right`. Hand cursor on hover
-- **Annotations** — toggle Annotation Mode from the toolbar (or `Ctrl+E`) to reveal the tool row: text-markup tools **Highlight**, **Underline**, **Strikethrough**, and **Squiggly** (drag over text, sticky), plus **Pen**, **Rectangle**, **Text Note**, **Text Box** (typewriter-style FreeText, drag a box), and **Eraser**. A shared five-colour palette (Yellow/Green/Red/Blue/Black) applies to every colour-capable tool via the toolbar's **Colour** flyout; a **Thickness** flyout (thin/normal/thick) applies to Pen and Rectangle. Annotations render in z-order: highlights below strokes/rectangles, text notes and text boxes on top. Collapsible popup notes with folded-corner icon. Select, move, and resize annotations in browse mode. Delete selected annotations with the Delete key.
-- **Comments pane** — the side panel's Comments section lists every annotation note and imported / in-PDF reviewer comment across the document; click an entry to jump to it, filter by source (all / reviewer / yours), and change a reviewer comment's review state inline
-- **Text selection** — select and copy text from PDF pages via the toolbar
-- **Toolbar** — floating Browse/Text Select/Copy toolbar for quick mode switching
-- **Annotation export** — export PDFs with embedded annotations (File → Export with Annotations)
-- **Annotation JSON export** — export annotation data as JSON (File → Export Annotations as JSON)
-- **Annotation import** — import annotations from a JSON file and merge with existing (File → Import Annotations). Share annotations with other RailReader2 users
-- **Undo/redo** — annotation history with Ctrl+Z / Ctrl+Y
-- **Annotation mode indicator** — status bar shows active tool name in amber with a clickable exit button
-- **Annotation tool cursors** — each annotation tool shows a distinct mouse cursor (crosshair for drawing tools, I-beam for text select, no-entry for eraser) so you always know the active mode
-- **Tab-switch tool reset** — switching tabs automatically exits any active annotation mode to prevent accidental edits
-
-#### Headless CLI
-
-- **Render pages as PNG** — export PDF pages as images with optional colour effects (high contrast, high visibility, amber, invert) and annotation overlay baked in
-- **Extract document structure** — output outline, ONNX layout blocks, and per-block text as JSON
-- **Export annotations** — export annotations as rich JSON (with extracted text, layout block correlations, and nearest section headings) or as an annotated PDF
-- **Batch VLM transcription** — send detected equations, tables, and figures to an OpenAI-compatible vision API and write LaTeX/Markdown/descriptions as JSON. Supports strict JSON schema output, per-class endpoint routing (e.g. local for equations + cloud for figures), and `$OPENAI_API_KEY` env-var fallback
-- **Export to Markdown** — convert a PDF to structured Markdown with heading hierarchy (matched against the PDF outline), LaTeX equations, pipe tables, figure images/descriptions, and annotation blockquotes. Degrades gracefully: full fidelity with ONNX + VLM, text-with-placeholders with ONNX only, plain text without either
-- Ships as separate standalone binaries for Linux and Windows on [GitHub Releases](https://github.com/sjvrensburg/railreader2/releases/latest)
-
-#### General
-
-- **Menu bar** — File, Edit, View, Rail, Navigation, Help menus. Every command is reachable by name (the **Rail** menu surfaces the rail toggles, the **Edit** menu the block-copy actions), items **grey out when unavailable** (e.g. *Export with Annotations* on an encrypted PDF), and each carries an `Alt`+letter access key (mnemonic) for keyboard and assistive navigation
-- **Vector icons** — the toolbar and panel controls use crisp Lucide SVG icons that inherit the theme text colour and scale with the UI font-size setting
-- **Settings panel** — live-editable, persisted settings in a simple view (Reading, Appearance, Auto-Scroll, Scanned Pages, Spelling) with outcome-level presets such as Reading pace; **Show advanced settings** reveals the fine-tuning controls plus Rendering, Analysis, Layout Model, Performance, Models and AI Assistant pages
-- **Keyboard shortcuts dialog** — press F1 or Help → Keyboard Shortcuts for a complete reference
-- **Tooltips** — all interactive controls have descriptive tooltips
-- **Splash screen** — startup splash while ONNX model loads
-- **About dialog** — version info and credits (Help → About)
-- **Diagnostic logging** — session log file written to the config directory; export via Help → Export Diagnostic Log, or copy the path from Help → About for bug reports
-- **Disk cleanup** — removes cache, old logs, temp files (Help → Clean Up Temp Files)
-- **Debug overlay** — visualise detected layout blocks with class labels and confidence
-
-## Installation
-
-Download the latest release from [GitHub Releases](https://github.com/sjvrensburg/railreader2/releases/latest). The AI layout model is bundled in all packages.
-
-> **Advanced users:** A standalone CLI for automated PDF extraction is also available from the same release page — see [Command-line interface](#command-line-interface) below. Download `railreader2-cli-linux-x64.tar.gz` (Linux) or `railreader2-cli-win-x64.zip` (Windows), extract, and run.
+The standalone installer isn't code-signed, so Windows SmartScreen may warn about it (the Store version doesn't have this problem). Click **More info**, then **Run anyway**. If your browser says the file "may be harmful", choose **Keep** (Chrome) or **Keep anyway** (Edge) first. The source code is public, so you can check exactly what you're installing.
+</details>
 
 ### Linux
 
-Download `railreader2-x86_64.AppImage`, make it executable, and run it:
+Download `railreader2-x86_64.AppImage` from the [latest release](https://github.com/sjvrensburg/railreader2/releases/latest), make it executable, and run it:
 
 ```bash
 chmod +x railreader2-x86_64.AppImage
 ./railreader2-x86_64.AppImage
 ```
 
-### Windows
+RailReader2 is also listed in the [AppImage catalogue](https://appimage.github.io/railreader2/), and the AppImage supports in-place updates with AppImageUpdate. If you'd rather not use an AppImage, a plain `railreader2-linux-x64.tar.gz` is on the same page.
 
-There are two ways to install on Windows:
+## Getting started
 
-**Microsoft Store** (recommended): Install directly from the [Microsoft Store](https://apps.microsoft.com/store/detail/9P9J8KZ6RVZP). This provides automatic updates, no SmartScreen warnings, and clean install/uninstall. Note: the Store release may lag behind the GitHub release by a few days due to certification review.
+1. Open a PDF with **File → Open** (`Ctrl+O`), from your file manager, or on the command line: `railreader2 paper.pdf`.
+2. Zoom in with the mouse wheel or `+`. Past about 300%, rail mode switches on and the current line is highlighted.
+3. Read with **Down** / **Up** (or `S` / `W`) for the next or previous line, and hold **Right** / **Left** (or `D` / `A`) to move along the line.
+4. Press `P` to let it scroll for you, and `D` to continue when it stops at an equation or figure.
 
-**Standalone installer**: Download `railreader2-setup-x64.exe` from [GitHub Releases](https://github.com/sjvrensburg/railreader2/releases/latest) and run it. This always has the latest version immediately.
-
-> **Windows SmartScreen warning** (standalone installer only)
->
-> Windows may show a "Windows protected your PC" SmartScreen warning because the standalone installer is not code-signed. This does not apply to the Microsoft Store version.
->
-> To proceed:
-> 1. Click **More info** in the SmartScreen dialog.
-> 2. Click **Run anyway**.
->
-> If your browser warns that the file "may be harmful", choose **Keep** (Chrome) or **Keep anyway** (Edge) before running it. The source code is fully public on GitHub — you can verify what is being installed.
-
-## Usage
-
-After installing, launch RailReader2 from your application menu or desktop shortcut. You can also open a PDF directly from your file manager by double-clicking (once associated) or by passing the file as a command-line argument:
-
-```
-railreader2 <path-to-pdf>
-```
-
-Use **File → Open** (Ctrl+O) to open a PDF from within the app.
-
-### CLI usage
-
-The headless CLI (`railreader2-cli`) provides five commands for automated PDF extraction:
-
-```bash
-# Render pages as PNG with amber colour effect
-railreader2-cli render paper.pdf --pages 1-5 --effect amber --output-dir ./out
-
-# Extract document structure with layout analysis
-railreader2-cli structure paper.pdf --analyze --include-text --output structure.json
-
-# Export annotations with extracted text and block context
-railreader2-cli annotations paper.pdf --include-text --output annotations.json
-
-# Transcribe every equation and table to LaTeX/Markdown via a vision LLM
-railreader2-cli vlm paper.pdf --classes equation,table \
-    --endpoint https://api.openai.com/v1 --model gpt-5.4-nano-2026-03-17 \
-    --output transcriptions.json
-
-# Export PDF to structured Markdown (headings, LaTeX, tables, figures, annotations)
-railreader2-cli export paper.pdf --output paper.md
-```
-
-Run `railreader2-cli --help` or `railreader2-cli <command> --help` for all options. See [docs/user-guide.md](docs/user-guide.md#cli-tool) for full reference.
-
-### Controls
+Press **F1** at any time for the full list of keyboard shortcuts. These are the ones you'll use most:
 
 | Key | Action |
 |-----|--------|
-| Ctrl+O | Open file |
-| Ctrl+W | Close tab |
-| Ctrl+Tab | Next tab |
-| Ctrl+\ | Split editor (add a pane to the right) |
-| Ctrl+Shift+\ | Close the focused pane |
-| Ctrl+Q | Quit |
-| Ctrl+E | Toggle annotation mode |
-| Ctrl+R / Ctrl+Shift+R | Rotate view clockwise / counter-clockwise |
-| U | Rotate to read the current sideways rail block (press again to reset) |
-| Ctrl+Shift+H / G / T / E | Jump to next heading / figure / table / equation |
-| PgDown / PgUp | Next / previous page |
-| Home / End | First / last page |
-| Ctrl+Home / Ctrl+End | First / last page |
-| Space | Next line (rail mode) or next page |
-| +/- | Zoom in / out |
-| 0 | Reset zoom and position |
-| Arrow Down / Up (S / W) | Next / previous line (rail mode) or pan; hold at page edge for 400ms to advance page (non-rail) |
-| Arrow Right / Left (D / A) | Hold to scroll along line (rail mode) or pan |
-| Ctrl + Mouse wheel | Horizontal scroll along line (rail mode) |
-| Ctrl+Drag | Free pan in rail mode (release Ctrl to snap back) |
-| Mouse drag | Pan |
-| Mouse wheel | Zoom towards cursor |
-| Click on block | Jump to block (rail mode) |
-| Home / End | Line start / end (rail mode) or first / last page |
-| P | Toggle auto-scroll (rail mode); D/S to continue when parked |
-| J | Toggle jump mode (saccade-style advance) |
-| B | Add bookmark for current page |
-| R | Start rail here — then click where to begin (rail-reads at the current zoom) |
-| Z | Freeze panes (both axes) / unfreeze |
-| Alt+Left / ` (backtick) | Navigate back |
-| Alt+Right | Navigate forward |
-| C | Cycle colour effect on active tab |
-| F | Toggle line focus dim (rail mode) |
-| H | Toggle line highlight tint (rail mode) |
-| Shift+Right / Shift+Left | Short jump — half distance (jump mode) |
-| [ / ] | Adjust scroll speed or jump distance (rail mode) |
-| Shift+[ / Shift+] | Adjust blur intensity (rail mode) |
-| D (shift) | Toggle debug overlay (shows detected blocks) |
-| Ctrl+Shift+O | Open Outline section |
-| Ctrl+Shift+B | Open Bookmarks section |
-| Ctrl+Shift+I | Open Index section (figures / tables / equations) |
-| Ctrl+L | Copy current block as LaTeX / Markdown / description (VLM) |
-| Ctrl+F | Open Search section |
-| F3 / Shift+F3 | Next / previous search match |
-| Right-click | Block actions (Copy as LaTeX / Markdown / Description / Image) + toggle Annotation Mode |
-| Ctrl+Z / Ctrl+Y | Undo / redo annotation |
-| Delete / Backspace | Delete selected annotation (browse mode) |
-| Ctrl+C | Copy selected text |
-| F11 | Toggle fullscreen (hides chrome) |
-| Escape | Stop auto-scroll / cancel annotation tool / close search / exit fullscreen |
-| F1 | Keyboard shortcuts dialog |
+| `Down` / `Up` (`S` / `W`) | Next / previous line in rail mode, otherwise pan |
+| `Right` / `Left` (`D` / `A`) | Scroll along the line (hold to speed up) |
+| `Home` / `End` | Start / end of the line in rail mode, otherwise first / last page |
+| `Space`, `PgDn` / `PgUp` | Next line or page / previous page |
+| `+` / `-` / `0` | Zoom in / zoom out / fit page |
+| `R` | Start rail reading here, at the current zoom |
+| `P` / `J` | Auto-scroll / jump mode |
+| `F` / `H` | Line focus / line highlight |
+| `[` / `]` | Slower / faster scrolling |
+| `Ctrl`+drag | Look around freely, then let go to snap back |
+| `C` | Cycle colour filters |
+| `Z` | Freeze panes / unfreeze |
+| `B` | Bookmark this page |
+| `Ctrl+Shift+H` / `G` / `T` / `E` | Next heading / figure / table / equation |
+| `Ctrl+F` | Search |
+| `Ctrl+E` | Annotation mode |
+| `Alt+Left` / `Alt+Right` | Back / forward |
+| `F11` | Full screen |
+| `Ctrl+,` | Settings |
 
-### Configuration
+## Settings
 
-Rail reading parameters are editable via the Settings panel (gear icon in menu bar) and persisted to the platform config directory (`~/.config/railreader2/config.json` on Linux, `%APPDATA%\railreader2\config.json` on Windows):
+**Settings** (`Ctrl+,`) opens with the options most readers change: reading pace, how the current line is marked, colours and text size, when auto-scroll stops, scanned pages, and spelling. Tick **Show advanced settings** for everything else, including render quality, layout models, GPU acceleration and the AI assistant.
 
-```json
-{
-  "rail_zoom_threshold": 3.0,
-  "snap_duration_ms": 300.0,
-  "scroll_speed_start": 10.0,
-  "scroll_speed_max": 30.0,
-  "scroll_ramp_time": 1.5,
-  "analysis_lookahead_pages": 2,
-  "ui_font_scale": 1.25,
-  "colour_effect": "None",
-  "colour_effect_intensity": 1.0,
-  "motion_blur": true,
-  "motion_blur_intensity": 0.33,
-  "pixel_snapping": true,
-  "line_focus_blur": false,
-  "line_focus_blur_intensity": 0.5,
-  "line_padding": 0.2,
-  "line_highlight_enabled": true,
-  "line_highlight_tint": "Auto",
-  "line_highlight_opacity": 0.25,
-  "auto_scroll_line_pause_ms": 400.0,
-  "auto_scroll_block_pause_ms": 600.0,
-  "jump_percentage": 25.0,
-  "dark_mode": false,
-  "navigable_classes": [
-    "abstract", "algorithm", "display_formula",
-    "footnote", "paragraph_title", "text"
-  ],
-  "centering_classes": [
-    "abstract", "algorithm", "display_formula",
-    "footnote", "text"
-  ],
-  "auto_scroll_trigger_enabled": false,
-  "auto_scroll_trigger_delay_ms": 2000.0,
-  "deskew_ocr_lines": true,
-  "continuous_scroll": false
-}
-```
+The [User Guide](https://sjvrensburg.github.io/railreader2/guide.html) explains every setting.
 
-| Parameter | Description |
-|-----------|-------------|
-| `rail_zoom_threshold` | Zoom level at which rail mode activates |
-| `snap_duration_ms` | Duration of line-snap animations (ms) |
-| `scroll_speed_start` | Initial horizontal scroll speed (page points/sec) |
-| `scroll_speed_max` | Maximum scroll speed after holding (page points/sec) |
-| `scroll_ramp_time` | Seconds to reach max speed from start |
-| `analysis_lookahead_pages` | Number of pages to pre-analyze ahead (0 to disable) |
-| `ui_font_scale` | UI font size multiplier (e.g. `1.25` for 25% larger text) |
-| `colour_effect` | Colour filter: `None`, `HighContrast`, `HighVisibility`, `Amber`, `Invert` |
-| `colour_effect_intensity` | Effect intensity from 0.0 (off) to 1.0 (full) |
-| `motion_blur` | Enable subtle directional blur during scroll and zoom (`true`/`false`) |
-| `motion_blur_intensity` | Motion blur strength from 0.0 (off) to 1.0 (maximum) |
-| `pixel_snapping` | Quantise camera positions to pixel grid to reduce text shimmer (`true`/`false`) |
-| `line_focus_blur` | Dim non-active lines in rail mode (`true`/`false`) |
-| `line_focus_blur_intensity` | Line focus dim strength from 0.0 (off) to 1.0 (maximum) |
-| `line_padding` | Padding around active line as fraction of line height (0.0–0.5) |
-| `line_highlight_enabled` | Enable line highlight tint independently of line focus blur (`true`/`false`) |
-| `line_highlight_tint` | Colour tint on active line in rail mode: `Auto`, `Yellow`, `Cyan`, `Green`, `None` |
-| `line_highlight_opacity` | Line highlight tint opacity from 0.0 (off) to 1.0 (full) |
-| `auto_scroll_line_pause_ms` | Per-line reading beat — pause held at every line end before advancing during auto-scroll (ms, 0 to disable) |
-| `auto_scroll_stop_classes` | Which block types semi-auto scroll parks on when reached (array of class names; headings, equations, tables, figures by default). Configurable via Settings → Auto-Scroll → Stop and wait at. |
-| `jump_percentage` | Jump distance as percentage of visible width (5–80%) |
-| `dark_mode` | Enable dark UI theme (`true`/`false`) |
-| `navigable_classes` | Which block types rail mode navigates (array of class names). Configurable via Settings → Analysis (advanced view). |
-| `centering_classes` | Which block types are horizontally centered when narrower than the viewport (array of class names). Excludes headings by default. Configurable via Settings → Analysis (advanced view). |
-| `auto_scroll_trigger_enabled` | Auto-start auto-scroll after holding D/Right for the trigger delay (`true`/`false`, default `false`) |
-| `auto_scroll_trigger_delay_ms` | Delay before auto-scroll triggers from hold (ms, default 2000) |
-| `deskew_ocr_lines` | Correct page tilt when grouping OCR'd text into lines on scanned pages (`true`/`false`, default `true`). Needs OCR; configurable via Settings → Scanned Pages (advanced view). |
-| `continuous_scroll` | Page-anchored camera lets browse-mode scrolling flow smoothly across page boundaries (`true`/`false`, default `false`). Configurable via Settings → Reading. |
+### Optional extras
 
-## Architecture
+- **Faster page analysis**: on a supported graphics card, layout detection or text recognition can run on the GPU, roughly ten times faster (Settings → Performance).
+- **Linux laptops with two graphics chips**: if scrolling feels sluggish on a large screen, try Settings → Performance → Display GPU to draw the window on the dedicated graphics card.
+- **AI copy for equations, tables and figures**: point Settings → AI Assistant at any OpenAI-compatible vision API. See the [vision-model setup guide](docs/vllm-guide.md) for cloud and local options.
+- **Other layout models**: Docling Heron (the default) suits most documents, and PP-DocLayoutV3 is an alternative tuned for academic papers. See the [layout model guide](docs/heron-layout-model.md).
 
-The portable core (models, controllers, rail navigation, line detection, search, annotations, the SkiaSharp renderer, and the Markdown export pipeline) lives in the separate [RailReaderCore](https://github.com/sjvrensburg/RailReaderCore) repository and is consumed here as NuGet packages: `RailReader.Core`, `RailReader.Core.Pdfium`, `RailReader.Core.Analysis`, `RailReader.Renderer.Skia`, `RailReader.Export`. This repository contains the desktop application shell, the headless CLI, and their tests:
+<details>
+<summary>Editing the config file directly</summary>
 
-```
-RailReader2.slnx              # Default solution
-├── src/RailReader2/            # Thin Avalonia UI shell
-├── src/RailReader2.Cli/        # Headless CLI
-└── tests/RailReader.Export.Tests/ # xUnit tests for the upstream Export package (Core tests live upstream in RailReaderCore)
-```
+Settings are saved to `~/.config/railreader2/config.json` (Linux) or `%APPDATA%\railreader2\config.json` (Windows). The Settings window covers all of these, but you can edit the file while the app is closed. Some useful fields:
 
-## Command-line interface
+| Field | Meaning |
+|-------|---------|
+| `rail_zoom_threshold` | Zoom level at which rail mode switches on (default `3.0`) |
+| `snap_duration_ms` | Length of the glide to the next line (ms) |
+| `scroll_speed_start` / `scroll_speed_max` | Scrolling speed along a line when you start holding the key / after `scroll_ramp_time` seconds |
+| `auto_scroll_line_pause_ms` | Pause at the end of each line during auto-scroll |
+| `auto_scroll_stop_classes` | Block types auto-scroll stops at, e.g. `Heading`, `DisplayMath`, `Table`, `Figure` |
+| `navigable_roles` | Block types rail mode reads, e.g. `Text`, `Heading`, `DisplayMath`, `Caption` |
+| `centering_roles` | Block types centred when narrower than the screen |
+| `jump_percentage` | Jump mode step, as a percentage of the screen width |
+| `line_focus_blur`, `line_focus_blur_intensity` | Dim the lines around the current one |
+| `line_highlight_enabled`, `line_highlight_tint`, `line_highlight_opacity` | Tint the current line (`auto`, `yellow`, `cyan`, `green`) |
+| `colour_effect`, `colour_effect_intensity` | Default colour filter for new documents |
+| `margin_cropping` | Fit to the text area instead of the whole page |
+| `continuous_scroll` | Scroll smoothly from page to page |
+| `render_quality` | Sharpness preset (`0` Ultra … `5` Performance, `6` Custom) |
+| `deskew_ocr_lines` | Correct crooked scans (needs OCR) |
+| `ui_font_scale`, `dark_mode` | Interface text size and theme |
+</details>
 
-A standalone headless CLI for automated PDF extraction. Download `railreader2-cli-linux-x64.tar.gz` (Linux) or `railreader2-cli-win-x64.zip` (Windows) from [GitHub Releases](https://github.com/sjvrensburg/railreader2/releases/latest), extract the archive, and run.
+## Command-line tool
+
+A separate command-line program, `railreader2-cli`, handles batch work without opening a window. Download `railreader2-cli-linux-x64.tar.gz` or `railreader2-cli-win-x64.zip` from the [latest release](https://github.com/sjvrensburg/railreader2/releases/latest).
 
 ```bash
-# Render pages as PNG
-railreader2-cli render paper.pdf --pages 1-5 --dpi 300 --effect amber --output-dir ./out
+# Convert a PDF to Markdown: headings, LaTeX equations, tables, figures and your annotations
+railreader2-cli export paper.pdf --output paper.md
 
-# Extract structure (outline + layout blocks + text)
+# The same, with equations and tables transcribed by a vision model
+railreader2-cli export paper.pdf --endpoint https://api.openai.com/v1 --model gpt-5.4-nano-2026-03-17 --output paper.md
+
+# Export your annotations, with the text under each one and its section heading
+railreader2-cli annotations paper.pdf --include-text --include-blocks --output annotations.json
+
+# Extract the outline, detected blocks and their text
 railreader2-cli structure paper.pdf --analyze --include-text --output structure.json
 
-# Export annotations with text and layout context
-railreader2-cli annotations paper.pdf --include-text --include-blocks --pages 1-10 --output annotations.json
-
-# Export to structured Markdown
-railreader2-cli export paper.pdf --pages 1-20 --output paper.md
-
-# Export with VLM transcription for equations and tables
-railreader2-cli export paper.pdf --endpoint https://api.openai.com/v1 --model gpt-5.4-nano-2026-03-17 --output paper.md
+# Save pages as images, optionally with a colour filter
+railreader2-cli render paper.pdf --pages 1-5 --dpi 300 --effect amber --output-dir ./out
 ```
 
-The CLI uses the ONNX layout model from the GUI installation. If the GUI isn't installed, download the model with `./scripts/download-model.sh`.
+Encrypted PDFs take `--password`. Run `railreader2-cli <command> --help` for every option, or see the [CLI section of the User Guide](https://sjvrensburg.github.io/railreader2/guide.html#cli-tool). The JSON formats are stable: breaking changes only happen in major versions, so other tools can build on them. [railmark](https://github.com/sjvrensburg/railmark), for example, turns your annotations into a Markdown summary.
 
-### Stable output format
+## Why I built this
 
-The CLI's JSON output format is a stable API. The `structure` and `annotations` commands produce JSON with snake_case keys. Breaking changes to the output schema will only occur in major version bumps. Downstream tools (see [Related projects](#related-projects)) can depend on this format.
+As a visually impaired user, I need a PDF viewer that works comfortably at high magnification for sustained reading. The tech industry rarely builds for this "missing middle": the market is too niche for standard software companies, and tools designed for full blindness aren't appropriate when you have poor-but-usable vision. [Read more →](https://sjvrensburg.github.io/railreader2/about.html)
 
-## Building
+## For developers
 
-### Dependencies
-
-- .NET 10 SDK
-- ONNX model (see below)
-
-### ONNX model
-
-Download the layout detection models:
+RailReader2 is a .NET 10 / [Avalonia](https://avaloniaui.net/) app. The reading engine (rail navigation, layout analysis, rendering, annotations, search, Markdown export) lives in [RailReaderCore](https://github.com/sjvrensburg/RailReaderCore) and is used here as NuGet packages. This repository holds the desktop app, the CLI, and their tests.
 
 ```bash
-./scripts/download-model.sh
-```
-
-This downloads both Docling Heron-INT8 (the bundled default, ~66 MB) and PP-DocLayoutV3 (optional alternative, ~50 MB). Without the models, a simple fallback layout (horizontal strips) is used.
-
-### Build
-
-```bash
-dotnet build RailReader2.slnx
-```
-
-### Test
-
-```bash
+./scripts/download-model.sh                               # layout models (Heron INT8 + PP-DocLayoutV3)
+dotnet build RailReader2.slnx                             # build app + CLI + tests
+dotnet run -c Release --project src/RailReader2 -- paper.pdf
 dotnet test tests/RailReader.Export.Tests
+dotnet publish src/RailReader2 -c Release -r linux-x64 --self-contained   # or win-x64
 ```
 
-### Run from source
-
-```bash
-# Open a specific PDF
-dotnet run -c Release --project src/RailReader2 -- <path-to-pdf>
-
-# Launch without arguments and use File → Open (Ctrl+O)
-dotnet run -c Release --project src/RailReader2 --
-
-# Run the CLI
-dotnet run -c Release --project src/RailReader2.Cli -- render <pdf> --output-dir ./out
-```
-
-### Publish self-contained
-
-```bash
-# Linux
-dotnet publish src/RailReader2 -c Release -r linux-x64 --self-contained
-
-# Windows
-dotnet publish src/RailReader2 -c Release -r win-x64 --self-contained
-```
-
-## Related projects
-
-- **[RailReaderCore](https://github.com/sjvrensburg/RailReaderCore)** — the portable core consumed here as NuGet packages (`RailReader.Core`, `RailReader.Core.Pdfium`, `RailReader.Core.Analysis`, `RailReader.Renderer.Skia`, `RailReader.Export`): models, controllers, rail navigation, line detection, search, annotations, the SkiaSharp renderer, and the Markdown export pipeline.
-- **[railmark](https://github.com/sjvrensburg/railmark)** — CLI tool that extracts your RailReader2 annotations into structured Markdown documents, grouped by section headings with surrounding paragraph context. Useful for feeding annotated PDFs to an AI for summarisation. Uses the RailReader2 CLI's `annotations` command as its data source.
+Use `-c Release` when running; debug builds are much slower. Without a layout model, RailReader2 still rail-reads using the PDF's own text layer, but can't tell headings, equations and figures apart. [CLAUDE.md](CLAUDE.md) describes the architecture in detail, and [DISTRIBUTION.md](DISTRIBUTION.md) covers releases.
 
 ## Acknowledgements
 
 RailReader2 stands on the shoulders of a lot of open-source work. Thank you to:
 
-- **[Avalonia](https://avaloniaui.net/)** — the cross-platform .NET UI framework the whole app is built on.
-- **[PDFium](https://pdfium.googlesource.com/pdfium/)** (via [bblanchon's native builds](https://github.com/bblanchon/pdfium-binaries)) and **[PDFtoImage](https://github.com/sungaila/PDFtoImage)** by David Sungaila — PDF rasterisation.
-- **[SkiaSharp](https://github.com/mono/SkiaSharp)** — GPU-accelerated 2D rendering.
-- **[ONNX Runtime](https://onnxruntime.ai/)**, **[Docling](https://github.com/docling-project/docling)** ([Heron layout model](docs/heron-layout-model.md)), and **[PaddlePaddle](https://github.com/PaddlePaddle/PaddleX)** (PP-DocLayoutV3 / PP-DocLayout-S) — the layout-detection models rail mode is built on.
-- **[RapidOCR](https://github.com/RapidAI/RapidOCR)** and **[RapidOcrNet](https://github.com/BobLd/RapidOcrNet)** by BobLd — OCR for scanned pages (opt-in, added in RailReaderCore 0.50.0).
-- **[CommunityToolkit.Mvvm](https://github.com/CommunityToolkit/dotnet)** — MVVM plumbing.
-- **[Claude Code](https://docs.anthropic.com/en/docs/claude-code)** — see [Why I built this](https://sjvrensburg.github.io/railreader2/about.html) for how AI-assisted development made this project possible.
+- **[Avalonia](https://avaloniaui.net/)**, the cross-platform .NET UI framework the whole app is built on.
+- **[PDFium](https://pdfium.googlesource.com/pdfium/)** (via [bblanchon's native builds](https://github.com/bblanchon/pdfium-binaries)) and **[PDFtoImage](https://github.com/sungaila/PDFtoImage)** by David Sungaila, for PDF rendering.
+- **[SkiaSharp](https://github.com/mono/SkiaSharp)**, for GPU-accelerated 2D drawing.
+- **[ONNX Runtime](https://onnxruntime.ai/)**, **[Docling](https://github.com/docling-project/docling)** ([Heron layout model](docs/heron-layout-model.md)) and **[PaddlePaddle](https://github.com/PaddlePaddle/PaddleX)** (PP-DocLayoutV3 / PP-DocLayout-S), the layout-detection models rail mode is built on.
+- **[RapidOCR](https://github.com/RapidAI/RapidOCR)** and **[RapidOcrNet](https://github.com/BobLd/RapidOcrNet)** by BobLd, for reading scanned pages.
+- **[WeCantSpell.Hunspell](https://github.com/aarondandy/WeCantSpell.Hunspell)** and the [LibreOffice dictionaries](https://github.com/LibreOffice/dictionaries), for spell checking.
+- **[Lucide](https://lucide.dev/)**, for the icons.
+- **[CommunityToolkit.Mvvm](https://github.com/CommunityToolkit/dotnet)**, for MVVM plumbing.
+- **[Claude Code](https://docs.anthropic.com/en/docs/claude-code)**, which made it possible to build this project at all ([more here](https://sjvrensburg.github.io/railreader2/about.html)).
 
-RailReader2 is one option in a small field of open-source PDF readers, each with a different focus. If it isn't the right fit for you, these are worth a look:
+RailReader2 is one of several open-source PDF readers, each with a different focus. If it isn't the right fit for you, try these:
 
-- **[Sioyek](https://sioyek.info/)** — a keyboard-driven PDF reader built for research papers. Its **Portals** feature — pinning a linked figure or table in view while you read past the text that cites it — directly inspired [RailReader2's own Portals](docs/portals-design.md); the concept and the name are borrowed with thanks.
-- **[Caly](https://github.com/CalyPdf/Caly)** by BobLd — a cross-platform PDF reader built on [PdfPig](https://github.com/UglyToad/PdfPig) and [PdfPig.Rendering.Skia](https://github.com/BobLd/PdfPig.Rendering.Skia), from the same author behind RapidOcrNet above. If you want a lean, PdfPig-native reading experience, it's worth trying.
+- **[Sioyek](https://sioyek.info/)**, a keyboard-driven PDF reader built for research papers. Its **Portals** feature, which keeps a linked figure or table in view while you read the text that cites it, directly inspired [RailReader2's Portals](docs/portals-design.md). The concept and the name are borrowed with thanks.
+- **[Caly](https://github.com/CalyPdf/Caly)** by BobLd, a cross-platform PDF reader built on [PdfPig](https://github.com/UglyToad/PdfPig) and [PdfPig.Rendering.Skia](https://github.com/BobLd/PdfPig.Rendering.Skia), from the author of RapidOcrNet. If you want a lean, PdfPig-native reader, give it a try.
+
+## License
+
+RailReader2 is released under the [MIT License](LICENSE). Versions before 3.0.0 were released under the GPLv3 and remain available under those terms.

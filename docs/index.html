@@ -107,7 +107,7 @@
       </div>
       <div class="hero__media" data-rise="4">
         <div class="media-frame">
-          <img src="img/rail_mode.png" alt="railreader2 rail mode — the active line lit by the amber highlight at high magnification while the rest of the text block stays calm" width="1534" height="1186" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}">
+          <img src="img/rail_mode.png" alt="railreader2 rail mode — the active line lit by the amber highlight at high magnification while the rest of the text block stays calm" width="1440" height="980" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}">
         </div>
       </div>
     </div>
@@ -163,8 +163,8 @@
           <p class="feature-row__eyebrow label-sm">Layout analysis</p>
           <h3>It reads the page before you do</h3>
           <p>A deep-learning model maps every page — text, headings, figures, tables, equations — and works out the reading order. Everything else builds on that.</p>
-          <p>Docling Heron by default, or PP-DocLayoutV3 as a drop-in alternative.</p>
-          <p>Scanned documents work too: opt-in OCR recovers the missing text layer — straightening a crooked scan as it goes — so rail reading, search, and selection behave as they do on a born-digital page.</p>
+          <p>Docling Heron by default, or PP-DocLayoutV3 and PP-DocLayout-S as downloadable alternatives.</p>
+          <p>Scanned documents work too: opt-in OCR recovers the missing text layer — straightening a crooked scan as it goes, with optional multilingual language packs — so rail reading, search, and selection behave as they do on a born-digital page.</p>
         </div>
         <div class="feature-row__media">
           <figure class="frame"><img src="img/full_page_view_with_analysis.png" alt="railreader2 showing AI layout analysis — detected text blocks, figures, and reading-order numbers overlaid on an academic page" loading="lazy" width="1150" height="1480" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}"></figure>
@@ -175,7 +175,7 @@
           <p class="feature-row__eyebrow label-sm">Rail reading</p>
           <h3>One line at a time</h3>
           <p>Past your zoom threshold, navigation locks to the detected blocks and advances line by line. Optional line-focus dimming fades all but the current line, so your eye never loses its place.</p>
-          <p>Hold Ctrl to free-pan a figure; release to snap back.</p>
+          <p>Hold Ctrl to free-pan a figure; release to snap back. Press R to start rail reading at whatever zoom you're at.</p>
         </div>
         <div class="feature-row__media">
           <figure class="frame"><img src="img/line_focus_blur.png" alt="railreader2 rail mode with line-focus dimming — the active line stays lit while surrounding lines fade" loading="lazy" width="1440" height="980" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}"></figure>
@@ -206,6 +206,7 @@
           <p class="feature-row__eyebrow label-sm">Mark it up</p>
           <h3>Highlights, notes, and ink</h3>
           <p>Highlight, underline, strikethrough, squiggly, pen, rectangles, sticky notes, and text boxes from the annotation toolbar — saved as native PDF annotations or a sidecar. Select, move, resize, undo; export or import as JSON or a flattened PDF.</p>
+          <p>Notes and text boxes are spell-checked as you type, with British and American English dictionaries built in and a personal word list for your own terms.</p>
         </div>
         <div class="feature-row__media">
           <figure class="frame"><img src="img/annotations.png" alt="railreader2 annotation tools — highlights, freehand pen, rectangles, and text notes on a PDF page" loading="lazy" width="1500" height="1040" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}"></figure>
@@ -218,7 +219,7 @@
           <p>Open many PDFs in tabs, each with its own state — open the same file twice and the two tabs share its caches and annotations while keeping independent positions. One side panel holds the outline, bookmarks, an index of every figure, table and equation, search, comments, and portals — and hands focus back to the page when you jump.</p>
         </div>
         <div class="feature-row__media">
-          <figure class="frame"><img src="img/multiple_tabs.png" alt="railreader2 with multiple PDF tabs open and the side-panel accordion showing the document outline" loading="lazy" width="2048" height="1000" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}"></figure>
+          <figure class="frame"><img src="img/multiple_tabs.png" alt="railreader2 with multiple PDF tabs open and the side-panel accordion showing the document outline" loading="lazy" width="1600" height="900" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}"></figure>
         </div>
       </div>
     </div>
@@ -252,13 +253,25 @@
       <div class="feature" data-reveal>
         <h3>Continuous Scrolling</h3>
         <p>
-          Opt in from Settings &rarr; Rendering to let the mouse wheel flow smoothly across page boundaries in browse mode, instead of jumping page to page. Rail mode stays page-local either way.
+          Opt in from Settings &rarr; Reading to let the mouse wheel flow smoothly across page boundaries in browse mode, instead of jumping page to page. Rail mode stays page-local either way.
         </p>
       </div>
       <div class="feature" data-reveal>
         <h3>GPU-Accelerated Analysis</h3>
         <p>
-          Optional WebGPU execution for the layout model &mdash; roughly 8&ndash;10&times; faster than CPU on supported hardware, with an automatic CPU fallback. Toggle in Settings &rarr; Advanced.
+          Optional WebGPU execution for the layout model (roughly 8&ndash;10&times; faster than CPU on supported hardware) or for OCR on scanned pages &mdash; one at a time, with an automatic CPU fallback. Pick a preset in Settings &rarr; Performance (advanced view).
+        </p>
+      </div>
+      <div class="feature" data-reveal>
+        <h3>Simple or Advanced Settings</h3>
+        <p>
+          Settings opens on the handful of options most readers change &mdash; a Relaxed / Normal / Brisk reading pace, how to mark the current line, colours, auto-scroll stops, scanned pages, spelling. Turn on <strong>Show advanced settings</strong> to fine-tune everything else.
+        </p>
+      </div>
+      <div class="feature" data-reveal>
+        <h3>Start Rail Anywhere</h3>
+        <p>
+          Rail reading normally starts past your zoom threshold. Press <code>R</code> &mdash; or use the toolbar button and click where to begin &mdash; to rail-read at the current zoom instead. <code>R</code> or <code>Escape</code> exits.
         </p>
       </div>
       <div class="feature" data-reveal>
@@ -288,7 +301,7 @@
       <div class="feature" data-reveal>
         <h3>Configurable Navigation</h3>
         <p>
-          Choose which block types are navigable and which centre when narrow; tune zoom thresholds, scroll speed, and snap timing. Settings persist.
+          Choose which block types rail stops on and which centre when narrow; set the rail zoom threshold and reading pace, or fine-tune scroll speed and snap timing individually. Settings persist.
         </p>
       </div>
       <div class="feature" data-reveal>
@@ -391,8 +404,10 @@
         (Edge). The full source code is available on GitHub.
       </li>
       <li>
-        Open a PDF with <code>Ctrl+O</code> or pass it as a command-line argument.
-        Zoom in to activate rail mode and start reading.
+        Open a PDF with the <strong>Open a PDF&hellip;</strong> button on the welcome screen,
+        <code>Ctrl+O</code>, or pass it as a command-line argument.
+        Zoom in past 3&times; to activate rail mode and start reading &mdash; or press <code>R</code>
+        to start it at the current zoom.
       </li>
     </ol>
     <p class="note" data-reveal>
@@ -431,6 +446,7 @@
         <tr><td>Ctrl+Shift+I</td><td>Open Index section (figures / tables / equations)</td></tr>
         <tr><td>Ctrl+Shift+H / G / T / E</td><td>Jump to next heading / figure / table / equation</td></tr>
         <tr><td>Ctrl+L</td><td>Copy block as LaTeX (VLM)</td></tr>
+        <tr><td>Ctrl+G</td><td>Go to page</td></tr>
         <tr><td>Ctrl+\ / Ctrl+Shift+\</td><td>Split editor / close focused pane</td></tr>
         <tr><td>Ctrl+R / Ctrl+Shift+R</td><td>Rotate view clockwise / counter-clockwise</td></tr>
         <tr><td>F1</td><td>Keyboard shortcuts</td></tr>
@@ -451,6 +467,7 @@
       </tbody>
       <tbody>
         <tr><th colspan="2" scope="rowgroup">Rail Mode</th></tr>
+        <tr><td>R</td><td>Start rail here at the current zoom (press again or Escape to exit)</td></tr>
         <tr><td>Down / S</td><td>Next line</td></tr>
         <tr><td>Up / W</td><td>Previous line</td></tr>
         <tr><td>Right / D</td><td>Scroll forward (hold)</td></tr>
@@ -459,11 +476,13 @@
         <tr><td>P</td><td>Toggle auto-scroll (D/S to continue when parked)</td></tr>
         <tr><td>J</td><td>Toggle jump mode (saccade-style advance)</td></tr>
         <tr><td>B</td><td>Add bookmark for current page</td></tr>
-        <tr><td>` (backtick)</td><td>Navigate back to previous location</td></tr>
-        <tr><td>C</td><td>Cycle colour effect on active tab</td></tr>
+        <tr><td>` (backtick) / Alt+Left</td><td>Navigate back to previous location</td></tr>
+        <tr><td>Alt+Right</td><td>Navigate forward</td></tr>
+        <tr><td>C</td><td>Cycle colour effect on the focused document</td></tr>
         <tr><td>F</td><td>Toggle line focus dim</td></tr>
         <tr><td>H</td><td>Toggle line highlight</td></tr>
         <tr><td>U</td><td>Rotate to read the current sideways rail block (press again to reset)</td></tr>
+        <tr><td>Z</td><td>Freeze panes (rows and columns) / unfreeze</td></tr>
         <tr><td>Ctrl+Drag</td><td>Free pan/zoom in rail mode (release to snap back)</td></tr>
         <tr><td>Escape</td><td>Stop auto-scroll</td></tr>
         <tr><td>[ / ]</td><td>Adjust scroll speed or jump distance (&plusmn;5)</td></tr>
@@ -479,9 +498,10 @@
         <tr><td>Ctrl+E</td><td>Toggle annotation mode</td></tr>
         <tr><td>Right-click</td><td>Block actions (Copy as LaTeX / Markdown / Description / Image) + toggle Annotation Mode</td></tr>
         <tr><td>Ctrl+Z</td><td>Undo annotation</td></tr>
-        <tr><td>Ctrl+Y</td><td>Redo annotation</td></tr>
+        <tr><td>Ctrl+Y / Ctrl+Shift+Z</td><td>Redo annotation</td></tr>
         <tr><td>Delete</td><td>Delete selected annotation (browse mode)</td></tr>
         <tr><td>Ctrl+C</td><td>Copy selected text</td></tr>
+        <tr><td>F7</td><td>Next misspelling (in the note editor)</td></tr>
       </tbody>
     </table>
   </section>
