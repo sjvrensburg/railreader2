@@ -8,21 +8,27 @@
     <ScrollViewer Padding="16">
         <StackPanel Spacing="12">
             <TextBlock Text="General" FontWeight="Bold" />
-            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" Margin="8,0">
+            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" Margin="8,0">
                 <TextBlock Grid.Row="0" Grid.Column="0" Text="Ctrl+O" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
                 <TextBlock Grid.Row="0" Grid.Column="1" Text="Open file" Margin="0,2" />
                 <TextBlock Grid.Row="1" Grid.Column="0" Text="Ctrl+W" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
                 <TextBlock Grid.Row="1" Grid.Column="1" Text="Close tab" Margin="0,2" />
-                <TextBlock Grid.Row="2" Grid.Column="0" Text="Ctrl+Q" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
-                <TextBlock Grid.Row="2" Grid.Column="1" Text="Quit" Margin="0,2" />
-                <TextBlock Grid.Row="3" Grid.Column="0" Text="Ctrl+Tab" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
-                <TextBlock Grid.Row="3" Grid.Column="1" Text="Next tab" Margin="0,2" />
-                <TextBlock Grid.Row="4" Grid.Column="0" Text="F1" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
-                <TextBlock Grid.Row="4" Grid.Column="1" Text="Toggle this dialog" Margin="0,2" />
+                <TextBlock Grid.Row="2" Grid.Column="0" Text="Ctrl+Tab" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="2" Grid.Column="1" Text="Next tab" Margin="0,2" />
+                <TextBlock Grid.Row="3" Grid.Column="0" Text="Ctrl+\" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="3" Grid.Column="1" Text="Split right (add a pane beside this one)" Margin="0,2" />
+                <TextBlock Grid.Row="4" Grid.Column="0" Text="Ctrl+Shift+\" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="4" Grid.Column="1" Text="Close the focused pane" Margin="0,2" />
+                <TextBlock Grid.Row="5" Grid.Column="0" Text="Ctrl+," FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="5" Grid.Column="1" Text="Settings" Margin="0,2" />
+                <TextBlock Grid.Row="6" Grid.Column="0" Text="Ctrl+Q" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="6" Grid.Column="1" Text="Quit" Margin="0,2" />
+                <TextBlock Grid.Row="7" Grid.Column="0" Text="F1" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="7" Grid.Column="1" Text="Toggle this dialog" Margin="0,2" />
             </Grid>
 
             <TextBlock Text="Navigation" FontWeight="Bold" />
-            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" Margin="8,0">
+            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" Margin="8,0">
                 <TextBlock Grid.Row="0" Grid.Column="0" Text="PgDn / Space" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
                 <TextBlock Grid.Row="0" Grid.Column="1" Text="Next page / next line in rail mode" Margin="0,2" />
                 <TextBlock Grid.Row="1" Grid.Column="0" Text="PgUp" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
@@ -35,50 +41,62 @@
                 <TextBlock Grid.Row="4" Grid.Column="1" Text="First page" Margin="0,2" />
                 <TextBlock Grid.Row="5" Grid.Column="0" Text="Ctrl+End" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
                 <TextBlock Grid.Row="5" Grid.Column="1" Text="Last page" Margin="0,2" />
-                <TextBlock Grid.Row="6" Grid.Column="0" Text="Ctrl+Shift+H" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
-                <TextBlock Grid.Row="6" Grid.Column="1" Text="Jump to next heading (rail mode; menu for previous)" Margin="0,2" />
-                <TextBlock Grid.Row="7" Grid.Column="0" Text="Ctrl+Shift+G" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
-                <TextBlock Grid.Row="7" Grid.Column="1" Text="Jump to next figure" Margin="0,2" />
-                <TextBlock Grid.Row="8" Grid.Column="0" Text="Ctrl+Shift+T" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
-                <TextBlock Grid.Row="8" Grid.Column="1" Text="Jump to next table" Margin="0,2" />
-                <TextBlock Grid.Row="9" Grid.Column="0" Text="Ctrl+Shift+E" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
-                <TextBlock Grid.Row="9" Grid.Column="1" Text="Jump to next equation" Margin="0,2" />
+                <TextBlock Grid.Row="6" Grid.Column="0" Text="Ctrl+G" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="6" Grid.Column="1" Text="Go to page" Margin="0,2" />
+                <TextBlock Grid.Row="7" Grid.Column="0" Text="Alt+Left / `" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="7" Grid.Column="1" Text="Back to previous location" Margin="0,2" />
+                <TextBlock Grid.Row="8" Grid.Column="0" Text="Alt+Right" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="8" Grid.Column="1" Text="Forward" Margin="0,2" />
+                <TextBlock Grid.Row="9" Grid.Column="0" Text="B" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="9" Grid.Column="1" Text="Bookmark this page" Margin="0,2" />
+                <TextBlock Grid.Row="10" Grid.Column="0" Text="Ctrl+Shift+H" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="10" Grid.Column="1" Text="Jump to next heading (rail mode; menu for previous)" Margin="0,2" />
+                <TextBlock Grid.Row="11" Grid.Column="0" Text="Ctrl+Shift+G" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="11" Grid.Column="1" Text="Jump to next figure" Margin="0,2" />
+                <TextBlock Grid.Row="12" Grid.Column="0" Text="Ctrl+Shift+T" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="12" Grid.Column="1" Text="Jump to next table" Margin="0,2" />
+                <TextBlock Grid.Row="13" Grid.Column="0" Text="Ctrl+Shift+E" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="13" Grid.Column="1" Text="Jump to next equation" Margin="0,2" />
             </Grid>
 
             <TextBlock Text="View" FontWeight="Bold" />
-            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" Margin="8,0">
+            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" Margin="8,0">
                 <TextBlock Grid.Row="0" Grid.Column="0" Text="+ / =" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
                 <TextBlock Grid.Row="0" Grid.Column="1" Text="Zoom in" Margin="0,2" />
                 <TextBlock Grid.Row="1" Grid.Column="0" Text="-" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
                 <TextBlock Grid.Row="1" Grid.Column="1" Text="Zoom out" Margin="0,2" />
                 <TextBlock Grid.Row="2" Grid.Column="0" Text="0" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
                 <TextBlock Grid.Row="2" Grid.Column="1" Text="Fit page" Margin="0,2" />
-                <TextBlock Grid.Row="3" Grid.Column="0" Text="Ctrl+Shift+O" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
-                <TextBlock Grid.Row="3" Grid.Column="1" Text="Toggle outline" Margin="0,2" />
-                <TextBlock Grid.Row="4" Grid.Column="0" Text="Ctrl+Shift+I" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
-                <TextBlock Grid.Row="4" Grid.Column="1" Text="Toggle figures panel" Margin="0,2" />
-                <TextBlock Grid.Row="5" Grid.Column="0" Text="Ctrl+M" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
-                <TextBlock Grid.Row="5" Grid.Column="1" Text="Toggle minimap (drag top to move, corner to resize)" Margin="0,2" />
-                <TextBlock Grid.Row="6" Grid.Column="0" Text="Ctrl+Shift+M" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
-                <TextBlock Grid.Row="6" Grid.Column="1" Text="Toggle margin cropping" Margin="0,2" />
-                <TextBlock Grid.Row="7" Grid.Column="0" Text="F11" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
-                <TextBlock Grid.Row="7" Grid.Column="1" Text="Toggle fullscreen" Margin="0,2" />
-                <TextBlock Grid.Row="8" Grid.Column="0" Text="Ctrl+," FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
-                <TextBlock Grid.Row="8" Grid.Column="1" Text="Settings" Margin="0,2" />
-                <TextBlock Grid.Row="9" Grid.Column="0" Text="Shift+D" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
-                <TextBlock Grid.Row="9" Grid.Column="1" Text="Toggle debug overlay" Margin="0,2" />
+                <TextBlock Grid.Row="3" Grid.Column="0" Text="C" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="3" Grid.Column="1" Text="Cycle colour effect (this document)" Margin="0,2" />
+                <TextBlock Grid.Row="4" Grid.Column="0" Text="Z" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="4" Grid.Column="1" Text="Freeze panes (rows and columns) / unfreeze" Margin="0,2" />
+                <TextBlock Grid.Row="5" Grid.Column="0" Text="Ctrl+Shift+O" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="5" Grid.Column="1" Text="Toggle outline" Margin="0,2" />
+                <TextBlock Grid.Row="6" Grid.Column="0" Text="Ctrl+Shift+B" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="6" Grid.Column="1" Text="Toggle bookmarks" Margin="0,2" />
+                <TextBlock Grid.Row="7" Grid.Column="0" Text="Ctrl+Shift+I" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="7" Grid.Column="1" Text="Toggle index (figures, tables, equations)" Margin="0,2" />
+                <TextBlock Grid.Row="8" Grid.Column="0" Text="Ctrl+M" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="8" Grid.Column="1" Text="Toggle minimap (drag top to move, corner to resize)" Margin="0,2" />
+                <TextBlock Grid.Row="9" Grid.Column="0" Text="Ctrl+Shift+M" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="9" Grid.Column="1" Text="Toggle margin cropping" Margin="0,2" />
+                <TextBlock Grid.Row="10" Grid.Column="0" Text="F11" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="10" Grid.Column="1" Text="Toggle fullscreen" Margin="0,2" />
+                <TextBlock Grid.Row="11" Grid.Column="0" Text="Shift+D" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="11" Grid.Column="1" Text="Toggle debug overlay" Margin="0,2" />
             </Grid>
 
             <TextBlock Text="Search" FontWeight="Bold" />
             <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto" Margin="8,0">
                 <TextBlock Grid.Row="0" Grid.Column="0" Text="Ctrl+F" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
-                <TextBlock Grid.Row="0" Grid.Column="1" Text="Open find bar" Margin="0,2" />
-                <TextBlock Grid.Row="1" Grid.Column="0" Text="Enter" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="0" Grid.Column="1" Text="Open search" Margin="0,2" />
+                <TextBlock Grid.Row="1" Grid.Column="0" Text="Enter / F3" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
                 <TextBlock Grid.Row="1" Grid.Column="1" Text="Next match" Margin="0,2" />
                 <TextBlock Grid.Row="2" Grid.Column="0" Text="Shift+Enter / Shift+F3" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
                 <TextBlock Grid.Row="2" Grid.Column="1" Text="Previous match" Margin="0,2" />
                 <TextBlock Grid.Row="3" Grid.Column="0" Text="Escape" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
-                <TextBlock Grid.Row="3" Grid.Column="1" Text="Close find bar" Margin="0,2" />
+                <TextBlock Grid.Row="3" Grid.Column="1" Text="Close search" Margin="0,2" />
             </Grid>
 
             <TextBlock Text="Rail Mode (active above zoom threshold)" FontWeight="Bold" />
@@ -142,7 +160,7 @@
             </Grid>
 
             <TextBlock Text="Annotations" FontWeight="Bold" />
-            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" Margin="8,0">
+            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" Margin="8,0">
                 <TextBlock Grid.Row="0" Grid.Column="0" Text="Ctrl+E" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
                 <TextBlock Grid.Row="0" Grid.Column="1" Text="Toggle annotation mode (shows the toolbar)" Margin="0,2" />
                 <TextBlock Grid.Row="1" Grid.Column="0" Text="1" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
@@ -161,10 +179,14 @@
                 <TextBlock Grid.Row="7" Grid.Column="1" Text="Cancel tool / exit annotation mode" Margin="0,2" />
                 <TextBlock Grid.Row="8" Grid.Column="0" Text="Ctrl+Z" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
                 <TextBlock Grid.Row="8" Grid.Column="1" Text="Undo annotation" Margin="0,2" />
-                <TextBlock Grid.Row="9" Grid.Column="0" Text="Ctrl+Shift+Z" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="9" Grid.Column="0" Text="Ctrl+Shift+Z / Ctrl+Y" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
                 <TextBlock Grid.Row="9" Grid.Column="1" Text="Redo annotation" Margin="0,2" />
-                <TextBlock Grid.Row="10" Grid.Column="0" Text="Ctrl+C" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
-                <TextBlock Grid.Row="10" Grid.Column="1" Text="Copy selected text" Margin="0,2" />
+                <TextBlock Grid.Row="10" Grid.Column="0" Text="Delete" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="10" Grid.Column="1" Text="Delete selected annotation" Margin="0,2" />
+                <TextBlock Grid.Row="11" Grid.Column="0" Text="Ctrl+C" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="11" Grid.Column="1" Text="Copy selected text" Margin="0,2" />
+                <TextBlock Grid.Row="12" Grid.Column="0" Text="F7" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="12" Grid.Column="1" Text="Next misspelling (in the note editor)" Margin="0,2" />
             </Grid>
 
             <TextBlock Text="VLM (requires configured endpoint)" FontWeight="Bold" />

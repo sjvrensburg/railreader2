@@ -722,7 +722,7 @@ public partial class MainWindow : Window
             case Key.Z when vm.CanFreeze || vm.IsFrozen || vm.FreezeArmMode != FreezeMode.None:
                 // Freeze panes: Unfreeze if frozen, else arm a "both" placement — the pointer becomes a
                 // crossing guide; click to drop the page-wide split (rows above + columns left). The
-                // Table-Reading panel offers rows-only / columns-only. Z again cancels the arm.
+                // toolbar's Freeze flyout offers rows-only / columns-only. Z again cancels the arm.
                 if (vm.IsFrozen) vm.Unfreeze(); else vm.ArmFreeze(FreezeMode.Both);
                 e.Handled = true; return true;
             case Key.OemOpenBrackets when e.KeyModifiers == (KeyModifiers.Control | KeyModifiers.Shift):
