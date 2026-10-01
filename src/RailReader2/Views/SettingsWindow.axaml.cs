@@ -89,6 +89,12 @@ public partial class SettingsWindow : Window
 
     private MainWindowViewModel? Vm => DataContext as MainWindowViewModel;
 
+    /// <summary>The document the per-document display prefs (colour effect, margin cropping, line
+    /// highlight/dim) apply to — the focused pane's, the same one the C/F/H keys and View/Rail menus
+    /// act on. Not <c>ActiveTab</c>: with split panes or a tear-off window focused, that can be a
+    /// different document.</summary>
+    private DocumentModel? FocusedDocument => Vm?.Controller.FocusedViewport?.Owner;
+
     private void LoadFromConfig()
     {
         if (Vm is not { } vm) return;
@@ -115,7 +121,7 @@ public partial class SettingsWindow : Window
         UpdateCustomRenderPanel(c.RenderQuality);
         ContinuousScrollCheck.IsChecked = c.ContinuousScroll;
         PixelSnappingCheck.IsChecked = c.PixelSnapping;
-        MarginCroppingCheck.IsChecked = vm.ActiveTab?.MarginCropping ?? c.MarginCropping;
+        MarginCroppingCheck.IsChecked = FocusedDocument?.MarginCropping ?? c.MarginCropping;
         LineFocusBlurSlider.Value = c.LineFocusBlurIntensity;
         LinePaddingSlider.Value = c.LinePadding;
         AutoScrollTriggerCheck.IsChecked = c.AutoScrollTriggerEnabled;
@@ -125,7 +131,7 @@ public partial class SettingsWindow : Window
         LineHighlightTintCombo.ItemsSource = Enum.GetNames<LineHighlightTint>();
         LineHighlightTintCombo.SelectedIndex = (int)c.LineHighlightTint;
         LineHighlightOpacitySlider.Value = c.LineHighlightOpacity;
-        LoadLineStyle(c, vm.ActiveTab);
+        LoadLineStyle(c, FocusedDocument);
 
         BuildRoleCheckboxes(_roleItems, c.NavigableRoles,
             set => { vm.AppConfig.NavigableRoles = set; vm.OnConfigChanged(); },
@@ -1261,12 +1267,12 @@ public partial class SettingsWindow : Window
         vm.AppConfig.MinimapMarginBottom = defaults.MinimapMarginBottom;
         vm.AppConfig.LineFocusBlur = defaults.LineFocusBlur;
         vm.AppConfig.LineFocusBlurIntensity = defaults.LineFocusBlurIntensity;
-        if (vm.ActiveTab is { } resetTab)
+        if (FocusedDocument is { } resetDoc)
         {
-            resetTab.LineFocusBlur = defaults.LineFocusBlur;
-            resetTab.LineHighlightEnabled = defaults.LineHighlightEnabled;
-            resetTab.MarginCropping = defaults.MarginCropping;
+            resetDoc.LineFocusBlur = defaults.LineFocusBlur;
+            resetDoc.LineHighlightEnabled = defaults.LineHighlightEnabled;
         }
+        vm.ApplyMarginCropping(defaults.MarginCropping);
         vm.AppConfig.AutoScrollLinePauseMs = defaults.AutoScrollLinePauseMs;
         vm.AppConfig.AutoScrollStopClasses = new HashSet<BlockRole>(defaults.AutoScrollStopClasses);
         vm.AppConfig.AutoScrollTriggerEnabled = defaults.AutoScrollTriggerEnabled;

@@ -7,7 +7,6 @@ using RailReader.Core;
 using RailReader.Core.Models;
 using RailReader.Core.Services;
 using RailReader2.Services;
-using RailReader2.ViewModels;
 
 namespace RailReader2.Views;
 
@@ -164,10 +163,10 @@ public partial class SettingsWindow
     // --- Current line (highlight / dim) ---
 
     // Index layout of LineStyleCombo: bit 0 = highlight, bit 1 = dim.
-    private void LoadLineStyle(AppConfig c, TabViewModel? tab)
+    private void LoadLineStyle(AppConfig c, DocumentModel? doc)
     {
-        bool highlight = tab?.LineHighlightEnabled ?? c.LineHighlightEnabled;
-        bool dim = tab?.LineFocusBlur ?? c.LineFocusBlur;
+        bool highlight = doc?.LineHighlightEnabled ?? c.LineHighlightEnabled;
+        bool dim = doc?.LineFocusBlur ?? c.LineFocusBlur;
         LineStyleCombo.SelectedIndex = (highlight ? 1 : 0) | (dim ? 2 : 0);
         UpdateLineStyleDependents();
     }
@@ -192,14 +191,15 @@ public partial class SettingsWindow
         bool highlight = (style & 1) != 0;
         bool dim = (style & 2) != 0;
 
-        // AppConfig holds the default for new documents; the open tab gets it immediately too
-        // (the F / H keys and Rail menu still toggle per-tab while reading).
+        // AppConfig holds the default for new documents; the focused document gets it immediately
+        // too (the F / H keys and Rail menu still toggle just that document while reading). Its
+        // tabs pick the change up through TabViewModel.OnStateChanged.
         vm.AppConfig.LineHighlightEnabled = highlight;
         vm.AppConfig.LineFocusBlur = dim;
-        if (vm.ActiveTab is { } tab)
+        if (FocusedDocument is { } doc)
         {
-            tab.LineHighlightEnabled = highlight;
-            tab.LineFocusBlur = dim;
+            doc.LineHighlightEnabled = highlight;
+            doc.LineFocusBlur = dim;
         }
         vm.OnConfigChanged();
     }

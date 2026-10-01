@@ -107,12 +107,12 @@
                                                ValueChanged="OnPaceValueChanged" />
                                 <TextBlock Grid.Row="2" Grid.Column="0" Text="Hold-to-scroll start speed:" VerticalAlignment="Center" />
                                 <NumericUpDown Grid.Row="2" Grid.Column="2" Name="ScrollStart" Value="10"
-                                               Minimum="10" Maximum="500" Increment="5"
+                                               Minimum="10" Maximum="160" Increment="5"
                                                FormatString="F0" Width="130" HorizontalAlignment="Left"
                                                ValueChanged="OnPaceValueChanged" />
                                 <TextBlock Grid.Row="4" Grid.Column="0" Text="Hold-to-scroll top speed:" VerticalAlignment="Center" />
                                 <NumericUpDown Grid.Row="4" Grid.Column="2" Name="ScrollMax" Value="30"
-                                               Minimum="10" Maximum="500" Increment="5"
+                                               Minimum="10" Maximum="160" Increment="5"
                                                FormatString="F0" Width="130" HorizontalAlignment="Left"
                                                ValueChanged="OnPaceValueChanged" />
                                 <TextBlock Grid.Row="6" Grid.Column="0" Text="Time to reach top speed (s):" VerticalAlignment="Center" />

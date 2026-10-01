@@ -15,9 +15,16 @@ public partial class RailToolBar : UserControl
     private Slider? _blurSlider;
     private TextBlock? _speedLabel;
     private bool _jumpMode;
-    // True while sliders are being set FROM config: the slider range is narrower than Settings'
-    // (speed tops out at 160, Settings allows 500), so a coerced value must not be written back.
+    // True while sliders are being set FROM config (or their range is being switched): loading a
+    // value is not an edit, and a coerced one — e.g. from a config written before the ranges were
+    // aligned — must not be written back over the configured value.
     private bool _syncing;
+
+    // The one slider edits two settings depending on mode; each range matches its Settings field
+    // (Reading ▸ hold-to-scroll top speed, Reading ▸ Jump distance) so neither side can push a value
+    // the other would clamp.
+    private const double SpeedMin = 10, SpeedMax = 160;
+    private const double JumpMin = 5, JumpMax = 80;
 
     private Button? _autoScrollBtn;
     private Button? _jumpBtn;
@@ -142,8 +149,8 @@ public partial class RailToolBar : UserControl
         _speedSlider = new Slider
         {
             Orientation = Orientation.Vertical,
-            Minimum = 5,
-            Maximum = 160,
+            Minimum = SpeedMin,
+            Maximum = SpeedMax,
             Value = 42,
             Height = 120,
             Width = 28,
@@ -237,7 +244,12 @@ public partial class RailToolBar : UserControl
 
         _speedLabel.Text = jumpMode ? "Jmp" : "Spd";
         _syncing = true;
-        try { _speedSlider.Value = jumpMode ? vm.AppConfig.JumpPercentage : vm.AppConfig.ScrollSpeedMax; }
+        try
+        {
+            _speedSlider.Minimum = jumpMode ? JumpMin : SpeedMin;
+            _speedSlider.Maximum = jumpMode ? JumpMax : SpeedMax;
+            _speedSlider.Value = jumpMode ? vm.AppConfig.JumpPercentage : vm.AppConfig.ScrollSpeedMax;
+        }
         finally { _syncing = false; }
         ToolTip.SetTip(_speedSlider, jumpMode
             ? "Jump distance % ([ / ] keys)"
