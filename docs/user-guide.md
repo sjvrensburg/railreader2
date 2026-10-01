@@ -44,11 +44,11 @@ The AI layout model is bundled in all packages.
 
 ### Opening a PDF
 
-Use **File > Open** or press `Ctrl+O` to open a PDF. You can also pass a file path as a command-line argument. When no file is open, a welcome screen shows with instructions.
+Use **File > Open** or press `Ctrl+O` to open a PDF. You can also pass a file path as a command-line argument. When no file is open, a welcome panel shows an **Open a PDF…** button and a few quick hints for getting started with rail reading.
 
 ### First steps
 
-Once a PDF is open, scroll through pages with `PgDn`/`PgUp`, zoom with `+`/`-` or mouse wheel, and pan by dragging. When you zoom past 3x, **rail mode** activates automatically — this is where the AI-guided reading begins.
+Once a PDF is open, scroll through pages with `PgDn`/`PgUp`, zoom with `+`/`-` or mouse wheel, and pan by dragging. When you zoom past 3x, **rail mode** activates automatically — this is where the AI-guided reading begins. Press `R` to [start rail reading at the current zoom](#start-rail-here-any-zoom) instead.
 
 ---
 
@@ -77,7 +77,7 @@ Once a PDF is open, scroll through pages with `PgDn`/`PgUp`, zoom with `+`/`-` o
 
 Press `Ctrl+Shift+M` to toggle **margin cropping**, or enable it in Settings. When on, fit/centre operations (the `F` and `0` keys, plus the page-flip on edge-hold) target the detected content area instead of the full page, so whitespace margins don't waste screen space at high zoom.
 
-The crop is computed from the analysed layout blocks and grows automatically as more pages are analysed — it never clips content. Without the ONNX model, cropping is a no-op.
+The crop is computed from the analysed layout blocks and grows automatically as more pages are analysed — it never clips content.
 
 Margin cropping never pushes you into rail mode: if the tighter fit would cross the rail zoom threshold, the fit is capped just below it. Toggling while zoomed past fit-width leaves your camera alone; the effect takes hold on your next fit or page flip.
 
@@ -150,6 +150,10 @@ When you reach the last line of a block, pressing `Down` advances to the next na
 ### Click to jump
 
 Click on any detected block in rail mode to jump directly to it. The view snaps to the clicked block's first line.
+
+### Start rail here (any zoom)
+
+You don't have to zoom past the threshold to rail-read. Press `R` (or **Rail > Start Rail Here**) to start rail mode on the block nearest the centre of the view at your current zoom — the camera doesn't lurch to a higher magnification. To choose the starting block yourself, click the **Start rail here** button on the toolbar, then click where you want to begin. Press `R` again or `Escape` to leave.
 
 ### Horizontal scrolling
 
@@ -251,7 +255,7 @@ Each split pane and tear-off window freezes **independently**, and a freeze belo
 
 Four GPU-accelerated colour filters are available, applied only to PDF content (not the UI). Access via **View > Colour Effect**, Settings > Appearance, or press `C` to cycle through effects on the focused document.
 
-Each tab keeps its own colour effect independently — you can have one PDF in Amber and another in High Contrast. The per-tab effect is saved with the reading position and restored when you reopen the file.
+Each document keeps its own colour effect independently — you can have one PDF in Amber and another in High Contrast. The effect is saved with the reading position and restored when you reopen the file.
 
 | Effect | Description |
 |--------|-------------|
@@ -274,7 +278,7 @@ Each effect has adjustable intensity (0.0 to 1.0). Rail mode overlay colours aut
 
 ## Search
 
-Press `Ctrl+F` to open the **Search** section of the side panel (one of the accordion sections, alongside Outline, Bookmarks, Index, and Comments). Type your query — results appear automatically after a brief debounce. Clicking a result jumps to the match and hands keyboard focus back to the page.
+Press `Ctrl+F` to open the **Search** section of the side panel (one of the accordion sections, alongside Outline, Bookmarks, Index, Comments, and Portals). Type your query — results appear automatically after a brief debounce. Clicking a result jumps to the match and hands keyboard focus back to the page.
 
 ![Search highlights](img/search_highlights.png)
 *Search results — matches grouped by page in the sidebar, highlighted on the page in yellow with the active match in orange*
@@ -304,7 +308,7 @@ Toggle **Annotation Mode** from the toolbar's Annotate button (or `Ctrl+E`, the 
 | **Pen** | `2` | Freehand drawing. |
 | **Rectangle** | `3` | Draw rectangular outlines or filled regions. |
 | **Text Note** | `4` | Click to place a note. Shows as a small folded-corner icon; click the icon in browse mode to expand/collapse the popup. Click an existing note in Text Note mode to edit. |
-| **Text Box** | — | Typewriter-style free text; drag a box, then type into it. |
+| **Text Box** | — | Typewriter-style free text; drag a box, then type its text in the note editor. |
 | **Eraser** | `5` | Click on an annotation to remove it. |
 
 Underline, Strikethrough, Squiggly, and Text Box have no numeric shortcut — pick them from the toolbar.
@@ -330,6 +334,12 @@ Annotations are drawn in a fixed z-order: highlights appear below freehand strok
 ### Popup notes
 
 Text notes display as a compact folded-corner icon (16px). In browse mode, click the icon to expand a floating popup showing the full note text with word wrapping. Click again to collapse. Double-click or use the Text Note tool to edit.
+
+### Spell checking in notes
+
+The note editor used by Text Note and Text Box underlines misspelled words as you type. **Right-click** an underlined word for suggestions, **Add to Dictionary**, or **Ignore**; press `F7` to jump to the next misspelling and open the same menu. Single letters, all-caps abbreviations, words with digits, LaTeX commands, and URLs are skipped.
+
+British and American English dictionaries are built in. Turn checking on or off and pick the dictionary in Settings > **Spelling**. In the advanced view you can manage your personal dictionary (words added there are accepted whichever dictionary is selected) and find the folder for adding other languages — any Hunspell `.aff` + `.dic` pair, such as LibreOffice's dictionaries.
 
 ### Select, move, and resize
 
@@ -486,7 +496,7 @@ Press `Ctrl+L` to send the current rail block to a Vision Language Model and cop
 - **Tables** → copied as Markdown
 - **Figures** → copied as a brief description
 
-You can also `Ctrl+right-click` any detected block to open a context menu with **Copy as LaTeX**, **Copy as Markdown**, **Copy Description**, and **Copy Image** options. The same four actions are available from the **Edit menu** (Copy Block as LaTeX / Markdown / Description / Image), where they act on the current rail block.
+You can also **right-click** any detected block to open a context menu with **Copy as LaTeX**, **Copy as Markdown**, **Copy Description**, and **Copy Image** options. The same four actions are available from the **Edit menu** (Copy Block as LaTeX / Markdown / Description / Image), where they act on the current rail block.
 
 ### Setup
 
@@ -782,7 +792,7 @@ A scanned page is a picture of text. It carries no text layer, so everything bui
   If you select a pack but never download it, the app quietly falls back to the bundled recogniser rather than turning OCR off; the log says so at startup.
 
 ### Spelling
-- **Check spelling in notes** and **Dictionary** (British and American English bundled). *Advanced:* the folder for extra Hunspell dictionaries, and your personal dictionary (add or remove words).
+- **Check spelling in notes** (on by default) and **Dictionary** (British and American English bundled). *Advanced:* the folder for extra Hunspell dictionaries, and your personal dictionary (add or remove words). See [Spell checking in notes](#spell-checking-in-notes).
 
 ### Advanced-only pages
 - **Rendering — Render quality:** Pick a render-DPI preset — **Ultra** (800 DPI), **Quality** (600), **High** (525, the default), **Balanced** (450), **Medium** (400), **Performance** (350), or **Custom**. Higher presets re-rasterise pages at a greater DPI cap for sharper text and deeper zoom, at the cost of more memory and more frequent re-renders; lower presets favour fluidity. The change applies to the open page immediately — no restart. With **Custom**, set your own maximum DPI (150–1200) and tier step (the DPI granularity at which the page re-rasterises; smaller steps render more crisply at intermediate zoom but re-raster more often).
@@ -813,6 +823,10 @@ The selected language pack isn't installed. Open Settings ▸ Scanned Pages with
 ### A scan reads as one giant rail line
 
 Line grouping is being defeated by page tilt. Check that **Skew correction** is enabled (Settings ▸ Scanned Pages, advanced view) and that scanned pages are set to **Find the lines only** or **Read the text** — skew is measured from the OCR results, so it can do nothing with OCR off. If it is already on, the page may exceed the ±5° correction limit, or carry two differently-tilted columns, which the correction deliberately declines to guess at.
+
+### Rail mode works, but figures and tables aren't recognised
+
+The layout model couldn't be loaded, so railreader2 has fallen back to a simpler layout built from the PDF's text layer. Rail reading still moves line by line, but blocks aren't classified, so anything that depends on block types — auto-scroll stops, the Index pane, semantic jumps, figure portals — has nothing to work with. Settings ▸ Models (advanced view) shows *Text-only (no layout model)* in this case; download a model from Settings ▸ Layout Model if needed. A scan with no text layer also needs [OCR](#scanned-pages) for this fallback to find any text.
 
 ### Exporting the log
 
@@ -868,7 +882,7 @@ The log is overwritten at the start of each session. Old `.log` files are automa
 
 | Key | Action |
 |-----|--------|
-| `R` | Start rail here — then click where to begin (rail-reads at the current zoom) |
+| `R` | Start rail here at the current zoom (press again or `Escape` to exit) |
 | `U` | Rotate to read the current sideways rail block (press again to reset) |
 | `Z` | Freeze panes (both axes) / unfreeze |
 | `Down` / `S` | Next line |
@@ -882,7 +896,7 @@ The log is overwritten at the start of each session. Old `.log` files are automa
 | `B` | Add bookmark for current page |
 | `Alt+Left` / `` ` `` | Navigate back |
 | `Alt+Right` | Navigate forward |
-| `C` | Cycle colour effect on active tab |
+| `C` | Cycle colour effect on the focused document |
 | `F` | Toggle line focus dim |
 | `H` | Toggle line highlight |
 | `Ctrl+Drag` | Free pan (release Ctrl to snap back) |
@@ -899,10 +913,11 @@ The log is overwritten at the start of each session. Old `.log` files are automa
 | `1` / `2` / `3` / `4` / `5` | Highlight / Pen / Rectangle / Text Note / Eraser |
 | Right-click | Block actions (Copy as LaTeX / Markdown / Description / Image) + toggle Annotation Mode |
 | `Ctrl+Z` | Undo |
-| `Ctrl+Y` | Redo |
+| `Ctrl+Y` / `Ctrl+Shift+Z` | Redo |
 | `Delete` / `Backspace` | Delete selected annotation (browse mode) |
 | `Ctrl+L` | Copy current block as LaTeX / Markdown / description (VLM) |
 | `Ctrl+C` | Copy selected text |
+| `F7` | Next misspelling (in the note editor) |
 | `Escape` | Cancel / close / stop / exit fullscreen |
 
 ---
@@ -911,10 +926,10 @@ The log is overwritten at the start of each session. Old `.log` files are automa
 
 Every command is reachable from the menu bar by name — handy for discovery, keyboard navigation, and assistive technologies. There are six menus:
 
-- **File** — open, duplicate / close tab, export & import annotations, settings, quit.
-- **Edit** — find, annotation mode, undo / redo, and **Copy Block as LaTeX / Markdown / Description / Image** (the same VLM block actions as the `Ctrl+right-click` context menu, acting on the current rail block).
-- **View** — zoom, side panels, minimap, fullscreen, **Split Editor** (split right, move pane to a new window, close panes), debug overlay, colour effects.
-- **Rail** — the rail-reading toggles: **Auto-Scroll**, **Jump Mode**, **Line Focus Dim**, **Line Highlight**, and **Add Bookmark** (mirroring the `P` / `J` / `F` / `H` / `B` shortcuts).
+- **File** — open, recent files, duplicate / close tab, export & import annotations, settings, quit.
+- **Edit** — find, annotation mode, undo / redo, and **Copy Block as LaTeX / Markdown / Description / Image** (the same VLM block actions as the block right-click menu, acting on the current rail block).
+- **View** — zoom and fit, **Rotate**, side panels, minimap, fullscreen, **Split Editor** (split right, move pane to a new window, close panes), debug overlay, colour effects.
+- **Rail** — **Start Rail Here** and **Rotate to Read Block** (`R` / `U`), then the rail-reading toggles: **Auto-Scroll**, **Jump Mode**, **Line Focus Dim**, **Line Highlight**, and **Add Bookmark** (mirroring the `P` / `J` / `F` / `H` / `B` shortcuts).
 - **Navigation** — go to / previous / next / first / last page, and semantic **Jump to Next / Previous** heading, figure, table, or equation.
 - **Help** — keyboard shortcuts, about, diagnostic log, clean-up.
 

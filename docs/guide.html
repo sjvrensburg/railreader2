@@ -163,7 +163,8 @@
       <p>
         Use <strong>File &rarr; Open</strong> or press <code>Ctrl+O</code> to open a PDF.
         You can also pass a file path as a command-line argument.
-        When no file is open, a welcome screen shows with instructions.
+        When no file is open, a welcome panel shows an <strong>Open a PDF&hellip;</strong> button and
+        a few quick hints for getting started with rail reading.
       </p>
 
       <h3>First steps</h3>
@@ -171,7 +172,8 @@
         Once a PDF is open, you can scroll through pages with <code>PgDn</code>/<code>PgUp</code>,
         zoom with <code>+</code>/<code>-</code> or the mouse wheel, and pan by dragging.
         When you zoom past 3x, <strong>rail mode</strong> activates automatically &mdash; this is
-        where the AI-guided reading begins.
+        where the AI-guided reading begins. Press <code>R</code> to <a href="#start-rail-here">start
+        rail reading at the current zoom</a> instead.
       </p>
     </section>
 
@@ -212,8 +214,7 @@
       </p>
       <p>
         The crop is computed from the analysed layout blocks and grows automatically as more
-        pages are analysed &mdash; it never clips content. Without the ONNX model, cropping is a
-        no-op. Margin cropping never pushes you into rail mode: if the tighter fit would cross
+        pages are analysed &mdash; it never clips content. Margin cropping never pushes you into rail mode: if the tighter fit would cross
         the rail zoom threshold, the fit is capped just below it. Toggling while zoomed past
         fit-width leaves your camera alone; the effect takes hold on your next fit or page flip.
       </p>
@@ -294,8 +295,8 @@
 
       <h3>Continuous scrolling</h3>
       <p>
-        Off by default. Turn on <strong>Continuous scrolling</strong> in Settings &rarr; Rendering
-        to let plain mouse-wheel scrolling in browse mode flow smoothly across page boundaries
+        Off by default. Turn on <strong>Scroll continuously from page to page</strong> in
+        Settings &rarr; Reading to let plain mouse-wheel scrolling in browse mode flow smoothly across page boundaries
         instead of jumping page to page &mdash; <code>Ctrl</code>+wheel still zooms. The minimap
         gains a thin document-position strip along its right edge while it's on. Rail mode is
         unaffected: it stays page-local, and the wheel still zooms at rail zoom regardless of this
@@ -313,7 +314,7 @@
       </p>
 
       <figure class="guide-screenshot">
-        <img src="img/rail_mode.png" alt="railreader2 rail mode navigating a text block line by line at high magnification with the current line highlighted" loading="lazy" width="1534" height="1186" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}">
+        <img src="img/rail_mode.png" alt="railreader2 rail mode navigating a text block line by line at high magnification with the current line highlighted" loading="lazy" width="1440" height="980" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}">
         <figcaption>Rail mode &mdash; line-by-line reading at high magnification with the current line highlighted</figcaption>
       </figure>
 
@@ -336,6 +337,16 @@
       <p>
         Click on any detected block in rail mode to jump directly to it. The view snaps to the
         clicked block's first line.
+      </p>
+
+      <h3 id="start-rail-here">Start rail here (any zoom)</h3>
+      <p>
+        You don't have to zoom past the threshold to rail-read. Press <code>R</code> (or
+        <strong>Rail &rarr; Start Rail Here</strong>) to start rail mode on the block nearest the
+        centre of the view at your current zoom &mdash; the camera doesn't lurch to a higher
+        magnification. To choose the starting block yourself, click the <strong>Start rail
+        here</strong> button on the toolbar, then click where you want to begin. Press
+        <code>R</code> again or <code>Escape</code> to leave.
       </p>
 
       <h3>Horizontal scrolling</h3>
@@ -414,11 +425,11 @@
         <li><strong>Inspect while parked:</strong> pan and zoom (and <code>Ctrl</code>+drag free-pan) stay
           fully live while parked, so you can study a parked equation or figure for as long as you like.</li>
         <li><strong>Reading beat:</strong> within prose, a brief pause is held at the end of every line
-          before moving to the next (default 400&nbsp;ms). Raise the <strong>Snap duration</strong>
-          (Settings &rarr; Rail Reading) if the move between lines feels too quick.</li>
+          before moving to the next (default 400&nbsp;ms). If the move between lines feels too quick,
+          choose a slower <strong>Reading pace</strong> (Settings &rarr; Reading).</li>
         <li><strong>What parks:</strong> the set of block types that park is configurable &mdash;
-          Settings &rarr; Auto-Scroll &rarr; <strong>Park On</strong> (headings, equations, tables, figures
-          by default; uncheck any to flow through it).</li>
+          Settings &rarr; Auto-Scroll &rarr; <strong>Stop and Wait At</strong> (headings, equations, tables,
+          figures by default; uncheck any to flow through it).</li>
         <li><strong>Stop:</strong> press <code>Escape</code>, <code>P</code>, or an opposing navigation key
           (<code>Up</code>, <code>Left</code>) to exit auto-scroll entirely.</li>
       </ul>
@@ -453,7 +464,7 @@
       </p>
       <p>
         This mimics natural reading eye movements and is useful for scanning text quickly.
-        Adjust jump distance with <code>[</code> / <code>]</code> or in Settings &rarr; Rail Reading.
+        Adjust jump distance with <code>[</code> / <code>]</code> or in Settings &rarr; Reading (advanced view).
       </p>
       <div class="tip">
         <strong>Tip:</strong> Auto-scroll and jump mode are mutually exclusive. Enabling one
@@ -473,14 +484,15 @@
       </p>
 
       <figure class="guide-screenshot">
-        <img src="img/line_focus_blur.png" alt="railreader2 line focus dim effect fading non-active lines to reduce distraction during rail reading" loading="lazy" width="1534" height="1186" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}">
+        <img src="img/line_focus_blur.png" alt="railreader2 line focus dim effect fading non-active lines to reduce distraction during rail reading" loading="lazy" width="1440" height="980" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}">
         <figcaption>Line focus dim &mdash; non-active lines are dimmed to reduce distraction</figcaption>
       </figure>
 
       <p>
-        Toggle with the <code>F</code> key, the <strong>F</strong> button on the rail toolbar, or in Settings &rarr; Rail Reading.
-        Dim intensity is adjustable from 0 (off) to 1 (maximum). The padding around the active line
-        (how much extra space stays fully visible) is also configurable.
+        Toggle with the <code>F</code> key, the <strong>F</strong> button on the rail toolbar, or in
+        Settings &rarr; Reading &rarr; <strong>Mark the line you're on</strong>. In the advanced view,
+        dim intensity is adjustable from 0 (off) to 1 (maximum), as is the padding around the active
+        line (how much extra space stays fully visible).
       </p>
 
       <h3>Line highlight tint</h3>
@@ -489,7 +501,7 @@
         This makes the current line stand out more clearly, especially at high magnification.
         Press <code>H</code> to toggle the line highlight independently of line focus dim.
       </p>
-      <p>Choose from five presets in Settings &rarr; Rail Reading:</p>
+      <p>Choose from five presets in Settings &rarr; Reading &rarr; <strong>Highlight colour</strong>:</p>
       <ul>
         <li><strong>Auto</strong> &mdash; Adapts to the active colour effect (amber for Amber, green for HighContrast/HighVisibility, etc.)</li>
         <li><strong>Yellow</strong> &mdash; Warm yellow highlighter</li>
@@ -498,7 +510,7 @@
         <li><strong>None</strong> &mdash; No tint &mdash; line is highlighted by dimming only</li>
       </ul>
       <p>
-        Opacity is adjustable from 0.0 (invisible) to 1.0 (fully opaque). The default is Auto at 25% opacity.
+        Opacity is adjustable from 0.0 (invisible) to 1.0 (fully opaque) in the advanced view. The default is Auto at 25% opacity.
       </p>
     </section>
 
@@ -546,7 +558,7 @@
       <p>
         Four GPU-accelerated colour filters are available, applied only to PDF content (not the UI).
         Access via <strong>View &rarr; Colour Effect</strong>, Settings &rarr; Appearance, or press
-        <code>C</code> to cycle through effects on the active tab.
+        <code>C</code> to cycle through effects on the focused document.
       </p>
       <ul>
         <li><strong>Amber Filter:</strong> Warm tint that reduces blue light and perceived haze. Good for extended reading.</li>
@@ -557,18 +569,18 @@
 
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1rem 0;">
         <figure class="guide-screenshot" style="max-width: 100%; margin: 0;">
-          <img src="img/colour_effects.png" alt="railreader2 amber colour filter applied to PDF content via GPU-accelerated shader" loading="lazy" width="1275" height="1649" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}">
+          <img src="img/colour_effects.png" alt="railreader2 amber colour filter applied to PDF content via GPU-accelerated shader" loading="lazy" width="1150" height="1480" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}">
           <figcaption>Amber filter &mdash; warm tint for comfortable reading</figcaption>
         </figure>
         <figure class="guide-screenshot" style="max-width: 100%; margin: 0;">
-          <img src="img/colour_effect_high_contrast.png" alt="railreader2 high contrast colour effect combined with rail mode for maximum readability" loading="lazy" width="1200" height="900" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}">
+          <img src="img/colour_effect_high_contrast.png" alt="railreader2 high contrast colour effect combined with rail mode for maximum readability" loading="lazy" width="1440" height="980" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}">
           <figcaption>High contrast + rail mode &mdash; maximum readability</figcaption>
         </figure>
       </div>
 
       <p>
-        Each tab keeps its own colour effect independently &mdash; you can have one PDF in Amber
-        and another in High Contrast. The per-tab effect is saved with the reading position and
+        Each document keeps its own colour effect independently &mdash; you can have one PDF in Amber
+        and another in High Contrast. The effect is saved with the reading position and
         restored when you reopen the file.
       </p>
       <p>
@@ -587,12 +599,12 @@
       <h2>Search</h2>
       <p>
         Press <code>Ctrl+F</code> to open the <strong>Search</strong> section of the side panel (one of the
-        accordion sections, alongside Outline, Bookmarks, Index, and Comments). Type your query &mdash; results
+        accordion sections, alongside Outline, Bookmarks, Index, Comments, and Portals). Type your query &mdash; results
         appear automatically after a brief debounce; clicking a result jumps to the match and hands keyboard focus back to the page.
       </p>
 
       <figure class="guide-screenshot">
-        <img src="img/search_highlights.png" alt="railreader2 full-text search with sidebar results panel and highlighted matches on the PDF page" loading="lazy" width="1935" height="1229" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}">
+        <img src="img/search_highlights.png" alt="railreader2 full-text search with sidebar results panel and highlighted matches on the PDF page" loading="lazy" width="1600" height="1000" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}">
         <figcaption>Search results &mdash; grouped by page in the sidebar, highlighted on the page with the active match in orange</figcaption>
       </figure>
 
@@ -618,7 +630,7 @@
       </p>
 
       <figure class="guide-screenshot">
-        <img src="img/annotations.png" alt="railreader2 annotation tools showing highlights, freehand pen marks, rectangles, and text notes on a PDF page" loading="lazy" width="1534" height="1186" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}">
+        <img src="img/annotations.png" alt="railreader2 annotation tools showing highlights, freehand pen marks, rectangles, and text notes on a PDF page" loading="lazy" width="1500" height="1040" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}">
         <figcaption>Annotations &mdash; highlights and text notes on a PDF page</figcaption>
       </figure>
 
@@ -628,7 +640,7 @@
         <li><strong>Pen</strong> (<code>2</code>) &mdash; Freehand drawing.</li>
         <li><strong>Rectangle</strong> (<code>3</code>) &mdash; Draw rectangular outlines or filled regions.</li>
         <li><strong>Text Note</strong> (<code>4</code>) &mdash; Click to place a note. Shows as a small folded-corner icon; click the icon in browse mode to expand/collapse the popup. Click an existing note in Text Note mode to edit.</li>
-        <li><strong>Text Box</strong> &mdash; typewriter-style free text; drag a box, then type into it.</li>
+        <li><strong>Text Box</strong> &mdash; typewriter-style free text; drag a box, then type its text in the note editor.</li>
         <li><strong>Eraser</strong> (<code>5</code>) &mdash; Click on an annotation to remove it.</li>
       </ul>
       <p>
@@ -672,6 +684,22 @@
       <p>
         Text notes display as a compact folded-corner icon (16px). In browse mode, click the icon to expand a
         floating popup showing the full note text with word wrapping. Click again to collapse.
+      </p>
+
+      <h3 id="spell-checking">Spell checking in notes</h3>
+      <p>
+        The note editor used by Text Note and Text Box underlines misspelled words as you type.
+        <strong>Right-click</strong> an underlined word for suggestions, <strong>Add to
+        Dictionary</strong>, or <strong>Ignore</strong>; press <code>F7</code> to jump to the next
+        misspelling and open the same menu. Single letters, all-caps abbreviations, words with
+        digits, LaTeX commands, and URLs are skipped.
+      </p>
+      <p>
+        British and American English dictionaries are built in. Turn checking on or off and pick the
+        dictionary in Settings &rarr; <strong>Spelling</strong>. In the advanced view you can manage
+        your personal dictionary (words added there are accepted whichever dictionary is selected)
+        and find the folder for adding other languages &mdash; any Hunspell <code>.aff</code> +
+        <code>.dic</code> pair, such as LibreOffice's dictionaries.
       </p>
 
       <h3>Select, move, and resize</h3>
@@ -814,7 +842,7 @@
       <p>
         Press <code>Ctrl+Shift+I</code> to open the <strong>Index</strong> pane &mdash;
         a browsable index of all figures, tables, and equations detected by the layout analysis model.
-        It is one of the side-panel accordion sections (alongside Outline, Bookmarks, Search, and Comments).
+        It is one of the side-panel accordion sections (alongside Outline, Bookmarks, Search, Comments, and Portals).
       </p>
 
       <h3>Background scanning</h3>
@@ -941,7 +969,7 @@
       <h2>Copy as LaTeX (VLM)</h2>
       <p>
         Press <code>Ctrl+L</code> to send the current rail block to a Vision Language Model and
-        copy the result to the clipboard. You can also <code>Ctrl+right-click</code> any detected
+        copy the result to the clipboard. You can also <strong>right-click</strong> any detected
         block to open a context menu with <strong>Copy as LaTeX</strong>,
         <strong>Copy as Markdown</strong>, <strong>Copy Description</strong>, and
         <strong>Copy Image</strong> options &mdash; the same four are on the
@@ -953,13 +981,14 @@
 
       <h3>Setup</h3>
       <p>
-        Open <strong>Settings &gt; VLM</strong> and configure an OpenAI-compatible API endpoint.
+        Open <strong>Settings &gt; AI Assistant</strong> (turn on <strong>Show advanced settings</strong>
+        first) and configure an OpenAI-compatible API endpoint.
         Use <strong>Test Connection</strong> to verify your setup.
       </p>
 
       <h3>Structured JSON output</h3>
       <p>
-        Under <strong>Settings &gt; VLM</strong> there's a <strong>Use structured JSON schema
+        Under <strong>Settings &gt; AI Assistant</strong> there's a <strong>Use structured JSON schema
         responses</strong> checkbox (off by default). Enabling it forces capable models
         (GPT-4o, Qwen2.5-VL, Gemini) to return a JSON object matching a strict schema,
         producing cleaner output &mdash; no stray <code>$$</code> wrappers, code fences, or
@@ -1165,97 +1194,92 @@ railreader2-cli export paper.pdf --figure-dir ./figures --output paper.md</code>
         Press <code>Ctrl+,</code> or use the menu to open Settings. Changes take effect immediately
         and are saved automatically to the config file.
       </p>
+      <p>
+        Settings opens in a <strong>simple view</strong>: five pages &mdash; Reading, Appearance,
+        Auto-Scroll, Scanned Pages, and Spelling &mdash; holding the settings most readers change.
+        Turn on <strong>Show advanced settings</strong> at the bottom of the window to reveal the
+        fine-tuning controls on those pages and six more pages: Rendering, Analysis, Layout Model,
+        Performance, Models, and AI Assistant. The switch is remembered. Links from in-app notices
+        that point at an advanced page reveal the advanced view for that visit only.
+      </p>
+      <p>
+        Colour effect, margin cropping, and the current-line style are kept per document &mdash;
+        <code>C</code>, <code>F</code>, <code>H</code> and the View/Rail menus change only the document
+        you're looking at. Settings shows the focused document's values; changing one there sets both
+        that document and the default for documents you open later.
+      </p>
+
+      <h3>Reading</h3>
+      <ul>
+        <li><strong>Start rail reading at:</strong> Zoom level at which rail mode activates (default 3.0&times;).</li>
+        <li><strong>Reading pace:</strong> <strong>Relaxed</strong>, <strong>Normal</strong> (default) or
+          <strong>Brisk</strong>. Sets how quickly the view glides between lines, how fast hold-to-scroll
+          moves and accelerates, and the auto-scroll pause at the end of each line, all together. Shows
+          <em>Custom</em> once any of those has been tuned by hand (including with the rail toolbar's speed
+          slider). <em>Advanced:</em> the individual values &mdash; line-to-line glide (ms), hold-to-scroll
+          start and top speed, time to reach top speed (s), and auto-scroll line pause (ms, 0 to disable).</li>
+        <li><strong>Mark the line you're on:</strong> Don't mark it / Highlight it / Dim the other lines /
+          Highlight and dim &mdash; the same two effects as the <code>H</code> and <code>F</code> keys.
+          <strong>Highlight colour:</strong> Auto, Yellow, Cyan, Green, None. <em>Advanced:</em> highlight
+          opacity, dim amount, and the space kept around the line.</li>
+        <li><strong>Crop page margins:</strong> Fit pages to their detected content (see
+          <a href="#navigation">Margin cropping</a>).</li>
+        <li><strong>Scroll continuously from page to page:</strong> Off by default. Lets browse-mode
+          mouse-wheel scrolling flow smoothly across page boundaries instead of jumping page to page &mdash;
+          see <em>Continuous scrolling</em> under <a href="#navigation">Basic Navigation</a>. Takes effect
+          immediately.</li>
+        <li><em>Advanced:</em> <strong>Jump distance</strong> &mdash; percentage of the visible width for
+          jump mode (5&ndash;80%).</li>
+      </ul>
 
       <h3>Appearance</h3>
       <ul>
-        <li><strong>UI Font Scale:</strong> Adjust the size of all UI text (default 1.25x).</li>
-        <li><strong>Dark Mode:</strong> Switch the UI to a dark theme. Takes effect immediately.</li>
-        <li><strong>Motion Blur:</strong> Toggle and adjust intensity of directional blur during scroll/zoom.</li>
-        <li><strong>Colour Effect:</strong> Select and configure the active colour filter (applies globally via Settings; use <code>C</code> key for per-tab cycling).</li>
-      </ul>
-
-      <h3>Rendering</h3>
-      <ul>
-        <li><strong>Render Quality:</strong> Pick a render-DPI preset &mdash; Ultra (800&nbsp;DPI),
-          Quality (600), High (525, the default), Balanced (450), Medium (400), Performance (350),
-          or Custom. Higher presets re-rasterise pages at a greater DPI cap for sharper text and
-          deeper zoom, at the cost of more memory and more frequent re-renders; lower presets favour
-          fluidity. The change applies to the open page immediately &mdash; no restart.</li>
-        <li><strong>Custom (Max render DPI / Tier step):</strong> When Custom is selected, set your
-          own maximum DPI (150&ndash;1200) and tier step (the DPI granularity at which the page
-          re-rasterises). Values are clamped to the supported range.</li>
-        <li><strong>Continuous scrolling:</strong> Off by default. Lets browse-mode mouse-wheel
-          scrolling flow smoothly across page boundaries instead of jumping page to page &mdash;
-          see <a href="#navigation">Split panes &amp; tear-off windows / Continuous scrolling</a>
-          under Basic Navigation for the full behaviour. Takes effect immediately.</li>
-      </ul>
-
-      <h3>Rail Reading</h3>
-      <ul>
-        <li><strong>Zoom Threshold:</strong> Zoom level at which rail mode activates (default 3.0x).</li>
-        <li><strong>Snap Duration:</strong> Duration of line-snap animations in milliseconds.</li>
-        <li><strong>Scroll Speed:</strong> Start and max speed for horizontal hold-to-scroll.</li>
-        <li><strong>Ramp Time:</strong> Seconds to reach max scroll speed from start.</li>
-        <li><strong>Pixel Snapping:</strong> Quantise camera to pixel grid to reduce text shimmer.</li>
-        <li><strong>Line Focus Dim:</strong> Toggle and set intensity. Adjust the focus padding (extra space around the active line that stays fully visible, 0&ndash;0.5).</li>
-        <li><strong>Line Highlight Tint:</strong> Choose a colour tint for the active line (Auto, Yellow, Cyan, Green, None) and set opacity.</li>
-        <li><strong>Jump Distance:</strong> Percentage of visible width for jump mode (5&ndash;80%).</li>
+        <li><strong>Dark mode:</strong> Switch the UI to a dark theme. Takes effect immediately.</li>
+        <li><strong>Menu and panel text size:</strong> Scales all UI text (default 1.25&times;).</li>
+        <li><strong>Colour effect</strong> and <strong>Strength:</strong> The page colour filter (see
+          <a href="#colour-effects">Colour Effects</a>).</li>
+        <li><em>Advanced:</em> <strong>Motion blur</strong> during scroll and zoom, and its amount;
+          <strong>Pixel snapping</strong>, which quantises the camera to the pixel grid to reduce text
+          shimmer while moving.</li>
       </ul>
 
       <h3>Auto-Scroll</h3>
       <ul>
-        <li><strong>Line Pause:</strong> The per-line reading beat &mdash; pause held at the end of every line before moving to the next (ms, 0 to disable).</li>
-        <li><strong>Park On:</strong> Which block types auto-scroll parks on when it reaches them (headings, equations, tables, figures by default). Unchecked types flow through like prose; column and page breaks always park.</li>
-        <li><strong>Enable auto-scroll trigger / Trigger delay:</strong> Optionally auto-start auto-scroll after holding <code>D</code>/<code>Right</code> for the set delay.</li>
+        <li><strong>Stop and wait at:</strong> Headings, equations and algorithms, tables, figures and
+          charts (all on by default).
+          Unchecked types flow through like prose; column and page breaks always stop.
+          <em>Advanced:</em> the full per-block-type list.</li>
+        <li><strong>Also start it by holding D or &rarr;:</strong> Optionally auto-start auto-scroll after
+          holding <code>D</code>/<code>Right</code>. <em>Advanced:</em> the hold time.</li>
+        <li>Scroll speed is set with the rail toolbar's slider; the end-of-line pause follows
+          <strong>Reading pace</strong>.</li>
       </ul>
 
-      <h3>Advanced</h3>
-      <ul>
-        <li><strong>Layout Model:</strong> Choose between Docling Heron-INT8 (default, bundled, ~66 MB)
-          and PP-DocLayoutV3 (alternative, ~50 MB). See the <a href="heron-layout-model.md">layout model guide</a>
-          for installation and trade-offs.</li>
-        <li><strong>Custom Layout Model:</strong> Optionally replace the built-in model with your own
-          ONNX (PP-style I/O contract) + class-mapping JSON.</li>
-        <li><strong>Navigable Block Types:</strong> Choose which block types are navigable
-          in rail mode. Toggling classes doesn't require re-running analysis.</li>
-        <li><strong>Centered Block Types:</strong> Choose which block types are horizontally centered
-          when they are narrower than the viewport. By default, headings (paragraph_title, doc_title)
-          are excluded so they stay left-aligned with surrounding text, while formulae and body text
-          are centered.</li>
-        <li><strong>Analysis Lookahead:</strong> Number of pages to pre-analyze ahead (0 to disable).</li>
-        <li><strong>GPU Acceleration:</strong> Off by default. Runs the ONNX layout model on your
-          GPU via WebGPU instead of the CPU &mdash; roughly 8&ndash;10&times; faster on supported
-          hardware. Applies only to Docling Heron and PP-DocLayoutV3 (PP-DocLayout-S and any custom
-          model always run on CPU); falls back to CPU automatically if no compatible GPU is found.
-          <strong>Needs a restart</strong> to take effect. Heron's GPU model is a separate one-time
-          download (run <code>./scripts/download-model.sh heron-gpu</code> or use the in-app
-          &ldquo;Download GPU model&rdquo; button); PP-DocLayoutV3 needs no extra download.</li>
-      </ul>
-
-      <h3>OCR</h3>
+      <h3 id="scanned-pages">Scanned Pages</h3>
       <p>
         A scanned page is a picture of text. It carries no text layer, so everything built on one
         stops working: line-by-line rail reading, search, text selection, table cells, Markdown
-        export, and VLM grounding. OCR reads the text back off the image so those features behave
-        as they would on a born-digital page. It is off by default and costs nothing until you
-        turn it on.
+        export, and VLM grounding. Text recognition (OCR) reads the text back off the image so those
+        features behave as they would on a born-digital page. It is off by default and costs nothing
+        until you turn it on.
       </p>
       <ul>
-        <li><strong>OCR mode:</strong> <strong>Off</strong> (default) does nothing.
-          <strong>Lines</strong> detects where the lines of text are without reading them &mdash;
-          enough to restore rail mode's line-by-line movement on a scan, though search and
-          selection still have nothing to work with. <strong>Full</strong> detects
+        <li><strong>On scanned pages:</strong> <strong>Do nothing</strong> (default) does nothing.
+          <strong>Find the lines only</strong> detects where the lines of text are without reading them
+          &mdash; enough to restore rail mode's line-by-line movement on a scan, though search and
+          selection still have nothing to work with. <strong>Read the text</strong> detects
           <em>and</em> recognises the text, restoring every text-dependent feature; pair it with
-          the PP-DocLayout-S layout model at 1920 for the best results. Changing the mode drops
-          cached analysis for affected pages, so open scans re-analyse immediately.</li>
-        <li><strong>Skew correction:</strong> Scans are rarely square on the glass, and line
-          detection is exactly the step a tilt breaks &mdash; under a degree is enough to fragment
-          a paragraph into a couple of huge rail lines, or to fuse neighbouring lines into one.
+          the PP-DocLayout-S layout model (advanced view &rarr; Layout Model) for the best results.
+          Changing this drops cached analysis for affected pages, so open scans re-analyse
+          immediately.</li>
+        <li><em>Advanced:</em> <strong>Skew correction:</strong> Scans are rarely square on the glass,
+          and line detection is exactly the step a tilt breaks &mdash; under a degree is enough to
+          fragment a paragraph into a couple of huge rail lines, or to fuse neighbouring lines into one.
           This measures the page's tilt from the OCR results and compensates when grouping text
-          into lines; square pages are left untouched. On by default, and disabled while OCR mode
-          is Off since the tilt is measured from the OCR results.</li>
-        <li><strong>OCR language pack:</strong> The bundled recogniser reads Latin-script text well
-          and little else. The optional PP-OCRv6 packs add broad multilingual coverage (Latin +
+          into lines; square pages are left untouched. On by default, and disabled while scanned pages
+          are set to Do nothing, since the tilt is measured from the OCR results.</li>
+        <li><em>Advanced:</em> <strong>Language pack:</strong> The bundled recogniser reads Latin-script
+          text well and little else. The optional PP-OCRv6 packs add broad multilingual coverage (Latin +
           CJK and more) in three tiers. Press <strong>Download language pack</strong> &mdash; files
           are saved to your config folder, so this works from a read-only AppImage &mdash; then
           restart.</li>
@@ -1277,7 +1301,58 @@ railreader2-cli export paper.pdf --figure-dir ./figures --output paper.md</code>
         queues behind any other scanned page already being recognised, though, since OCR itself
         runs on a single thread. On the Medium pack a page can still take a minute or more &mdash;
         it isn't frozen, and the session log records each page as it completes.
+        (<a href="#performance">GPU acceleration for OCR</a> speeds up the larger packs considerably.)
       </p>
+
+      <h3>Spelling</h3>
+      <ul>
+        <li><strong>Check spelling in notes</strong> (on by default) and <strong>Dictionary</strong>
+          (British and American English bundled). <em>Advanced:</em> the folder for extra Hunspell
+          dictionaries, and your personal dictionary (add or remove words). See
+          <a href="#spell-checking">Spell checking in notes</a>.</li>
+      </ul>
+
+      <h3>Advanced-only pages</h3>
+      <ul>
+        <li><strong>Rendering &mdash; Render quality:</strong> Pick a render-DPI preset &mdash; Ultra
+          (800&nbsp;DPI), Quality (600), High (525, the default), Balanced (450), Medium (400),
+          Performance (350), or Custom. Higher presets re-rasterise pages at a greater DPI cap for
+          sharper text and deeper zoom, at the cost of more memory and more frequent re-renders; lower
+          presets favour fluidity. The change applies to the open page immediately &mdash; no restart.
+          With Custom, set your own maximum DPI (150&ndash;1200) and tier step (the DPI granularity at
+          which the page re-rasterises).</li>
+        <li><strong>Analysis:</strong> Lookahead pages, background analysis range, and page cache range;
+          <strong>Rail stops on</strong> (which block types rail mode navigates &mdash; toggling doesn't
+          require re-running analysis); <strong>Centred block types</strong> (which block types are
+          centred horizontally when narrower than the viewport; headings are excluded by default so they
+          stay left-aligned with surrounding text).</li>
+        <li><strong>Layout Model:</strong> Choose between Docling Heron-INT8 (default, bundled, ~66 MB),
+          PP-DocLayoutV3 (~125 MB, model-supplied reading order), and the lightweight PP-DocLayout-S,
+          with a <strong>Download model</strong> button. See the
+          <a href="heron-layout-model.md">layout model guide</a> for trade-offs.
+          <strong>Custom layout model:</strong> optionally replace the built-in model with your own ONNX
+          (PP-style I/O contract) + class-mapping JSON. Changing the model needs a restart.</li>
+        <li id="performance"><strong>Performance &mdash; GPU acceleration:</strong> Off by default. A
+          preset picker (<strong>CPU only</strong> / <strong>Faster page navigation</strong> /
+          <strong>Faster scanned-document OCR</strong>) or individual toggles run layout analysis
+          <em>or</em> OCR on your GPU via WebGPU &mdash; not both at once, so turning one on turns the
+          other off. Layout on GPU is roughly 8&ndash;10&times; faster on supported hardware and applies
+          only to Docling Heron and PP-DocLayoutV3 (PP-DocLayout-S and any custom model always run on
+          CPU); OCR on GPU mainly helps the larger language packs. Everything falls back to CPU
+          automatically if no compatible GPU is found. <strong>Needs a restart.</strong> Heron's GPU
+          model is a separate one-time download (the in-app <strong>Download GPU model</strong>
+          button); PP-DocLayoutV3 needs no extra download.</li>
+        <li><strong>Performance &mdash; Display GPU</strong> (Linux only): on a laptop with both an
+          integrated and a discrete GPU, the window is drawn on the integrated one by default, which can
+          make scrolling stutter on a large or high-resolution window. <strong>Prefer the discrete GPU
+          for drawing</strong> switches it. Takes effect after a restart.</li>
+        <li><strong>Models:</strong> Read-only &mdash; which layout model, OCR language pack, and
+          accelerators are actually running this session, what a restart would change
+          (<em>Pending</em>), and advisories with a one-click fix for combinations that work against
+          each other.</li>
+        <li><strong>AI Assistant:</strong> The vision-language-model endpoint for Copy as LaTeX &mdash;
+          see <a href="#vlm">Copy as LaTeX (VLM)</a>.</li>
+      </ul>
 
       <h3>Config file</h3>
       <p>
@@ -1301,13 +1376,14 @@ railreader2-cli export paper.pdf --figure-dir ./figures --output paper.md</code>
         scanned page still queues behind one already being recognised &mdash; and with the
         <strong>Medium</strong> language pack a single page can take
         a minute or more. Switch to the <strong>Tiny</strong> or <strong>Small</strong> pack
-        (Settings &rarr; OCR), or set OCR mode to <strong>Lines</strong>, which restores rail
-        reading on scans without the recognition cost.
+        (Settings &rarr; Scanned Pages, advanced view), or set scanned pages to <strong>Find the lines
+        only</strong>, which restores rail reading on scans without the recognition cost.
       </p>
 
       <h3>&ldquo;OCR model failed to load&rdquo;</h3>
       <p>
-        The selected language pack isn't installed. Open Settings &rarr; OCR, press
+        The selected language pack isn't installed. Open Settings &rarr; Scanned Pages with
+        <strong>Show advanced settings</strong> on, press
         <strong>Download language pack</strong>, and restart. Recent versions fall back to the
         bundled recogniser instead of disabling OCR, so this message means only that your chosen
         pack is unavailable &mdash; not that OCR is broken.
@@ -1316,11 +1392,22 @@ railreader2-cli export paper.pdf --figure-dir ./figures --output paper.md</code>
       <h3>A scan reads as one giant rail line</h3>
       <p>
         Line grouping is being defeated by page tilt. Check that <strong>Skew correction</strong>
-        is enabled (Settings &rarr; OCR) and that OCR mode is <strong>Lines</strong> or
-        <strong>Full</strong> &mdash; skew is measured from the OCR results, so it can do nothing
+        is enabled (Settings &rarr; Scanned Pages, advanced view) and that scanned pages are set to
+        <strong>Find the lines only</strong> or <strong>Read the text</strong> &mdash; skew is measured from the OCR results, so it can do nothing
         with OCR off. If it is already on, the page may exceed the &plusmn;5&deg; correction limit,
         or carry two differently-tilted columns, which the correction deliberately declines to
         guess at.
+      </p>
+
+      <h3>Rail mode works, but figures and tables aren't recognised</h3>
+      <p>
+        The layout model couldn't be loaded, so railreader2 has fallen back to a simpler layout built
+        from the PDF's text layer. Rail reading still moves line by line, but blocks aren't classified,
+        so anything that depends on block types &mdash; auto-scroll stops, the Index pane, semantic
+        jumps, figure portals &mdash; has nothing to work with. Settings &rarr; Models (advanced view)
+        shows <em>Text-only (no layout model)</em> in this case; download one from Settings &rarr; Layout Model if
+        needed. A scan with no text layer also needs <a href="#scanned-pages">OCR</a> for this
+        fallback to find any text.
       </p>
 
       <h3>Exporting the log</h3>
@@ -1357,6 +1444,8 @@ railreader2-cli export paper.pdf --figure-dir ./figures --output paper.md</code>
           <tr><td><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 11V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2 M0 0 M14 10V4a2 2 0 0 0-2-2a2 2 0 0 0-2 2v2 M0 0 M10 10.5V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2v8 M0 0 M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg></td><td>Browse / Pan</td><td>Pan the page and click to navigate &mdash; the default mode</td></tr>
           <tr><td><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 22h-1a4 4 0 0 1-4-4V6a4 4 0 0 1 4-4h1 M0 0 M7 22h1a4 4 0 0 0 4-4 M0 0 M7 2h1a4 4 0 0 1 4 4"/></svg></td><td>Text Select</td><td>Select text on the page to copy</td></tr>
           <tr><td><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10,8 H20 A2,2 0 0 1 22,10 V20 A2,2 0 0 1 20,22 H10 A2,2 0 0 1 8,20 V10 A2,2 0 0 1 10,8 Z M0 0 M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></td><td>Copy</td><td>Copy the selected text (<code>Ctrl+C</code>)</td></tr>
+          <tr><td><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12 A10 10 0 0 1 22 12 A10 10 0 0 1 2 12 M0 0 M22 12 L18 12 M0 0 M6 12 L2 12 M0 0 M12 6 L12 2 M0 0 M12 22 L12 18"/></svg></td><td>Start rail here</td><td>Click, then click where to begin rail reading at the current zoom (<code>R</code> starts at the view centre)</td></tr>
+          <tr><td><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12h20 M0 0 M12 2v20 M0 0 m20 16-4-4 4-4 M0 0 m4 8 4 4-4 4 M0 0 m16 4-4 4-4-4 M0 0 m8 20 4-4 4 4"/></svg></td><td>Freeze</td><td>Freeze panes &mdash; pin rows, columns, or both while the page scrolls (<a href="#freeze-panes">Freeze Panes</a>)</td></tr>
           <tr><td><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7 M0 0 M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z"/></svg></td><td>Annotate</td><td>Enter annotation mode (<code>Ctrl+E</code>)</td></tr>
         </tbody>
         <tbody>
@@ -1368,7 +1457,7 @@ railreader2-cli export paper.pdf --figure-dir ./figures --output paper.md</code>
           <tr><td><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/></svg></td><td>Pen</td><td>Freehand drawing</td></tr>
           <tr><td><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5,3 H19 A2,2 0 0 1 21,5 V19 A2,2 0 0 1 19,21 H5 A2,2 0 0 1 3,19 V5 A2,2 0 0 1 5,3 Z"/></svg></td><td>Rectangle</td><td>Draw a rectangle outline</td></tr>
           <tr><td><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 9a2.4 2.4 0 0 0-.706-1.706l-3.588-3.588A2.4 2.4 0 0 0 15 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2z M0 0 M15 3v5a1 1 0 0 0 1 1h5"/></svg></td><td>Text note</td><td>Drop a collapsible popup note</td></tr>
-          <tr><td><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v16 M0 0 M4 7V5a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v2 M0 0 M9 20h6"/></svg></td><td>Text box</td><td>Drag a box, then type into it (typewriter-style)</td></tr>
+          <tr><td><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v16 M0 0 M4 7V5a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v2 M0 0 M9 20h6"/></svg></td><td>Text box</td><td>Drag a box, then type its text (typewriter-style)</td></tr>
           <tr><td><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 21H8a2 2 0 0 1-1.42-.587l-3.994-3.999a2 2 0 0 1 0-2.828l10-10a2 2 0 0 1 2.829 0l5.999 6a2 2 0 0 1 0 2.828L12.834 21 M0 0 m5.082 11.09 8.828 8.828"/></svg></td><td>Eraser</td><td>Erase annotations under the cursor</td></tr>
           <tr><td><span style="display:inline-block;width:16px;height:16px;border-radius:2px;background:#FFFF00;border:1px solid #888" aria-hidden="true"></span></td><td>Colour</td><td>Shared 5-colour palette (yellow/green/red/blue/black) for every colour-capable tool</td></tr>
           <tr><td><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 21h8 M0 0 m15 5 4 4 M0 0 M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/></svg></td><td>Thickness</td><td>Stroke thickness for the pen and rectangle only (thin / normal / thick)</td></tr>
@@ -1428,6 +1517,8 @@ railreader2-cli export paper.pdf --figure-dir ./figures --output paper.md</code>
         </tbody>
         <tbody>
           <tr><th colspan="2" scope="rowgroup">Rail Mode</th></tr>
+          <tr><td>R</td><td>Start rail here at the current zoom (press again or Escape to exit)</td></tr>
+          <tr><td>Z</td><td>Freeze panes (rows and columns) / unfreeze</td></tr>
           <tr><td>Down / S</td><td>Next line</td></tr>
           <tr><td>Up / W</td><td>Previous line</td></tr>
           <tr><td>Right / D</td><td>Scroll forward (hold)</td></tr>
@@ -1439,7 +1530,7 @@ railreader2-cli export paper.pdf --figure-dir ./figures --output paper.md</code>
           <tr><td>B</td><td>Add bookmark for current page</td></tr>
           <tr><td>Alt+Left / ` (backtick)</td><td>Navigate back</td></tr>
           <tr><td>Alt+Right</td><td>Navigate forward</td></tr>
-          <tr><td>C</td><td>Cycle colour effect on active tab</td></tr>
+          <tr><td>C</td><td>Cycle colour effect on the focused document</td></tr>
           <tr><td>F</td><td>Toggle line focus dim</td></tr>
           <tr><td>H</td><td>Toggle line highlight</td></tr>
           <tr><td>[ / ]</td><td>Adjust speed or jump distance (&plusmn;5)</td></tr>
@@ -1457,9 +1548,10 @@ railreader2-cli export paper.pdf --figure-dir ./figures --output paper.md</code>
           <tr><td>1 / 2 / 3 / 4 / 5</td><td>Highlight / Pen / Rectangle / Text Note / Eraser</td></tr>
           <tr><td>Right-click</td><td>Block actions (Copy as LaTeX / Markdown / Description / Image) + toggle Annotation Mode</td></tr>
           <tr><td>Ctrl+Z</td><td>Undo</td></tr>
-          <tr><td>Ctrl+Y</td><td>Redo</td></tr>
+          <tr><td>Ctrl+Y / Ctrl+Shift+Z</td><td>Redo</td></tr>
           <tr><td>Delete / Backspace</td><td>Delete selected annotation (browse mode)</td></tr>
           <tr><td>Ctrl+C</td><td>Copy selected text</td></tr>
+          <tr><td>F7</td><td>Next misspelling (in the note editor)</td></tr>
           <tr><td>Escape</td><td>Cancel tool / close search / stop auto-scroll / exit fullscreen</td></tr>
         </tbody>
       </table>
@@ -1473,10 +1565,10 @@ railreader2-cli export paper.pdf --figure-dir ./figures --output paper.md</code>
         navigation, and assistive technologies. There are six menus:
       </p>
       <ul>
-        <li><strong>File</strong> &mdash; open, duplicate / close tab, export &amp; import annotations, settings, quit.</li>
-        <li><strong>Edit</strong> &mdash; find, annotation mode, undo / redo, and <strong>Copy Block as LaTeX / Markdown / Description / Image</strong> (the same VLM block actions as the <code>Ctrl+right-click</code> context menu, acting on the current rail block).</li>
-        <li><strong>View</strong> &mdash; zoom, side panels, minimap, fullscreen, debug overlay, colour effects.</li>
-        <li><strong>Rail</strong> &mdash; the rail-reading toggles: <strong>Auto-Scroll</strong>, <strong>Jump Mode</strong>, <strong>Line Focus Dim</strong>, <strong>Line Highlight</strong>, and <strong>Add Bookmark</strong> (mirroring the <code>P</code> / <code>J</code> / <code>F</code> / <code>H</code> / <code>B</code> shortcuts).</li>
+        <li><strong>File</strong> &mdash; open, recent files, duplicate / close tab, export &amp; import annotations, settings, quit.</li>
+        <li><strong>Edit</strong> &mdash; find, annotation mode, undo / redo, and <strong>Copy Block as LaTeX / Markdown / Description / Image</strong> (the same VLM block actions as the block right-click menu, acting on the current rail block).</li>
+        <li><strong>View</strong> &mdash; zoom and fit, <strong>Rotate</strong>, side panels, minimap, fullscreen, <strong>Split Editor</strong> (split right, move pane to a new window, close panes), debug overlay, colour effects.</li>
+        <li><strong>Rail</strong> &mdash; <strong>Start Rail Here</strong> and <strong>Rotate to Read Block</strong> (<code>R</code> / <code>U</code>), then the rail-reading toggles: <strong>Auto-Scroll</strong>, <strong>Jump Mode</strong>, <strong>Line Focus Dim</strong>, <strong>Line Highlight</strong>, and <strong>Add Bookmark</strong> (mirroring the <code>P</code> / <code>J</code> / <code>F</code> / <code>H</code> / <code>B</code> shortcuts).</li>
         <li><strong>Navigation</strong> &mdash; go to / previous / next / first / last page, and semantic <strong>Jump to Next / Previous</strong> heading, figure, table, or equation.</li>
         <li><strong>Help</strong> &mdash; keyboard shortcuts, about, diagnostic log, clean-up.</li>
       </ul>
