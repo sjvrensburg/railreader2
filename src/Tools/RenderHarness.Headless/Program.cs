@@ -105,6 +105,48 @@ SetTheme(config.Theme);
 window.Show();
 Pump(20);
 
+// Settings-window shots: `--settings-shots <dir>` captures each Settings page in the simple and
+// advanced views, then exits without running the document shots. Flipping the advanced switch
+// persists ConfigDir/settings_view_prefs.json, so that file is restored afterwards.
+if (GetOption("settings-shots") is { } settingsDir)
+{
+    settingsDir = Path.IsPathRooted(settingsDir) ? settingsDir : Path.Combine(repoRoot, settingsDir);
+    Directory.CreateDirectory(settingsDir);
+    var prefsPath = RailReader2.Services.SettingsViewPreferences.Path;
+    var prefsBackup = File.Exists(prefsPath) ? File.ReadAllText(prefsPath) : null;
+    try
+    {
+        foreach (var (advanced, pages) in new[]
+        {
+            (false, new[] { "Reading", "Appearance", "Auto-Scroll", "Scanned Pages", "Spelling" }),
+            (true, new[] { "Reading", "Auto-Scroll", "Performance" }),
+        })
+        {
+            foreach (var page in pages)
+            {
+                var settings = new SettingsWindow { DataContext = vm, FontSize = window.FontSize, Width = 760, Height = 640 };
+                settings.Show(window);
+                Pump(10);
+                settings.FindControl<ToggleSwitch>("AdvancedToggle")!.IsChecked = advanced;
+                settings.SelectTab(page);
+                Pump(20);
+                var shotPath = Path.Combine(settingsDir, $"settings_{(advanced ? "advanced" : "simple")}_{page.Replace(' ', '_').Replace("-", "").ToLowerInvariant()}.png");
+                using (var fs = File.Create(shotPath))
+                    (settings.CaptureRenderedFrame() ?? throw new InvalidOperationException("No frame")).Save(fs, PngBitmapEncoderOptions.Default);
+                Console.Error.WriteLine($"  {shotPath}");
+                settings.Close();
+                Pump(4);
+            }
+        }
+    }
+    finally
+    {
+        if (prefsBackup is null) File.Delete(prefsPath);
+        else File.WriteAllText(prefsPath, prefsBackup);
+    }
+    return 0;
+}
+
 void SetUiScale(float scale)
 {
     appConfig.UiFontScale = scale > 0 ? scale : (config.UiScale > 0 ? config.UiScale : 1.0f);

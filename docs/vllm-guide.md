@@ -13,7 +13,7 @@ OpenAI's models produce the most reliable LaTeX and Markdown output, especially 
 ### Setup
 
 1. Get an API key from [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
-2. Open **Settings > VLM** in RailReader2 and enter:
+2. Open **Settings** in RailReader2, turn on **Show advanced settings**, go to the **AI Assistant** page and enter:
 
 | Field    | Value                        |
 |----------|------------------------------|
@@ -37,7 +37,7 @@ OpenAI's models produce the most reliable LaTeX and Markdown output, especially 
 
 ### Structured output (recommended for cloud models)
 
-After configuring an OpenAI-compatible endpoint, enable **Use structured JSON schema responses** under **Settings > VLM**. Capable models (GPT-4o, Qwen2.5-VL, Gemini) will return stricter, cleaner output — no stray `$$` wrappers, no code fences, no prompt echoes. Disable this checkbox if your model returns errors or truncated responses (some local and OCR-specialised models don't support JSON schema enforcement).
+After configuring an OpenAI-compatible endpoint, enable **Use structured JSON schema responses** under **Settings > AI Assistant**. Capable models (GPT-4o, Qwen2.5-VL, Gemini) will return stricter, cleaner output — no stray `$$` wrappers, no code fences, no prompt echoes. Disable this checkbox if your model returns errors or truncated responses (some local and OCR-specialised models don't support JSON schema enforcement).
 
 ---
 

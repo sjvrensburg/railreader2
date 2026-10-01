@@ -173,7 +173,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     [ObservableProperty] private string? _settingsInitialTab;
 
     /// <summary>Opens Settings pre-scrolled to a specific tab (matched by its <c>TabItem.Header</c>
-    /// text, e.g. "OCR") — used by toast actions that point the user at the setting that unblocks
+    /// text, e.g. "Scanned Pages") — used by toast actions that point the user at the setting that unblocks
     /// them, rather than just describing it in text.</summary>
     public void OpenSettingsTab(string tabHeader)
     {
@@ -459,7 +459,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         {
             logger.Debug(
                 $"[OCR] Language pack '{desc.DisplayName}' is selected but not installed; " +
-                "using the bundled default. Download it in Settings ▸ OCR, then restart.");
+                "using the bundled default. Download it in Settings ▸ Scanned Pages (advanced view), then restart.");
             return (null, BundledOcrPackDisplayName, null);
         }
 
@@ -609,7 +609,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
                 _logger.Warn("[Advisory] Running FP32 PP-DocLayoutV3 on CPU — Docling Heron (INT8) would be faster here but isn't downloaded.");
                 ShowStatusToast(
                     "Layout is running the heavier FP32 model on CPU — Docling Heron (INT8) would be faster here —",
-                    "review layout settings", () => OpenSettingsTab("Advanced"));
+                    "review layout settings", () => OpenSettingsTab("Layout Model"));
             }
         }
         else if (ocrGpuWastedOnTiny)
@@ -905,7 +905,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
             var (gotResults, _, _) = _controller.PollAnalysisResults();
             if (gotResults)
-                InvalidateOverlay();
+                OnAnalysisDrainedOutsideFrame();
             EvaluatePortals(forceRender: gotResults && PortalResolvePending);
 
             bool hasWork = _controller.HasBackgroundAnalysisWork;
@@ -955,6 +955,19 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>
+    /// A result drained outside <see cref="RunAnimationFrame"/> can seat a view's rail — e.g. a document
+    /// reopened at its saved rail zoom engages rail the moment its first analysis lands. Redraw the
+    /// overlay and re-raise <see cref="ActiveTab"/>, as the frame loop does when its own pump gets
+    /// results: the rail toolbar, status bar and menu gating key off it, and the snap animation that
+    /// follows only reports camera changes, so without this they stay stale until the next line move.
+    /// </summary>
+    private void OnAnalysisDrainedOutsideFrame()
+    {
+        InvalidateOverlay();
+        OnPropertyChanged(nameof(ActiveTab));
+    }
+
+    /// <summary>
     /// Fired by <see cref="DocumentController.ResultAvailable"/> on the UI thread as soon as the
     /// analysis worker has a result sitting in its channel — before anything drains it. Mirrors the
     /// old <c>_pollTimer</c> tick body, minus the timer: while an animation frame is already requested,
@@ -970,7 +983,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         if (tab is not null && !_animationRequested)
             tab.SubmitPendingLookahead(_controller.Worker);
         if (gotResults)
-            InvalidateOverlay();
+            OnAnalysisDrainedOutsideFrame();
         // Only force a portal re-evaluation when something is still waiting on analysis (a pinned
         // target's page, or an automatic reference's caption page) — otherwise the reading-position
         // callbacks + memo already cover the steady case, and forcing on every unrelated analysis
@@ -1276,6 +1289,10 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             dark ? Avalonia.Styling.ThemeVariant.Dark : Avalonia.Styling.ThemeVariant.Light;
     }
 
+    /// <summary>Raised after <see cref="OnConfigChanged"/> applies a config edit (Settings, Reset to
+    /// Defaults) — lets chrome that caches config values, like the rail toolbar's sliders, re-read them.</summary>
+    public event Action? ConfigChanged;
+
     public void OnConfigChanged()
     {
         _controller.OnConfigChanged(_appConfig.ToCoreSettings());
@@ -1283,6 +1300,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         ApplyFontScale();
         InvalidateAll();
         OnPropertyChanged(nameof(ActiveTab));
+        ConfigChanged?.Invoke();
     }
 
     public void OnSliderChanged() => _controller.OnSliderChanged(_appConfig.ToCoreSettings());

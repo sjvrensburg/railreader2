@@ -124,7 +124,8 @@ PP-DocLayoutV3, you can switch models at any time. Both methods require
 ### From Settings (recommended)
 
 1. **File → Settings…** (or `Ctrl+,`).
-2. Open the **Advanced** tab.
+2. Turn on **Show advanced settings** at the bottom, then open the
+   **Layout Model** page.
 3. Under **Layout Model**, the dropdown shows the active model.
 4. The status line below the dropdown tells you whether the file was
    found, and the path it resolved to.
@@ -188,7 +189,7 @@ After restart, open any PDF. There are a few quick checks:
 
 ## Switch to PP-DocLayoutV3
 
-Set the dropdown in **Settings → Advanced → Layout Model** to
+Set the dropdown in **Settings → Layout Model** (advanced view) to
 *PP-DocLayoutV3 (bundled)*, or edit `custom_layout_model.json`
 and set `"builtin_analyzer": "PpDocLayoutV3"`. Restart.
 

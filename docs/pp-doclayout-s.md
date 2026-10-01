@@ -127,7 +127,8 @@ take effect.
 ### From Settings (recommended)
 
 1. **File → Settings…** (or `Ctrl+,`).
-2. Open the **Advanced** tab.
+2. Turn on **Show advanced settings** at the bottom, then open the
+   **Layout Model** page.
 3. Under **Layout Model**, change the dropdown from
    *Docling Heron-INT8 (default, bundled)* to *PP-DocLayout-S (lightweight)*.
 4. The status line below the dropdown tells you whether the file was
@@ -189,7 +190,7 @@ After restart, open any PDF:
 
 ## Switch back to Heron-INT8
 
-Set the dropdown in **Settings → Advanced → Layout Model** back to
+Set the dropdown in **Settings → Layout Model** (advanced view) back to
 *Docling Heron-INT8 (default, bundled)*, or edit `custom_layout_model.json`
 and set `"builtin_analyzer": "Heron"`. Restart.
 

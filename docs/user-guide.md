@@ -116,7 +116,7 @@ Every pane and window is an independent viewport showing the same document with 
 
 ### Continuous scrolling
 
-Off by default. Turn on **Continuous scrolling** in Settings > Rendering to let plain mouse-wheel scrolling in browse mode flow smoothly across page boundaries instead of jumping page to page — `Ctrl`+wheel still zooms. The minimap gains a thin document-position strip along its right edge while it's on. Rail mode is unaffected: it stays page-local, and the wheel still zooms at rail zoom regardless of this setting. Takes effect immediately, no restart.
+Off by default. Turn on **Scroll continuously from page to page** in Settings > Reading to let plain mouse-wheel scrolling in browse mode flow smoothly across page boundaries instead of jumping page to page — `Ctrl`+wheel still zooms. The minimap gains a thin document-position strip along its right edge while it's on. Rail mode is unaffected: it stays page-local, and the wheel still zooms at rail zoom regardless of this setting. Takes effect immediately, no restart.
 
 ---
 
@@ -180,10 +180,10 @@ Press `P` in rail mode to toggle **semi-automatic auto-scroll**. The view flows 
 - **Where it parks:** auto-scroll stops on arrival at a non-prose block — a display equation, table, figure, or heading — and at the end of a column and a page. Continuous prose flows straight through, even across paragraph breaks.
 - **Continuing:** while parked, press `D` or `S` (or `Right`/`Down`) to resume flow. The status bar and a small on-page banner show **"Parked — press D to continue"** so a stop never looks like a freeze.
 - **Inspect while parked:** pan and zoom (and `Ctrl`+drag free-pan) stay fully live while parked, so you can study a parked equation or figure for as long as you like before continuing.
-- **Reading beat:** within prose, a brief pause is held at the end of every line before moving to the next, giving your eyes time to settle. If the move between lines feels too quick, raise the **Snap duration** (Settings > Rail Reading).
+- **Reading beat:** within prose, a brief pause is held at the end of every line before moving to the next, giving your eyes time to settle. If the move between lines feels too quick, choose a slower **Reading pace** (Settings > Reading).
 - **Speed:** adjust with the rail toolbar slider or the `[` / `]` keys; holding `D`/`Right` during flow temporarily boosts speed.
-- **What parks:** the set of block types that park is configurable — Settings > Auto-Scroll > **Park On** (headings, equations, tables, figures by default; uncheck any to flow through it instead).
-- **Auto-scroll trigger:** optionally, auto-scroll can start automatically after holding `D` or `Right` for a configurable delay. Enable this in Settings > Auto-Scroll > **Enable auto-scroll trigger** and set the desired hold duration.
+- **What parks:** the set of block types that park is configurable — Settings > Auto-Scroll > **Stop and wait at** (headings, equations, tables, figures by default; uncheck any to flow through it instead).
+- **Auto-scroll trigger:** optionally, auto-scroll can start automatically after holding `D` or `Right` for a configurable delay. Enable this in Settings > Auto-Scroll > **Also start it by holding D or →**; the hold time is in the advanced view.
 - **Stop:** press `Escape`, `P`, or an opposing navigation key (`Up`, `Left`) to exit auto-scroll entirely.
 
 The status bar shows an **"Auto-Scroll"** indicator while flowing and **"Parked — press D to continue"** while stopped.
@@ -196,7 +196,7 @@ Press `J` in rail mode to toggle **jump mode**. Instead of continuous scrolling,
 
 Hold `Shift` with `Right` or `Left` to perform a **short jump** at half the normal distance. This is useful for fine-grained positioning within a line.
 
-This mimics natural reading eye movements and is useful for scanning text quickly. Adjust jump distance with `[` / `]` or in Settings > Rail Reading.
+This mimics natural reading eye movements and is useful for scanning text quickly. Adjust jump distance with `[` / `]` or in Settings > Reading (advanced view).
 
 > **Note:** Auto-scroll and jump mode are mutually exclusive. Enabling one disables the other.
 
@@ -211,13 +211,13 @@ When enabled, line focus dim applies a smooth feathered dimming overlay to the e
 ![Line focus dim](img/line_focus_blur.png)
 *Line focus dim — non-active lines are dimmed to reduce distraction*
 
-Toggle with the `F` key, the **F** button on the rail toolbar, or in Settings > Rail Reading. Dim intensity is adjustable from 0 (off) to 1 (maximum). The line padding (how much extra space stays fully visible around the active line) is also configurable.
+Toggle with the `F` key, the **F** button on the rail toolbar, or in Settings > Reading > **Mark the line you're on**. In the advanced view, dim intensity is adjustable from 0 (off) to 1 (maximum), as is the line padding (how much extra space stays fully visible around the active line).
 
 ### Line highlight tint
 
 The active line in rail mode can have a configurable colour tint applied as an overlay. This makes the current line stand out more clearly, especially at high magnification. Toggle independently with the `H` key or the **H** button on the rail toolbar. Line highlight works with or without line focus dim enabled.
 
-Choose from five presets in Settings > Rail Reading:
+Choose from five presets in Settings > Reading > **Highlight colour**:
 
 | Tint | Description |
 |------|-------------|
@@ -227,7 +227,7 @@ Choose from five presets in Settings > Rail Reading:
 | **Green** | Soft green tint |
 | **None** | No tint — line is highlighted by dimming only |
 
-Opacity is adjustable from 0.0 (invisible) to 1.0 (fully opaque). The default is Auto at 25% opacity.
+Opacity is adjustable from 0.0 (invisible) to 1.0 (fully opaque) in the advanced view. The default is Auto at 25% opacity.
 
 ---
 
@@ -249,7 +249,7 @@ Each split pane and tear-off window freezes **independently**, and a freeze belo
 
 ## Colour Effects
 
-Four GPU-accelerated colour filters are available, applied only to PDF content (not the UI). Access via **View > Colour Effect**, Settings > Appearance, or press `C` to cycle through effects on the active tab.
+Four GPU-accelerated colour filters are available, applied only to PDF content (not the UI). Access via **View > Colour Effect**, Settings > Appearance, or press `C` to cycle through effects on the focused document.
 
 Each tab keeps its own colour effect independently — you can have one PDF in Amber and another in High Contrast. The per-tab effect is saved with the reading position and restored when you reopen the file.
 
@@ -490,7 +490,7 @@ You can also `Ctrl+right-click` any detected block to open a context menu with *
 
 ### Setup
 
-Open **Settings > VLM** and configure:
+Open **Settings > AI Assistant** (turn on **Show advanced settings** first) and configure:
 
 - **Endpoint** — the URL of an OpenAI-compatible API (e.g., `http://localhost:11434/v1` for Ollama)
 - **Model** — the model name (e.g., `qwen2.5-vl:7b`, `lightonai/LightOnOCR-2-1B`, `gpt-4o`)
@@ -500,7 +500,7 @@ Use the **Test Connection** button to verify your setup. The API key is stored l
 
 ### Structured JSON output
 
-Under **Settings > VLM** there's a **Use structured JSON schema responses** checkbox (off by default). Enabling it forces the model to return a JSON object matching a strict schema (`{latex}`, `{markdown}`, or `{description}`), which produces cleaner output on capable models — no stray `$$` wrappers, code fences, or prompt echoes. Recommended for GPT-4o, Qwen2.5-VL, Gemini, and other instruction-tuned vision models served via an OpenAI-compatible API that honours `response_format: json_schema`.
+Under **Settings > AI Assistant** there's a **Use structured JSON schema responses** checkbox (off by default). Enabling it forces the model to return a JSON object matching a strict schema (`{latex}`, `{markdown}`, or `{description}`), which produces cleaner output on capable models — no stray `$$` wrappers, code fences, or prompt echoes. Recommended for GPT-4o, Qwen2.5-VL, Gemini, and other instruction-tuned vision models served via an OpenAI-compatible API that honours `response_format: json_schema`.
 
 Some local or OCR-specialised models (LightOnOCR, certain older Ollama builds) don't reliably support JSON schema and may return truncated or mis-escaped output. If you see errors, disable this checkbox.
 
@@ -612,7 +612,7 @@ railreader2-cli vlm <pdf> [options]
 | `--min-confidence <f>` | Skip blocks below this detection confidence (0–1) |
 | `--from-structure <path>` | Reuse an existing `structure --analyze` JSON instead of re-running ONNX |
 
-**Endpoint config (override `Settings > VLM`):**
+**Endpoint config (override `Settings > AI Assistant`):**
 
 | Option | Description |
 |--------|-------------|
@@ -686,7 +686,7 @@ railreader2-cli export <pdf> [options]
 | `--no-annotations` | Exclude annotations from output |
 | `--figure-dir <dir>` | Save figure PNGs and reference them in the Markdown |
 
-**VLM config (override `Settings > VLM`):**
+**VLM config (override `Settings > AI Assistant`):**
 
 | Option | Description |
 |--------|-------------|
@@ -727,58 +727,47 @@ railreader2-cli export paper.pdf --pages 1-10 --no-annotations --output chapter1
 
 Press `Ctrl+,` or use the menu to open Settings. Changes take effect immediately and are saved automatically.
 
+Settings opens in a **simple view**: five pages holding the settings most readers change. Turn on **Show advanced settings** at the bottom of the window to reveal the fine-tuning controls on those pages (shown indented beneath the simple ones) and six more pages — Rendering, Analysis, Layout Model, Performance, Models and AI Assistant. The switch is remembered. Links from in-app notices that point at an advanced page reveal the advanced view for that visit only.
+
+Colour effect, margin cropping and the current-line style are kept per document — `C`, `F`, `H` and the View/Rail menus change only the document you're looking at. Settings shows the focused document's values; changing one there sets both that document and the default for documents you open later.
+
+### Reading
+- **Start rail reading at:** Zoom level at which rail mode activates (default 3.0×).
+- **Reading pace:** **Relaxed**, **Normal** (default) or **Brisk**. Sets how quickly the view glides between lines, how fast hold-to-scroll moves and accelerates, and the auto-scroll pause at the end of each line, all together. Shows *Custom* once any of those has been tuned by hand (including with the rail toolbar's speed slider). *Advanced:* the individual values — line-to-line glide (snap duration, ms), hold-to-scroll start and top speed (10–160), time to reach top speed (s), and auto-scroll line pause (ms, 0 to disable).
+- **Mark the line you're on:** Don't mark it / Highlight it / Dim the other lines / Highlight and dim — the same two effects as the `H` and `F` keys. **Highlight colour:** Auto, Yellow, Cyan, Green, None. *Advanced:* highlight opacity, dim amount, and the space kept around the line (it sizes both the highlight band and the undimmed area).
+- **Crop page margins:** Fit pages to their detected content.
+- **Scroll continuously from page to page:** Off by default. Lets browse-mode mouse-wheel scrolling flow smoothly across page boundaries instead of jumping page to page — see [Continuous scrolling](#continuous-scrolling) under Basic Navigation for the full behaviour.
+- *Advanced:* **Jump distance** — percentage of the visible width for jump mode (5–80%).
+
 ### Appearance
-- **UI Font Scale:** Adjust the size of all UI text (default 1.25x).
-- **Dark Mode:** Switch the UI to a dark theme. Takes effect immediately.
-- **Motion Blur:** Toggle and adjust intensity of directional blur during scroll/zoom.
-- **Colour Effect:** Select and configure the active colour filter (applies globally via Settings; use `C` key for per-tab cycling).
-
-### Rendering
-- **Render Quality:** Pick a render-DPI preset — **Ultra** (800 DPI), **Quality** (600), **High** (525, the default), **Balanced** (450), **Medium** (400), **Performance** (350), or **Custom**. Higher presets re-rasterise pages at a greater DPI cap for sharper text and deeper zoom, at the cost of more memory and more frequent re-renders; lower presets favour fluidity. The change applies to the open page immediately — no restart.
-- **Custom (Max render DPI / Tier step):** When **Custom** is selected, set your own maximum DPI (150–1200) and tier step (the DPI granularity at which the page re-rasterises; smaller steps render more crisply at intermediate zoom but re-raster more often). Values are clamped to the supported range.
-- **Continuous scrolling:** Off by default. Lets browse-mode mouse-wheel scrolling flow smoothly across page boundaries instead of jumping page to page — see [Continuous scrolling](#continuous-scrolling) under Basic Navigation for the full behaviour. Takes effect immediately.
-
-### Rail Reading
-- **Zoom Threshold:** Zoom level at which rail mode activates (default 3.0x).
-- **Snap Duration:** Duration of line-snap animations in milliseconds.
-- **Scroll Speed:** Start and max speed for horizontal hold-to-scroll.
-- **Ramp Time:** Seconds to reach max scroll speed from start.
-- **Pixel Snapping:** Quantise camera to pixel grid to reduce text shimmer.
-- **Line Focus Dim:** Toggle and set intensity and padding.
-- **Line Highlight:** Toggle the active-line highlight independently (works with or without line focus dim). Choose a colour tint (Auto, Yellow, Cyan, Green, None) and set opacity.
-- **Jump Distance:** Percentage of visible width for jump mode (5–80%).
+- **Dark mode:** Switch the UI to a dark theme.
+- **Menu and panel text size:** Scales all UI text (default 1.25×).
+- **Colour effect** and **Strength:** The page colour filter (see [Colour Effects](#colour-effects)).
+- *Advanced:* **Motion blur** during scroll and zoom, and its amount; **Pixel snapping**, which quantises the camera to the pixel grid to reduce text shimmer while moving.
 
 ### Auto-Scroll
-- **Line Pause:** The per-line reading beat — the pause held at the end of every line before moving to the next (ms, 0 to disable).
-- **Park On:** Which block types auto-scroll parks on when it reaches them (headings, equations, tables, figures by default). Unchecked types flow through like prose; column and page breaks always park.
-- **Enable auto-scroll trigger / Trigger delay:** Optionally auto-start auto-scroll after holding `D`/`Right` for the set delay.
+- **Stop and wait at:** Headings, equations and algorithms, tables, figures and charts (all on by default). Unchecked types flow through like prose; column and page breaks always stop. *Advanced:* the full per-block-type list.
+- **Also start it by holding D or →:** Optionally auto-start auto-scroll after holding `D`/`Right`. *Advanced:* the hold time.
+- Scroll speed is set with the rail toolbar's slider; the end-of-line pause follows **Reading pace**.
 
-### Advanced
-- **Layout Model:** Choose between Docling Heron-INT8 (default, bundled, ~66 MB) and PP-DocLayoutV3 (alternative, ~50 MB). See the [Heron layout model guide](heron-layout-model.md) for installation instructions and trade-offs.
-- **Custom Layout Model:** Optionally replace the built-in model with your own ONNX (PP-style I/O contract) + class-mapping JSON.
-- **Navigable Block Types:** Choose which block types are navigable in rail mode. Roles are model-independent.
-- **Centered Block Types:** Choose which block types are horizontally centered when they are narrower than the viewport. By default, headings (paragraph_title, doc_title) are excluded so they stay left-aligned with surrounding text, while formulae and body text are centered.
-- **Analysis Lookahead:** Number of pages to pre-analyze ahead (0 to disable).
-- **GPU Acceleration:** Off by default. Runs the ONNX layout model on your GPU via WebGPU instead of the CPU — roughly 8–10x faster on supported hardware. Applies only to Docling Heron and PP-DocLayoutV3 (PP-DocLayout-S and any custom model always run on CPU); falls back to CPU automatically if no compatible GPU is found. **Needs a restart** to take effect. Heron's GPU model is a separate one-time download (run `./scripts/download-model.sh heron-gpu` or use the in-app "Download GPU model" button); PP-DocLayoutV3 needs no extra download.
+### Scanned Pages
 
-### OCR
+A scanned page is a picture of text. It carries no text layer, so everything built on one stops working: line-by-line rail reading, search, text selection, table cells, Markdown export, and VLM grounding. Text recognition (OCR) reads the text back off the image so those features behave as they would on a born-digital page. It is off by default and costs nothing until you turn it on.
 
-A scanned page is a picture of text. It carries no text layer, so everything built on one stops working: line-by-line rail reading, search, text selection, table cells, Markdown export, and VLM grounding. OCR reads the text back off the image so those features behave as they would on a born-digital page. It is off by default and costs nothing until you turn it on.
+- **On scanned pages:**
+  - **Do nothing** (default) — no OCR, no cost.
+  - **Find the lines only** — detects where the lines of text are, but does not read them. Enough to restore rail mode's line-by-line movement on a scan; search and selection still have nothing to work with.
+  - **Read the text** — detects *and* recognises the text, restoring every text-dependent feature. Pair it with the PP-DocLayout-S layout model at 1920 (advanced view ▸ Layout Model) for the best results; the 800px models rasterise pages too small for reliable recognition.
 
-- **OCR mode:**
-  - **Off** (default) — no OCR, no cost.
-  - **Lines** — detects where the lines of text are, but does not read them. Enough to restore rail mode's line-by-line movement on a scan; search and selection still have nothing to work with.
-  - **Full** — detects *and* recognises the text, restoring every text-dependent feature. Pair it with the PP-DocLayout-S layout model at 1920 (Advanced tab) for the best results; the 800px models rasterise pages too small for reliable recognition.
+  Changing this drops cached analysis for affected pages, so open scans re-analyse immediately — no restart.
 
-  Changing the mode drops cached analysis for affected pages, so open scans re-analyse immediately — no restart.
+  **Reading the text is CPU-heavy**, and it runs on its own worker thread, separate from layout analysis — so a scanned page's recognition no longer blocks layout analysis of other open documents. It still queues behind any other scanned page already being recognised, since OCR itself runs on a single thread. On a slow language pack a page can still take a while; it isn't frozen, and the session log records each page as it completes.
 
-  **Full recognition is CPU-heavy**, and it runs on its own worker thread, separate from layout analysis — so a scanned page's recognition no longer blocks layout analysis of other open documents. It still queues behind any other scanned page already being recognised, since OCR itself runs on a single thread. On a slow language pack a page can still take a while; it isn't frozen, and the session log records each page as it completes.
-
-- **Skew correction:** Scans are rarely square on the glass, and line detection is exactly the step that a tilt breaks — under a degree is enough to fragment a paragraph into a couple of huge rail lines, or to fuse neighbouring lines into one. This measures the page's tilt from the OCR results and compensates for it when grouping text into lines. Pages that are already square are left untouched. On by default; it needs OCR, so the checkbox is disabled while OCR mode is Off.
+- *Advanced:* **Skew correction:** Scans are rarely square on the glass, and line detection is exactly the step that a tilt breaks — under a degree is enough to fragment a paragraph into a couple of huge rail lines, or to fuse neighbouring lines into one. This measures the page's tilt from the OCR results and compensates for it when grouping text into lines. Pages that are already square are left untouched. On by default; it needs OCR, so the checkbox is disabled while OCR is set to Do nothing.
 
   Two known limits: the line-focus dim and line highlight bands stay square, so on a visibly tilted page they clip the ends of a line slightly; and the interiors of tables are not deskewed.
 
-- **OCR language pack:** The recogniser bundled with the app reads Latin-script text well and little else. The optional PP-OCRv6 packs add broad multilingual coverage (Latin + CJK and more) in three tiers. Pick one and press **Download language pack** — files are saved to your config folder, so this works from a read-only AppImage — then **restart** for it to take effect.
+- *Advanced:* **Language pack:** The recogniser bundled with the app reads Latin-script text well and little else. The optional PP-OCRv6 packs add broad multilingual coverage (Latin + CJK and more) in three tiers. Pick one and press **Download language pack** — files are saved to your config folder, so this works from a read-only AppImage — then **restart** for it to take effect.
 
   The tiers trade accuracy against speed, and the spread is large:
 
@@ -792,6 +781,17 @@ A scanned page is a picture of text. It carries no text layer, so everything bui
 
   If you select a pack but never download it, the app quietly falls back to the bundled recogniser rather than turning OCR off; the log says so at startup.
 
+### Spelling
+- **Check spelling in notes** and **Dictionary** (British and American English bundled). *Advanced:* the folder for extra Hunspell dictionaries, and your personal dictionary (add or remove words).
+
+### Advanced-only pages
+- **Rendering — Render quality:** Pick a render-DPI preset — **Ultra** (800 DPI), **Quality** (600), **High** (525, the default), **Balanced** (450), **Medium** (400), **Performance** (350), or **Custom**. Higher presets re-rasterise pages at a greater DPI cap for sharper text and deeper zoom, at the cost of more memory and more frequent re-renders; lower presets favour fluidity. The change applies to the open page immediately — no restart. With **Custom**, set your own maximum DPI (150–1200) and tier step (the DPI granularity at which the page re-rasterises; smaller steps render more crisply at intermediate zoom but re-raster more often).
+- **Analysis:** Lookahead pages, background analysis range and page cache range; **Rail stops on** (which block types rail mode navigates — model-independent); **Centred block types** (which block types are centred horizontally when narrower than the viewport; headings are excluded by default so they stay left-aligned).
+- **Layout Model:** Choose between Docling Heron-INT8 (default, bundled, ~66 MB), PP-DocLayoutV3 and PP-DocLayout-S, with a **Download model** button. See the [Heron layout model guide](heron-layout-model.md) for trade-offs. **Custom layout model:** optionally replace the built-in model with your own ONNX (PP-style I/O contract) + class-mapping JSON.
+- **Performance — GPU acceleration:** Off by default. A preset picker (CPU only / Faster page navigation / Faster scanned-document OCR) or individual toggles run layout analysis *or* OCR on your GPU via WebGPU — not both at once. Layout on GPU is roughly 8–10x faster on supported hardware and applies only to Docling Heron and PP-DocLayoutV3 (PP-DocLayout-S and any custom model always run on CPU); everything falls back to CPU automatically if no compatible GPU is found. **Needs a restart.** Heron's GPU model is a separate one-time download (run `./scripts/download-model.sh heron-gpu` or use the in-app **Download GPU model** button); PP-DocLayoutV3 needs no extra download. On Linux laptops with two GPUs, **Display GPU** draws the window on the discrete GPU instead.
+- **Models:** Read-only — which layout model, OCR pack and accelerators are actually running this session, what a restart would change, and advisories for combinations that work against each other.
+- **AI Assistant:** The vision-language-model endpoint for Copy as LaTeX — see [Copy as LaTeX (VLM)](#copy-as-latex-vlm).
+
 ### Config file
 
 Configuration is stored at `~/.config/railreader2/config.json` (Linux) or `%APPDATA%\railreader2\config.json` (Windows). You can edit it directly; restart the app to apply changes.
@@ -804,15 +804,15 @@ RailReader2 writes a diagnostic log during each session. If you encounter a prob
 
 ### The app seems to freeze on a scanned page
 
-Almost always OCR working, not a crash. Full recognition runs on its own worker thread (separate from layout analysis, so it no longer blocks other open documents), but a second scanned page still queues behind one already being recognised — and with the **Medium** language pack a single page can take a minute or more. Switch to the **Tiny** or **Small** pack (Settings ▸ OCR), or set OCR mode to **Lines**, which restores rail reading on scans without the recognition cost. The session log records each page as it completes, so you can confirm progress.
+Almost always OCR working, not a crash. Full recognition runs on its own worker thread (separate from layout analysis, so it no longer blocks other open documents), but a second scanned page still queues behind one already being recognised — and with the **Medium** language pack a single page can take a minute or more. Switch to the **Tiny** or **Small** pack (Settings ▸ Scanned Pages, advanced view), or set scanned pages to **Find the lines only**, which restores rail reading on scans without the recognition cost. The session log records each page as it completes, so you can confirm progress.
 
 ### "OCR model failed to load"
 
-The selected language pack isn't installed. Open Settings ▸ OCR, press **Download language pack**, and restart. Recent versions fall back to the bundled recogniser instead of disabling OCR, so this message means only that your chosen pack is unavailable — not that OCR is broken.
+The selected language pack isn't installed. Open Settings ▸ Scanned Pages with **Show advanced settings** on, press **Download language pack**, and restart. Recent versions fall back to the bundled recogniser instead of disabling OCR, so this message means only that your chosen pack is unavailable — not that OCR is broken.
 
 ### A scan reads as one giant rail line
 
-Line grouping is being defeated by page tilt. Check that **Skew correction** is enabled (Settings ▸ OCR) and that OCR mode is **Lines** or **Full** — skew is measured from the OCR results, so it can do nothing with OCR off. If it is already on, the page may exceed the ±5° correction limit, or carry two differently-tilted columns, which the correction deliberately declines to guess at.
+Line grouping is being defeated by page tilt. Check that **Skew correction** is enabled (Settings ▸ Scanned Pages, advanced view) and that scanned pages are set to **Find the lines only** or **Read the text** — skew is measured from the OCR results, so it can do nothing with OCR off. If it is already on, the page may exceed the ±5° correction limit, or carry two differently-tilted columns, which the correction deliberately declines to guess at.
 
 ### Exporting the log
 

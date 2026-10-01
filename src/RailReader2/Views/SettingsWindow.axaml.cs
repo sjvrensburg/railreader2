@@ -60,17 +60,20 @@ public partial class SettingsWindow : Window
     public SettingsWindow()
     {
         InitializeComponent();
+        InitAdvancedView();
     }
 
     /// <summary>Selects the tab whose <c>TabItem.Header</c> matches <paramref name="header"/>
-    /// (e.g. "OCR"). Call any time after construction — the tabs exist as soon as
-    /// <c>InitializeComponent</c> has run. No-op if no tab matches.</summary>
+    /// (e.g. "Scanned Pages"), revealing the advanced view first if that tab lives there. Call any
+    /// time after construction — the tabs exist as soon as <c>InitializeComponent</c> has run.
+    /// No-op if no tab matches.</summary>
     public void SelectTab(string header)
     {
         foreach (var item in MainTabControl.Items)
         {
             if (item is TabItem { Header: string h } ti && h == header)
             {
+                if (ti.Classes.Contains("adv")) SetAdvanced(true, persist: false);
                 MainTabControl.SelectedItem = ti;
                 return;
             }
@@ -86,6 +89,12 @@ public partial class SettingsWindow : Window
 
     private MainWindowViewModel? Vm => DataContext as MainWindowViewModel;
 
+    /// <summary>The document the per-document display prefs (colour effect, margin cropping, line
+    /// highlight/dim) apply to — the focused pane's, the same one the C/F/H keys and View/Rail menus
+    /// act on. Not <c>ActiveTab</c>: with split panes or a tear-off window focused, that can be a
+    /// different document.</summary>
+    private DocumentModel? FocusedDocument => Vm?.Controller.FocusedViewport?.Owner;
+
     private void LoadFromConfig()
     {
         if (Vm is not { } vm) return;
@@ -95,14 +104,16 @@ public partial class SettingsWindow : Window
         MotionBlurCheck.IsChecked = c.MotionBlur;
         BlurIntensitySlider.Value = c.MotionBlurIntensity;
         ZoomThreshold.Value = (decimal)c.RailZoomThreshold;
-        SnapDuration.Value = (decimal)c.SnapDurationMs;
-        ScrollStart.Value = (decimal)c.ScrollSpeedStart;
-        ScrollMax.Value = (decimal)c.ScrollSpeedMax;
-        RampTime.Value = (decimal)c.ScrollRampTime;
+        LoadPaceFields(c);
+        UpdatePaceRadios();
         Lookahead.Value = c.AnalysisLookaheadPages;
         AnalysisWindow.Value = c.BackgroundAnalysisWindowPages;
         PageCacheRadius.Value = c.PageCacheRadius;
-        EffectCombo.SelectedIndex = (int)c.ColourEffect;
+        // Colour effect, margin cropping and the current-line style are per document/tab — the C,
+        // F and H keys and the View/Rail menus change only the open one, and AppConfig holds the
+        // default for documents opened later. Show what the reader is actually looking at; the
+        // change handlers write both.
+        EffectCombo.SelectedIndex = (int)vm.Controller.ActiveColourEffect;
         IntensitySlider.Value = c.ColourEffectIntensity;
         RenderQualityCombo.SelectedIndex = (int)c.RenderQuality;
         CustomMaxDpi.Value = c.CustomMaxRenderDpi;
@@ -110,19 +121,17 @@ public partial class SettingsWindow : Window
         UpdateCustomRenderPanel(c.RenderQuality);
         ContinuousScrollCheck.IsChecked = c.ContinuousScroll;
         PixelSnappingCheck.IsChecked = c.PixelSnapping;
-        MarginCroppingCheck.IsChecked = c.MarginCropping;
-        LineFocusBlurCheck.IsChecked = c.LineFocusBlur;
+        MarginCroppingCheck.IsChecked = FocusedDocument?.MarginCropping ?? c.MarginCropping;
         LineFocusBlurSlider.Value = c.LineFocusBlurIntensity;
         LinePaddingSlider.Value = c.LinePadding;
-        AutoScrollLinePause.Value = (decimal)c.AutoScrollLinePauseMs;
         AutoScrollTriggerCheck.IsChecked = c.AutoScrollTriggerEnabled;
         AutoScrollTriggerDelay.Value = (decimal)c.AutoScrollTriggerDelayMs;
         JumpPercentage.Value = (decimal)c.JumpPercentage;
 
-        LineHighlightCheck.IsChecked = c.LineHighlightEnabled;
         LineHighlightTintCombo.ItemsSource = Enum.GetNames<LineHighlightTint>();
         LineHighlightTintCombo.SelectedIndex = (int)c.LineHighlightTint;
         LineHighlightOpacitySlider.Value = c.LineHighlightOpacity;
+        LoadLineStyle(c, FocusedDocument);
 
         BuildRoleCheckboxes(_roleItems, c.NavigableRoles,
             set => { vm.AppConfig.NavigableRoles = set; vm.OnConfigChanged(); },
@@ -131,8 +140,9 @@ public partial class SettingsWindow : Window
             set => { vm.AppConfig.CenteringRoles = set; vm.OnConfigChanged(); },
             CenteringRolesList);
         BuildRoleCheckboxes(_stopRoleItems, c.AutoScrollStopClasses,
-            set => { vm.AppConfig.AutoScrollStopClasses = set; vm.OnConfigChanged(); },
+            set => { vm.AppConfig.AutoScrollStopClasses = set; vm.OnConfigChanged(); SyncStopRoleItems(set); },
             StopRolesList);
+        BuildStopRoleGroups(c.AutoScrollStopClasses);
 
         VlmEndpoint.Text = c.VlmEndpoint ?? "";
         VlmModelName.Text = c.VlmModel ?? "";
@@ -825,15 +835,6 @@ public partial class SettingsWindow : Window
         vm.OnConfigChanged();
     }
 
-    private void OnLineFocusBlurChanged(object? sender, RoutedEventArgs e)
-    {
-        if (Vm is not { } vm || _loading) return;
-        bool value = LineFocusBlurCheck.IsChecked == true;
-        vm.AppConfig.LineFocusBlur = value; // update default for new documents
-        if (vm.ActiveTab is { } tab) tab.LineFocusBlur = value;
-        vm.OnConfigChanged();
-    }
-
     private void OnMarginCroppingChanged(object? sender, RoutedEventArgs e)
     {
         if (Vm is not { } vm || _loading) return;
@@ -848,15 +849,6 @@ public partial class SettingsWindow : Window
 
     private void OnLinePaddingChanged(object? sender, Avalonia.AvaloniaPropertyChangedEventArgs e)
         => OnSliderChanged(e, c => c.LinePadding = LinePaddingSlider.Value);
-
-    private void OnLineHighlightEnabledChanged(object? sender, RoutedEventArgs e)
-    {
-        if (Vm is not { } vm || _loading) return;
-        bool value = LineHighlightCheck.IsChecked == true;
-        vm.AppConfig.LineHighlightEnabled = value;
-        if (vm.ActiveTab is { } tab) tab.LineHighlightEnabled = value;
-        vm.OnConfigChanged();
-    }
 
     private void OnLineHighlightTintChanged(object? sender, SelectionChangedEventArgs e)
     {
@@ -1152,7 +1144,7 @@ public partial class SettingsWindow : Window
         else if (selectedOcrPackMissing)
         {
             var selDesc = OcrModelRegistry.ById(ocrPrefs.ModelSetId!)!;
-            ModelsOcrPendingText.Text = $"{selDesc.DisplayName} selected but not downloaded — using {pendingOcrName} until it is. Download it in the OCR tab.";
+            ModelsOcrPendingText.Text = $"{selDesc.DisplayName} selected but not downloaded — using {pendingOcrName} until it is. Download it on the Scanned Pages page.";
         }
         else
         {
@@ -1199,7 +1191,7 @@ public partial class SettingsWindow : Window
         // otherwise CustomLayoutModelLoader's existing fallback just lands back on V3 next launch
         // (logged, not an error) and this same advisory would fire again having "fixed" nothing.
         // When it isn't installed, apply the switch anyway (so it's ready the moment the download
-        // finishes) but land the user on Advanced, where the file-missing status line and the
+        // finishes) but land the user on Layout Model, where the file-missing status line and the
         // already-built Download button are waiting — reusing that download/progress machinery
         // rather than duplicating it in this small panel.
         bool heronInstalled = HeronModelLocator.FindModelPath() != null;
@@ -1216,7 +1208,7 @@ public partial class SettingsWindow : Window
         UpdateGpuAccelerationStatus();
         UpdateModelsOverview();
 
-        if (!heronInstalled) SelectTab("Advanced");
+        if (!heronInstalled) SelectTab("Layout Model");
     }
 
     /// <summary>
@@ -1275,12 +1267,12 @@ public partial class SettingsWindow : Window
         vm.AppConfig.MinimapMarginBottom = defaults.MinimapMarginBottom;
         vm.AppConfig.LineFocusBlur = defaults.LineFocusBlur;
         vm.AppConfig.LineFocusBlurIntensity = defaults.LineFocusBlurIntensity;
-        if (vm.ActiveTab is { } resetTab)
+        if (FocusedDocument is { } resetDoc)
         {
-            resetTab.LineFocusBlur = defaults.LineFocusBlur;
-            resetTab.LineHighlightEnabled = defaults.LineHighlightEnabled;
-            resetTab.MarginCropping = defaults.MarginCropping;
+            resetDoc.LineFocusBlur = defaults.LineFocusBlur;
+            resetDoc.LineHighlightEnabled = defaults.LineHighlightEnabled;
         }
+        vm.ApplyMarginCropping(defaults.MarginCropping);
         vm.AppConfig.AutoScrollLinePauseMs = defaults.AutoScrollLinePauseMs;
         vm.AppConfig.AutoScrollStopClasses = new HashSet<BlockRole>(defaults.AutoScrollStopClasses);
         vm.AppConfig.AutoScrollTriggerEnabled = defaults.AutoScrollTriggerEnabled;

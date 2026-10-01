@@ -71,7 +71,16 @@ public partial class MainWindow : Window
             vm.ViewportFocusRequested += OnViewportFocusRequested;
             vm.PortalViewChanged += OnPortalViewChanged;
             vm.PortalViewTeardownRequested += OnPortalViewTeardownRequested;
+            vm.ConfigChanged += OnConfigChanged;
         }
+    }
+
+    /// <summary>Settings writes AppConfig directly, so the rail toolbar's sliders (scroll speed / jump
+    /// distance, motion blur) and its F/H toggles would otherwise keep showing startup values.</summary>
+    private void OnConfigChanged()
+    {
+        RailToolBar.SyncFromConfig();
+        RailToolBar.UpdateToggleStates();
     }
 
     private void OnViewportFocusRequested() => Document.FocusViewport();
@@ -116,6 +125,7 @@ public partial class MainWindow : Window
             vm.ViewportFocusRequested -= OnViewportFocusRequested;
             vm.PortalViewChanged -= OnPortalViewChanged;
             vm.PortalViewTeardownRequested -= OnPortalViewTeardownRequested;
+            vm.ConfigChanged -= OnConfigChanged;
             Document.Teardown();
             _subscribedVm = null;
         }
