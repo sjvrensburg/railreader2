@@ -46,6 +46,7 @@ Edit [`screenshots.json`](screenshots.json). Each `shots` entry:
 |--------------------|--------------------------------------------------------------------------|
 | `name`             | Output filename (no extension), e.g. `rail_mode`.                        |
 | `pdf`              | Source PDF path, relative to the repo root.                             |
+| `extraTabs`        | More PDFs to have open as background tabs (the `pdf` stays active).     |
 | `page`             | 1-based page number.                                                     |
 | `zoom`             | Absolute camera zoom (`1.0` = 100%). `0` = fit page. Above ≈`3.0` engages rail mode. |
 | `theme`            | Per-shot `dark` \| `light` override.                                     |
