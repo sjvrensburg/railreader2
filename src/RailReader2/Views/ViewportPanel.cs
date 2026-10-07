@@ -410,6 +410,43 @@ public class ViewportPanel : Panel
     {
         var menu = ScaledContextMenu(vm);
 
+        // Annotation actions for the annotation under the pointer (selected, so its chrome shows which
+        // one the menu acts on). Text markup is select/delete only, so it offers its text instead.
+        if (vm.FindAnnotationAt(pageX, pageY) is { } ann)
+        {
+            vm.SelectAnnotation(ann);
+            if (ann is TextMarkupAnnotation)
+            {
+                var copyTextItem = new MenuItem { Header = "Copy Highlighted Text", InputGesture = new KeyGesture(Key.C, KeyModifiers.Control) };
+                copyTextItem.Click += (_, _) => vm.CopySelectedAnnotation();
+                menu.Items.Add(copyTextItem);
+            }
+            else if (Annotation.IsCopyable(ann))
+            {
+                var copyAnnItem = new MenuItem { Header = "Copy Annotation", InputGesture = new KeyGesture(Key.C, KeyModifiers.Control) };
+                copyAnnItem.Click += (_, _) => vm.CopySelectedAnnotation();
+                menu.Items.Add(copyAnnItem);
+                var cutAnnItem = new MenuItem { Header = "Cut Annotation", InputGesture = new KeyGesture(Key.X, KeyModifiers.Control) };
+                cutAnnItem.Click += (_, _) => vm.CutSelectedAnnotation();
+                menu.Items.Add(cutAnnItem);
+            }
+            var deleteAnnItem = new MenuItem
+            {
+                Header = ann is TextMarkupAnnotation ? "Delete Highlight" : "Delete Annotation",
+                InputGesture = new KeyGesture(Key.Delete),
+            };
+            deleteAnnItem.Click += (_, _) => vm.DeleteSelectedAnnotation();
+            menu.Items.Add(deleteAnnItem);
+        }
+        if (vm.HasAnnotationClipboard)
+        {
+            var pasteItem = new MenuItem { Header = "Paste Annotation Here", IsEnabled = !vm.IsViewRotated };
+            pasteItem.Click += (_, _) => vm.PasteAnnotation(pageX, pageY);
+            menu.Items.Add(pasteItem);
+        }
+        if (menu.Items.Count > 0)
+            menu.Items.Add(new Separator());
+
         // Block actions (Copy as LaTeX / Markdown / Description / Image) when over a detected block.
         if (vm.FindBlockAt(pageX, pageY) is { } block)
         {

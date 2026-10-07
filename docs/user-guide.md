@@ -343,11 +343,17 @@ British and American English dictionaries are built in. Turn checking on or off 
 
 ### Select, move, and resize
 
-In **browse mode** (no annotation tool active), click on any annotation to select it (shown with a dashed blue outline). Drag a selected annotation to move it. For freehand annotations, 8 resize handles appear on the bounding box — drag a handle to scale proportionally. All move and resize actions support undo/redo.
+In **browse mode** (no annotation tool active), click on any annotation to select it (shown with a dashed blue outline). Drag a selected annotation to move it. Text markup (highlight, underline, strikethrough, squiggly) can be selected and deleted but not moved — it belongs to the text it was made on, so dragging over it pans the page as usual. For freehand annotations, 8 resize handles appear on the bounding box — drag a handle to scale proportionally. All move and resize actions support undo/redo.
 
 ### Delete selected annotation
 
 Press `Delete` or `Backspace` in browse mode to remove the selected annotation. This uses the same undo-supported removal as the eraser.
+
+### Copy and paste
+
+Select a text note, text box, rectangle, or pen stroke and press `Ctrl+C` to copy it (or `Ctrl+X` to cut it). `Ctrl+V` pastes it onto the current page — of the same document or any other open one. Pasting back onto the page it came from offsets each copy slightly so it doesn't sit on top of the original. Right-click on the page and choose **Paste Annotation Here** to place it at the pointer instead. A pasted annotation is a new annotation of its own, saved like any other, and `Ctrl+Z` undoes the paste.
+
+Text markup isn't copied as an annotation; `Ctrl+C` on a selected highlight copies the text under it instead. Copying a note or text box also puts its text on the system clipboard, for pasting into other apps. Right-clicking an annotation offers the same copy, cut, and delete actions. Pasting is unavailable while the view is rotated.
 
 ### Undo and redo
 
@@ -911,12 +917,14 @@ The log is overwritten at the start of each session. Old `.log` files are automa
 | `Ctrl+F` | Open search panel |
 | `F3` / `Shift+F3` | Next / previous match |
 | `1` / `2` / `3` / `4` / `5` | Highlight / Pen / Rectangle / Text Note / Eraser |
-| Right-click | Block actions (Copy as LaTeX / Markdown / Description / Image) + toggle Annotation Mode |
+| Right-click | Annotation actions (copy / cut / delete / paste here) + block actions (Copy as LaTeX / Markdown / Description / Image) + toggle Annotation Mode |
 | `Ctrl+Z` | Undo |
 | `Ctrl+Y` / `Ctrl+Shift+Z` | Redo |
 | `Delete` / `Backspace` | Delete selected annotation (browse mode) |
 | `Ctrl+L` | Copy current block as LaTeX / Markdown / description (VLM) |
-| `Ctrl+C` | Copy selected text |
+| `Ctrl+C` | Copy selected text, or the selected annotation (a highlight copies its text) |
+| `Ctrl+X` | Cut selected annotation |
+| `Ctrl+V` | Paste annotation onto the current page |
 | `F7` | Next misspelling (in the note editor) |
 | `Escape` | Cancel / close / stop / exit fullscreen |
 

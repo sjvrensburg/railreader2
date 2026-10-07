@@ -158,6 +158,10 @@ public partial class MenuBarView : UserControl
     private void OnToggleAnnotationMode(object? s, RoutedEventArgs e) => Vm?.ToggleAnnotationMode();
     private void OnUndo(object? s, RoutedEventArgs e) => Vm?.UndoAnnotation();
     private void OnRedo(object? s, RoutedEventArgs e) => Vm?.RedoAnnotation();
+    private void OnCut(object? s, RoutedEventArgs e) => Vm?.CutSelectedAnnotation();
+    private void OnCopy(object? s, RoutedEventArgs e) => Vm?.CopySelection();
+    private void OnPaste(object? s, RoutedEventArgs e) => Vm?.PasteAnnotation();
+    private void OnDeleteAnnotation(object? s, RoutedEventArgs e) => Vm?.DeleteSelectedAnnotation();
     private void OnCopyBlockAsLatex(object? s, RoutedEventArgs e)
     {
         if (Vm is { } vm) vm.FireAndForget(vm.CopyBlockAsLatex(), nameof(vm.CopyBlockAsLatex));

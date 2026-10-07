@@ -649,8 +649,11 @@ public partial class MainWindow : Window
             case Key.Y:
                 vm.RedoAnnotation(); e.Handled = true; return true;
             case Key.C:
-                if (vm.SelectedText is not null) vm.CopySelectedText();
-                e.Handled = true; return true;
+                vm.CopySelection(); e.Handled = true; return true;
+            case Key.X:
+                vm.CutSelectedAnnotation(); e.Handled = true; return true;
+            case Key.V:
+                vm.PasteAnnotation(); e.Handled = true; return true;
             case Key.L:
                 vm.FireAndForget(vm.CopyBlockAsLatex(), nameof(vm.CopyBlockAsLatex));
                 e.Handled = true; return true;
