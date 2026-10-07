@@ -29,6 +29,10 @@
             <Separator />
             <MenuItem Header="_Undo" InputGesture="Ctrl+Z" Click="OnUndo" IsEnabled="{Binding HasDocument}" />
             <MenuItem Header="_Redo" InputGesture="Ctrl+Shift+Z" Click="OnRedo" IsEnabled="{Binding HasDocument}" />
+            <MenuItem Header="Cu_t Annotation" InputGesture="Ctrl+X" Click="OnCut" IsEnabled="{Binding HasDocument}" />
+            <MenuItem Header="_Copy" InputGesture="Ctrl+C" Click="OnCopy" IsEnabled="{Binding HasDocument}" />
+            <MenuItem Header="_Paste Annotation" InputGesture="Ctrl+V" Click="OnPaste" IsEnabled="{Binding HasDocument}" />
+            <MenuItem Header="_Delete Annotation" InputGesture="Delete" Click="OnDeleteAnnotation" IsEnabled="{Binding HasDocument}" />
             <Separator />
             <MenuItem Header="Copy Block as _LaTeX" InputGesture="Ctrl+L" Click="OnCopyBlockAsLatex" IsEnabled="{Binding CanVlmCopyBlock}" />
             <MenuItem Header="Copy Block as Mar_kdown" Click="OnCopyBlockAsMarkdown" IsEnabled="{Binding CanVlmCopyBlock}" />

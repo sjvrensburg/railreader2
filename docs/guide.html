@@ -705,7 +705,9 @@
       <h3>Select, move, and resize</h3>
       <p>
         In <strong>browse mode</strong> (no annotation tool active), click on any annotation to select it
-        (shown with a dashed blue outline). Drag a selected annotation to move it. For freehand annotations,
+        (shown with a dashed blue outline). Drag a selected annotation to move it. Text markup (highlight,
+        underline, strikethrough, squiggly) can be selected and deleted but not moved &mdash; it belongs to
+        the text it was made on, so dragging over it pans the page as usual. For freehand annotations,
         8 resize handles appear on the bounding box &mdash; drag a handle to scale proportionally.
         All move and resize actions support undo/redo.
       </p>
@@ -714,6 +716,22 @@
       <p>
         Press <code>Delete</code> or <code>Backspace</code> in browse mode to remove the selected annotation.
         This uses the same undo-supported removal as the eraser.
+      </p>
+
+      <h3>Copy and paste</h3>
+      <p>
+        Select a text note, text box, rectangle, or pen stroke and press <code>Ctrl+C</code> to copy it
+        (or <code>Ctrl+X</code> to cut it). <code>Ctrl+V</code> pastes it onto the current page &mdash; of
+        the same document or any other open one. Pasting back onto the page it came from offsets each copy
+        slightly so it doesn't sit on top of the original. Right-click on the page and choose
+        <strong>Paste Annotation Here</strong> to place it at the pointer instead. A pasted annotation is a
+        new annotation of its own, saved like any other, and <code>Ctrl+Z</code> undoes the paste.
+      </p>
+      <p>
+        Text markup isn't copied as an annotation; <code>Ctrl+C</code> on a selected highlight copies the
+        text under it instead. Copying a note or text box also puts its text on the system clipboard, for
+        pasting into other apps. Right-clicking an annotation offers the same copy, cut, and delete actions.
+        Pasting is unavailable while the view is rotated.
       </p>
 
       <h3>Undo and redo</h3>
@@ -1550,7 +1568,9 @@ railreader2-cli export paper.pdf --figure-dir ./figures --output paper.md</code>
           <tr><td>Ctrl+Z</td><td>Undo</td></tr>
           <tr><td>Ctrl+Y / Ctrl+Shift+Z</td><td>Redo</td></tr>
           <tr><td>Delete / Backspace</td><td>Delete selected annotation (browse mode)</td></tr>
-          <tr><td>Ctrl+C</td><td>Copy selected text</td></tr>
+          <tr><td>Ctrl+C</td><td>Copy selected text, or the selected annotation</td></tr>
+          <tr><td>Ctrl+X</td><td>Cut selected annotation</td></tr>
+          <tr><td>Ctrl+V</td><td>Paste annotation onto the current page</td></tr>
           <tr><td>F7</td><td>Next misspelling (in the note editor)</td></tr>
           <tr><td>Escape</td><td>Cancel tool / close search / stop auto-scroll / exit fullscreen</td></tr>
         </tbody>

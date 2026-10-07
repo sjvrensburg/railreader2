@@ -160,7 +160,7 @@
             </Grid>
 
             <TextBlock Text="Annotations" FontWeight="Bold" />
-            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" Margin="8,0">
+            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" Margin="8,0">
                 <TextBlock Grid.Row="0" Grid.Column="0" Text="Ctrl+E" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
                 <TextBlock Grid.Row="0" Grid.Column="1" Text="Toggle annotation mode (shows the toolbar)" Margin="0,2" />
                 <TextBlock Grid.Row="1" Grid.Column="0" Text="1" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
@@ -174,7 +174,7 @@
                 <TextBlock Grid.Row="5" Grid.Column="0" Text="5" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
                 <TextBlock Grid.Row="5" Grid.Column="1" Text="Eraser tool" Margin="0,2" />
                 <TextBlock Grid.Row="6" Grid.Column="0" Text="Right-click" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
-                <TextBlock Grid.Row="6" Grid.Column="1" Text="Context menu (block actions, annotation mode)" Margin="0,2" />
+                <TextBlock Grid.Row="6" Grid.Column="1" Text="Context menu (annotation and block actions, annotation mode)" Margin="0,2" />
                 <TextBlock Grid.Row="7" Grid.Column="0" Text="Escape" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
                 <TextBlock Grid.Row="7" Grid.Column="1" Text="Cancel tool / exit annotation mode" Margin="0,2" />
                 <TextBlock Grid.Row="8" Grid.Column="0" Text="Ctrl+Z" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
@@ -184,9 +184,13 @@
                 <TextBlock Grid.Row="10" Grid.Column="0" Text="Delete" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
                 <TextBlock Grid.Row="10" Grid.Column="1" Text="Delete selected annotation" Margin="0,2" />
                 <TextBlock Grid.Row="11" Grid.Column="0" Text="Ctrl+C" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
-                <TextBlock Grid.Row="11" Grid.Column="1" Text="Copy selected text" Margin="0,2" />
-                <TextBlock Grid.Row="12" Grid.Column="0" Text="F7" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
-                <TextBlock Grid.Row="12" Grid.Column="1" Text="Next misspelling (in the note editor)" Margin="0,2" />
+                <TextBlock Grid.Row="11" Grid.Column="1" Text="Copy selected text, or the selected annotation (a highlight copies its text)" Margin="0,2" />
+                <TextBlock Grid.Row="12" Grid.Column="0" Text="Ctrl+X" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="12" Grid.Column="1" Text="Cut selected annotation (notes, text boxes, rectangles, pen)" Margin="0,2" />
+                <TextBlock Grid.Row="13" Grid.Column="0" Text="Ctrl+V" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="13" Grid.Column="1" Text="Paste annotation onto the current page (any open document)" Margin="0,2" />
+                <TextBlock Grid.Row="14" Grid.Column="0" Text="F7" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="14" Grid.Column="1" Text="Next misspelling (in the note editor)" Margin="0,2" />
             </Grid>
 
             <TextBlock Text="VLM (requires configured endpoint)" FontWeight="Bold" />

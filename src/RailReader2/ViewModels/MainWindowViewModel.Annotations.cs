@@ -282,6 +282,133 @@ public sealed partial class MainWindowViewModel
         }
     }
 
+    // --- Copy / cut / paste (Core 0.63.0) ---
+    // Notes, text boxes, rectangles and pen strokes are copyable, within and across documents (the
+    // clipboard lives in the shared AnnotationInteractionHandler). Text markup is not: it only means
+    // something over the text it was made on, so "copying" one copies that text instead.
+
+    public bool HasAnnotationClipboard => _controller.Annotations.HasAnnotationClipboard;
+
+    /// <summary>The topmost annotation under a page point on the focused view's page, or null.
+    /// Mirrors Core's browse hit-test priority: a movable annotation wins over text markup, whose
+    /// union bounds can cover a note or box drawn earlier.</summary>
+    public Annotation? FindAnnotationAt(double pageX, double pageY)
+    {
+        if (IsViewRotated || _controller.FocusedViewport is not { } vp) return null;
+        if (AnnotationInteractionHandler.GetCurrentPageAnnotations(vp) is not { } list) return null;
+        Annotation? markup = null;
+        for (int i = list.Count - 1; i >= 0; i--)
+        {
+            if (!AnnotationGeometry.HitTest(list[i], (float)pageX, (float)pageY)) continue;
+            if (list[i] is not TextMarkupAnnotation) return list[i];
+            markup ??= list[i];
+        }
+        return markup;
+    }
+
+    /// <summary>Select an annotation (e.g. the one under a right-click) so its chrome shows and the
+    /// copy/cut/delete actions target it.</summary>
+    public void SelectAnnotation(Annotation ann)
+    {
+        SelectedAnnotation = ann;
+        OnPropertyChanged(nameof(SelectedAnnotation));
+        InvalidateAnnotations();
+    }
+
+    /// <summary>Ctrl+C: selected text first, then the selected annotation.</summary>
+    public void CopySelection()
+    {
+        if (SelectedText is not null)
+            CopySelectedText();
+        else if (SelectedAnnotation is not null)
+            CopySelectedAnnotation();
+    }
+
+    public void CopySelectedAnnotation()
+    {
+        if (IsViewRotated || SelectedAnnotation is not { } ann) return;
+
+        if (ann is TextMarkupAnnotation markup)
+        {
+            if (MarkupText(markup) is { } text)
+            {
+                CopyToClipboard?.Invoke(text);
+                ShowStatusToast("Copied the highlighted text");
+            }
+            else
+            {
+                ShowStatusToast("No text under this highlight to copy");
+            }
+            return;
+        }
+
+        if (!_controller.Annotations.CopySelectedAnnotation(_controller.FocusedViewport))
+        {
+            ShowStatusToast("This annotation can't be copied");
+            return;
+        }
+        // A note's or text box's body also goes to the system clipboard, so it can be pasted
+        // into other apps; Ctrl+V inside railreader2 still pastes the annotation itself.
+        if (ann is TextNoteAnnotation or FreeTextAnnotation && !string.IsNullOrWhiteSpace(ann.EffectiveContents))
+            CopyToClipboard?.Invoke(ann.EffectiveContents);
+        OnPropertyChanged(nameof(HasAnnotationClipboard));
+        ShowStatusToast("Annotation copied — Ctrl+V to paste");
+    }
+
+    public void CutSelectedAnnotation()
+    {
+        if (IsViewRotated || SelectedAnnotation is not { } ann) return;
+        if (ann is TextMarkupAnnotation)
+        {
+            ShowStatusToast("Highlights can't be cut — press Delete to remove one");
+            return;
+        }
+        if (!_controller.Annotations.CutSelectedAnnotation(_controller.FocusedViewport))
+        {
+            ShowStatusToast("This annotation can't be cut");
+            return;
+        }
+        OnPropertyChanged(nameof(HasAnnotationClipboard));
+        OnPropertyChanged(nameof(SelectedAnnotation));
+        InvalidateAnnotations();
+        NotifyAnnotationsMutated();
+    }
+
+    /// <summary>Paste the copied annotation onto the focused view's current page — at its original
+    /// position (nudged when pasting back onto the source page), or with its top-left at the given
+    /// page point (context menu "Paste Here").</summary>
+    public void PasteAnnotation(double? pageX = null, double? pageY = null)
+    {
+        if (!HasAnnotationClipboard || _controller.FocusedViewport is not { } vp) return;
+        if (AnnotationInteractionHandler.IsPasteBlockedByRotation(vp))
+        {
+            ShowStatusToast("Annotations are unavailable while the view is rotated");
+            return;
+        }
+        var pasted = _controller.Annotations.PasteAnnotation(vp, (float?)pageX, (float?)pageY);
+        if (pasted is null)
+        {
+            ShowStatusToast("Couldn't paste the annotation here");
+            return;
+        }
+        OnPropertyChanged(nameof(SelectedAnnotation));
+        InvalidateAnnotations();
+        NotifyAnnotationsMutated();
+    }
+
+    /// <summary>The text under a markup annotation on the focused view's page, line by line
+    /// (same per-quad extraction as the Markdown export), or null when there is none.</summary>
+    private string? MarkupText(TextMarkupAnnotation markup)
+    {
+        if (_controller.FocusedViewport is not { } vp) return null;
+        var pageText = vp.Owner.GetOrExtractText(vp.CurrentPage);
+        var parts = new List<string>();
+        foreach (var r in markup.Rects)
+            if (pageText.ExtractTextInRect(r.X, r.Y, r.X + r.W, r.Y + r.H) is { Length: > 0 } t)
+                parts.Add(t);
+        return parts.Count > 0 ? string.Join(" ", parts) : null;
+    }
+
     public void UndoAnnotation()
     {
         _controller.Annotations.UndoAnnotation(_controller.FocusedViewport);
