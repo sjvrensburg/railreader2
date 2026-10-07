@@ -736,7 +736,10 @@ public partial class DocumentView : UserControl, IViewportSurface
             Pages: pages,
             SelectedAnnotation: rotated ? null : vm.SelectedAnnotation,
             PreviewAnnotation: rotated ? null : vm.PreviewAnnotation,
-            TextSelectionRects: vm.TextSelectionRects);
+            TextSelectionRects: vm.TextSelectionRects,
+            // Same effect the page layer is drawn with (BuildPageState), so the highlight blend
+            // always matches the backdrop actually underneath it.
+            DarkBackdrop: AnnotationRenderer.IsDarkBackdrop(vm.Controller.ActiveColourEffect));
     }
 
     private SearchRenderState BuildSearchState(TabViewModel? tab)

@@ -86,7 +86,8 @@ public static class RenderCommand
 
                     canvas.Save();
                     canvas.Scale(scaleX, scaleY);
-                    AnnotationRenderer.DrawAnnotations(canvas, pageAnnotations, null, expandAllNotes: true);
+                    AnnotationRenderer.DrawAnnotations(canvas, pageAnnotations, null, expandAllNotes: true,
+                        darkBackdrop: AnnotationRenderer.IsDarkBackdrop(effect));
                     canvas.Restore();
                 }
 

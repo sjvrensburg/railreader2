@@ -18,12 +18,16 @@ internal readonly record struct AnnotationPageState(
 /// Immutable snapshot of all state needed to render annotations for one frame. Preview annotation
 /// (mid-authoring) and text-selection rects are always on the anchor page — annotation authoring
 /// stays page-local and anchored per the continuous-scroll host contract.
+/// <see cref="DarkBackdrop"/> (Core 0.63.1, <c>AnnotationRenderer.IsDarkBackdrop</c>): highlights draw
+/// with a Multiply blend so text shows through, which would make them vanish on the dark page of an
+/// inverting colour effect — there Core falls back to alpha-capped SrcOver.
 /// </summary>
 internal sealed record AnnotationRenderState(
     IReadOnlyList<AnnotationPageState> Pages,
     Annotation? SelectedAnnotation,
     Annotation? PreviewAnnotation,
-    List<HighlightRect>? TextSelectionRects);
+    List<HighlightRect>? TextSelectionRects,
+    bool DarkBackdrop);
 
 /// <summary>
 /// Hosts a CompositionCustomVisual for annotation rendering.
@@ -74,7 +78,8 @@ internal sealed class AnnotationVisualHandler : CompositionCustomVisualHandler
             canvas.Concat(page.Camera);
 
             if (page.Annotations is { } annotations)
-                AnnotationRenderer.DrawAnnotations(canvas, annotations, state.SelectedAnnotation);
+                AnnotationRenderer.DrawAnnotations(canvas, annotations, state.SelectedAnnotation,
+                    darkBackdrop: state.DarkBackdrop);
 
             if (page.IsAnchor)
             {
