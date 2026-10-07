@@ -101,6 +101,9 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="3.70.0.0" date="2026-10-07">
+      <description><p>Copy, cut and paste notes, text boxes, rectangles and pen strokes within and between documents. Highlights stay on their text, and highlights from other PDF tools no longer hide the words underneath.</p></description>
+    </release>
     <release version="3.69.0.0" date="2026-10-01">
       <description><p>A simpler Settings window: the most-used settings by default, with everything else behind "Show advanced settings".</p></description>
     </release>
