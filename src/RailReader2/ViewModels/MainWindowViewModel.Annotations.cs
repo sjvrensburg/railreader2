@@ -169,11 +169,13 @@ public sealed partial class MainWindowViewModel
         // on a read-only/signed PDF only RailReader-authored annotations reach the sidecar, so a
         // reviewer's in-PDF highlight merged away here would come back from the PDF next time,
         // beside the merged copy. Re-decide per gesture (the focused document changes) — but only
-        // for a text-markup commit, the one path Core reads the flag on: the storage probe opens
-        // the PDF for writing, which a pen stroke or eraser click shouldn't pay for.
+        // for a text-markup commit, the one path Core reads the flag on (its own gate is a pending
+        // text-markup preview, mirrored here): the storage probe opens the PDF for writing — and
+        // the first time per document reads it whole for the signature check — which a pen stroke,
+        // an eraser click, or a highlight-tool click that dragged nothing shouldn't pay for.
         _controller.Annotations.AutoMergeTextMarkup =
             AutoMergeTextMarkup
-            && AnnotationInteractionHandler.IsTextMarkupTool(ActiveTool)
+            && _controller.Annotations.PreviewAnnotation is TextMarkupAnnotation
             && _controller.FocusedViewport is { } vpUp
             && IsAnnotationStorageInPdf(vpUp.Owner);
         if (_controller.Annotations.HandleAnnotationPointerUp(_controller.FocusedViewport, pageX, pageY))
