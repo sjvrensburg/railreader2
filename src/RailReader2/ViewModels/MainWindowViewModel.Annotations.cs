@@ -168,9 +168,14 @@ public sealed partial class MainWindowViewModel
         // Auto-merge is a preference, but it can't apply where the merge would be undone on reload:
         // on a read-only/signed PDF only RailReader-authored annotations reach the sidecar, so a
         // reviewer's in-PDF highlight merged away here would come back from the PDF next time,
-        // beside the merged copy. Re-decide per gesture (the focused document changes).
+        // beside the merged copy. Re-decide per gesture (the focused document changes) — but only
+        // for a text-markup commit, the one path Core reads the flag on: the storage probe opens
+        // the PDF for writing, which a pen stroke or eraser click shouldn't pay for.
         _controller.Annotations.AutoMergeTextMarkup =
-            AutoMergeTextMarkup && _controller.FocusedViewport is { } vpUp && IsAnnotationStorageInPdf(vpUp.Owner);
+            AutoMergeTextMarkup
+            && AnnotationInteractionHandler.IsTextMarkupTool(ActiveTool)
+            && _controller.FocusedViewport is { } vpUp
+            && IsAnnotationStorageInPdf(vpUp.Owner);
         if (_controller.Annotations.HandleAnnotationPointerUp(_controller.FocusedViewport, pageX, pageY))
         {
             InvalidateAnnotations();
@@ -264,6 +269,15 @@ public sealed partial class MainWindowViewModel
         if (SelectedAnnotation is not { } ann)
         {
             ShowStatusToast("Select an annotation first — click a highlight or note in browse mode");
+            return;
+        }
+        // The handler's selection is shared across pages, tabs and documents and isn't cleared on
+        // a page change, so it can point at an annotation that isn't on the focused view's page.
+        // Editing it through this view would push the undo step onto (and dirty) the wrong
+        // document, so the edit is never saved where it belongs.
+        if (!IsOnFocusedPage(ann))
+        {
+            ShowStatusToast("Select an annotation on this page first — click a highlight or note in browse mode");
             return;
         }
         if (!CanEditComment(ann))
@@ -497,11 +511,23 @@ public sealed partial class MainWindowViewModel
     /// (read-only or signed), recorded from <c>CompositeAnnotationStore.OnSidecarFallback</c>.</summary>
     private readonly HashSet<string> _sidecarFallbackPaths = new(StringComparer.Ordinal);
 
-    private void RecordSidecarFallback(string pdfPath)
+    private void RecordSidecarFallback(string pdfPath) => _sidecarFallbackPaths.Add(FallbackKey(pdfPath));
+
+    /// <summary>The key <see cref="_sidecarFallbackPaths"/> is recorded and looked up by — one
+    /// normalisation for both sides, or a recorded path could never match a probed one.</summary>
+    private static string FallbackKey(string pdfPath)
     {
-        try { _sidecarFallbackPaths.Add(System.IO.Path.GetFullPath(pdfPath)); }
-        catch (Exception) { _sidecarFallbackPaths.Add(pdfPath); }
+        try { return System.IO.Path.GetFullPath(pdfPath); }
+        catch (Exception) { return pdfPath; }
     }
+
+    /// <summary>True when <paramref name="ann"/> is on the focused view's current page — the only
+    /// place a selection-driven edit or merge may act, since the shared selection outlives page
+    /// and tab changes (Core's <c>DeleteSelectedAnnotation</c> makes the same check).</summary>
+    private bool IsOnFocusedPage(Annotation ann)
+        => _controller.FocusedViewport is { } vp
+           && AnnotationInteractionHandler.GetCurrentPageAnnotations(vp) is { } list
+           && list.Contains(ann);
 
     /// <summary>Whether this document's annotations are reconciled into the PDF on save, so that
     /// deleting an in-PDF annotation (as a merge does to its sources) sticks. False once the store
@@ -510,9 +536,7 @@ public sealed partial class MainWindowViewModel
     /// writable PDF is therefore only caught after its first save.</summary>
     private bool IsAnnotationStorageInPdf(DocumentModel doc)
     {
-        string path;
-        try { path = System.IO.Path.GetFullPath(doc.FilePath); }
-        catch (Exception) { path = doc.FilePath; }
+        string path = FallbackKey(doc.FilePath);
         if (_sidecarFallbackPaths.Contains(path)) return false;
         try
         {
@@ -539,8 +563,10 @@ public sealed partial class MainWindowViewModel
     /// <summary>A cluster that includes a reviewer's in-PDF highlight can't be merged on a PDF the
     /// store won't write back into (see <see cref="IsAnnotationStorageInPdf"/>): the sources would
     /// return from the PDF on reload, beside the merged copy.</summary>
-    private bool IsMergeBlockedByStorage(Viewport vp, IEnumerable<TextMarkupAnnotation> cluster)
-        => cluster.Any(m => m.Source == AnnotationSource.InPdf) && !IsAnnotationStorageInPdf(vp.Owner);
+    private bool IsMergeBlockedByStorage(Viewport vp, IReadOnlyList<TextMarkupAnnotation> cluster)
+        => cluster.Count > 1
+           && cluster.Any(m => m.Source == AnnotationSource.InPdf)
+           && !IsAnnotationStorageInPdf(vp.Owner);
 
     private const string MergeBlockedMessage =
         "Can't merge a reviewer's highlight here — this PDF is read-only or signed, so it can't be changed";
@@ -559,8 +585,15 @@ public sealed partial class MainWindowViewModel
             ShowStatusToast("Select a highlight first — click it in browse mode");
             return;
         }
-        if (AnnotationInteractionHandler.GetCurrentPageAnnotations(vp) is { } list &&
-            IsMergeBlockedByStorage(vp, TextMarkupMerge.FindCluster(list, markup)))
+        // Core's merge accepts a seed that isn't in the page list (for a not-yet-added preview), so
+        // a selection left over from another page or document would be merged INTO this page by
+        // whatever its old geometry happens to overlap here. Refuse it, as Delete does.
+        if (AnnotationInteractionHandler.GetCurrentPageAnnotations(vp) is not { } list || !list.Contains(markup))
+        {
+            ShowStatusToast("Select a highlight on this page first — click it in browse mode");
+            return;
+        }
+        if (IsMergeBlockedByStorage(vp, TextMarkupMerge.FindCluster(list, markup)))
         {
             ShowStatusToast(MergeBlockedMessage);
             return;
@@ -594,15 +627,18 @@ public sealed partial class MainWindowViewModel
             return;
         }
         // Refuse the whole sweep rather than silently skipping the protected clusters: the user
-        // asked for the page, and a partial result with no explanation reads as a bug.
+        // asked for the page, and a partial result with no explanation reads as a bug. The storage
+        // verdict is per-document (it opens the file), so it is taken once, and only when an in-PDF
+        // markup actually has a partner.
+        bool? storageInPdf = null;
         foreach (var ann in list)
         {
-            if (ann is TextMarkupAnnotation { Source: AnnotationSource.InPdf } m &&
-                TextMarkupMerge.FindCluster(list, m).Count > 1 && !IsAnnotationStorageInPdf(vp.Owner))
-            {
-                ShowStatusToast(MergeBlockedMessage);
-                return;
-            }
+            if (ann is not TextMarkupAnnotation { Source: AnnotationSource.InPdf } m) continue;
+            if (TextMarkupMerge.FindCluster(list, m).Count < 2) continue;
+            storageInPdf ??= IsAnnotationStorageInPdf(vp.Owner);
+            if (storageInPdf.Value) break; // writable: no cluster on this page can be blocked
+            ShowStatusToast(MergeBlockedMessage);
+            return;
         }
 
         int removed = vp.Owner.MergeOverlappingTextMarkup(vp.CurrentPage);

@@ -358,20 +358,21 @@ public class ViewportPanel : Panel
             {
                 ViewModel.ActivateRailAtClick(pos.X, pos.Y);
             }
-            // Browse-mode double-click on text markup → its comment dialog (Core 0.64.0). Core's
-            // pointer-down deliberately returns false for markup (the camera must still pan from a
-            // press on it), so _browseAnnotationDrag is never set for it and the gesture would fall
-            // through to the block framing below. Tested before markers/framing so a highlight on
-            // a detected block takes precedence — the user aimed at the highlight.
-            else if (isClick && _pressClickCount >= 2 && TryEditMarkupCommentAt(pos))
-            {
-            }
-            // Markers are tested before block framing so a double-click on a source pin opens the
-            // detached window rather than zooming into the block under it.
+            // Markers are tested before markup comments and block framing so a double-click on a
+            // source pin opens the detached window rather than opening a comment or zooming into
+            // the block under it — a marker is a small, deliberate target.
             else if (isClick && TryHandlePortalMarkerClick(pos, popOut: _pressClickCount >= 2))
             {
                 // Clicked a portal marker: showed its target (double-click: in the pop-out window),
                 // jumped to its source, or opened a chooser.
+            }
+            // Browse-mode double-click on text markup → its comment dialog (Core 0.64.0). Core's
+            // pointer-down deliberately returns false for markup (the camera must still pan from a
+            // press on it), so _browseAnnotationDrag is never set for it and the gesture would fall
+            // through to the block framing below. Tested before framing so a highlight on a
+            // detected block takes precedence — the user aimed at the highlight.
+            else if (isClick && _pressClickCount >= 2 && TryEditMarkupCommentAt(pos))
+            {
             }
             else if (isClick && _pressClickCount >= 2 && TryFrameBlockAt(pos))
             {
@@ -605,10 +606,11 @@ public class ViewportPanel : Panel
     /// <summary>Double-click target: the comment dialog of the text markup under
     /// <paramref name="screenPos"/>, via the VM's browse-click handler (which also selects it).
     /// Returns false when nothing there is text markup, so the chain can go on to block framing.
-    /// Notes under the point are handled earlier, by the browse-drag branch.</summary>
+    /// Notes under the point are handled earlier, by the browse-drag branch. Browse mode only —
+    /// the release chain's annotation-mode branch runs before this is reached.</summary>
     private bool TryEditMarkupCommentAt(Point screenPos)
     {
-        if (ViewModel is not { } vm || vm.IsAnnotating) return false;
+        if (ViewModel is not { } vm) return false;
         var (pageX, pageY) = ScreenToGesturePage(screenPos);
         if (vm.FindAnnotationAt(pageX, pageY) is not TextMarkupAnnotation) return false;
         return vm.HandleBrowseClick((float)pageX, (float)pageY, isDoubleClick: true).Handled;
