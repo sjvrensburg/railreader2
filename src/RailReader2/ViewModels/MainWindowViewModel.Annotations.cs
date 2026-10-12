@@ -489,7 +489,7 @@ public sealed partial class MainWindowViewModel
     // single comment between them (Core refuses when both carry different comments, or when one
     // is part of a reply thread). The result is a fresh RailReader-authored annotation; the sources
     // are deleted from the PDF on save by their /NM — which is exactly what can't happen on a
-    // read-only or signed PDF, hence IsAnnotationStorageInPdf below.
+    // read-only or signed PDF, hence IsAnnotationStorageInPdf below (the store's own verdict).
 
     private readonly AnnotationPreferences _annotationPrefs = AnnotationPreferences.Load();
 
@@ -507,20 +507,6 @@ public sealed partial class MainWindowViewModel
         }
     }
 
-    /// <summary>Full paths of PDFs whose annotation save fell back to the sidecar this session
-    /// (read-only or signed), recorded from <c>CompositeAnnotationStore.OnSidecarFallback</c>.</summary>
-    private readonly HashSet<string> _sidecarFallbackPaths = new(StringComparer.Ordinal);
-
-    private void RecordSidecarFallback(string pdfPath) => _sidecarFallbackPaths.Add(FallbackKey(pdfPath));
-
-    /// <summary>The key <see cref="_sidecarFallbackPaths"/> is recorded and looked up by — one
-    /// normalisation for both sides, or a recorded path could never match a probed one.</summary>
-    private static string FallbackKey(string pdfPath)
-    {
-        try { return System.IO.Path.GetFullPath(pdfPath); }
-        catch (Exception) { return pdfPath; }
-    }
-
     /// <summary>True when <paramref name="ann"/> is on the focused view's current page — the only
     /// place a selection-driven edit or merge may act, since the shared selection outlives page
     /// and tab changes (Core's <c>DeleteSelectedAnnotation</c> makes the same check).</summary>
@@ -530,26 +516,11 @@ public sealed partial class MainWindowViewModel
            && list.Contains(ann);
 
     /// <summary>Whether this document's annotations are reconciled into the PDF on save, so that
-    /// deleting an in-PDF annotation (as a merge does to its sources) sticks. False once the store
-    /// has reported a sidecar fallback for it, or when the file isn't writable on disk — the same
-    /// test the store makes, minus its signature probe, which Core doesn't expose; a signed-but-
-    /// writable PDF is therefore only caught after its first save.</summary>
-    private bool IsAnnotationStorageInPdf(DocumentModel doc)
-    {
-        string path = FallbackKey(doc.FilePath);
-        if (_sidecarFallbackPaths.Contains(path)) return false;
-        try
-        {
-            if (!File.Exists(path)) return false;
-            if (File.GetAttributes(path).HasFlag(FileAttributes.ReadOnly)) return false;
-            using var fs = new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite);
-            return true;
-        }
-        catch (Exception)
-        {
-            return false;
-        }
-    }
+    /// deleting an in-PDF annotation (as a merge does to its sources) sticks. The store's own
+    /// verdict (Core 0.64.1): writable on disk and unsigned. It probes the file, so this is a
+    /// per-decision call, never a per-frame one.</summary>
+    private static bool IsAnnotationStorageInPdf(DocumentModel doc)
+        => CompositeAnnotationStore.Default.GetSidecarFallbackReason(doc.FilePath, doc.Pdf.Password) is null;
 
     /// <summary>True when the selected text markup overlaps at least one it could merge with —
     /// gates the context-menu item so it isn't offered for a lone highlight.</summary>
