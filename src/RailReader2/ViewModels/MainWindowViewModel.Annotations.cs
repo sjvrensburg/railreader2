@@ -4,6 +4,7 @@ using RailReader.Core;
 using RailReader.Core.Models;
 using RailReader.Core.Services;
 using RailReader.Renderer.Skia;
+using RailReader2.Services;
 using RailReader2.Views;
 
 namespace RailReader2.ViewModels;
@@ -142,7 +143,7 @@ public sealed partial class MainWindowViewModel
         if (needsDialog)
         {
             if (isEdit && existingNote is not null)
-                FireAndForget(EditTextNote(existingNote), nameof(EditTextNote));
+                FireAndForget(EditAnnotationComment(existingNote), nameof(EditAnnotationComment));
             else
                 FireAndForget(CreateTextNote(px, py), nameof(CreateTextNote));
         }
@@ -164,6 +165,12 @@ public sealed partial class MainWindowViewModel
 
     public void HandleAnnotationPointerUp(double pageX, double pageY)
     {
+        // Auto-merge is a preference, but it can't apply where the merge would be undone on reload:
+        // on a read-only/signed PDF only RailReader-authored annotations reach the sidecar, so a
+        // reviewer's in-PDF highlight merged away here would come back from the PDF next time,
+        // beside the merged copy. Re-decide per gesture (the focused document changes).
+        _controller.Annotations.AutoMergeTextMarkup =
+            AutoMergeTextMarkup && _controller.FocusedViewport is { } vpUp && IsAnnotationStorageInPdf(vpUp.Owner);
         if (_controller.Annotations.HandleAnnotationPointerUp(_controller.FocusedViewport, pageX, pageY))
         {
             InvalidateAnnotations();
@@ -205,16 +212,66 @@ public sealed partial class MainWindowViewModel
         NotifyAnnotationsMutated();
     }
 
-    private async Task EditTextNote(TextNoteAnnotation note)
+    /// <summary>Edit the text of a sticky note, or the comment attached to any other annotation
+    /// (a highlight's comment is what this feature is for; rectangles and pen strokes take one too).
+    /// Same dialog as a new note; Cancel leaves the annotation untouched, an emptied box clears the
+    /// comment. One undo step in Core (<c>EditContentsAction</c>).</summary>
+    private async Task EditAnnotationComment(Annotation ann)
     {
         if (_window is null) return;
-        var dialog = new TextNoteDialog(note.EffectiveContents) { FontSize = CurrentFontSize };
+        var dialog = new TextNoteDialog(ann.EffectiveContents ?? "")
+        {
+            FontSize = CurrentFontSize,
+            Title = CommentDialogTitle(ann),
+        };
         var result = await dialog.ShowDialog<string?>(_window);
         if (result is null) return;
 
-        _controller.Annotations.CompleteTextNoteEdit(_controller.FocusedViewport, note, result);
+        _controller.Annotations.CompleteCommentEdit(_controller.FocusedViewport, ann, result);
         InvalidateAnnotations();
         NotifyAnnotationsMutated();
+    }
+
+    private static string CommentDialogTitle(Annotation ann) => ann switch
+    {
+        TextNoteAnnotation => "Text Note",
+        FreeTextAnnotation => "Text Box",
+        TextMarkupAnnotation m => $"Comment on {MarkupNoun(m)}",
+        _ => "Comment",
+    };
+
+    /// <summary>What the UI calls a text-markup annotation of this kind, lower case.</summary>
+    public static string MarkupNoun(TextMarkupAnnotation m) => m switch
+    {
+        UnderlineAnnotation => "underline",
+        StrikeOutAnnotation => "strikethrough",
+        SquigglyAnnotation => "squiggle",
+        _ => "highlight",
+    };
+
+    /// <summary>True when the annotation's comment can be edited from the menus: everything but a
+    /// text box, whose body is its visible text and has no edit path yet.</summary>
+    public static bool CanEditComment(Annotation ann) => ann is not FreeTextAnnotation;
+
+    /// <summary>Menu/double-click entry: edit the selected annotation's note or comment.</summary>
+    public void EditSelectedAnnotationComment()
+    {
+        if (IsViewRotated)
+        {
+            ShowStatusToast("Annotations are unavailable while the view is rotated");
+            return;
+        }
+        if (SelectedAnnotation is not { } ann)
+        {
+            ShowStatusToast("Select an annotation first — click a highlight or note in browse mode");
+            return;
+        }
+        if (!CanEditComment(ann))
+        {
+            ShowStatusToast("Text boxes can't take a comment");
+            return;
+        }
+        FireAndForget(EditAnnotationComment(ann), nameof(EditAnnotationComment));
     }
 
     // --- Browse-mode annotation interaction ---
@@ -254,16 +311,20 @@ public sealed partial class MainWindowViewModel
         return false;
     }
 
-    public (bool Handled, TextNoteAnnotation? EditNote) HandleBrowseClick(float pageX, float pageY, bool isDoubleClick = false)
+    /// <summary>Browse-mode click on an annotation: a note toggles open/closed (double-click edits
+    /// it); a double-click on text markup selects it and opens its comment (Core 0.64.0). The
+    /// returned <c>Edit</c> is the annotation whose dialog was opened, if any.</summary>
+    public (bool Handled, Annotation? Edit) HandleBrowseClick(float pageX, float pageY, bool isDoubleClick = false)
     {
+        if (IsViewRotated) return (false, null); // annotations are hidden while rotated
         var result = _controller.Annotations.HandleBrowseClick(_controller.FocusedViewport, pageX, pageY, isDoubleClick);
         if (result.Handled)
         {
             OnPropertyChanged(nameof(SelectedAnnotation));
             InvalidateAnnotations();
         }
-        if (result.EditNote is not null)
-            FireAndForget(EditTextNote(result.EditNote), nameof(EditTextNote));
+        if (result.Edit is not null)
+            FireAndForget(EditAnnotationComment(result.Edit), nameof(EditAnnotationComment));
         return result;
     }
 
@@ -408,6 +469,167 @@ public sealed partial class MainWindowViewModel
                 parts.Add(t);
         return parts.Count > 0 ? string.Join(" ", parts) : null;
     }
+
+    // --- Merging overlapping text markup (Core 0.64.0) ---
+    // Two highlights of the same kind and colour whose line bands overlap become one, keeping the
+    // single comment between them (Core refuses when both carry different comments, or when one
+    // is part of a reply thread). The result is a fresh RailReader-authored annotation; the sources
+    // are deleted from the PDF on save by their /NM — which is exactly what can't happen on a
+    // read-only or signed PDF, hence IsAnnotationStorageInPdf below.
+
+    private readonly AnnotationPreferences _annotationPrefs = AnnotationPreferences.Load();
+
+    /// <summary>Merge a new highlight into any same-style highlight it overlaps as it is drawn
+    /// (Edit ▸ Merge Overlapping Highlights ▸ Automatically When Drawing). Persisted app-side.</summary>
+    public bool AutoMergeTextMarkup
+    {
+        get => _annotationPrefs.AutoMergeTextMarkup;
+        set
+        {
+            if (_annotationPrefs.AutoMergeTextMarkup == value) return;
+            _annotationPrefs.AutoMergeTextMarkup = value;
+            _annotationPrefs.Save();
+            OnPropertyChanged();
+        }
+    }
+
+    /// <summary>Full paths of PDFs whose annotation save fell back to the sidecar this session
+    /// (read-only or signed), recorded from <c>CompositeAnnotationStore.OnSidecarFallback</c>.</summary>
+    private readonly HashSet<string> _sidecarFallbackPaths = new(StringComparer.Ordinal);
+
+    private void RecordSidecarFallback(string pdfPath)
+    {
+        try { _sidecarFallbackPaths.Add(System.IO.Path.GetFullPath(pdfPath)); }
+        catch (Exception) { _sidecarFallbackPaths.Add(pdfPath); }
+    }
+
+    /// <summary>Whether this document's annotations are reconciled into the PDF on save, so that
+    /// deleting an in-PDF annotation (as a merge does to its sources) sticks. False once the store
+    /// has reported a sidecar fallback for it, or when the file isn't writable on disk — the same
+    /// test the store makes, minus its signature probe, which Core doesn't expose; a signed-but-
+    /// writable PDF is therefore only caught after its first save.</summary>
+    private bool IsAnnotationStorageInPdf(DocumentModel doc)
+    {
+        string path;
+        try { path = System.IO.Path.GetFullPath(doc.FilePath); }
+        catch (Exception) { path = doc.FilePath; }
+        if (_sidecarFallbackPaths.Contains(path)) return false;
+        try
+        {
+            if (!File.Exists(path)) return false;
+            if (File.GetAttributes(path).HasFlag(FileAttributes.ReadOnly)) return false;
+            using var fs = new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite);
+            return true;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>True when the selected text markup overlaps at least one it could merge with —
+    /// gates the context-menu item so it isn't offered for a lone highlight.</summary>
+    public bool HasMergePartner(TextMarkupAnnotation markup)
+    {
+        if (_controller.FocusedViewport is not { } vp) return false;
+        if (AnnotationInteractionHandler.GetCurrentPageAnnotations(vp) is not { } list) return false;
+        return TextMarkupMerge.FindCluster(list, markup).Count > 1;
+    }
+
+    /// <summary>A cluster that includes a reviewer's in-PDF highlight can't be merged on a PDF the
+    /// store won't write back into (see <see cref="IsAnnotationStorageInPdf"/>): the sources would
+    /// return from the PDF on reload, beside the merged copy.</summary>
+    private bool IsMergeBlockedByStorage(Viewport vp, IEnumerable<TextMarkupAnnotation> cluster)
+        => cluster.Any(m => m.Source == AnnotationSource.InPdf) && !IsAnnotationStorageInPdf(vp.Owner);
+
+    private const string MergeBlockedMessage =
+        "Can't merge a reviewer's highlight here — this PDF is read-only or signed, so it can't be changed";
+
+    /// <summary>Merge the selected highlight with every same-style highlight it overlaps.</summary>
+    public void MergeSelectedTextMarkup()
+    {
+        if (_controller.FocusedViewport is not { } vp) return;
+        if (IsViewRotated)
+        {
+            ShowStatusToast("Annotations are unavailable while the view is rotated");
+            return;
+        }
+        if (SelectedAnnotation is not TextMarkupAnnotation markup)
+        {
+            ShowStatusToast("Select a highlight first — click it in browse mode");
+            return;
+        }
+        if (AnnotationInteractionHandler.GetCurrentPageAnnotations(vp) is { } list &&
+            IsMergeBlockedByStorage(vp, TextMarkupMerge.FindCluster(list, markup)))
+        {
+            ShowStatusToast(MergeBlockedMessage);
+            return;
+        }
+
+        var merged = _controller.Annotations.MergeSelectedTextMarkup(vp, out var refusal);
+        if (merged is null)
+        {
+            ShowStatusToast(MergeRefusalMessage(refusal, markup));
+            return;
+        }
+        OnPropertyChanged(nameof(SelectedAnnotation));
+        InvalidateAnnotations();
+        NotifyAnnotationsMutated();
+        ShowStatusToast($"Merged overlapping {MarkupNoun(merged)}s — Ctrl+Z to undo");
+    }
+
+    /// <summary>Merge every cluster of overlapping same-style highlights on the focused view's page
+    /// (one undo step per cluster; clusters Core refuses are left alone).</summary>
+    public void MergePageTextMarkup()
+    {
+        if (_controller.FocusedViewport is not { } vp) return;
+        if (IsViewRotated)
+        {
+            ShowStatusToast("Annotations are unavailable while the view is rotated");
+            return;
+        }
+        if (AnnotationInteractionHandler.GetCurrentPageAnnotations(vp) is not { } list)
+        {
+            ShowStatusToast("No highlights on this page");
+            return;
+        }
+        // Refuse the whole sweep rather than silently skipping the protected clusters: the user
+        // asked for the page, and a partial result with no explanation reads as a bug.
+        foreach (var ann in list)
+        {
+            if (ann is TextMarkupAnnotation { Source: AnnotationSource.InPdf } m &&
+                TextMarkupMerge.FindCluster(list, m).Count > 1 && !IsAnnotationStorageInPdf(vp.Owner))
+            {
+                ShowStatusToast(MergeBlockedMessage);
+                return;
+            }
+        }
+
+        int removed = vp.Owner.MergeOverlappingTextMarkup(vp.CurrentPage);
+        if (removed == 0)
+        {
+            ShowStatusToast("No overlapping highlights of the same colour on this page");
+            return;
+        }
+        // The selection may have been one of the merged-away sources.
+        if (SelectedAnnotation is { } sel && !list.Contains(sel))
+            SelectedAnnotation = null;
+        OnPropertyChanged(nameof(SelectedAnnotation));
+        InvalidateAnnotations();
+        NotifyAnnotationsMutated();
+        ShowStatusToast(removed == 1
+            ? "Merged 2 overlapping highlights into one — Ctrl+Z to undo"
+            : $"Merged overlapping highlights — {removed} fewer on this page — Ctrl+Z to undo");
+    }
+
+    private static string MergeRefusalMessage(TextMarkupMerge.Refusal refusal, TextMarkupAnnotation markup) => refusal switch
+    {
+        TextMarkupMerge.Refusal.ConflictingComments =>
+            "These highlights have different comments — edit one to match (or clear it) before merging",
+        TextMarkupMerge.Refusal.Threaded =>
+            "One of these highlights has replies — merging would orphan them",
+        _ => $"Nothing to merge — no other {MarkupNoun(markup)} of the same colour overlaps this one",
+    };
 
     public void UndoAnnotation()
     {

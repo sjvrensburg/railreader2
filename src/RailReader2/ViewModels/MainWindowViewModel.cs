@@ -1258,8 +1258,12 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     // Load, never Save, so they never raise these.
     private void WireAnnotationStoreSignals()
     {
-        CompositeAnnotationStore.Default.OnSidecarFallback = (_, reason) =>
-            Dispatcher.UIThread.Post(() => ShowStatusToast(SidecarFallbackMessage(reason)));
+        CompositeAnnotationStore.Default.OnSidecarFallback = (path, reason) =>
+            Dispatcher.UIThread.Post(() =>
+            {
+                RecordSidecarFallback(path); // gates highlight merging, see MergeSelectedTextMarkup
+                ShowStatusToast(SidecarFallbackMessage(reason));
+            });
         CompositeAnnotationStore.Default.OnSidecarMigration = _ =>
             Dispatcher.UIThread.Post(() => ShowStatusToast(
                 "Your private notes will be written into this PDF the next time it is saved."));
