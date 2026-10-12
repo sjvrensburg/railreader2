@@ -358,12 +358,21 @@ public class ViewportPanel : Panel
             {
                 ViewModel.ActivateRailAtClick(pos.X, pos.Y);
             }
-            // Markers are tested before block framing so a double-click on a source pin opens the
-            // detached window rather than zooming into the block under it.
+            // Markers are tested before markup comments and block framing so a double-click on a
+            // source pin opens the detached window rather than opening a comment or zooming into
+            // the block under it — a marker is a small, deliberate target.
             else if (isClick && TryHandlePortalMarkerClick(pos, popOut: _pressClickCount >= 2))
             {
                 // Clicked a portal marker: showed its target (double-click: in the pop-out window),
                 // jumped to its source, or opened a chooser.
+            }
+            // Browse-mode double-click on text markup → its comment dialog (Core 0.64.0). Core's
+            // pointer-down deliberately returns false for markup (the camera must still pan from a
+            // press on it), so _browseAnnotationDrag is never set for it and the gesture would fall
+            // through to the block framing below. Tested before framing so a highlight on a
+            // detected block takes precedence — the user aimed at the highlight.
+            else if (isClick && _pressClickCount >= 2 && TryEditMarkupCommentAt(pos))
+            {
             }
             else if (isClick && _pressClickCount >= 2 && TryFrameBlockAt(pos))
             {
@@ -406,6 +415,8 @@ public class ViewportPanel : Panel
     private static ContextMenu ScaledContextMenu(MainWindowViewModel vm)
         => new() { FontSize = vm.CurrentFontSize };
 
+    private static string Capitalise(string s) => s.Length == 0 ? s : char.ToUpperInvariant(s[0]) + s[1..];
+
     private void ShowViewportContextMenu(MainWindowViewModel vm, double pageX, double pageY)
     {
         var menu = ScaledContextMenu(vm);
@@ -415,11 +426,32 @@ public class ViewportPanel : Panel
         if (vm.FindAnnotationAt(pageX, pageY) is { } ann)
         {
             vm.SelectAnnotation(ann);
-            if (ann is TextMarkupAnnotation)
+            // Comment on anything but a text box (its body IS its visible text); notes say "note".
+            if (MainWindowViewModel.CanEditComment(ann))
+            {
+                bool hasBody = !string.IsNullOrWhiteSpace(ann.EffectiveContents);
+                var commentItem = new MenuItem
+                {
+                    Header = ann is TextNoteAnnotation ? "Edit Note..."
+                        : hasBody ? "Edit Comment..." : "Add Comment...",
+                };
+                commentItem.Click += (_, _) => vm.EditSelectedAnnotationComment();
+                menu.Items.Add(commentItem);
+            }
+            if (ann is TextMarkupAnnotation markup)
             {
                 var copyTextItem = new MenuItem { Header = "Copy Highlighted Text", InputGesture = new KeyGesture(Key.C, KeyModifiers.Control) };
                 copyTextItem.Click += (_, _) => vm.CopySelectedAnnotation();
                 menu.Items.Add(copyTextItem);
+                // Only offered when there is actually something to merge with; the Edit menu's
+                // copy is always there and explains itself with a toast.
+                if (vm.HasMergePartner(markup))
+                {
+                    var mergeItem = new MenuItem { Header = $"Merge Overlapping {Capitalise(MainWindowViewModel.MarkupNoun(markup))}s" };
+                    ToolTip.SetTip(mergeItem, "Combine this with every overlapping one of the same kind and colour into a single annotation.");
+                    mergeItem.Click += (_, _) => vm.MergeSelectedTextMarkup();
+                    menu.Items.Add(mergeItem);
+                }
             }
             else if (Annotation.IsCopyable(ann))
             {
@@ -570,6 +602,19 @@ public class ViewportPanel : Panel
 
     // Double-click frame zoom duration (ms) — gentler than the native 180ms zoom.
     private const double FrameZoomDurationMs = 320.0;
+
+    /// <summary>Double-click target: the comment dialog of the text markup under
+    /// <paramref name="screenPos"/>, via the VM's browse-click handler (which also selects it).
+    /// Returns false when nothing there is text markup, so the chain can go on to block framing.
+    /// Notes under the point are handled earlier, by the browse-drag branch. Browse mode only —
+    /// the release chain's annotation-mode branch runs before this is reached.</summary>
+    private bool TryEditMarkupCommentAt(Point screenPos)
+    {
+        if (ViewModel is not { } vm) return false;
+        var (pageX, pageY) = ScreenToGesturePage(screenPos);
+        if (vm.FindAnnotationAt(pageX, pageY) is not TextMarkupAnnotation) return false;
+        return vm.HandleBrowseClick((float)pageX, (float)pageY, isDoubleClick: true).Handled;
+    }
 
     private bool IsClick(Point pos)
     {

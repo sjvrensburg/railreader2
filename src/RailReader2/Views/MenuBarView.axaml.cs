@@ -162,6 +162,9 @@ public partial class MenuBarView : UserControl
     private void OnCopy(object? s, RoutedEventArgs e) => Vm?.CopySelection();
     private void OnPaste(object? s, RoutedEventArgs e) => Vm?.PasteAnnotation();
     private void OnDeleteAnnotation(object? s, RoutedEventArgs e) => Vm?.DeleteSelectedAnnotation();
+    private void OnEditComment(object? s, RoutedEventArgs e) => Vm?.EditSelectedAnnotationComment();
+    private void OnMergeSelectedHighlight(object? s, RoutedEventArgs e) => Vm?.MergeSelectedTextMarkup();
+    private void OnMergePageHighlights(object? s, RoutedEventArgs e) => Vm?.MergePageTextMarkup();
     private void OnCopyBlockAsLatex(object? s, RoutedEventArgs e)
     {
         if (Vm is { } vm) vm.FireAndForget(vm.CopyBlockAsLatex(), nameof(vm.CopyBlockAsLatex));

@@ -33,6 +33,14 @@
             <MenuItem Header="_Copy" InputGesture="Ctrl+C" Click="OnCopy" IsEnabled="{Binding HasDocument}" />
             <MenuItem Header="_Paste Annotation" InputGesture="Ctrl+V" Click="OnPaste" IsEnabled="{Binding HasDocument}" />
             <MenuItem Header="_Delete Annotation" InputGesture="Delete" Click="OnDeleteAnnotation" IsEnabled="{Binding HasDocument}" />
+            <MenuItem Header="Add/Edit Co_mment..." Click="OnEditComment" IsEnabled="{Binding HasDocument}" />
+            <MenuItem Header="Merge Overlapping _Highlights" IsEnabled="{Binding HasDocument}">
+                <MenuItem Header="_Selected Highlight" Click="OnMergeSelectedHighlight" />
+                <MenuItem Header="Whole _Page" Click="OnMergePageHighlights" />
+                <Separator />
+                <MenuItem Header="_Automatically When Drawing" ToggleType="CheckBox"
+                          IsChecked="{Binding AutoMergeTextMarkup, Mode=TwoWay}" />
+            </MenuItem>
             <Separator />
             <MenuItem Header="Copy Block as _LaTeX" InputGesture="Ctrl+L" Click="OnCopyBlockAsLatex" IsEnabled="{Binding CanVlmCopyBlock}" />
             <MenuItem Header="Copy Block as Mar_kdown" Click="OnCopyBlockAsMarkdown" IsEnabled="{Binding CanVlmCopyBlock}" />

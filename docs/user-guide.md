@@ -335,6 +335,14 @@ Annotations are drawn in a fixed z-order: highlights appear below freehand strok
 
 Text notes display as a compact folded-corner icon (16px). In browse mode, click the icon to expand a floating popup showing the full note text with word wrapping. Click again to collapse. Double-click or use the Text Note tool to edit.
 
+### Comments on highlights
+
+Any highlight, underline, strikethrough, or squiggle can carry a comment, like a sticky note attached to the marked text. In browse mode, **double-click** the highlight to open the same note editor used for text notes; or right-click it and choose **Add Comment...** (**Edit Comment...** once it has one), or use Edit > **Add/Edit Comment...** with the highlight selected. A highlight with a comment shows a small note icon at the end of its first line, and the comment pops up beside it while the highlight is selected. Clearing the text removes the comment. Rectangles and pen strokes take a comment the same way from the right-click menu. Comments appear in the side panel's **Comments** list and in the Markdown export, and are saved into the PDF as the annotation's contents, so other PDF readers show them too.
+
+### Merging overlapping highlights
+
+Highlighting the same passage twice, or extending a highlight by drawing over its end, leaves two overlapping annotations. Right-click one and choose **Merge Overlapping Highlights** to combine it with every highlight of the same kind and colour that it overlaps into a single annotation (the item only appears when there is something to merge with). Edit > **Merge Overlapping Highlights** does the same for the selected highlight, or for the **Whole Page** at once. Turn on **Automatically When Drawing** in that submenu to merge each new highlight into whatever it overlaps as you draw it. Every merge is one undo step. If two overlapping highlights carry different comments they are left alone — edit or clear one first. A reviewer's highlight that lives inside a read-only or signed PDF can't be merged, because the PDF can't be changed to remove it.
+
 ### Spell checking in notes
 
 The note editor used by Text Note and Text Box underlines misspelled words as you type. **Right-click** an underlined word for suggestions, **Add to Dictionary**, or **Ignore**; press `F7` to jump to the next misspelling and open the same menu. Single letters, all-caps abbreviations, words with digits, LaTeX commands, and URLs are skipped.
@@ -343,7 +351,7 @@ British and American English dictionaries are built in. Turn checking on or off 
 
 ### Select, move, and resize
 
-In **browse mode** (no annotation tool active), click on any annotation to select it (shown with a dashed blue outline). Drag a selected annotation to move it. Text markup (highlight, underline, strikethrough, squiggly) can be selected and deleted but not moved — it belongs to the text it was made on, so dragging over it pans the page as usual. For freehand annotations, 8 resize handles appear on the bounding box — drag a handle to scale proportionally. All move and resize actions support undo/redo.
+In **browse mode** (no annotation tool active), click on any annotation to select it (shown with a dashed blue outline). Drag a selected annotation to move it. Text markup (highlight, underline, strikethrough, squiggly) can be selected, deleted, commented on, and merged, but not moved — it belongs to the text it was made on, so dragging over it pans the page as usual. For freehand annotations, 8 resize handles appear on the bounding box — drag a handle to scale proportionally. All move and resize actions support undo/redo.
 
 ### Delete selected annotation
 
