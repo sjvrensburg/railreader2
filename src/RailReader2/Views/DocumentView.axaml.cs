@@ -54,7 +54,7 @@ public partial class DocumentView : UserControl, IViewportSurface
     // page's annotation set changes (add/remove); pan/zoom frames reuse it.
     private int _annoSortPage = -1;
     private object? _annoSortSource;
-    private int _annoSortCount = -1;
+    private List<Annotation>? _annoSortSnapshot; // the source's members, in order, at sort time
     private List<Annotation>? _annoSortResult;
 
     // Cache for the active search-match local index. Only changes on match
@@ -702,8 +702,8 @@ public partial class DocumentView : UserControl, IViewportSurface
                 {
                     if (pageAnnotations is { Count: > 1 }
                         && ReferenceEquals(pageAnnotations, _annoSortSource)
-                        && pageAnnotations.Count == _annoSortCount
-                        && vp.CurrentPage == _annoSortPage)
+                        && vp.CurrentPage == _annoSortPage
+                        && SameMembers(pageAnnotations, _annoSortSnapshot))
                     {
                         sorted = _annoSortResult;
                     }
@@ -711,14 +711,17 @@ public partial class DocumentView : UserControl, IViewportSurface
                     {
                         // Covers both the recompute path (Count > 1, cache miss) and the Count <= 1
                         // path (0 or 1 annotations need no sorting). Both must update the cache
-                        // fields — Core mutates pageAnnotations in place, so its reference survives
-                        // an add/delete, and a stale _annoSortCount left over from before a delete
-                        // can spuriously match again after a later add brings the count back up,
-                        // resurrecting a stale _annoSortResult that still has the deleted annotation
-                        // and lacks the new one.
+                        // fields. Core mutates pageAnnotations in place, so its reference survives
+                        // every edit; the hit test is therefore a reference-by-reference comparison
+                        // against a snapshot of the members, not the count — a merge of a new
+                        // highlight into one existing partner (Core 0.64.0 auto-merge) replaces one
+                        // object with another at the same count, and a count-keyed cache kept drawing
+                        // the removed highlight while the merged one (now the selection) was never
+                        // drawn, so no selection outline could match. O(n) references per frame
+                        // beats the sort it guards, and it needs no allocation on a hit.
                         sorted = pageAnnotations is { Count: > 1 } ? AnnotationRenderer.SortByZOrder(pageAnnotations) : pageAnnotations;
                         _annoSortSource = pageAnnotations;
-                        _annoSortCount = pageAnnotations?.Count ?? -1;
+                        _annoSortSnapshot = pageAnnotations is null ? null : [.. pageAnnotations];
                         _annoSortPage = vp.CurrentPage;
                         _annoSortResult = sorted;
                     }
@@ -740,6 +743,15 @@ public partial class DocumentView : UserControl, IViewportSurface
             // Same effect the page layer is drawn with (BuildPageState), so the highlight blend
             // always matches the backdrop actually underneath it.
             DarkBackdrop: AnnotationRenderer.IsDarkBackdrop(vm.Controller.ActiveColourEffect));
+    }
+
+    /// <summary>Same objects in the same order (reference equality) — the sort-cache hit test.</summary>
+    private static bool SameMembers(List<Annotation> live, List<Annotation>? snapshot)
+    {
+        if (snapshot is null || snapshot.Count != live.Count) return false;
+        for (int i = 0; i < live.Count; i++)
+            if (!ReferenceEquals(live[i], snapshot[i])) return false;
+        return true;
     }
 
     private SearchRenderState BuildSearchState(TabViewModel? tab)
