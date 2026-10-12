@@ -175,6 +175,7 @@ public sealed partial class MainWindowViewModel
         // an eraser click, or a highlight-tool click that dragged nothing shouldn't pay for.
         _controller.Annotations.AutoMergeTextMarkup =
             AutoMergeTextMarkup
+            && AnnotationInteractionHandler.IsTextMarkupTool(ActiveTool)
             && _controller.Annotations.PreviewAnnotation is TextMarkupAnnotation
             && _controller.FocusedViewport is { } vpUp
             && IsAnnotationStorageInPdf(vpUp.Owner);
