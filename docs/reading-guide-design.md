@@ -1,6 +1,6 @@
 # Reading guide — pointer-driven word and line focus at low magnification (design)
 
-**Status:** Proposed, 2026-10-13 — Phase 0 needs RailReaderCore (word index + hit-tester); Phases 1–3 are shell-side
+**Status:** Phase 0 implemented in RailReaderCore 0.65.0 (`WordIndex`, `ReadingGuideHitTester`; issue #136), 2026-10-13; Phases 1–3 (shell) pending
 **Author:** drafted with Claude Code, 2026-10-13
 **Related roadmap item:** "Make RailReader2 useful to readers who use only low magnification (1.25–2×)" — rail reading *and* help focusing on the immediately important content
 
@@ -71,8 +71,8 @@ While Shift is held and the pointer is over a document view:
 Behavioural constraints that make it feel like a ruler rather than a jitter:
 
 - **Vertical hysteresis.** The current line only changes when the pointer's Y leaves the current line's band expanded by a dead zone (proposed: 60 % of line height on each side); then the nearest line by centre wins. Moving along a line with an unsteady hand never flickers to a neighbour.
-- **Horizontal freedom.** Inside the line's horizontal extent the word under X is lit. Outside it (pointer in the margin or in the gutter between columns) the line stays lit with no word — this is the "rest the hand in the margin and slide down" ruler behaviour, with no setting.
-- **Line ends stick.** Past the right end of a line the last word stays lit until the pointer actually moves to another line's band.
+- **Horizontal freedom.** Inside the *block's* horizontal extent (± a small tolerance) the word under X — or the nearest word on the line — is lit. Outside it (pointer in the margin or in the gutter between columns) the line stays lit with no word — this is the "rest the hand in the margin and slide down" ruler behaviour, with no setting.
+- **Line ends stick.** Past the ragged right end of a line (still inside the block) the nearest word is the last one, so it stays lit until the pointer actually moves to another line's band.
 - **Column awareness.** Candidate lines are those of blocks whose horizontal extent contains the pointer X (with a tolerance); only if none qualifies does the nearest block take over. This stops a two-column page from snapping to the other column's line at the same Y.
 
 ### 3.5 Relationship to rail mode
@@ -127,7 +127,7 @@ void Clear()
 
 - Candidate blocks: those whose bbox horizontal extent contains `pageX` ± tolerance; else all blocks. Non-navigable roles (page headers/footers, page numbers) are excluded by the same `NavigableRoles` set rail uses, so the guide never lands on furniture.
 - Line choice: keep the current line while `pageY` lies inside its band expanded by `dead_zone × height`; otherwise the candidate line with the nearest centre.
-- Word choice: if `pageX` is within the line's `[X, X+Width]`, the word whose `[Left, Right]` contains it, else the nearest word in that line; if outside the line's extent, `null`. "Line ends stick" falls out of the hysteresis plus the nearest-word rule.
+- Word choice: if `pageX` is within the block's extent (± tolerance), the word whose `[Left, Right]` contains it, else the nearest word on that line; outside the block's extent, `null`. "Line ends stick" falls out of the hysteresis plus the nearest-word rule.
 - Degradation: `words == null` (no text layer) → line-only positions. Lines come from whichever analyser produced the `PageAnalysis` — the ONNX models, the model-free `TextLayoutAnalyzer`, or `LineDetector`'s pixel-projection fallback for a scan with OCR off — so the hit-tester has no model dependency at all.
 
 Cost per pointer move: a linear scan over the page's blocks and the candidate block's lines plus a binary search over one line's words — microseconds.
@@ -157,7 +157,7 @@ Phase 1 is useful on its own; Phase 2 is where the "help focusing on the immedia
 
 ## 7. Risks & open questions
 
-- **Rotated views.** Block lines come from analysis re-run in the rotated frame, but `PageText.CharBoxes` are in the page's own frame. The word index must map boxes through `ViewRotation` (or the guide runs line-only while rotated, as annotations are locked out while rotated). Decide in Phase 0.
+- **Rotated views.** Block lines come from analysis re-run in the rotated frame, but `PageText.CharBoxes` are in the page's own frame. **Decided (2026-10-13): the guide runs line-only while rotated** (the shell passes `words: null`), matching the annotation lockout while rotated. Mapping boxes through `ViewRotation` is a possible later refinement.
 - **Maths-heavy text.** An inline equation is a run of glyph boxes with odd spacing; whitespace splitting may yield one giant "word" or many fragments. Acceptable for v1 (the line highlight still carries the position); a max-word-width cap that splits on large gaps is a cheap refinement.
 - **Hyphenation / ligatures.** A hyphenated word is two words on two lines — correct for a place-keeper. Ligature glyphs map to one `CharBox` for several characters; the index handles this since it walks boxes by `Index`, not by string position.
 - **Continuous scroll.** Hover already resolves to the page under the pointer; the guide needs that page's analysis (background read-ahead usually has it). A page without analysis gets no guide and a one-line hint, not a stale one.
