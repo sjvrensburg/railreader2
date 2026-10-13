@@ -591,13 +591,21 @@ public partial class DocumentView : UserControl, IViewportSurface
     private ReadingGuideRenderState BuildGuideState()
     {
         var vm = _shared;
-        if (vm is null || _viewport is not { } vp || !vm.TryGetGuide(vp, out var pos) || vp.Rail.VisualsVisible)
-            return new ReadingGuideRenderState(SKMatrix.Identity, null, null, 0f, SKColors.Transparent, SKColors.Transparent, 1f);
+        var empty = new ReadingGuideRenderState(SKMatrix.Identity, null, null, 0f, SKColors.Transparent, SKColors.Transparent, 1f);
+        if (vm is null || _viewport is not { } vp) return empty;
         var palette = vm.Controller.ActiveColourEffect.GetOverlayPalette();
         var tint = vm.AppConfig.LineHighlightTint;
         double opacity = vm.AppConfig.LineHighlightOpacity;
         var lineColor = palette.ResolveLineHighlight(tint, opacity).ToSKColor();
         var wordColor = palette.ResolveLineHighlight(tint, Math.Min(1.0, Math.Max(opacity * 2.0, 0.45))).ToSKColor();
+        if (vp.Rail.VisualsVisible)
+        {
+            // Rail draws its own line; the layer contributes only the optional steering word marker (§11).
+            return vm.TryGetRailWordMarker(vp, out var marker)
+                ? new ReadingGuideRenderState(BuildCamera(vp), null, marker, 0f, SKColors.Transparent, wordColor, (float)vp.Camera.Zoom)
+                : empty;
+        }
+        if (!vm.TryGetGuide(vp, out var pos)) return empty;
         return new ReadingGuideRenderState(
             BuildCamera(vp), pos.LineRect, vm.ReadingGuidePrefs.WordHighlight ? pos.WordRect : null,
             (float)vm.AppConfig.LinePadding, lineColor, wordColor, (float)vp.Camera.Zoom);

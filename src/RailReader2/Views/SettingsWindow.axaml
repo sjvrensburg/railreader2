@@ -164,7 +164,7 @@
                         <TextBlock Classes="section" Text="Reading Guide" />
                         <Separator />
                         <TextBlock Classes="hint"
-                                   Text="With the reading guide on (toolbar, Rail menu, or K), hold Shift and nudge the pointer: the guide flows word by word through the text at your reading pace and the page only scrolls when the guide nears the edge. Click a word to start there." />
+                                   Text="With the reading guide on (toolbar, Rail menu, or K), hold Shift and nudge the pointer: the guide flows word by word through the text at your reading pace and the page only scrolls when the guide nears the edge. Click a word to start there. In rail mode the same nudge scrolls the rail along the line." />
                         <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto,8,Auto">
                             <TextBlock Grid.Row="0" Grid.Column="0" Text="Follow the pointer:" VerticalAlignment="Center" />
                             <ComboBox Grid.Row="0" Grid.Column="2" Name="GuideFollowCombo" Width="220"
@@ -178,6 +178,11 @@
                                       IsCheckedChanged="OnGuideWordChanged" />
                         </Grid>
                         <Border Classes="advblock adv">
+                            <StackPanel Spacing="8">
+                                <CheckBox Name="GuideRailWordCheck"
+                                          Content="In rail mode, also mark the word being read while steering"
+                                          ToolTip.Tip="Above the rail zoom threshold the same Shift-and-nudge steers the rail itself. This adds a moving word marker on the rail line; off by default because it distracts some readers."
+                                          IsCheckedChanged="OnGuideRailWordChanged" />
                             <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto">
                                 <TextBlock Grid.Column="0" Text="Line stickiness (point modes):" VerticalAlignment="Center"
                                            ToolTip.Tip="Point modes only: how far the pointer may stray above or below the current line (in line heights) before the guide moves to the next one. Steer pace follows the Reading Pace preset." />
@@ -185,6 +190,7 @@
                                         Value="0.6" MinWidth="120"
                                         PropertyChanged="OnGuideDeadZoneChanged" />
                             </Grid>
+                            </StackPanel>
                         </Border>
 
                         <TextBlock Classes="section" Text="Pages" />

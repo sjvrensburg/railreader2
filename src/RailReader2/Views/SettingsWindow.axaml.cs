@@ -831,7 +831,15 @@ public partial class SettingsWindow : Window
             _ => 2,
         };
         GuideWordCheck.IsChecked = p.WordHighlight;
+        GuideRailWordCheck.IsChecked = p.RailWordMarker;
         GuideDeadZoneSlider.Value = p.DeadZone;
+    }
+
+    private void OnGuideRailWordChanged(object? sender, RoutedEventArgs e)
+    {
+        if (Vm is not { } vm || _loading) return;
+        vm.ReadingGuidePrefs.RailWordMarker = GuideRailWordCheck.IsChecked == true;
+        vm.OnReadingGuidePrefsChanged();
     }
 
     private void OnGuideFollowChanged(object? sender, SelectionChangedEventArgs e)

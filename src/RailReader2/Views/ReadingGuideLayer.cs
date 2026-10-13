@@ -55,7 +55,7 @@ internal sealed class ReadingGuideVisualHandler : CompositionCustomVisualHandler
     public override void OnRender(ImmediateDrawingContext context)
     {
         var state = _state;
-        if (state?.LineRect is not { } line) return;
+        if (state is null || (state.LineRect is null && state.WordRect is null)) return;
 
         if (context.TryGetFeature(typeof(ISkiaSharpApiLeaseFeature)) is not ISkiaSharpApiLeaseFeature leaseFeature)
             return;
@@ -66,9 +66,13 @@ internal sealed class ReadingGuideVisualHandler : CompositionCustomVisualHandler
         canvas.Concat(state.Camera);
 
         // Line band: same geometry as the rail line highlight (OverlayRenderer), padding in line heights.
-        float pad = line.Height * state.LinePadding;
-        _paint.Color = state.LineColor;
-        canvas.DrawRect(SKRect.Create(line.Left, line.Top - pad, line.Width, line.Height + pad * 2), _paint);
+        // Absent for the rail word marker (§11), where the rail draws the line itself.
+        if (state.LineRect is { } line)
+        {
+            float pad = line.Height * state.LinePadding;
+            _paint.Color = state.LineColor;
+            canvas.DrawRect(SKRect.Create(line.Left, line.Top - pad, line.Width, line.Height + pad * 2), _paint);
+        }
 
         if (state.WordRect is { } word)
         {
