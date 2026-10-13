@@ -597,7 +597,8 @@ public partial class DocumentView : UserControl, IViewportSurface
         var tint = vm.AppConfig.LineHighlightTint;
         double opacity = vm.AppConfig.LineHighlightOpacity;
         var lineColor = palette.ResolveLineHighlight(tint, opacity).ToSKColor();
-        var wordColor = palette.ResolveLineHighlight(tint, Math.Min(1.0, Math.Max(opacity * 2.0, 0.45))).ToSKColor();
+        // The word is an outline (ReadingGuideLayer), so it can be strong without touching the glyphs' contrast.
+        var wordColor = palette.ResolveLineHighlight(tint, Math.Min(1.0, Math.Max(opacity * 2.0, 0.8))).ToSKColor();
         if (vp.Rail.VisualsVisible)
         {
             // Rail draws its own line; the layer contributes only the optional steering word marker (§11).

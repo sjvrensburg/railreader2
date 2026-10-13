@@ -299,6 +299,9 @@ public sealed partial class MainWindowViewModel
             // The pointer resting on a word of the current line: read from that word (the camera eases to
             // centre it); elsewhere, continue from where the rail is.
             vp.Rail.TrySeatSteerReadingPointAt(s.PointerX, s.PointerY);
+            // A line step is a camera snap here, so repeat more slowly than the word guide's line stepping.
+            s.Steer.MinLinesPerSecond = 0.6;
+            s.Steer.MaxLinesPerSecond = 2.0;
             s.RailSteering = true;
             s.Steer.Engage(s.ScreenX, s.ScreenY);
             RequestAnimationFrame();
@@ -313,6 +316,8 @@ public sealed partial class MainWindowViewModel
             if (s.Position is null) return; // no analysis yet (toasted) — try again on the next Shift press
         }
         var cfg = _controller.Config;
+        s.Steer.MinLinesPerSecond = 0.8;
+        s.Steer.MaxLinesPerSecond = 3.0;
         s.Steer.MinCharsPerSecond = Math.Max(1.0, cfg.ScrollSpeedStart * CharsPerSecondPerScrollSpeed);
         s.Steer.MaxCharsPerSecond = Math.Max(s.Steer.MinCharsPerSecond, cfg.ScrollSpeedMax * CharsPerSecondPerScrollSpeed);
         s.Steer.Engage(s.ScreenX, s.ScreenY);
