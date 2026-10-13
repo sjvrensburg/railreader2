@@ -1,6 +1,6 @@
 # Reading guide — pointer-driven word and line focus at low magnification (design)
 
-**Status:** Phase 0 implemented in RailReaderCore 0.65.0 (`WordIndex`, `ReadingGuideHitTester`; issue #136), 2026-10-13; Phases 1–3 (shell) pending
+**Status:** Phase 0 implemented on RailReaderCore branch `feat/reading-guide-phase0` (not yet merged to `main`) (`WordIndex`, `ReadingGuideHitTester`, `ReadingGuidePosition`; commit `3bbfbf8`, slated for the **unreleased** 0.65.0 — the app still pins 0.64.2; issue #136 stays open until the shell lands), 2026-10-13; Phases 1–3 (shell) pending
 **Author:** drafted with Claude Code, 2026-10-13
 **Related roadmap item:** "Make RailReader2 useful to readers who use only low magnification (1.25–2×)" — rail reading *and* help focusing on the immediately important content
 
@@ -42,7 +42,7 @@ Rather than build a third rail variant, the decision (user, 2026-10-13) is a **p
 
 - **Toolbar**: a third pointer-mode toggle beside **Browse** and **Text-Select** in `ToolBarView` (the three form a radio group, as Browse/Text-Select do today). Icon: a Lucide glyph suggesting a pointer over text (e.g. `text-cursor` / `scan-line`), converted to a `StreamGeometry` per the icon recipe.
 - **Menu**: Rail ▸ **Reading Guide** (checkable), mirroring the toolbar.
-- **Shortcut**: `A` — free (plain `A`, `K`, `N` are the unbound letters; `G` is Go-to-page), and it sits under the left hand that also holds Shift. `Escape` leaves the mode like every other modal state.
+- **Shortcut**: `K` — free (plain `K` and `N` are the only unbound letters; `A` is **not** free — rail mode binds WASD, `A`/`D` = line left/right in `MainWindow.TryHandleKey`, and `G` is Go-to-page). `Escape` leaves the mode like every other modal state.
 - Entering the mode clears any text selection; annotation tools are unavailable while it is on (it is a pointer mode, same exclusivity as Text-Select). Left-drag still pans the page, wheel still scrolls/zooms.
 
 ### 3.2 Following (Shift held)
@@ -57,7 +57,7 @@ While Shift is held and the pointer is over a document view:
 ### 3.3 Parked (Shift released)
 
 - The guide stays exactly where it was. Its position is **page-anchored** (block/line/word indices on a page), so wheel scrolling moves the text and the highlight together.
-- A parked guide survives zoom changes, page re-renders and analysis refreshes for that page (re-resolved by index; if the page's analysis is replaced and the indices no longer exist, the guide clears rather than pointing at the wrong line).
+- A parked guide survives zoom changes, page re-renders and analysis refreshes for that page. Re-resolution by index is **shell work**: Core's `ReadingGuideHitTester.Resolve` is point-based and forgets its hysteresis on a new `PageAnalysis` instance, so the shell re-reads `(BlockIndex, LineIndex, WordIndex)` against the new analysis (`Blocks[b].Lines[l]`, `WordIndex.For(analysis, text).WordsOf(b, l)`) to refresh the rects; if the indices no longer exist, the guide clears rather than pointing at the wrong line.
 - Changing page clears it. Leaving the mode clears it.
 
 ### 3.4 What is drawn
@@ -88,13 +88,14 @@ Following acts on the **view under the pointer**, not `FocusedViewport` — hove
 **Transient, per viewport** (never persisted):
 
 ```
-ReadingGuidePosition(
-    int Page,
+ReadingGuidePosition(                 // Core record struct (RailReader.Core.Models) — carries no page
     int BlockIndex,          // index into PageAnalysis.Blocks (page-level, not navigable-subset)
-    int LineIndex,           // index into block.Lines
-    int? WordIndex,          // index into the line's word list; null = margin / no word
-    RectF LineRect, RectF? WordRect)   // page points, rotation-aware display frame
+    int LineIndex,           // index into block.Lines (0 for a block with no lines = whole block)
+    int? WordIndex,          // index into WordIndex.WordsOf(block, line); null = margin / no word
+    RectF LineRect, RectF? WordRect)   // page points, displayed frame (matches the analysis)
 ```
+
+The shell's per-viewport `GuideState` wraps it with the `Page` it belongs to (and the last pointer point, for re-resolving on Shift-down with a still pointer).
 
 **Preferences**, app-side sidecar `ConfigDir/reading_guide_prefs.json` (`Services/ReadingGuidePreferences.cs`, same `JsonSidecar` pattern as `PortalPreferences` — Core's `AppConfig` is a NuGet type we don't extend):
 
@@ -114,9 +115,9 @@ Two small, portable, testable pieces (filed as a Core issue; see Phasing):
 
 **`WordIndex`** — built lazily per `(PageAnalysis, PageText)` and cached on the analysis:
 
-- Words are maximal runs of non-whitespace characters in `PageText.Text`, mapped to their `CharBox`es by `CharBox.Index`; a word's rect is the union of its boxes. A run with no boxes (synthetic whitespace, control chars) is skipped.
-- Each word is assigned to the block line whose vertical band contains the word's centre and whose block bbox contains its centre X; words matching no line attach to the nearest line of the containing block. Per line, words are sorted by `Left`.
-- Exposes `IReadOnlyList<WordSpan> WordsOf(block, line)` where `WordSpan(int Start, int Length, RectF Rect)`.
+- Words are runs of glyphs walked in `CharBox.Index` order (over `PageText.DedupedCharBoxes`, so fake-bold duplicates drop out), broken by a whitespace character in `PageText.Text` between consecutive glyphs (boxless whitespace included), by a glyph whose vertical band no longer overlaps the previous one, or by a glyph starting more than a glyph-height to the left of the previous one (line breaks a producer emitted without whitespace). A word's rect is the union of its boxes; a ligature is one box inside its word.
+- Each word goes to the block whose bbox contains its centre (smallest when blocks overlap), then to that block's line whose vertical band contains the centre, else the nearest line by centre; a word in no block is **dropped** (the guide never highlights text the layout did not claim). Per line, words are sorted by `Left`.
+- Exposes `IReadOnlyList<WordSpan> WordsOf(blockIndex, lineIndex)` where `WordSpan(int Start, int Length, RectF Rect)`, plus `TextOf(word)`. `WordIndex.For(analysis, text)` is the cached entry point (`ConditionalWeakTable` keyed on the analysis instance; rebuilt if the `PageText` changes), `Build` the uncached one.
 
 **`ReadingGuideHitTester`** — stateful per viewport (it owns the hysteresis):
 
@@ -125,7 +126,7 @@ ReadingGuidePosition? Resolve(float pageX, float pageY, PageAnalysis analysis, W
 void Clear()
 ```
 
-- Candidate blocks: those whose bbox horizontal extent contains `pageX` ± tolerance; else all blocks. Non-navigable roles (page headers/footers, page numbers) are excluded by the same `NavigableRoles` set rail uses, so the guide never lands on furniture.
+- Candidate blocks: those whose bbox horizontal extent contains `pageX` ± tolerance (`ColumnToleranceFraction`, 5 % of block width); else all blocks. Non-navigable roles (page headers/footers, page numbers) are excluded via the tester's `NavigableRoles` property — which **defaults to `DefaultRoleSets.Navigable`, not the user's configured set**; the shell must assign `AppConfig.NavigableRoles` at construction and again from `OnConfigChanged`, or a role the user removed in Settings ▸ Analysis still captures the guide.
 - Line choice: keep the current line while `pageY` lies inside its band expanded by `dead_zone × height`; otherwise the candidate line with the nearest centre.
 - Word choice: if `pageX` is within the block's extent (± tolerance), the word whose `[Left, Right]` contains it, else the nearest word on that line; outside the block's extent, `null`. "Line ends stick" falls out of the hysteresis plus the nearest-word rule.
 - Degradation: `words == null` (no text layer) → line-only positions. Lines come from whichever analyser produced the `PageAnalysis` — the ONNX models, the model-free `TextLayoutAnalyzer`, or `LineDetector`'s pixel-projection fallback for a scan with OCR off — so the hit-tester has no model dependency at all.
@@ -161,7 +162,7 @@ Phase 1 is useful on its own; Phase 2 is where the "help focusing on the immedia
 - **Maths-heavy text.** An inline equation is a run of glyph boxes with odd spacing; whitespace splitting may yield one giant "word" or many fragments. Acceptable for v1 (the line highlight still carries the position); a max-word-width cap that splits on large gaps is a cheap refinement.
 - **Hyphenation / ligatures.** A hyphenated word is two words on two lines — correct for a place-keeper. Ligature glyphs map to one `CharBox` for several characters; the index handles this since it walks boxes by `Index`, not by string position.
 - **Continuous scroll.** Hover already resolves to the page under the pointer; the guide needs that page's analysis (background read-ahead usually has it). A page without analysis gets no guide and a one-line hint, not a stale one.
-- **Shift collisions.** Shift+drag constrains annotation shapes — not reachable in this mode. Shift+arrows are rail-only. Shift+wheel (horizontal scroll on some platforms) should keep working: following is about pointer *moves*, so wheel events pass through untouched.
+- **Shift collisions.** Shift+drag constrains annotation shapes — not reachable in this mode. Shift+arrows are rail-only. Shift+wheel (horizontal scroll on some platforms) should keep working: following is about pointer *moves*, so wheel events pass through untouched. **Shift chords are the real hazard**: `Shift+H/G/T/E` (semantic jumps), `Shift+O/B/I` (panes), `Shift+D` (debug overlay), `Shift+Z` (redo), `Shift+M`, `Shift+R` all begin with a Shift-down that §5.2 treats as "start following" — the parked guide would jump to wherever the pointer happens to rest, then re-park there on release. Rule: Shift-down only re-resolves when the pointer is over a document view, and a non-Shift key pressed while Shift is held cancels the follow and restores the position parked before the chord.
 - **Hidden cursor edge cases.** The cursor must be restored on every exit path (Shift up, pointer exit, mode exit, window deactivation, tab switch). A stuck hidden cursor is a bug class worth a dedicated test checklist.
 - **Touchpad without a mouse.** Holding Shift and dragging a finger on a touchpad is fine; a tap would be a click (pan start/end, harmless).
 - **Open:** should the word highlight use the line tint or a fixed accent? Should `follow: always` hide the cursor too (probably not — the pointer then also serves normal clicking)?
