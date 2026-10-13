@@ -135,7 +135,7 @@ Cost per pointer move: a linear scan over the page's blocks and the candidate bl
 
 ### 5.2 Shell (RailReader2)
 
-- **Mode**: `MainWindowViewModel.IsReadingGuideMode` + `ReadingGuidePreferences`; `ToolBarView` third toggle; `MenuBarView` item; `MainWindow.TryHandleKey` binds `A` and the `Escape` exit; `ViewportPanel` cursor table gets the mode.
+- **Mode**: `MainWindowViewModel.IsReadingGuideMode` + `ReadingGuidePreferences`; `ToolBarView` third toggle; `MenuBarView` item; `MainWindow.TryHandleKey` binds `K` and the `Escape` exit; `ViewportPanel` cursor table gets the mode.
 - **Input**: `ViewportPanel.OnPointerMoved` → if mode && (Shift || follow-always) → `ResolveHoverPoint(pos)` → `vm.UpdateReadingGuide(surface, page, pageX, pageY)` → controller/Core hit-test → per-viewport `GuideState`. `MainWindow` forwards Shift `KeyDown`/`KeyUp` so a press with a still pointer re-resolves and a release parks. `PointerExited` parks (and restores the cursor) without clearing.
 - **Rendering**: a new `ReadingGuideLayer : CompositionLayerControl<ReadingGuideVisualHandler>` in `DocumentView`, between `SearchHighlightLayer` and `RailOverlayLayer`. State = `(camera, page, LineRect, WordRect?, tint, opacities, padding, effect)`, pushed via `SendHandlerMessage` only when the position or camera changes. Two `DrawRect` calls; no `SaveLayer`, no image filters.
 - **Dim / aperture**: `DocumentView.BuildPageState` already takes `LineY/LineH` from the rail; with the guide active and rail not drawing, it takes them from the guide position instead. Phase 2 replaces the single band with the aperture description.

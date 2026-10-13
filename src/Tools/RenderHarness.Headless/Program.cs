@@ -225,6 +225,7 @@ foreach (var shot in config.Shots)
 
     int? annotatedPage = null;
     (float Cx, float Cy)? annotCenter = null;
+    RailReader2.Services.ReadingGuideFollow? guidePrevFollow = null;
     TabViewModel? tab = null;
     try
     {
@@ -383,6 +384,20 @@ foreach (var shot in config.Shots)
             Pump(10);
         }
 
+        // Reading guide: pointer mode + a virtual pointer at the requested page fraction. Drives the
+        // VM exactly as ViewportPanel would (TrackGuidePointer), under a temporary follow-always
+        // preference that is NOT saved (the sidecar only writes through OnReadingGuidePrefsChanged).
+        if (shot.GuideX > 0 && shot.GuideY > 0)
+        {
+            var prefs = vm.ReadingGuidePrefs;
+            guidePrevFollow = prefs.Follow;
+            prefs.Follow = RailReader2.Services.ReadingGuideFollow.Always;
+            vm.IsReadingGuideMode = true;
+            Pump(4);
+            vm.TrackGuidePointer(tab.Viewport, shot.GuideX * tab.State.PageWidth, shot.GuideY * tab.State.PageHeight);
+            Pump(8);
+        }
+
         Pump(12);
 
         var frame = window.CaptureRenderedFrame()
@@ -408,6 +423,12 @@ foreach (var shot in config.Shots)
     }
     finally
     {
+        // Leave reading-guide mode and restore the follow preference (never saved) after a guide shot.
+        if (guidePrevFollow is { } prevFollow)
+        {
+            vm.IsReadingGuideMode = false;
+            vm.ReadingGuidePrefs.Follow = prevFollow;
+        }
         // Never let injected demo annotations leak into the user's store or later shots.
         if (annotatedPage is { } ap && tab is not null && tab.State.Annotations.Pages.TryGetValue(ap, out var l))
             l.Clear();

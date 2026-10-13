@@ -6,6 +6,7 @@
     <!-- Lucide icon geometries (24x24 viewBox, stroked). Converted from lucide.dev (ISC). -->
     <StreamGeometry x:Key="IconBrowse">M18 11V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2 M0 0 M14 10V4a2 2 0 0 0-2-2a2 2 0 0 0-2 2v2 M0 0 M10 10.5V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2v8 M0 0 M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15</StreamGeometry>
     <StreamGeometry x:Key="IconTextSelect">M17 22h-1a4 4 0 0 1-4-4V6a4 4 0 0 1 4-4h1 M0 0 M7 22h1a4 4 0 0 0 4-4 M0 0 M7 2h1a4 4 0 0 1 4 4</StreamGeometry>
+    <StreamGeometry x:Key="IconReadingGuide">M3 7V5a2 2 0 0 1 2-2h2 M0 0 M17 3h2a2 2 0 0 1 2 2v2 M0 0 M21 17v2a2 2 0 0 1-2 2h-2 M0 0 M7 21H5a2 2 0 0 1-2-2v-2 M0 0 M7 8h8 M0 0 M7 12h10 M0 0 M7 16h6</StreamGeometry>
     <StreamGeometry x:Key="IconCopy">M10,8 H20 A2,2 0 0 1 22,10 V20 A2,2 0 0 1 20,22 H10 A2,2 0 0 1 8,20 V10 A2,2 0 0 1 10,8 Z M0 0 M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2</StreamGeometry>
     <StreamGeometry x:Key="IconAnnotate">M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7 M0 0 M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z</StreamGeometry>
     <StreamGeometry x:Key="IconHighlight">m9 11-6 6v3h9l3-3 M0 0 m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4</StreamGeometry>

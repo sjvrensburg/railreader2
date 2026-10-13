@@ -44,6 +44,7 @@ public partial class ToolBarView : UserControl
 
         BrowseButton.Click += (_, _) => _vm?.SetAnnotationTool(AnnotationTool.None);
         SelectButton.Click += (_, _) => _vm?.SetAnnotationTool(AnnotationTool.TextSelect);
+        GuideButton.Click += (_, _) => _vm?.ToggleReadingGuideMode();
         CopyButton.Click += (_, _) => _vm?.CopySelectedText();
         RailHereButton.Click += (_, _) => _vm?.ToggleArmActivateRailClick();
         AnnotateButton.Click += (_, _) => _vm?.ToggleAnnotationMode();
@@ -101,6 +102,9 @@ public partial class ToolBarView : UserControl
             case nameof(MainWindowViewModel.IsViewRotated):
                 UpdateModeState();
                 break;
+            case nameof(MainWindowViewModel.IsReadingGuideMode):
+                UpdateToggleState();
+                break;
             case nameof(MainWindowViewModel.ArmActivateRailClick):
                 UpdateRailHereState();
                 break;
@@ -146,8 +150,10 @@ public partial class ToolBarView : UserControl
     {
         if (_vm is null) return;
         var t = _vm.ActiveTool;
-        BrowseButton.IsChecked = t == AnnotationTool.None;
+        bool guide = _vm.IsReadingGuideMode;
+        BrowseButton.IsChecked = t == AnnotationTool.None && !guide;
         SelectButton.IsChecked = t == AnnotationTool.TextSelect;
+        GuideButton.IsChecked = guide;
         HighlightButton.IsChecked = t == AnnotationTool.Highlight;
         UnderlineButton.IsChecked = t == AnnotationTool.Underline;
         StrikeButton.IsChecked = t == AnnotationTool.StrikeOut;

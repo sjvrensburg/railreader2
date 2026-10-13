@@ -24,6 +24,9 @@
             <v:PdfPageLayer Name="PageLayer" />
             <v:SearchHighlightLayer Name="SearchLayer" />
             <v:AnnotationLayer Name="AnnotationLayer" />
+            <!-- Pointer-driven reading guide (word + line under the pointer), below the rail overlay so a
+                 rail line highlight drawn at rail zoom sits above it. -->
+            <v:ReadingGuideLayer Name="GuideLayer" />
             <v:RailOverlayLayer Name="OverlayLayer" />
             <!-- Table freeze-panes: rows above + columns left of the frozen cell, pinned over the page.
                  Above the overlay so the table focus-dim doesn't dim the frozen tiles. -->

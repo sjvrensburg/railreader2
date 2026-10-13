@@ -357,6 +357,7 @@ public sealed partial class MainWindowViewModel
     /// <c>DocumentView</c> on close of a split pane / tear-off that still has its layer attached.</summary>
     internal IReadOnlyList<SKImage> TakeFreezeCrops(Viewport vp)
     {
+        DropGuideState(vp); // same per-viewport teardown path: the reading guide's state goes with the view
         var imgs = new List<SKImage>();
         if (_freezeByVp.Remove(vp, out var f))
         {
@@ -374,6 +375,7 @@ public sealed partial class MainWindowViewModel
     /// another tab, so its layer no longer references these crops).</summary>
     internal void DisposeFreezeFor(Viewport vp)
     {
+        DropGuideState(vp);
         if (_freezeByVp.Remove(vp, out var f))
         {
             f.Corner?.Dispose(); f.Top?.Dispose(); f.Left?.Dispose();
@@ -401,6 +403,7 @@ public sealed partial class MainWindowViewModel
             f.Corner?.Dispose(); f.Top?.Dispose(); f.Left?.Dispose();
         }
         _freezeByVp.Clear();
+        _guideByVp.Clear();
         foreach (var list in _freezeRetired.Values)
             foreach (var img in list) img.Dispose();
         _freezeRetired.Clear();

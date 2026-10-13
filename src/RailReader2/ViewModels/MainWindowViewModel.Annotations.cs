@@ -34,6 +34,9 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
+        // Any tool other than Browse displaces the reading guide (it is a pointer mode too).
+        if (tool != AnnotationTool.None && IsReadingGuideMode) IsReadingGuideMode = false;
+
         // Picking a real annotation tool implies annotation mode; Browse/TextSelect do not.
         if (tool is not AnnotationTool.None and not AnnotationTool.TextSelect)
             IsAnnotationMode = true;

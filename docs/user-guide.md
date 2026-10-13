@@ -155,6 +155,12 @@ Click on any detected block in rail mode to jump directly to it. The view snaps 
 
 You don't have to zoom past the threshold to rail-read. Press `R` (or **Rail > Start Rail Here**) to start rail mode on the block nearest the centre of the view at your current zoom — the camera doesn't lurch to a higher magnification. To choose the starting block yourself, click the **Start rail here** button on the toolbar, then click where you want to begin. Press `R` again or `Escape` to leave.
 
+### Reading guide (pointer-driven, any zoom)
+
+If you read at low magnification (around 1.25–2×) and don't want the page to move at all, use the **reading guide** instead of rail mode. Turn it on with the **Reading guide** toolbar button (beside Browse and Text Select), **Rail > Reading Guide**, or `K`. Then hold `Shift` and move the pointer over the text: the **word** under the pointer and its **line** are marked, snapped to the detected text so an unsteady hand never flickers between lines. Rest the pointer in the margin to mark just the line, like a reading ruler. Release `Shift` and the guide **parks** where it is, anchored to the page, so you can scroll with the wheel and it moves with the text. The mouse cursor is hidden while you hold `Shift` — the highlight is the cursor.
+
+The guide uses the same line highlight colour and **Dim the other lines** setting as rail mode (Settings > Reading > Current Line), so turning the dim on quiets the rest of the page around the guide line. In Settings > Reading > **Reading Guide** you can make the guide follow the pointer **always** (no key to hold; the cursor stays visible) and switch the word marking off. The advanced view adds **Line stickiness**, how far the pointer may stray before the guide moves to the next line. Press `K` or `Escape` to leave the mode. On a scanned page without a text layer, or while the view is rotated, the guide marks lines only.
+
 ### Horizontal scrolling
 
 Holding `Right`/`D` scrolls horizontally along the current line with speed ramping — it starts slow and accelerates. `Ctrl + mouse wheel` also scrolls horizontally. The speed ramp time and max speed are configurable in Settings.
@@ -897,6 +903,7 @@ The log is overwritten at the start of each session. Old `.log` files are automa
 | Key | Action |
 |-----|--------|
 | `R` | Start rail here at the current zoom (press again or `Escape` to exit) |
+| `K` | Reading guide on/off — hold `Shift` and move the pointer to mark the word and line (any zoom) |
 | `U` | Rotate to read the current sideways rail block (press again to reset) |
 | `Z` | Freeze panes (both axes) / unfreeze |
 | `Down` / `S` | Next line |
@@ -945,7 +952,7 @@ Every command is reachable from the menu bar by name — handy for discovery, ke
 - **File** — open, recent files, duplicate / close tab, export & import annotations, settings, quit.
 - **Edit** — find, annotation mode, undo / redo, and **Copy Block as LaTeX / Markdown / Description / Image** (the same VLM block actions as the block right-click menu, acting on the current rail block).
 - **View** — zoom and fit, **Rotate**, side panels, minimap, fullscreen, **Split Editor** (split right, move pane to a new window, close panes), debug overlay, colour effects.
-- **Rail** — **Start Rail Here** and **Rotate to Read Block** (`R` / `U`), then the rail-reading toggles: **Auto-Scroll**, **Jump Mode**, **Line Focus Dim**, **Line Highlight**, and **Add Bookmark** (mirroring the `P` / `J` / `F` / `H` / `B` shortcuts).
+- **Rail** — **Start Rail Here**, **Reading Guide**, and **Rotate to Read Block** (`R` / `K` / `U`), then the rail-reading toggles: **Auto-Scroll**, **Jump Mode**, **Line Focus Dim**, **Line Highlight**, and **Add Bookmark** (mirroring the `P` / `J` / `F` / `H` / `B` shortcuts).
 - **Navigation** — go to / previous / next / first / last page, and semantic **Jump to Next / Previous** heading, figure, table, or equation.
 - **Help** — keyboard shortcuts, about, diagnostic log, clean-up.
 

@@ -374,6 +374,17 @@ public partial class DocumentView : UserControl, IViewportSurface
     /// changed). Cheap: the page-space marker list is cached and only rebuilt when it actually changes.</summary>
     public void RenderPortalMarkers() => PortalMarkerLayer.UpdateState(BuildPortalMarkerState(_tab));
 
+    /// <summary>Re-send the reading-guide layer for THIS view's viewport, refresh the pointer-glyph hiding
+    /// (the follow state can change without a pointer move — Shift down/up, mode off), and, when the
+    /// line-focus dim is on, re-send the page state so the dim band tracks the guide line.</summary>
+    public void RenderReadingGuide()
+    {
+        GuideLayer.UpdateState(BuildGuideState());
+        Viewport.UpdateGuideCursor();
+        if (_tab?.LineFocusBlur == true && _viewport is { Rail.VisualsVisible: false })
+            PageLayer.UpdateState(BuildPageState(_tab));
+    }
+
     public void RenderOverlay()
     {
         OverlayLayer.UpdateState(BuildOverlayState(_tab));
@@ -441,6 +452,7 @@ public partial class DocumentView : UserControl, IViewportSurface
         OverlayLayer.UpdateState(BuildOverlayState(_tab));
         SearchLayer.UpdateState(BuildSearchState(_tab));
         AnnotationLayer.UpdateState(BuildAnnotationState(_tab));
+        GuideLayer.UpdateState(BuildGuideState());
         RenderFreezePanes();
         PortalMarkerLayer.UpdateState(BuildPortalMarkerState(_tab));
     }
@@ -506,6 +518,13 @@ public partial class DocumentView : UserControl, IViewportSurface
             lineY = line.Y;
             lineH = line.Height;
         }
+        else if (tab?.LineFocusBlur == true && _viewport is { } guideVp && vm.TryGetGuide(guideVp, out var guide))
+        {
+            // No rail line on this view: the reading guide's line drives the dim band instead
+            // (docs/reading-guide-design.md §3.4). Rail, when active, keeps precedence above.
+            lineY = guide.LineRect.MidY;
+            lineH = guide.LineRect.Height;
+        }
 
         var pages = new List<PageDraw>();
         if (_viewport is { } vp)
@@ -563,6 +582,25 @@ public partial class DocumentView : UserControl, IViewportSurface
             Effect: vm.Controller.ActiveColourEffect,
             EffectIntensity: vm.Controller.ActiveColourIntensity,
             Effects: vm.ColourEffects);
+    }
+
+    /// <summary>The reading-guide layer state for this view: the parked / followed position of its own
+    /// viewport (null line = draw nothing), hidden while the rail draws its own line visuals at rail zoom.
+    /// Colours come from the same overlay palette + line-highlight tint/opacity the rail line uses, the word
+    /// at a stronger opacity (≈2×, capped).</summary>
+    private ReadingGuideRenderState BuildGuideState()
+    {
+        var vm = _shared;
+        if (vm is null || _viewport is not { } vp || !vm.TryGetGuide(vp, out var pos) || vp.Rail.VisualsVisible)
+            return new ReadingGuideRenderState(SKMatrix.Identity, null, null, 0f, SKColors.Transparent, SKColors.Transparent, 1f);
+        var palette = vm.Controller.ActiveColourEffect.GetOverlayPalette();
+        var tint = vm.AppConfig.LineHighlightTint;
+        double opacity = vm.AppConfig.LineHighlightOpacity;
+        var lineColor = palette.ResolveLineHighlight(tint, opacity).ToSKColor();
+        var wordColor = palette.ResolveLineHighlight(tint, Math.Min(1.0, Math.Max(opacity * 2.0, 0.45))).ToSKColor();
+        return new ReadingGuideRenderState(
+            BuildCamera(vp), pos.LineRect, vm.ReadingGuidePrefs.WordHighlight ? pos.WordRect : null,
+            (float)vm.AppConfig.LinePadding, lineColor, wordColor, (float)vp.Camera.Zoom);
     }
 
     private RailOverlayRenderState BuildOverlayState(TabViewModel? tab)
