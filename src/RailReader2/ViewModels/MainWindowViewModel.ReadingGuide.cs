@@ -78,9 +78,6 @@ public sealed partial class MainWindowViewModel
     // Steer pace from the reading-pace settings (Relaxed 10/28 → 4/11 chars/s, Normal 14/42 → 5.6/17,
     // Brisk 20/60 → 8/24): the same preset that sets hold-to-scroll speed sets the flow.
     private const double CharsPerSecondPerScrollSpeed = 0.4;
-    // Rail word marker (§11): the reading point along the rail line, as a fraction of the view width —
-    // where the snapped line start lands, so the marked word is the one the eye is on.
-    private const double RailReadingPointFraction = 1.0 / 3.0;
 
     /// <summary>The reading-guide pointer mode (toolbar button, Rail ▸ Reading Guide, <c>K</c>). Mutually
     /// exclusive with Text-Select and the annotation tools, like any pointer mode.</summary>
@@ -354,8 +351,10 @@ public sealed partial class MainWindowViewModel
     }
 
     /// <summary>The rail word marker (§11, on with <see cref="ReadingGuidePreferences.WordHighlight"/>):
-    /// while <paramref name="vp"/>'s stick drives the rail, the word on the current rail line nearest the
-    /// reading point (<see cref="RailReadingPointFraction"/> across the view). Rotated view: none.</summary>
+    /// while <paramref name="vp"/>'s stick drives the rail, the word on the current rail line under Core's
+    /// steered reading point (<c>RailNav.SteerReadingPointPageX</c> — it sweeps the line's head and tail
+    /// while the camera is pinned, so every word gets its turn; before the first tick, the window's reading
+    /// point). Rotated view: none.</summary>
     public bool TryGetRailWordMarker(Viewport vp, out RectF rect)
     {
         rect = default;
@@ -368,7 +367,8 @@ public sealed partial class MainWindowViewModel
         var words = WordIndex.For(analysis, doc.GetOrExtractText(vp.CurrentPage));
         var list = words.WordsOf(vp.Rail.CurrentNavigableArrayIndex, vp.Rail.CurrentLine);
         if (list.Count == 0) return false;
-        double px = (vp.Width * RailReadingPointFraction - vp.Camera.OffsetX) / vp.Camera.Zoom;
+        double px = vp.Rail.SteerReadingPointPageX
+            ?? (vp.Width * vp.Rail.SteerReadingPointFraction - vp.Camera.OffsetX) / vp.Camera.Zoom;
         double bestD = double.MaxValue;
         foreach (var w in list)
         {
