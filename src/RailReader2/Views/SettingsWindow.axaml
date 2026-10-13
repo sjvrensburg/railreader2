@@ -174,15 +174,10 @@
                                 <ComboBoxItem Content="Point at the text, always (no key)" />
                             </ComboBox>
                             <CheckBox Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="3" Name="GuideWordCheck"
-                                      Content="Mark the word under the pointer"
+                                      Content="Mark the word being read (also on the rail line while steering)"
                                       IsCheckedChanged="OnGuideWordChanged" />
                         </Grid>
                         <Border Classes="advblock adv">
-                            <StackPanel Spacing="8">
-                                <CheckBox Name="GuideRailWordCheck"
-                                          Content="In rail mode, also mark the word being read while steering"
-                                          ToolTip.Tip="Above the rail zoom threshold the same Shift-and-nudge steers the rail itself. This adds a moving word marker on the rail line; off by default because it distracts some readers."
-                                          IsCheckedChanged="OnGuideRailWordChanged" />
                             <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto">
                                 <TextBlock Grid.Column="0" Text="Line stickiness (point modes):" VerticalAlignment="Center"
                                            ToolTip.Tip="Point modes only: how far the pointer may stray above or below the current line (in line heights) before the guide moves to the next one. Steer pace follows the Reading Pace preset." />
@@ -190,7 +185,6 @@
                                         Value="0.6" MinWidth="120"
                                         PropertyChanged="OnGuideDeadZoneChanged" />
                             </Grid>
-                            </StackPanel>
                         </Border>
 
                         <TextBlock Classes="section" Text="Pages" />

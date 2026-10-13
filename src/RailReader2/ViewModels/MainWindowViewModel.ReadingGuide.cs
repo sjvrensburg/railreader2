@@ -26,7 +26,7 @@ namespace RailReader2.ViewModels;
 //   same stick drives the rail instead — horizontal deflection is the rail's scroll velocity along the
 //   line (Core's steered scroll: hold-to-scroll's speed curve over deflection, edge-hold line advance,
 //   page turns, park on stop units), vertical steps lines. No word guide is drawn; the rail's own line
-//   visuals are what the reader sees (plus an optional word marker, RailWordMarker).
+//   visuals are what the reader sees, plus the word at the reading point while steering (WordHighlight).
 //
 // State is PER-VIEWPORT (like freeze panes): each split pane / tear-off / duplicate tab keeps its own
 // hit-tester, stick and parked position. Following acts on the view UNDER THE POINTER, not
@@ -353,13 +353,13 @@ public sealed partial class MainWindowViewModel
         return s.Steer.IsMoving;
     }
 
-    /// <summary>The optional rail word marker (§11, <see cref="ReadingGuidePreferences.RailWordMarker"/>):
+    /// <summary>The rail word marker (§11, on with <see cref="ReadingGuidePreferences.WordHighlight"/>):
     /// while <paramref name="vp"/>'s stick drives the rail, the word on the current rail line nearest the
     /// reading point (<see cref="RailReadingPointFraction"/> across the view). Rotated view: none.</summary>
     public bool TryGetRailWordMarker(Viewport vp, out RectF rect)
     {
         rect = default;
-        if (!IsReadingGuideMode || !_guidePrefs.RailWordMarker || !_guideByVp.TryGetValue(vp, out var s)
+        if (!IsReadingGuideMode || !_guidePrefs.WordHighlight || !_guideByVp.TryGetValue(vp, out var s)
             || !s.RailSteering || !s.Steer.Engaged || !vp.Rail.VisualsVisible)
             return false;
         var doc = vp.Owner;
