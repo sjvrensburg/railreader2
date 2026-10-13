@@ -101,6 +101,9 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="3.73.0.0" date="2026-10-13">
+      <description><p>The reading guide now steers rail mode too: hold Shift and nudge to scroll along the line with the word being read outlined and kept centred, step lines with a nudge up or down, and pause at equations, tables and new pages until you push again.</p></description>
+    </release>
     <release version="3.72.0.0" date="2026-10-13">
       <description><p>Reading Guide: a new pointer mode for reading at low magnification. Hold Shift and nudge the mouse to steer a word-by-word highlight along the text at your reading pace, like an invisible joystick; release to park it. Point-at-the-text and no-key variants are in Settings.</p></description>
     </release>
