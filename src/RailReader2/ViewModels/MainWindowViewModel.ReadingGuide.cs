@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using CommunityToolkit.Mvvm.ComponentModel;
 using RailReader.Core;
 using RailReader.Core.Models;
@@ -9,34 +10,47 @@ using RailReader2.Services;
 namespace RailReader2.ViewModels;
 
 // Reading guide — pointer-driven word + line focus for low-magnification readers
-// (docs/reading-guide-design.md). A pointer MODE beside Browse / Text-Select: while it is on, holding
-// Shift (or always, per preference) and moving the pointer over a page highlights the word under it
-// and its line, snapped to the text geometry Core already knows; releasing Shift parks the guide
-// where it is (page-anchored, so it scrolls with the text). The camera is never moved.
+// (docs/reading-guide-design.md). A pointer MODE beside Browse / Text-Select. Two ways to drive it:
+//
+//   STEER (default, §10): Shift-down plants an invisible joystick where the pointer is (and seats the
+//   guide on the word under it if none is parked on this page). The pointer's displacement from that
+//   origin is a throttle, not a position: right flows the guide word by word along reading order
+//   (wrapping lines, blocks, and the page), left reverses, up/down steps lines. The view scrolls only
+//   when the guide leaves the middle band of the viewport (keep-in-view). Release Shift to park; click
+//   a word to re-seat.
+//
+//   POINT (WhileShiftHeld / Always): the guide sits on the word under the pointer, snapped to text
+//   geometry (Core's hit-tester, with hysteresis and a carriage return at line ends).
 //
 // State is PER-VIEWPORT (like freeze panes): each split pane / tear-off / duplicate tab keeps its own
-// hit-tester (Core's ReadingGuideHitTester owns the line hysteresis) and parked position. Following
-// acts on the view UNDER THE POINTER, not FocusedViewport — hover never focuses a pane.
+// hit-tester, stick and parked position. Following acts on the view UNDER THE POINTER, not
+// FocusedViewport — hover never focuses a pane. The camera is only moved by steer mode's keep-in-view.
 //
 // Shift chords (Shift+D debug overlay, Shift+H/G/T/E jumps, Shift+O/B/I panes, …) all begin with a
-// Shift-down. Rule (design §7): Shift-down only re-resolves where the pointer actually rests over a
-// view, and a non-Shift key pressed while Shift is held cancels the follow and restores every position
-// parked before the chord, so a chord never moves a reader's place-keeper.
+// Shift-down. Rule (design §7): Shift-down only acts where the pointer actually rests over a view, and
+// a non-Shift key pressed while Shift is held cancels the follow and restores every position parked
+// before the chord, so a chord never moves a reader's place-keeper.
 public sealed partial class MainWindowViewModel
 {
     private sealed class GuideState
     {
         public readonly ReadingGuideHitTester Tester = new();
+        public readonly ReadingGuideSteer Steer = new();
         public int Page = -1;
         public ReadingGuidePosition? Position;
         /// <summary>The analysis instance <see cref="Position"/> was resolved against, so a replaced
         /// analysis (re-run, OCR landed) can be detected and the parked indices re-read against it.</summary>
         public PageAnalysis? Analysis;
         /// <summary>True while the pointer is over this viewport's surface (so a Shift press with a still
-        /// pointer can resolve its last position); cleared on pointer exit.</summary>
+        /// pointer can act on its last position); cleared on pointer exit.</summary>
         public bool PointerOver;
-        public double PointerX, PointerY; // last pointer position, page points on the anchor page
+        public double PointerX, PointerY;   // last pointer position, page points on the anchor page
+        public double ScreenX, ScreenY;     // last pointer position, viewport pixels (the stick's frame)
+        public long LastMoveTicks;          // Stopwatch ticks of the last pointer move (sweep gate)
         public int NoAnalysisToastPage = -1;
+        /// <summary>After a steer page turn: seat on the new page's first (+1) / last (−1) word as soon
+        /// as its analysis is available; 0 = nothing pending.</summary>
+        public int PendingSeat;
     }
 
     private readonly Dictionary<Viewport, GuideState> _guideByVp = new();
@@ -45,22 +59,35 @@ public sealed partial class MainWindowViewModel
     private bool _guideChordCancelled;
     private List<(Viewport Vp, int Page, ReadingGuidePosition? Position, PageAnalysis? Analysis)>? _guidePreChord;
 
+    // Keep-in-view band (fractions of the viewport): the guide word is scrolled back inside it only
+    // when it leaves — never recentred — so the page stays still while reading inside the band.
+    private const double KeepInViewTop = 0.18, KeepInViewBottom = 0.82;
+    private const double KeepInViewLeft = 0.08, KeepInViewRight = 0.92;
+    private const double KeepInViewTauSecs = 0.14;   // exponential ease time constant
+    // Point mode: a leftward sweep faster than this (viewport px per ms) is the return sweep, not reading;
+    // the word highlight holds instead of flickering backwards through the line.
+    private const double SweepGatePxPerMs = 1.2;
+    // Steer pace from the reading-pace settings (Relaxed 10/28 → 4/11 chars/s, Normal 14/42 → 5.6/17,
+    // Brisk 20/60 → 8/24): the same preset that sets hold-to-scroll speed sets the flow.
+    private const double CharsPerSecondPerScrollSpeed = 0.4;
+
     /// <summary>The reading-guide pointer mode (toolbar button, Rail ▸ Reading Guide, <c>K</c>). Mutually
     /// exclusive with Text-Select and the annotation tools, like any pointer mode.</summary>
     [ObservableProperty] private bool _isReadingGuideMode;
 
     public ReadingGuidePreferences ReadingGuidePrefs => _guidePrefs;
 
+    private bool GuideUsesShift => _guidePrefs.Follow != ReadingGuideFollow.Always;
+    private bool GuideIsSteer => _guidePrefs.Follow == ReadingGuideFollow.Steer;
+
     /// <summary>True while pointer moves should drive the guide: the mode is on and either the
     /// preference is "always" or Shift is held (and no chord has cancelled the hold).</summary>
     public bool IsGuideFollowing =>
-        IsReadingGuideMode
-        && (_guidePrefs.Follow == ReadingGuideFollow.Always || (_guideShiftHeld && !_guideChordCancelled));
+        IsReadingGuideMode && (!GuideUsesShift || (_guideShiftHeld && !_guideChordCancelled));
 
-    /// <summary>True while the pointer glyph should be hidden over a page: following under a held Shift.
-    /// In "always" mode the pointer also serves ordinary clicking, so it stays visible.</summary>
-    public bool IsGuideCursorHidden =>
-        IsGuideFollowing && _guidePrefs.Follow == ReadingGuideFollow.WhileShiftHeld;
+    /// <summary>True while the pointer glyph should be hidden over a page: following under a held Shift
+    /// (point or steer). In "always" mode the pointer also serves ordinary clicking, so it stays visible.</summary>
+    public bool IsGuideCursorHidden => IsGuideFollowing && GuideUsesShift;
 
     public void ToggleReadingGuideMode()
     {
@@ -78,9 +105,12 @@ public sealed partial class MainWindowViewModel
             else if (ActiveTool != AnnotationTool.None) SetAnnotationTool(AnnotationTool.None);
             ArmActivateRailClick = false;
             FreezeArmMode = FreezeMode.None;
-            ShowStatusToast(_guidePrefs.Follow == ReadingGuideFollow.Always
-                ? "Reading guide on — move the pointer over the text (K or Escape to leave)"
-                : "Reading guide on — hold Shift and move the pointer (K or Escape to leave)");
+            ShowStatusToast(_guidePrefs.Follow switch
+            {
+                ReadingGuideFollow.Steer => "Reading guide on — hold Shift and nudge the pointer to read; click a word to start there (K or Escape to leave)",
+                ReadingGuideFollow.Always => "Reading guide on — move the pointer over the text (K or Escape to leave)",
+                _ => "Reading guide on — hold Shift and move the pointer (K or Escape to leave)",
+            });
         }
         else
         {
@@ -106,30 +136,74 @@ public sealed partial class MainWindowViewModel
         return true;
     }
 
-    /// <summary>Pointer moved over <paramref name="vp"/>'s surface at the given page point (anchor page).
-    /// Always records the point (a later Shift press resolves it without a wiggle); resolves the guide
-    /// only while <see cref="IsGuideFollowing"/>.</summary>
-    public void TrackGuidePointer(Viewport vp, double pageX, double pageY)
+    /// <summary>Pointer moved over <paramref name="vp"/>'s surface: <paramref name="pageX"/>/<paramref name="pageY"/>
+    /// on the anchor page, <paramref name="screenX"/>/<paramref name="screenY"/> in viewport pixels.
+    /// Always records the point (a later Shift press acts on it without a wiggle). While following:
+    /// steer mode feeds the stick, point mode resolves the word under the pointer.</summary>
+    public void TrackGuidePointer(Viewport vp, double pageX, double pageY, double screenX, double screenY)
     {
         if (!IsReadingGuideMode) return;
         if (!_guideByVp.TryGetValue(vp, out var s))
             _guideByVp[vp] = s = new GuideState();
+        long now = Stopwatch.GetTimestamp();
+        double dxPx = screenX - s.ScreenX, dyPx = screenY - s.ScreenY;
+        double ms = s.PointerOver ? (now - s.LastMoveTicks) * 1000.0 / Stopwatch.Frequency : double.PositiveInfinity;
         s.PointerOver = true;
         s.PointerX = pageX;
         s.PointerY = pageY;
-        if (IsGuideFollowing) ResolveGuide(vp, s);
+        s.ScreenX = screenX;
+        s.ScreenY = screenY;
+        s.LastMoveTicks = now;
+        if (!IsGuideFollowing) return;
+
+        if (GuideIsSteer)
+        {
+            // Shift went down with the pointer elsewhere (or off the window): plant the stick on first contact.
+            if (!s.Steer.Engaged) EngageSteer(vp, s);
+            s.Steer.SetPointer(screenX, screenY);
+            if (s.Steer.Engaged) RequestAnimationFrame();
+            return;
+        }
+
+        // Point mode. Return sweep: a fast leftward move (the hand flying back to the next line's start)
+        // keeps the current word instead of lighting every word it crosses in reverse.
+        if (ms > 0 && ms < 80 && dxPx < 0 && Math.Abs(dxPx) > Math.Abs(dyPx)
+            && -dxPx / ms > SweepGatePxPerMs && s.Position is not null)
+            return;
+        ResolveGuide(vp, s);
     }
 
-    /// <summary>Pointer left <paramref name="vp"/>'s surface: the guide stays parked; only the "pointer
-    /// is here" flag drops so a Shift press elsewhere doesn't re-resolve this view.</summary>
+    /// <summary>Pointer left <paramref name="vp"/>'s surface: the guide stays parked (and a steering
+    /// stick keeps its throttle until Shift is released); only the "pointer is here" flag drops so a Shift
+    /// press elsewhere doesn't act on this view.</summary>
     public void GuidePointerExited(Viewport vp)
     {
         if (_guideByVp.TryGetValue(vp, out var s)) s.PointerOver = false;
     }
 
+    /// <summary>A click on a word while the mode is on (no drag): seat the guide there — the way to jump
+    /// in steer mode, where the pointer's position otherwise means nothing. Re-plants an engaged stick
+    /// at the click so the throttle restarts from rest.</summary>
+    public void SeatGuideAt(Viewport? vp, double pageX, double pageY, double screenX, double screenY)
+    {
+        if (vp is null || !IsReadingGuideMode) return;
+        if (!_guideByVp.TryGetValue(vp, out var s))
+            _guideByVp[vp] = s = new GuideState();
+        s.PointerOver = true;
+        s.PointerX = pageX;
+        s.PointerY = pageY;
+        s.ScreenX = screenX;
+        s.ScreenY = screenY;
+        s.PendingSeat = 0;
+        ResolveGuide(vp, s);
+        if (s.Steer.Engaged) s.Steer.Engage(screenX, screenY);
+    }
+
     /// <summary>Shift pressed / released (MainWindow key handling, forwarded from tear-off windows too).
-    /// Press: snapshot the parked positions (for a chord cancel) and resolve wherever the pointer rests
-    /// over a view. Release: park — nothing moves, the position simply stops following.</summary>
+    /// Press: snapshot the parked positions (for a chord cancel), then — steer — plant the stick where
+    /// the pointer rests over a view (seating the guide there first if nothing is parked on that page),
+    /// or — point — resolve under the pointer. Release: park — nothing moves, the position simply stops
+    /// following (steer: the stick lets go).</summary>
     public void SetGuideShiftHeld(bool held)
     {
         if (!IsReadingGuideMode || _guideShiftHeld == held) return;
@@ -140,14 +214,19 @@ public sealed partial class MainWindowViewModel
             _guidePreChord = new();
             foreach (var (vp, s) in _guideByVp)
                 _guidePreChord.Add((vp, s.Page, s.Position, s.Analysis));
-            if (_guidePrefs.Follow == ReadingGuideFollow.WhileShiftHeld)
+            if (GuideUsesShift)
                 foreach (var (vp, s) in _guideByVp)
-                    if (s.PointerOver) ResolveGuide(vp, s);
+                {
+                    if (!s.PointerOver) continue;
+                    if (GuideIsSteer) EngageSteer(vp, s);
+                    else ResolveGuide(vp, s);
+                }
         }
         else
         {
             _guidePreChord = null;
             _guideChordCancelled = false;
+            ReleaseSteer();
         }
         OnPropertyChanged(nameof(IsGuideFollowing));
         OnPropertyChanged(nameof(IsGuideCursorHidden));
@@ -159,10 +238,10 @@ public sealed partial class MainWindowViewModel
     /// again. No-op in "always" mode, where Shift has no meaning.</summary>
     public void CancelGuideChord()
     {
-        if (!IsReadingGuideMode || !_guideShiftHeld || _guideChordCancelled
-            || _guidePrefs.Follow != ReadingGuideFollow.WhileShiftHeld)
+        if (!IsReadingGuideMode || !_guideShiftHeld || _guideChordCancelled || !GuideUsesShift)
             return;
         _guideChordCancelled = true;
+        ReleaseSteer();
         if (_guidePreChord is { } snapshot)
             foreach (var (vp, page, pos, analysis) in snapshot)
                 if (_guideByVp.TryGetValue(vp, out var s))
@@ -170,6 +249,7 @@ public sealed partial class MainWindowViewModel
                     s.Page = page;
                     s.Position = pos;
                     s.Analysis = analysis;
+                    s.PendingSeat = 0;
                     s.Tester.Clear();
                 }
         _guidePreChord = null;
@@ -182,10 +262,164 @@ public sealed partial class MainWindowViewModel
     public void OnReadingGuidePrefsChanged()
     {
         _guidePrefs.Save();
+        ReleaseSteer();
         OnPropertyChanged(nameof(IsGuideFollowing));
         OnPropertyChanged(nameof(IsGuideCursorHidden));
         InvalidateReadingGuide();
     }
+
+    // ── Steer ──────────────────────────────────────────────────────────────────
+
+    private void EngageSteer(Viewport vp, GuideState s)
+    {
+        if (s.Position is null || s.Page != vp.CurrentPage)
+        {
+            // Nothing parked on this page: start on the word under the pointer.
+            s.PendingSeat = 0;
+            ResolveGuide(vp, s);
+            if (s.Position is null) return; // no analysis yet (toasted) — try again on the next Shift press
+        }
+        var cfg = _controller.Config;
+        s.Steer.MinCharsPerSecond = Math.Max(1.0, cfg.ScrollSpeedStart * CharsPerSecondPerScrollSpeed);
+        s.Steer.MaxCharsPerSecond = Math.Max(s.Steer.MinCharsPerSecond, cfg.ScrollSpeedMax * CharsPerSecondPerScrollSpeed);
+        s.Steer.Engage(s.ScreenX, s.ScreenY);
+        RequestAnimationFrame();
+    }
+
+    private void ReleaseSteer()
+    {
+        foreach (var s in _guideByVp.Values)
+            if (s.Steer.Engaged) s.Steer.Release();
+    }
+
+    /// <summary>Per animation frame: advance every engaged stick, apply its word / line steps along
+    /// reading order (turning the page at the ends), and ease the camera to keep the guide in view.
+    /// Returns true while anything is still moving (the frame loop keeps running).</summary>
+    private bool TickReadingGuide(double dt)
+    {
+        if (!IsReadingGuideMode || _guideByVp.Count == 0) return false;
+        bool animating = false;
+        foreach (var (vp, s) in _guideByVp)
+        {
+            if (!s.Steer.Engaged) continue;
+            if (s.PendingSeat != 0) { animating = true; continue; }   // page turned; waiting for analysis
+            if (s.Position is not { } pos || s.Page != vp.CurrentPage) continue;
+
+            var doc = vp.Owner;
+            if (!doc.TryGetAnalysis(s.Page, vp.AnalysisParams, out var analysis)) continue;
+            var words = doc.ViewRotation == 0 ? WordIndex.For(analysis, doc.GetOrExtractText(s.Page)) : null;
+            var roles = _controller.Config.NavigableRoles;
+
+            int chars = 0;
+            bool sentenceEnd = false;
+            if (words is not null && pos.WordIndex is { } wi)
+            {
+                var list = words.WordsOf(pos.BlockIndex, pos.LineIndex);
+                if (wi < list.Count)
+                {
+                    string w = words.TextOf(list[wi]);
+                    chars = w.Length;
+                    sentenceEnd = w.Length > 0 && w[^1] is '.' or '!' or '?' or ':' or ';';
+                }
+            }
+
+            var step = s.Steer.Tick(dt, chars, sentenceEnd);
+            if (step.Any)
+            {
+                bool forward = (step.WordSteps + step.LineSteps) > 0;
+                var next = step.WordSteps != 0
+                    ? ReadingGuideFlow.StepWord(pos, forward, analysis, words, roles)
+                    : ReadingGuideFlow.StepLine(pos, forward, analysis, words, roles);
+                if (next is { } n)
+                    SetGuide(vp, s, s.Page, n, analysis);
+                else
+                    TurnGuidePage(vp, s, forward);
+            }
+            if (s.Steer.IsMoving) animating = true;
+            if (KeepGuideInView(vp, s, dt)) animating = true;
+        }
+        return animating;
+    }
+
+    /// <summary>Flow reached the page end / start: turn this viewport's page and seat on the new page's
+    /// first / last word once its analysis is in (<see cref="RefreshGuidesAfterAnalysis"/>).</summary>
+    private void TurnGuidePage(Viewport vp, GuideState s, bool forward)
+    {
+        var doc = vp.Owner;
+        int target = vp.CurrentPage + (forward ? 1 : -1);
+        if (target < 0 || target >= doc.PageCount || vp.Focus is not null)
+        {
+            s.Steer.Release(); // nowhere to flow: let go so the stick doesn't spin at the document end
+            return;
+        }
+        if (!doc.GoToPage(vp, target, _controller.Worker, _controller.Config.NavigableRoles, vp.Width, vp.Height))
+            return;
+        doc.QueueLookahead(vp, _appConfig.AnalysisLookaheadPages);
+        s.PendingSeat = forward ? 1 : -1;
+        s.Page = target;
+        s.Position = null;
+        s.Analysis = null;
+        s.Tester.Clear();
+        foreach (var surface in _surfaces)
+            if (ReferenceEquals(surface.SurfaceViewport, vp))
+            {
+                surface.RenderPage();
+                surface.RenderSearch();
+                surface.RenderAnnotations();
+                surface.RenderCamera();
+            }
+        OnPropertyChanged(nameof(ActiveTab));
+        TrySeatPending(vp, s);
+    }
+
+    private void TrySeatPending(Viewport vp, GuideState s)
+    {
+        if (s.PendingSeat == 0 || vp.CurrentPage != s.Page) return;
+        var doc = vp.Owner;
+        if (!doc.TryGetAnalysis(s.Page, vp.AnalysisParams, out var analysis)) return;
+        var words = doc.ViewRotation == 0 ? WordIndex.For(analysis, doc.GetOrExtractText(s.Page)) : null;
+        var roles = _controller.Config.NavigableRoles;
+        var pos = s.PendingSeat > 0
+            ? ReadingGuideFlow.First(analysis, words, roles)
+            : ReadingGuideFlow.Last(analysis, words, roles);
+        s.PendingSeat = 0;
+        if (pos is null) { s.Steer.Release(); return; }   // a page with no text to flow through
+        SetGuide(vp, s, s.Page, pos, analysis);
+        if (s.Steer.Engaged) RequestAnimationFrame();
+    }
+
+    /// <summary>Ease this viewport's camera so the guide word (or line) sits inside the keep-in-view band,
+    /// by the minimum amount and never recentring. Returns true while the camera is still easing.</summary>
+    private bool KeepGuideInView(Viewport vp, GuideState s, double dt)
+    {
+        if (s.Position is not { } pos || s.Page != vp.CurrentPage || IsViewportFrozen(vp)) return false;
+        var cam = vp.Camera;
+        double z = cam.Zoom;
+        var rect = pos.WordRect ?? pos.LineRect;
+        double top = rect.Top * z + cam.OffsetY, bottom = rect.Bottom * z + cam.OffsetY;
+        double left = rect.Left * z + cam.OffsetX, right = rect.Right * z + cam.OffsetX;
+        double H = vp.Height, W = vp.Width;
+
+        double targetY = cam.OffsetY, targetX = cam.OffsetX;
+        if (bottom > H * KeepInViewBottom) targetY -= bottom - H * KeepInViewBottom;
+        else if (top < H * KeepInViewTop) targetY += H * KeepInViewTop - top;
+        if (right > W * KeepInViewRight) targetX -= right - W * KeepInViewRight;
+        else if (left < W * KeepInViewLeft) targetX += W * KeepInViewLeft - left;
+
+        double dy = targetY - cam.OffsetY, dx = targetX - cam.OffsetX;
+        if (Math.Abs(dy) < 0.5 && Math.Abs(dx) < 0.5) return false;
+
+        double k = 1 - Math.Exp(-dt / KeepInViewTauSecs);
+        cam.OffsetY += Math.Abs(dy) < 1 ? dy : dy * k;
+        cam.OffsetX += Math.Abs(dx) < 1 ? dx : dx * k;
+        vp.ClampCamera(W, H);
+        foreach (var surface in _surfaces)
+            if (ReferenceEquals(surface.SurfaceViewport, vp))
+                surface.RenderCamera();
+        return true;
+    }
+
+    // ── Point / shared ─────────────────────────────────────────────────────────
 
     private void ResolveGuide(Viewport vp, GuideState s)
     {
@@ -224,44 +458,25 @@ public sealed partial class MainWindowViewModel
         if (changed) InvalidateReadingGuide(vp);
     }
 
-    /// <summary>After analysis results land: a page's analysis instance may have been replaced (re-run,
-    /// OCR, config change). Re-read each parked position's indices against the new instance so the
-    /// rects refresh; a position whose indices no longer exist clears rather than pointing at the wrong
-    /// line (design §3.3 — Core's Resolve is point-based, so this is shell work).</summary>
+    /// <summary>After analysis results land: seat a pending steer page turn, and re-read each parked
+    /// position's indices against a replaced analysis instance (re-run, OCR, config change) so the rects
+    /// refresh; a position whose indices no longer exist clears rather than pointing at the wrong line
+    /// (design §3.3 — Core's Resolve is point-based, so this is shell work).</summary>
     private void RefreshGuidesAfterAnalysis()
     {
         if (!IsReadingGuideMode || _guideByVp.Count == 0) return;
         foreach (var (vp, s) in _guideByVp)
         {
+            if (s.PendingSeat != 0) { TrySeatPending(vp, s); continue; }
             if (s.Position is not { } pos || s.Page != vp.CurrentPage) continue;
             var doc = vp.Owner;
             if (!doc.TryGetAnalysis(s.Page, vp.AnalysisParams, out var analysis)
                 || ReferenceEquals(analysis, s.Analysis))
                 continue;
-            SetGuide(vp, s, s.Page, ReanchorGuide(doc, s.Page, analysis, pos), analysis);
+            var words = doc.ViewRotation == 0 ? WordIndex.For(analysis, doc.GetOrExtractText(s.Page)) : null;
+            SetGuide(vp, s, s.Page,
+                ReadingGuideFlow.At(analysis, words, pos.BlockIndex, pos.LineIndex, pos.WordIndex), analysis);
         }
-    }
-
-    private static ReadingGuidePosition? ReanchorGuide(DocumentModel doc, int page, PageAnalysis analysis,
-        ReadingGuidePosition pos)
-    {
-        if ((uint)pos.BlockIndex >= (uint)analysis.Blocks.Count) return null;
-        var block = analysis.Blocks[pos.BlockIndex];
-        int lineCount = Math.Max(1, block.Lines.Count);
-        if ((uint)pos.LineIndex >= (uint)lineCount) return null;
-        var line = block.Lines.Count == 0
-            ? new LineInfo(block.BBox.Y + block.BBox.H / 2f, block.BBox.H, block.BBox.X, block.BBox.W)
-            : block.Lines[pos.LineIndex];
-        var lineRect = new RectF(line.X, line.Y - line.Height / 2f, line.X + line.Width, line.Y + line.Height / 2f);
-
-        int? wordIndex = null;
-        RectF? wordRect = null;
-        if (pos.WordIndex is { } w && doc.ViewRotation == 0)
-        {
-            var words = WordIndex.For(analysis, doc.GetOrExtractText(page)).WordsOf(pos.BlockIndex, pos.LineIndex);
-            if (w < words.Count) { wordIndex = w; wordRect = words[w].Rect; }
-        }
-        return new ReadingGuidePosition(pos.BlockIndex, pos.LineIndex, wordIndex, lineRect, wordRect);
     }
 
     private void ClearAllGuides()
@@ -269,9 +484,11 @@ public sealed partial class MainWindowViewModel
         foreach (var s in _guideByVp.Values)
         {
             s.Tester.Clear();
+            s.Steer.Release();
             s.Position = null;
             s.Analysis = null;
             s.Page = -1;
+            s.PendingSeat = 0;
         }
     }
 

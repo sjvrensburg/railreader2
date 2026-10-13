@@ -236,7 +236,7 @@ public class ViewportPanel : Panel
             {
                 var gpos = e.GetPosition(this);
                 if (OwnerView?.SurfaceViewport is { } guideVp && ResolveHoverPoint(gpos) is { } gp)
-                    ViewModel.TrackGuidePointer(guideVp, gp.PageX, gp.PageY);
+                    ViewModel.TrackGuidePointer(guideVp, gp.PageX, gp.PageY, gpos.X, gpos.Y);
                 UpdateGuideCursor();
                 return;
             }
@@ -388,6 +388,14 @@ public class ViewportPanel : Panel
             else if (isClick && ViewModel.ArmActivateRailClick)
             {
                 ViewModel.ActivateRailAtClick(pos.X, pos.Y);
+            }
+            else if (isClick && ViewModel.IsReadingGuideMode)
+            {
+                // Guide mode: a click seats the guide on the word under it (the jump gesture of steer
+                // mode, where the pointer's position otherwise means nothing). Takes precedence over
+                // links / block framing — this is a reading mode; leave it (K) to click links.
+                var (pageX, pageY) = ScreenToPage(pos);
+                ViewModel.SeatGuideAt(OwnerView?.SurfaceViewport, pageX, pageY, pos.X, pos.Y);
             }
             // Markers are tested before markup comments and block framing so a double-click on a
             // source pin opens the detached window rather than opening a comment or zooming into

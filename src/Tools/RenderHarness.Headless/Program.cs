@@ -394,7 +394,9 @@ foreach (var shot in config.Shots)
             prefs.Follow = RailReader2.Services.ReadingGuideFollow.Always;
             vm.IsReadingGuideMode = true;
             Pump(4);
-            vm.TrackGuidePointer(tab.Viewport, shot.GuideX * tab.State.PageWidth, shot.GuideY * tab.State.PageHeight);
+            double gpx = shot.GuideX * tab.State.PageWidth, gpy = shot.GuideY * tab.State.PageHeight;
+            vm.TrackGuidePointer(tab.Viewport, gpx, gpy,
+                gpx * tab.Camera.Zoom + tab.Camera.OffsetX, gpy * tab.Camera.Zoom + tab.Camera.OffsetY);
             Pump(8);
         }
 

@@ -1075,6 +1075,10 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             anyAnimating |= r.StillAnimating;
         }
 
+        // Reading guide steer mode: advance engaged sticks along reading order + keep-in-view easing.
+        // Runs only while a stick is engaged, so an idle guide costs nothing here.
+        if (TickReadingGuide(dt)) { anyAnimating = true; anyDrew = true; }
+
         // One document-global analysis pump, quiescent only when nothing is animating (the gate the
         // single-view Tick(dt) applied to the focused view).
         var (gotResults, _, gotPageChange) = _controller.PumpAnalysis(quiescent: !anyAnimating);

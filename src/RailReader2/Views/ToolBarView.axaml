@@ -39,7 +39,7 @@
             <!-- Reading guide: a pointer mode for low magnification — hold Shift and move the pointer to
                  mark the word + line under it (release to park). Shortcut: K. -->
             <ToggleButton Name="GuideButton" Classes="toolBtn"
-                          ToolTip.Tip="Reading guide — hold Shift and move the pointer to mark the word and line you're on (K)"
+                          ToolTip.Tip="Reading guide — hold Shift and nudge the pointer to read word by word; click a word to start there (K)"
                           a:AutomationProperties.Name="Reading guide">
                 <c:Icon Data="{StaticResource IconReadingGuide}" />
             </ToggleButton>

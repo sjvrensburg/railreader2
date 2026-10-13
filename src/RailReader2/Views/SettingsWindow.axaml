@@ -164,13 +164,14 @@
                         <TextBlock Classes="section" Text="Reading Guide" />
                         <Separator />
                         <TextBlock Classes="hint"
-                                   Text="With the reading guide on (toolbar, Rail menu, or K), the word and line under the pointer are marked at any zoom — the page never moves." />
+                                   Text="With the reading guide on (toolbar, Rail menu, or K), hold Shift and nudge the pointer: the guide flows word by word through the text at your reading pace and the page only scrolls when the guide nears the edge. Click a word to start there." />
                         <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto,8,Auto">
                             <TextBlock Grid.Row="0" Grid.Column="0" Text="Follow the pointer:" VerticalAlignment="Center" />
                             <ComboBox Grid.Row="0" Grid.Column="2" Name="GuideFollowCombo" Width="220"
                                       HorizontalAlignment="Left" SelectionChanged="OnGuideFollowChanged">
-                                <ComboBoxItem Content="While Shift is held" />
-                                <ComboBoxItem Content="Always" />
+                                <ComboBoxItem Content="Steer with the pointer (hold Shift)" />
+                                <ComboBoxItem Content="Point at the text (hold Shift)" />
+                                <ComboBoxItem Content="Point at the text, always (no key)" />
                             </ComboBox>
                             <CheckBox Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="3" Name="GuideWordCheck"
                                       Content="Mark the word under the pointer"
@@ -178,8 +179,8 @@
                         </Grid>
                         <Border Classes="advblock adv">
                             <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto">
-                                <TextBlock Grid.Column="0" Text="Line stickiness:" VerticalAlignment="Center"
-                                           ToolTip.Tip="How far the pointer may stray above or below the current line (in line heights) before the guide moves to the next one" />
+                                <TextBlock Grid.Column="0" Text="Line stickiness (point modes):" VerticalAlignment="Center"
+                                           ToolTip.Tip="Point modes only: how far the pointer may stray above or below the current line (in line heights) before the guide moves to the next one. Steer pace follows the Reading Pace preset." />
                                 <Slider Grid.Column="2" Name="GuideDeadZoneSlider" Minimum="0" Maximum="1.5"
                                         Value="0.6" MinWidth="120"
                                         PropertyChanged="OnGuideDeadZoneChanged" />

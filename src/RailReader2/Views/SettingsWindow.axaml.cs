@@ -824,7 +824,12 @@ public partial class SettingsWindow : Window
     private void LoadReadingGuidePrefs(MainWindowViewModel vm)
     {
         var p = vm.ReadingGuidePrefs;
-        GuideFollowCombo.SelectedIndex = p.Follow == ReadingGuideFollow.Always ? 1 : 0;
+        GuideFollowCombo.SelectedIndex = p.Follow switch
+        {
+            ReadingGuideFollow.Steer => 0,
+            ReadingGuideFollow.WhileShiftHeld => 1,
+            _ => 2,
+        };
         GuideWordCheck.IsChecked = p.WordHighlight;
         GuideDeadZoneSlider.Value = p.DeadZone;
     }
@@ -832,8 +837,12 @@ public partial class SettingsWindow : Window
     private void OnGuideFollowChanged(object? sender, SelectionChangedEventArgs e)
     {
         if (Vm is not { } vm || _loading || GuideFollowCombo.SelectedIndex < 0) return;
-        vm.ReadingGuidePrefs.Follow = GuideFollowCombo.SelectedIndex == 1
-            ? ReadingGuideFollow.Always : ReadingGuideFollow.WhileShiftHeld;
+        vm.ReadingGuidePrefs.Follow = GuideFollowCombo.SelectedIndex switch
+        {
+            0 => ReadingGuideFollow.Steer,
+            1 => ReadingGuideFollow.WhileShiftHeld,
+            _ => ReadingGuideFollow.Always,
+        };
         vm.OnReadingGuidePrefsChanged();
     }
 
