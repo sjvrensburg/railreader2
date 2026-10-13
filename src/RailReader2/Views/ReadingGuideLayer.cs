@@ -34,7 +34,7 @@ internal sealed class ReadingGuideVisualHandler : CompositionCustomVisualHandler
     // The word rect must stay legible at low zoom: at 1.25× a 10 pt line is ~12 px, so a tight glyph
     // box can be a few px tall. Pad the word to at least this many DEVICE pixels of height.
     private const float MinWordHeightPx = 10f;
-    private const float WordStrokePx = 2f;
+    private const float WordStrokePx = 3f;
     private const float WordCornerPx = 3f;
 
     private ReadingGuideRenderState? _state;
