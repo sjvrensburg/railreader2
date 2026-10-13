@@ -324,6 +324,12 @@ public class ViewportPanel : Panel
         Cursor = hide ? s_hiddenCursor : null;
     }
     // True while this pane is pushing a freeze-mode guide line, so it can be cleared once disarmed.
+    private bool SeatGuideAtClick(Point pos)
+    {
+        var (pageX, pageY) = ScreenToPage(pos);
+        return ViewModel!.SeatGuideAt(OwnerView?.SurfaceViewport, pageX, pageY, pos.X, pos.Y);
+    }
+
     private bool _freezeGuidePushed;
     private static readonly Cursor s_crossCursor = new(StandardCursorType.Cross);
     private static readonly Cursor s_noCursor = new(StandardCursorType.No);
@@ -389,13 +395,12 @@ public class ViewportPanel : Panel
             {
                 ViewModel.ActivateRailAtClick(pos.X, pos.Y);
             }
-            else if (isClick && ViewModel.IsReadingGuideMode)
+            else if (isClick && ViewModel.IsReadingGuideMode && SeatGuideAtClick(pos))
             {
                 // Guide mode: a click seats the guide on the word under it (the jump gesture of steer
                 // mode, where the pointer's position otherwise means nothing). Takes precedence over
-                // links / block framing — this is a reading mode; leave it (K) to click links.
-                var (pageX, pageY) = ScreenToPage(pos);
-                ViewModel.SeatGuideAt(OwnerView?.SurfaceViewport, pageX, pageY, pos.X, pos.Y);
+                // links / block framing — this is a reading mode; leave it (K) to click links. At rail
+                // zoom SeatGuideAt declines (false) and the click falls through to the rail's own seat.
             }
             // Markers are tested before markup comments and block framing so a double-click on a
             // source pin opens the detached window rather than opening a comment or zooming into

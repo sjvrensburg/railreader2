@@ -22,6 +22,12 @@ namespace RailReader2.ViewModels;
 //   POINT (WhileShiftHeld / Always): the guide sits on the word under the pointer, snapped to text
 //   geometry (Core's hit-tester, with hysteresis and a carriage return at line ends).
 //
+//   RAIL (§11): with the rail active and drawing (above the zoom threshold, or "start rail here"), the
+//   same stick drives the rail instead — horizontal deflection is the rail's scroll velocity along the
+//   line (Core's steered scroll: hold-to-scroll's speed curve over deflection, edge-hold line advance,
+//   page turns, park on stop units), vertical steps lines. No word guide is drawn; the rail's own line
+//   visuals are what the reader sees, plus the word at the reading point while steering (WordHighlight).
+//
 // State is PER-VIEWPORT (like freeze panes): each split pane / tear-off / duplicate tab keeps its own
 // hit-tester, stick and parked position. Following acts on the view UNDER THE POINTER, not
 // FocusedViewport — hover never focuses a pane. The camera is only moved by steer mode's keep-in-view.
@@ -51,6 +57,8 @@ public sealed partial class MainWindowViewModel
         /// <summary>After a steer page turn: seat on the new page's first (+1) / last (−1) word as soon
         /// as its analysis is available; 0 = nothing pending.</summary>
         public int PendingSeat;
+        /// <summary>True while this view's stick drives the rail (§11) rather than the word guide.</summary>
+        public bool RailSteering;
     }
 
     private readonly Dictionary<Viewport, GuideState> _guideByVp = new();
@@ -183,10 +191,11 @@ public sealed partial class MainWindowViewModel
 
     /// <summary>A click on a word while the mode is on (no drag): seat the guide there — the way to jump
     /// in steer mode, where the pointer's position otherwise means nothing. Re-plants an engaged stick
-    /// at the click so the throttle restarts from rest.</summary>
-    public void SeatGuideAt(Viewport? vp, double pageX, double pageY, double screenX, double screenY)
+    /// at the click so the throttle restarts from rest. Returns false — click not consumed — at rail
+    /// zoom (§11), where the click is the rail's own (Core's <c>HandleClick</c> seats the block / line).</summary>
+    public bool SeatGuideAt(Viewport? vp, double pageX, double pageY, double screenX, double screenY)
     {
-        if (vp is null || !IsReadingGuideMode) return;
+        if (vp is null || !IsReadingGuideMode) return false;
         if (!_guideByVp.TryGetValue(vp, out var s))
             _guideByVp[vp] = s = new GuideState();
         s.PointerOver = true;
@@ -194,9 +203,18 @@ public sealed partial class MainWindowViewModel
         s.PointerY = pageY;
         s.ScreenX = screenX;
         s.ScreenY = screenY;
+        if (vp.Rail.VisualsVisible)
+        {
+            // The click falls through to the rail's own seat (block + line under it); the steered reading
+            // point lands on the clicked word once that line is current.
+            vp.Rail.SeatSteerReadingPoint(pageX);
+            if (s.Steer.Engaged) s.Steer.Engage(screenX, screenY);
+            return false;
+        }
         s.PendingSeat = 0;
         ResolveGuide(vp, s);
         if (s.Steer.Engaged) s.Steer.Engage(screenX, screenY);
+        return true;
     }
 
     /// <summary>Shift pressed / released (MainWindow key handling, forwarded from tear-off windows too).
@@ -272,6 +290,24 @@ public sealed partial class MainWindowViewModel
 
     private void EngageSteer(Viewport vp, GuideState s)
     {
+        if (vp.Rail.VisualsVisible)
+        {
+            // §11: at rail zoom the stick drives the rail itself — nothing to seat. Planting stops a running
+            // (semi-)auto-scroll: the stick supersedes it, as A/Left does.
+            if (_controller.AutoScrollActive && ReferenceEquals(vp, _controller.FocusedViewport))
+                _controller.StopAutoScroll();
+            // The pointer resting on a word of the current line: read from that word (the camera eases to
+            // centre it); elsewhere, continue from where the rail is.
+            vp.Rail.TrySeatSteerReadingPointAt(s.PointerX, s.PointerY);
+            // A line step is a camera snap here, so repeat more slowly than the word guide's line stepping.
+            s.Steer.MinLinesPerSecond = 0.6;
+            s.Steer.MaxLinesPerSecond = 2.0;
+            s.RailSteering = true;
+            s.Steer.Engage(s.ScreenX, s.ScreenY);
+            RequestAnimationFrame();
+            return;
+        }
+        s.RailSteering = false;
         if (s.Position is null || s.Page != vp.CurrentPage)
         {
             // Nothing parked on this page: start on the word under the pointer.
@@ -280,6 +316,8 @@ public sealed partial class MainWindowViewModel
             if (s.Position is null) return; // no analysis yet (toasted) — try again on the next Shift press
         }
         var cfg = _controller.Config;
+        s.Steer.MinLinesPerSecond = 0.8;
+        s.Steer.MaxLinesPerSecond = 3.0;
         s.Steer.MinCharsPerSecond = Math.Max(1.0, cfg.ScrollSpeedStart * CharsPerSecondPerScrollSpeed);
         s.Steer.MaxCharsPerSecond = Math.Max(s.Steer.MinCharsPerSecond, cfg.ScrollSpeedMax * CharsPerSecondPerScrollSpeed);
         s.Steer.Engage(s.ScreenX, s.ScreenY);
@@ -288,12 +326,75 @@ public sealed partial class MainWindowViewModel
 
     private void ReleaseSteer()
     {
-        foreach (var s in _guideByVp.Values)
+        foreach (var (vp, s) in _guideByVp)
+        {
             if (s.Steer.Engaged) s.Steer.Release();
+            ReleaseRailSteer(vp, s);
+        }
     }
 
-    /// <summary>Per animation frame: advance every engaged stick, apply its word / line steps along
-    /// reading order (turning the page at the ends), and ease the camera to keep the guide in view.
+    private void ReleaseRailSteer(Viewport vp, GuideState s)
+    {
+        if (!s.RailSteering) return;
+        s.RailSteering = false;
+        _controller.SteerRail(vp, 0);
+    }
+
+    /// <summary>Per frame while the stick drives the rail (§11): the stick's horizontal throttle becomes the
+    /// rail's steered scroll velocity (Core moves the camera in its own tick — line ends, snaps, page turns
+    /// and stop-unit parks all happen there), a vertical step is ↑/↓. Returns true while the stick is
+    /// deflected so the frame loop keeps running.</summary>
+    private bool TickRailSteer(Viewport vp, GuideState s, double dt)
+    {
+        if (!vp.Rail.VisualsVisible)
+        {
+            // The rail went away under the stick (zoomed out, free pan, page without analysis): let go;
+            // the next Shift press re-plants in whichever regime applies then.
+            s.Steer.Release();
+            ReleaseRailSteer(vp, s);
+            return false;
+        }
+        var step = s.Steer.Tick(dt, 0, false);   // word steps are ignored here — only the throttle and line steps matter
+        _controller.SteerRail(vp, s.Steer.Axis == SteerAxis.Horizontal ? s.Steer.Throttle : 0);
+        if (step.LineSteps != 0)
+            _controller.StepRailLine(vp, step.LineSteps > 0);
+        // The word marker follows Core's reading point, which moves while the camera is pinned at a line's
+        // head or tail — so redraw it every tick, not only when the camera moves.
+        InvalidateReadingGuide(vp);
+        return s.Steer.IsMoving;
+    }
+
+    /// <summary>The rail word marker (§11, on with <see cref="ReadingGuidePreferences.WordHighlight"/>):
+    /// while <paramref name="vp"/>'s stick drives the rail, the word on the current rail line under Core's
+    /// steered reading point (<c>RailNav.SteerReadingPointPageX</c> — it sweeps the line's head and tail
+    /// while the camera is pinned, so every word gets its turn; before the first tick, the window's reading
+    /// point). Rotated view: none.</summary>
+    public bool TryGetRailWordMarker(Viewport vp, out RectF rect)
+    {
+        rect = default;
+        if (!IsReadingGuideMode || !_guidePrefs.WordHighlight || !_guideByVp.TryGetValue(vp, out var s)
+            || !s.RailSteering || !s.Steer.Engaged || !vp.Rail.VisualsVisible)
+            return false;
+        var doc = vp.Owner;
+        if (doc.ViewRotation != 0 || !doc.TryGetAnalysis(vp.CurrentPage, vp.AnalysisParams, out var analysis))
+            return false;
+        var words = WordIndex.For(analysis, doc.GetOrExtractText(vp.CurrentPage));
+        var list = words.WordsOf(vp.Rail.CurrentNavigableArrayIndex, vp.Rail.CurrentLine);
+        if (list.Count == 0) return false;
+        double px = vp.Rail.SteerReadingPointPageX
+            ?? (vp.Width * vp.Rail.SteerReadingPointFraction - vp.Camera.OffsetX) / vp.Camera.Zoom;
+        double bestD = double.MaxValue;
+        foreach (var w in list)
+        {
+            double d = px < w.Rect.Left ? w.Rect.Left - px : px > w.Rect.Right ? px - w.Rect.Right : 0;
+            if (d < bestD) { bestD = d; rect = w.Rect; }
+        }
+        return true;
+    }
+
+    /// <summary>Per animation frame: advance every engaged stick — driving the rail where it is active
+    /// (§11) — otherwise apply its word / line steps along reading order (turning the page at the ends),
+    /// and ease the camera to keep the guide in view.
     /// Returns true while anything is still moving (the frame loop keeps running).</summary>
     private bool TickReadingGuide(double dt)
     {
@@ -302,6 +403,11 @@ public sealed partial class MainWindowViewModel
         foreach (var (vp, s) in _guideByVp)
         {
             if (!s.Steer.Engaged) continue;
+            if (s.RailSteering)
+            {
+                if (TickRailSteer(vp, s, dt)) animating = true;
+                continue;
+            }
             if (s.PendingSeat != 0) { animating = true; continue; }   // page turned; waiting for analysis
             if (s.Position is not { } pos || s.Page != vp.CurrentPage) continue;
 
@@ -481,10 +587,11 @@ public sealed partial class MainWindowViewModel
 
     private void ClearAllGuides()
     {
-        foreach (var s in _guideByVp.Values)
+        foreach (var (vp, s) in _guideByVp)
         {
             s.Tester.Clear();
             s.Steer.Release();
+            ReleaseRailSteer(vp, s);
             s.Position = null;
             s.Analysis = null;
             s.Page = -1;

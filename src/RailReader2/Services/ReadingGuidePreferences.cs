@@ -32,7 +32,8 @@ public sealed class ReadingGuidePreferences
 {
     public ReadingGuideFollow Follow { get; set; } = ReadingGuideFollow.Steer;
 
-    /// <summary>Draw the word under the pointer (the line band is always drawn).</summary>
+    /// <summary>Draw the word the guide is on (the line band is always drawn). Also governs the word marker
+    /// on the rail line while steering the rail (design §11).</summary>
     public bool WordHighlight { get; set; } = true;
 
     /// <summary>Point mode: vertical hysteresis of the guide line, as a fraction of the line's height

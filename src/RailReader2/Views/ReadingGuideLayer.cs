@@ -34,6 +34,7 @@ internal sealed class ReadingGuideVisualHandler : CompositionCustomVisualHandler
     // The word rect must stay legible at low zoom: at 1.25× a 10 pt line is ~12 px, so a tight glyph
     // box can be a few px tall. Pad the word to at least this many DEVICE pixels of height.
     private const float MinWordHeightPx = 10f;
+    private const float WordStrokePx = 3f;
     private const float WordCornerPx = 3f;
 
     private ReadingGuideRenderState? _state;
@@ -55,7 +56,7 @@ internal sealed class ReadingGuideVisualHandler : CompositionCustomVisualHandler
     public override void OnRender(ImmediateDrawingContext context)
     {
         var state = _state;
-        if (state?.LineRect is not { } line) return;
+        if (state is null || (state.LineRect is null && state.WordRect is null)) return;
 
         if (context.TryGetFeature(typeof(ISkiaSharpApiLeaseFeature)) is not ISkiaSharpApiLeaseFeature leaseFeature)
             return;
@@ -66,20 +67,30 @@ internal sealed class ReadingGuideVisualHandler : CompositionCustomVisualHandler
         canvas.Concat(state.Camera);
 
         // Line band: same geometry as the rail line highlight (OverlayRenderer), padding in line heights.
-        float pad = line.Height * state.LinePadding;
-        _paint.Color = state.LineColor;
-        canvas.DrawRect(SKRect.Create(line.Left, line.Top - pad, line.Width, line.Height + pad * 2), _paint);
+        // Absent for the rail word marker (§11), where the rail draws the line itself.
+        if (state.LineRect is { } line)
+        {
+            float pad = line.Height * state.LinePadding;
+            _paint.Color = state.LineColor;
+            canvas.DrawRect(SKRect.Create(line.Left, line.Top - pad, line.Width, line.Height + pad * 2), _paint);
+        }
 
         if (state.WordRect is { } word)
         {
+            // A thin rounded OUTLINE around the word, not a fill: a fill over the glyphs cost too much
+            // contrast for the readers this is for (first rail test). Stroke width in device px.
             float zoom = state.Zoom > 0 ? state.Zoom : 1f;
             float minH = MinWordHeightPx / zoom;          // device px → page units
             float grow = Math.Max(0f, (minH - word.Height) / 2f);
-            float hpad = word.Height * 0.08f;             // a hair of side padding so the fill hugs the glyphs
-            var rect = SKRect.Create(word.Left - hpad, word.Top - grow, word.Width + hpad * 2, word.Height + grow * 2);
+            float hpad = word.Height * 0.12f + WordStrokePx / zoom;   // clear of the glyphs
+            float vpad = word.Height * 0.08f + grow;
+            var rect = SKRect.Create(word.Left - hpad, word.Top - vpad, word.Width + hpad * 2, word.Height + vpad * 2);
             _paint.Color = state.WordColor;
+            _paint.Style = SKPaintStyle.Stroke;
+            _paint.StrokeWidth = WordStrokePx / zoom;
             float r = WordCornerPx / zoom;
             canvas.DrawRoundRect(rect, r, r, _paint);
+            _paint.Style = SKPaintStyle.Fill;
         }
 
         canvas.Restore();
