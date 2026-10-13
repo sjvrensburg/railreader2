@@ -36,6 +36,13 @@
                           a:AutomationProperties.Name="Text Select">
                 <c:Icon Data="{StaticResource IconTextSelect}" />
             </ToggleButton>
+            <!-- Reading guide: a pointer mode for low magnification — hold Shift and move the pointer to
+                 mark the word + line under it (release to park). Shortcut: K. -->
+            <ToggleButton Name="GuideButton" Classes="toolBtn"
+                          ToolTip.Tip="Reading guide — hold Shift and nudge the pointer to read word by word; click a word to start there (K)"
+                          a:AutomationProperties.Name="Reading guide">
+                <c:Icon Data="{StaticResource IconReadingGuide}" />
+            </ToggleButton>
             <Button Name="CopyButton" Classes="toolBtn" ToolTip.Tip="Copy Selected Text (Ctrl+C)"
                     a:AutomationProperties.Name="Copy selected text" IsVisible="False">
                 <c:Icon Data="{StaticResource IconCopy}" />

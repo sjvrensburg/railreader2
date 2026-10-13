@@ -132,6 +132,7 @@ public partial class SettingsWindow : Window
         LineHighlightTintCombo.SelectedIndex = (int)c.LineHighlightTint;
         LineHighlightOpacitySlider.Value = c.LineHighlightOpacity;
         LoadLineStyle(c, FocusedDocument);
+        LoadReadingGuidePrefs(vm);
 
         BuildRoleCheckboxes(_roleItems, c.NavigableRoles,
             set => { vm.AppConfig.NavigableRoles = set; vm.OnConfigChanged(); },
@@ -816,6 +817,47 @@ public partial class SettingsWindow : Window
         if (Vm is not { } vm || _loading) return;
         vm.AppConfig.MotionBlur = MotionBlurCheck.IsChecked == true;
         vm.OnConfigChanged();
+    }
+
+    // --- Reading guide (app-side sidecar, see ReadingGuidePreferences) ---
+
+    private void LoadReadingGuidePrefs(MainWindowViewModel vm)
+    {
+        var p = vm.ReadingGuidePrefs;
+        GuideFollowCombo.SelectedIndex = p.Follow switch
+        {
+            ReadingGuideFollow.Steer => 0,
+            ReadingGuideFollow.WhileShiftHeld => 1,
+            _ => 2,
+        };
+        GuideWordCheck.IsChecked = p.WordHighlight;
+        GuideDeadZoneSlider.Value = p.DeadZone;
+    }
+
+    private void OnGuideFollowChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (Vm is not { } vm || _loading || GuideFollowCombo.SelectedIndex < 0) return;
+        vm.ReadingGuidePrefs.Follow = GuideFollowCombo.SelectedIndex switch
+        {
+            0 => ReadingGuideFollow.Steer,
+            1 => ReadingGuideFollow.WhileShiftHeld,
+            _ => ReadingGuideFollow.Always,
+        };
+        vm.OnReadingGuidePrefsChanged();
+    }
+
+    private void OnGuideWordChanged(object? sender, RoutedEventArgs e)
+    {
+        if (Vm is not { } vm || _loading) return;
+        vm.ReadingGuidePrefs.WordHighlight = GuideWordCheck.IsChecked == true;
+        vm.OnReadingGuidePrefsChanged();
+    }
+
+    private void OnGuideDeadZoneChanged(object? sender, Avalonia.AvaloniaPropertyChangedEventArgs e)
+    {
+        if (e.Property.Name != "Value" || Vm is not { } vm || _loading) return;
+        vm.ReadingGuidePrefs.DeadZone = GuideDeadZoneSlider.Value;
+        vm.OnReadingGuidePrefsChanged();
     }
 
     private void OnSliderChanged(Avalonia.AvaloniaPropertyChangedEventArgs e, Action<AppConfig> apply)

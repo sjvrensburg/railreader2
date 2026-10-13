@@ -210,6 +210,8 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
     partial void OnIsAnnotationModeChanged(bool value)
     {
+        // Annotation mode is a pointer mode too: entering it displaces the reading guide.
+        if (value && IsReadingGuideMode) IsReadingGuideMode = false;
         if (!value)
         {
             // Leaving annotation mode: drop any active tool and selected annotation
@@ -964,6 +966,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     private void OnAnalysisDrainedOutsideFrame()
     {
         InvalidateOverlay();
+        RefreshGuidesAfterAnalysis();
         OnPropertyChanged(nameof(ActiveTab));
     }
 
@@ -1072,9 +1075,14 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             anyAnimating |= r.StillAnimating;
         }
 
+        // Reading guide steer mode: advance engaged sticks along reading order + keep-in-view easing.
+        // Runs only while a stick is engaged, so an idle guide costs nothing here.
+        if (TickReadingGuide(dt)) { anyAnimating = true; anyDrew = true; }
+
         // One document-global analysis pump, quiescent only when nothing is animating (the gate the
         // single-view Tick(dt) applied to the focused view).
         var (gotResults, _, gotPageChange) = _controller.PumpAnalysis(quiescent: !anyAnimating);
+        if (gotResults) RefreshGuidesAfterAnalysis(); // parked reading guides re-read their indices against a replaced analysis
 
         foreach (var (surface, r) in _tickScratch)
         {

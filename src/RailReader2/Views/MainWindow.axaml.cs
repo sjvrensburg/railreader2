@@ -39,6 +39,9 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        // A Shift held when the window loses focus never gets its key-up here: release the reading
+        // guide's follow so it parks instead of following on the next move back in.
+        Deactivated += (_, _) => Vm?.SetGuideShiftHeld(false);
     }
 
     private MainWindowViewModel? Vm => DataContext as MainWindowViewModel;
@@ -561,6 +564,14 @@ public partial class MainWindow : Window
             return true;
         }
 
+        // Reading guide: Shift is the follow key; any other key while Shift is held is a chord, not a
+        // follow (MainWindowViewModel.ReadingGuide). Never handled here — Shift must reach everything else.
+        if (vm.IsReadingGuideMode)
+        {
+            if (e.Key is Key.LeftShift or Key.RightShift) vm.SetGuideShiftHeld(true);
+            else if (e.KeyModifiers.HasFlag(KeyModifiers.Shift)) vm.CancelGuideChord();
+        }
+
         if (e.KeyModifiers.HasFlag(KeyModifiers.Control) && HandleCtrlShortcut(vm, e))
             { RailToolBar.SyncState(); return true; }
 
@@ -703,6 +714,9 @@ public partial class MainWindow : Window
             case Key.R:
                 // Click-free "start rail here" — force rail at the viewport centre (toggles off if forced).
                 vm.StartRailHere(); e.Handled = true; return true;
+            case Key.K:
+                // Reading guide pointer mode (plain K — A/D are rail's WASD line keys, G is Go-to-page).
+                vm.ToggleReadingGuideMode(); e.Handled = true; return true;
             case Key.U:
                 // Rotate-to-read: make a sideways rail block upright (press again to reset).
                 vm.RotateToReadBlock(); e.Handled = true; return true;
@@ -829,6 +843,8 @@ public partial class MainWindow : Window
                 vm.StopAutoScroll(); e.Handled = true; return true;
             case Key.Escape when vm.IsFullScreen:
                 vm.IsFullScreen = false; e.Handled = true; return true;
+            case Key.Escape when vm.IsReadingGuideMode:
+                vm.IsReadingGuideMode = false; e.Handled = true; return true;
             case Key.Escape when vm.IsAnnotating:
                 vm.CancelAnnotationTool(); e.Handled = true; return true;
             case Key.Escape when vm.IsAnnotationMode:
@@ -855,6 +871,9 @@ public partial class MainWindow : Window
     /// stops its viewport's hold-to-scroll — otherwise the scroll free-runs after release.</summary>
     private bool TryHandleKeyUp(MainWindowViewModel vm, KeyEventArgs e)
     {
+        // Releasing Shift parks the reading guide (not handled — Shift-up must reach everything else).
+        if (e.Key is Key.LeftShift or Key.RightShift) vm.SetGuideShiftHeld(false);
+
         if (e.Key is Key.Left or Key.Right or Key.A or Key.D)
         {
             vm.HandleArrowRelease(true);

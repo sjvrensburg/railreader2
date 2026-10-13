@@ -47,6 +47,14 @@
       "lineHighlight": true, "railLineFraction": 0.33, "railAdvanceLines": 7, "requireAnalysis": true
     },
     {
+      "name": "reading_guide",
+      "pdf": "experiments/PDFs/Attention_is_all_you_need.pdf",
+      "page": 2, "zoom": 1.6,
+      "theme": "dark", "width": 1440, "height": 980,
+      "sidebar": "none",
+      "lineHighlight": true, "guideX": 0.42, "guideY": 0.40, "requireAnalysis": true
+    },
+    {
       "name": "line_focus_blur",
       "pdf": "experiments/PDFs/Attention_is_all_you_need.pdf",
       "page": 2, "zoom": 5.75,

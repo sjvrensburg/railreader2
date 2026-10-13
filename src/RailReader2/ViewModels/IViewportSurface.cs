@@ -30,6 +30,9 @@ public interface IViewportSurface
     void RenderAnnotations();
     void RenderPortalMarkers();
     void RenderFreezePanes();
+    /// <summary>Re-send this surface's reading-guide layer state (and refresh the pointer-glyph hiding)
+    /// for its own viewport's parked / followed guide position.</summary>
+    void RenderReadingGuide();
     void NotifyAccessibility();
 
     /// <summary>Show or hide this surface's focused-pane affordance (a border accent). The VM only

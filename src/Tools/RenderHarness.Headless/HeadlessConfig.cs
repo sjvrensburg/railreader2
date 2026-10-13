@@ -94,6 +94,12 @@ public sealed class ShotSpec
     /// section heading and onto a body line).</summary>
     public int RailAdvanceLines { get; set; } = 0;
 
+    /// <summary>Reading guide: turn the pointer mode on and place the (virtual) pointer at this
+    /// fraction of the page width / height (e.g. 0.30 / 0.42), marking the word + line there. Both
+    /// must be &gt; 0. Uses the follow-always path, so no Shift is simulated; nothing is persisted.</summary>
+    public float GuideX { get; set; } = 0f;
+    public float GuideY { get; set; } = 0f;
+
     /// <summary>Enter annotation mode so the annotation tool controls are visible.</summary>
     public bool AnnotationMode { get; set; } = false;
 

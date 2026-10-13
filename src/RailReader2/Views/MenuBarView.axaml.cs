@@ -185,6 +185,7 @@ public partial class MenuBarView : UserControl
     // Rail menu — rail-reading toggles + bookmark (mirror the R/P/J/F/H/B keyboard shortcuts so
     // they are discoverable and AT-SPI-actionable by name; the keys themselves are display-only here).
     private void OnStartRailHere(object? s, RoutedEventArgs e) => Vm?.StartRailHere();
+    private void OnToggleReadingGuide(object? s, RoutedEventArgs e) => Vm?.ToggleReadingGuideMode();
     private void OnRotateToReadBlock(object? s, RoutedEventArgs e) => Vm?.RotateToReadBlock();
     private void OnToggleAutoScroll(object? s, RoutedEventArgs e) => Vm?.ToggleAutoScrollExclusive();
     private void OnToggleJumpMode(object? s, RoutedEventArgs e) => Vm?.ToggleJumpModeExclusive();

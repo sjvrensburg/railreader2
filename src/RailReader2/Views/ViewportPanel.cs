@@ -229,6 +229,18 @@ public class ViewportPanel : Panel
             }
             ClearFreezeGuide(); // the link/annotation cursor logic re-applies on the next move, below
 
+            // Reading guide mode: every move over this pane is recorded on ITS viewport (so a Shift press
+            // with a still pointer resolves at once); the VM resolves it only while following. Hover
+            // resolution is the non-anchoring kind — mere movement never re-anchors a continuous view.
+            if (ViewModel.IsReadingGuideMode)
+            {
+                var gpos = e.GetPosition(this);
+                if (OwnerView?.SurfaceViewport is { } guideVp && ResolveHoverPoint(gpos) is { } gp)
+                    ViewModel.TrackGuidePointer(guideVp, gp.PageX, gp.PageY, gpos.X, gpos.Y);
+                UpdateGuideCursor();
+                return;
+            }
+
             // Not dragging — update cursor for link hover (only in browse mode)
             if (!ViewModel.IsAnnotating)
             {
@@ -289,9 +301,28 @@ public class ViewportPanel : Panel
         // pointer (and a fresh guide) moves onto a different split pane. The move handler re-pushes it on
         // re-entry. (OnPointerMoved only clears the guide once disarmed, never on a plain cross-pane exit.)
         ClearFreezeGuide();
+        if (ViewModel is { IsReadingGuideMode: true } gvm && OwnerView?.SurfaceViewport is { } guideVp)
+            gvm.GuidePointerExited(guideVp);
+        UpdateGuideCursor(); // IsPointerOver is false now → the glyph comes back
     }
 
     private bool _showingLinkCursor;
+    // True while this pane hides the pointer glyph for the reading guide (the highlight IS the cursor).
+    private bool _guideCursorHidden;
+    private static readonly Cursor s_hiddenCursor = new(StandardCursorType.None);
+
+    /// <summary>Hide the pointer glyph while the reading guide follows under a held Shift, restore it
+    /// otherwise. Called on pointer moves in guide mode and from <see cref="DocumentView.RenderReadingGuide"/>
+    /// when the follow state changes without a move (Shift down/up, chord cancel, mode off). Restored on
+    /// every exit path because it keys on <see cref="InputElement.IsPointerOver"/> too.</summary>
+    public void UpdateGuideCursor()
+    {
+        bool hide = ViewModel is { IsGuideCursorHidden: true } && IsPointerOver;
+        if (hide == _guideCursorHidden) return;
+        _guideCursorHidden = hide;
+        _showingLinkCursor = false;
+        Cursor = hide ? s_hiddenCursor : null;
+    }
     // True while this pane is pushing a freeze-mode guide line, so it can be cleared once disarmed.
     private bool _freezeGuidePushed;
     private static readonly Cursor s_crossCursor = new(StandardCursorType.Cross);
@@ -357,6 +388,14 @@ public class ViewportPanel : Panel
             else if (isClick && ViewModel.ArmActivateRailClick)
             {
                 ViewModel.ActivateRailAtClick(pos.X, pos.Y);
+            }
+            else if (isClick && ViewModel.IsReadingGuideMode)
+            {
+                // Guide mode: a click seats the guide on the word under it (the jump gesture of steer
+                // mode, where the pointer's position otherwise means nothing). Takes precedence over
+                // links / block framing — this is a reading mode; leave it (K) to click links.
+                var (pageX, pageY) = ScreenToPage(pos);
+                ViewModel.SeatGuideAt(OwnerView?.SurfaceViewport, pageX, pageY, pos.X, pos.Y);
             }
             // Markers are tested before markup comments and block framing so a double-click on a
             // source pin opens the detached window rather than opening a comment or zooming into
