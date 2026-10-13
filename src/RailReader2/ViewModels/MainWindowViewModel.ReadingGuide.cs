@@ -205,6 +205,9 @@ public sealed partial class MainWindowViewModel
         s.ScreenY = screenY;
         if (vp.Rail.VisualsVisible)
         {
+            // The click falls through to the rail's own seat (block + line under it); the steered reading
+            // point lands on the clicked word once that line is current.
+            vp.Rail.SeatSteerReadingPoint(pageX);
             if (s.Steer.Engaged) s.Steer.Engage(screenX, screenY);
             return false;
         }
@@ -293,6 +296,9 @@ public sealed partial class MainWindowViewModel
             // (semi-)auto-scroll: the stick supersedes it, as A/Left does.
             if (_controller.AutoScrollActive && ReferenceEquals(vp, _controller.FocusedViewport))
                 _controller.StopAutoScroll();
+            // The pointer resting on a word of the current line: read from that word (the camera eases to
+            // centre it); elsewhere, continue from where the rail is.
+            vp.Rail.TrySeatSteerReadingPointAt(s.PointerX, s.PointerY);
             s.RailSteering = true;
             s.Steer.Engage(s.ScreenX, s.ScreenY);
             RequestAnimationFrame();
@@ -347,6 +353,9 @@ public sealed partial class MainWindowViewModel
         _controller.SteerRail(vp, s.Steer.Axis == SteerAxis.Horizontal ? s.Steer.Throttle : 0);
         if (step.LineSteps != 0)
             _controller.StepRailLine(vp, step.LineSteps > 0);
+        // The word marker follows Core's reading point, which moves while the camera is pinned at a line's
+        // head or tail — so redraw it every tick, not only when the camera moves.
+        InvalidateReadingGuide(vp);
         return s.Steer.IsMoving;
     }
 
