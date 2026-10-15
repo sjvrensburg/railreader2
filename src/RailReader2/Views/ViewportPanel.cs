@@ -48,7 +48,7 @@ public class ViewportPanel : Panel
     // highlight out from under the pointer before the second click's release, so a fresh hit-test there
     // misses it and the double-click would fall through to block framing. Same idea as
     // _lastPortalMarkerHit. See TryEditMarkupCommentAt.
-    private (int Page, double X, double Y)? _firstClickMarkupPoint;
+    private (int Page, double X, double Y, Point Screen)? _firstClickMarkupPoint;
 
     // Track the last tool so we only update cursor when it changes
     private AnnotationTool _lastCursorTool = AnnotationTool.None;
@@ -440,7 +440,7 @@ public class ViewportPanel : Panel
                 {
                     var (cx, cy) = ScreenToGesturePage(pos);
                     if (ViewModel.FindAnnotationAt(cx, cy) is TextMarkupAnnotation)
-                        _firstClickMarkupPoint = (_gesturePage ?? clickVp.CurrentPage, cx, cy);
+                        _firstClickMarkupPoint = (_gesturePage ?? clickVp.CurrentPage, cx, cy, pos);
                 }
                 ViewModel.HandleClick(pos.X, pos.Y);
             }
@@ -676,7 +676,9 @@ public class ViewportPanel : Panel
         // Prefer the first click's remembered point (the camera may have moved since); fall back to a
         // fresh hit-test when it was not on markup or the page changed.
         double pageX, pageY;
-        if (_firstClickMarkupPoint is { } first && ActiveViewport?.CurrentPage == first.Page)
+        if (_firstClickMarkupPoint is { } first && ActiveViewport?.CurrentPage == first.Page
+            && (screenPos - first.Screen).X is var fx && (screenPos - first.Screen).Y is var fy
+            && fx * fx + fy * fy <= 100.0)   // the second click must be where the first was (≈10 px)
             (pageX, pageY) = (first.X, first.Y);
         else
             (pageX, pageY) = ScreenToGesturePage(screenPos);

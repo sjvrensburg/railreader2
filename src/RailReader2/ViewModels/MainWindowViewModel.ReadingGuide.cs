@@ -74,6 +74,12 @@ public sealed partial class MainWindowViewModel
         /// <summary>Rail steering: (page, block, line) seen on the previous tick — a change that did not come from
         /// a vertical nudge is the rail advancing by itself, and parks. Null = take a fresh snapshot.</summary>
         public (int Page, int Block, int Line)? RailSnapshot;
+        /// <summary>The page analysis <see cref="RailSnapshot"/> was taken against: a different instance (re-run,
+        /// OCR landed) renumbers blocks and lines, which is not the rail advancing — no park.</summary>
+        public PageAnalysis? RailSnapshotAnalysis;
+        /// <summary>The indicator state last sent to the guide layer, so a frame in which nothing about it
+        /// changed (still zone, parked) re-sends nothing.</summary>
+        public SteerIndicator? LastIndicator;
     }
 
     private readonly Dictionary<Viewport, GuideState> _guideByVp = new();
@@ -324,7 +330,8 @@ public sealed partial class MainWindowViewModel
     /// <summary>Apply the sensitivity preference to a stick's geometry (called each time it is planted).</summary>
     private void ConfigureSteerGeometry(Viewport vp, GuideState s)
     {
-        double k = Math.Clamp(_guidePrefs.SteerSensitivity, 0.25, 4.0);
+        // The slider offers 0.4–2; a hand-edited / corrupt file must not turn the geometry into NaN.
+        double k = double.IsFinite(_guidePrefs.SteerSensitivity) ? Math.Clamp(_guidePrefs.SteerSensitivity, 0.4, 2.0) : 1.0;
         double full = SteerFullDeflectionBasePx / k, dead = SteerDeadZoneBasePx / k;
         // A small pane / tear-off / portal view can't hold the full throw (the pointer leaving the pane
         // stops reporting): keep full deflection within ~45 % of its short side.
@@ -349,6 +356,7 @@ public sealed partial class MainWindowViewModel
     {
         s.Parked = false;
         s.RailSnapshot = null;
+        s.LastIndicator = null;
         ConfigureSteerGeometry(vp, s);
         if (vp.Rail.VisualsVisible)
         {
@@ -416,21 +424,30 @@ public sealed partial class MainWindowViewModel
         }
         var step = s.Steer.Tick(dt, 0, false);   // word steps are ignored here — only the throttle and line steps matter
         var here = (vp.CurrentPage, vp.Rail.CurrentNavigableArrayIndex, vp.Rail.CurrentLine);
+        vp.Owner.TryGetAnalysis(vp.CurrentPage, vp.AnalysisParams, out var hereAnalysis);
         if (s.Parked)
         {
-            // Parked after the rail advanced by itself: hold still until the pointer is back in the still zone.
-            if (s.Steer.Axis == SteerAxis.None) s.Parked = false;
-            _controller.SteerRail(vp, 0);
-            s.RailSnapshot = here;
-            return false;
+            // Parked after the rail advanced by itself: hold still until the pointer is back in the still
+            // zone — or the reader nudges vertically, which is a deliberate request for a line.
+            if (s.Steer.Axis == SteerAxis.None || step.LineSteps != 0) s.Parked = false;
+            if (s.Parked)
+            {
+                _controller.SteerRail(vp, 0);
+                s.RailSnapshot = here;
+                s.RailSnapshotAnalysis = hereAnalysis;
+                return false;
+            }
         }
         // The rail moved to another line / block / page since the last tick without a vertical nudge: it
-        // advanced by itself at a line end (Core's edge-hold advance) — park there.
-        if (_guidePrefs.ParkAtNewLine && s.RailSnapshot is { } before && before != here)
+        // advanced by itself at a line end (Core's edge-hold advance) — park there. A replaced analysis
+        // renumbers blocks and lines without the rail having moved, so it only refreshes the snapshot.
+        if (_guidePrefs.ParkAtNewLine && !s.Parked && s.RailSnapshot is { } before && before != here
+            && ReferenceEquals(s.RailSnapshotAnalysis, hereAnalysis))
         {
             s.Parked = true;
             _controller.SteerRail(vp, 0);
             s.RailSnapshot = here;
+            s.RailSnapshotAnalysis = hereAnalysis;
             return false;
         }
         _controller.SteerRail(vp, s.Steer.Axis == SteerAxis.Horizontal ? s.Steer.Throttle : 0);
@@ -440,6 +457,7 @@ public sealed partial class MainWindowViewModel
             here = (vp.CurrentPage, vp.Rail.CurrentNavigableArrayIndex, vp.Rail.CurrentLine);   // the nudge's own move
         }
         s.RailSnapshot = here;
+        s.RailSnapshotAnalysis = hereAnalysis;
         // The word marker follows Core's reading point, which moves while the camera is pinned at a line's
         // head or tail; TickReadingGuide re-sends the guide layer after every tick, so it is redrawn then.
         return s.Steer.IsMoving;
@@ -485,9 +503,16 @@ public sealed partial class MainWindowViewModel
         {
             if (!s.Steer.Engaged) continue;
             if (TickStick(vp, s, dt)) animating = true;
-            // One repaint of the stick indicator per frame, AFTER the tick: the pointer moves while the page
-            // may not, and a release inside the tick (document end, rail gone) must clear it too.
-            InvalidateGuideLayer(vp);
+            // Repaint the stick indicator AFTER the tick — the pointer moves while the page may not, and a
+            // release inside the tick (document end, rail gone) must clear it too — but only when it changed
+            // (a held stick in the still zone, or parked, re-sends nothing). Rail steering also moves the word
+            // marker every tick while the stick is deflected, so it always re-sends then.
+            var indicator = TryGetSteerIndicator(vp);
+            if (indicator != s.LastIndicator || (s.RailSteering && s.Steer.IsMoving))
+            {
+                s.LastIndicator = indicator;
+                InvalidateGuideLayer(vp);
+            }
         }
         return animating;
     }
@@ -521,9 +546,10 @@ public sealed partial class MainWindowViewModel
         var step = s.Steer.Tick(dt, chars, sentenceEnd);
         if (s.Parked)
         {
-            // Parked after a new line: ignore the stick until the pointer is back in the still zone.
-            if (s.Steer.Axis == SteerAxis.None) s.Parked = false;
-            return KeepGuideInView(vp, s, dt);
+            // Parked after a new line: ignore the stick until the pointer is back in the still zone. A
+            // vertical nudge is a deliberate request for a line, so it is honoured (and ends the park).
+            if (s.Steer.Axis == SteerAxis.None || step.LineSteps != 0) s.Parked = false;
+            if (s.Parked) return KeepGuideInView(vp, s, dt);
         }
         if (step.Any)
         {

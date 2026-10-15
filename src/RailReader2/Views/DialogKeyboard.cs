@@ -72,7 +72,11 @@ internal static class DialogStacking
 
     private static void Raise(Window dialog)
     {
-        if (dialog.Owner is not Window { WindowState: WindowState.FullScreen }) return;
+        // Any ancestor counts: a dialog opened from another (topmost) dialog has that dialog as its owner.
+        bool fullscreen = false;
+        for (var o = dialog.Owner as Window; o is not null && !fullscreen; o = o.Owner as Window)
+            fullscreen = o.WindowState == WindowState.FullScreen;
+        if (!fullscreen) return;
         dialog.Topmost = true;
         dialog.Activate();
     }

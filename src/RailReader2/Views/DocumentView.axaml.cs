@@ -603,6 +603,15 @@ public partial class DocumentView : UserControl, IViewportSurface
     /// a halo of the opposite lightness (black on dark pages, white on light ones).</summary>
     internal static (SKColor Accent, SKColor Halo) SteerColours(ColourEffect effect)
     {
+        // Pure function of the effect, evaluated every frame a stick is deflected: compute once per effect.
+        if (s_steerColours.TryGetValue(effect, out var cached)) return cached;
+        return s_steerColours[effect] = ComputeSteerColours(effect);
+    }
+
+    private static readonly Dictionary<ColourEffect, (SKColor Accent, SKColor Halo)> s_steerColours = new();
+
+    private static (SKColor Accent, SKColor Halo) ComputeSteerColours(ColourEffect effect)
+    {
         bool darkPage = AnnotationRenderer.IsDarkBackdrop(effect);
         // Conservative page colours: pure black, and a cream a little darker than white (Amber's page),
         // which gives a lower ratio than white would.
