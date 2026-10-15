@@ -8,8 +8,8 @@
     <DockPanel Margin="16">
         <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal"
                     HorizontalAlignment="Right" Spacing="8" Margin="0,12,0,0">
-            <Button Content="OK" Width="80" Click="OnOkClick" />
-            <Button Content="Cancel" Width="80" Click="OnCancelClick" />
+            <Button Content="OK" MinWidth="80" HorizontalContentAlignment="Center" Click="OnOkClick" />
+            <Button Content="Cancel" MinWidth="80" HorizontalContentAlignment="Center" Click="OnCancelClick" />
         </StackPanel>
         <TextBox x:Name="PageInput" />
     </DockPanel>
