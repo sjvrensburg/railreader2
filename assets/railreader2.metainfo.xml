@@ -101,6 +101,9 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="3.74.0.0" date="2026-10-15">
+      <description><p>Steering is calmer and easier to follow: a small indicator shows where the stick was planted and how far you are pushing (in the colours of the active colour effect), steering parks when it moves to a new line so you can find your place and re-centre the mouse, and a new Steer sensitivity setting tunes the throw. Double-clicking a highlight at rail zoom now opens its comment instead of zooming, dialogs no longer hide behind a fullscreen window, and Cancel is no longer clipped at larger font sizes.</p></description>
+    </release>
     <release version="3.73.0.0" date="2026-10-13">
       <description><p>The reading guide now steers rail mode too: hold Shift and nudge to scroll along the line with the word being read outlined and kept centred, step lines with a nudge up or down, and pause at equations, tables and new pages until you push again.</p></description>
     </release>

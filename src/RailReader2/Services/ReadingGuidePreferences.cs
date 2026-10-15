@@ -40,6 +40,16 @@ public sealed class ReadingGuidePreferences
     /// on each side (Core's <c>ReadingGuideHitTester.DeadZoneFraction</c>). 0 = always the nearest line.</summary>
     public double DeadZone { get; set; } = 0.6;
 
+    /// <summary>Steer mode: how readily the pointer's displacement moves the guide. 1 = the default; lower
+    /// widens the still zone around where Shift went down and the distance to full speed (calmer),
+    /// higher narrows both. Scales Core's <c>ReadingGuideSteer.DeadZonePx</c>/<c>FullDeflectionPx</c>.</summary>
+    public double SteerSensitivity { get; set; } = 1.0;
+
+    /// <summary>Steer mode: when the flow (or the rail) moves to a new line or page on its own, park — nothing
+    /// moves until the pointer is back in the still zone and pushes again — so the reader has time to find
+    /// their place and re-centre the pointer. A line the reader steps to with a vertical nudge doesn't park.</summary>
+    public bool ParkAtNewLine { get; set; } = true;
+
     public static string Path => System.IO.Path.Combine(AppConfig.ConfigDir, "reading_guide_prefs.json");
 
     public static ReadingGuidePreferences Load()

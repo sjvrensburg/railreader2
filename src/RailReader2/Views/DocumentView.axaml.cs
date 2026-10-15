@@ -374,13 +374,21 @@ public partial class DocumentView : UserControl, IViewportSurface
     /// changed). Cheap: the page-space marker list is cached and only rebuilt when it actually changes.</summary>
     public void RenderPortalMarkers() => PortalMarkerLayer.UpdateState(BuildPortalMarkerState(_tab));
 
-    /// <summary>Re-send the reading-guide layer for THIS view's viewport, refresh the pointer-glyph hiding
-    /// (the follow state can change without a pointer move — Shift down/up, mode off), and, when the
-    /// line-focus dim is on, re-send the page state so the dim band tracks the guide line.</summary>
-    public void RenderReadingGuide()
+    /// <summary>Re-send just the reading-guide layer for THIS view's viewport and refresh the pointer-glyph
+    /// hiding (it depends on whether the steer stick is planted). The per-frame path for the steer
+    /// indicator: no line-focus page-state rebuild.</summary>
+    public void RenderReadingGuideLayer()
     {
         GuideLayer.UpdateState(BuildGuideState());
         Viewport.UpdateGuideCursor();
+    }
+
+    /// <summary>Re-send the reading-guide layer and pointer-glyph hiding (the follow state can change
+    /// without a pointer move — Shift down/up, mode off), and, when the line-focus dim is on, re-send the
+    /// page state so the dim band tracks the guide line.</summary>
+    public void RenderReadingGuide()
+    {
+        RenderReadingGuideLayer();
         if (_tab?.LineFocusBlur == true && _viewport is { Rail.VisualsVisible: false })
             PageLayer.UpdateState(BuildPageState(_tab));
     }
@@ -588,11 +596,62 @@ public partial class DocumentView : UserControl, IViewportSurface
     /// viewport (null line = draw nothing), hidden while the rail draws its own line visuals at rail zoom.
     /// Colours come from the same overlay palette + line-highlight tint/opacity the rail line uses, the word
     /// at a stronger opacity (≈2×, capped).</summary>
+    /// <summary>Steer indicator colours for a colour effect: the effect's overlay accent (its block outline —
+    /// blue / cyan / yellow / amber / green, each picked to stand out on that effect), pushed toward contrast
+    /// with the page it is drawn on until it clears a minimum WCAG ratio (a pale accent darkens on a light
+    /// page, a dark one lightens on a dark page — e.g. amber becomes a brown on the cream Amber page), over
+    /// a halo of the opposite lightness (black on dark pages, white on light ones).</summary>
+    internal static (SKColor Accent, SKColor Halo) SteerColours(ColourEffect effect)
+    {
+        // Pure function of the effect, evaluated every frame a stick is deflected: compute once per effect.
+        if (s_steerColours.TryGetValue(effect, out var cached)) return cached;
+        return s_steerColours[effect] = ComputeSteerColours(effect);
+    }
+
+    private static readonly Dictionary<ColourEffect, (SKColor Accent, SKColor Halo)> s_steerColours = new();
+
+    private static (SKColor Accent, SKColor Halo) ComputeSteerColours(ColourEffect effect)
+    {
+        bool darkPage = AnnotationRenderer.IsDarkBackdrop(effect);
+        // Conservative page colours: pure black, and a cream a little darker than white (Amber's page),
+        // which gives a lower ratio than white would.
+        var page = darkPage ? new SKColor(0, 0, 0) : new SKColor(255, 250, 215);
+        double min = darkPage ? 7.0 : 4.5;
+        var c = effect.GetOverlayPalette().BlockOutline.ToSKColor().WithAlpha(255);
+        for (int i = 0; i < 12 && ContrastRatio(c, page) < min; i++)
+        {
+            c = darkPage
+                ? new SKColor((byte)(c.Red + (255 - c.Red) * 0.2f), (byte)(c.Green + (255 - c.Green) * 0.2f),
+                    (byte)(c.Blue + (255 - c.Blue) * 0.2f))
+                : new SKColor((byte)(c.Red * 0.88f), (byte)(c.Green * 0.88f), (byte)(c.Blue * 0.88f));
+        }
+        return (c, darkPage ? SKColors.Black : SKColors.White);
+    }
+
+    /// <summary>WCAG 2 contrast ratio between two opaque colours (1…21).</summary>
+    private static double ContrastRatio(SKColor a, SKColor b)
+    {
+        static double Lin(byte v) { double c = v / 255.0; return c <= 0.04045 ? c / 12.92 : Math.Pow((c + 0.055) / 1.055, 2.4); }
+        static double Lum(SKColor k) => 0.2126 * Lin(k.Red) + 0.7152 * Lin(k.Green) + 0.0722 * Lin(k.Blue);
+        double la = Lum(a), lb = Lum(b);
+        return (Math.Max(la, lb) + 0.05) / (Math.Min(la, lb) + 0.05);
+    }
+
     private ReadingGuideRenderState BuildGuideState()
     {
         var vm = _shared;
         var empty = new ReadingGuideRenderState(SKMatrix.Identity, null, null, 0f, SKColors.Transparent, SKColors.Transparent, 1f);
         if (vm is null || _viewport is not { } vp) return empty;
+        // The steering indicator is screen-space and independent of where the guide / rail line is.
+        var steer = vm.TryGetSteerIndicator(vp);
+        var (steerAccent, steerHalo) = steer is null
+            ? (empty.SteerAccent, empty.SteerHalo)
+            : SteerColours(vm.Controller.ActiveColourEffect);
+        empty = empty with
+        {
+            Steer = steer, SteerAccent = steerAccent, SteerHalo = steerHalo,
+            SteerOnDarkPage = steer is not null && AnnotationRenderer.IsDarkBackdrop(vm.Controller.ActiveColourEffect),
+        };
         var palette = vm.Controller.ActiveColourEffect.GetOverlayPalette();
         var tint = vm.AppConfig.LineHighlightTint;
         double opacity = vm.AppConfig.LineHighlightOpacity;
@@ -604,12 +663,14 @@ public partial class DocumentView : UserControl, IViewportSurface
             // Rail draws its own line; the layer contributes only the optional steering word marker (§11).
             return vm.TryGetRailWordMarker(vp, out var marker)
                 ? new ReadingGuideRenderState(BuildCamera(vp), null, marker, 0f, SKColors.Transparent, wordColor, (float)vp.Camera.Zoom)
+                    { Steer = empty.Steer, SteerAccent = empty.SteerAccent, SteerHalo = empty.SteerHalo, SteerOnDarkPage = empty.SteerOnDarkPage }
                 : empty;
         }
         if (!vm.TryGetGuide(vp, out var pos)) return empty;
         return new ReadingGuideRenderState(
             BuildCamera(vp), pos.LineRect, vm.ReadingGuidePrefs.WordHighlight ? pos.WordRect : null,
-            (float)vm.AppConfig.LinePadding, lineColor, wordColor, (float)vp.Camera.Zoom);
+            (float)vm.AppConfig.LinePadding, lineColor, wordColor, (float)vp.Camera.Zoom)
+        { Steer = empty.Steer, SteerAccent = empty.SteerAccent, SteerHalo = empty.SteerHalo, SteerOnDarkPage = empty.SteerOnDarkPage };
     }
 
     private RailOverlayRenderState BuildOverlayState(TabViewModel? tab)

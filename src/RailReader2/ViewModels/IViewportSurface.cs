@@ -33,6 +33,9 @@ public interface IViewportSurface
     /// <summary>Re-send this surface's reading-guide layer state (and refresh the pointer-glyph hiding)
     /// for its own viewport's parked / followed guide position.</summary>
     void RenderReadingGuide();
+    /// <summary>Re-send just the reading-guide layer's state (and refresh the pointer-glyph hiding) — the
+    /// cheap per-frame path for the steer indicator (no line-focus page-state rebuild).</summary>
+    void RenderReadingGuideLayer();
     void NotifyAccessibility();
 
     /// <summary>Show or hide this surface's focused-pane affordance (a border accent). The VM only

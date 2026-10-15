@@ -43,6 +43,13 @@ public class ViewportPanel : Panel
     // fresh hit-test at that point can miss the marker entirely. See TryHandlePortalMarkerClick.
     private PortalMarker? _lastPortalMarkerHit;
 
+    // Page-space point of the gesture's first click when it landed on text markup, kept across the
+    // clicks of a double-click. At rail zoom the first click's rail snap (Core's HandleClick) scrolls the
+    // highlight out from under the pointer before the second click's release, so a fresh hit-test there
+    // misses it and the double-click would fall through to block framing. Same idea as
+    // _lastPortalMarkerHit. See TryEditMarkupCommentAt.
+    private (int Page, double X, double Y, Point Screen)? _firstClickMarkupPoint;
+
     // Track the last tool so we only update cursor when it changes
     private AnnotationTool _lastCursorTool = AnnotationTool.None;
 
@@ -171,7 +178,11 @@ public class ViewportPanel : Panel
             _dragging = true;
             _browseAnnotationDrag = false;
             _pressClickCount = e.ClickCount;
-            if (_pressClickCount <= 1) _lastPortalMarkerHit = null;   // fresh gesture: drop any stale cache
+            if (_pressClickCount <= 1)
+            {
+                _lastPortalMarkerHit = null;   // fresh gesture: drop any stale caches
+                _firstClickMarkupPoint = null;
+            }
             e.Handled = true;
 
             bool isPen = e.Pointer.Type == PointerType.Pen;
@@ -317,7 +328,7 @@ public class ViewportPanel : Panel
     /// every exit path because it keys on <see cref="InputElement.IsPointerOver"/> too.</summary>
     public void UpdateGuideCursor()
     {
-        bool hide = ViewModel is { IsGuideCursorHidden: true } && IsPointerOver;
+        bool hide = ViewModel?.IsGuideCursorHiddenOver(OwnerView?.SurfaceViewport) == true && IsPointerOver;
         if (hide == _guideCursorHidden) return;
         _guideCursorHidden = hide;
         _showingLinkCursor = false;
@@ -424,6 +435,13 @@ public class ViewportPanel : Panel
             }
             else if (isClick)
             {
+                // Remember a text-markup hit BEFORE HandleClick: at rail zoom it snaps the camera.
+                if (_pressClickCount <= 1 && ActiveViewport is { } clickVp)
+                {
+                    var (cx, cy) = ScreenToGesturePage(pos);
+                    if (ViewModel.FindAnnotationAt(cx, cy) is TextMarkupAnnotation)
+                        _firstClickMarkupPoint = (_gesturePage ?? clickVp.CurrentPage, cx, cy, pos);
+                }
                 ViewModel.HandleClick(pos.X, pos.Y);
             }
         }
@@ -655,7 +673,15 @@ public class ViewportPanel : Panel
     private bool TryEditMarkupCommentAt(Point screenPos)
     {
         if (ViewModel is not { } vm) return false;
-        var (pageX, pageY) = ScreenToGesturePage(screenPos);
+        // Prefer the first click's remembered point (the camera may have moved since); fall back to a
+        // fresh hit-test when it was not on markup or the page changed.
+        double pageX, pageY;
+        if (_firstClickMarkupPoint is { } first && ActiveViewport?.CurrentPage == first.Page
+            && (screenPos - first.Screen).X is var fx && (screenPos - first.Screen).Y is var fy
+            && fx * fx + fy * fy <= 100.0)   // the second click must be where the first was (≈10 px)
+            (pageX, pageY) = (first.X, first.Y);
+        else
+            (pageX, pageY) = ScreenToGesturePage(screenPos);
         if (vm.FindAnnotationAt(pageX, pageY) is not TextMarkupAnnotation) return false;
         return vm.HandleBrowseClick((float)pageX, (float)pageY, isDoubleClick: true).Handled;
     }

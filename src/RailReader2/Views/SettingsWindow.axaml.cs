@@ -60,6 +60,7 @@ public partial class SettingsWindow : Window
     public SettingsWindow()
     {
         InitializeComponent();
+        DialogStacking.KeepAboveFullscreenOwner(this);
         InitAdvancedView();
     }
 
@@ -832,6 +833,8 @@ public partial class SettingsWindow : Window
         };
         GuideWordCheck.IsChecked = p.WordHighlight;
         GuideDeadZoneSlider.Value = p.DeadZone;
+        GuideSteerSensitivitySlider.Value = p.SteerSensitivity;
+        GuideParkCheck.IsChecked = p.ParkAtNewLine;
     }
 
     private void OnGuideFollowChanged(object? sender, SelectionChangedEventArgs e)
@@ -857,6 +860,20 @@ public partial class SettingsWindow : Window
     {
         if (e.Property.Name != "Value" || Vm is not { } vm || _loading) return;
         vm.ReadingGuidePrefs.DeadZone = GuideDeadZoneSlider.Value;
+        vm.OnReadingGuidePrefsChanged();
+    }
+
+    private void OnGuideParkChanged(object? sender, RoutedEventArgs e)
+    {
+        if (Vm is not { } vm || _loading) return;
+        vm.ReadingGuidePrefs.ParkAtNewLine = GuideParkCheck.IsChecked == true;
+        vm.OnReadingGuidePrefsChanged();
+    }
+
+    private void OnGuideSteerSensitivityChanged(object? sender, Avalonia.AvaloniaPropertyChangedEventArgs e)
+    {
+        if (e.Property.Name != "Value" || Vm is not { } vm || _loading) return;
+        vm.ReadingGuidePrefs.SteerSensitivity = GuideSteerSensitivitySlider.Value;
         vm.OnReadingGuidePrefsChanged();
     }
 
