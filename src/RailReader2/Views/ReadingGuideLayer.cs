@@ -123,6 +123,7 @@ internal sealed class ReadingGuideVisualHandler : CompositionCustomVisualHandler
     // on a dark one) and takes its accent from the colour effect's overlay palette. Deliberately small and quiet — it is orientation, not a
     // control; the knob firms up as the throttle rises. No closures: this redraws every frame.
     private const float KnobRadiusPx = 6f;
+    private const float ParkedKnobRadiusPx = 11f;   // roomy enough for a legible pause mark
     private const float ZoneCornerPx = 8f;
 
     private void DrawSteerIndicator(SKCanvas canvas, SteerIndicator st, SKColor accent, SKColor haloColour, bool darkPage)
@@ -134,7 +135,8 @@ internal sealed class ReadingGuideVisualHandler : CompositionCustomVisualHandler
         float mag = MathF.Max(MathF.Abs(dx), MathF.Abs(dy));   // Core's norm
         if (mag > full && mag > 0) { float k = full / mag; dx *= k; dy *= k; mag = full; }
         float kx = ox + dx, ky = oy + dy;
-        bool pushing = mag > dead;
+        bool parked = st.Parked;
+        bool pushing = mag > dead && !parked;
         float push = (float)Math.Clamp(st.Throttle, 0, 1);
         // Near-opaque: a translucent stroke blends toward the page and loses the contrast the accent was
         // chosen for. The knob/line firm up a little with the throttle.
@@ -149,7 +151,8 @@ internal sealed class ReadingGuideVisualHandler : CompositionCustomVisualHandler
         {
             bool halo = pass == 0;
             // Still zone.
-            Stroke(halo, haloColour, 1.5f, accent.WithAlpha(ring));
+            // Parked: the zone is where to come back to — draw it heavier.
+            Stroke(halo, haloColour, parked ? 3f : 1.5f, accent.WithAlpha(ring));
             canvas.DrawRoundRect(zone, ZoneCornerPx, ZoneCornerPx, _paint);
             if (pushing)
             {
@@ -162,7 +165,7 @@ internal sealed class ReadingGuideVisualHandler : CompositionCustomVisualHandler
             {
                 // Hollow knob inside the zone.
                 Stroke(halo, haloColour, 2f, accent.WithAlpha(hollow));
-                canvas.DrawCircle(kx, ky, KnobRadiusPx, _paint);
+                canvas.DrawCircle(kx, ky, parked ? ParkedKnobRadiusPx : KnobRadiusPx, _paint);
             }
         }
         if (pushing)
@@ -173,6 +176,18 @@ internal sealed class ReadingGuideVisualHandler : CompositionCustomVisualHandler
             canvas.DrawCircle(kx, ky, KnobRadiusPx + 2f, _paint);
             _paint.Color = accent.WithAlpha(strong);
             canvas.DrawCircle(kx, ky, KnobRadiusPx, _paint);
+        }
+        if (parked)
+        {
+            // Pause mark inside the hollow knob: the stick is waiting for the pointer to come back.
+            _paint.Style = SKPaintStyle.Stroke;
+            _paint.StrokeCap = SKStrokeCap.Butt;
+            for (int pass = 0; pass < 2; pass++)
+            {
+                Stroke(pass == 0, haloColour, 3f, accent.WithAlpha(hollow));
+                canvas.DrawLine(kx - 3.5f, ky - 5f, kx - 3.5f, ky + 5f, _paint);
+                canvas.DrawLine(kx + 3.5f, ky - 5f, kx + 3.5f, ky + 5f, _paint);
+            }
         }
         _paint.Style = SKPaintStyle.Fill;
     }

@@ -178,7 +178,7 @@
                                       IsCheckedChanged="OnGuideWordChanged" />
                         </Grid>
                         <Border Classes="advblock adv">
-                            <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto,8,Auto">
+                            <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto,8,Auto,8,Auto">
                                 <TextBlock Grid.Row="0" Grid.Column="0" Text="Line stickiness (point modes):" VerticalAlignment="Center"
                                            ToolTip.Tip="Point modes only: how far the pointer may stray above or below the current line (in line heights) before the guide moves to the next one. Steer pace follows the Reading Pace preset." />
                                 <Slider Grid.Row="0" Grid.Column="2" Name="GuideDeadZoneSlider" Minimum="0" Maximum="1.5"
@@ -189,6 +189,10 @@
                                 <Slider Grid.Row="2" Grid.Column="2" Name="GuideSteerSensitivitySlider" Minimum="0.4" Maximum="2"
                                         Value="1" MinWidth="120"
                                         PropertyChanged="OnGuideSteerSensitivityChanged" />
+                                <CheckBox Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="3" Name="GuideParkCheck"
+                                          Content="Pause at each new line (steer back to the centre ring, then push to continue)"
+                                          ToolTip.Tip="Steer mode: when the guide or the rail moves to a new line or page on its own, it parks until you bring the pointer back to the centre ring — time to find your place and re-centre the mouse. Lines you step to with a vertical nudge don't pause."
+                                          IsCheckedChanged="OnGuideParkChanged" />
                             </Grid>
                         </Border>
 

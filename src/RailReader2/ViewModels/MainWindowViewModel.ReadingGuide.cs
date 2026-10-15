@@ -43,7 +43,7 @@ namespace RailReader2.ViewModels;
 /// </summary>
 public readonly record struct SteerIndicator(
     double OriginX, double OriginY, double PointerX, double PointerY,
-    double DeadZonePx, double FullDeflectionPx, double Throttle);
+    double DeadZonePx, double FullDeflectionPx, double Throttle, bool Parked = false);
 
 public sealed partial class MainWindowViewModel
 {
@@ -68,6 +68,12 @@ public sealed partial class MainWindowViewModel
         public int PendingSeat;
         /// <summary>True while this view's stick drives the rail (§11) rather than the word guide.</summary>
         public bool RailSteering;
+        /// <summary>Steer parked after moving to a new line / page on its own: the stick is ignored until the
+        /// pointer returns to its still zone (then a fresh push resumes).</summary>
+        public bool Parked;
+        /// <summary>Rail steering: (page, block, line) seen on the previous tick — a change that did not come from
+        /// a vertical nudge is the rail advancing by itself, and parks. Null = take a fresh snapshot.</summary>
+        public (int Page, int Block, int Line)? RailSnapshot;
     }
 
     private readonly Dictionary<Viewport, GuideState> _guideByVp = new();
@@ -336,11 +342,13 @@ public sealed partial class MainWindowViewModel
         if (!IsReadingGuideMode || !_guideByVp.TryGetValue(vp, out var s) || !s.Steer.Engaged)
             return null;
         return new SteerIndicator(s.Steer.OriginX, s.Steer.OriginY, s.ScreenX, s.ScreenY,
-            s.Steer.DeadZonePx, s.Steer.FullDeflectionPx, Math.Abs(s.Steer.Throttle));
+            s.Steer.DeadZonePx, s.Steer.FullDeflectionPx, Math.Abs(s.Steer.Throttle), s.Parked);
     }
 
     private void EngageSteer(Viewport vp, GuideState s)
     {
+        s.Parked = false;
+        s.RailSnapshot = null;
         ConfigureSteerGeometry(vp, s);
         if (vp.Rail.VisualsVisible)
         {
@@ -407,9 +415,31 @@ public sealed partial class MainWindowViewModel
             return false;
         }
         var step = s.Steer.Tick(dt, 0, false);   // word steps are ignored here — only the throttle and line steps matter
+        var here = (vp.CurrentPage, vp.Rail.CurrentNavigableArrayIndex, vp.Rail.CurrentLine);
+        if (s.Parked)
+        {
+            // Parked after the rail advanced by itself: hold still until the pointer is back in the still zone.
+            if (s.Steer.Axis == SteerAxis.None) s.Parked = false;
+            _controller.SteerRail(vp, 0);
+            s.RailSnapshot = here;
+            return false;
+        }
+        // The rail moved to another line / block / page since the last tick without a vertical nudge: it
+        // advanced by itself at a line end (Core's edge-hold advance) — park there.
+        if (_guidePrefs.ParkAtNewLine && s.RailSnapshot is { } before && before != here)
+        {
+            s.Parked = true;
+            _controller.SteerRail(vp, 0);
+            s.RailSnapshot = here;
+            return false;
+        }
         _controller.SteerRail(vp, s.Steer.Axis == SteerAxis.Horizontal ? s.Steer.Throttle : 0);
         if (step.LineSteps != 0)
+        {
             _controller.StepRailLine(vp, step.LineSteps > 0);
+            here = (vp.CurrentPage, vp.Rail.CurrentNavigableArrayIndex, vp.Rail.CurrentLine);   // the nudge's own move
+        }
+        s.RailSnapshot = here;
         // The word marker follows Core's reading point, which moves while the camera is pinned at a line's
         // head or tail; TickReadingGuide re-sends the guide layer after every tick, so it is redrawn then.
         return s.Steer.IsMoving;
@@ -489,6 +519,12 @@ public sealed partial class MainWindowViewModel
         }
 
         var step = s.Steer.Tick(dt, chars, sentenceEnd);
+        if (s.Parked)
+        {
+            // Parked after a new line: ignore the stick until the pointer is back in the still zone.
+            if (s.Steer.Axis == SteerAxis.None) s.Parked = false;
+            return KeepGuideInView(vp, s, dt);
+        }
         if (step.Any)
         {
             bool forward = (step.WordSteps + step.LineSteps) > 0;
@@ -496,7 +532,14 @@ public sealed partial class MainWindowViewModel
                 ? ReadingGuideFlow.StepWord(pos, forward, analysis, words, roles)
                 : ReadingGuideFlow.StepLine(pos, forward, analysis, words, roles);
             if (next is { } n)
+            {
+                // The flow ran off the end of a line (or into another block) by itself: park there. A
+                // vertical nudge asked for its line, so it doesn't park.
+                if (step.WordSteps != 0 && _guidePrefs.ParkAtNewLine
+                    && (n.BlockIndex != pos.BlockIndex || n.LineIndex != pos.LineIndex))
+                    s.Parked = true;
                 SetGuide(vp, s, s.Page, n, analysis);
+            }
             else
                 TurnGuidePage(vp, s, forward);
         }
@@ -519,6 +562,7 @@ public sealed partial class MainWindowViewModel
         if (!doc.GoToPage(vp, target, _controller.Worker, _controller.Config.NavigableRoles, vp.Width, vp.Height))
             return;
         doc.QueueLookahead(vp, _appConfig.AnalysisLookaheadPages);
+        s.Parked = _guidePrefs.ParkAtNewLine;   // a new page is the biggest change of place there is
         s.PendingSeat = forward ? 1 : -1;
         s.Page = target;
         s.Position = null;
