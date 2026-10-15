@@ -13,7 +13,8 @@
   <a href="https://github.com/sjvrensburg/railreader2/releases/latest">Download</a> &middot;
   <a href="https://apps.microsoft.com/store/detail/9P9J8KZ6RVZP">Microsoft Store</a> &middot;
   <a href="https://sjvrensburg.github.io/railreader2/">Website</a> &middot;
-  <a href="https://sjvrensburg.github.io/railreader2/guide.html">User Guide</a>
+  <a href="https://sjvrensburg.github.io/railreader2/guide.html">User Guide</a> &middot;
+  <a href="https://sjvrensburg.github.io/railreader2/ecosystem.html">Ecosystem</a>
 </p>
 
 <p align="center">
@@ -55,6 +56,7 @@ Everything runs on your own computer. The layout model is included in the downlo
 - Line-by-line rail reading through paragraphs, columns and pages, in reading order.
 - Semi-automatic scrolling (`P`): flows through prose on its own and stops at equations, tables, figures and headings until you press a key to continue.
 - Jump mode (`J`) for reading in short hops instead of a continuous scroll.
+- Reading guide (`K`) for lower zoom: hold `Shift` and nudge the pointer, like an invisible joystick, to carry a word-by-word highlight along the text at your pace. A small indicator shows how far you are pushing, and the guide pauses at each new line so you can find your place. Above the rail threshold, the same nudge drives rail mode.
 - Line focus (`F`) and line highlight (`H`) keep your eye on the current line.
 - Freeze panes (toolbar snowflake): pin a table's header row or label column while the rest scrolls, like in a spreadsheet.
 - Portals: keep a figure or table in view while you read the paragraph that refers to it. "See Figure 3" can pin Figure 3 automatically.
@@ -79,12 +81,19 @@ Everything runs on your own computer. The layout model is included in the downlo
 
 **Notes and highlights**
 - Highlight, underline, strike out, draw, add text notes and text boxes, with undo.
+- Comments on highlights (double-click one), and merging of overlapping highlights.
 - Spell checking in notes (British and American English included, and you can add other Hunspell dictionaries).
 - Annotations save automatically. You can export them into a copy of the PDF or share them as a file, and comments already in a PDF (from a reviewer, say) appear in the comments list alongside your own.
 
 **Equations, tables and figures**
 - Copy an equation as LaTeX, a table as Markdown, or a figure as a description, using an AI vision model of your choice: a cloud service, or a local one through Ollama or vLLM. This is optional and off until you configure it.
 - Command-line tool to turn a whole PDF into structured Markdown, or extract its annotations and structure as JSON.
+
+<p align="center">
+  <img src="docs/img/steer_indicator.png" alt="The reading guide steering along a line: a square shows where Shift was pressed, and a dot and line show how far the pointer has been pushed" width="45%">
+  &nbsp;
+  <img src="docs/img/steer_parked.png" alt="The reading guide paused at the start of the next line, with a pause mark on the dot" width="45%">
+</p>
 
 <p align="center">
   <img src="docs/img/colour_effect_high_contrast.png" alt="High-contrast colour filter in rail mode" width="45%">
@@ -135,6 +144,7 @@ Press **F1** at any time for the full list of keyboard shortcuts. These are the 
 | `Space`, `PgDn` / `PgUp` | Next line or page / previous page |
 | `+` / `-` / `0` | Zoom in / zoom out / fit page |
 | `R` | Start rail reading here, at the current zoom |
+| `K` | Reading guide on / off (hold `Shift` and nudge the pointer to read) |
 | `P` / `J` | Auto-scroll / jump mode |
 | `F` / `H` | Line focus / line highlight |
 | `[` / `]` | Slower / faster scrolling |
@@ -208,7 +218,14 @@ railreader2-cli structure paper.pdf --analyze --include-text --output structure.
 railreader2-cli render paper.pdf --pages 1-5 --dpi 300 --effect amber --output-dir ./out
 ```
 
-Encrypted PDFs take `--password`. Run `railreader2-cli <command> --help` for every option, or see the [CLI section of the User Guide](https://sjvrensburg.github.io/railreader2/guide.html#cli-tool). The JSON formats are stable: breaking changes only happen in major versions, so other tools can build on them. [railmark](https://github.com/sjvrensburg/railmark), for example, turns your annotations into a Markdown summary.
+Encrypted PDFs take `--password`. Run `railreader2-cli <command> --help` for every option, or see the [CLI section of the User Guide](https://sjvrensburg.github.io/railreader2/guide.html#cli-tool). The JSON formats are stable: breaking changes only happen in major versions, so other tools can build on them. [RailMark](https://sjvrensburg.github.io/railmark/), for example, turns your annotations into a Markdown summary.
+
+## The wider family
+
+railreader2 is one of three connected projects, all MIT-licensed. There is a short [ecosystem page](https://sjvrensburg.github.io/railreader2/ecosystem.html) with more detail.
+
+- **[RailReaderCore](https://github.com/sjvrensburg/RailReaderCore)** is the reading engine under railreader2, as a set of portable .NET libraries on [NuGet](https://www.nuget.org/packages?q=RailReader): rail navigation, layout analysis, OCR, search, annotations and Markdown export. Use it if you want these in your own project.
+- **[RailMark](https://sjvrensburg.github.io/railmark/)** ([source](https://github.com/sjvrensburg/railmark)) reads the highlights and comments in a PDF out as Markdown or JSON, exports any PDF to layout-aware Markdown, and writes an AI reviewer's markup back in as native PDF annotations. It is built on RailReaderCore, and works with the annotations you make in railreader2.
 
 ## Why I built this
 
@@ -216,7 +233,7 @@ As a visually impaired user, I need a PDF viewer that works comfortably at high 
 
 ## For developers
 
-RailReader2 is a .NET 10 / [Avalonia](https://avaloniaui.net/) app. The reading engine (rail navigation, layout analysis, rendering, annotations, search, Markdown export) lives in [RailReaderCore](https://github.com/sjvrensburg/RailReaderCore) and is used here as NuGet packages. This repository holds the desktop app, the CLI, and their tests.
+RailReader2 is a .NET 10 / [Avalonia](https://avaloniaui.net/) app. The reading engine (rail navigation, layout analysis, rendering, annotations, search, Markdown export) lives in [RailReaderCore](https://github.com/sjvrensburg/RailReaderCore) and is used here as NuGet packages (see [the ecosystem page](https://sjvrensburg.github.io/railreader2/ecosystem.html)). This repository holds the desktop app, the CLI, and their tests.
 
 ```bash
 ./scripts/download-model.sh                               # layout models (Heron INT8 + PP-DocLayoutV3)

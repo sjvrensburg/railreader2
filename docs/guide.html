@@ -96,6 +96,7 @@
         <a href="#cli-tool">CLI</a>
         <a href="#icons">Icons</a>
         <a href="#shortcuts">Shortcuts</a>
+        <a href="ecosystem.html">Ecosystem</a>
         <a href="https://github.com/sjvrensburg/railreader2">GitHub</a>
       </nav>
     </div>
@@ -349,11 +350,77 @@
         <code>R</code> again or <code>Escape</code> to leave.
       </p>
 
+      <h3 id="reading-guide">Reading guide (pointer-driven, any zoom)</h3>
+      <p>
+        If you read at low magnification (around 1.25&ndash;2&times;) and don't want to chase the text with
+        the mouse, use the <strong>reading guide</strong> instead of rail mode. Turn it on with the
+        <strong>Reading guide</strong> toolbar button (beside Browse and Text Select),
+        <strong>Rail &rarr; Reading Guide</strong>, or <code>K</code>. Click the word you want to start on,
+        then hold <code>Shift</code> and <strong>nudge</strong> the pointer: the pointer becomes an invisible
+        joystick. Push a little to the right and the guide flows <strong>word by word</strong> through the
+        text &mdash; on to the next line, the next paragraph, the next page &mdash; at your reading pace; push
+        further to go faster; push left to go back; up or down to step lines. Bring the pointer back to where
+        you pressed <code>Shift</code> and it stops. The <strong>word</strong> the guide is on and its
+        <strong>line</strong> are marked, and the page only scrolls when the guide nears the edge of the view.
+        Release <code>Shift</code> and the guide <strong>parks</strong> where it is; click another word to jump.
+      </p>
+      <p>
+        The mouse cursor is hidden while you hold <code>Shift</code>, so a small <strong>steering
+        indicator</strong> stands in for it: a square marks where you pressed <code>Shift</code> (the still
+        zone), a dot follows your pointer, and a line joins them once you push past the square. It takes its
+        colour from your colour effect, so it stays easy to see on every one.
+      </p>
+      <figure class="guide-screenshot">
+        <img src="img/steer_indicator.png" alt="The reading guide steering along a line of a two-column paper: the current line and word are marked, a square shows where Shift was pressed, and a dot and line show how far the pointer has been pushed" loading="lazy" width="1440" height="926" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}">
+        <figcaption>Steering with the reading guide &mdash; the square is the still zone; the dot and line show how far you are pushing</figcaption>
+      </figure>
+      <p>
+        <strong>Pausing at each new line.</strong> When the guide moves to a new line, block or page by itself,
+        it <strong>pauses</strong> there: the square turns heavier and the dot shows a pause mark. That gives you
+        time to find your place and, if you like, reposition the mouse. Bring the pointer back inside the
+        square, then push again to carry on. A line you step to with an up or down nudge doesn't pause, and a
+        nudge while paused is honoured straight away.
+      </p>
+      <figure class="guide-screenshot">
+        <img src="img/steer_parked.png" alt="The reading guide paused at the start of a new line, with a heavier square and a dot showing a pause mark" loading="lazy" width="1440" height="926" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}">
+        <figcaption>Paused at the start of the next line &mdash; bring the pointer back inside the square and push again to continue</figcaption>
+      </figure>
+      <p>
+        The pace follows <strong>Reading pace</strong> in Settings &rarr; Reading (Relaxed / Normal / Brisk), and a
+        long word is given a little longer than a short one. The guide uses the same line highlight colour and
+        <strong>Dim the other lines</strong> setting as rail mode (Settings &rarr; Reading &rarr; Current Line). In
+        Settings &rarr; Reading &rarr; <strong>Reading Guide</strong> you can switch to <strong>pointing</strong>
+        instead of steering &mdash; the guide then sits on the word under the pointer while you hold
+        <code>Shift</code> (or <strong>always</strong>, with no key to hold; the cursor stays visible), snapped to
+        the detected text so an unsteady hand never flickers between lines &mdash; and switch the word marking off.
+        Two advanced settings fine-tune steering: <strong>Steer sensitivity</strong> (how far you push before it
+        starts, and how far for full speed &mdash; lower is calmer) and <strong>Pause at each new line</strong>
+        (on by default). Press <code>K</code> or <code>Escape</code> to leave the mode. On a scanned page without a
+        text layer, or while the view is rotated, the guide marks lines only.
+      </p>
+      <p>
+        <strong>In rail mode too.</strong> Zoom past the rail threshold (or use <strong>Start Rail Here</strong>)
+        with the reading guide on, and the same gesture drives the rail: hold <code>Shift</code> and push right to
+        scroll along the line &mdash; gently for a slow read, further for faster &mdash; and the rail turns the
+        line's end into the next line for you, then pauses there (bring the pointer back inside the square and
+        push again to continue); push left to read back; push up or down to step lines. Where semi-auto scroll
+        would stop (an equation, a table, a figure, a heading, a new page) the rail stops too. The
+        <strong>word</strong> passing the reading point is marked on the rail line as you steer. There's no need
+        for the arrow keys or <code>D</code>/<code>S</code>, though they still work.
+      </p>
+
       <h3>Horizontal scrolling</h3>
       <p>
         Holding <code>Right</code>/<code>D</code> scrolls horizontally along the current line with
         speed ramping &mdash; it starts slow and accelerates. <code>Ctrl + mouse wheel</code> also
         scrolls horizontally. The speed ramp time and max speed are configurable in Settings.
+      </p>
+
+      <h3>Rail toolbar</h3>
+      <p>
+        When rail mode is active, a floating toolbar appears with <strong>P</strong> (auto-scroll),
+        <strong>J</strong> (jump mode), <strong>F</strong> (line focus dim), and <strong>H</strong> (line
+        highlight) toggle buttons, plus a speed/distance slider.
       </p>
 
       <h3>Free pan (Ctrl+Drag)</h3>
@@ -684,6 +751,32 @@
       <p>
         Text notes display as a compact folded-corner icon (16px). In browse mode, click the icon to expand a
         floating popup showing the full note text with word wrapping. Click again to collapse.
+      </p>
+
+      <h3 id="highlight-comments">Comments on highlights</h3>
+      <p>
+        Any highlight, underline, strikethrough, or squiggle can carry a comment, like a sticky note attached to
+        the marked text. In browse mode, <strong>double-click</strong> the highlight to open the same note editor
+        used for text notes; or right-click it and choose <strong>Add Comment&hellip;</strong>
+        (<strong>Edit Comment&hellip;</strong> once it has one), or use Edit &rarr;
+        <strong>Add/Edit Comment&hellip;</strong> with the highlight selected. A highlight with a comment shows a
+        small note icon at the end of its first line, and the comment pops up beside it while the highlight is
+        selected. Clearing the text removes the comment. Rectangles and pen strokes take a comment the same way from
+        the right-click menu. Comments appear in the side panel's <strong>Comments</strong> list and in the Markdown
+        export, and are saved into the PDF as the annotation's contents, so other PDF readers show them too.
+      </p>
+
+      <h3 id="merge-highlights">Merging overlapping highlights</h3>
+      <p>
+        Highlighting the same passage twice, or extending a highlight by drawing over its end, leaves two overlapping
+        annotations. Right-click one and choose <strong>Merge Overlapping Highlights</strong> to combine it with every
+        highlight of the same kind and colour that it overlaps into a single annotation (the item only appears when
+        there is something to merge with). Edit &rarr; <strong>Merge Overlapping Highlights</strong> does the same for
+        the selected highlight, or for the <strong>Whole Page</strong> at once. Turn on <strong>Automatically When
+        Drawing</strong> in that submenu to merge each new highlight into whatever it overlaps as you draw it. Every
+        merge is one undo step. If two overlapping highlights carry different comments they are left alone &mdash;
+        edit or clear one first. A reviewer's highlight that lives inside a read-only or signed PDF can't be merged,
+        because the PDF can't be changed to remove it.
       </p>
 
       <h3 id="spell-checking">Spell checking in notes</h3>
@@ -1246,6 +1339,11 @@ railreader2-cli export paper.pdf --figure-dir ./figures --output paper.md</code>
           mouse-wheel scrolling flow smoothly across page boundaries instead of jumping page to page &mdash;
           see <em>Continuous scrolling</em> under <a href="#navigation">Basic Navigation</a>. Takes effect
           immediately.</li>
+        <li><strong>Reading Guide:</strong> How the guide follows the pointer &mdash; <strong>steer</strong> (the
+          default), <strong>point</strong> while holding <code>Shift</code>, or point <strong>always</strong> &mdash;
+          and whether to mark the word being read (see <a href="#reading-guide">Reading guide</a>).
+          <em>Advanced:</em> <strong>Line stickiness</strong> (point modes), <strong>Steer sensitivity</strong>
+          (lower is calmer), and <strong>Pause at each new line</strong>.</li>
         <li><em>Advanced:</em> <strong>Jump distance</strong> &mdash; percentage of the visible width for
           jump mode (5&ndash;80%).</li>
       </ul>
@@ -1536,6 +1634,7 @@ railreader2-cli export paper.pdf --figure-dir ./figures --output paper.md</code>
         <tbody>
           <tr><th colspan="2" scope="rowgroup">Rail Mode</th></tr>
           <tr><td>R</td><td>Start rail here at the current zoom (press again or Escape to exit)</td></tr>
+          <tr><td>K</td><td>Reading guide on/off &mdash; click a word, hold Shift and nudge the pointer to read (any zoom)</td></tr>
           <tr><td>Z</td><td>Freeze panes (rows and columns) / unfreeze</td></tr>
           <tr><td>Down / S</td><td>Next line</td></tr>
           <tr><td>Up / W</td><td>Previous line</td></tr>
@@ -1588,7 +1687,7 @@ railreader2-cli export paper.pdf --figure-dir ./figures --output paper.md</code>
         <li><strong>File</strong> &mdash; open, recent files, duplicate / close tab, export &amp; import annotations, settings, quit.</li>
         <li><strong>Edit</strong> &mdash; find, annotation mode, undo / redo, and <strong>Copy Block as LaTeX / Markdown / Description / Image</strong> (the same VLM block actions as the block right-click menu, acting on the current rail block).</li>
         <li><strong>View</strong> &mdash; zoom and fit, <strong>Rotate</strong>, side panels, minimap, fullscreen, <strong>Split Editor</strong> (split right, move pane to a new window, close panes), debug overlay, colour effects.</li>
-        <li><strong>Rail</strong> &mdash; <strong>Start Rail Here</strong> and <strong>Rotate to Read Block</strong> (<code>R</code> / <code>U</code>), then the rail-reading toggles: <strong>Auto-Scroll</strong>, <strong>Jump Mode</strong>, <strong>Line Focus Dim</strong>, <strong>Line Highlight</strong>, and <strong>Add Bookmark</strong> (mirroring the <code>P</code> / <code>J</code> / <code>F</code> / <code>H</code> / <code>B</code> shortcuts).</li>
+        <li><strong>Rail</strong> &mdash; <strong>Start Rail Here</strong>, <strong>Reading Guide</strong> and <strong>Rotate to Read Block</strong> (<code>R</code> / <code>K</code> / <code>U</code>), then the rail-reading toggles: <strong>Auto-Scroll</strong>, <strong>Jump Mode</strong>, <strong>Line Focus Dim</strong>, <strong>Line Highlight</strong>, and <strong>Add Bookmark</strong> (mirroring the <code>P</code> / <code>J</code> / <code>F</code> / <code>H</code> / <code>B</code> shortcuts).</li>
         <li><strong>Navigation</strong> &mdash; go to / previous / next / first / last page, and semantic <strong>Jump to Next / Previous</strong> heading, figure, table, or equation.</li>
         <li><strong>Help</strong> &mdash; keyboard shortcuts, about, diagnostic log, clean-up.</li>
       </ul>
@@ -1616,6 +1715,7 @@ railreader2-cli export paper.pdf --figure-dir ./figures --output paper.md</code>
       <a href="index.html">Home</a> &middot;
       <a href="https://github.com/sjvrensburg/railreader2">Source</a> &middot;
       <a href="https://github.com/sjvrensburg/railreader2/releases">Releases</a> &middot;
+      <a href="ecosystem.html">Ecosystem</a> &middot;
       <a href="about.html#acknowledgements">Acknowledgements</a> &middot;
       <a href="privacy.html">Privacy</a> &middot;
       MIT License
