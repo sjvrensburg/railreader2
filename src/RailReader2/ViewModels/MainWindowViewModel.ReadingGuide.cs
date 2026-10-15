@@ -36,6 +36,15 @@ namespace RailReader2.ViewModels;
 // Shift-down. Rule (design §7): Shift-down only acts where the pointer actually rests over a view, and
 // a non-Shift key pressed while Shift is held cancels the follow and restores every position parked
 // before the chord, so a chord never moves a reader's place-keeper.
+/// <summary>
+/// The steer stick as the reader needs to see it, in viewport pixels: where it was planted, where the
+/// (hidden) pointer is now, the still-zone radius, the radius of full deflection, and the current
+/// throttle magnitude 0…1. Drawn by the reading-guide layer.
+/// </summary>
+public readonly record struct SteerIndicator(
+    double OriginX, double OriginY, double PointerX, double PointerY,
+    double DeadZonePx, double FullDeflectionPx, double Throttle);
+
 public sealed partial class MainWindowViewModel
 {
     private sealed class GuideState
@@ -78,6 +87,12 @@ public sealed partial class MainWindowViewModel
     // Steer pace from the reading-pace settings (Relaxed 10/28 → 4/11 chars/s, Normal 14/42 → 5.6/17,
     // Brisk 20/60 → 8/24): the same preset that sets hold-to-scroll speed sets the flow.
     private const double CharsPerSecondPerScrollSpeed = 0.4;
+    // Steer stick geometry at sensitivity 1 (Core's defaults, 16/160 px, were found too twitchy: a hand
+    // resting on the mouse drifts past 16 px, and the pace at the dead-zone edge was already a walk).
+    // The pace at the edge of the dead zone is this fraction of the preset's slow end, so a nudge starts
+    // gently and the ramp to full speed has room.
+    private const double SteerDeadZoneBasePx = 28, SteerFullDeflectionBasePx = 260;
+    private const double SteerEdgePaceFraction = 0.5;
 
     /// <summary>The reading-guide pointer mode (toolbar button, Rail ▸ Reading Guide, <c>K</c>). Mutually
     /// exclusive with Text-Select and the annotation tools, like any pointer mode.</summary>
@@ -288,8 +303,28 @@ public sealed partial class MainWindowViewModel
 
     // ── Steer ──────────────────────────────────────────────────────────────────
 
+    /// <summary>Apply the sensitivity preference to a stick's geometry (called each time it is planted).</summary>
+    private void ConfigureSteerGeometry(GuideState s)
+    {
+        double k = Math.Clamp(_guidePrefs.SteerSensitivity, 0.25, 4.0);
+        s.Steer.DeadZonePx = SteerDeadZoneBasePx / k;
+        s.Steer.FullDeflectionPx = SteerFullDeflectionBasePx / k;
+    }
+
+    /// <summary>The on-screen steering indicator for <paramref name="vp"/> while its stick is planted:
+    /// the pointer glyph is hidden while steering, and a hand with no visible cursor loses track of where
+    /// the stick's centre is and how far it has pushed. Null when the stick isn't engaged.</summary>
+    public SteerIndicator? TryGetSteerIndicator(Viewport vp)
+    {
+        if (!IsReadingGuideMode || !_guideByVp.TryGetValue(vp, out var s) || !s.Steer.Engaged)
+            return null;
+        return new SteerIndicator(s.Steer.OriginX, s.Steer.OriginY, s.ScreenX, s.ScreenY,
+            s.Steer.DeadZonePx, s.Steer.FullDeflectionPx, Math.Abs(s.Steer.Throttle));
+    }
+
     private void EngageSteer(Viewport vp, GuideState s)
     {
+        ConfigureSteerGeometry(s);
         if (vp.Rail.VisualsVisible)
         {
             // §11: at rail zoom the stick drives the rail itself — nothing to seat. Planting stops a running
@@ -318,7 +353,7 @@ public sealed partial class MainWindowViewModel
         var cfg = _controller.Config;
         s.Steer.MinLinesPerSecond = 0.8;
         s.Steer.MaxLinesPerSecond = 3.0;
-        s.Steer.MinCharsPerSecond = Math.Max(1.0, cfg.ScrollSpeedStart * CharsPerSecondPerScrollSpeed);
+        s.Steer.MinCharsPerSecond = Math.Max(1.0, cfg.ScrollSpeedStart * CharsPerSecondPerScrollSpeed * SteerEdgePaceFraction);
         s.Steer.MaxCharsPerSecond = Math.Max(s.Steer.MinCharsPerSecond, cfg.ScrollSpeedMax * CharsPerSecondPerScrollSpeed);
         s.Steer.Engage(s.ScreenX, s.ScreenY);
         RequestAnimationFrame();
@@ -403,6 +438,8 @@ public sealed partial class MainWindowViewModel
         foreach (var (vp, s) in _guideByVp)
         {
             if (!s.Steer.Engaged) continue;
+            // Redraw the stick indicator every frame (the pointer moves while the page may not).
+            InvalidateGuideLayer(vp);
             if (s.RailSteering)
             {
                 if (TickRailSteer(vp, s, dt)) animating = true;
@@ -602,6 +639,15 @@ public sealed partial class MainWindowViewModel
     /// <summary>A viewport is going away (tab / pane / window closed): drop its guide state so the
     /// dictionary doesn't pin the disposed viewport (and, via Owner, its document).</summary>
     private void DropGuideState(Viewport vp) => _guideByVp.Remove(vp);
+
+    /// <summary>Re-send only the guide layer (no page-state rebuild) — the per-frame path for the steer
+    /// indicator, which moves with every pointer move.</summary>
+    private void InvalidateGuideLayer(Viewport vp)
+    {
+        foreach (var s in _surfaces)
+            if (ReferenceEquals(s.SurfaceViewport, vp))
+                s.RenderReadingGuideLayer();
+    }
 
     private void InvalidateReadingGuide(Viewport? vp = null)
     {

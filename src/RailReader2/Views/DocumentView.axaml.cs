@@ -377,9 +377,11 @@ public partial class DocumentView : UserControl, IViewportSurface
     /// <summary>Re-send the reading-guide layer for THIS view's viewport, refresh the pointer-glyph hiding
     /// (the follow state can change without a pointer move — Shift down/up, mode off), and, when the
     /// line-focus dim is on, re-send the page state so the dim band tracks the guide line.</summary>
+    public void RenderReadingGuideLayer() => GuideLayer.UpdateState(BuildGuideState());
+
     public void RenderReadingGuide()
     {
-        GuideLayer.UpdateState(BuildGuideState());
+        RenderReadingGuideLayer();
         Viewport.UpdateGuideCursor();
         if (_tab?.LineFocusBlur == true && _viewport is { Rail.VisualsVisible: false })
             PageLayer.UpdateState(BuildPageState(_tab));
@@ -593,6 +595,8 @@ public partial class DocumentView : UserControl, IViewportSurface
         var vm = _shared;
         var empty = new ReadingGuideRenderState(SKMatrix.Identity, null, null, 0f, SKColors.Transparent, SKColors.Transparent, 1f);
         if (vm is null || _viewport is not { } vp) return empty;
+        // The steering indicator is screen-space and independent of where the guide / rail line is.
+        empty = empty with { Steer = vm.TryGetSteerIndicator(vp) };
         var palette = vm.Controller.ActiveColourEffect.GetOverlayPalette();
         var tint = vm.AppConfig.LineHighlightTint;
         double opacity = vm.AppConfig.LineHighlightOpacity;
@@ -604,12 +608,14 @@ public partial class DocumentView : UserControl, IViewportSurface
             // Rail draws its own line; the layer contributes only the optional steering word marker (§11).
             return vm.TryGetRailWordMarker(vp, out var marker)
                 ? new ReadingGuideRenderState(BuildCamera(vp), null, marker, 0f, SKColors.Transparent, wordColor, (float)vp.Camera.Zoom)
+                    { Steer = empty.Steer }
                 : empty;
         }
         if (!vm.TryGetGuide(vp, out var pos)) return empty;
         return new ReadingGuideRenderState(
             BuildCamera(vp), pos.LineRect, vm.ReadingGuidePrefs.WordHighlight ? pos.WordRect : null,
-            (float)vm.AppConfig.LinePadding, lineColor, wordColor, (float)vp.Camera.Zoom);
+            (float)vm.AppConfig.LinePadding, lineColor, wordColor, (float)vp.Camera.Zoom)
+        { Steer = empty.Steer };
     }
 
     private RailOverlayRenderState BuildOverlayState(TabViewModel? tab)

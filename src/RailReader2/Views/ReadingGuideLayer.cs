@@ -2,6 +2,7 @@ using Avalonia.Media;
 using Avalonia.Rendering.Composition;
 using Avalonia.Skia;
 using RailReader.Core.Models;
+using RailReader2.ViewModels;
 using SkiaSharp;
 
 namespace RailReader2.Views;
@@ -19,7 +20,11 @@ internal sealed record ReadingGuideRenderState(
     float LinePadding,
     SKColor LineColor,
     SKColor WordColor,
-    float Zoom);
+    float Zoom)
+{
+    /// <summary>Screen-space steering indicator, or null when no stick is planted.</summary>
+    public SteerIndicator? Steer { get; init; }
+}
 
 /// <summary>
 /// Hosts a CompositionCustomVisual for the pointer-driven reading guide (docs/reading-guide-design.md):
@@ -56,13 +61,21 @@ internal sealed class ReadingGuideVisualHandler : CompositionCustomVisualHandler
     public override void OnRender(ImmediateDrawingContext context)
     {
         var state = _state;
-        if (state is null || (state.LineRect is null && state.WordRect is null)) return;
+        if (state is null || (state.LineRect is null && state.WordRect is null && state.Steer is null)) return;
 
         if (context.TryGetFeature(typeof(ISkiaSharpApiLeaseFeature)) is not ISkiaSharpApiLeaseFeature leaseFeature)
             return;
         using var lease = leaseFeature.Lease();
         var canvas = lease.SkCanvas;
 
+        if (state.LineRect is not null || state.WordRect is not null)
+            DrawGuide(canvas, state);
+        if (state.Steer is { } steer)
+            DrawSteerIndicator(canvas, steer);
+    }
+
+    private void DrawGuide(SKCanvas canvas, ReadingGuideRenderState state)
+    {
         canvas.Save();
         canvas.Concat(state.Camera);
 
@@ -94,5 +107,61 @@ internal sealed class ReadingGuideVisualHandler : CompositionCustomVisualHandler
         }
 
         canvas.Restore();
+    }
+
+    // Steering indicator: a faint ring marking the still zone where Shift went down, a knob where the
+    // (hidden) pointer is, and a line between them once pushed past the ring. Each stroke sits on a white
+    // halo so it reads on both a white page and a dark/inverted one. Deliberately small and quiet — it
+    // is orientation, not a control; the knob firms up as the throttle rises.
+    private static readonly SKColor SteerAccent = new(0x33, 0x90, 0xFF);
+    private const float KnobRadiusPx = 6f;
+
+    private void DrawSteerIndicator(SKCanvas canvas, SteerIndicator st)
+    {
+        float ox = (float)st.OriginX, oy = (float)st.OriginY;
+        float dx = (float)(st.PointerX - st.OriginX), dy = (float)(st.PointerY - st.OriginY);
+        float len = MathF.Sqrt(dx * dx + dy * dy);
+        float maxLen = (float)st.FullDeflectionPx;
+        if (len > maxLen && len > 0) { dx *= maxLen / len; dy *= maxLen / len; len = maxLen; }
+        float kx = ox + dx, ky = oy + dy;
+        float dead = (float)st.DeadZonePx;
+        byte strong = (byte)(150 + 90 * Math.Clamp(st.Throttle, 0, 1));
+
+        _paint.Style = SKPaintStyle.Stroke;
+        // Still zone ring.
+        StrokeWithHalo(canvas, c => c.DrawCircle(ox, oy, dead, _paint), 1.5f, SteerAccent.WithAlpha(110));
+        // Push line, from the ring's edge to the knob.
+        if (len > dead)
+        {
+            float ux = dx / len, uy = dy / len;
+            StrokeWithHalo(canvas, c => c.DrawLine(ox + ux * dead, oy + uy * dead, kx, ky, _paint), 2f, SteerAccent.WithAlpha(strong));
+        }
+        // Knob: hollow inside the still zone, filled once the stick is pushing.
+        bool pushing = len > dead;
+        if (pushing)
+        {
+            _paint.Style = SKPaintStyle.Fill;
+            _paint.Color = SKColors.White.WithAlpha(200);
+            canvas.DrawCircle(kx, ky, KnobRadiusPx + 2f, _paint);
+            _paint.Color = SteerAccent.WithAlpha(strong);
+            canvas.DrawCircle(kx, ky, KnobRadiusPx, _paint);
+            _paint.Style = SKPaintStyle.Stroke;
+        }
+        else
+        {
+            StrokeWithHalo(canvas, c => c.DrawCircle(kx, ky, KnobRadiusPx, _paint), 2f, SteerAccent.WithAlpha(200));
+        }
+        _paint.Style = SKPaintStyle.Fill;
+    }
+
+    private void StrokeWithHalo(SKCanvas canvas, Action<SKCanvas> draw, float width, SKColor color)
+    {
+        _paint.StrokeCap = SKStrokeCap.Round;
+        _paint.StrokeWidth = width + 3f;
+        _paint.Color = SKColors.White.WithAlpha(150);
+        draw(canvas);
+        _paint.StrokeWidth = width;
+        _paint.Color = color;
+        draw(canvas);
     }
 }

@@ -178,12 +178,17 @@
                                       IsCheckedChanged="OnGuideWordChanged" />
                         </Grid>
                         <Border Classes="advblock adv">
-                            <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto">
-                                <TextBlock Grid.Column="0" Text="Line stickiness (point modes):" VerticalAlignment="Center"
+                            <Grid ColumnDefinitions="Auto,8,*" RowDefinitions="Auto,8,Auto">
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Line stickiness (point modes):" VerticalAlignment="Center"
                                            ToolTip.Tip="Point modes only: how far the pointer may stray above or below the current line (in line heights) before the guide moves to the next one. Steer pace follows the Reading Pace preset." />
-                                <Slider Grid.Column="2" Name="GuideDeadZoneSlider" Minimum="0" Maximum="1.5"
+                                <Slider Grid.Row="0" Grid.Column="2" Name="GuideDeadZoneSlider" Minimum="0" Maximum="1.5"
                                         Value="0.6" MinWidth="120"
                                         PropertyChanged="OnGuideDeadZoneChanged" />
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Steer sensitivity:" VerticalAlignment="Center"
+                                           ToolTip.Tip="Steer mode: how far the pointer must move from where Shift went down before the guide starts, and how far for full speed. Lower is calmer." />
+                                <Slider Grid.Row="2" Grid.Column="2" Name="GuideSteerSensitivitySlider" Minimum="0.4" Maximum="2"
+                                        Value="1" MinWidth="120"
+                                        PropertyChanged="OnGuideSteerSensitivityChanged" />
                             </Grid>
                         </Border>
 

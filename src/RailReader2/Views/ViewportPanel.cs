@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
+using Avalonia.Threading;
 using RailReader.Core;
 using RailReader.Core.Models;
 using RailReader2.Services;
@@ -42,6 +43,12 @@ public class ViewportPanel : Panel
     // in ActOnPortalMarker), which resizes the viewport before the second click's release arrives — a
     // fresh hit-test at that point can miss the marker entirely. See TryHandlePortalMarkerClick.
     private PortalMarker? _lastPortalMarkerHit;
+
+    // A plain click on text markup is held back for the double-click interval (see
+    // DeferClickForDoubleClick): at rail zoom the click snaps the camera to the block under it, which
+    // moves the highlight away from the pointer before a double-click's second click lands.
+    private DispatcherTimer? _deferredClickTimer;
+    private Action? _deferredClick;
 
     // Track the last tool so we only update cursor when it changes
     private AnnotationTool _lastCursorTool = AnnotationTool.None;
@@ -108,6 +115,7 @@ public class ViewportPanel : Panel
     protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
     {
         base.OnPointerWheelChanged(e);
+        ResolveDeferredClick(runIt: false);   // the view is about to move; a held-back click would land elsewhere
         if (ViewModel is null) return;
 
         double scrollY = e.Delta.Y * 30.0;
@@ -172,6 +180,9 @@ public class ViewportPanel : Panel
             _browseAnnotationDrag = false;
             _pressClickCount = e.ClickCount;
             if (_pressClickCount <= 1) _lastPortalMarkerHit = null;   // fresh gesture: drop any stale cache
+            // A held-back single click either becomes the first half of this double-click (drop it) or
+            // was a lone click that the user has moved on from (run it now, before this press acts).
+            ResolveDeferredClick(runIt: _pressClickCount <= 1);
             e.Handled = true;
 
             bool isPen = e.Pointer.Type == PointerType.Pen;
@@ -424,7 +435,10 @@ public class ViewportPanel : Panel
             }
             else if (isClick)
             {
-                ViewModel.HandleClick(pos.X, pos.Y);
+                if (_pressClickCount <= 1 && TextMarkupAt(pos) is not null)
+                    DeferClickForDoubleClick(pos);
+                else
+                    ViewModel.HandleClick(pos.X, pos.Y);
             }
         }
 
@@ -654,10 +668,53 @@ public class ViewportPanel : Panel
     /// the release chain's annotation-mode branch runs before this is reached.</summary>
     private bool TryEditMarkupCommentAt(Point screenPos)
     {
-        if (ViewModel is not { } vm) return false;
+        if (ViewModel is not { } vm || TextMarkupAt(screenPos) is null) return false;
         var (pageX, pageY) = ScreenToGesturePage(screenPos);
-        if (vm.FindAnnotationAt(pageX, pageY) is not TextMarkupAnnotation) return false;
         return vm.HandleBrowseClick((float)pageX, (float)pageY, isDoubleClick: true).Handled;
+    }
+
+    /// <summary>The text-markup annotation under <paramref name="screenPos"/> (browse mode), if any.
+    /// Annotations are neither drawn nor hit-testable while the view is rotated.</summary>
+    private TextMarkupAnnotation? TextMarkupAt(Point screenPos)
+    {
+        if (ViewModel is not { IsViewRotated: false } vm) return null;
+        var (pageX, pageY) = ScreenToGesturePage(screenPos);
+        return vm.FindAnnotationAt(pageX, pageY) as TextMarkupAnnotation;
+    }
+
+    /// <summary>Holds a single click on text markup back for the platform double-click interval.
+    /// Core's click handler snaps the rail to the block under the pointer, which scrolls the page —
+    /// by the time a double-click's second click arrived the highlight had moved out from under it,
+    /// the comment hit-test missed, and the double-click fell through to block framing (a zoom to the
+    /// rail threshold) instead of opening the comment. The held click still runs if no second click
+    /// follows (<see cref="ResolveDeferredClick"/>), so rail entry by clicking highlighted text only
+    /// loses the interval's latency. Single-shot, bounded by the interval.</summary>
+    private void DeferClickForDoubleClick(Point pos)
+    {
+        ResolveDeferredClick(runIt: false);
+        var interval = Application.Current?.PlatformSettings?.GetDoubleTapTime(PointerType.Mouse)
+            ?? TimeSpan.FromMilliseconds(500);
+        var timer = new DispatcherTimer { Interval = interval };
+        _deferredClick = () => ViewModel?.HandleClick(pos.X, pos.Y);
+        timer.Tick += (_, _) =>
+        {
+            if (ReferenceEquals(_deferredClickTimer, timer)) ResolveDeferredClick(runIt: true);
+        };
+        _deferredClickTimer = timer;
+        timer.Start();
+    }
+
+    /// <summary>Drops the held-back click, or — <paramref name="runIt"/> — runs it now (the next
+    /// press is a new gesture, so the pointer position it was recorded at is still the intended
+    /// target; nothing has moved the camera since).</summary>
+    private void ResolveDeferredClick(bool runIt)
+    {
+        if (_deferredClickTimer is not { } timer) return;
+        timer.Stop();
+        _deferredClickTimer = null;
+        var click = _deferredClick;
+        _deferredClick = null;
+        if (runIt) click?.Invoke();
     }
 
     private bool IsClick(Point pos)

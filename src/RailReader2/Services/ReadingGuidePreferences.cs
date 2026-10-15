@@ -40,6 +40,11 @@ public sealed class ReadingGuidePreferences
     /// on each side (Core's <c>ReadingGuideHitTester.DeadZoneFraction</c>). 0 = always the nearest line.</summary>
     public double DeadZone { get; set; } = 0.6;
 
+    /// <summary>Steer mode: how readily the pointer's displacement moves the guide. 1 = the default; lower
+    /// widens the still zone around where Shift went down and the distance to full speed (calmer),
+    /// higher narrows both. Scales Core's <c>ReadingGuideSteer.DeadZonePx</c>/<c>FullDeflectionPx</c>.</summary>
+    public double SteerSensitivity { get; set; } = 1.0;
+
     public static string Path => System.IO.Path.Combine(AppConfig.ConfigDir, "reading_guide_prefs.json");
 
     public static ReadingGuidePreferences Load()
