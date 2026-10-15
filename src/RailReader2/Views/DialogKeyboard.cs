@@ -40,14 +40,28 @@ internal static class DialogKeyboard
     /// <summary>
     /// Focuses <paramref name="input"/> once the dialog has opened, optionally selecting
     /// its existing text. No-op until <c>Opened</c> fires (otherwise the focus can lose
-    /// the race with the window activation).
+    /// the race with the window activation). Also lifts the dialog above a fullscreen owner
+    /// (<see cref="RaiseOverFullscreenOwner"/>).
     /// </summary>
     public static void FocusOnOpen(Window dialog, Control input, bool selectAll = false)
     {
         dialog.Opened += (_, _) =>
         {
+            RaiseOverFullscreenOwner(dialog);
             input.Focus();
             if (selectAll && input is TextBox tb) tb.SelectAll();
         };
+    }
+
+    /// <summary>
+    /// A fullscreen main window can end up stacked above its own modal dialog on some window
+    /// managers (the dialog opens but is hidden behind the page, so the app looks frozen waiting on
+    /// it). When the owner is fullscreen, make the dialog topmost and activate it.
+    /// </summary>
+    public static void RaiseOverFullscreenOwner(Window dialog)
+    {
+        if (dialog.Owner is not Window { WindowState: WindowState.FullScreen }) return;
+        dialog.Topmost = true;
+        dialog.Activate();
     }
 }
