@@ -24,6 +24,13 @@ internal sealed record ReadingGuideRenderState(
 {
     /// <summary>Screen-space steering indicator, or null when no stick is planted.</summary>
     public SteerIndicator? Steer { get; init; }
+    /// <summary>Indicator colours: the colour effect's accent (already adjusted for contrast with the
+    /// page) and the halo that separates it from the page behind.</summary>
+    public SKColor SteerAccent { get; init; } = new(0x33, 0x90, 0xFF);
+    public SKColor SteerHalo { get; init; } = SKColors.White;
+    /// <summary>The page behind is dark (inverting / white-on-black effects): translucent strokes blend
+    /// into it, so the indicator is drawn more opaque there.</summary>
+    public bool SteerOnDarkPage { get; init; }
 }
 
 /// <summary>
@@ -71,7 +78,7 @@ internal sealed class ReadingGuideVisualHandler : CompositionCustomVisualHandler
         if (state.LineRect is not null || state.WordRect is not null)
             DrawGuide(canvas, state);
         if (state.Steer is { } steer)
-            DrawSteerIndicator(canvas, steer);
+            DrawSteerIndicator(canvas, steer, state.SteerAccent, state.SteerHalo, state.SteerOnDarkPage);
     }
 
     private void DrawGuide(SKCanvas canvas, ReadingGuideRenderState state)
@@ -112,14 +119,13 @@ internal sealed class ReadingGuideVisualHandler : CompositionCustomVisualHandler
     // Steering indicator: a faint square marking the still zone where Shift went down, a knob where the
     // (hidden) pointer is, and a line between them once pushed past the zone. The zone is a SQUARE because
     // Core's ReadingGuideSteer measures displacement as max(|dx|, |dy|) — a diagonal nudge that is still
-    // inside the square must not look like a push. Each stroke sits on a white halo so it reads on both a
-    // white page and a dark/inverted one. Deliberately small and quiet — it is orientation, not a
+    // inside the square must not look like a push. Each stroke sits on a halo (white on a light page, black
+    // on a dark one) and takes its accent from the colour effect's overlay palette. Deliberately small and quiet — it is orientation, not a
     // control; the knob firms up as the throttle rises. No closures: this redraws every frame.
-    private static readonly SKColor SteerAccent = new(0x33, 0x90, 0xFF);
     private const float KnobRadiusPx = 6f;
     private const float ZoneCornerPx = 8f;
 
-    private void DrawSteerIndicator(SKCanvas canvas, SteerIndicator st)
+    private void DrawSteerIndicator(SKCanvas canvas, SteerIndicator st, SKColor accent, SKColor haloColour, bool darkPage)
     {
         float ox = (float)st.OriginX, oy = (float)st.OriginY;
         float dx = (float)(st.PointerX - st.OriginX), dy = (float)(st.PointerY - st.OriginY);
@@ -129,7 +135,12 @@ internal sealed class ReadingGuideVisualHandler : CompositionCustomVisualHandler
         if (mag > full && mag > 0) { float k = full / mag; dx *= k; dy *= k; mag = full; }
         float kx = ox + dx, ky = oy + dy;
         bool pushing = mag > dead;
-        byte strong = (byte)(150 + 90 * Math.Clamp(st.Throttle, 0, 1));
+        float push = (float)Math.Clamp(st.Throttle, 0, 1);
+        // Near-opaque: a translucent stroke blends toward the page and loses the contrast the accent was
+        // chosen for. The knob/line firm up a little with the throttle.
+        byte strong = (byte)(220 + 35 * push);
+        byte ring = darkPage ? (byte)215 : (byte)200;
+        byte hollow = 255;
         var zone = SKRect.Create(ox - dead, oy - dead, dead * 2, dead * 2);
 
         _paint.Style = SKPaintStyle.Stroke;
@@ -138,19 +149,19 @@ internal sealed class ReadingGuideVisualHandler : CompositionCustomVisualHandler
         {
             bool halo = pass == 0;
             // Still zone.
-            Stroke(halo, 1.5f, SteerAccent.WithAlpha(110));
+            Stroke(halo, haloColour, 1.5f, accent.WithAlpha(ring));
             canvas.DrawRoundRect(zone, ZoneCornerPx, ZoneCornerPx, _paint);
             if (pushing)
             {
                 // Push line from where it leaves the zone to the knob.
                 float t = dead / mag;
-                Stroke(halo, 2f, SteerAccent.WithAlpha(strong));
+                Stroke(halo, haloColour, 2f, accent.WithAlpha(strong));
                 canvas.DrawLine(ox + dx * t, oy + dy * t, kx, ky, _paint);
             }
             else
             {
                 // Hollow knob inside the zone.
-                Stroke(halo, 2f, SteerAccent.WithAlpha(200));
+                Stroke(halo, haloColour, 2f, accent.WithAlpha(hollow));
                 canvas.DrawCircle(kx, ky, KnobRadiusPx, _paint);
             }
         }
@@ -158,17 +169,17 @@ internal sealed class ReadingGuideVisualHandler : CompositionCustomVisualHandler
         {
             // Filled knob once the stick is pushing.
             _paint.Style = SKPaintStyle.Fill;
-            _paint.Color = SKColors.White.WithAlpha(200);
+            _paint.Color = haloColour.WithAlpha(200);
             canvas.DrawCircle(kx, ky, KnobRadiusPx + 2f, _paint);
-            _paint.Color = SteerAccent.WithAlpha(strong);
+            _paint.Color = accent.WithAlpha(strong);
             canvas.DrawCircle(kx, ky, KnobRadiusPx, _paint);
         }
         _paint.Style = SKPaintStyle.Fill;
     }
 
-    private void Stroke(bool halo, float width, SKColor color)
+    private void Stroke(bool halo, SKColor haloColour, float width, SKColor color)
     {
         _paint.StrokeWidth = halo ? width + 3f : width;
-        _paint.Color = halo ? SKColors.White.WithAlpha(150) : color;
+        _paint.Color = halo ? haloColour.WithAlpha(150) : color;
     }
 }
