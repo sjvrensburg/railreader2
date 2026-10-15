@@ -101,6 +101,9 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="3.75.0.0" date="2026-10-15">
+      <description><p>Scrolling pace now stays the same on screen at any magnification. Holding the arrow keys, auto-scroll and steering with Shift used to move faster the further you zoomed in and crawl when zoomed out; the speeds are now scaled to feel the same as at 7x.</p></description>
+    </release>
     <release version="3.74.0.0" date="2026-10-15">
       <description><p>Steering is calmer and easier to follow: a small indicator shows where the stick was planted and how far you are pushing (in the colours of the active colour effect), steering parks when it moves to a new line so you can find your place and re-centre the mouse, and a new Steer sensitivity setting tunes the throw. Double-clicking a highlight at rail zoom now opens its comment instead of zooming, dialogs no longer hide behind a fullscreen window, and Cancel is no longer clipped at larger font sizes.</p></description>
     </release>
