@@ -374,15 +374,21 @@ public partial class DocumentView : UserControl, IViewportSurface
     /// changed). Cheap: the page-space marker list is cached and only rebuilt when it actually changes.</summary>
     public void RenderPortalMarkers() => PortalMarkerLayer.UpdateState(BuildPortalMarkerState(_tab));
 
-    /// <summary>Re-send the reading-guide layer for THIS view's viewport, refresh the pointer-glyph hiding
-    /// (the follow state can change without a pointer move — Shift down/up, mode off), and, when the
-    /// line-focus dim is on, re-send the page state so the dim band tracks the guide line.</summary>
-    public void RenderReadingGuideLayer() => GuideLayer.UpdateState(BuildGuideState());
+    /// <summary>Re-send just the reading-guide layer for THIS view's viewport and refresh the pointer-glyph
+    /// hiding (it depends on whether the steer stick is planted). The per-frame path for the steer
+    /// indicator: no line-focus page-state rebuild.</summary>
+    public void RenderReadingGuideLayer()
+    {
+        GuideLayer.UpdateState(BuildGuideState());
+        Viewport.UpdateGuideCursor();
+    }
 
+    /// <summary>Re-send the reading-guide layer and pointer-glyph hiding (the follow state can change
+    /// without a pointer move — Shift down/up, mode off), and, when the line-focus dim is on, re-send the
+    /// page state so the dim band tracks the guide line.</summary>
     public void RenderReadingGuide()
     {
         RenderReadingGuideLayer();
-        Viewport.UpdateGuideCursor();
         if (_tab?.LineFocusBlur == true && _viewport is { Rail.VisualsVisible: false })
             PageLayer.UpdateState(BuildPageState(_tab));
     }

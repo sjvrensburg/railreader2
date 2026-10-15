@@ -12,6 +12,7 @@ public partial class PasswordDialog : Window
     public PasswordDialog(string? fileName = null, bool wrongPassword = false)
     {
         InitializeComponent();
+        DialogStacking.KeepAboveFullscreenOwner(this);
 
         var name = string.IsNullOrEmpty(fileName) ? "This PDF" : $"“{fileName}”";
         MessageText.Text = wrongPassword

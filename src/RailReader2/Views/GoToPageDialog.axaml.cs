@@ -11,6 +11,7 @@ public partial class GoToPageDialog : Window
     {
         _maxPage = maxPage;
         InitializeComponent();
+        DialogStacking.KeepAboveFullscreenOwner(this);
         PageInput.PlaceholderText = $"Page (1–{maxPage})";
         PageInput.Text = currentPage.ToString();
         DialogKeyboard.FocusOnOpen(this, PageInput, selectAll: true);

@@ -112,6 +112,16 @@ public sealed partial class MainWindowViewModel
     /// (point or steer). In "always" mode the pointer also serves ordinary clicking, so it stays visible.</summary>
     public bool IsGuideCursorHidden => IsGuideFollowing && GuideUsesShift;
 
+    /// <summary>Whether the pointer glyph over <paramref name="vp"/> should be hidden. In steer mode only
+    /// once this view's stick is planted — the indicator then stands in for the cursor; if planting
+    /// bailed out (no analysis yet / nothing under the pointer) the reader keeps their pointer.</summary>
+    public bool IsGuideCursorHiddenOver(Viewport? vp)
+    {
+        if (!IsGuideCursorHidden) return false;
+        if (!GuideIsSteer) return true;
+        return vp is not null && _guideByVp.TryGetValue(vp, out var s) && s.Steer.Engaged;
+    }
+
     public void ToggleReadingGuideMode()
     {
         if (!IsReadingGuideMode && ActiveTab is null) return;
@@ -224,11 +234,13 @@ public sealed partial class MainWindowViewModel
             // point lands on the clicked word once that line is current.
             vp.Rail.SeatSteerReadingPoint(pageX);
             if (s.Steer.Engaged) s.Steer.Engage(screenX, screenY);
+            InvalidateGuideLayer(vp);
             return false;
         }
         s.PendingSeat = 0;
-        ResolveGuide(vp, s);
+        // Re-plant the stick first so the repaint ResolveGuide triggers already has the new origin.
         if (s.Steer.Engaged) s.Steer.Engage(screenX, screenY);
+        ResolveGuide(vp, s);
         return true;
     }
 
@@ -304,11 +316,16 @@ public sealed partial class MainWindowViewModel
     // ── Steer ──────────────────────────────────────────────────────────────────
 
     /// <summary>Apply the sensitivity preference to a stick's geometry (called each time it is planted).</summary>
-    private void ConfigureSteerGeometry(GuideState s)
+    private void ConfigureSteerGeometry(Viewport vp, GuideState s)
     {
         double k = Math.Clamp(_guidePrefs.SteerSensitivity, 0.25, 4.0);
-        s.Steer.DeadZonePx = SteerDeadZoneBasePx / k;
-        s.Steer.FullDeflectionPx = SteerFullDeflectionBasePx / k;
+        double full = SteerFullDeflectionBasePx / k, dead = SteerDeadZoneBasePx / k;
+        // A small pane / tear-off / portal view can't hold the full throw (the pointer leaving the pane
+        // stops reporting): keep full deflection within ~45 % of its short side.
+        double limit = 0.45 * Math.Min(vp.Width, vp.Height);
+        if (limit > 0 && full > limit) full = Math.Max(limit, 60);
+        s.Steer.FullDeflectionPx = full;
+        s.Steer.DeadZonePx = Math.Min(dead, full * 0.4);
     }
 
     /// <summary>The on-screen steering indicator for <paramref name="vp"/> while its stick is planted:
@@ -324,7 +341,7 @@ public sealed partial class MainWindowViewModel
 
     private void EngageSteer(Viewport vp, GuideState s)
     {
-        ConfigureSteerGeometry(s);
+        ConfigureSteerGeometry(vp, s);
         if (vp.Rail.VisualsVisible)
         {
             // §11: at rail zoom the stick drives the rail itself — nothing to seat. Planting stops a running
@@ -394,8 +411,7 @@ public sealed partial class MainWindowViewModel
         if (step.LineSteps != 0)
             _controller.StepRailLine(vp, step.LineSteps > 0);
         // The word marker follows Core's reading point, which moves while the camera is pinned at a line's
-        // head or tail — so redraw it every tick, not only when the camera moves.
-        InvalidateReadingGuide(vp);
+        // head or tail; TickReadingGuide re-sends the guide layer after every tick, so it is redrawn then.
         return s.Steer.IsMoving;
     }
 
@@ -438,49 +454,54 @@ public sealed partial class MainWindowViewModel
         foreach (var (vp, s) in _guideByVp)
         {
             if (!s.Steer.Engaged) continue;
-            // Redraw the stick indicator every frame (the pointer moves while the page may not).
+            if (TickStick(vp, s, dt)) animating = true;
+            // One repaint of the stick indicator per frame, AFTER the tick: the pointer moves while the page
+            // may not, and a release inside the tick (document end, rail gone) must clear it too.
             InvalidateGuideLayer(vp);
-            if (s.RailSteering)
-            {
-                if (TickRailSteer(vp, s, dt)) animating = true;
-                continue;
-            }
-            if (s.PendingSeat != 0) { animating = true; continue; }   // page turned; waiting for analysis
-            if (s.Position is not { } pos || s.Page != vp.CurrentPage) continue;
-
-            var doc = vp.Owner;
-            if (!doc.TryGetAnalysis(s.Page, vp.AnalysisParams, out var analysis)) continue;
-            var words = doc.ViewRotation == 0 ? WordIndex.For(analysis, doc.GetOrExtractText(s.Page)) : null;
-            var roles = _controller.Config.NavigableRoles;
-
-            int chars = 0;
-            bool sentenceEnd = false;
-            if (words is not null && pos.WordIndex is { } wi)
-            {
-                var list = words.WordsOf(pos.BlockIndex, pos.LineIndex);
-                if (wi < list.Count)
-                {
-                    string w = words.TextOf(list[wi]);
-                    chars = w.Length;
-                    sentenceEnd = w.Length > 0 && w[^1] is '.' or '!' or '?' or ':' or ';';
-                }
-            }
-
-            var step = s.Steer.Tick(dt, chars, sentenceEnd);
-            if (step.Any)
-            {
-                bool forward = (step.WordSteps + step.LineSteps) > 0;
-                var next = step.WordSteps != 0
-                    ? ReadingGuideFlow.StepWord(pos, forward, analysis, words, roles)
-                    : ReadingGuideFlow.StepLine(pos, forward, analysis, words, roles);
-                if (next is { } n)
-                    SetGuide(vp, s, s.Page, n, analysis);
-                else
-                    TurnGuidePage(vp, s, forward);
-            }
-            if (s.Steer.IsMoving) animating = true;
-            if (KeepGuideInView(vp, s, dt)) animating = true;
         }
+        return animating;
+    }
+
+    /// <summary>One engaged stick's frame: drive the rail (§11) or step the word guide, then keep it in view.
+    /// Returns true while it is still moving.</summary>
+    private bool TickStick(Viewport vp, GuideState s, double dt)
+    {
+        if (s.RailSteering) return TickRailSteer(vp, s, dt);
+        if (s.PendingSeat != 0) return true;   // page turned; waiting for analysis
+        if (s.Position is not { } pos || s.Page != vp.CurrentPage) return false;
+
+        var doc = vp.Owner;
+        if (!doc.TryGetAnalysis(s.Page, vp.AnalysisParams, out var analysis)) return false;
+        var words = doc.ViewRotation == 0 ? WordIndex.For(analysis, doc.GetOrExtractText(s.Page)) : null;
+        var roles = _controller.Config.NavigableRoles;
+
+        int chars = 0;
+        bool sentenceEnd = false;
+        if (words is not null && pos.WordIndex is { } wi)
+        {
+            var list = words.WordsOf(pos.BlockIndex, pos.LineIndex);
+            if (wi < list.Count)
+            {
+                string w = words.TextOf(list[wi]);
+                chars = w.Length;
+                sentenceEnd = w.Length > 0 && w[^1] is '.' or '!' or '?' or ':' or ';';
+            }
+        }
+
+        var step = s.Steer.Tick(dt, chars, sentenceEnd);
+        if (step.Any)
+        {
+            bool forward = (step.WordSteps + step.LineSteps) > 0;
+            var next = step.WordSteps != 0
+                ? ReadingGuideFlow.StepWord(pos, forward, analysis, words, roles)
+                : ReadingGuideFlow.StepLine(pos, forward, analysis, words, roles);
+            if (next is { } n)
+                SetGuide(vp, s, s.Page, n, analysis);
+            else
+                TurnGuidePage(vp, s, forward);
+        }
+        bool animating = s.Steer.IsMoving;
+        if (KeepGuideInView(vp, s, dt)) animating = true;
         return animating;
     }
 
@@ -526,7 +547,7 @@ public sealed partial class MainWindowViewModel
             ? ReadingGuideFlow.First(analysis, words, roles)
             : ReadingGuideFlow.Last(analysis, words, roles);
         s.PendingSeat = 0;
-        if (pos is null) { s.Steer.Release(); return; }   // a page with no text to flow through
+        if (pos is null) { s.Steer.Release(); InvalidateGuideLayer(vp); return; }   // a page with no text to flow through
         SetGuide(vp, s, s.Page, pos, analysis);
         if (s.Steer.Engaged) RequestAnimationFrame();
     }

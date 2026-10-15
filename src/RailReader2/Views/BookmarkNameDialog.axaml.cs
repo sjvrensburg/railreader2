@@ -8,6 +8,7 @@ public partial class BookmarkNameDialog : Window
     public BookmarkNameDialog(int currentPage)
     {
         InitializeComponent();
+        DialogStacking.KeepAboveFullscreenOwner(this);
         NameInput.Text = $"Page {currentPage}";
         DialogKeyboard.FocusOnOpen(this, NameInput, selectAll: true);
         DialogKeyboard.EnableEscEnterClose<string?>(this, cancelResult: null, confirmResult: GetName);

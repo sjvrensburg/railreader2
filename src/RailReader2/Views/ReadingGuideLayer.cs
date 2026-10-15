@@ -109,59 +109,66 @@ internal sealed class ReadingGuideVisualHandler : CompositionCustomVisualHandler
         canvas.Restore();
     }
 
-    // Steering indicator: a faint ring marking the still zone where Shift went down, a knob where the
-    // (hidden) pointer is, and a line between them once pushed past the ring. Each stroke sits on a white
-    // halo so it reads on both a white page and a dark/inverted one. Deliberately small and quiet — it
-    // is orientation, not a control; the knob firms up as the throttle rises.
+    // Steering indicator: a faint square marking the still zone where Shift went down, a knob where the
+    // (hidden) pointer is, and a line between them once pushed past the zone. The zone is a SQUARE because
+    // Core's ReadingGuideSteer measures displacement as max(|dx|, |dy|) — a diagonal nudge that is still
+    // inside the square must not look like a push. Each stroke sits on a white halo so it reads on both a
+    // white page and a dark/inverted one. Deliberately small and quiet — it is orientation, not a
+    // control; the knob firms up as the throttle rises. No closures: this redraws every frame.
     private static readonly SKColor SteerAccent = new(0x33, 0x90, 0xFF);
     private const float KnobRadiusPx = 6f;
+    private const float ZoneCornerPx = 8f;
 
     private void DrawSteerIndicator(SKCanvas canvas, SteerIndicator st)
     {
         float ox = (float)st.OriginX, oy = (float)st.OriginY;
         float dx = (float)(st.PointerX - st.OriginX), dy = (float)(st.PointerY - st.OriginY);
-        float len = MathF.Sqrt(dx * dx + dy * dy);
-        float maxLen = (float)st.FullDeflectionPx;
-        if (len > maxLen && len > 0) { dx *= maxLen / len; dy *= maxLen / len; len = maxLen; }
-        float kx = ox + dx, ky = oy + dy;
         float dead = (float)st.DeadZonePx;
+        float full = (float)st.FullDeflectionPx;
+        float mag = MathF.Max(MathF.Abs(dx), MathF.Abs(dy));   // Core's norm
+        if (mag > full && mag > 0) { float k = full / mag; dx *= k; dy *= k; mag = full; }
+        float kx = ox + dx, ky = oy + dy;
+        bool pushing = mag > dead;
         byte strong = (byte)(150 + 90 * Math.Clamp(st.Throttle, 0, 1));
+        var zone = SKRect.Create(ox - dead, oy - dead, dead * 2, dead * 2);
 
         _paint.Style = SKPaintStyle.Stroke;
-        // Still zone ring.
-        StrokeWithHalo(canvas, c => c.DrawCircle(ox, oy, dead, _paint), 1.5f, SteerAccent.WithAlpha(110));
-        // Push line, from the ring's edge to the knob.
-        if (len > dead)
+        _paint.StrokeCap = SKStrokeCap.Round;
+        for (int pass = 0; pass < 2; pass++)   // pass 0: white halo, pass 1: accent
         {
-            float ux = dx / len, uy = dy / len;
-            StrokeWithHalo(canvas, c => c.DrawLine(ox + ux * dead, oy + uy * dead, kx, ky, _paint), 2f, SteerAccent.WithAlpha(strong));
+            bool halo = pass == 0;
+            // Still zone.
+            Stroke(halo, 1.5f, SteerAccent.WithAlpha(110));
+            canvas.DrawRoundRect(zone, ZoneCornerPx, ZoneCornerPx, _paint);
+            if (pushing)
+            {
+                // Push line from where it leaves the zone to the knob.
+                float t = dead / mag;
+                Stroke(halo, 2f, SteerAccent.WithAlpha(strong));
+                canvas.DrawLine(ox + dx * t, oy + dy * t, kx, ky, _paint);
+            }
+            else
+            {
+                // Hollow knob inside the zone.
+                Stroke(halo, 2f, SteerAccent.WithAlpha(200));
+                canvas.DrawCircle(kx, ky, KnobRadiusPx, _paint);
+            }
         }
-        // Knob: hollow inside the still zone, filled once the stick is pushing.
-        bool pushing = len > dead;
         if (pushing)
         {
+            // Filled knob once the stick is pushing.
             _paint.Style = SKPaintStyle.Fill;
             _paint.Color = SKColors.White.WithAlpha(200);
             canvas.DrawCircle(kx, ky, KnobRadiusPx + 2f, _paint);
             _paint.Color = SteerAccent.WithAlpha(strong);
             canvas.DrawCircle(kx, ky, KnobRadiusPx, _paint);
-            _paint.Style = SKPaintStyle.Stroke;
-        }
-        else
-        {
-            StrokeWithHalo(canvas, c => c.DrawCircle(kx, ky, KnobRadiusPx, _paint), 2f, SteerAccent.WithAlpha(200));
         }
         _paint.Style = SKPaintStyle.Fill;
     }
 
-    private void StrokeWithHalo(SKCanvas canvas, Action<SKCanvas> draw, float width, SKColor color)
+    private void Stroke(bool halo, float width, SKColor color)
     {
-        _paint.StrokeCap = SKStrokeCap.Round;
-        _paint.StrokeWidth = width + 3f;
-        _paint.Color = SKColors.White.WithAlpha(150);
-        draw(canvas);
-        _paint.StrokeWidth = width;
-        _paint.Color = color;
-        draw(canvas);
+        _paint.StrokeWidth = halo ? width + 3f : width;
+        _paint.Color = halo ? SKColors.White.WithAlpha(150) : color;
     }
 }

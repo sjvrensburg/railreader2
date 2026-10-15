@@ -40,25 +40,37 @@ internal static class DialogKeyboard
     /// <summary>
     /// Focuses <paramref name="input"/> once the dialog has opened, optionally selecting
     /// its existing text. No-op until <c>Opened</c> fires (otherwise the focus can lose
-    /// the race with the window activation). Also lifts the dialog above a fullscreen owner
-    /// (<see cref="RaiseOverFullscreenOwner"/>).
+    /// the race with the window activation).
     /// </summary>
     public static void FocusOnOpen(Window dialog, Control input, bool selectAll = false)
     {
         dialog.Opened += (_, _) =>
         {
-            RaiseOverFullscreenOwner(dialog);
             input.Focus();
             if (selectAll && input is TextBox tb) tb.SelectAll();
         };
     }
+}
 
+/// <summary>
+/// A fullscreen main window can end up stacked above its own modal dialog on some window managers
+/// (the dialog opens hidden behind the page, so the app looks frozen waiting on it).
+/// </summary>
+internal static class DialogStacking
+{
     /// <summary>
-    /// A fullscreen main window can end up stacked above its own modal dialog on some window
-    /// managers (the dialog opens but is hidden behind the page, so the app looks frozen waiting on
-    /// it). When the owner is fullscreen, make the dialog topmost and activate it.
+    /// Call once from a modal dialog's constructor. While the dialog is active and its owner is
+    /// fullscreen it is topmost, so it cannot hide behind the page; the flag is dropped when the dialog
+    /// loses activation (alt-tab) so it never floats above other applications.
     /// </summary>
-    public static void RaiseOverFullscreenOwner(Window dialog)
+    public static void KeepAboveFullscreenOwner(Window dialog)
+    {
+        dialog.Opened += (_, _) => Raise(dialog);
+        dialog.Activated += (_, _) => Raise(dialog);
+        dialog.Deactivated += (_, _) => dialog.Topmost = false;
+    }
+
+    private static void Raise(Window dialog)
     {
         if (dialog.Owner is not Window { WindowState: WindowState.FullScreen }) return;
         dialog.Topmost = true;

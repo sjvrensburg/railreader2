@@ -12,6 +12,7 @@ public partial class TextNoteDialog : Window
     public TextNoteDialog()
     {
         InitializeComponent();
+        DialogStacking.KeepAboveFullscreenOwner(this);
         _spellCheck = TextBoxSpellCheck.Attach(NoteTextBox, SpellCheckService.Shared);
         _spellCheck.Changed += UpdateSpellingStatus;
         DialogKeyboard.FocusOnOpen(this, NoteTextBox);

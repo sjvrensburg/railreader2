@@ -8,6 +8,7 @@ public partial class ConfirmUrlDialog : Window
     public ConfirmUrlDialog(string url)
     {
         InitializeComponent();
+        DialogStacking.KeepAboveFullscreenOwner(this);
         UrlDisplay.Text = url;
         DialogKeyboard.EnableEscEnterClose(this, cancelResult: false, confirmResult: () => true);
     }

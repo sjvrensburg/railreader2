@@ -60,6 +60,7 @@ public partial class SettingsWindow : Window
     public SettingsWindow()
     {
         InitializeComponent();
+        DialogStacking.KeepAboveFullscreenOwner(this);
         InitAdvancedView();
     }
 
