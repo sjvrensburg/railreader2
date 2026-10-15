@@ -383,13 +383,23 @@ public sealed partial class MainWindowViewModel
             ResolveGuide(vp, s);
             if (s.Position is null) return; // no analysis yet (toasted) — try again on the next Shift press
         }
-        var cfg = _controller.Config;
         s.Steer.MinLinesPerSecond = 0.8;
         s.Steer.MaxLinesPerSecond = 3.0;
-        s.Steer.MinCharsPerSecond = Math.Max(1.0, cfg.ScrollSpeedStart * CharsPerSecondPerScrollSpeed * SteerEdgePaceFraction);
-        s.Steer.MaxCharsPerSecond = Math.Max(s.Steer.MinCharsPerSecond, cfg.ScrollSpeedMax * CharsPerSecondPerScrollSpeed);
+        ApplyWordPace(vp, s);
         s.Steer.Engage(s.ScreenX, s.ScreenY);
         RequestAnimationFrame();
+    }
+
+    /// <summary>The word-guide flow's chars/s from the reading-pace settings, scaled by Core's zoom factor
+    /// (<c>ScrollSpeedZoomFactor</c>) so the text moves at the same on-screen speed as the rail's steered scroll
+    /// — the pace was otherwise fixed in content units, which feels twice as quick at twice the magnification.
+    /// Re-applied every tick, since the reader can zoom with the stick planted.</summary>
+    private void ApplyWordPace(Viewport vp, GuideState s)
+    {
+        var cfg = _controller.Config;
+        double f = cfg.ScrollSpeedZoomFactor(vp.Camera.Zoom);
+        s.Steer.MinCharsPerSecond = Math.Max(1.0, cfg.ScrollSpeedStart * CharsPerSecondPerScrollSpeed * SteerEdgePaceFraction * f);
+        s.Steer.MaxCharsPerSecond = Math.Max(s.Steer.MinCharsPerSecond, cfg.ScrollSpeedMax * CharsPerSecondPerScrollSpeed * f);
     }
 
     private void ReleaseSteer()
@@ -543,6 +553,7 @@ public sealed partial class MainWindowViewModel
             }
         }
 
+        ApplyWordPace(vp, s);
         var step = s.Steer.Tick(dt, chars, sentenceEnd);
         if (s.Parked)
         {
