@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Ecosystem — railreader2</title>
+  <meta name="description" content="railreader2 is built on RailReaderCore, an open-source set of NuGet packages for rail reading, layout analysis, OCR and Markdown export, and is paired with RailMark, a command-line tool for PDF review markup.">
+  <meta name="author" content="Stéfan Janse van Rensburg">
+  <link rel="canonical" href="https://sjvrensburg.github.io/railreader2/ecosystem.html">
+  <link rel="icon" href="img/logo.png" type="image/png">
+  <link rel="sitemap" type="application/xml" href="sitemap.xml">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://sjvrensburg.github.io/railreader2/ecosystem.html">
+  <meta property="og:title" content="The Ecosystem — railreader2">
+  <meta property="og:description" content="RailReaderCore (the reading engine, as NuGet packages) and RailMark (PDF review markup for AI agents): the projects around railreader2.">
+  <meta property="og:image" content="https://sjvrensburg.github.io/railreader2/img/rail_mode.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="The Ecosystem — railreader2">
+  <meta name="twitter:description" content="RailReaderCore (the reading engine, as NuGet packages) and RailMark (PDF review markup for AI agents).">
+  <meta name="twitter:image" content="https://sjvrensburg.github.io/railreader2/img/rail_mode.png">
+  <meta name="theme-color" content="#f4eee2">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="system.css">
+  <link rel="stylesheet" href="style.css">
+  <script>
+    (function () {
+      var stored = localStorage.getItem('rr2-theme');
+      var theme = stored || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+      document.documentElement.setAttribute('data-theme', theme);
+    })();
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "CollectionPage",
+        "name": "The Ecosystem — railreader2",
+        "url": "https://sjvrensburg.github.io/railreader2/ecosystem.html",
+        "about": {
+          "@type": "SoftwareApplication",
+          "name": "railreader2",
+          "url": "https://sjvrensburg.github.io/railreader2/"
+        },
+        "author": { "@type": "Person", "name": "Stéfan Janse van Rensburg" }
+      },
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "railreader2", "item": "https://sjvrensburg.github.io/railreader2/" },
+          { "@type": "ListItem", "position": 2, "name": "The Ecosystem", "item": "https://sjvrensburg.github.io/railreader2/ecosystem.html" }
+        ]
+      }
+    ]
+  }
+  </script>
+</head>
+<body>
+
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+
+  <!-- Header -->
+  <header class="header">
+    <div class="header__left">
+      <a href="index.html" class="header__logo brand"><img src="img/logo.png" alt="railreader2 icon" width="56" height="30"><span class="brand-wordmark">railreader2</span></a>
+      <nav>
+        <a href="index.html">Home</a>
+        <a href="index.html#features">Features</a>
+        <a href="index.html#getting-started">Get Started</a>
+        <a href="guide.html">User Guide</a>
+        <a href="ecosystem.html" aria-current="page">Ecosystem</a>
+        <a href="https://github.com/sjvrensburg/railreader2">GitHub</a>
+      </nav>
+    </div>
+    <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle light/dark mode" title="Toggle light/dark mode">
+      <span id="theme-icon"></span>
+    </button>
+  </header>
+
+  <main id="main-content">
+    <article class="content">
+      <h1>The ecosystem</h1>
+      <p class="subtitle">railreader2 is the reader. Two sibling projects take the same ideas further.</p>
+
+      <p>
+        railreader2 is a thin desktop shell. The reading engine underneath it &mdash; rail navigation, layout
+        analysis, OCR, search, annotations and Markdown export &mdash; lives in its own library, and a separate
+        command-line tool uses that same engine to move review markup in and out of PDFs. All three are free and
+        open source (MIT).
+      </p>
+
+      <div class="eco-cards">
+
+        <section class="eco-card" id="core" aria-labelledby="core-title">
+          <p class="eco-card__eyebrow label-sm">Library &middot; .NET / NuGet</p>
+          <h2 id="core-title">RailReaderCore</h2>
+          <p>
+            The portable libraries that power railreader2, built to be reused by other apps. Nothing in them depends
+            on a UI toolkit, so the same engine can sit behind a desktop app, a command-line tool, or a future web
+            or mobile reader.
+          </p>
+          <ul>
+            <li><strong>Rail navigation</strong> &mdash; line detection, reading order, semi-automatic scroll, the
+              reading guide, freeze panes and portals.</li>
+            <li><strong>Layout analysis</strong> &mdash; Docling Heron, PP-DocLayoutV3 and PP-DocLayout-S behind one
+              interface, with optional WebGPU acceleration and a model-free fallback that works from the PDF's text
+              layer.</li>
+            <li><strong>Scanned pages</strong> &mdash; optional OCR that supplies the missing text layer, with skew
+              correction and language packs.</li>
+            <li><strong>Everything else</strong> &mdash; search, annotations stored in the PDF itself, vision-model
+              transcription of equations and tables, and structured Markdown export.</li>
+          </ul>
+          <p class="eco-card__packages">
+            Packages: <code>RailReader.Core</code>, <code>RailReader.Core.Pdfium</code>,
+            <code>RailReader.Core.Analysis</code> (and <code>.WebGpu</code>), <code>RailReader.Core.Ocr.RapidOcr</code>,
+            <code>RailReader.Core.Vlm.OpenAI</code>, <code>RailReader.Renderer.Skia</code> and
+            <code>RailReader.Export</code>.
+          </p>
+          <p class="eco-card__links">
+            <a class="btn btn--primary" href="https://github.com/sjvrensburg/RailReaderCore">RailReaderCore on GitHub</a>
+            <a class="btn btn--secondary" href="https://www.nuget.org/packages?q=RailReader">NuGet packages</a>
+          </p>
+        </section>
+
+        <section class="eco-card" id="railmark" aria-labelledby="railmark-title">
+          <p class="eco-card__eyebrow label-sm">Command-line tool &middot; Linux &amp; Windows</p>
+          <h2 id="railmark-title">RailMark</h2>
+          <p>
+            PDF review markup for AI agents, in both directions. RailMark reads the highlights and comments in a PDF
+            out as Markdown or JSON, exports any PDF to layout-aware Markdown, and writes an AI reviewer's markup back
+            in as native PDF annotations. It ships as one self-contained binary.
+          </p>
+          <ul>
+            <li><strong>Read markup out</strong> &mdash; every annotation in the file, filed under the document's
+              headings in reading order, with a summary table.</li>
+            <li><strong>Export a PDF</strong> &mdash; layout-aware Markdown from any PDF, ready for an AI to
+              summarise.</li>
+            <li><strong>Write markup back</strong> &mdash; highlights, underlines, strikeouts, replacements and notes
+              applied from a plan, with quoted text resolved to exact PDF geometry.</li>
+          </ul>
+          <p>
+            It is built directly on the RailReaderCore packages, and the repository includes a Claude Code skill so an
+            agent can produce review markup for you.
+          </p>
+          <p class="eco-card__links">
+            <a class="btn btn--primary" href="https://sjvrensburg.github.io/railmark/">RailMark website</a>
+            <a class="btn btn--secondary" href="https://github.com/sjvrensburg/railmark">RailMark on GitHub</a>
+            <a class="btn btn--secondary" href="https://github.com/sjvrensburg/railmark/releases">Releases</a>
+          </p>
+        </section>
+
+      </div>
+
+      <h2 id="together">How they fit together</h2>
+      <ul>
+        <li><strong>railreader2</strong> is where you read and mark up. Highlights, underlines and comments are saved
+          into the PDF as native annotations, so other tools can read them.</li>
+        <li><strong>RailMark</strong> turns those annotations into a Markdown or JSON summary you can hand to an AI
+          &mdash; and writes an AI reviewer's markup back into a PDF, where railreader2 shows it in the
+          <a href="guide.html#comments">Comments</a> list and on the page.</li>
+        <li><strong>RailReaderCore</strong> is the shared engine under both, and the part to build on if you want
+          rail reading or PDF structure extraction in your own .NET project.</li>
+      </ul>
+      <p>
+        railreader2 also has its own <a href="guide.html#cli-tool">command-line tool</a> for rendering pages,
+        extracting structure and annotations, and exporting Markdown. RailMark is the one to reach for when the job is
+        review markup rather than reading.
+      </p>
+    </article>
+  </main>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <p>
+      railreader2 &mdash;
+      <a href="https://github.com/sjvrensburg/railreader2">source</a> &middot;
+      <a href="https://github.com/sjvrensburg/railreader2/releases">releases</a> &middot;
+      <a href="https://apps.microsoft.com/store/detail/9P9J8KZ6RVZP">microsoft store</a> &middot;
+      <a href="ecosystem.html">ecosystem</a> &middot;
+      <a href="about.html#acknowledgements">acknowledgements</a> &middot;
+      <a href="privacy.html">privacy</a> &middot;
+      MIT License
+    </p>
+  </footer>
+
+  <script>
+    function applyTheme(theme) {
+      document.documentElement.setAttribute('data-theme', theme);
+      document.getElementById('theme-icon').textContent = theme === 'dark' ? '☀️' : '🌙';
+    }
+    function toggleTheme() {
+      var current = document.documentElement.getAttribute('data-theme');
+      var next = current === 'dark' ? 'light' : 'dark';
+      localStorage.setItem('rr2-theme', next);
+      applyTheme(next);
+    }
+    applyTheme(document.documentElement.getAttribute('data-theme') || 'light');
+  </script>
+</body>
+</html>

@@ -1018,3 +1018,62 @@ pre code {
     transform: none;
   }
 }
+
+/* ------------------------------------------------------------------
+   Ecosystem page — one card per sibling project
+   ------------------------------------------------------------------ */
+
+.eco-cards {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-lg);
+  margin: var(--space-xl) 0;
+}
+
+.eco-card {
+  background: var(--color-surface);
+  border: var(--border-hairline);
+  border-top: 3px solid var(--color-accent);
+  border-radius: var(--radius-md);
+  padding: var(--space-lg);
+}
+
+.eco-card h2 {
+  margin-top: 0;
+}
+
+.eco-card__eyebrow {
+  color: var(--color-accent-strong);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  margin-bottom: var(--space-3xs);
+}
+
+.eco-card ul {
+  padding-left: var(--space-md);
+  margin: var(--space-sm) 0;
+}
+
+.eco-card li {
+  margin-bottom: var(--space-2xs);
+}
+
+.eco-card__packages {
+  font-size: var(--text-body-sm);
+  color: var(--color-text-muted);
+}
+
+.eco-card__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  margin-top: var(--space-md);
+}
+
+.eco-card__links .btn {
+  border-bottom: none;
+}
+
+.header nav a[aria-current="page"] {
+  border-bottom-color: var(--color-accent);
+}

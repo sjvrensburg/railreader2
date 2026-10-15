@@ -50,7 +50,7 @@
     },
     "softwareVersion": "3.74.0.0",
     "datePublished": "2026-02-18",
-    "dateModified": "2026-08-12",
+    "dateModified": "2026-10-15",
     "license": "https://opensource.org/licenses/MIT",
     "author": {
       "@type": "Person",
@@ -74,6 +74,7 @@
         <a href="#getting-started">Get Started</a>
         <a href="#shortcuts">Shortcuts</a>
         <a href="guide.html">User Guide</a>
+        <a href="ecosystem.html">Ecosystem</a>
         <a href="https://github.com/sjvrensburg/railreader2">GitHub</a>
       </nav>
     </div>
@@ -183,6 +184,17 @@
       </div>
       <div class="feature-row" data-reveal>
         <div class="feature-row__text">
+          <p class="feature-row__eyebrow label-sm">Reading guide</p>
+          <h3>Steer the page with your pointer</h3>
+          <p>For reading at lower zoom, turn on the reading guide (<code>K</code>), click a word, then hold Shift and nudge the mouse: the pointer becomes an invisible joystick that carries a word-by-word highlight along the text at your pace. Above the rail threshold, the same nudge drives rail mode.</p>
+          <p>A small indicator shows where you pressed Shift and how far you are pushing, in the colours of your colour effect. When the guide reaches a new line it pauses, so you can find your place and re-centre the mouse before pushing on.</p>
+        </div>
+        <div class="feature-row__media">
+          <figure class="frame"><img src="img/steer_indicator.png" alt="railreader2 reading guide steering along a line of a two-column paper, with a square, dot and line showing how far the pointer has been pushed" loading="lazy" width="1440" height="926" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}"></figure>
+        </div>
+      </div>
+      <div class="feature-row" data-reveal>
+        <div class="feature-row__text">
           <p class="feature-row__eyebrow label-sm">Visual comfort</p>
           <h3>Tuned to your eyes</h3>
           <p>GPU colour filters — amber, high-contrast, high-visibility, invert — on the page only, at any intensity. Each document keeps its own; press C to cycle.</p>
@@ -206,6 +218,7 @@
           <p class="feature-row__eyebrow label-sm">Mark it up</p>
           <h3>Highlights, notes, and ink</h3>
           <p>Highlight, underline, strikethrough, squiggly, pen, rectangles, sticky notes, and text boxes from the annotation toolbar — saved as native PDF annotations or a sidecar. Select, move, resize, copy and paste between documents, undo; export or import as JSON or a flattened PDF.</p>
+          <p>Any highlight can carry a comment &mdash; double-click it &mdash; and overlapping highlights can be merged into one. Comments are saved into the PDF, so other readers show them too.</p>
           <p>Notes and text boxes are spell-checked as you type, with British and American English dictionaries built in and a personal word list for your own terms.</p>
         </div>
         <div class="feature-row__media">
@@ -349,7 +362,7 @@
       <div class="feature" data-reveal>
         <h3>Headless Core Library</h3>
         <p>
-          All logic lives in a rendering-agnostic <code>RailReader.Core</code> (zero Avalonia/SkiaSharp), fully unit-tested without a display. A standalone <strong>CLI</strong> reuses it for rendering, extraction, and batch VLM transcription.
+          All logic lives in a rendering-agnostic <code>RailReader.Core</code> (zero Avalonia/SkiaSharp), fully unit-tested without a display. A standalone <strong>CLI</strong> reuses it for rendering, extraction, and batch VLM transcription. See the <a href="ecosystem.html#core">ecosystem page</a> for RailReaderCore and its sibling, RailMark.
         </p>
       </div>
     </div>
@@ -364,6 +377,11 @@
     <p class="story-hook" data-reveal>
       Built by a statistics lecturer who reads at high magnification — and almost
       entirely with an AI coding agent. <a href="about.html">Read the story &rarr;</a>
+    </p>
+    <p class="story-hook" data-reveal>
+      The reading engine is open source too: <a href="ecosystem.html#core">RailReaderCore</a>, and
+      <a href="ecosystem.html#railmark">RailMark</a> for PDF review markup.
+      <a href="ecosystem.html">See the ecosystem &rarr;</a>
     </p>
   </section>
 
@@ -468,6 +486,7 @@
       <tbody>
         <tr><th colspan="2" scope="rowgroup">Rail Mode</th></tr>
         <tr><td>R</td><td>Start rail here at the current zoom (press again or Escape to exit)</td></tr>
+        <tr><td>K</td><td>Reading guide on/off (click a word, hold Shift and nudge the pointer to read)</td></tr>
         <tr><td>Down / S</td><td>Next line</td></tr>
         <tr><td>Up / W</td><td>Previous line</td></tr>
         <tr><td>Right / D</td><td>Scroll forward (hold)</td></tr>
@@ -518,6 +537,7 @@
       <a href="https://github.com/sjvrensburg/railreader2">source</a> &middot;
       <a href="https://github.com/sjvrensburg/railreader2/releases">releases</a> &middot;
       <a href="https://apps.microsoft.com/store/detail/9P9J8KZ6RVZP">microsoft store</a> &middot;
+      <a href="ecosystem.html">ecosystem</a> &middot;
       <a href="about.html#acknowledgements">acknowledgements</a> &middot;
       <a href="privacy.html">privacy</a> &middot;
       MIT License
