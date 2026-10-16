@@ -282,7 +282,7 @@ public sealed partial class MainWindowViewModel
         }
 
         var dialog = new Views.ConfirmUrlDialog(uri);
-        var result = await dialog.ShowDialog<bool?>(_window);
+        var result = await dialog.ShowDialog<bool?>(DialogOwner!);
         if (result == true)
         {
             try
@@ -355,11 +355,25 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(AutoScrollActive));
     }
 
+    /// <summary>Saves a display toggle made from a key/menu into the config and hands Core the new
+    /// settings snapshot, so the next document opened this session starts with it too (Core builds new
+    /// documents from its own copy). The light variant: a toggle changes no analysis-derived state, and
+    /// the full <see cref="OnConfigChanged()"/> would also re-invalidate every layer.</summary>
+    private void PersistDisplayDefault()
+    {
+        _controller.OnSliderChanged(AppConfig.ToCoreSettings());
+        AppConfig.Save();
+    }
+
     public void ToggleLineFocusBlur()
     {
         if (_controller.FocusedViewport?.Owner is { } doc)
         {
             doc.LineFocusBlur = !doc.LineFocusBlur;
+            // The toggle is also the default for new documents and the next session (as the colour
+            // effect is) — AppConfig is what Settings edits and what is loaded at startup.
+            AppConfig.LineFocusBlur = doc.LineFocusBlur;
+            PersistDisplayDefault();
             InvalidatePage();
             InvalidateOverlay();
         }
@@ -374,9 +388,10 @@ public sealed partial class MainWindowViewModel
     /// was approximately at fit-width, re-fits to the new content width while
     /// preserving the page-space point at viewport center (no jump to top).
     /// If the user has deliberately zoomed in past fit-width, only the flag
-    /// changes — the effect becomes visible on the next fit or page flip.
+    /// changes — the effect becomes visible on the next fit or page flip — unless
+    /// <paramref name="refitIfZoomed"/> (the keyboard shortcut) asks to re-fit regardless.
     /// </summary>
-    public void ApplyMarginCropping(bool enabled)
+    public void ApplyMarginCropping(bool enabled, bool refitIfZoomed = false)
     {
         if (_controller.FocusedViewport?.Owner is not { } doc) return;
         if (doc.MarginCropping == enabled) return;
@@ -392,7 +407,7 @@ public sealed partial class MainWindowViewModel
 
         doc.MarginCropping = enabled;
 
-        if (atFitWidth)
+        if (atFitWidth || refitIfZoomed)
         {
             Dispatch(() =>
             {
@@ -402,13 +417,44 @@ public sealed partial class MainWindowViewModel
         }
     }
 
+    /// <summary>
+    /// Ctrl+Shift+M. At fit-width (or with cropping off) it toggles cropping and re-fits to the new content
+    /// width. But when cropping is already on and the reader has zoomed in past fit-width the press is
+    /// "take me back to the margin-fit level":
+    /// cropping is switched on if it was off and the view re-fits to the content width (keeping the
+    /// page point at the viewport centre), instead of silently flipping a flag whose effect is
+    /// invisible until the next page turn. Press again, now at fit-width, to toggle cropping off.
+    /// </summary>
     public void ToggleMarginCropping()
     {
         // Margin cropping is a document-level pref. Toggle it on the focused viewport's document; the
         // re-fit inside ApplyMarginCropping sizes off the main view (not a confined portal), so this stays
         // reachable even while the live portal viewport is focused — they share the same document model.
-        if (_controller.FocusedViewport?.Owner is { } doc)
-            ApplyMarginCropping(!doc.MarginCropping);
+        if (_controller.FocusedViewport?.Owner is not { } doc) return;
+
+        var refVp = _controller.FocusedViewport is { Focus: null } fv ? fv : ActiveTab?.Viewport;
+        var (ww, wh) = refVp is { } r ? (r.Width, r.Height) : FocusedViewportSize();
+        bool zoomedPastFit = false;
+        if (doc.MarginCropping)
+        {
+            var (_, _, rw, _) = doc.GetFitRect();
+            zoomedPastFit = rw > 0 && doc.Camera.Zoom > ww / rw * AtFitWidthHysteresis;
+        }
+
+        if (zoomedPastFit)
+        {
+            Dispatch(() =>
+            {
+                doc.FitWidthPreservingTop(ww, wh);
+                doc.UpdateRailZoom(ww, wh);
+            }, InvalidateCameraAndTab);
+            return;
+        }
+
+        bool enable = !doc.MarginCropping;
+        AppConfig.MarginCropping = enable;
+        PersistDisplayDefault();
+        ApplyMarginCropping(enable, refitIfZoomed: true);
     }
 
     public void ToggleLineHighlight()
@@ -416,6 +462,8 @@ public sealed partial class MainWindowViewModel
         if (_controller.FocusedViewport?.Owner is { } doc)
         {
             doc.LineHighlightEnabled = !doc.LineHighlightEnabled;
+            AppConfig.LineHighlightEnabled = doc.LineHighlightEnabled;
+            PersistDisplayDefault();
             InvalidateOverlay();
         }
     }

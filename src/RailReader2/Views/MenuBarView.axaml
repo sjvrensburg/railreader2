@@ -34,6 +34,9 @@
             <MenuItem Header="_Paste Annotation" InputGesture="Ctrl+V" Click="OnPaste" IsEnabled="{Binding HasDocument}" />
             <MenuItem Header="_Delete Annotation" InputGesture="Delete" Click="OnDeleteAnnotation" IsEnabled="{Binding HasDocument}" />
             <MenuItem Header="Add/Edit Co_mment..." Click="OnEditComment" IsEnabled="{Binding HasDocument}" />
+            <MenuItem Name="AnnotationColourMenu" Header="Annotation C_olour" IsEnabled="{Binding HasDocument}" SubmenuOpened="OnAnnotationColourMenuOpened">
+                <MenuItem Header="(placeholder)" IsEnabled="False" />
+            </MenuItem>
             <MenuItem Header="Merge Overlapping _Highlights" IsEnabled="{Binding HasDocument}">
                 <MenuItem Header="_Selected Highlight" Click="OnMergeSelectedHighlight" />
                 <MenuItem Header="Whole _Page" Click="OnMergePageHighlights" />
