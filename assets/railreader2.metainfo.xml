@@ -101,6 +101,9 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="3.76.0.0" date="2026-10-16">
+      <description><p>You can now change the colour of an existing annotation: right-click it and choose Colour, or use Edit, Annotation Colour. The line focus and line highlight toggles are remembered between sessions, and Ctrl+Shift+M now zooms back out to the margin-fit level even when you have zoomed in past it. Comments and notes started from the pop-out portal window no longer open behind it.</p></description>
+    </release>
     <release version="3.75.0.0" date="2026-10-15">
       <description><p>Scrolling pace now stays the same on screen at any magnification. Holding the arrow keys, auto-scroll and steering with Shift used to move faster the further you zoomed in and crawl when zoomed out; the speeds are now scaled to feel the same as at 7x.</p></description>
     </release>

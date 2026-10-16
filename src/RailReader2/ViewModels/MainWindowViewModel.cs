@@ -724,6 +724,14 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         }
     }
 
+    /// <summary>The window that should own a modal dialog: the one hosting the focused surface (the
+    /// pop-out portal or a tear-off pane when that is where the reader is working), else the main window.
+    /// Owning it by the main window put the dialog behind an always-on-top portal/tear-off window, so a
+    /// comment or note started there appeared to do nothing.</summary>
+    private Window? DialogOwner
+        => FocusedSurface is Avalonia.Visual v && Avalonia.Controls.TopLevel.GetTopLevel(v) is Window w && w.IsVisible
+            ? w : _window;
+
     /// <summary>Make <paramref name="vp"/> the focused viewport — all keyboard/scroll/menu commands then
     /// act on this surface (Core routes host input through <c>FocusedViewport</c>). Idempotent.</summary>
     public void FocusSurface(IViewportSurface surface, Viewport vp, bool wireReadingSignals = true)

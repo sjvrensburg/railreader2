@@ -71,6 +71,39 @@ public sealed partial class MainWindowViewModel
         InvalidateAnnotations();
     }
 
+    /// <summary>Display names for <see cref="AnnotationInteractionHandler.AnnotationColors"/>, same order.</summary>
+    public static readonly string[] AnnotationColourNames = ["Yellow", "Green", "Red", "Blue", "Black"];
+
+    /// <summary>Recolours the selected annotation to a palette entry as one undo step — the colour
+    /// picker for an annotation that already exists (the toolbar's flyout only sets the colour the
+    /// NEXT stroke is drawn with). Opacity is kept, so a highlight stays translucent.</summary>
+    public void RecolorSelectedAnnotation(int paletteIndex)
+    {
+        if (IsViewRotated)
+        {
+            ShowStatusToast("Annotations are unavailable while the view is rotated");
+            return;
+        }
+        var palette = AnnotationInteractionHandler.AnnotationColors;
+        if (paletteIndex < 0 || paletteIndex >= palette.Length) return;
+        if (SelectedAnnotation is not { } ann || !IsOnFocusedPage(ann))
+        {
+            ShowStatusToast("Select an annotation on this page first — click a highlight or note in browse mode");
+            return;
+        }
+        if (_controller.FocusedViewport?.Owner is not { } doc) return;
+        if (string.Equals(ann.Color, palette[paletteIndex], StringComparison.OrdinalIgnoreCase)) return;
+
+        var action = new ChangeColorAction(ann, ann.Color, ann.ColorComponents, palette[paletteIndex]);
+        action.Redo(doc.Annotations);
+        ann.ModifiedUtc = DateTimeOffset.UtcNow;
+        doc.PushUndoAction(action);
+
+        OnPropertyChanged(nameof(SelectedAnnotation));
+        NotifyAnnotationsMutated();
+        InvalidateAnnotations();
+    }
+
     /// <summary>Navigate to a comment: jump to its page, select it, and recenter on it.</summary>
     public void NavigateToAnnotation(int page, Annotation ann)
     {
@@ -195,10 +228,10 @@ public sealed partial class MainWindowViewModel
 
     private async Task CompletePendingFreeText()
     {
-        if (_window is null) { _controller.Annotations.CancelPendingFreeText(); return; }
+        if (DialogOwner is not { } owner) { _controller.Annotations.CancelPendingFreeText(); return; }
 
         var dialog = new TextNoteDialog { FontSize = CurrentFontSize };
-        var result = await dialog.ShowDialog<string?>(_window);
+        var result = await dialog.ShowDialog<string?>(owner);
         if (string.IsNullOrEmpty(result))
         {
             _controller.Annotations.CancelPendingFreeText();
@@ -213,9 +246,9 @@ public sealed partial class MainWindowViewModel
 
     private async Task CreateTextNote(float pageX, float pageY)
     {
-        if (_window is null) return;
+        if (DialogOwner is not { } owner) return;
         var dialog = new TextNoteDialog { FontSize = CurrentFontSize };
-        var result = await dialog.ShowDialog<string?>(_window);
+        var result = await dialog.ShowDialog<string?>(owner);
         if (string.IsNullOrEmpty(result)) return;
 
         _controller.Annotations.CompleteTextNote(_controller.FocusedViewport, pageX, pageY, result);
@@ -229,13 +262,13 @@ public sealed partial class MainWindowViewModel
     /// comment. One undo step in Core (<c>EditContentsAction</c>).</summary>
     private async Task EditAnnotationComment(Annotation ann)
     {
-        if (_window is null) return;
+        if (DialogOwner is not { } owner) return;
         var dialog = new TextNoteDialog(ann.EffectiveContents ?? "")
         {
             FontSize = CurrentFontSize,
             Title = CommentDialogTitle(ann),
         };
-        var result = await dialog.ShowDialog<string?>(_window);
+        var result = await dialog.ShowDialog<string?>(owner);
         if (result is null) return;
 
         _controller.Annotations.CompleteCommentEdit(_controller.FocusedViewport, ann, result);

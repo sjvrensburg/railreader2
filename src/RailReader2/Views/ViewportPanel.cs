@@ -477,6 +477,51 @@ public class ViewportPanel : Panel
     private static ContextMenu ScaledContextMenu(MainWindowViewModel vm)
         => new() { FontSize = vm.CurrentFontSize };
 
+    /// <summary>"Colour" submenu for the annotation under the pointer: one entry per palette colour
+    /// with a swatch, the annotation's current colour checked. Recolours the selection (the context menu
+    /// has just selected it) as one undo step.</summary>
+    internal static MenuItem BuildAnnotationColourMenu(MainWindowViewModel vm, Annotation? current)
+    {
+        var colourMenu = new MenuItem { Header = "Colour" };
+        FillAnnotationColourItems(colourMenu, vm, current);
+        return colourMenu;
+    }
+
+    /// <summary>Fills <paramref name="target"/> (replacing its items) with the palette entries — used both for the
+    /// right-click submenu and, on open, for the Edit menu's live item.</summary>
+    internal static void FillAnnotationColourItems(MenuItem target, MainWindowViewModel vm, Annotation? current)
+    {
+        target.Items.Clear();
+        var palette = AnnotationInteractionHandler.AnnotationColors;
+        for (int i = 0; i < palette.Length; i++)
+        {
+            int idx = i;
+            var item = new MenuItem
+            {
+                Header = new StackPanel
+                {
+                    Orientation = Avalonia.Layout.Orientation.Horizontal,
+                    Spacing = 8,
+                    Children =
+                    {
+                        new Border
+                        {
+                            Width = 14, Height = 14,
+                            CornerRadius = new CornerRadius(3),
+                            Background = new SolidColorBrush(Color.Parse(palette[i])),
+                            BorderBrush = Brushes.Gray, BorderThickness = new Thickness(1),
+                        },
+                        new TextBlock { Text = MainWindowViewModel.AnnotationColourNames[i] },
+                    },
+                },
+                ToggleType = MenuItemToggleType.Radio,
+                IsChecked = current is not null && string.Equals(current.Color, palette[i], StringComparison.OrdinalIgnoreCase),
+            };
+            item.Click += (_, _) => vm.RecolorSelectedAnnotation(idx);
+            target.Items.Add(item);
+        }
+    }
+
     private static string Capitalise(string s) => s.Length == 0 ? s : char.ToUpperInvariant(s[0]) + s[1..];
 
     private void ShowViewportContextMenu(MainWindowViewModel vm, double pageX, double pageY)
@@ -524,6 +569,7 @@ public class ViewportPanel : Panel
                 cutAnnItem.Click += (_, _) => vm.CutSelectedAnnotation();
                 menu.Items.Add(cutAnnItem);
             }
+            menu.Items.Add(BuildAnnotationColourMenu(vm, ann));
             var deleteAnnItem = new MenuItem
             {
                 Header = ann is TextMarkupAnnotation ? "Delete Highlight" : "Delete Annotation",

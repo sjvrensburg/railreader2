@@ -76,9 +76,9 @@ public sealed partial class MainWindowViewModel
                 }
                 catch (PdfPasswordRequiredException ex)
                 {
-                    if (_window is null) return;
+                    if (DialogOwner is not { } pwOwner) return;
                     var entered = await new PasswordDialog(Path.GetFileName(path), ex.WrongPassword)
-                        .ShowDialog<string?>(_window);
+                        .ShowDialog<string?>(pwOwner);
                     // Cancel = "changed my mind", not a failure — abort quietly (no toast).
                     if (entered is null) return;
                     password = entered;

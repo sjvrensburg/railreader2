@@ -163,6 +163,13 @@ public partial class MenuBarView : UserControl
     private void OnPaste(object? s, RoutedEventArgs e) => Vm?.PasteAnnotation();
     private void OnDeleteAnnotation(object? s, RoutedEventArgs e) => Vm?.DeleteSelectedAnnotation();
     private void OnEditComment(object? s, RoutedEventArgs e) => Vm?.EditSelectedAnnotationComment();
+    // Rebuilt on open so the checked entry follows the current selection; the submenu is the
+    // same one the viewport's right-click offers.
+    private void OnAnnotationColourMenuOpened(object? s, RoutedEventArgs e)
+    {
+        if (Vm is { } vm)
+            ViewportPanel.FillAnnotationColourItems(AnnotationColourMenu, vm, vm.SelectedAnnotation);
+    }
     private void OnMergeSelectedHighlight(object? s, RoutedEventArgs e) => Vm?.MergeSelectedTextMarkup();
     private void OnMergePageHighlights(object? s, RoutedEventArgs e) => Vm?.MergePageTextMarkup();
     private void OnCopyBlockAsLatex(object? s, RoutedEventArgs e)
