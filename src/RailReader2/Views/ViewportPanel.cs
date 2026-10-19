@@ -43,12 +43,12 @@ public class ViewportPanel : Panel
     // fresh hit-test at that point can miss the marker entirely. See TryHandlePortalMarkerClick.
     private PortalMarker? _lastPortalMarkerHit;
 
-    // Page-space point of the gesture's first click when it landed on text markup, kept across the
-    // clicks of a double-click. At rail zoom the first click's rail snap (Core's HandleClick) scrolls the
-    // highlight out from under the pointer before the second click's release, so a fresh hit-test there
-    // misses it and the double-click would fall through to block framing. Same idea as
-    // _lastPortalMarkerHit. See TryEditMarkupCommentAt.
-    private (int Page, double X, double Y, Point Screen)? _firstClickMarkupPoint;
+    // Page-space point of the gesture's first click, kept across the clicks of a double-click. At rail
+    // zoom the first click's rail snap (Core's HandleClick) scrolls the page out from under the pointer
+    // before the second click's release, so a fresh hit-test there lands on the wrong spot: it would miss
+    // a highlight (falling through to block framing) or frame the wrong line. Same idea as
+    // _lastPortalMarkerHit. See DoubleClickPagePoint.
+    private (int Page, double X, double Y, Point Screen)? _firstClickPoint;
 
     // Track the last tool so we only update cursor when it changes
     private AnnotationTool _lastCursorTool = AnnotationTool.None;
@@ -181,7 +181,7 @@ public class ViewportPanel : Panel
             if (_pressClickCount <= 1)
             {
                 _lastPortalMarkerHit = null;   // fresh gesture: drop any stale caches
-                _firstClickMarkupPoint = null;
+                _firstClickPoint = null;
             }
             e.Handled = true;
 
@@ -431,16 +431,15 @@ public class ViewportPanel : Panel
             }
             else if (isClick && _pressClickCount >= 2 && TryFrameBlockAt(pos))
             {
-                // Double-click on a detected block → smooth zoom into rail mode at its start.
+                // Double-click on a detected block → smooth zoom into rail mode on the clicked line.
             }
             else if (isClick)
             {
-                // Remember a text-markup hit BEFORE HandleClick: at rail zoom it snaps the camera.
+                // Remember where the first click landed BEFORE HandleClick: at rail zoom it snaps the camera.
                 if (_pressClickCount <= 1 && ActiveViewport is { } clickVp)
                 {
                     var (cx, cy) = ScreenToGesturePage(pos);
-                    if (ViewModel.FindAnnotationAt(cx, cy) is TextMarkupAnnotation)
-                        _firstClickMarkupPoint = (_gesturePage ?? clickVp.CurrentPage, cx, cy, pos);
+                    _firstClickPoint = (_gesturePage ?? clickVp.CurrentPage, cx, cy, pos);
                 }
                 ViewModel.HandleClick(pos.X, pos.Y);
             }
@@ -719,17 +718,21 @@ public class ViewportPanel : Panel
     private bool TryEditMarkupCommentAt(Point screenPos)
     {
         if (ViewModel is not { } vm) return false;
-        // Prefer the first click's remembered point (the camera may have moved since); fall back to a
-        // fresh hit-test when it was not on markup or the page changed.
-        double pageX, pageY;
-        if (_firstClickMarkupPoint is { } first && ActiveViewport?.CurrentPage == first.Page
-            && (screenPos - first.Screen).X is var fx && (screenPos - first.Screen).Y is var fy
-            && fx * fx + fy * fy <= 100.0)   // the second click must be where the first was (≈10 px)
-            (pageX, pageY) = (first.X, first.Y);
-        else
-            (pageX, pageY) = ScreenToGesturePage(screenPos);
+        var (pageX, pageY) = DoubleClickPagePoint(screenPos);
         if (vm.FindAnnotationAt(pageX, pageY) is not TextMarkupAnnotation) return false;
         return vm.HandleBrowseClick((float)pageX, (float)pageY, isDoubleClick: true).Handled;
+    }
+
+    /// <summary>Page-space point a double-click's second click aims at: the first click's remembered
+    /// point (the camera may have moved since — see <see cref="_firstClickPoint"/>), or a fresh
+    /// hit-test when the page changed or the second click landed elsewhere.</summary>
+    private (double PageX, double PageY) DoubleClickPagePoint(Point screenPos)
+    {
+        if (_firstClickPoint is { } first && ActiveViewport?.CurrentPage == first.Page
+            && (screenPos - first.Screen).X is var fx && (screenPos - first.Screen).Y is var fy
+            && fx * fx + fy * fy <= 100.0)   // the second click must be where the first was (≈10 px)
+            return (first.X, first.Y);
+        return ScreenToGesturePage(screenPos);
     }
 
     private bool IsClick(Point pos)
@@ -739,8 +742,8 @@ public class ViewportPanel : Panel
         return dx * dx + dy * dy < ClickThresholdSq;
     }
 
-    /// <summary>Double-click target: smoothly zoom into rail mode at the start of the detected block
-    /// under <paramref name="screenPos"/> (a centred frame for non-navigable figures/tables — the
+    /// <summary>Double-click target: smoothly zoom into rail mode on the line under
+    /// <paramref name="screenPos"/> of the detected block there (a centred frame for non-navigable figures/tables — the
     /// fallback in <c>SmoothlyFrameBlock</c>). The mouse-driven way to zoom onto a specific block,
     /// which has no keyboard equivalent. Returns false (so the normal click handler runs) when no
     /// block is there.</summary>
@@ -749,12 +752,13 @@ public class ViewportPanel : Panel
         if (ViewModel is not { } vm) return false;
         // Release-time hit-test for the SAME press/release gesture ScreenToPage pinned at press —
         // stay on that page rather than re-resolving (and potentially re-anchoring) at release.
-        var (pageX, pageY) = ScreenToGesturePage(screenPos);
+        var (pageX, pageY) = DoubleClickPagePoint(screenPos);
         int index = vm.FindBlockIndexAt(pageX, pageY);
         if (index < 0) return false;
         // A gentler ease than the native 180ms zoom — a double-click is a deliberate framing
         // gesture, so it reads as intentional rather than a snap.
-        return vm.SmoothlyFrameBlock(index, durationMs: FrameZoomDurationMs);
+        return vm.SmoothlyFrameBlock(index, durationMs: FrameZoomDurationMs,
+            line: vm.FindNearestLineIndex(index, pageY));
     }
 
     /// <summary>Resolves a screen point to page-local coordinates for an actual interaction dispatch
