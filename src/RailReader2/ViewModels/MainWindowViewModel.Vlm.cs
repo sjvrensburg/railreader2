@@ -87,6 +87,28 @@ public sealed partial class MainWindowViewModel
         return -1;
     }
 
+    /// <summary>Index of the line of page block <paramref name="pageBlockIndex"/> whose centre is
+    /// nearest <paramref name="pageY"/> — the <c>line</c> <see cref="SmoothlyFrameBlock"/> takes — or 0
+    /// when the block has no lines or there is no analysis. Mirrors Core's rail click seating
+    /// (<c>RailNav.FindNearestLine</c>).</summary>
+    public int FindNearestLineIndex(int pageBlockIndex, double pageY)
+    {
+        var vp = _controller.FocusedViewport;
+        if (vp is null || !vp.Owner.TryGetAnalysis(vp.CurrentPage, vp.AnalysisParams, out var analysis)
+            || (uint)pageBlockIndex >= (uint)analysis.Blocks.Count)
+            return 0;
+
+        var lines = analysis.Blocks[pageBlockIndex].Lines;
+        int best = 0;
+        double bestDist = double.MaxValue;
+        for (int i = 0; i < lines.Count; i++)
+        {
+            double d = Math.Abs(lines[i].Y - pageY); // LineInfo.Y is the line centre
+            if (d < bestDist) { bestDist = d; best = i; }
+        }
+        return best;
+    }
+
     public async Task CopyBlockWithAction(LayoutBlock block, BlockAction action)
     {
         var doc = _controller.FocusedViewport?.Owner;
