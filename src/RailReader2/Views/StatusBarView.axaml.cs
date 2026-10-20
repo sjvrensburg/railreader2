@@ -30,7 +30,7 @@ public partial class StatusBarView : UserControl
     private readonly record struct StatusShape(
         bool PendingRail, bool RailActive, bool AutoScrollActive, bool AutoScrollParked, bool JumpMode,
         bool IsViewRotated, int ViewRotationDegrees, bool IsAnnotating, AnnotationTool ActiveTool,
-        bool HasBreadcrumb, bool HasToast, bool HasToastAction);
+        bool HasBreadcrumb, bool HasToast, bool HasToastAction, bool CanGoBack, bool CanGoForward);
     private StatusShape? _lastShape;
     private TabViewModel? _lastShapeTab;
     private TextBlock? _toastLabel;
@@ -73,7 +73,9 @@ public partial class StatusBarView : UserControl
             nameof(MainWindowViewModel.AutoScrollParked) or
             nameof(MainWindowViewModel.JumpMode) or
             nameof(MainWindowViewModel.IsViewRotated) or
-            nameof(MainWindowViewModel.StatusToast))
+            nameof(MainWindowViewModel.StatusToast) or
+            nameof(MainWindowViewModel.CanGoBack) or
+            nameof(MainWindowViewModel.CanGoForward))
         {
             SubscribeToTab(_subscribedVm?.ActiveTab);
             UpdateStatus();
@@ -100,6 +102,16 @@ public partial class StatusBarView : UserControl
             ? g as Avalonia.Media.Geometry
             : null;
 
+    /// <summary>Sets a tooltip anchored above <paramref name="control"/>. The default pointer placement
+    /// is pushed up over the pointer at the bottom of the screen, and on X11 the tooltip is its own
+    /// window, so it swallowed the press and a click on the control (e.g. Back) was silently lost.</summary>
+    private static void SetTip(Control control, object? tip)
+    {
+        ToolTip.SetTip(control, tip);
+        ToolTip.SetPlacement(control, PlacementMode.Top);
+        ToolTip.SetVerticalOffset(control, -4); // the default +20 would push it back down over the control
+    }
+
     private static Button MakeNavButton(string iconKey, EventHandler<RoutedEventArgs> handler,
         string? tooltip = null, string? automationId = null)
     {
@@ -111,7 +123,7 @@ public partial class StatusBarView : UserControl
         };
         if (tooltip is not null)
         {
-            ToolTip.SetTip(btn, tooltip);
+            SetTip(btn, tooltip);
             Avalonia.Automation.AutomationProperties.SetName(btn, tooltip);
         }
         if (automationId is not null)
@@ -262,7 +274,7 @@ public partial class StatusBarView : UserControl
             VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
         };
         if (full.Length > BreadcrumbMaxChars)
-            ToolTip.SetTip(_breadcrumbLabel, full);
+            SetTip(_breadcrumbLabel, full);
         StatusPanel.Children.Add(_breadcrumbLabel);
     }
 
@@ -313,7 +325,8 @@ public partial class StatusBarView : UserControl
         var shape = new StatusShape(
             pendingRail, rail.Active, vm.AutoScrollActive, vm.AutoScrollParked, vm.JumpMode,
             vm.IsViewRotated, vm.ViewRotationDegrees, vm.IsAnnotating, vm.ActiveTool,
-            breadcrumbFull is not null, vm.StatusToast is not null, vm.StatusToastActionLabel is not null);
+            breadcrumbFull is not null, vm.StatusToast is not null, vm.StatusToastActionLabel is not null,
+            vm.CanGoBack, vm.CanGoForward);
 
         // Fast path: the set of children hasn't changed since the last rebuild (the overwhelmingly common
         // case while continuously rail-reading — ActiveTab is re-raised every animation frame, see
@@ -332,6 +345,15 @@ public partial class StatusBarView : UserControl
 
         StatusPanel.Children.Clear();
         int zoomPct = (int)Math.Round(zoom * 100);
+        // Back / Forward through the view's history (link jumps, outline, search, …). Always present —
+        // disabled when there is nowhere to go — so the way back is in the same place after a stray click.
+        var backBtn = MakeNavButton("IconBack", (_, _) => vm?.NavigateBack(), "Back (Alt+Left)", "NavigateBack");
+        backBtn.IsEnabled = vm.CanGoBack;
+        StatusPanel.Children.Add(backBtn);
+        var forwardBtn = MakeNavButton("IconForward", (_, _) => vm?.NavigateForward(), "Forward (Alt+Right)", "NavigateForward");
+        forwardBtn.IsEnabled = vm.CanGoForward;
+        StatusPanel.Children.Add(forwardBtn);
+        AddSeparator();
         StatusPanel.Children.Add(MakeNavButton("IconChevronLeft", (_, _) =>
         vm?.StepPage(-1), "Previous page (PgUp)", "PreviousPage"));
         _pageLabel = new TextBlock
@@ -340,7 +362,7 @@ public partial class StatusBarView : UserControl
             VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
             Cursor = new Cursor(StandardCursorType.Hand),
         };
-        ToolTip.SetTip(_pageLabel, "Click to go to page");
+        SetTip(_pageLabel, "Click to go to page");
         // Spoken form reads cleaner than the compact "3/15"; AutomationId is a stable handle.
         Avalonia.Automation.AutomationProperties.SetName(_pageLabel, $"Page {curPage + 1} of {tab.PageCount}");
         Avalonia.Automation.AutomationProperties.SetAutomationId(_pageLabel, "PageIndicator");
@@ -355,7 +377,7 @@ public partial class StatusBarView : UserControl
             VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
             Cursor = new Cursor(StandardCursorType.Hand),
         };
-        ToolTip.SetTip(_zoomLabel, "Click to set zoom");
+        SetTip(_zoomLabel, "Click to set zoom");
         Avalonia.Automation.AutomationProperties.SetName(_zoomLabel, $"Zoom {zoomPct} percent");
         Avalonia.Automation.AutomationProperties.SetAutomationId(_zoomLabel, "ZoomIndicator");
         _zoomLabel.Tapped += (_, _) => BeginZoomEdit(vm!, tab);
@@ -476,7 +498,7 @@ public partial class StatusBarView : UserControl
         if (_breadcrumbLabel is not null && breadcrumbFull is not null)
         {
             _breadcrumbLabel.Text = TruncateBreadcrumb(breadcrumbFull, BreadcrumbMaxChars);
-            ToolTip.SetTip(_breadcrumbLabel, breadcrumbFull.Length > BreadcrumbMaxChars ? breadcrumbFull : null);
+            SetTip(_breadcrumbLabel, breadcrumbFull.Length > BreadcrumbMaxChars ? breadcrumbFull : null);
         }
 
         if (rail.Active && _railStatusLabel is not null)

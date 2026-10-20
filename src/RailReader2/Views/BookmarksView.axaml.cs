@@ -56,6 +56,11 @@ public partial class BookmarksView : PaneRefreshView
 
     private void OnVmPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs args)
     {
+        if (args.PropertyName == nameof(MainWindowViewModel.CanGoBack))
+        {
+            UpdateBackButton();
+            return;
+        }
         if (args.PropertyName != nameof(MainWindowViewModel.ActiveTab)) return;
         // ActiveTab is raised synthetically on every navigation; only rebuild the list on a real
         // tab switch (bookmarks otherwise change via BookmarksChanged). The cheap back-button

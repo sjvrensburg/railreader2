@@ -57,6 +57,24 @@ public sealed partial class MainWindowViewModel
         InvalidateAfterNavigation();
     }
 
+    /// <summary>Back/Forward availability on the focused view — drives the status-bar buttons, the
+    /// Navigation menu items and the Bookmarks pane's Back button. Re-published by
+    /// <see cref="RefreshHistoryAvailability"/> only when a value changes.</summary>
+    public bool CanGoBack => _controller.CanGoBack;
+    public bool CanGoForward => _controller.CanGoForward;
+    private bool _gateCanGoBack, _gateCanGoForward;
+
+    /// <summary>Re-publishes <see cref="CanGoBack"/>/<see cref="CanGoForward"/> if either changed. Called
+    /// from the focused view's <c>Viewport.HistoryChanged</c> and on every <see cref="ActiveTab"/> raise,
+    /// which covers a focus switch to another view (whose stacks differ) without a subscription.</summary>
+    private void RefreshHistoryAvailability()
+    {
+        if (CanGoBack is var back && back != _gateCanGoBack)
+        { _gateCanGoBack = back; OnPropertyChanged(nameof(CanGoBack)); }
+        if (CanGoForward is var fwd && fwd != _gateCanGoForward)
+        { _gateCanGoForward = fwd; OnPropertyChanged(nameof(CanGoForward)); }
+    }
+
     /// <summary>Jumps to <paramref name="page"/> and records it in Back/Forward history (outline,
     /// index, go-to-page, first/last page). For previous/next-page stepping use <see cref="StepPage"/>.</summary>
     [RelayCommand]
@@ -133,14 +151,15 @@ public sealed partial class MainWindowViewModel
     /// framing (clamped to the block's line range; 0 = first line). Returns true if the block could be
     /// framed. Routes through Dispatch(..., animate: true) so the eased motion is driven by
     /// RequestAnimationFrame — the same path real user input takes.</summary>
-    public bool SmoothlyFrameBlock(int pageBlockIndex, double? zoom = null, double? durationMs = null, int line = 0)
+    public bool SmoothlyFrameBlock(int pageBlockIndex, double? zoom = null, double? durationMs = null, int line = 0,
+        double? focusPageX = null)
     {
         // Framing eases the zoom, which would slide the frozen panes out of alignment with the body —
         // gate it like every other zoom entry point. Reachable while frozen via double-click block-framing
         // and the portal "Go to source" action.
         if (ZoomBlockedByFreeze()) return false;
         bool ok = false;
-        Dispatch(() => ok = _controller.SmoothlyFrameBlock(pageBlockIndex, zoom, durationMs, line),
+        Dispatch(() => ok = _controller.SmoothlyFrameBlock(pageBlockIndex, zoom, durationMs, line, focusPageX),
             InvalidateCameraAndTab, animate: true);
         return ok;
     }
@@ -211,8 +230,11 @@ public sealed partial class MainWindowViewModel
     public void ApplyStartupView(int? page1Based, double? zoomPercent, bool rail)
     {
         if (ActiveTab is not { } tab) return;
+        // The opening position, not a jump away from somewhere: kept out of history so Back right after
+        // opening doesn't go to page 1.
         if (page1Based is { } p)
-            GoToPage(Math.Clamp(p - 1, 0, Math.Max(0, tab.PageCount - 1)));
+            Dispatch(() => _controller.GoToPage(Math.Clamp(p - 1, 0, Math.Max(0, tab.PageCount - 1)), recordHistory: false),
+                InvalidateAfterNavigation);
         if (zoomPercent is { } z)
             SetZoomPercent(z);
         if (!rail) return;
@@ -270,12 +292,19 @@ public sealed partial class MainWindowViewModel
     public void HandleClick(double canvasX, double canvasY)
     {
         if (IsScanAllActive) return;
+        var vp = _controller.FocusedViewport;
+        int pageBefore = vp?.CurrentPage ?? -1, backBefore = vp?.BackStackCount ?? 0;
         var (handled, link) = _controller.HandleClick(canvasX, canvasY);
         if (link is UriDestination uriDest)
         {
             _ = PromptAndOpenUrl(uriDest.Uri);
             return;
         }
+        // An internal link moved the view: links are easy to hit by accident, so say where it went and
+        // offer the way back. (Not when Core declined to follow it — a confined view or a render failure.)
+        if (link is PageDestination && vp is not null && _controller.CanGoBack
+            && (vp.CurrentPage != pageBefore || vp.BackStackCount != backBefore))
+            ShowStatusToast($"Followed link to page {vp.CurrentPage + 1}", "Back (Alt+\u2190)", NavigateBack);
         if (handled)
             InvalidateNavigation();
     }

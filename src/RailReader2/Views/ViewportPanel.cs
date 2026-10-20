@@ -145,6 +145,15 @@ public class ViewportPanel : Panel
 
         var point = e.GetCurrentPoint(this);
 
+        // Mouse side buttons: Back / Forward through this view's history (the press already focused it).
+        if (point.Properties.IsXButton1Pressed || point.Properties.IsXButton2Pressed)
+        {
+            if (point.Properties.IsXButton1Pressed) ViewModel?.NavigateBack();
+            else ViewModel?.NavigateForward();
+            e.Handled = true;
+            return;
+        }
+
         // Right-click: text-selection menu, cancel an in-progress tool, or the
         // viewport context menu (block actions + Annotation Mode toggle).
         if (point.Properties.IsRightButtonPressed && ViewModel is { } vm)
@@ -431,7 +440,7 @@ public class ViewportPanel : Panel
             }
             else if (isClick && _pressClickCount >= 2 && TryFrameBlockAt(pos))
             {
-                // Double-click on a detected block → smooth zoom into rail mode on the clicked line.
+                // Double-click on a detected block → smooth zoom into rail mode at the clicked point.
             }
             else if (isClick)
             {
@@ -742,7 +751,7 @@ public class ViewportPanel : Panel
         return dx * dx + dy * dy < ClickThresholdSq;
     }
 
-    /// <summary>Double-click target: smoothly zoom into rail mode on the line under
+    /// <summary>Double-click target: smoothly zoom into rail mode at the point under
     /// <paramref name="screenPos"/> of the detected block there (a centred frame for non-navigable figures/tables — the
     /// fallback in <c>SmoothlyFrameBlock</c>). The mouse-driven way to zoom onto a specific block,
     /// which has no keyboard equivalent. Returns false (so the normal click handler runs) when no
@@ -757,8 +766,10 @@ public class ViewportPanel : Panel
         if (index < 0) return false;
         // A gentler ease than the native 180ms zoom — a double-click is a deliberate framing
         // gesture, so it reads as intentional rather than a snap.
+        // The clicked line, and on a line wider than the window the clicked x stays in view rather than
+        // the landing snapping back to the line start.
         return vm.SmoothlyFrameBlock(index, durationMs: FrameZoomDurationMs,
-            line: vm.FindNearestLineIndex(index, pageY));
+            line: vm.FindNearestLineIndex(index, pageY), focusPageX: pageX);
     }
 
     /// <summary>Resolves a screen point to page-local coordinates for an actual interaction dispatch

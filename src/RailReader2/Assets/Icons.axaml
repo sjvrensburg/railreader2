@@ -23,6 +23,7 @@
     <StreamGeometry x:Key="IconLock">M5,11 H19 A2,2 0 0 1 21,13 V20 A2,2 0 0 1 19,22 H5 A2,2 0 0 1 3,20 V13 A2,2 0 0 1 5,11 M0 0 M7 11V7a5 5 0 0 1 10 0v4</StreamGeometry>
     <StreamGeometry x:Key="IconLockOpen">M5,11 H19 A2,2 0 0 1 21,13 V20 A2,2 0 0 1 19,22 H5 A2,2 0 0 1 3,20 V13 A2,2 0 0 1 5,11 M0 0 M7 11V7a5 5 0 0 1 9.9-1</StreamGeometry>
     <StreamGeometry x:Key="IconBack">m12 19-7-7 7-7 M0 0 M19 12H5</StreamGeometry>
+    <StreamGeometry x:Key="IconForward">M5 12h14 M0 0 M12 5l7 7-7 7</StreamGeometry>
     <StreamGeometry x:Key="IconChevronUp">m18 15-6-6-6 6</StreamGeometry>
     <StreamGeometry x:Key="IconChevronDown">m6 9 6 6 6-6</StreamGeometry>
     <StreamGeometry x:Key="IconChevronLeft">m15 18-6-6 6-6</StreamGeometry>
