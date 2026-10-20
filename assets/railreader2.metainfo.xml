@@ -101,6 +101,9 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="3.77.0.0" date="2026-10-20">
+      <description><p>Back and Forward buttons are now always in the status bar (and in the Navigation menu, on Alt+Left/Right and on the mouse side buttons), and Back returns to exactly where you were, including the zoom and the rail line. Following a link shows where it went with a one-click way back. Page changes at rail zoom no longer pause the app while the new page renders, double-clicking into rail mode lands on the line and spot you clicked, and status-bar buttons no longer ignore a click made while their tooltip is showing.</p></description>
+    </release>
     <release version="3.76.0.0" date="2026-10-16">
       <description><p>You can now change the colour of an existing annotation: right-click it and choose Colour, or use Edit, Annotation Colour. The line focus and line highlight toggles are remembered between sessions, and Ctrl+Shift+M now zooms back out to the margin-fit level even when you have zoomed in past it. Comments and notes started from the pop-out portal window no longer open behind it.</p></description>
     </release>
