@@ -126,6 +126,8 @@ public partial class MenuBarView : UserControl
     private void OnGoToPage(object? s, RoutedEventArgs e)
     { if (Vm is { } vm) vm.ShowGoToPage = true; }
 
+    private void OnNavigateBack(object? s, RoutedEventArgs e) => Vm?.NavigateBack();
+    private void OnNavigateForward(object? s, RoutedEventArgs e) => Vm?.NavigateForward();
     private void OnPrevPage(object? s, RoutedEventArgs e) => Vm?.StepPage(-1);
     private void OnNextPage(object? s, RoutedEventArgs e) => Vm?.StepPage(+1);
     private void OnFirstPage(object? s, RoutedEventArgs e) => Vm?.GoToPage(0);

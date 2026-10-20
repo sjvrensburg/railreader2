@@ -30,7 +30,7 @@ public partial class StatusBarView : UserControl
     private readonly record struct StatusShape(
         bool PendingRail, bool RailActive, bool AutoScrollActive, bool AutoScrollParked, bool JumpMode,
         bool IsViewRotated, int ViewRotationDegrees, bool IsAnnotating, AnnotationTool ActiveTool,
-        bool HasBreadcrumb, bool HasToast, bool HasToastAction);
+        bool HasBreadcrumb, bool HasToast, bool HasToastAction, bool CanGoBack, bool CanGoForward);
     private StatusShape? _lastShape;
     private TabViewModel? _lastShapeTab;
     private TextBlock? _toastLabel;
@@ -73,7 +73,9 @@ public partial class StatusBarView : UserControl
             nameof(MainWindowViewModel.AutoScrollParked) or
             nameof(MainWindowViewModel.JumpMode) or
             nameof(MainWindowViewModel.IsViewRotated) or
-            nameof(MainWindowViewModel.StatusToast))
+            nameof(MainWindowViewModel.StatusToast) or
+            nameof(MainWindowViewModel.CanGoBack) or
+            nameof(MainWindowViewModel.CanGoForward))
         {
             SubscribeToTab(_subscribedVm?.ActiveTab);
             UpdateStatus();
@@ -313,7 +315,8 @@ public partial class StatusBarView : UserControl
         var shape = new StatusShape(
             pendingRail, rail.Active, vm.AutoScrollActive, vm.AutoScrollParked, vm.JumpMode,
             vm.IsViewRotated, vm.ViewRotationDegrees, vm.IsAnnotating, vm.ActiveTool,
-            breadcrumbFull is not null, vm.StatusToast is not null, vm.StatusToastActionLabel is not null);
+            breadcrumbFull is not null, vm.StatusToast is not null, vm.StatusToastActionLabel is not null,
+            vm.CanGoBack, vm.CanGoForward);
 
         // Fast path: the set of children hasn't changed since the last rebuild (the overwhelmingly common
         // case while continuously rail-reading — ActiveTab is re-raised every animation frame, see
@@ -332,6 +335,15 @@ public partial class StatusBarView : UserControl
 
         StatusPanel.Children.Clear();
         int zoomPct = (int)Math.Round(zoom * 100);
+        // Back / Forward through the view's history (link jumps, outline, search, …). Always present —
+        // disabled when there is nowhere to go — so the way back is in the same place after a stray click.
+        var backBtn = MakeNavButton("IconBack", (_, _) => vm?.NavigateBack(), "Back (Alt+Left)", "NavigateBack");
+        backBtn.IsEnabled = vm.CanGoBack;
+        StatusPanel.Children.Add(backBtn);
+        var forwardBtn = MakeNavButton("IconForward", (_, _) => vm?.NavigateForward(), "Forward (Alt+Right)", "NavigateForward");
+        forwardBtn.IsEnabled = vm.CanGoForward;
+        StatusPanel.Children.Add(forwardBtn);
+        AddSeparator();
         StatusPanel.Children.Add(MakeNavButton("IconChevronLeft", (_, _) =>
         vm?.StepPage(-1), "Previous page (PgUp)", "PreviousPage"));
         _pageLabel = new TextBlock

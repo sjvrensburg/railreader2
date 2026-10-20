@@ -39,6 +39,9 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        // Mouse side buttons → Back / Forward anywhere in the window. A press on a viewport is handled
+        // there (it also focuses that view), so this only sees presses on the chrome and side panel.
+        AddHandler(PointerPressedEvent, OnHistoryButtonPressed, Avalonia.Interactivity.RoutingStrategies.Bubble);
         // A Shift held when the window loses focus never gets its key-up here: release the reading
         // guide's follow so it parks instead of following on the next move back in.
         Deactivated += (_, _) => Vm?.SetGuideShiftHeld(false);
@@ -278,6 +281,16 @@ public partial class MainWindow : Window
     // Focus the portal's live viewport on any click in the pop-out, so its floating toolbar (annotate /
     // freeze / start-rail-here) and forwarded keys act on the portal rather than the main view. The
     // reading-position sync is unaffected (EvaluatePortals tracks doc.Primary, never the focused view).
+    private void OnHistoryButtonPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (Vm is not { } vm) return;
+        var props = e.GetCurrentPoint(this).Properties;
+        if (props.IsXButton1Pressed) vm.NavigateBack();
+        else if (props.IsXButton2Pressed) vm.NavigateForward();
+        else return;
+        e.Handled = true;
+    }
+
     private void OnPortalPointerPressed(object? sender, PointerPressedEventArgs e)
     {
         // Input focus only — wireReadingSignals:false keeps a11y + the portal pin loop tracking the main

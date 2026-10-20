@@ -661,6 +661,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         { _gateCanExport = canExport; OnPropertyChanged(nameof(CanExportAnnotated)); }
         if (CanVlmCopyBlock is var canVlm && canVlm != _gateCanVlm)
         { _gateCanVlm = canVlm; OnPropertyChanged(nameof(CanVlmCopyBlock)); }
+        RefreshHistoryAvailability();
     }
 
     private void OnControllerStateChanged(string propertyName)
@@ -821,10 +822,12 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         {
             prev.PageChanged -= OnFocusedViewportPageChanged;
             prev.ReadingPositionChanged -= OnFocusedViewportReadingPositionChanged;
+            prev.HistoryChanged -= RefreshHistoryAvailability;
         }
         _signalWiredViewport = vp;
         vp.PageChanged += OnFocusedViewportPageChanged;
         vp.ReadingPositionChanged += OnFocusedViewportReadingPositionChanged;
+        vp.HistoryChanged += RefreshHistoryAvailability;
     }
 
     private void OnFocusedViewportPageChanged(int _) => OnReadingContextChanged();
@@ -840,6 +843,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         {
             prev.PageChanged -= OnFocusedViewportPageChanged;
             prev.ReadingPositionChanged -= OnFocusedViewportReadingPositionChanged;
+            prev.HistoryChanged -= RefreshHistoryAvailability;
         }
         _signalWiredViewport = null;
     }
