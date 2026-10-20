@@ -809,10 +809,10 @@ public partial class MainWindow : Window
         switch (e.Key)
         {
             case Key.PageDown:
-                if (vm.ActiveTab is { } t1) vm.GoToPage(t1.CurrentPage + 1);
+                vm.StepPage(+1);
                 e.Handled = true; return true;
             case Key.PageUp:
-                if (vm.ActiveTab is { } t2) vm.GoToPage(t2.CurrentPage - 1);
+                vm.StepPage(-1);
                 e.Handled = true; return true;
             case Key.F1:
                 vm.ShowShortcuts = true; e.Handled = true; return true;

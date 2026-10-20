@@ -57,9 +57,20 @@ public sealed partial class MainWindowViewModel
         InvalidateAfterNavigation();
     }
 
+    /// <summary>Jumps to <paramref name="page"/> and records it in Back/Forward history (outline,
+    /// index, go-to-page, first/last page). For previous/next-page stepping use <see cref="StepPage"/>.</summary>
     [RelayCommand]
     public void GoToPage(int page)
         => Dispatch(() => _controller.GoToPage(page), InvalidateAfterNavigation);
+
+    /// <summary>Moves the focused view <paramref name="delta"/> pages (PgUp/PgDn, the previous/next
+    /// buttons). Incremental, so it is not recorded in Back/Forward history.</summary>
+    public void StepPage(int delta)
+    {
+        if (_controller.FocusedViewport is not { } vp) return;
+        Dispatch(() => _controller.GoToPage(vp.CurrentPage + delta, recordHistory: false),
+            InvalidateAfterNavigation);
+    }
 
     [RelayCommand]
     public void FitPage()

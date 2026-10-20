@@ -126,10 +126,8 @@ public partial class MenuBarView : UserControl
     private void OnGoToPage(object? s, RoutedEventArgs e)
     { if (Vm is { } vm) vm.ShowGoToPage = true; }
 
-    private void OnPrevPage(object? s, RoutedEventArgs e)
-    { if (Vm?.ActiveTab is { } tab) Vm.GoToPage(tab.CurrentPage - 1); }
-    private void OnNextPage(object? s, RoutedEventArgs e)
-    { if (Vm?.ActiveTab is { } tab) Vm.GoToPage(tab.CurrentPage + 1); }
+    private void OnPrevPage(object? s, RoutedEventArgs e) => Vm?.StepPage(-1);
+    private void OnNextPage(object? s, RoutedEventArgs e) => Vm?.StepPage(+1);
     private void OnFirstPage(object? s, RoutedEventArgs e) => Vm?.GoToPage(0);
     private void OnLastPage(object? s, RoutedEventArgs e)
     { if (Vm?.ActiveTab is { } tab) Vm.GoToPage(tab.PageCount - 1); }

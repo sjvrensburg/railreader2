@@ -333,7 +333,7 @@ public partial class StatusBarView : UserControl
         StatusPanel.Children.Clear();
         int zoomPct = (int)Math.Round(zoom * 100);
         StatusPanel.Children.Add(MakeNavButton("IconChevronLeft", (_, _) =>
-        { if (vm?.Controller.FocusedViewport is { } v) vm.GoToPage(v.CurrentPage - 1); }, "Previous page (PgUp)", "PreviousPage"));
+        vm?.StepPage(-1), "Previous page (PgUp)", "PreviousPage"));
         _pageLabel = new TextBlock
         {
             Text = $"Page {curPage + 1}/{tab.PageCount}",
@@ -347,7 +347,7 @@ public partial class StatusBarView : UserControl
         _pageLabel.Tapped += (_, _) => BeginPageEdit(vm!, tab);
         StatusPanel.Children.Add(_pageLabel);
         StatusPanel.Children.Add(MakeNavButton("IconChevronRight", (_, _) =>
-        { if (vm?.Controller.FocusedViewport is { } v) vm.GoToPage(v.CurrentPage + 1); }, "Next page (PgDn)", "NextPage"));
+        vm?.StepPage(+1), "Next page (PgDn)", "NextPage"));
         AddSeparator();
         _zoomLabel = new TextBlock
         {
