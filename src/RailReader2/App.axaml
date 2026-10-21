@@ -11,6 +11,16 @@
     </Application.Resources>
     <Application.Styles>
         <FluentTheme />
+        <!-- Tooltips sit beside their control (above it, or below when there's no room above), never
+             at the pointer. Pointer placement is pushed up over the pointer near the bottom of the
+             screen, and on X11 the tooltip is its own window, so it swallowed the press and the click
+             on the control was lost (e.g. status-bar Back needing several presses). `:is(Control)`,
+             not `Control`: a bare type selector matches only that exact type. Offset 0 so the
+             flipped-below case doesn't overlap the control either. -->
+        <Style Selector=":is(Control)">
+            <Setter Property="ToolTip.Placement" Value="Top" />
+            <Setter Property="ToolTip.VerticalOffset" Value="0" />
+        </Style>
         <!-- Flat icon toggle/button shared by the annotation toolbar and the sidebar toggle:
              transparent and theme-aware (icons inherit Foreground so they adapt to light/dark),
              accent-filled when active. The .borderless modifier drops the outline (sidebar). -->

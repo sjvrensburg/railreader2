@@ -102,16 +102,6 @@ public partial class StatusBarView : UserControl
             ? g as Avalonia.Media.Geometry
             : null;
 
-    /// <summary>Sets a tooltip anchored above <paramref name="control"/>. The default pointer placement
-    /// is pushed up over the pointer at the bottom of the screen, and on X11 the tooltip is its own
-    /// window, so it swallowed the press and a click on the control (e.g. Back) was silently lost.</summary>
-    private static void SetTip(Control control, object? tip)
-    {
-        ToolTip.SetTip(control, tip);
-        ToolTip.SetPlacement(control, PlacementMode.Top);
-        ToolTip.SetVerticalOffset(control, -4); // the default +20 would push it back down over the control
-    }
-
     private static Button MakeNavButton(string iconKey, EventHandler<RoutedEventArgs> handler,
         string? tooltip = null, string? automationId = null)
     {
@@ -123,7 +113,7 @@ public partial class StatusBarView : UserControl
         };
         if (tooltip is not null)
         {
-            SetTip(btn, tooltip);
+            ToolTip.SetTip(btn, tooltip);
             Avalonia.Automation.AutomationProperties.SetName(btn, tooltip);
         }
         if (automationId is not null)
@@ -274,7 +264,7 @@ public partial class StatusBarView : UserControl
             VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
         };
         if (full.Length > BreadcrumbMaxChars)
-            SetTip(_breadcrumbLabel, full);
+            ToolTip.SetTip(_breadcrumbLabel, full);
         StatusPanel.Children.Add(_breadcrumbLabel);
     }
 
@@ -362,7 +352,7 @@ public partial class StatusBarView : UserControl
             VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
             Cursor = new Cursor(StandardCursorType.Hand),
         };
-        SetTip(_pageLabel, "Click to go to page");
+        ToolTip.SetTip(_pageLabel, "Click to go to page");
         // Spoken form reads cleaner than the compact "3/15"; AutomationId is a stable handle.
         Avalonia.Automation.AutomationProperties.SetName(_pageLabel, $"Page {curPage + 1} of {tab.PageCount}");
         Avalonia.Automation.AutomationProperties.SetAutomationId(_pageLabel, "PageIndicator");
@@ -377,7 +367,7 @@ public partial class StatusBarView : UserControl
             VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
             Cursor = new Cursor(StandardCursorType.Hand),
         };
-        SetTip(_zoomLabel, "Click to set zoom");
+        ToolTip.SetTip(_zoomLabel, "Click to set zoom");
         Avalonia.Automation.AutomationProperties.SetName(_zoomLabel, $"Zoom {zoomPct} percent");
         Avalonia.Automation.AutomationProperties.SetAutomationId(_zoomLabel, "ZoomIndicator");
         _zoomLabel.Tapped += (_, _) => BeginZoomEdit(vm!, tab);
@@ -498,7 +488,7 @@ public partial class StatusBarView : UserControl
         if (_breadcrumbLabel is not null && breadcrumbFull is not null)
         {
             _breadcrumbLabel.Text = TruncateBreadcrumb(breadcrumbFull, BreadcrumbMaxChars);
-            SetTip(_breadcrumbLabel, breadcrumbFull.Length > BreadcrumbMaxChars ? breadcrumbFull : null);
+            ToolTip.SetTip(_breadcrumbLabel, breadcrumbFull.Length > BreadcrumbMaxChars ? breadcrumbFull : null);
         }
 
         if (rail.Active && _railStatusLabel is not null)
