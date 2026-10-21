@@ -837,6 +837,8 @@ public partial class MainWindow : Window
                 vm.IsFullScreen = !vm.IsFullScreen; e.Handled = true; return true;
             // Disarm a pending "start rail here" click first — it's a one-shot action mode, so a single
             // Escape should always cancel it rather than being shadowed by the other Escape handlers.
+            case Key.Escape when vm.IsLinkPeekOpen:
+                vm.CloseLinkPeek(); e.Handled = true; return true;
             case Key.Escape when vm.FreezeArmMode != FreezeMode.None:
                 vm.FreezeArmMode = FreezeMode.None; e.Handled = true; return true;
             // An ACTIVE freeze (not just an armed-but-unplaced one, handled above) needs its own Escape
