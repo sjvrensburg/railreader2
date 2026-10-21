@@ -10,10 +10,25 @@
              NOTE: only Avalonia's UIA backend (Windows) honours LiveSetting; the AT-SPI backend
              (Linux) does not map it, so on Linux the spoken announcements come from
              DocumentViewportAutomationPeer raising a property-change instead. Kept for the UIA benefit. -->
-        <StackPanel Orientation="Horizontal" Spacing="16" Name="StatusPanel"
-                    a:AutomationProperties.LiveSetting="Polite"
-                    a:AutomationProperties.Name="Status">
-            <!-- Content is set in code-behind based on active tab -->
-        </StackPanel>
+        <Panel>
+            <StackPanel Orientation="Horizontal" Spacing="16" Name="StatusPanel"
+                        a:AutomationProperties.LiveSetting="Polite"
+                        a:AutomationProperties.Name="Status">
+                <!-- Content is set in code-behind based on active tab -->
+            </StackPanel>
+            <!-- A toast briefly takes over the whole bar (opaque, over the status readout, which keeps its
+                 layout so the bar's height doesn't jump), rather than squeezing in at the end of it. -->
+            <DockPanel Name="ToastPanel" IsVisible="False"
+                       Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}"
+                       a:AutomationProperties.LiveSetting="Polite"
+                       a:AutomationProperties.Name="Notification">
+                <TextBlock Name="ToastText" DockPanel.Dock="Left" FontWeight="Bold"
+                           VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                <TextBlock Name="ToastAction" DockPanel.Dock="Left" IsVisible="False"
+                           TextDecorations="Underline" Cursor="Hand"
+                           VerticalAlignment="Center" Margin="12,0,0,0" />
+                <Panel /> <!-- fills the rest of the bar -->
+            </DockPanel>
+        </Panel>
     </Border>
 </UserControl>
