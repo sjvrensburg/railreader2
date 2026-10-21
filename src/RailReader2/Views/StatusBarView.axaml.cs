@@ -30,16 +30,30 @@ public partial class StatusBarView : UserControl
     private readonly record struct StatusShape(
         bool PendingRail, bool RailActive, bool AutoScrollActive, bool AutoScrollParked, bool JumpMode,
         bool IsViewRotated, int ViewRotationDegrees, bool IsAnnotating, AnnotationTool ActiveTool,
-        bool HasBreadcrumb, bool HasToast, bool HasToastAction, bool CanGoBack, bool CanGoForward);
+        bool HasBreadcrumb, bool CanGoBack, bool CanGoForward);
     private StatusShape? _lastShape;
     private TabViewModel? _lastShapeTab;
-    private TextBlock? _toastLabel;
-    private TextBlock? _toastActionLabel;
 
     public StatusBarView()
     {
         InitializeComponent();
-        DataContextChanged += (_, _) => UpdateStatus();
+        DataContextChanged += (_, _) => { UpdateStatus(); UpdateToast(); };
+        ToastText.Foreground = AmberBrush;
+        ToastAction.Foreground = RailModeBrush;
+        ToastAction.Tapped += (_, _) => _subscribedVm?.InvokeStatusToastAction();
+    }
+
+    /// <summary>Shows the VM's toast over the whole bar, or hides it. Independent of the status readout,
+    /// so a toast neither forces a rebuild of it nor competes with it for width.</summary>
+    private void UpdateToast()
+    {
+        var vm = DataContext as MainWindowViewModel;
+        ToastPanel.IsVisible = vm?.StatusToast is not null;
+        ToastText.Text = vm?.StatusToast;
+        ToolTip.SetTip(ToastText, vm?.StatusToast); // in case it's trimmed
+        ToastAction.IsVisible = vm?.StatusToastActionLabel is not null;
+        ToastAction.Text = vm?.StatusToastActionLabel;
+        Avalonia.Automation.AutomationProperties.SetName(ToastAction, vm?.StatusToastActionLabel);
     }
 
     protected override void OnLoaded(RoutedEventArgs e)
@@ -66,6 +80,12 @@ public partial class StatusBarView : UserControl
 
     private void OnVmPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs args)
     {
+        if (args.PropertyName is nameof(MainWindowViewModel.StatusToast) or
+            nameof(MainWindowViewModel.StatusToastActionLabel))
+        {
+            UpdateToast();
+            return;
+        }
         if (args.PropertyName is nameof(MainWindowViewModel.ActiveTab) or
             nameof(MainWindowViewModel.ActiveTabIndex) or
             nameof(MainWindowViewModel.ActiveTool) or
@@ -73,7 +93,6 @@ public partial class StatusBarView : UserControl
             nameof(MainWindowViewModel.AutoScrollParked) or
             nameof(MainWindowViewModel.JumpMode) or
             nameof(MainWindowViewModel.IsViewRotated) or
-            nameof(MainWindowViewModel.StatusToast) or
             nameof(MainWindowViewModel.CanGoBack) or
             nameof(MainWindowViewModel.CanGoForward))
         {
@@ -315,8 +334,7 @@ public partial class StatusBarView : UserControl
         var shape = new StatusShape(
             pendingRail, rail.Active, vm.AutoScrollActive, vm.AutoScrollParked, vm.JumpMode,
             vm.IsViewRotated, vm.ViewRotationDegrees, vm.IsAnnotating, vm.ActiveTool,
-            breadcrumbFull is not null, vm.StatusToast is not null, vm.StatusToastActionLabel is not null,
-            vm.CanGoBack, vm.CanGoForward);
+            breadcrumbFull is not null, vm.CanGoBack, vm.CanGoForward);
 
         // Fast path: the set of children hasn't changed since the last rebuild (the overwhelmingly common
         // case while continuously rail-reading — ActiveTab is re-raised every animation frame, see
@@ -436,36 +454,6 @@ public partial class StatusBarView : UserControl
             StatusPanel.Children.Add(MakeDangerButton("IconClose", (_, _) => vm.CancelAnnotationTool(), "Cancel tool (Escape)"));
         }
 
-        if (vm?.StatusToast is { } toast)
-        {
-            AddSeparator();
-            _toastLabel = MakeBoldLabel(toast, AmberBrush);
-            StatusPanel.Children.Add(_toastLabel);
-
-            if (vm.StatusToastActionLabel is { } actionLabel)
-            {
-                _toastActionLabel = new TextBlock
-                {
-                    Text = actionLabel,
-                    Foreground = RailModeBrush,
-                    TextDecorations = Avalonia.Media.TextDecorations.Underline,
-                    Cursor = new Cursor(StandardCursorType.Hand),
-                    VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
-                    Margin = new Avalonia.Thickness(6, 0, 0, 0),
-                };
-                Avalonia.Automation.AutomationProperties.SetName(_toastActionLabel, actionLabel);
-                _toastActionLabel.Tapped += (_, _) => vm.InvokeStatusToastAction();
-                StatusPanel.Children.Add(_toastActionLabel);
-            }
-            else
-            {
-                _toastActionLabel = null;
-            }
-        }
-        else
-        {
-            _toastActionLabel = null;
-        }
     }
 
     private static string RailStatusText(RailNav rail) =>
@@ -473,7 +461,7 @@ public partial class StatusBarView : UserControl
 
     /// <summary>Fast path for UpdateStatus: the panel's children are unchanged from the last full
     /// rebuild, so only patch the text/tooltip/automation-name of the labels that can still have changed
-    /// (page, zoom, breadcrumb, rail position, toast message) — no new controls, no Children mutation.</summary>
+    /// (page, zoom, breadcrumb, rail position) — no new controls, no Children mutation.</summary>
     private void UpdateLabelsInPlace(
         MainWindowViewModel vm, TabViewModel tab, int curPage, double zoom, RailNav rail, string? breadcrumbFull)
     {
@@ -494,13 +482,5 @@ public partial class StatusBarView : UserControl
         if (rail.Active && _railStatusLabel is not null)
             _railStatusLabel.Text = RailStatusText(rail);
 
-        if (vm.StatusToast is { } toast && _toastLabel is not null)
-            _toastLabel.Text = toast;
-
-        if (vm.StatusToastActionLabel is { } actionLabel && _toastActionLabel is not null)
-        {
-            _toastActionLabel.Text = actionLabel;
-            Avalonia.Automation.AutomationProperties.SetName(_toastActionLabel, actionLabel);
-        }
     }
 }

@@ -63,6 +63,7 @@ public class ViewportPanel : Panel
     // ~60–125Hz; gating the hit-test on a small movement delta avoids running it
     // (a per-page link scan) on every event without a perceptible cursor lag.
     private Point _lastLinkHitTestPos = new(double.NegativeInfinity, double.NegativeInfinity);
+    private bool _lastLinkHitTestCtrl;
     private const double LinkHitTestMinMoveSq = 9.0; // 3px squared
 
     // The page the current annotation/browse gesture is pinned to, set by ScreenToPage at press
@@ -265,12 +266,15 @@ public class ViewportPanel : Panel
             if (!ViewModel.IsAnnotating)
             {
                 var pos = e.GetPosition(this);
+                bool ctrl = e.KeyModifiers.HasFlag(KeyModifiers.Control);
                 double mdx = pos.X - _lastLinkHitTestPos.X;
                 double mdy = pos.Y - _lastLinkHitTestPos.Y;
-                if (mdx * mdx + mdy * mdy >= LinkHitTestMinMoveSq)
+                // Re-test on a Ctrl change too: with Ctrl+click links the hand only shows while Ctrl is held.
+                if (mdx * mdx + mdy * mdy >= LinkHitTestMinMoveSq || ctrl != _lastLinkHitTestCtrl)
                 {
                     _lastLinkHitTestPos = pos;
-                    bool overLink = ResolveHoverPoint(pos) is { } p && ViewModel.IsOverLink(p.PageX, p.PageY);
+                    _lastLinkHitTestCtrl = ctrl;
+                    bool overLink = ResolveHoverPoint(pos) is { } p && ViewModel.IsOverLink(p.PageX, p.PageY, ctrl);
                     UpdateLinkCursor(overLink);
                 }
             }
@@ -450,7 +454,7 @@ public class ViewportPanel : Panel
                     var (cx, cy) = ScreenToGesturePage(pos);
                     _firstClickPoint = (_gesturePage ?? clickVp.CurrentPage, cx, cy, pos);
                 }
-                ViewModel.HandleClick(pos.X, pos.Y);
+                ViewModel.HandleClick(pos.X, pos.Y, e.KeyModifiers.HasFlag(KeyModifiers.Control));
             }
         }
 

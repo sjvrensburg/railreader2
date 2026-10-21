@@ -3,6 +3,8 @@ using CommunityToolkit.Mvvm.Input;
 using RailReader.Core;
 using RailReader.Core.Models;
 
+using RailReader2.Services;
+
 namespace RailReader2.ViewModels;
 
 // Navigation, camera, rail, auto-scroll, line focus, colour effects
@@ -289,12 +291,21 @@ public sealed partial class MainWindowViewModel
             ShowStatusToast("Rail-reading needs layout analysis here — try again in a moment");
     }
 
-    public void HandleClick(double canvasX, double canvasY)
+    private readonly LinkPreferences _linkPrefs = LinkPreferences.Load();
+
+    public LinkPreferences LinkPrefs => _linkPrefs;
+
+    public void OnLinkPrefsChanged() => _linkPrefs.Save();
+
+    /// <summary>A click on the focused view. <paramref name="ctrl"/> is the modifier state, which decides
+    /// (per <see cref="LinkPreferences"/>) whether a link under the click is followed; when it isn't, the
+    /// click acts as if no link were there (it still seats the rail).</summary>
+    public void HandleClick(double canvasX, double canvasY, bool ctrl = false)
     {
         if (IsScanAllActive) return;
         var vp = _controller.FocusedViewport;
         int pageBefore = vp?.CurrentPage ?? -1, backBefore = vp?.BackStackCount ?? 0;
-        var (handled, link) = _controller.HandleClick(canvasX, canvasY);
+        var (handled, link) = _controller.HandleClick(canvasX, canvasY, followLinks: _linkPrefs.Follows(ctrl));
         if (link is UriDestination uriDest)
         {
             _ = PromptAndOpenUrl(uriDest.Uri);
@@ -341,8 +352,38 @@ public sealed partial class MainWindowViewModel
         }
     }
 
-    public bool IsOverLink(double pageX, double pageY)
-        => _controller.HitTestLink(pageX, pageY) is not null;
+    // The link the pointer was last over (by its rect), so the "how to follow" hint toasts once per
+    // entry onto a link rather than on every hover re-test.
+    private RectF? _hoverLinkRect;
+
+    /// <summary>True when a click here with the given modifier state would follow a link — drives the
+    /// hand cursor, so it only shows where a click actually does something. When the pointer moves onto a
+    /// link a plain click won't follow (Ctrl-only or off), toasts where it goes and how to follow it, so
+    /// the setting doesn't make links look broken.</summary>
+    public bool IsOverLink(double pageX, double pageY, bool ctrl)
+    {
+        var link = _controller.HitTestLink(pageX, pageY);
+        bool entered = link is not null && link.Rect != _hoverLinkRect;
+        _hoverLinkRect = link?.Rect;
+        if (link is null) return false;
+        if (entered && !_linkPrefs.Follows(ctrl: false))
+            ShowLinkHint(link.Destination);
+        return _linkPrefs.Follows(ctrl);
+    }
+
+    private void ShowLinkHint(PdfLinkDestination dest)
+    {
+        string target = dest switch
+        {
+            PageDestination p => $"Link to page {p.PageIndex + 1}",
+            UriDestination u => $"Link to {u.Uri}",
+            _ => "Link",
+        };
+        if (_linkPrefs.LinkClick == LinkClickAction.CtrlClick)
+            ShowStatusToast($"{target} \u2014 Ctrl+click to follow");
+        else
+            ShowStatusToast($"{target} \u2014 following links is off", "Settings", () => OpenSettingsTab("Reading"));
+    }
 
     // --- Auto-scroll ---
 

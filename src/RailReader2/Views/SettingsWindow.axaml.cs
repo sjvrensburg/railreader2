@@ -134,6 +134,7 @@ public partial class SettingsWindow : Window
         LineHighlightOpacitySlider.Value = c.LineHighlightOpacity;
         LoadLineStyle(c, FocusedDocument);
         LoadReadingGuidePrefs(vm);
+        LinkClickCombo.SelectedIndex = (int)vm.LinkPrefs.LinkClick;
 
         BuildRoleCheckboxes(_roleItems, c.NavigableRoles,
             set => { vm.AppConfig.NavigableRoles = set; vm.OnConfigChanged(); },
@@ -875,6 +876,15 @@ public partial class SettingsWindow : Window
         if (e.Property.Name != "Value" || Vm is not { } vm || _loading) return;
         vm.ReadingGuidePrefs.SteerSensitivity = GuideSteerSensitivitySlider.Value;
         vm.OnReadingGuidePrefsChanged();
+    }
+
+    // --- Links (app-side sidecar, see LinkPreferences) ---
+
+    private void OnLinkClickChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (Vm is not { } vm || _loading || LinkClickCombo.SelectedIndex < 0) return;
+        vm.LinkPrefs.LinkClick = (LinkClickAction)LinkClickCombo.SelectedIndex;
+        vm.OnLinkPrefsChanged();
     }
 
     private void OnSliderChanged(Avalonia.AvaloniaPropertyChangedEventArgs e, Action<AppConfig> apply)
