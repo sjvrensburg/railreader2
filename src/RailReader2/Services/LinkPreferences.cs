@@ -12,6 +12,9 @@ public enum LinkClickAction
     Click,
     /// <summary>Only Ctrl+click follows it; a plain click acts as if no link were there.</summary>
     CtrlClick,
+    /// <summary>A plain click on an internal link shows a preview of where it goes, with a button to go
+    /// there; Ctrl+click follows it directly. (Web links still ask before opening, as with Click.)</summary>
+    Peek,
     /// <summary>Links are never followed from the page.</summary>
     Off,
 }
@@ -30,9 +33,12 @@ public sealed class LinkPreferences
     public bool Follows(bool ctrl) => LinkClick switch
     {
         LinkClickAction.Click => true,
-        LinkClickAction.CtrlClick => ctrl,
+        LinkClickAction.CtrlClick or LinkClickAction.Peek => ctrl,
         _ => false,
     };
+
+    /// <summary>Whether a click with the given modifier state previews a link under it instead.</summary>
+    public bool Peeks(bool ctrl) => LinkClick == LinkClickAction.Peek && !ctrl;
 
     public static string Path => System.IO.Path.Combine(AppConfig.ConfigDir, "link_prefs.json");
 

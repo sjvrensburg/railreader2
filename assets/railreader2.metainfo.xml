@@ -101,6 +101,9 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="3.79.0.0" date="2026-10-21">
+      <description><p>Link peek: choose "Shows a preview" under Settings, Reading, Links, and clicking a link opens a small preview of where it goes (the reference, equation or figure it points at, in your colour effect) with a button to go there. Ctrl+click still follows the link directly, and Escape or a click elsewhere closes the preview.</p></description>
+    </release>
     <release version="3.78.0.0" date="2026-10-21">
       <description><p>A new setting (Settings, Reading, Links) chooses what clicking a link does: follow it, follow it only with Ctrl+click, or nothing, so a stray click while reading no longer jumps away. When a plain click won't follow a link, pointing at it says where it goes and how to follow it. Messages now briefly use the whole status bar, and tooltips everywhere sit beside their control instead of under the pointer, so they can no longer swallow a click.</p></description>
     </release>

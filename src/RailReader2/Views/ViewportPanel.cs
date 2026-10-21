@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Media;
 using RailReader.Core;
@@ -454,7 +455,10 @@ public class ViewportPanel : Panel
                     var (cx, cy) = ScreenToGesturePage(pos);
                     _firstClickPoint = (_gesturePage ?? clickVp.CurrentPage, cx, cy, pos);
                 }
+                var peekBefore = ViewModel.OpenLinkPeek;
                 ViewModel.HandleClick(pos.X, pos.Y, e.KeyModifiers.HasFlag(KeyModifiers.Control));
+                if (ViewModel.OpenLinkPeek is { } peek && !ReferenceEquals(peek, peekBefore))
+                    ShowLinkPeek(peek);
             }
         }
 
@@ -943,5 +947,109 @@ public class ViewportPanel : Panel
         {
             vm.GoToPortalSource(portal);
         }
+    }
+
+    // --- Link peek popup (LinkClickAction.Peek) ---
+
+    private Popup? _linkPeekPopup;
+
+    /// <summary>Show <paramref name="peek"/> in a light-dismiss popup at the pointer. The popup owns the
+    /// preview bitmap; it closes on a click outside, Escape (MainWindow → <c>CloseLinkPeek</c>), its
+    /// close button, Go, or a newer peek, and clears the VM's <c>OpenLinkPeek</c> when it does.</summary>
+    private void ShowLinkPeek(LinkPeek peek)
+    {
+        _linkPeekPopup?.Close();
+        if (ViewModel is not { } vm) return;
+
+        double scaling = TopLevel.GetTopLevel(this)?.RenderScaling ?? 1.0;
+        var image = new Image
+        {
+            Source = peek.Image,
+            Stretch = Stretch.Uniform,
+            MaxWidth = Math.Min(peek.Image.PixelSize.Width / scaling, Bounds.Width * 0.8),
+            MaxHeight = Math.Max(120, Bounds.Height * 0.5),
+            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Left,
+        };
+        Avalonia.Automation.AutomationProperties.SetName(image, $"Preview of page {peek.Page + 1}");
+
+        var go = new Button { Content = $"Go to page {peek.Page + 1}" };
+        go.Click += (_, _) => vm.FollowPeekedLink();
+        var close = new Button
+        {
+            Content = new RailReader2.Controls.Icon
+            {
+                Data = Application.Current?.TryGetResource("IconClose", null, out var g) == true ? g as Geometry : null,
+            },
+            Background = Brushes.Transparent,
+            Padding = new Thickness(6),
+        };
+        ToolTip.SetTip(close, "Close (Escape)");
+        Avalonia.Automation.AutomationProperties.SetName(close, "Close preview");
+        close.Click += (_, _) => vm.CloseLinkPeek();
+
+        var header = new DockPanel { LastChildFill = true };
+        DockPanel.SetDock(close, Avalonia.Controls.Dock.Right);
+        DockPanel.SetDock(go, Avalonia.Controls.Dock.Right);
+        header.Children.Add(close);
+        header.Children.Add(go);
+        header.Children.Add(new TextBlock
+        {
+            Text = $"Link to page {peek.Page + 1}",
+            FontWeight = FontWeight.Bold,
+            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 12, 0),
+        });
+
+        var border = new Border
+        {
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(6),
+            Padding = new Thickness(8),
+            Child = new StackPanel { Spacing = 6, Children = { header, image } },
+        };
+        // Escape reaches MainWindow only while it has focus; once a popup button does, close from here.
+        border.KeyDown += (_, args) =>
+        {
+            if (args.Key != Key.Escape) return;
+            vm.CloseLinkPeek();
+            args.Handled = true;
+        };
+        border.Bind(Border.BackgroundProperty, border.GetResourceObservable("SystemControlBackgroundChromeMediumLowBrush"));
+        border.Bind(Border.BorderBrushProperty, border.GetResourceObservable("SystemControlForegroundBaseMediumLowBrush"));
+
+        var popup = new Popup
+        {
+            PlacementTarget = this,
+            Placement = Avalonia.Controls.PlacementMode.Pointer,
+            IsLightDismissEnabled = true,
+            // The dismissing click goes on to the page, so the second click of a double-click still
+            // reaches it (block framing, markup comments) rather than only closing the preview.
+            OverlayDismissEventPassThrough = true,
+            Child = border,
+        };
+        // The pane may be torn down (closed, torn off, rebuilt) with the preview open.
+        void OnDetached(object? sender, VisualTreeAttachmentEventArgs args) => popup.Close();
+        DetachedFromVisualTree += OnDetached;
+
+        void OnVmChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs args)
+        {
+            if (args.PropertyName == nameof(MainWindowViewModel.OpenLinkPeek) && !ReferenceEquals(vm.OpenLinkPeek, peek))
+                popup.Close();
+        }
+        vm.PropertyChanged += OnVmChanged;
+        popup.Closed += (_, _) =>
+        {
+            vm.PropertyChanged -= OnVmChanged;
+            DetachedFromVisualTree -= OnDetached;
+            if (ReferenceEquals(vm.OpenLinkPeek, peek)) vm.CloseLinkPeek();
+            Children.Remove(popup);
+            if (ReferenceEquals(_linkPeekPopup, popup)) _linkPeekPopup = null;
+            // Off-screen now; dispose after this frame so nothing is still drawing it.
+            Avalonia.Threading.Dispatcher.UIThread.Post(peek.Image.Dispose, Avalonia.Threading.DispatcherPriority.Background);
+        };
+
+        _linkPeekPopup = popup;
+        Children.Add(popup); // logical parent, so the popup inherits the theme and resources
+        popup.Open();
     }
 }

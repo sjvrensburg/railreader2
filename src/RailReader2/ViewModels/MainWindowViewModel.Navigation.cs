@@ -298,26 +298,51 @@ public sealed partial class MainWindowViewModel
     public void OnLinkPrefsChanged() => _linkPrefs.Save();
 
     /// <summary>A click on the focused view. <paramref name="ctrl"/> is the modifier state, which decides
-    /// (per <see cref="LinkPreferences"/>) whether a link under the click is followed; when it isn't, the
-    /// click acts as if no link were there (it still seats the rail).</summary>
+    /// (per <see cref="LinkPreferences"/>) whether a link under the click is followed, previewed
+    /// (<see cref="OpenLinkPeek"/>), or ignored; when it isn't followed, the click still seats the rail.</summary>
     public void HandleClick(double canvasX, double canvasY, bool ctrl = false)
     {
         if (IsScanAllActive) return;
         var vp = _controller.FocusedViewport;
         int pageBefore = vp?.CurrentPage ?? -1, backBefore = vp?.BackStackCount ?? 0;
-        var (handled, link) = _controller.HandleClick(canvasX, canvasY, followLinks: _linkPrefs.Follows(ctrl));
+        bool follows = _linkPrefs.Follows(ctrl);
+        // Peek: hit-test the link BEFORE Core handles the click, which may re-anchor a continuous view or
+        // snap the rail and so move what the click point resolves to.
+        PdfLinkDestination? peekLink = null;
+        if (vp is not null && _linkPrefs.Peeks(ctrl))
+        {
+            var (page, pageX, pageY) = vp.ResolvePoint(canvasX, canvasY);
+            peekLink = vp.Owner.HitTestLink(page, pageX, pageY)?.Destination;
+        }
+        // Not following: Core seats the rail as if no link were there.
+        var (handled, link) = _controller.HandleClick(canvasX, canvasY, followLinks: follows);
+        if (peekLink is not null && vp is not null)
+        {
+            link = peekLink;
+            if (link is PageDestination peekDest)
+            {
+                OpenLinkPeek = BuildLinkPeek(vp, peekDest);
+                if (OpenLinkPeek is null)
+                    ShowStatusToast($"Couldn't preview this link to page {peekDest.PageIndex + 1} \u2014 Ctrl+click to follow it");
+            }
+        }
         if (link is UriDestination uriDest)
         {
             _ = PromptAndOpenUrl(uriDest.Uri);
             return;
         }
-        // An internal link moved the view: links are easy to hit by accident, so say where it went and
-        // offer the way back. (Not when Core declined to follow it — a confined view or a render failure.)
-        if (link is PageDestination && vp is not null && _controller.CanGoBack
-            && (vp.CurrentPage != pageBefore || vp.BackStackCount != backBefore))
-            ShowStatusToast($"Followed link to page {vp.CurrentPage + 1}", "Back (Alt+\u2190)", NavigateBack);
+        if (follows && link is PageDestination && vp is not null)
+            ToastIfLinkFollowed(vp, pageBefore, backBefore);
         if (handled)
             InvalidateNavigation();
+    }
+
+    /// <summary>An internal link moved the view: links are easy to hit by accident, so say where it went
+    /// and offer the way back. (Not when Core declined to follow it — a confined view or a render failure.)</summary>
+    private void ToastIfLinkFollowed(Viewport vp, int pageBefore, int backBefore)
+    {
+        if (_controller.CanGoBack && (vp.CurrentPage != pageBefore || vp.BackStackCount != backBefore))
+            ShowStatusToast($"Followed link to page {vp.CurrentPage + 1}", "Back (Alt+\u2190)", NavigateBack);
     }
 
     private async Task PromptAndOpenUrl(string uri)
@@ -356,19 +381,19 @@ public sealed partial class MainWindowViewModel
     // entry onto a link rather than on every hover re-test.
     private RectF? _hoverLinkRect;
 
-    /// <summary>True when a click here with the given modifier state would follow a link — drives the
-    /// hand cursor, so it only shows where a click actually does something. When the pointer moves onto a
-    /// link a plain click won't follow (Ctrl-only or off), toasts where it goes and how to follow it, so
-    /// the setting doesn't make links look broken.</summary>
+    /// <summary>True when a click here with the given modifier state would follow or preview a link —
+    /// drives the hand cursor, so it only shows where a click actually does something. When the pointer
+    /// moves onto a link a plain click does nothing with (Ctrl-only or off), toasts where it goes and how
+    /// to follow it, so the setting doesn't make links look broken.</summary>
     public bool IsOverLink(double pageX, double pageY, bool ctrl)
     {
         var link = _controller.HitTestLink(pageX, pageY);
         bool entered = link is not null && link.Rect != _hoverLinkRect;
         _hoverLinkRect = link?.Rect;
         if (link is null) return false;
-        if (entered && !_linkPrefs.Follows(ctrl: false))
+        if (entered && !_linkPrefs.Follows(ctrl: false) && !_linkPrefs.Peeks(ctrl: false))
             ShowLinkHint(link.Destination);
-        return _linkPrefs.Follows(ctrl);
+        return _linkPrefs.Follows(ctrl) || _linkPrefs.Peeks(ctrl);
     }
 
     private void ShowLinkHint(PdfLinkDestination dest)

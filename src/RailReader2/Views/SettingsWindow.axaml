@@ -209,10 +209,11 @@
                                    Text="Links in a PDF are easy to click by accident while reading. Back (Alt+←, or the arrow in the status bar) always returns you to where you were." />
                         <Grid ColumnDefinitions="Auto,8,*">
                             <TextBlock Grid.Column="0" Text="Clicking a link:" VerticalAlignment="Center" />
-                            <ComboBox Grid.Column="2" Name="LinkClickCombo" Width="220"
+                            <ComboBox Grid.Column="2" Name="LinkClickCombo" Width="280"
                                       HorizontalAlignment="Left" SelectionChanged="OnLinkClickChanged">
                                 <ComboBoxItem Content="Follows it" />
                                 <ComboBoxItem Content="Follows it only with Ctrl" />
+                                <ComboBoxItem Content="Shows a preview (Ctrl+click follows)" />
                                 <ComboBoxItem Content="Does nothing" />
                             </ComboBox>
                         </Grid>
