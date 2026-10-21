@@ -101,6 +101,9 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="3.78.0.0" date="2026-10-21">
+      <description><p>A new setting (Settings, Reading, Links) chooses what clicking a link does: follow it, follow it only with Ctrl+click, or nothing, so a stray click while reading no longer jumps away. When a plain click won't follow a link, pointing at it says where it goes and how to follow it. Messages now briefly use the whole status bar, and tooltips everywhere sit beside their control instead of under the pointer, so they can no longer swallow a click.</p></description>
+    </release>
     <release version="3.77.0.0" date="2026-10-20">
       <description><p>Back and Forward buttons are now always in the status bar (and in the Navigation menu, on Alt+Left/Right and on the mouse side buttons), and Back returns to exactly where you were, including the zoom and the rail line. Following a link shows where it went with a one-click way back. Page changes at rail zoom no longer pause the app while the new page renders, double-clicking into rail mode lands on the line and spot you clicked, and status-bar buttons no longer ignore a click made while their tooltip is showing.</p></description>
     </release>
