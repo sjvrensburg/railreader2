@@ -546,6 +546,22 @@ public sealed partial class MainWindowViewModel
         }
     }
 
+    /// <summary>The reader's name for their own comments (Settings ▸ Reading ▸ Annotations). Null/blank
+    /// shows as "You". Persisted app-side.</summary>
+    public string? AnnotationAuthorName
+    {
+        get => _annotationPrefs.AuthorName;
+        set
+        {
+            value = string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+            if (_annotationPrefs.AuthorName == value) return;
+            _annotationPrefs.AuthorName = value;
+            _annotationPrefs.Save();
+            OnPropertyChanged();
+            NotifyAnnotationsMutated();
+        }
+    }
+
     /// <summary>True when <paramref name="ann"/> is on the focused view's current page — the only
     /// place a selection-driven edit or merge may act, since the shared selection outlives page
     /// and tab changes (Core's <c>DeleteSelectedAnnotation</c> makes the same check).</summary>

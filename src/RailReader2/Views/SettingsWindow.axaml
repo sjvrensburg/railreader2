@@ -205,6 +205,15 @@
                         <CheckBox Name="ContinuousScrollCheck" Content="Scroll continuously from page to page"
                                   IsCheckedChanged="OnContinuousScrollChanged" />
 
+                        <TextBlock Classes="section" Text="Annotations" />
+                        <Separator />
+                        <Grid ColumnDefinitions="Auto,8,*">
+                            <TextBlock Grid.Column="0" Text="Your name:" VerticalAlignment="Center"
+                                       ToolTip.Tip="Shown on your own comments in the Comments pane. Leave blank to show &quot;You&quot;." />
+                            <TextBox Grid.Column="2" Name="AuthorNameBox" Width="220" HorizontalAlignment="Left"
+                                     PlaceholderText="You" TextChanged="OnAuthorNameChanged" />
+                        </Grid>
+
                         <TextBlock Classes="section" Text="Links" />
                         <Separator />
                         <TextBlock Classes="hint"

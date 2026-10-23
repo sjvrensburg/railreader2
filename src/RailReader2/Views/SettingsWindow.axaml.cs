@@ -134,6 +134,7 @@ public partial class SettingsWindow : Window
         LineHighlightOpacitySlider.Value = c.LineHighlightOpacity;
         LoadLineStyle(c, FocusedDocument);
         LoadReadingGuidePrefs(vm);
+        AuthorNameBox.Text = vm.AnnotationAuthorName;
         LinkClickCombo.SelectedIndex = (int)vm.LinkPrefs.LinkClick;
 
         BuildRoleCheckboxes(_roleItems, c.NavigableRoles,
@@ -886,6 +887,12 @@ public partial class SettingsWindow : Window
         if (e.Property.Name != "Value" || Vm is not { } vm || _loading) return;
         vm.ReadingGuidePrefs.SteerSensitivity = GuideSteerSensitivitySlider.Value;
         vm.OnReadingGuidePrefsChanged();
+    }
+
+    private void OnAuthorNameChanged(object? sender, TextChangedEventArgs e)
+    {
+        if (Vm is not { } vm || _loading) return;
+        vm.AnnotationAuthorName = AuthorNameBox.Text;
     }
 
     // --- Links (app-side sidecar, see LinkPreferences) ---

@@ -13,6 +13,13 @@ public sealed class CommentEntryViewModel
     public required Annotation Annotation { get; init; }
     public required int PageIndex { get; init; }
 
+    /// <summary>Nesting level in a reply thread: 0 for a thread's first comment.</summary>
+    public int Depth { get; init; }
+    /// <summary>The reader's configured name, shown for their own comments that carry no author.</summary>
+    public string? OwnAuthorName { get; init; }
+    public bool IsReply => Depth > 0;
+    public Avalonia.Thickness RowMargin => new(2 + Math.Min(Depth, 4) * 14, 1, 2, 1);
+
     public bool IsReviewerComment => Annotation.Source == AnnotationSource.InPdf;
     public string SourceBadge => IsReviewerComment ? "Reviewer" : "You";
 
@@ -22,7 +29,7 @@ public sealed class CommentEntryViewModel
     public IBrush BadgeBackground => IsReviewerComment ? ReviewerBadgeBrush : OwnBadgeBrush;
 
     public string Author => string.IsNullOrWhiteSpace(Annotation.Author)
-        ? (IsReviewerComment ? "Reviewer" : "You")
+        ? (IsReviewerComment ? "Reviewer" : string.IsNullOrWhiteSpace(OwnAuthorName) ? "You" : OwnAuthorName!)
         : Annotation.Author!;
 
     public string Body => Annotation.EffectiveContents;
@@ -37,7 +44,9 @@ public sealed class CommentEntryViewModel
     public ReviewState[] StateOptions { get; } =
         [ReviewState.None, ReviewState.Accepted, ReviewState.Rejected, ReviewState.Cancelled, ReviewState.Completed];
 
-    public string TypeLabel => Annotation switch
+    public string TypeLabel => (IsReply ? "↳ " : "") + BaseTypeLabel;
+
+    private string BaseTypeLabel => Annotation switch
     {
         HighlightAnnotation => "Highlight",
         UnderlineAnnotation => "Underline",
@@ -126,20 +135,76 @@ public partial class CommentsView : PaneRefreshView
 
         int filter = CommentFilter.SelectedIndex; // 0 All, 1 Reviewer, 2 Yours
 
-        var entries = new List<CommentEntryViewModel>();
+        var all = new List<(Annotation Ann, int Page)>();
         foreach (var (page, list) in file.Pages.OrderBy(kv => kv.Key))
+            foreach (var ann in list) all.Add((ann, page));
+
+        var entries = new List<CommentEntryViewModel>();
+        foreach (var (ann, page, depth) in OrderAsThreads(all))
         {
-            foreach (var ann in list)
+            entries.Add(new CommentEntryViewModel
             {
-                bool reviewer = ann.Source == AnnotationSource.InPdf;
-                if (filter == 1 && !reviewer) continue;
-                if (filter == 2 && reviewer) continue;
-                entries.Add(new CommentEntryViewModel { Annotation = ann, PageIndex = page });
+                Annotation = ann, PageIndex = page, Depth = depth,
+                OwnAuthorName = _vm!.AnnotationAuthorName,
+            });
+        }
+
+        // The filter applies to a thread's first comment; replies follow it, so a reviewer's thread
+        // still shows your answers.
+        if (filter != 0)
+        {
+            var kept = new List<CommentEntryViewModel>();
+            bool keep = false;
+            foreach (var e in entries)
+            {
+                if (!e.IsReply) keep = e.IsReviewerComment == (filter == 1);
+                if (keep) kept.Add(e);
             }
+            entries = kept;
         }
 
         CommentEntryList.ItemsSource = entries;
         CommentEmptyLabel.IsVisible = entries.Count == 0;
+    }
+
+    /// <summary>Annotations in document order with each reply placed directly under its parent
+    /// (<see cref="Annotation.InReplyTo"/> = the parent's <see cref="Annotation.NativeId"/>). A reply whose
+    /// parent is absent, and any cycle, degrades to an ordinary top-level entry.</summary>
+    internal static List<(Annotation Ann, int Page, int Depth)> OrderAsThreads(
+        IReadOnlyList<(Annotation Ann, int Page)> all)
+    {
+        var byId = new Dictionary<string, (Annotation Ann, int Page)>(StringComparer.Ordinal);
+        foreach (var item in all)
+            if (!string.IsNullOrEmpty(item.Ann.NativeId)) byId.TryAdd(item.Ann.NativeId!, item);
+
+        var children = new Dictionary<string, List<(Annotation Ann, int Page)>>(StringComparer.Ordinal);
+        var roots = new List<(Annotation Ann, int Page)>();
+        foreach (var item in all)
+        {
+            string? parent = item.Ann.InReplyTo;
+            if (!string.IsNullOrEmpty(parent) && byId.TryGetValue(parent!, out var p)
+                && !ReferenceEquals(p.Ann, item.Ann))
+            {
+                if (!children.TryGetValue(parent!, out var list)) children[parent!] = list = [];
+                list.Add(item);
+            }
+            else roots.Add(item);
+        }
+
+        var result = new List<(Annotation, int, int)>(all.Count);
+        var seen = new HashSet<Annotation>(ReferenceEqualityComparer.Instance);
+        void Walk((Annotation Ann, int Page) node, int depth)
+        {
+            if (!seen.Add(node.Ann)) return;
+            result.Add((node.Ann, node.Page, depth));
+            if (string.IsNullOrEmpty(node.Ann.NativeId) || !children.TryGetValue(node.Ann.NativeId!, out var kids)) return;
+            foreach (var kid in kids.OrderBy(k => k.Ann.CreatedUtc ?? DateTimeOffset.MinValue))
+                Walk(kid, depth + 1);
+        }
+        foreach (var r in roots) Walk(r, 0);
+        // Members of a pure cycle are reachable from no root: list them flat rather than dropping them.
+        foreach (var item in all) if (!seen.Contains(item.Ann)) Walk(item, 0);
+        return result;
     }
 
     private void OnAnnotationsMutated()

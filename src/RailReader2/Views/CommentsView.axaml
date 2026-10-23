@@ -25,7 +25,7 @@
                         <Button Click="OnCommentEntryClick"
                                 HorizontalAlignment="Stretch"
                                 HorizontalContentAlignment="Stretch"
-                                Margin="2,1" Padding="6,4">
+                                Margin="{Binding RowMargin}" Padding="6,4">
                             <StackPanel Spacing="2">
                                 <DockPanel>
                                     <Border DockPanel.Dock="Right"

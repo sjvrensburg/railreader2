@@ -18,6 +18,10 @@ public sealed class AnnotationPreferences
     /// result a fresh identity, which matters for reviewers' highlights that live in the PDF.</summary>
     public bool AutoMergeTextMarkup { get; set; }
 
+    /// <summary>The name shown on the reader's own comments in the Comments pane. Empty = "You". Core
+    /// will stamp it onto new annotations once it supports an author on creation (RailReaderCore#150).</summary>
+    public string? AuthorName { get; set; }
+
     public static string Path => System.IO.Path.Combine(AppConfig.ConfigDir, "annotation_prefs.json");
 
     public static AnnotationPreferences Load()
