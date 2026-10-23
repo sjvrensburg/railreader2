@@ -97,7 +97,8 @@
         </MenuItem>
         <MenuItem Header="_Rail" IsEnabled="{Binding HasDocument}">
             <MenuItem Header="Start Rail _Here" InputGesture="R" Click="OnStartRailHere" />
-            <MenuItem Header="Reading _Guide" InputGesture="K" Click="OnToggleReadingGuide" />
+            <MenuItem Header="Reading _Guide" InputGesture="K" Click="OnToggleReadingGuide"
+                      IsVisible="{Binding ExperimentalFeaturesEnabled}" />
             <MenuItem Header="Rotate to Read Bloc_k" InputGesture="U" Click="OnRotateToReadBlock" />
             <Separator />
             <MenuItem Header="_Auto-Scroll" InputGesture="P" Click="OnToggleAutoScroll" />

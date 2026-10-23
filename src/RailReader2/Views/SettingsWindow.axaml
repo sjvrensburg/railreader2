@@ -161,6 +161,7 @@
                             </Grid>
                         </Border>
 
+                        <StackPanel Name="GuideSection" Spacing="8">
                         <TextBlock Classes="section" Text="Reading Guide" />
                         <Separator />
                         <TextBlock Classes="hint"
@@ -195,6 +196,7 @@
                                           IsCheckedChanged="OnGuideParkChanged" />
                             </Grid>
                         </Border>
+                        </StackPanel>
 
                         <TextBlock Classes="section" Text="Pages" />
                         <Separator />
@@ -217,6 +219,15 @@
                                 <ComboBoxItem Content="Does nothing" />
                             </ComboBox>
                         </Grid>
+
+                        <StackPanel Classes="adv" Spacing="8">
+                            <TextBlock Classes="section" Text="Experimental" />
+                            <Separator />
+                            <CheckBox Name="ExperimentalCheck" Content="Enable experimental features"
+                                      ToolTip.Tip="Shows features that are still rough around the edges and may change or be removed. Currently: the reading guide."
+                                      IsCheckedChanged="OnExperimentalChanged" />
+                            <TextBlock Classes="hint" Text="Currently adds the reading guide (toolbar, Rail menu, K)." />
+                        </StackPanel>
 
                         <StackPanel Classes="adv" Spacing="8">
                             <TextBlock Classes="section" Text="Jump Mode" />
