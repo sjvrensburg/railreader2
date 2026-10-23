@@ -105,6 +105,9 @@ public partial class ToolBarView : UserControl
             case nameof(MainWindowViewModel.IsReadingGuideMode):
                 UpdateToggleState();
                 break;
+            case nameof(MainWindowViewModel.ExperimentalFeaturesEnabled):
+                GuideButton.IsVisible = _vm?.ExperimentalFeaturesEnabled ?? false;
+                break;
             case nameof(MainWindowViewModel.ArmActivateRailClick):
                 UpdateRailHereState();
                 break;
@@ -154,6 +157,7 @@ public partial class ToolBarView : UserControl
         BrowseButton.IsChecked = t == AnnotationTool.None && !guide;
         SelectButton.IsChecked = t == AnnotationTool.TextSelect;
         GuideButton.IsChecked = guide;
+        GuideButton.IsVisible = _vm.ExperimentalFeaturesEnabled;
         HighlightButton.IsChecked = t == AnnotationTool.Highlight;
         UnderlineButton.IsChecked = t == AnnotationTool.Underline;
         StrikeButton.IsChecked = t == AnnotationTool.StrikeOut;

@@ -84,6 +84,7 @@ public sealed partial class MainWindowViewModel
 
     private readonly Dictionary<Viewport, GuideState> _guideByVp = new();
     private readonly ReadingGuidePreferences _guidePrefs = ReadingGuidePreferences.Load();
+    private readonly ExperimentalPreferences _experimentalPrefs = ExperimentalPreferences.Load();
     private bool _guideShiftHeld;
     private bool _guideChordCancelled;
     private List<(Viewport Vp, int Page, ReadingGuidePosition? Position, PageAnalysis? Analysis)>? _guidePreChord;
@@ -134,8 +135,23 @@ public sealed partial class MainWindowViewModel
         return vp is not null && _guideByVp.TryGetValue(vp, out var s) && s.Steer.Engaged;
     }
 
+    /// <summary>Whether experimental features are exposed (off by default). Currently gates the whole
+    /// reading guide: toolbar button, Rail-menu item, the <c>K</c> key and its Settings section.</summary>
+    public bool ExperimentalFeaturesEnabled => _experimentalPrefs.Enabled;
+
+    /// <summary>Settings toggle: persist, and switch the guide off if it is on.</summary>
+    public void SetExperimentalFeatures(bool enabled)
+    {
+        if (_experimentalPrefs.Enabled == enabled) return;
+        _experimentalPrefs.Enabled = enabled;
+        _experimentalPrefs.Save();
+        if (!enabled) IsReadingGuideMode = false;
+        OnPropertyChanged(nameof(ExperimentalFeaturesEnabled));
+    }
+
     public void ToggleReadingGuideMode()
     {
+        if (!_experimentalPrefs.Enabled) return;
         if (!IsReadingGuideMode && ActiveTab is null) return;
         IsReadingGuideMode = !IsReadingGuideMode;
     }

@@ -826,6 +826,8 @@ public partial class SettingsWindow : Window
     private void LoadReadingGuidePrefs(MainWindowViewModel vm)
     {
         var p = vm.ReadingGuidePrefs;
+        ExperimentalCheck.IsChecked = vm.ExperimentalFeaturesEnabled;
+        GuideSection.IsVisible = vm.ExperimentalFeaturesEnabled;
         GuideFollowCombo.SelectedIndex = p.Follow switch
         {
             ReadingGuideFollow.Steer => 0,
@@ -836,6 +838,14 @@ public partial class SettingsWindow : Window
         GuideDeadZoneSlider.Value = p.DeadZone;
         GuideSteerSensitivitySlider.Value = p.SteerSensitivity;
         GuideParkCheck.IsChecked = p.ParkAtNewLine;
+    }
+
+    private void OnExperimentalChanged(object? sender, RoutedEventArgs e)
+    {
+        if (Vm is not { } vm || _loading) return;
+        bool on = ExperimentalCheck.IsChecked == true;
+        vm.SetExperimentalFeatures(on);
+        GuideSection.IsVisible = on;
     }
 
     private void OnGuideFollowChanged(object? sender, SelectionChangedEventArgs e)

@@ -101,6 +101,9 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="3.80.0.0" date="2026-10-23">
+      <description><p>The reading guide is now an experimental feature and is hidden by default. To use it, turn on "Enable experimental features" under Settings, Reading (advanced view); the toolbar button, the Rail menu entry and the K key then appear. Your guide settings are kept either way.</p></description>
+    </release>
     <release version="3.79.0.0" date="2026-10-21">
       <description><p>Link peek: choose "Shows a preview" under Settings, Reading, Links, and clicking a link opens a small preview of where it goes (the reference, equation or figure it points at, in your colour effect) with a button to go there. Ctrl+click still follows the link directly, and Escape or a click elsewhere closes the preview.</p></description>
     </release>
