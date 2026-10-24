@@ -650,7 +650,9 @@ public sealed partial class MainWindowViewModel
             return false;
         }
         NavigateToAnnotation(page, ann);
-        if (ReferenceEquals(SelectedAnnotation, ann)) return true;
+        // Selected AND on the focused view's page: with split panes the focused viewport can belong to
+        // a different document than the Comments pane's, and Core edits/deletes against the focused view.
+        if (ReferenceEquals(SelectedAnnotation, ann) && IsOnFocusedPage(ann)) return true;
         ShowStatusToast("Couldn't go to that comment — try again in a moment");
         return false;
     }

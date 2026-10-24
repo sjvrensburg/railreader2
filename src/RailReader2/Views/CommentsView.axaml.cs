@@ -147,6 +147,8 @@ public partial class CommentsView : PaneRefreshView
 
         var entries = new List<CommentEntryViewModel>();
         string? me = _vm!.AnnotationAuthorName;
+        // Annotation -> page, built once (and only if a reply needs it) instead of a per-reply scan of the file.
+        Dictionary<Annotation, int>? pageOf = null;
         foreach (var thread in _vm.ActiveTab!.State.GetThreads())
         {
             entries.Add(new CommentEntryViewModel
@@ -159,7 +161,7 @@ public partial class CommentsView : PaneRefreshView
                 entries.Add(new CommentEntryViewModel
                 {
                     Annotation = reply,
-                    PageIndex = AnnotationThreads.PageOf(file, reply) ?? thread.Page,
+                    PageIndex = PageOfAnnotation(file, reply, ref pageOf) ?? thread.Page,
                     Depth = 1, OwnAuthorName = me,
                 });
             }
@@ -181,6 +183,17 @@ public partial class CommentsView : PaneRefreshView
 
         CommentEntryList.ItemsSource = entries;
         CommentEmptyLabel.IsVisible = entries.Count == 0;
+    }
+
+    private static int? PageOfAnnotation(AnnotationFile file, Annotation ann, ref Dictionary<Annotation, int>? map)
+    {
+        if (map is null)
+        {
+            map = new Dictionary<Annotation, int>(ReferenceEqualityComparer.Instance);
+            foreach (var (page, list) in file.Pages)
+                foreach (var a in list) map[a] = page;
+        }
+        return map.TryGetValue(ann, out int p) ? p : null;
     }
 
     private void OnAnnotationsMutated()
