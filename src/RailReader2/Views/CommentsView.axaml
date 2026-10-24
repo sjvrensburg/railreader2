@@ -25,7 +25,7 @@
                         <Button Click="OnCommentEntryClick"
                                 HorizontalAlignment="Stretch"
                                 HorizontalContentAlignment="Stretch"
-                                Margin="2,1" Padding="6,4">
+                                Margin="{Binding RowMargin}" Padding="6,4">
                             <StackPanel Spacing="2">
                                 <DockPanel>
                                     <Border DockPanel.Dock="Right"
@@ -49,6 +49,16 @@
                                            TextWrapping="Wrap" MaxLines="3"
                                            TextTrimming="CharacterEllipsis"
                                            Opacity="0.9" Margin="0,1,0,0" />
+                                <TextBlock Text="{Binding ReplyCountDisplay}" IsVisible="{Binding HasReplies}"
+                                           FontSize="10" Opacity="0.6" />
+                                <StackPanel Orientation="Horizontal" Spacing="4" Margin="0,2,0,0">
+                                    <Button Content="Reply" Classes="toolBtn" FontSize="11" Padding="6,1"
+                                            Click="OnCommentReplyClick" />
+                                    <Button Content="Edit" Classes="toolBtn" FontSize="11" Padding="6,1"
+                                            IsVisible="{Binding CanEdit}" Click="OnCommentEditClick" />
+                                    <Button Content="Delete" Classes="toolBtn" FontSize="11" Padding="6,1"
+                                            Click="OnCommentDeleteClick" />
+                                </StackPanel>
                                 <DockPanel Margin="0,1,0,0">
                                     <TextBlock DockPanel.Dock="Left" Text="Status:"
                                                VerticalAlignment="Center" FontSize="10"

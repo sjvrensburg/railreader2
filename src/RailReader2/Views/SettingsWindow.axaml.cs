@@ -134,6 +134,7 @@ public partial class SettingsWindow : Window
         LineHighlightOpacitySlider.Value = c.LineHighlightOpacity;
         LoadLineStyle(c, FocusedDocument);
         LoadReadingGuidePrefs(vm);
+        AuthorNameBox.Text = vm.AnnotationAuthorName;
         LinkClickCombo.SelectedIndex = (int)vm.LinkPrefs.LinkClick;
 
         BuildRoleCheckboxes(_roleItems, c.NavigableRoles,
@@ -739,6 +740,8 @@ public partial class SettingsWindow : Window
     /// the HTTP copy + hash would run to completion against a window the user has already dismissed.</summary>
     protected override void OnClosed(EventArgs e)
     {
+        // Closing with the name box still focused may not raise its LostFocus first.
+        CommitAuthorName();
         _downloadCts?.Cancel();
         _downloadCts?.Dispose();
         _downloadCts = null;
@@ -886,6 +889,21 @@ public partial class SettingsWindow : Window
         if (e.Property.Name != "Value" || Vm is not { } vm || _loading) return;
         vm.ReadingGuidePrefs.SteerSensitivity = GuideSteerSensitivitySlider.Value;
         vm.OnReadingGuidePrefsChanged();
+    }
+
+    private void OnAuthorNameChanged(object? sender, RoutedEventArgs e) => CommitAuthorName();
+
+    private void OnAuthorNameKeyDown(object? sender, Avalonia.Input.KeyEventArgs e)
+    {
+        if (e.Key != Avalonia.Input.Key.Enter) return;
+        CommitAuthorName();
+        e.Handled = true;
+    }
+
+    private void CommitAuthorName()
+    {
+        if (Vm is not { } vm || _loading) return;
+        vm.AnnotationAuthorName = AuthorNameBox.Text;
     }
 
     // --- Links (app-side sidecar, see LinkPreferences) ---

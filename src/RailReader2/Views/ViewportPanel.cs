@@ -561,6 +561,10 @@ public class ViewportPanel : Panel
                 commentItem.Click += (_, _) => vm.EditSelectedAnnotationComment();
                 menu.Items.Add(commentItem);
             }
+            // Any annotation can be replied to (a text box has no editable comment, but takes replies).
+            var replyItem = new MenuItem { Header = "Reply...", IsEnabled = !vm.IsViewRotated };
+            replyItem.Click += (_, _) => vm.ReplyToSelectedAnnotation();
+            menu.Items.Add(replyItem);
             if (ann is TextMarkupAnnotation markup)
             {
                 var copyTextItem = new MenuItem { Header = "Copy Highlighted Text", InputGesture = new KeyGesture(Key.C, KeyModifiers.Control) };

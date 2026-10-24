@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Media;
 using RailReader.Core.Models;
+using RailReader.Core.Services;
 using RailReader2.ViewModels;
 
 namespace RailReader2.Views;
@@ -13,7 +14,22 @@ public sealed class CommentEntryViewModel
     public required Annotation Annotation { get; init; }
     public required int PageIndex { get; init; }
 
-    public bool IsReviewerComment => Annotation.Source == AnnotationSource.InPdf;
+    /// <summary>Nesting level in a reply thread: 0 for a thread's first comment.</summary>
+    public int Depth { get; init; }
+    /// <summary>The reader's configured name, shown for their own comments that carry no author.</summary>
+    public string? OwnAuthorName { get; init; }
+    public bool IsReply => Depth > 0;
+    /// <summary>Replies in this thread (on its first comment only).</summary>
+    public int ReplyCount { get; init; }
+    public string ReplyCountDisplay => ReplyCount == 1 ? "1 reply" : $"{ReplyCount} replies";
+    public bool HasReplies => ReplyCount > 0;
+    public bool CanEdit => MainWindowViewModel.CanEditComment(Annotation);
+    public Avalonia.Thickness RowMargin => new(2 + Math.Min(Depth, 1) * 14, 1, 2, 1);
+
+    // A comment you wrote reads back from the PDF as "in the PDF" once saved, so go by the author name too.
+    public bool IsReviewerComment => Annotation.Source == AnnotationSource.InPdf && !IsOwnByName;
+    private bool IsOwnByName => !string.IsNullOrWhiteSpace(OwnAuthorName)
+        && string.Equals(Annotation.Author?.Trim(), OwnAuthorName.Trim(), StringComparison.OrdinalIgnoreCase);
     public string SourceBadge => IsReviewerComment ? "Reviewer" : "You";
 
     private static readonly IBrush ReviewerBadgeBrush = new SolidColorBrush(Color.Parse("#2D5B88"));
@@ -22,7 +38,8 @@ public sealed class CommentEntryViewModel
     public IBrush BadgeBackground => IsReviewerComment ? ReviewerBadgeBrush : OwnBadgeBrush;
 
     public string Author => string.IsNullOrWhiteSpace(Annotation.Author)
-        ? (IsReviewerComment ? "Reviewer" : "You")
+        ? (Annotation.Source == AnnotationSource.InPdf ? "Reviewer"
+            : string.IsNullOrWhiteSpace(OwnAuthorName) ? "You" : OwnAuthorName!)
         : Annotation.Author!;
 
     public string Body => Annotation.EffectiveContents;
@@ -37,7 +54,9 @@ public sealed class CommentEntryViewModel
     public ReviewState[] StateOptions { get; } =
         [ReviewState.None, ReviewState.Accepted, ReviewState.Rejected, ReviewState.Cancelled, ReviewState.Completed];
 
-    public string TypeLabel => Annotation switch
+    public string TypeLabel => (IsReply ? "↳ " : "") + BaseTypeLabel;
+
+    private string BaseTypeLabel => Annotation switch
     {
         HighlightAnnotation => "Highlight",
         UnderlineAnnotation => "Underline",
@@ -127,19 +146,54 @@ public partial class CommentsView : PaneRefreshView
         int filter = CommentFilter.SelectedIndex; // 0 All, 1 Reviewer, 2 Yours
 
         var entries = new List<CommentEntryViewModel>();
-        foreach (var (page, list) in file.Pages.OrderBy(kv => kv.Key))
+        string? me = _vm!.AnnotationAuthorName;
+        // Annotation -> page, built once (and only if a reply needs it) instead of a per-reply scan of the file.
+        Dictionary<Annotation, int>? pageOf = null;
+        foreach (var thread in _vm.ActiveTab!.State.GetThreads())
         {
-            foreach (var ann in list)
+            entries.Add(new CommentEntryViewModel
             {
-                bool reviewer = ann.Source == AnnotationSource.InPdf;
-                if (filter == 1 && !reviewer) continue;
-                if (filter == 2 && reviewer) continue;
-                entries.Add(new CommentEntryViewModel { Annotation = ann, PageIndex = page });
+                Annotation = thread.Root, PageIndex = thread.Page, Depth = 0,
+                ReplyCount = thread.Replies.Count, OwnAuthorName = me,
+            });
+            foreach (var reply in thread.Replies)
+            {
+                entries.Add(new CommentEntryViewModel
+                {
+                    Annotation = reply,
+                    PageIndex = PageOfAnnotation(file, reply, ref pageOf) ?? thread.Page,
+                    Depth = 1, OwnAuthorName = me,
+                });
             }
+        }
+
+        // The filter applies to a thread's first comment; replies follow it, so a reviewer's thread
+        // still shows your answers.
+        if (filter != 0)
+        {
+            var kept = new List<CommentEntryViewModel>();
+            bool keep = false;
+            foreach (var e in entries)
+            {
+                if (!e.IsReply) keep = e.IsReviewerComment == (filter == 1);
+                if (keep) kept.Add(e);
+            }
+            entries = kept;
         }
 
         CommentEntryList.ItemsSource = entries;
         CommentEmptyLabel.IsVisible = entries.Count == 0;
+    }
+
+    private static int? PageOfAnnotation(AnnotationFile file, Annotation ann, ref Dictionary<Annotation, int>? map)
+    {
+        if (map is null)
+        {
+            map = new Dictionary<Annotation, int>(ReferenceEqualityComparer.Instance);
+            foreach (var (page, list) in file.Pages)
+                foreach (var a in list) map[a] = page;
+        }
+        return map.TryGetValue(ann, out int p) ? p : null;
     }
 
     private void OnAnnotationsMutated()
@@ -167,6 +221,24 @@ public partial class CommentsView : PaneRefreshView
             _vm.NavigateToAnnotation(entry.PageIndex, entry.Annotation);
             _vm.RequestViewportFocus();
         }
+    }
+
+    private void OnCommentReplyClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is Button { DataContext: CommentEntryViewModel entry } && _vm is not null)
+            _vm.FireAndForget(_vm.ReplyToAnnotation(entry.Annotation, _vm.ActiveTab?.State), nameof(_vm.ReplyToAnnotation));
+    }
+
+    private void OnCommentEditClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is Button { DataContext: CommentEntryViewModel entry } && _vm is not null)
+            _vm.EditCommentFromPane(entry.PageIndex, entry.Annotation);
+    }
+
+    private void OnCommentDeleteClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is Button { DataContext: CommentEntryViewModel entry } && _vm is not null)
+            _vm.DeleteCommentFromPane(entry.PageIndex, entry.Annotation);
     }
 
     private void OnCommentStateChanged(object? sender, SelectionChangedEventArgs e)
