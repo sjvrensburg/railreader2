@@ -101,6 +101,9 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="3.81.0.0" date="2026-10-24">
+      <description><p>Comments can now be answered. Reply to any annotation from its right-click menu, the Edit menu or the Comments pane, which shows each comment with its replies underneath. Replies are saved into the PDF as threaded comments, so other PDF readers show them nested too. Set your name under Settings, Reading, Annotations and it is saved with everything you write. Deleting a comment deletes its replies with it, and Undo brings them all back.</p></description>
+    </release>
     <release version="3.80.0.0" date="2026-10-23">
       <description><p>The reading guide is now an experimental feature and is hidden by default. To use it, turn on "Enable experimental features" under Settings, Reading (advanced view); the toolbar button, the Rail menu entry and the K key then appear. Your guide settings are kept either way.</p></description>
     </release>

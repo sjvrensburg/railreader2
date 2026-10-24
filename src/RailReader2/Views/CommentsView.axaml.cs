@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Media;
 using RailReader.Core.Models;
+using RailReader.Core.Services;
 using RailReader2.ViewModels;
 
 namespace RailReader2.Views;
@@ -18,9 +19,17 @@ public sealed class CommentEntryViewModel
     /// <summary>The reader's configured name, shown for their own comments that carry no author.</summary>
     public string? OwnAuthorName { get; init; }
     public bool IsReply => Depth > 0;
-    public Avalonia.Thickness RowMargin => new(2 + Math.Min(Depth, 4) * 14, 1, 2, 1);
+    /// <summary>Replies in this thread (on its first comment only).</summary>
+    public int ReplyCount { get; init; }
+    public string ReplyCountDisplay => ReplyCount == 1 ? "1 reply" : $"{ReplyCount} replies";
+    public bool HasReplies => ReplyCount > 0;
+    public bool CanEdit => MainWindowViewModel.CanEditComment(Annotation);
+    public Avalonia.Thickness RowMargin => new(2 + Math.Min(Depth, 1) * 14, 1, 2, 1);
 
-    public bool IsReviewerComment => Annotation.Source == AnnotationSource.InPdf;
+    // A comment you wrote reads back from the PDF as "in the PDF" once saved, so go by the author name too.
+    public bool IsReviewerComment => Annotation.Source == AnnotationSource.InPdf && !IsOwnByName;
+    private bool IsOwnByName => !string.IsNullOrWhiteSpace(OwnAuthorName)
+        && string.Equals(Annotation.Author?.Trim(), OwnAuthorName.Trim(), StringComparison.OrdinalIgnoreCase);
     public string SourceBadge => IsReviewerComment ? "Reviewer" : "You";
 
     private static readonly IBrush ReviewerBadgeBrush = new SolidColorBrush(Color.Parse("#2D5B88"));
@@ -29,7 +38,8 @@ public sealed class CommentEntryViewModel
     public IBrush BadgeBackground => IsReviewerComment ? ReviewerBadgeBrush : OwnBadgeBrush;
 
     public string Author => string.IsNullOrWhiteSpace(Annotation.Author)
-        ? (IsReviewerComment ? "Reviewer" : string.IsNullOrWhiteSpace(OwnAuthorName) ? "You" : OwnAuthorName!)
+        ? (IsReviewerComment || Annotation.Source == AnnotationSource.InPdf ? "Reviewer"
+            : string.IsNullOrWhiteSpace(OwnAuthorName) ? "You" : OwnAuthorName!)
         : Annotation.Author!;
 
     public string Body => Annotation.EffectiveContents;
@@ -135,18 +145,24 @@ public partial class CommentsView : PaneRefreshView
 
         int filter = CommentFilter.SelectedIndex; // 0 All, 1 Reviewer, 2 Yours
 
-        var all = new List<(Annotation Ann, int Page)>();
-        foreach (var (page, list) in file.Pages.OrderBy(kv => kv.Key))
-            foreach (var ann in list) all.Add((ann, page));
-
         var entries = new List<CommentEntryViewModel>();
-        foreach (var (ann, page, depth) in OrderAsThreads(all))
+        string? me = _vm!.AnnotationAuthorName;
+        foreach (var thread in _vm.ActiveTab!.State.GetThreads())
         {
             entries.Add(new CommentEntryViewModel
             {
-                Annotation = ann, PageIndex = page, Depth = depth,
-                OwnAuthorName = _vm!.AnnotationAuthorName,
+                Annotation = thread.Root, PageIndex = thread.Page, Depth = 0,
+                ReplyCount = thread.Replies.Count, OwnAuthorName = me,
             });
+            foreach (var reply in thread.Replies)
+            {
+                entries.Add(new CommentEntryViewModel
+                {
+                    Annotation = reply,
+                    PageIndex = AnnotationThreads.PageOf(file, reply) ?? thread.Page,
+                    Depth = 1, OwnAuthorName = me,
+                });
+            }
         }
 
         // The filter applies to a thread's first comment; replies follow it, so a reviewer's thread
@@ -165,46 +181,6 @@ public partial class CommentsView : PaneRefreshView
 
         CommentEntryList.ItemsSource = entries;
         CommentEmptyLabel.IsVisible = entries.Count == 0;
-    }
-
-    /// <summary>Annotations in document order with each reply placed directly under its parent
-    /// (<see cref="Annotation.InReplyTo"/> = the parent's <see cref="Annotation.NativeId"/>). A reply whose
-    /// parent is absent, and any cycle, degrades to an ordinary top-level entry.</summary>
-    internal static List<(Annotation Ann, int Page, int Depth)> OrderAsThreads(
-        IReadOnlyList<(Annotation Ann, int Page)> all)
-    {
-        var byId = new Dictionary<string, (Annotation Ann, int Page)>(StringComparer.Ordinal);
-        foreach (var item in all)
-            if (!string.IsNullOrEmpty(item.Ann.NativeId)) byId.TryAdd(item.Ann.NativeId!, item);
-
-        var children = new Dictionary<string, List<(Annotation Ann, int Page)>>(StringComparer.Ordinal);
-        var roots = new List<(Annotation Ann, int Page)>();
-        foreach (var item in all)
-        {
-            string? parent = item.Ann.InReplyTo;
-            if (!string.IsNullOrEmpty(parent) && byId.TryGetValue(parent!, out var p)
-                && !ReferenceEquals(p.Ann, item.Ann))
-            {
-                if (!children.TryGetValue(parent!, out var list)) children[parent!] = list = [];
-                list.Add(item);
-            }
-            else roots.Add(item);
-        }
-
-        var result = new List<(Annotation, int, int)>(all.Count);
-        var seen = new HashSet<Annotation>(ReferenceEqualityComparer.Instance);
-        void Walk((Annotation Ann, int Page) node, int depth)
-        {
-            if (!seen.Add(node.Ann)) return;
-            result.Add((node.Ann, node.Page, depth));
-            if (string.IsNullOrEmpty(node.Ann.NativeId) || !children.TryGetValue(node.Ann.NativeId!, out var kids)) return;
-            foreach (var kid in kids.OrderBy(k => k.Ann.CreatedUtc ?? DateTimeOffset.MinValue))
-                Walk(kid, depth + 1);
-        }
-        foreach (var r in roots) Walk(r, 0);
-        // Members of a pure cycle are reachable from no root: list them flat rather than dropping them.
-        foreach (var item in all) if (!seen.Contains(item.Ann)) Walk(item, 0);
-        return result;
     }
 
     private void OnAnnotationsMutated()
@@ -232,6 +208,24 @@ public partial class CommentsView : PaneRefreshView
             _vm.NavigateToAnnotation(entry.PageIndex, entry.Annotation);
             _vm.RequestViewportFocus();
         }
+    }
+
+    private void OnCommentReplyClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is Button { DataContext: CommentEntryViewModel entry } && _vm is not null)
+            _vm.FireAndForget(_vm.ReplyToAnnotation(entry.Annotation), nameof(_vm.ReplyToAnnotation));
+    }
+
+    private void OnCommentEditClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is Button { DataContext: CommentEntryViewModel entry } && _vm is not null)
+            _vm.EditCommentFromPane(entry.PageIndex, entry.Annotation);
+    }
+
+    private void OnCommentDeleteClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is Button { DataContext: CommentEntryViewModel entry } && _vm is not null)
+            _vm.DeleteCommentFromPane(entry.PageIndex, entry.Annotation);
     }
 
     private void OnCommentStateChanged(object? sender, SelectionChangedEventArgs e)

@@ -209,9 +209,9 @@
                         <Separator />
                         <Grid ColumnDefinitions="Auto,8,*">
                             <TextBlock Grid.Column="0" Text="Your name:" VerticalAlignment="Center"
-                                       ToolTip.Tip="Shown on your own comments in the Comments pane. Leave blank to show &quot;You&quot;." />
+                                       ToolTip.Tip="Saved with every annotation and reply you write, and shown on them in the Comments pane. Leave blank to stay unnamed." />
                             <TextBox Grid.Column="2" Name="AuthorNameBox" Width="220" HorizontalAlignment="Left"
-                                     PlaceholderText="You" TextChanged="OnAuthorNameChanged" />
+                                     PlaceholderText="You" LostFocus="OnAuthorNameChanged" />
                         </Grid>
 
                         <TextBlock Classes="section" Text="Links" />

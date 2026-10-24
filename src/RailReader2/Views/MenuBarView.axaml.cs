@@ -162,6 +162,7 @@ public partial class MenuBarView : UserControl
     private void OnCopy(object? s, RoutedEventArgs e) => Vm?.CopySelection();
     private void OnPaste(object? s, RoutedEventArgs e) => Vm?.PasteAnnotation();
     private void OnDeleteAnnotation(object? s, RoutedEventArgs e) => Vm?.DeleteSelectedAnnotation();
+    private void OnReplyToComment(object? s, RoutedEventArgs e) => Vm?.ReplyToSelectedAnnotation();
     private void OnEditComment(object? s, RoutedEventArgs e) => Vm?.EditSelectedAnnotationComment();
     // Rebuilt on open so the checked entry follows the current selection; the submenu is the
     // same one the viewport's right-click offers.

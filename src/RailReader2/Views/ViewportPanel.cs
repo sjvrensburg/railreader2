@@ -560,6 +560,9 @@ public class ViewportPanel : Panel
                 };
                 commentItem.Click += (_, _) => vm.EditSelectedAnnotationComment();
                 menu.Items.Add(commentItem);
+                var replyItem = new MenuItem { Header = "Reply...", IsEnabled = !vm.IsViewRotated };
+                replyItem.Click += (_, _) => vm.ReplyToSelectedAnnotation();
+                menu.Items.Add(replyItem);
             }
             if (ann is TextMarkupAnnotation markup)
             {

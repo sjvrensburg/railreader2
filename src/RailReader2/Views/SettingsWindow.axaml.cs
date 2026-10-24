@@ -889,7 +889,7 @@ public partial class SettingsWindow : Window
         vm.OnReadingGuidePrefsChanged();
     }
 
-    private void OnAuthorNameChanged(object? sender, TextChangedEventArgs e)
+    private void OnAuthorNameChanged(object? sender, RoutedEventArgs e)
     {
         if (Vm is not { } vm || _loading) return;
         vm.AnnotationAuthorName = AuthorNameBox.Text;

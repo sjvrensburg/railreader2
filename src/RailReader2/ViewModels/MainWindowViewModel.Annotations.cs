@@ -388,11 +388,20 @@ public sealed partial class MainWindowViewModel
 
     public void DeleteSelectedAnnotation()
     {
+        // Core removes a comment's replies with it; count them first so the toast can say so.
+        int replies = 0;
+        if (SelectedAnnotation is { } sel && _controller.FocusedViewport?.Owner is { } doc)
+            replies = doc.GetThreads().FirstOrDefault(t => ReferenceEquals(t.Root, sel))?.Replies.Count ?? 0;
+
         if (_controller.Annotations.DeleteSelectedAnnotation(_controller.FocusedViewport))
         {
             OnPropertyChanged(nameof(SelectedAnnotation));
             InvalidateAnnotations();
             NotifyAnnotationsMutated();
+            if (replies > 0)
+                ShowStatusToast(replies == 1
+                    ? "Deleted the comment and its reply — Ctrl+Z to undo"
+                    : $"Deleted the comment and its {replies} replies — Ctrl+Z to undo");
         }
     }
 
@@ -546,20 +555,82 @@ public sealed partial class MainWindowViewModel
         }
     }
 
-    /// <summary>The reader's name for their own comments (Settings ▸ Reading ▸ Annotations). Null/blank
-    /// shows as "You". Persisted app-side.</summary>
+    /// <summary>The reader's name, stamped by Core onto every annotation and reply they author
+    /// (<c>AppConfig.AnnotationAuthor</c>, Settings ▸ Reading ▸ Annotations). Null/blank = unnamed; the
+    /// Comments pane then shows "You".</summary>
     public string? AnnotationAuthorName
     {
-        get => _annotationPrefs.AuthorName;
+        get => string.IsNullOrWhiteSpace(_appConfig.AnnotationAuthor) ? null : _appConfig.AnnotationAuthor;
         set
         {
             value = string.IsNullOrWhiteSpace(value) ? null : value.Trim();
-            if (_annotationPrefs.AuthorName == value) return;
-            _annotationPrefs.AuthorName = value;
-            _annotationPrefs.Save();
+            if (AnnotationAuthorName == value) return;
+            _appConfig.AnnotationAuthor = value;
+            OnConfigChanged(); // saves, and pushes the author to Core's annotation handler
             OnPropertyChanged();
             NotifyAnnotationsMutated();
         }
+    }
+
+    // --- Reply threads (Core 0.71.0) ---
+    // Threads are flat: a reply to a reply attaches to the thread's root (DocumentModel.AddReply).
+    // Deleting a comment deletes its replies with it (one undo step), as Acrobat does.
+
+    /// <summary>Reply to <paramref name="parent"/> in the active document (the Comments pane, or the
+    /// selected annotation via the menus). Cancel or an empty reply adds nothing.</summary>
+    public async Task ReplyToAnnotation(Annotation parent)
+    {
+        if (DialogOwner is not { } owner) return;
+        if (IsViewRotated)
+        {
+            ShowStatusToast("Annotations are unavailable while the view is rotated");
+            return;
+        }
+        var doc = _controller.FocusedViewport?.Owner ?? ActiveTab?.State;
+        if (doc is null) return;
+
+        string who = string.IsNullOrWhiteSpace(parent.Author) ? "comment" : parent.Author!;
+        var dialog = new TextNoteDialog("")
+        {
+            FontSize = CurrentFontSize,
+            Title = $"Reply to {who}",
+        };
+        var text = await dialog.ShowDialog<string?>(owner);
+        if (string.IsNullOrWhiteSpace(text)) return;
+
+        if (doc.AddReply(parent, text, AnnotationAuthorName) is null)
+        {
+            ShowStatusToast("Couldn't add the reply — the comment is no longer in the document");
+            return;
+        }
+        InvalidateAnnotations();
+        NotifyAnnotationsMutated();
+    }
+
+    /// <summary>Menu/context entry: reply to the selected annotation.</summary>
+    public void ReplyToSelectedAnnotation()
+    {
+        if (SelectedAnnotation is not { } ann)
+        {
+            ShowStatusToast("Select an annotation first — click a highlight or note in browse mode");
+            return;
+        }
+        FireAndForget(ReplyToAnnotation(ann), nameof(ReplyToAnnotation));
+    }
+
+    /// <summary>Comments-pane Edit: go to the annotation (Core edits against the focused view's page),
+    /// then edit its text.</summary>
+    public void EditCommentFromPane(int page, Annotation ann)
+    {
+        NavigateToAnnotation(page, ann);
+        FireAndForget(EditAnnotationComment(ann), nameof(EditAnnotationComment));
+    }
+
+    /// <summary>Comments-pane Delete: go to the annotation, then delete it like the Delete key would.</summary>
+    public void DeleteCommentFromPane(int page, Annotation ann)
+    {
+        NavigateToAnnotation(page, ann);
+        DeleteSelectedAnnotation();
     }
 
     /// <summary>True when <paramref name="ann"/> is on the focused view's current page — the only
@@ -689,7 +760,7 @@ public sealed partial class MainWindowViewModel
         TextMarkupMerge.Refusal.ConflictingComments =>
             "These highlights have different comments — edit one to match (or clear it) before merging",
         TextMarkupMerge.Refusal.Threaded =>
-            "One of these highlights has replies — merging would orphan them",
+            "One of these highlights is a reply — a reply can't be merged into another annotation",
         _ => $"Nothing to merge — no other {MarkupNoun(markup)} of the same colour overlaps this one",
     };
 
