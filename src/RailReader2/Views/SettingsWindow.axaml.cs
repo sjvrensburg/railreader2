@@ -740,6 +740,8 @@ public partial class SettingsWindow : Window
     /// the HTTP copy + hash would run to completion against a window the user has already dismissed.</summary>
     protected override void OnClosed(EventArgs e)
     {
+        // Closing with the name box still focused may not raise its LostFocus first.
+        CommitAuthorName();
         _downloadCts?.Cancel();
         _downloadCts?.Dispose();
         _downloadCts = null;
@@ -889,7 +891,16 @@ public partial class SettingsWindow : Window
         vm.OnReadingGuidePrefsChanged();
     }
 
-    private void OnAuthorNameChanged(object? sender, RoutedEventArgs e)
+    private void OnAuthorNameChanged(object? sender, RoutedEventArgs e) => CommitAuthorName();
+
+    private void OnAuthorNameKeyDown(object? sender, Avalonia.Input.KeyEventArgs e)
+    {
+        if (e.Key != Avalonia.Input.Key.Enter) return;
+        CommitAuthorName();
+        e.Handled = true;
+    }
+
+    private void CommitAuthorName()
     {
         if (Vm is not { } vm || _loading) return;
         vm.AnnotationAuthorName = AuthorNameBox.Text;

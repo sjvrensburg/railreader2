@@ -211,7 +211,7 @@
                             <TextBlock Grid.Column="0" Text="Your name:" VerticalAlignment="Center"
                                        ToolTip.Tip="Saved with every annotation and reply you write, and shown on them in the Comments pane. Leave blank to stay unnamed." />
                             <TextBox Grid.Column="2" Name="AuthorNameBox" Width="220" HorizontalAlignment="Left"
-                                     PlaceholderText="You" LostFocus="OnAuthorNameChanged" />
+                                     PlaceholderText="You" LostFocus="OnAuthorNameChanged" KeyDown="OnAuthorNameKeyDown" />
                         </Grid>
 
                         <TextBlock Classes="section" Text="Links" />

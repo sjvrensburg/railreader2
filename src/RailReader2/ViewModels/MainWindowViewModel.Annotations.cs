@@ -578,7 +578,7 @@ public sealed partial class MainWindowViewModel
 
     /// <summary>Reply to <paramref name="parent"/> in the active document (the Comments pane, or the
     /// selected annotation via the menus). Cancel or an empty reply adds nothing.</summary>
-    public async Task ReplyToAnnotation(Annotation parent)
+    public async Task ReplyToAnnotation(Annotation parent, DocumentModel? doc = null)
     {
         if (DialogOwner is not { } owner) return;
         if (IsViewRotated)
@@ -586,7 +586,7 @@ public sealed partial class MainWindowViewModel
             ShowStatusToast("Annotations are unavailable while the view is rotated");
             return;
         }
-        var doc = _controller.FocusedViewport?.Owner ?? ActiveTab?.State;
+        doc ??= _controller.FocusedViewport?.Owner ?? ActiveTab?.State;
         if (doc is null) return;
 
         string who = string.IsNullOrWhiteSpace(parent.Author) ? "comment" : parent.Author!;
@@ -615,6 +615,12 @@ public sealed partial class MainWindowViewModel
             ShowStatusToast("Select an annotation first — click a highlight or note in browse mode");
             return;
         }
+        // The shared selection outlives page and tab changes: don't collect a reply for a stale target.
+        if (!IsOnFocusedPage(ann))
+        {
+            ShowStatusToast("Select an annotation on this page first — click a highlight or note in browse mode");
+            return;
+        }
         FireAndForget(ReplyToAnnotation(ann), nameof(ReplyToAnnotation));
     }
 
@@ -622,15 +628,31 @@ public sealed partial class MainWindowViewModel
     /// then edit its text.</summary>
     public void EditCommentFromPane(int page, Annotation ann)
     {
-        NavigateToAnnotation(page, ann);
+        if (!TryNavigateForPaneAction(page, ann)) return;
         FireAndForget(EditAnnotationComment(ann), nameof(EditAnnotationComment));
     }
 
     /// <summary>Comments-pane Delete: go to the annotation, then delete it like the Delete key would.</summary>
     public void DeleteCommentFromPane(int page, Annotation ann)
     {
-        NavigateToAnnotation(page, ann);
+        if (!TryNavigateForPaneAction(page, ann)) return;
         DeleteSelectedAnnotation();
+    }
+
+    /// <summary>Go to <paramref name="ann"/> and confirm it is now the selection, so a pane action can
+    /// never fall through to a different, previously selected annotation (navigation is refused while
+    /// a scan-all is running, and annotations are locked while the view is rotated).</summary>
+    private bool TryNavigateForPaneAction(int page, Annotation ann)
+    {
+        if (IsViewRotated)
+        {
+            ShowStatusToast("Annotations are unavailable while the view is rotated");
+            return false;
+        }
+        NavigateToAnnotation(page, ann);
+        if (ReferenceEquals(SelectedAnnotation, ann)) return true;
+        ShowStatusToast("Couldn't go to that comment — try again in a moment");
+        return false;
     }
 
     /// <summary>True when <paramref name="ann"/> is on the focused view's current page — the only

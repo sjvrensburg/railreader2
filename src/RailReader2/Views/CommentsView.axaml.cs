@@ -38,7 +38,7 @@ public sealed class CommentEntryViewModel
     public IBrush BadgeBackground => IsReviewerComment ? ReviewerBadgeBrush : OwnBadgeBrush;
 
     public string Author => string.IsNullOrWhiteSpace(Annotation.Author)
-        ? (IsReviewerComment || Annotation.Source == AnnotationSource.InPdf ? "Reviewer"
+        ? (Annotation.Source == AnnotationSource.InPdf ? "Reviewer"
             : string.IsNullOrWhiteSpace(OwnAuthorName) ? "You" : OwnAuthorName!)
         : Annotation.Author!;
 
@@ -213,7 +213,7 @@ public partial class CommentsView : PaneRefreshView
     private void OnCommentReplyClick(object? sender, RoutedEventArgs e)
     {
         if (sender is Button { DataContext: CommentEntryViewModel entry } && _vm is not null)
-            _vm.FireAndForget(_vm.ReplyToAnnotation(entry.Annotation), nameof(_vm.ReplyToAnnotation));
+            _vm.FireAndForget(_vm.ReplyToAnnotation(entry.Annotation, _vm.ActiveTab?.State), nameof(_vm.ReplyToAnnotation));
     }
 
     private void OnCommentEditClick(object? sender, RoutedEventArgs e)
