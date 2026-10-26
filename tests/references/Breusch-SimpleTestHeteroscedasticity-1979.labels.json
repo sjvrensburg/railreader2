@@ -109,6 +109,13 @@
   {
    "page": 1,
    "kind": "Citation",
+   "number": "9",
+   "target_page": 8,
+   "target_block": 14
+  },
+  {
+   "page": 1,
+   "kind": "Citation",
    "number": "5",
    "target_page": 8,
    "target_block": 10
@@ -130,6 +137,48 @@
   {
    "page": 2,
    "kind": "Citation",
+   "number": "6",
+   "target_page": 8,
+   "target_block": 11
+  },
+  {
+   "page": 2,
+   "kind": "Citation",
+   "number": "15",
+   "target_page": 8,
+   "target_block": 20
+  },
+  {
+   "page": 2,
+   "kind": "Citation",
+   "number": "16",
+   "target_page": 8,
+   "target_block": 21
+  },
+  {
+   "page": 2,
+   "kind": "Citation",
+   "number": "7",
+   "target_page": 8,
+   "target_block": 12
+  },
+  {
+   "page": 2,
+   "kind": "Citation",
+   "number": "8",
+   "target_page": 8,
+   "target_block": 13
+  },
+  {
+   "page": 2,
+   "kind": "Citation",
+   "number": "19",
+   "target_page": 8,
+   "target_block": 24
+  },
+  {
+   "page": 2,
+   "kind": "Citation",
    "number": "11",
    "target_page": 8,
    "target_block": 16
@@ -140,6 +189,27 @@
    "number": "21",
    "target_page": 8,
    "target_block": 26
+  },
+  {
+   "page": 3,
+   "kind": "Citation",
+   "number": "18",
+   "target_page": 8,
+   "target_block": 23
+  },
+  {
+   "page": 4,
+   "kind": "Citation",
+   "number": "12",
+   "target_page": 8,
+   "target_block": 17
+  },
+  {
+   "page": 4,
+   "kind": "Citation",
+   "number": "2",
+   "target_page": 8,
+   "target_block": 7
   },
   {
    "page": 4,
@@ -182,20 +252,6 @@
    "number": "17",
    "target_page": 8,
    "target_block": 22
-  },
-  {
-   "page": 4,
-   "kind": "Citation",
-   "number": "12",
-   "target_page": 8,
-   "target_block": 17
-  },
-  {
-   "page": 4,
-   "kind": "Citation",
-   "number": "2",
-   "target_page": 8,
-   "target_block": 7
   }
  ],
  "empty_pages": [

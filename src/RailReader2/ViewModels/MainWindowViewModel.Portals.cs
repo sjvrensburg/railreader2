@@ -169,10 +169,11 @@ public sealed partial class MainWindowViewModel
         => $"auto:{r.Kind}:{r.Number}:p{t.Page}b{t.TargetBlock}";
 
     /// <summary>What an auto pin points at; each class has its own persisted toggle.</summary>
-    private enum AutoPinClass { FiguresTables, Statements, Equations }
+    private enum AutoPinClass { FiguresTables, Statements, Equations, Citations }
 
     private static AutoPinClass ClassOf(ReferenceIndex.RefKind kind)
-        => ReferenceIndex.IsEquation(kind) ? AutoPinClass.Equations
+        => ReferenceIndex.IsCitation(kind) ? AutoPinClass.Citations
+         : ReferenceIndex.IsEquation(kind) ? AutoPinClass.Equations
          : ReferenceIndex.IsStatement(kind) ? AutoPinClass.Statements
          : AutoPinClass.FiguresTables;
 
@@ -180,6 +181,7 @@ public sealed partial class MainWindowViewModel
     {
         AutoPinClass.Statements => _portalPrefs.AutoPinStatements,
         AutoPinClass.Equations => _portalPrefs.AutoPinEquations,
+        AutoPinClass.Citations => _portalPrefs.AutoPinCitations,
         _ => _portalPrefs.AutoPinFiguresTables,
     };
 
@@ -225,6 +227,21 @@ public sealed partial class MainWindowViewModel
             _portalPrefs.Save();
             OnPropertyChanged(nameof(AutoPinEquations));
             DropDisplayedAutoPinOnToggleOff(value, AutoPinClass.Equations);
+        }
+    }
+
+    /// <summary>Toggle for automatic pinning of cited references ("[12]", "Smith et al. (2019)"),
+    /// persisted app-wide. Off by default; independent of the other classes.</summary>
+    public bool AutoPinCitations
+    {
+        get => _portalPrefs.AutoPinCitations;
+        set
+        {
+            if (_portalPrefs.AutoPinCitations == value) return;
+            _portalPrefs.AutoPinCitations = value;
+            _portalPrefs.Save();
+            OnPropertyChanged(nameof(AutoPinCitations));
+            DropDisplayedAutoPinOnToggleOff(value, AutoPinClass.Citations);
         }
     }
 
@@ -550,10 +567,11 @@ public sealed partial class MainWindowViewModel
     /// stays up meanwhile. UI thread only.</summary>
     private void TryAutoPin(DocumentModel doc, int srcPage, int srcBlock, int srcLine)
     {
-        if ((!AutoPinPortals && !AutoPinStatements && !AutoPinEquations) || srcBlock < 0 || srcLine < 0) return;
+        if ((!AutoPinPortals && !AutoPinStatements && !AutoPinEquations && !AutoPinCitations) || srcBlock < 0 || srcLine < 0) return;
         if (!doc.TryGetAnalysis(srcPage, out var analysis)
             || srcBlock >= analysis.Blocks.Count
-            || analysis.Blocks[srcBlock].Role is BlockRole.Caption or BlockRole.DisplayMath)
+            || analysis.Blocks[srcBlock].Role is BlockRole.Caption or BlockRole.DisplayMath
+            || _referenceIndex.IsBibliographyBlock(srcPage, srcBlock))   // a reference list cites nothing of its own
             return;
 
         var pageText = doc.GetOrExtractText(srcPage);

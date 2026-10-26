@@ -25,6 +25,10 @@ public sealed class PortalPreferences
     /// numbered display equation. Off by default, like statements.</summary>
     public bool AutoPinEquations { get; set; }
 
+    /// <summary>When true, a line that cites "[12]" or "Smith et al. (2019)" shows that entry of the
+    /// document's reference list. Off by default, like statements and equations.</summary>
+    public bool AutoPinCitations { get; set; }
+
     public static string Path => System.IO.Path.Combine(AppConfig.ConfigDir, "portal_prefs.json");
 
     public static PortalPreferences Load()
