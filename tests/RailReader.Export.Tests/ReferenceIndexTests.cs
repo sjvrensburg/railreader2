@@ -265,4 +265,60 @@ public class ReferenceIndexTests
             (BlockRole.Caption, 50, 310, 500, 30));
         Assert.Equal(-1, ReferenceIndex.NearestTargetBlock(page, 1, RefKind.Figure));
     }
+
+    // --- numbered statements: mentions ---
+
+    [Theory]
+    [InlineData("see Theorem 2 for", "Theorem", "2")]
+    [InlineData("by Lemma 3.1 we", "Lemma", "3.1")]
+    [InlineData("Proposition 2.16 follows", "Proposition", "2.16")]
+    [InlineData("as in Definition 2.1 above", "Definition", "2.1")]
+    [InlineData("the active frame of Ex. 3 is", "Example", "3")]
+    [InlineData("In Def. 13, for each", "Definition", "13")]
+    [InlineData("By Prop. 2 the log", "Proposition", "2")]
+    [InlineData("see Remark 2.15 and", "Remark", "2.15")]
+    [InlineData("Corollary 4 gives", "Corollary", "4")]
+    [InlineData("solve Exercise 3.1 first", "Exercise", "3.1")]
+    public void ParseLine_RecognisesStatementKinds(string line, string kind, string number)
+        => Assert.Contains(new Ref(Enum.Parse<RefKind>(kind), number), ReferenceIndex.ParseLine(line));
+
+    [Fact]
+    public void ParseLine_ExpandsPluralStatementContinuations()
+        => Assert.Equal(["2.12", "2.13"],
+            ReferenceIndex.ParseLine("extension operations (Definitions 2.12 and 2.13). The").Select(r => r.Number));
+
+    [Theory]
+    [InlineData("for example 3 items were")]            // lower-case prose
+    [InlineData("an ex 3 minutes ago")]
+    [InlineData("Theorem 1 in [4] shows")]              // another work's statement
+    [InlineData("Definition 17 of Smith et al. [3]")]
+    [InlineData("Lemma 2 from Jones (2019) states")]
+    [InlineData("Theorem A states that")]               // digitless
+    [InlineData("Example I presented earlier")]
+    public void ParseLine_IgnoresStatementLookalikes(string line)
+        => Assert.Empty(ReferenceIndex.ParseLine(line));
+
+    [Fact]
+    public void ParseLine_ForeignCitationAlsoSkipsFloats()
+        => Assert.Empty(ReferenceIndex.ParseLine("shown in Figure 2 of [7]"));
+
+    // --- numbered statements: headers ---
+
+    [Theory]
+    [InlineData("Definition 1. (Test systems) Let D be", "Definition", "1")]
+    [InlineData("Definition 2.3 (match). A match m", "Definition", "2.3")]
+    [InlineData("Theorem 1. If a D-reachability", "Theorem", "1")]
+    [InlineData("Example 2.2. We introduce here", "Example", "2.2")]
+    [InlineData("Exercise 3.1 [Uncorrelated does not imply independent]", "Exercise", "3.1")]
+    public void ParseStatementHeader_RecognisesHeaders(string line, string kind, string number)
+        => Assert.Equal(new Ref(Enum.Parse<RefKind>(kind), number), ReferenceIndex.ParseStatementHeader(line));
+
+    [Theory]
+    [InlineData("Theorem 1 shows that the algorithm")]
+    [InlineData("see Definition 3. above")]             // not at the line start
+    [InlineData("Definition 17 of [4]")]
+    [InlineData("Examples are given below")]
+    [InlineData("Theorem")]
+    public void ParseStatementHeader_RejectsBodyText(string line)
+        => Assert.Null(ReferenceIndex.ParseStatementHeader(line));
 }
