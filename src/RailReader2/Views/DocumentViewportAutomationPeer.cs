@@ -48,6 +48,7 @@ internal sealed class DocumentViewportAutomationPeer : ControlAutomationPeer, IV
     private string _cachedName;
     private string _cachedDescription;
     private (int Page, bool Rail, int Block, int Line) _lastSig;
+    private double _lastZoom = -1;
 
     // Page outline is relatively expensive to format and only changes with the page, so cache it.
     private int _outlinePage = -1;
@@ -91,11 +92,24 @@ internal sealed class DocumentViewportAutomationPeer : ControlAutomationPeer, IV
     public void NotifyStateChanged()
     {
         var sig = Signature();
-        if (sig == _lastSig) return;
-        _lastSig = sig;
-
         var vm = _owner.ViewModel;
         var vp = FocusedViewport;
+        double zoom = vp?.Camera.Zoom ?? -1;
+        if (sig == _lastSig)
+        {
+            // Zoom is not part of the announce signature (it would spam during animations), but
+            // the on-demand description embeds it — refresh that cache silently, without raising
+            // a name change, so automation clients never read a stale "zoom N%".
+            if (vp is not null && zoom != _lastZoom)
+            {
+                _lastZoom = zoom;
+                var pos = vp.Rail.Active ? vm?.GetReadingPosition() : null;
+                _cachedDescription = Describe(vp, pos, PageOutline(vm, vp.CurrentPage));
+            }
+            return;
+        }
+        _lastSig = sig;
+        _lastZoom = zoom;
         // Rail position (role + block/line text), computed in Core; null when not rail-reading.
         var position = vp is { Rail.Active: true } ? vm?.GetReadingPosition() : null;
         string outline = PageOutline(vm, vp?.CurrentPage ?? -1);

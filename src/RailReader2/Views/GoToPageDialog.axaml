@@ -11,6 +11,9 @@
             <Button Content="OK" MinWidth="80" HorizontalContentAlignment="Center" Click="OnOkClick" />
             <Button Content="Cancel" MinWidth="80" HorizontalContentAlignment="Center" Click="OnCancelClick" />
         </StackPanel>
-        <TextBox x:Name="PageInput" />
+        <StackPanel Spacing="8">
+            <TextBox x:Name="PageInput" />
+            <TextBlock x:Name="ErrorText" Foreground="Red" TextWrapping="Wrap" IsVisible="False" />
+        </StackPanel>
     </DockPanel>
 </Window>

@@ -249,11 +249,19 @@ public partial class MinimapControl : UserControl
         e.Handled = true;
     }
 
+    private static readonly Dictionary<StandardCursorType, Cursor> s_cursors = [];
+    private StandardCursorType? _cursorType;
+
     private void UpdateCursor(Point p)
     {
-        Cursor = HitResizeHandle(p) ? new Cursor(CursorForResizeCorner())
-              : HitMoveStripe(p)    ? new Cursor(StandardCursorType.SizeAll)
-              :                       new Cursor(StandardCursorType.Hand);
+        var type = HitResizeHandle(p) ? CursorForResizeCorner()
+                 : HitMoveStripe(p)   ? StandardCursorType.SizeAll
+                 :                      StandardCursorType.Hand;
+        if (type == _cursorType) return;
+        _cursorType = type;
+        if (!s_cursors.TryGetValue(type, out var cursor))
+            s_cursors[type] = cursor = new Cursor(type);
+        Cursor = cursor;
     }
 
     private StandardCursorType CursorForResizeCorner() => ResizeCornerInside() switch

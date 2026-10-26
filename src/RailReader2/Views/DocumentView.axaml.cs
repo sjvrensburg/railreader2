@@ -57,6 +57,11 @@ public partial class DocumentView : UserControl, IViewportSurface
     private List<Annotation>? _annoSortSnapshot; // the source's members, in order, at sort time
     private List<Annotation>? _annoSortResult;
 
+    // Same z-order cache for continuous-scroll neighbour pages, keyed by page (the anchor keeps
+    // the single-slot cache above). Snapshots are member lists, like the anchor's.
+    private readonly Dictionary<int, (object? Source, List<Annotation>? Snapshot, List<Annotation>? Result)>
+        _annoSortByPage = [];
+
     // Cache for the active search-match local index. Only changes on match
     // navigation or page change, not while the camera moves.
     private int _searchIdxPage = -1;
@@ -253,6 +258,13 @@ public partial class DocumentView : UserControl, IViewportSurface
     /// state, so a texture is freed only once the layer has stopped drawing it. Falls back to a UI-thread
     /// dispose only when the layer's visual is already gone (the compositor is no longer drawing here).
     /// </summary>
+    public void RetireImages(IReadOnlyList<SKImage> images)
+    {
+        foreach (var img in images)
+            if (!PageLayer.TrySendMessage(new RetireImage(img)))
+                img.Dispose();
+    }
+
     private void RetireOwnedImages(ViewportImages images)
     {
         PageLayer.UpdateState(BlankPage);
@@ -801,9 +813,9 @@ public partial class DocumentView : UserControl, IViewportSurface
                 tab.Annotations.Pages.TryGetValue(vpg.Page, out var pageAnnotations);
 
                 // Pre-sort by z-order on the UI thread so the compositor doesn't need LINQ. Cache the
-                // result for the anchor page only: z-order only changes when the page's annotation
+                // result per page: z-order only changes when the page's annotation
                 // set changes, so pan/zoom frames (which re-send camera every tick) reuse it.
-                // Non-anchor pages (continuous-scroll neighbours) sort fresh each frame — cheap for
+                // Non-anchor pages (continuous-scroll neighbours) use the _annoSortByPage cache — cheap for
                 // the small annotation counts a visible neighbour page typically carries.
                 List<Annotation>? sorted;
                 if (isAnchor)
@@ -834,9 +846,23 @@ public partial class DocumentView : UserControl, IViewportSurface
                         _annoSortResult = sorted;
                     }
                 }
+                else if (pageAnnotations is { Count: > 1 })
+                {
+                    if (_annoSortByPage.TryGetValue(vpg.Page, out var c)
+                        && ReferenceEquals(pageAnnotations, c.Source)
+                        && SameMembers(pageAnnotations, c.Snapshot))
+                    {
+                        sorted = c.Result;
+                    }
+                    else
+                    {
+                        sorted = AnnotationRenderer.SortByZOrder(pageAnnotations);
+                        _annoSortByPage[vpg.Page] = (pageAnnotations, [.. pageAnnotations], sorted);
+                    }
+                }
                 else
                 {
-                    sorted = pageAnnotations is { Count: > 1 } ? AnnotationRenderer.SortByZOrder(pageAnnotations) : pageAnnotations;
+                    sorted = pageAnnotations;
                 }
 
                 pages.Add(new AnnotationPageState(vpg.Page, isAnchor, PageCamera(vp, vpg), sorted));

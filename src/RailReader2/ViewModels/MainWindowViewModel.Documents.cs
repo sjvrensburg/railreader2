@@ -204,6 +204,11 @@ public sealed partial class MainWindowViewModel
         if (IsScanAllActive) return;
         if (index < 0 || index >= Tabs.Count) return;
         var tab = Tabs[index];
+        if (_exportingTabs.Contains(tab))
+        {
+            ShowStatusToast("An annotated export of this tab is still running — it can be closed when the export finishes.");
+            return;
+        }
         Tabs.RemoveAt(index);
 
         // Model lifecycle (decision #1): several tabs may share one DocumentModel. Dispose the model
@@ -226,7 +231,11 @@ public sealed partial class MainWindowViewModel
                     s.RebindTab(sibling);
         }
 
-        tab.Dispose(); // unsubscribe + free this tab's images (not the shared model / its viewport)
+        // Take (don't dispose) this tab's page/minimap wraps: the primary surface draws them
+        // borrowed on the composition thread, so a UI-thread Dispose here can free one mid-draw
+        // (#191). They are handed to that surface as RetireImage messages after the rebind below.
+        var retiredTabImages = tab.Images.TakeRetiredImages();
+        tab.Dispose(); // unsubscribe (images already taken above; not the shared model / its viewport)
         Services.PortalSetManager.Default.Release(tab.FilePath); // drop our portal-set checkout
         if (!modelStillUsed)
         {
@@ -258,6 +267,13 @@ public sealed partial class MainWindowViewModel
             RestoreSidebarState(Tabs[ActiveTabIndex]);
         }
         OnPropertyChanged(nameof(ActiveTab));
+        // The rebind above queued the new tab's page state on the primary surface, so retiring the
+        // closed tab's wraps there now frees them only after the layer stops drawing them (FIFO).
+        if (retiredTabImages.Count > 0)
+        {
+            if (_surfaces.Count > 0) _surfaces[0].RetireImages(retiredTabImages);
+            else foreach (var img in retiredTabImages) img.Dispose();
+        }
         if (Tabs.Count > 0) FocusViewport(Tabs[ActiveTabIndex].Viewport);
         else UnwireFocusedSignals(); // no viewport to re-point to — release the disposed one
 

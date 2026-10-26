@@ -91,7 +91,7 @@ public static class AnnotationsCommand
         includeBlocks = analyzer is not null;
 
         IPdfTextService? textService = null;
-        if (includeText)
+        if (includeText || includeBlocks)
             textService = factory.CreatePdfTextService();
 
         var result = new AnnotationExportOutput

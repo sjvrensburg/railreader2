@@ -530,8 +530,28 @@ internal sealed partial class ReferenceIndex
     /// when the scan stopped at a page it had no budget to index — the caller should retry (progress is
     /// cached). The scan never skips such a page to return a farther match: a nearer one may be hiding
     /// there. A complete miss is negative-cached until the set of analysed pages changes.</summary>
+    /// <summary>Drop the negative/restart caches when any already-indexed page has been
+    /// re-analysed (a new <see cref="PageAnalysis"/> instance at the same analysed-page count —
+    /// OCR landing, a re-run). Those caches are keyed only on <see cref="IReferenceDocument.AnalysedPageCount"/>,
+    /// so without this a same-count replacement would keep serving a stale miss. Per-page entries
+    /// themselves are rebuilt lazily by the <see cref="PageLabels.Analysis"/> identity check.</summary>
+    private void DropStaleNegativeCaches(IReferenceDocument doc)
+    {
+        if (_noMatch.Count == 0 && _restartEvidence is null) return;
+        foreach (var (page, entry) in _pages)
+        {
+            if (doc.TryGetAnalysis(page, out var analysis) && !ReferenceEquals(entry.Analysis, analysis))
+            {
+                _noMatch.Clear();
+                _restartEvidence = null;
+                return;
+            }
+        }
+    }
+
     public Target? Resolve(IReferenceDocument doc, Reference reference, int nearPage, out bool incomplete)
     {
+        DropStaleNegativeCaches(doc);
         incomplete = false;
         int budget = MaxPageBuildsPerResolve;
         if (IsCitation(reference.Kind)) return ResolveCitation(doc, reference, nearPage, ref budget, ref incomplete);

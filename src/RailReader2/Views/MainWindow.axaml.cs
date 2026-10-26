@@ -585,6 +585,12 @@ public partial class MainWindow : Window
             else if (e.KeyModifiers.HasFlag(KeyModifiers.Shift)) vm.CancelGuideChord();
         }
 
+        // A focused text box owns its keys — including Ctrl+C/X/V/Z/Y and plain typing. Without
+        // this, the Ctrl tier below pastes/cuts annotations instead of text in the search, status
+        // bar and portal-rename boxes, and plain keys (p, Space, Backspace) trigger rail actions
+        // while renaming. Global shortcuts resume once focus leaves the box.
+        if (IsInControl<TextBox>(e)) return false;
+
         if (e.KeyModifiers.HasFlag(KeyModifiers.Control) && HandleCtrlShortcut(vm, e))
             { RailToolBar.SyncState(); return true; }
 
@@ -601,12 +607,28 @@ public partial class MainWindow : Window
         bool textInputFocused = (vm.ShowOutline && vm.IsSearchInputFocused && vm.ActivePane == SidePane.Search)
             || StatusBar.IsEditing;
 
-        if (!textInputFocused && HandleNavigationKey(vm, e))
+        // Controls that consume arrows/Space themselves (slider, list, tree, combo) own those
+        // keys while focused; a button owns Space (activation). Rail/page keys resume once the
+        // viewport is clicked again.
+        bool controlOwnsKey = IsInControl<Slider>(e) || IsInControl<ListBox>(e)
+            || IsInControl<TreeView>(e) || IsInControl<ComboBox>(e)
+            || (e.Key == Key.Space && IsInControl<Button>(e));
+
+        if (!textInputFocused && !controlOwnsKey && HandleNavigationKey(vm, e))
             { RailToolBar.SyncState(); return true; }
 
         if (HandleGlobalKey(vm, e))
             { RailToolBar.SyncState(); return true; }
 
+        return false;
+    }
+
+    /// <summary>True when the key event originated inside a control of type <typeparamref name="T"/>
+    /// (walking the visual parent chain, so template parts like a TextBox's presenter match).</summary>
+    private static bool IsInControl<T>(KeyEventArgs e) where T : Visual
+    {
+        for (Visual? v = e.Source as Visual; v is not null; v = v.Parent as Visual)
+            if (v is T) return true;
         return false;
     }
 

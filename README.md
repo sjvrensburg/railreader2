@@ -56,7 +56,7 @@ Everything runs on your own computer. The layout model is included in the downlo
 - Line-by-line rail reading through paragraphs, columns and pages, in reading order.
 - Semi-automatic scrolling (`P`): flows through prose on its own and stops at equations, tables, figures and headings until you press a key to continue.
 - Jump mode (`J`) for reading in short hops instead of a continuous scroll.
-- Reading guide (`K`) for lower zoom: hold `Shift` and nudge the pointer, like an invisible joystick, to carry a word-by-word highlight along the text at your pace. A small indicator shows how far you are pushing, and the guide pauses at each new line so you can find your place. Above the rail threshold, the same nudge drives rail mode.
+- Reading guide (`K`, experimental — enable it under Settings ▸ Reading ▸ Experimental) for lower zoom: hold `Shift` and nudge the pointer, like an invisible joystick, to carry a word-by-word highlight along the text at your pace. A small indicator shows how far you are pushing, and the guide pauses at each new line so you can find your place. Above the rail threshold, the same nudge drives rail mode.
 - Line focus (`F`) and line highlight (`H`) keep your eye on the current line.
 - Freeze panes (toolbar snowflake): pin a table's header row or label column while the rest scrolls, like in a spreadsheet.
 - Portals: keep a figure or table in view while you read the paragraph that refers to it. "See Figure 3" can pin Figure 3 automatically.
@@ -144,7 +144,7 @@ Press **F1** at any time for the full list of keyboard shortcuts. These are the 
 | `Space`, `PgDn` / `PgUp` | Next line or page / previous page |
 | `+` / `-` / `0` | Zoom in / zoom out / fit page |
 | `R` | Start rail reading here, at the current zoom |
-| `K` | Reading guide on / off (hold `Shift` and nudge the pointer to read) |
+| `K` | Reading guide on / off (experimental; hold `Shift` and nudge the pointer to read) |
 | `P` / `J` | Auto-scroll / jump mode |
 | `F` / `H` | Line focus / line highlight |
 | `[` / `]` | Slower / faster scrolling |
@@ -216,6 +216,9 @@ railreader2-cli structure paper.pdf --analyze --include-text --output structure.
 
 # Save pages as images, optionally with a colour filter
 railreader2-cli render paper.pdf --pages 1-5 --dpi 300 --effect amber --output-dir ./out
+
+# Resolve figure/table mentions to the blocks they refer to
+railreader2-cli references paper.pdf --output references.json
 ```
 
 Encrypted PDFs take `--password`. Run `railreader2-cli <command> --help` for every option, or see the [CLI section of the User Guide](https://sjvrensburg.github.io/railreader2/guide.html#cli-tool). The JSON formats are stable: breaking changes only happen in major versions, so other tools can build on them. [RailMark](https://sjvrensburg.github.io/railmark/), for example, turns your annotations into a Markdown summary.

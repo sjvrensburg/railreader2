@@ -137,14 +137,21 @@ public partial class BookmarksView : PaneRefreshView
         }
     }
 
-    private void OnDeleteBookmarkClick(object? sender, RoutedEventArgs e)
+    private async void OnDeleteBookmarkClick(object? sender, RoutedEventArgs e)
     {
         e.Handled = true;
         if (_vm is not { } vm) return;
         if (ResolveBookmarkIndex(sender) is not (var bm, var index)) return;
+        if (TopLevel.GetTopLevel(this) is not Window window) return;
+
+        // Bookmarks have no undo stack, so confirm before the permanent delete.
+        var confirm = new ConfirmDialog("Delete bookmark?",
+            $"Delete the bookmark “{bm.Name}”? This cannot be undone.", "Delete");
+        if (await confirm.ShowDialog<bool>(window) != true) return;
 
         vm.Controller.RemoveBookmark(index);
         UpdateBookmarkSource();
+        vm.ShowStatusToast($"Bookmark deleted: {bm.Name}");
     }
 
     private async void OnRenameBookmarkClick(object? sender, RoutedEventArgs e)

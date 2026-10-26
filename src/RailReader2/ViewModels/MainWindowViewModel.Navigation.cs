@@ -138,7 +138,10 @@ public sealed partial class MainWindowViewModel
     {
         if (ZoomBlockedByFreeze()) return;
         if (ActiveTab is not { } tab) return;
-        double current = tab.Camera.Zoom;
+        // HandleZoom acts on the focused viewport (split pane / tear-off may differ from the
+        // tab's own viewport), and the status bar displays that viewport's zoom — derive the
+        // relative delta from it, not from the tab's camera.
+        double current = _controller.FocusedViewport?.Camera.Zoom ?? tab.Camera.Zoom;
         if (current <= 0) return;
         double target = Math.Clamp(percent / 100.0, 0.5, 20.0); // mirrors Core's HandleZoom clamp
         double delta = ((target / current) - 1.0) / ZoomDeltaScale;

@@ -12,6 +12,10 @@ namespace RailReader2.ViewModels;
 // Annotations: mode, tools, markup, pointer handlers, browse mode, undo/redo, review state, export/import
 public sealed partial class MainWindowViewModel
 {
+    // Tabs with an annotated-PDF export running on a background thread (see ExportAnnotated);
+    // CloseTab refuses to dispose a model out from under one.
+    private readonly HashSet<TabViewModel> _exportingTabs = [];
+
     public void ToggleAnnotationMode()
     {
         // Core refuses annotation authoring while the view is rotated (stored geometry is the
@@ -850,6 +854,9 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
+        // The export reads tab.Pdf/tab.Annotations on a background thread; closing the tab would
+        // dispose the model under it. CloseTab refuses while a tab is in this set.
+        _exportingTabs.Add(tab);
         try
         {
             await Task.Run(() =>
@@ -869,6 +876,11 @@ public sealed partial class MainWindowViewModel
         catch (Exception ex)
         {
             _logger.Error("[Export] Failed", ex);
+            ShowStatusToast("Annotated export failed — see the log for details. Your annotations are saved inside the original PDF.");
+        }
+        finally
+        {
+            _exportingTabs.Remove(tab);
         }
     }
 
