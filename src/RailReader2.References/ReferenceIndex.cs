@@ -109,6 +109,7 @@ internal sealed partial class ReferenceIndex
     {
         _pages.Clear();
         _noMatch.Clear();
+        _restartEvidence = null;
     }
 
     /// <summary>All figure/table references mentioned in a text run, in reading order. Plural
@@ -457,6 +458,45 @@ internal sealed partial class ReferenceIndex
 
     public int MaxFlatNumberPageDistance { get; init; } = DefaultMaxFlatNumberPageDistance;
 
+    /// <summary>When true (default) the flat-number cap only applies to documents whose flat labels
+    /// restart — the same "Figure 1" defined on pages more than the cap apart, as in a proceedings
+    /// volume. A document without such evidence resolves a flat number at any distance. Until every
+    /// page is analysed there is no evidence either way, and the cap stays.</summary>
+    public bool AdaptiveCap { get; init; } = true;
+
+    private (int Analysed, bool Value)? _restartEvidence;
+
+    /// <summary>True when the document's flat labels may restart, or cannot yet be known. False only
+    /// when every page is analysed and no flat label is defined on two pages further apart than the
+    /// cap. Indexes the whole document (budgeted: sets <paramref name="incomplete"/> and the caller
+    /// retries).</summary>
+    private bool LabelsMayRestart(IReferenceDocument doc, ref int budget, ref bool incomplete)
+    {
+        int analysed = doc.AnalysedPageCount;
+        if (analysed < doc.PageCount) return true;
+        if (_restartEvidence is { } cached && cached.Analysed == analysed) return cached.Value;
+
+        Dictionary<Reference, (int Min, int Max)> span = [];
+        for (int page = 0; page < doc.PageCount; page++)
+        {
+            if (!doc.TryGetAnalysis(page, out var analysis)) return true;
+            if (!_pages.TryGetValue(page, out var entry) || !ReferenceEquals(entry.Analysis, analysis))
+            {
+                if (budget <= 0) { incomplete = true; return true; }
+                budget--;
+                _pages[page] = entry = BuildPage(doc, page, analysis);
+            }
+            foreach (var (label, _, _) in entry.Labels)
+            {
+                if (!IsFlatNumber(label.Number)) continue;
+                span[label] = span.TryGetValue(label, out var s) ? (Math.Min(s.Min, page), Math.Max(s.Max, page)) : (page, page);
+            }
+        }
+        bool restarts = span.Values.Any(v => v.Max - v.Min > MaxFlatNumberPageDistance);
+        _restartEvidence = (analysed, restarts);
+        return restarts;
+    }
+
     /// <summary>Resolve a reference to its defining caption + figure/table block, scanning analysed
     /// pages outward from <paramref name="nearPage"/> (nearest match wins; the preceding page is tried
     /// before the following one at each distance, since a referenced float most often sits before or
@@ -507,8 +547,20 @@ internal sealed partial class ReferenceIndex
         // it is ambiguous and shows nothing.
         bool uniqueRequired = IsEquation(reference.Kind);
         Target? first = null;
-        for (int d = 0; d <= reach; d++)
+        bool? mayRestart = null;
+        for (int d = 0; d < pageCount; d++)
         {
+            if (capped && d > reach)
+            {
+                // The window is exhausted. A document whose flat labels never restart has no foreign
+                // float to mistake this one for, so keep looking outward; a proceedings volume (labels
+                // restarting per paper) stops here, as before.
+                // An equation already found inside the window still needs the rest of the document checked
+                // for a second definition — unless the labels restart, where a far copy is another paper's.
+                mayRestart ??= !AdaptiveCap || LabelsMayRestart(doc, ref budget, ref incomplete);
+                if (incomplete) return null;
+                if (mayRestart.Value) break;
+            }
             foreach (int page in d == 0 ? [nearPage] : new[] { nearPage - d, nearPage + d })
             {
                 if (page < 0 || page >= pageCount) continue;
