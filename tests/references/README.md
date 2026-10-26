@@ -35,7 +35,7 @@ references and dangling labels, not repeated labels.
 
 ## Current result (Heron INT8)
 
-Precision is 1.00 on every document. Recall is 1.00 on all but the EPTCS volume (0.92) and Murphy chapter 3 (0.85).
+Precision is 1.00 on every document. Recall is 1.00 on all but the EPTCS volume (0.92) and Murphy chapter 3 (0.89).
 
 History of the three fixes this set motivated (before → after):
 
@@ -48,6 +48,28 @@ History of the three fixes this set motivated (before → after):
 Two further bugs surfaced by the EPTCS volume: `Resolve` could pass over a nearer page it had no
 indexing budget for and return a farther cached match, and the cap made a negative-cache entry
 position-dependent (a miss near one page must not hide a float near another). Both have tests.
+
+### Equations
+
+Labels were written **before** equation support existed: declared tags from `pdftotext -bbox-layout`
+(a parenthesised number in a display block, at the right margin in three documents and the *left*
+margin in Breusch 1979), mentions from the PDF text. The first, deliberately plain implementation
+(cue words + a bare `(N)` after a word, validated against declared tags only) scored P 1.00 / R 1.00
+on all 19 equation mentions in Attention, Breusch, arXiv 2504.09663, and Murphy ch. 3, including the
+negatives (`O(1)`, `AR(1)`, `(2017)`, `(0.52)`, journal issues). Running it over the EPTCS volume
+then found six genuine `Eq. (N)` mentions I had not labelled; they are labelled now (6/6 correct).
+
+Rules added afterwards from reading Cauchy's source, **not** from a corpus failure, so they are
+covered by synthetic hard-negative unit tests only: a bare `(1)` that opens its clause (list
+marker / proof step) is not a mention; results named inside `[IK99, Lemma 1.15]`, `[2, eqs. (5) and
+(6)]`, `(Smith 2019, Theorem 3)` belong to the cited work (an interval `[0, 1]` is not a citation);
+`Theorem (3.2)` is a statement; dot-leader contents entries are not statement headers. Labels carry
+the PDF's SHA-256 and the runner refuses a different file.
+
+Honest scope: five documents, all of which I have looked at while building this; the equation
+numbers in four of them are flat (restart per paper), so the 12-page cap does real work. Not
+covered: equations numbered inside `align` environments with several tags in one detected block
+(they all map to that block), tags the detector does not type as display maths, scans.
 
 ### Statements (Definition/Theorem/Example/…)
 
