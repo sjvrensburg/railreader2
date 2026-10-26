@@ -35,33 +35,31 @@ references and dangling labels, not repeated labels.
 
 ## Current result (Heron INT8)
 
-Precision 1.00 on every paper except applsci (0.95); Murphy ch. 3 is clean (21/21, both dangling references abstained). Recall 1.00 except Medvigy (0.50) and applsci (0.95).
+Precision is 1.00 on every document. Recall is 1.00 on all but the EPTCS volume (0.86).
 
-- **Panel mentions** (Medvigy, 11 misses): `Fig. 2a` has number `2a`, which never matches caption `2`.
-- **Stacked floats** (applsci, 1 false positive): Figure 17 and Figure 18 plots are stacked with
-  captions below. Figure 17's caption is nearer the *next* plot by a few points, so it resolves to
-  Figure 18's plot. The caption sits below its own float, so a below-caption/above-caption
-  preference would fix it.
+History of the three fixes this set motivated (before → after):
 
-### EPTCS proceedings (the repeated-label case)
+| Document | Before | After | Fix |
+|---|---|---|---|
+| Medvigy | P 1.00, R 0.50 | P 1.00, R 1.00 | panel mentions (`Fig. 2a` → Figure 2) |
+| applsci | P 0.95, R 0.95 | P 1.00, R 1.00 | one-to-one caption↔float binding (stacked floats) |
+| EPTCS | P 0.84, R 0.84 | P 1.00, R 0.86 | 12-page cap on flat numbers; nearest page never skipped |
 
-Resolver P=0.84 R=0.84, `first_match` 0.27, `nearest_match` 0.86 (8 errors, all precision losses):
+Two further bugs surfaced by the EPTCS volume: `Resolve` could pass over a nearer page it had no
+indexing budget for and return a farther cached match, and the cap made a negative-cache entry
+position-dependent (a miss near one page must not hide a float near another). Both have tests.
 
-- **No document boundary** (6 errors): a paper whose own caption isn't registered resolves to another
-  paper's same-numbered float, 13–20 pages away (Hydra paper's "Figure 1"/"Figure 4" → the Hadoop
-  and benchmark papers). Abstaining when the nearest match is far away would turn these into
-  abstentions instead of wrong answers.
-- **Role-gated float choice** (2 errors): a Figure whose content the detector labelled
-  `Table`/`Algorithm` is never bound; a Table 3 holding an XML listing (`Algorithm` block) binds to
-  the next real `Table`. Detector errors, but the resolver should not turn them into wrong targets.
-- A forward reference to an appendix table (`Table 2 in the Appendix`) resolves to an earlier paper's
-  Table 2 because that one is nearer in page distance.
+Remaining EPTCS misses (7, all abstentions): the detector gave a figure's content a `Table` or
+`Algorithm` role, or a "table" holding an XML listing an `Algorithm` role, so no float of the right
+kind sits by the caption. That is a detector limit; the resolver now abstains instead of binding
+the wrong float. Closing it would need captions to accept any non-text block as their float.
 
 ## Limits
 
-- On the single-paper documents both baselines tie the resolver (they share its nearest-float
-  geometry). Only the EPTCS volume separates them, and there `nearest_match` is marginally better
-  than the resolver (0.86 vs 0.84): the baselines have no role gate. A baseline that picks the nearest
-  float by plain distance would be a useful third one.
+- On the single-paper documents the baselines tie or trail the resolver. The EPTCS volume separates
+  them: `first_match` 0.27, `nearest_match` P 0.86 (7 wrong answers) against the resolver's P 1.00.
+- The 12-page cap was chosen from the EPTCS volume's error distances (13–28 pages) and the longest
+  legitimate flat reference in this set (7 pages, appendix tables). It is not tuned beyond that; a
+  long thesis with flat numbering and a 40-page-away appendix table would now abstain.
 - Nothing yet tests abstention on ambiguous labels, only on pages with no mentions.
 - Scanned pages (OCR) are not covered: `references` uses the PDF text layer.
