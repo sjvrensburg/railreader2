@@ -356,6 +356,319 @@
    "number": "4",
    "target_page": 138,
    "target_block": 8
+  },
+  {
+   "page": 31,
+   "kind": "Definition",
+   "number": "3",
+   "target_page": 30,
+   "target_block": 8
+  },
+  {
+   "page": 31,
+   "kind": "Example",
+   "number": "3",
+   "target_page": 30,
+   "target_block": 11
+  },
+  {
+   "page": 31,
+   "kind": "Example",
+   "number": "4",
+   "target_page": 31,
+   "target_block": 3
+  },
+  {
+   "page": 32,
+   "kind": "Example",
+   "number": "4",
+   "target_page": 31,
+   "target_block": 3
+  },
+  {
+   "page": 32,
+   "kind": "Example",
+   "number": "3",
+   "target_page": 30,
+   "target_block": 11
+  },
+  {
+   "page": 34,
+   "kind": "Definition",
+   "number": "13",
+   "target_page": 34,
+   "target_block": 5
+  },
+  {
+   "page": 35,
+   "kind": "Proposition",
+   "number": "2",
+   "target_page": 34,
+   "target_block": 16
+  },
+  {
+   "page": 36,
+   "kind": "Example",
+   "number": "2",
+   "target_page": 29,
+   "target_block": 8
+  },
+  {
+   "page": 38,
+   "kind": "Example",
+   "number": "2",
+   "target_page": 29,
+   "target_block": 8
+  },
+  {
+   "page": 57,
+   "kind": "Example",
+   "number": "2.2",
+   "target_page": 56,
+   "target_block": 2
+  },
+  {
+   "page": 58,
+   "kind": "Definition",
+   "number": "2.1",
+   "target_page": 55,
+   "target_block": 9
+  },
+  {
+   "page": 58,
+   "kind": "Definition",
+   "number": "2.3",
+   "target_page": 56,
+   "target_block": 5
+  },
+  {
+   "page": 58,
+   "kind": "Definition",
+   "number": "2.10",
+   "target_page": 58,
+   "target_block": 6
+  },
+  {
+   "page": 58,
+   "kind": "Definition",
+   "number": "2.14",
+   "target_page": 59,
+   "target_block": 8
+  },
+  {
+   "page": 58,
+   "kind": "Definition",
+   "number": "2.12",
+   "target_page": 59,
+   "target_block": 6
+  },
+  {
+   "page": 58,
+   "kind": "Definition",
+   "number": "2.13",
+   "target_page": 59,
+   "target_block": 7
+  },
+  {
+   "page": 58,
+   "kind": "Example",
+   "number": "2.7",
+   "target_page": 57,
+   "target_block": 0
+  },
+  {
+   "page": 58,
+   "kind": "Remark",
+   "number": "2.15",
+   "target_page": 60,
+   "target_block": 3
+  },
+  {
+   "page": 59,
+   "kind": "Definition",
+   "number": "2.14",
+   "target_page": 59,
+   "target_block": 8
+  },
+  {
+   "page": 59,
+   "kind": "Remark",
+   "number": "2.15",
+   "target_page": 60,
+   "target_block": 3
+  },
+  {
+   "page": 60,
+   "kind": "Definition",
+   "number": "2.14",
+   "target_page": 59,
+   "target_block": 8
+  },
+  {
+   "page": 61,
+   "kind": "Proposition",
+   "number": "2.16",
+   "target_page": 60,
+   "target_block": 13
+  },
+  {
+   "page": 62,
+   "kind": "Definition",
+   "number": "3.2",
+   "target_page": 62,
+   "target_block": 5
+  },
+  {
+   "page": 62,
+   "kind": "Definition",
+   "number": "3.1",
+   "target_page": 61,
+   "target_block": 11
+  },
+  {
+   "page": 62,
+   "kind": "Example",
+   "number": "2.7",
+   "target_page": 57,
+   "target_block": 0
+  },
+  {
+   "page": 63,
+   "kind": "Definition",
+   "number": "3.5",
+   "target_page": 63,
+   "target_block": 4
+  },
+  {
+   "page": 63,
+   "kind": "Definition",
+   "number": "3.6",
+   "target_page": 63,
+   "target_block": 12
+  },
+  {
+   "page": 63,
+   "kind": "Definition",
+   "number": "3.1",
+   "target_page": 61,
+   "target_block": 11
+  },
+  {
+   "page": 64,
+   "kind": "Definition",
+   "number": "2.14",
+   "target_page": 59,
+   "target_block": 8
+  },
+  {
+   "page": 64,
+   "kind": "Remark",
+   "number": "2.15",
+   "target_page": 60,
+   "target_block": 3
+  },
+  {
+   "page": 64,
+   "kind": "Example",
+   "number": "2.7",
+   "target_page": 57,
+   "target_block": 0
+  },
+  {
+   "page": 64,
+   "kind": "Example",
+   "number": "3.3",
+   "target_page": 62,
+   "target_block": 12
+  },
+  {
+   "page": 66,
+   "kind": "Definition",
+   "number": "3.6",
+   "target_page": 63,
+   "target_block": 12
+  },
+  {
+   "page": 66,
+   "kind": "Definition",
+   "number": "2.8",
+   "target_page": 58,
+   "target_block": 2
+  },
+  {
+   "page": 67,
+   "kind": "Example",
+   "number": "3.9",
+   "target_page": 64,
+   "target_block": 6
+  },
+  {
+   "page": 93,
+   "kind": "Theorem",
+   "number": "1",
+   "target_page": 93,
+   "target_block": 7
+  },
+  {
+   "page": 93,
+   "kind": "Theorem",
+   "number": "1.4"
+  },
+  {
+   "page": 94,
+   "kind": "Definition",
+   "number": "2",
+   "target_page": 93,
+   "target_block": 12
+  },
+  {
+   "page": 94,
+   "kind": "Definition",
+   "number": "4",
+   "target_page": 94,
+   "target_block": 9
+  },
+  {
+   "page": 94,
+   "kind": "Definition",
+   "number": "3",
+   "target_page": 94,
+   "target_block": 4
+  },
+  {
+   "page": 95,
+   "kind": "Definition",
+   "number": "5",
+   "target_page": 94,
+   "target_block": 15
+  },
+  {
+   "page": 97,
+   "kind": "Lemma",
+   "number": "9",
+   "target_page": 97,
+   "target_block": 7
+  },
+  {
+   "page": 97,
+   "kind": "Lemma",
+   "number": "6",
+   "target_page": 95,
+   "target_block": 8
+  },
+  {
+   "page": 99,
+   "kind": "Lemma",
+   "number": "9",
+   "target_page": 97,
+   "target_block": 7
+  },
+  {
+   "page": 99,
+   "kind": "Theorem",
+   "number": "10",
+   "target_page": 98,
+   "target_block": 13
   }
  ],
  "empty_pages": [
@@ -385,14 +698,8 @@
   28,
   29,
   30,
-  31,
-  32,
   33,
-  34,
-  35,
-  36,
   37,
-  38,
   39,
   40,
   41,
@@ -408,17 +715,7 @@
   54,
   55,
   56,
-  57,
-  58,
-  59,
-  60,
-  61,
-  62,
-  63,
-  64,
   65,
-  66,
-  67,
   68,
   69,
   70,
@@ -432,11 +729,8 @@
   90,
   91,
   92,
-  93,
-  94,
   96,
   98,
-  99,
   100,
   101,
   102,

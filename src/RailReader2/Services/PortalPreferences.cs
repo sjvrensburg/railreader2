@@ -16,6 +16,11 @@ public sealed class PortalPreferences
     /// shows the matching figure/table in the portal preview, no manual link needed.</summary>
     public bool AutoPinFiguresTables { get; set; } = true;
 
+    /// <summary>When true, a line that mentions "Theorem 2", "Def. 3", "Example 2.1" … shows that
+    /// numbered statement. Off by default: it is validated on far fewer documents than figures and
+    /// tables, and a wrong preview costs a long pan to check.</summary>
+    public bool AutoPinStatements { get; set; }
+
     public static string Path => System.IO.Path.Combine(AppConfig.ConfigDir, "portal_prefs.json");
 
     public static PortalPreferences Load()

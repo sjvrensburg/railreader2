@@ -17,8 +17,8 @@ The PDFs themselves are not in the repo (`experiments/PDFs/` is gitignored). Run
 | applsci-15-05957 | 21 | MDPI survey, 18 figures, stacked floats with captions below, "Figures 5 and 6" plurals, table continued over two pages |
 | Foundation Models ... Tutorial and Survey | 7 | two-column, float on the first page, full-page taxonomy figure |
 | 2504.09663v2 | 4 | arXiv, appendix Table 1 continued over three pages ("Table 1 (continued)") |
-| murphy-pml1-ch3 | 23 | Murphy, *Probabilistic Machine Learning: An Introduction*, chapter 3 only (`Figure 3.x` labels, forward and backward references, two dangling cross-chapter references that must abstain) |
-| eptcs-scss2021-proceedings | 51 | EPTCS full volume (CC-BY, 141 pp., 11 papers): **genuinely repeated labels**, Figure 1 on 8 pages, Table 1 on 4. Numbering restarts per paper. 33 pages carry mentions, 108 must resolve nothing |
+| murphy-pml1-ch3 | 29 | Murphy, *Probabilistic Machine Learning: An Introduction*, chapter 3 only (`Figure 3.x` labels, forward and backward references, two dangling cross-chapter references that must abstain, six `Exercise 3.x` mentions) |
+| eptcs-scss2021-proceedings | 96 | EPTCS full volume (CC-BY, 141 pp., 11 papers): **genuinely repeated labels**, Figure 1 on 8 pages, Table 1 on 4. Numbering restarts per paper. 52 pages carry mentions, 89 must resolve nothing. Includes 45 **statement** mentions (Definition/Example/Theorem/Lemma/Proposition/Remark; one foreign `Theorem 1.4 in [2]` that must abstain) |
 | svd_ols_ridge_pcr | 0 | negative control: lecture notes with no floats; every page must resolve nothing |
 
 `murphy-pml1-ch3.pdf` is a local excerpt of the book's CC-BY-NC-ND draft (not redistributed here):
@@ -35,7 +35,7 @@ references and dangling labels, not repeated labels.
 
 ## Current result (Heron INT8)
 
-Precision is 1.00 on every document. Recall is 1.00 on all but the EPTCS volume (0.86).
+Precision is 1.00 on every document. Recall is 1.00 on all but the EPTCS volume (0.92) and Murphy chapter 3 (0.85).
 
 History of the three fixes this set motivated (before → after):
 
@@ -49,7 +49,18 @@ Two further bugs surfaced by the EPTCS volume: `Resolve` could pass over a neare
 indexing budget for and return a farther cached match, and the cap made a negative-cache entry
 position-dependent (a miss near one page must not hide a float near another). Both have tests.
 
-Remaining EPTCS misses (7, all abstentions): the detector gave a figure's content a `Table` or
+### Statements (Definition/Theorem/Example/…)
+
+On the EPTCS volume 44 of 45 statement mentions resolve correctly and none wrongly. The one miss is
+a mention split by a soft hyphen (`Re\x02mark 2.15`). Murphy's four missed `Exercise 3.1–3.3` mentions
+abstain because the detector typed the whole exercise list as one `Algorithm` block. Earlier runs
+found three real bugs here, each now covered by a test: a header's own line hiding a later genuine
+mention on the page (benchmark scan), a mention wrapped to the start of a line being read as a
+header (`…are given in⏎Remark 2.15. We`), and headers typed `Heading`/`Caption` not being indexed.
+
+Only two documents contain statements, so this is the thinnest-validated part: the toggle ships off.
+
+Remaining EPTCS figure/table misses (7, all abstentions): the detector gave a figure's content a `Table` or
 `Algorithm` role, or a "table" holding an XML listing an `Algorithm` role, so no float of the right
 kind sits by the caption. That is a detector limit; the resolver now abstains instead of binding
 the wrong float. Closing it would need captions to accept any non-text block as their float.

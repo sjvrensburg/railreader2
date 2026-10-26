@@ -94,10 +94,12 @@ internal static class ReferenceBenchmark
                     if (lineText is null) continue;
                     foreach (var reference in ReferenceIndex.ParseLine(lineText, limit))
                     {
-                        if (!seen.Add((page, reference))) continue;
+                        if (seen.Contains((page, reference))) continue;
                         var target = ResolveFully(index, doc, reference, page);
-                        // Reading the (pseudo-)caption itself isn't a mention of it.
+                        // Reading the (pseudo-)caption itself isn't a mention of it — and must not
+                        // hide a later genuine mention of the same label on this page.
                         if (target is { } self && self.Page == page && self.CaptionBlock == b) continue;
+                        seen.Add((page, reference));
                         results.Add(ToResult(page, b, l, reference, target));
                     }
                 }
@@ -141,6 +143,13 @@ internal static class ReferenceBenchmark
             var text = doc.GetText(page);
             for (int i = 0; i < analysis.Blocks.Count; i++)
             {
+                // Statements: a Text block whose text opens with a header, no ambiguity handling.
+                if (ReferenceIndex.CanHoldStatementHeader(analysis.Blocks[i].Role)
+                    && ReferenceIndex.ParseStatementHeader(text.ExtractBlockText(analysis.Blocks[i])) is { } header)
+                {
+                    captions.Add((header, page, i, i));
+                    continue;
+                }
                 if (analysis.Blocks[i].Role != BlockRole.Caption) continue;
                 if (ReferenceIndex.ParseCaptionLabel(text.ExtractBlockText(analysis.Blocks[i])) is not { } r) continue;
                 int target = ReferenceIndex.FindNearestTarget(analysis, i, r.Kind).Index;
@@ -233,12 +242,8 @@ internal static class ReferenceBenchmark
         return metrics;
     }
 
-    private static string Norm(string kind) => kind.ToLowerInvariant() switch
-    {
-        "figure" => "Figure",
-        "table" => "Table",
-        _ => kind,
-    };
+    private static string Norm(string kind)
+        => kind.Length == 0 ? kind : char.ToUpperInvariant(kind[0]) + kind[1..].ToLowerInvariant();
 
     private static Metrics ToMetrics(int[] r)
     {

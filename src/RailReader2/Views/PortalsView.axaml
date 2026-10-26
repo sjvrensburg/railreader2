@@ -21,6 +21,11 @@
                   Content="Auto-pin referenced figures &amp; tables"
                   ToolTip.Tip="While rail-reading, automatically show the figure or table the current line refers to (e.g. “see Figure 3”) — no manual link needed." />
 
+        <CheckBox DockPanel.Dock="Top" Margin="8,0,8,2" FontSize="12"
+                  IsChecked="{Binding AutoPinStatements}"
+                  Content="Auto-pin theorems, definitions &amp; examples"
+                  ToolTip.Tip="While rail-reading, automatically show the numbered statement the current line refers to (e.g. “by Theorem 2”, “see Def. 3”). Shows nothing when the match is unclear." />
+
         <!-- Empty-state hint when no portals exist -->
         <TextBlock Name="NoPortalsLabel" DockPanel.Dock="Top" Margin="8,4"
                    Opacity="0.6" TextWrapping="Wrap" IsVisible="False"

@@ -13,7 +13,11 @@ namespace RailReader2.References;
 /// </summary>
 internal sealed partial class ReferenceIndex
 {
-    internal enum RefKind { Figure, Table }
+    internal enum RefKind { Figure, Table, Theorem, Lemma, Proposition, Corollary, Definition, Example, Remark, Exercise }
+
+    /// <summary>Numbered statements (as opposed to captioned floats): their target is the text block
+    /// whose line opens with the header ("Definition 2.1 (graph)."), not a float beside a caption.</summary>
+    internal static bool IsStatement(RefKind kind) => kind >= RefKind.Theorem;
 
     /// <summary>A parsed reference label, e.g. (Figure, "3.2"). Numbers are normalized to lowercase
     /// (suffix letters, appendix prefixes, roman numerals) so an in-text mention and a caption label
@@ -32,9 +36,22 @@ internal sealed partial class ReferenceIndex
     private const string NumberPattern = @"(?:(?:[A-Za-z]\.)?\d+(?:\.\d+)*[a-z]?|(?-i:[IVXLC]+|[A-Z]))\b";
 
     // In-text mentions: "Figure 3", "Fig. 2.1", "Figs 4a", "Table 12", "Tab. 3", "TABLE II".
-    [GeneratedRegex(@"\b(?<kind>fig(?:ure)?s?|tab(?:le)?s?)\.?\s*(?<num>" + NumberPattern + ")",
+    // Statement kind words are matched case-sensitively and capitalised ("Theorem 2", "Ex. 3", "Defs. 2.12"):
+    // lower-case "example 3" / "ex 3" is ordinary prose far more often than a reference.
+    [GeneratedRegex(@"\b(?<kind>fig(?:ure)?s?|tab(?:le)?s?|(?-i:Theorems?|Thms?|Lemmas?|Lems?|Propositions?|Props?|Corollar(?:y|ies)|Cors?|Definitions?|Defs?|Exercises?|Examples?|Exs?|Remarks?|Rems?))\.?\s*(?<num>" + NumberPattern + ")",
         RegexOptions.IgnoreCase)]
     private static partial Regex LineReferenceRegex();
+
+    // A statement header opening a line: full kind word, number, then ".", ":" or an opening bracket
+    // ("Definition 2.1 (graph).", "Theorem 1. If", "Exercise 3.1 [Title]"). Body sentences such as
+    // "Theorem 1 shows that" and citations such as "Definition 17 of [4]" do not match.
+    [GeneratedRegex(@"^[\s\p{P}]{0,3}(?<kind>(?-i:Theorem|Lemma|Proposition|Corollary|Definition|Exercise|Example|Remark))\s*(?<num>\d+(?:\.\d+)*)(?=\s*[.:(\[])")]
+    private static partial Regex StatementHeaderRegex();
+
+    // "… of [4]", "… in Smith (2019)", "… from Smith et al. [3]": the number names a statement in some
+    // OTHER work, so it must not resolve to this document's statement of the same number.
+    [GeneratedRegex(@"\G\s*(?:of|in|from)\s+(?:\[|[A-Z][\p{L}'-]+(?:\s+et\s+al\.?)?\s*[\[(])")]
+    private static partial Regex ForeignCitationRegex();
 
     // Follow-on numbers of a plural/range mention — "Figures 2 and 3", "Tables 1, 4", "Figs. 3–5"
     // (ranges yield their endpoints). \G anchors each match at the previous one's end. Only applied
@@ -106,10 +123,11 @@ internal sealed partial class ReferenceIndex
             if (m.Index >= startLimit) break;
             string kindWord = m.Groups["kind"].Value;
             string headNumber = m.Groups["num"].Value;
-            if (!AcceptNumber(kindWord, headNumber)) continue;
+            var kind = KindOfWord(kindWord);
+            if (!AcceptNumber(kind, kindWord, headNumber)) continue;
             int endIndex = m.Index + m.Length;
             headNumber = MergeChapterDashSuffix(text, kindWord, headNumber, ref endIndex);
-            var kind = char.ToLowerInvariant(kindWord[0]) == 'f' ? RefKind.Figure : RefKind.Table;
+            if (ForeignCitationRegex().IsMatch(text, endIndex)) continue;
             refs.Add(new Reference(kind, NormalizeNumber(headNumber)));
 
             bool plural = IsPluralKindWord(kindWord);
@@ -126,7 +144,7 @@ internal sealed partial class ReferenceIndex
                 if (!c.Success) break;
                 string contNumber = c.Groups["num"].Value;
                 if (letterSeries && !EndsWithLetterSuffix(contNumber)) break;
-                if (!AcceptNumber(kindWord, contNumber)) break;
+                if (!AcceptNumber(kind, kindWord, contNumber)) break;
                 refs.Add(new Reference(kind, NormalizeNumber(contNumber)));
                 pos = c.Index + c.Length;
             }
@@ -171,7 +189,7 @@ internal sealed partial class ReferenceIndex
         var m = CaptionLabelRegex().Match(captionText);
         string kindWord = m.Groups["kind"].Value;
         string number = m.Groups["num"].Value;
-        if (!m.Success || !AcceptNumber(kindWord, number)) return null;
+        if (!m.Success || !AcceptNumber(KindOfWord(kindWord), kindWord, number)) return null;
         int endIndex = m.Index + m.Length;
         number = MergeChapterDashSuffix(captionText, kindWord, number, ref endIndex);
         if (requirePunctuation)
@@ -186,20 +204,34 @@ internal sealed partial class ReferenceIndex
                 if (!punctuated) return null;
             }
         }
-        return new Reference(
-            char.ToLowerInvariant(kindWord[0]) == 'f' ? RefKind.Figure : RefKind.Table,
-            NormalizeNumber(number));
+        return new Reference(KindOfWord(kindWord), NormalizeNumber(number));
     }
 
-    /// <summary>Digitless numbers (roman numerals, bare letters) are accepted only after a
-    /// capitalised kind word — keeps IEEE "Table II" and appendix "Figure B" while rejecting the
-    /// pronoun in "the table I made".</summary>
-    private static bool AcceptNumber(string kindWord, string number)
+    /// <summary>The kind a mention's kind word names ("Fig." / "Tables" / "Thm." / "Defs.").</summary>
+    private static RefKind KindOfWord(string kindWord)
+    {
+        string w = kindWord.ToLowerInvariant();
+        if (w.StartsWith("fig")) return RefKind.Figure;
+        if (w.StartsWith("tab")) return RefKind.Table;
+        if (w.StartsWith("th")) return RefKind.Theorem;
+        if (w.StartsWith("lem")) return RefKind.Lemma;
+        if (w.StartsWith("pro")) return RefKind.Proposition;
+        if (w.StartsWith("cor")) return RefKind.Corollary;
+        if (w.StartsWith("def")) return RefKind.Definition;
+        if (w.StartsWith("exer")) return RefKind.Exercise;
+        if (w.StartsWith("ex")) return RefKind.Example;
+        return RefKind.Remark;
+    }
+
+    /// <summary>Digitless numbers (roman numerals, bare letters) are accepted only for floats, and only
+    /// after a capitalised kind word — keeps IEEE "Table II" and appendix "Figure B" while rejecting
+    /// the pronoun in "the table I made". Statements always need a digit.</summary>
+    private static bool AcceptNumber(RefKind kind, string kindWord, string number)
     {
         foreach (char c in number)
             if (char.IsAsciiDigit(c))
                 return true;
-        return char.IsUpper(kindWord[0]);
+        return !IsStatement(kind) && char.IsUpper(kindWord[0]);
     }
 
     private static string NormalizeNumber(string number) => number.ToLowerInvariant();
@@ -340,7 +372,104 @@ internal sealed partial class ReferenceIndex
         }
         Bind(analysis, pseudo, pseudoMaxGap, claimed, labels);
 
+        AddStatementLabels(analysis, Text, labels);
+
         return new PageLabels(analysis, labels);
+    }
+
+    [GeneratedRegex(@"\b(?:Theorem|Lemma|Proposition|Corollary|Definition|Exercise|Example|Remark)\s*\d")]
+    private static partial Regex StatementWordRegex();
+
+    /// <summary>Index the numbered statements on a page: any line of a Text block that opens with a
+    /// header ("Definition 2.1 (graph).") labels that block — a header may start mid-block when the
+    /// detector merged the statement with the paragraph before it. A header that occurs twice on one
+    /// page is ambiguous and labels nothing. The block is both target and "caption": the statement
+    /// carries its own label.</summary>
+    private static void AddStatementLabels(PageAnalysis analysis, Func<PageText> text,
+        List<(Reference Ref, int TargetBlock, int CaptionBlock)> labels)
+    {
+        Dictionary<Reference, (int Block, int Count)> found = [];
+        for (int i = 0; i < analysis.Blocks.Count; i++)
+        {
+            var block = analysis.Blocks[i];
+            if (!CanHoldStatementHeader(block.Role)) continue;
+            if (!StatementWordRegex().IsMatch(text().ExtractBlockText(block))) continue;   // cheap prefilter
+            string? previous = null;
+            foreach (var line in block.Lines)
+            {
+                string? lineText = LineText(text(), line);
+                string? before = previous;
+                previous = lineText;
+                if (lineText is not { Length: > 0 }) continue;
+                if (ParseStatementHeader(lineText) is not { } reference) continue;
+                // A header starting a block is a header; one starting a later line must follow a line that
+                // ended a sentence, or it is a mention that happened to wrap ("…are given in⏎Remark 2.15. We").
+                if (before is not null && !EndsSentence(before)) continue;
+                found[reference] = found.TryGetValue(reference, out var prior) ? (prior.Block, prior.Count + 1) : (i, 1);
+            }
+        }
+        foreach (var (reference, (block, count)) in found)
+            if (count == 1 && !labels.Any(l => l.Ref == reference))
+                labels.Add((reference, block, block));
+    }
+
+    /// <summary>The statement a line of text opens, e.g. "Definition 2.1 (graph). Every …" →
+    /// (Definition, "2.1"); null when the line is not a statement header.</summary>
+    internal static Reference? ParseStatementHeader(string lineText)
+    {
+        var m = StatementHeaderRegex().Match(lineText);
+        return m.Success
+            ? new Reference(KindOfWord(m.Groups["kind"].Value), NormalizeNumber(m.Groups["num"].Value))
+            : null;
+    }
+
+    // A statement's body is the blocks after its header up to the next statement, heading, "Proof" or
+    // float; capped so a mis-detected boundary can't turn the preview into half a page.
+    private const int MaxStatementExtentBlocks = 8;
+
+    [GeneratedRegex(@"^[\s\p{P}]{0,3}Proof\b")]
+    private static partial Regex ProofStartRegex();
+
+    /// <summary>Index of the last block of the statement whose header is block <paramref name="block"/>
+    /// on <paramref name="page"/>: continuation text, list items and display maths up to the next
+    /// statement header, heading, proof, float, page furniture, or a jump back up the page (next
+    /// column). Equals <paramref name="block"/> when nothing follows. Used to preview the whole
+    /// statement rather than just its first block.</summary>
+    internal static int StatementExtentEnd(IReferenceDocument doc, int page, int block)
+    {
+        if (!doc.TryGetAnalysis(page, out var analysis) || block < 0 || block >= analysis.Blocks.Count)
+            return block;
+        PageText? text = null;
+        int last = block;
+        for (int i = block + 1; i < analysis.Blocks.Count && i - block <= MaxStatementExtentBlocks; i++)
+        {
+            var b = analysis.Blocks[i];
+            var prev = analysis.Blocks[last].BBox;
+            if (b.BBox.Y + 2 < prev.Y + prev.H) break;   // jumped back up: next column
+            if (b.Role is BlockRole.DisplayMath or BlockRole.Algorithm) { last = i; continue; }
+            if (b.Role != BlockRole.Text) break;
+            string firstLine = (text ??= doc.GetText(page)).ExtractBlockText(b).TrimStart();
+            if (ParseStatementHeader(firstLine) is not null || ProofStartRegex().IsMatch(firstLine)) break;
+            last = i;
+        }
+        return last;
+    }
+
+    /// <summary>Detectors file statement headers under several roles: usually Text, but a short header
+    /// line is often typed Heading or Caption. Floats, page furniture and maths never hold one.</summary>
+    internal static bool CanHoldStatementHeader(BlockRole role)
+        => role is BlockRole.Text or BlockRole.Heading or BlockRole.Caption;
+
+    private static bool EndsSentence(string line)
+    {
+        string t = line.TrimEnd();
+        return t.Length > 0 && t[^1] is '.' or '?' or '!' or ':' or ';' or ')' or ']';
+    }
+
+    private static string? LineText(PageText text, LineInfo line)
+    {
+        float top = line.Y - line.Height / 2f;
+        return text.ExtractTextInRect(line.X, top, line.X + line.Width, top + line.Height);
     }
 
     /// <summary>Bind captions to floats one-to-one, smallest vertical gap first. Only kind-matched
@@ -386,12 +515,6 @@ internal sealed partial class ReferenceIndex
     internal static string? LineTextWithLookahead(PageText pageText, IReadOnlyList<LineInfo> lines,
         int lineIdx, out int startLimit)
     {
-        static string? LineText(PageText text, LineInfo line)
-        {
-            float top = line.Y - line.Height / 2f;
-            return text.ExtractTextInRect(line.X, top, line.X + line.Width, top + line.Height);
-        }
-
         startLimit = 0;
         string? lineText = LineText(pageText, lines[lineIdx]);
         if (string.IsNullOrEmpty(lineText)) return null;

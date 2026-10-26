@@ -168,8 +168,8 @@ public sealed partial class MainWindowViewModel
     private static string AutoPinId(ReferenceIndex.Reference r, ReferenceIndex.Target t)
         => $"auto:{r.Kind}:{r.Number}:p{t.Page}b{t.TargetBlock}";
 
-    /// <summary>Toggle for automatic pinning, persisted app-wide (sidecar). Turning it off clears a
-    /// currently shown auto pin; saved portals are unaffected either way.</summary>
+    /// <summary>Toggle for automatic figure/table pinning, persisted app-wide (sidecar). Turning it off
+    /// clears a currently shown figure/table auto pin; saved portals are unaffected either way.</summary>
     public bool AutoPinPortals
     {
         get => _portalPrefs.AutoPinFiguresTables;
@@ -179,15 +179,41 @@ public sealed partial class MainWindowViewModel
             _portalPrefs.AutoPinFiguresTables = value;
             _portalPrefs.Save();
             OnPropertyChanged(nameof(AutoPinPortals));
-            // Toggling off drops a displayed auto pin — unless the view is locked: the lock's
-            // freeze contract wins, and the pin then simply stays until something replaces it after
-            // unlock. Fields only — the forced evaluation below performs the single image
-            // render-or-clear swap, preserving the one-behind disposal guarantee.
-            if (!value && !_isPortalViewLocked && _autoPin is not null)
-                ResetDisplayedPortal();
-            EvaluatePortals(forceRender: true);
+            DropDisplayedAutoPinOnToggleOff(value, statements: false);
         }
     }
+
+    /// <summary>Toggle for automatic pinning of numbered statements ("Theorem 2", "Def. 3"), persisted
+    /// app-wide. Off by default; independent of <see cref="AutoPinPortals"/>.</summary>
+    public bool AutoPinStatements
+    {
+        get => _portalPrefs.AutoPinStatements;
+        set
+        {
+            if (_portalPrefs.AutoPinStatements == value) return;
+            _portalPrefs.AutoPinStatements = value;
+            _portalPrefs.Save();
+            OnPropertyChanged(nameof(AutoPinStatements));
+            DropDisplayedAutoPinOnToggleOff(value, statements: true);
+        }
+    }
+
+    /// <summary>Toggling a kind off drops a displayed auto pin of that kind — unless the view is locked:
+    /// the lock's freeze contract wins, and the pin then simply stays until something replaces it after
+    /// unlock. Fields only — the forced evaluation performs the single image render-or-clear swap,
+    /// preserving the one-behind disposal guarantee.</summary>
+    private void DropDisplayedAutoPinOnToggleOff(bool nowOn, bool statements)
+    {
+        if (!nowOn && !_isPortalViewLocked && _autoPin is not null && DisplayedAutoPinIsStatement() == statements)
+            ResetDisplayedPortal();
+        EvaluatePortals(forceRender: true);
+    }
+
+    /// <summary>True when the displayed auto pin (id "auto:{Kind}:…") names a numbered statement.</summary>
+    private bool DisplayedAutoPinIsStatement()
+        => _displayedPortalId is { } id && id.StartsWith("auto:", StringComparison.Ordinal)
+           && id.Split(':') is [_, var kind, ..]
+           && Enum.TryParse<ReferenceIndex.RefKind>(kind, out var k) && ReferenceIndex.IsStatement(k);
 
     /// <summary>True when the sync loop is waiting on background analysis — for a saved portal's
     /// target page or an automatic reference's caption page — so the analysis poll should force a
@@ -494,7 +520,7 @@ public sealed partial class MainWindowViewModel
     /// stays up meanwhile. UI thread only.</summary>
     private void TryAutoPin(DocumentModel doc, int srcPage, int srcBlock, int srcLine)
     {
-        if (!AutoPinPortals || srcBlock < 0 || srcLine < 0) return;
+        if ((!AutoPinPortals && !AutoPinStatements) || srcBlock < 0 || srcLine < 0) return;
         if (!doc.TryGetAnalysis(srcPage, out var analysis)
             || srcBlock >= analysis.Blocks.Count
             || analysis.Blocks[srcBlock].Role == BlockRole.Caption)
@@ -509,6 +535,7 @@ public sealed partial class MainWindowViewModel
         if (lineText is null) return;
 
         var refs = ReferenceIndex.ParseLine(lineText, startLimit);
+        refs.RemoveAll(r => ReferenceIndex.IsStatement(r.Kind) ? !AutoPinStatements : !AutoPinPortals);
         if (refs.Count == 0) return;
         var source = new DocumentModelReferenceSource(doc);
 
@@ -546,6 +573,11 @@ public sealed partial class MainWindowViewModel
         ReferenceIndex.Target target, int srcPage, int srcBlock, int srcLine)
     {
         string autoId = AutoPinId(reference, target);
+        // A float previews with its caption; a statement with its whole body (header block to the last
+        // continuation block). Stored in place of the caption block so dock re-renders reproduce it.
+        int previewEnd = ReferenceIndex.IsStatement(reference.Kind)
+            ? ReferenceIndex.StatementExtentEnd(new DocumentModelReferenceSource(doc), target.Page, target.TargetBlock)
+            : target.CaptionBlock;
 
         // Render the float+caption union crop into the tracking preview — unless that preview has no
         // on-screen consumer right now (#190: popped-out + live shows the confined viewport instead and
@@ -553,7 +585,7 @@ public sealed partial class MainWindowViewModel
         Bitmap? bitmap = null;
         if (!PortalCropRedundant)
         {
-            bitmap = RenderAutoPinUnionCrop(doc, target.Page, target.TargetBlock, target.CaptionBlock);
+            bitmap = RenderAutoPinUnionCrop(doc, target.Page, target.TargetBlock, previewEnd);
             if (bitmap is null)
             {
                 // Remember the failure: a deterministic render failure must not re-trigger a full-page
@@ -564,7 +596,7 @@ public sealed partial class MainWindowViewModel
         }
 
         _displayedPortalId = autoId;
-        _autoPin = (srcPage, srcBlock, srcLine, target.Page, target.TargetBlock, target.CaptionBlock);
+        _autoPin = (srcPage, srcBlock, srcLine, target.Page, target.TargetBlock, previewEnd);
         _portalTargetPending = false;
         _trackingCropSkipped = bitmap is null;   // skipped while redundant → re-render on dock
         ActivePortalLabel = $"{reference} (p.{target.Page + 1}) · auto";

@@ -37,11 +37,19 @@ public class ReferenceResolveTests
             List<CharBox> boxes = [];
             foreach (var (index, caption) in captions ?? [])
             {
+                // Each newline-separated piece is one detected line: a band of the block's height.
                 var b = blocks[index];
-                float cw = b.W / caption.Length;
-                for (int i = 0; i < caption.Length; i++)
-                    boxes.Add(new CharBox(text.Length + i, b.X + i * cw, b.Y, b.X + (i + 1) * cw, b.Y + b.H));
-                text.Append(caption);
+                var pieces = caption.Split('\n');
+                float lh = b.H / pieces.Length;
+                for (int li = 0; li < pieces.Length; li++)
+                {
+                    string piece = pieces[li] + " ";
+                    float cw = b.W / piece.Length;
+                    for (int i = 0; i < piece.Length; i++)
+                        boxes.Add(new CharBox(text.Length + i, b.X + i * cw, b.Y + li * lh, b.X + (i + 1) * cw, b.Y + (li + 1) * lh));
+                    text.Append(piece);
+                    analysis.Blocks[index].Lines.Add(new LineInfo(b.Y + (li + 0.5f) * lh, lh, b.X, b.W, []));
+                }
             }
             _pages[page] = (analysis, new PageText(text.ToString(), boxes));
             return this;
@@ -181,5 +189,145 @@ public class ReferenceResolveTests
         var index = new ReferenceIndex();
         Assert.Equal(0, Resolve(index, doc, new Ref(RefKind.Figure, "1"), 0)!.Value.TargetBlock);
         Assert.Null(Resolve(index, doc, new Ref(RefKind.Figure, "2"), 0));
+    }
+
+    // --- numbered statements ---
+
+    private static FakeDoc WithStatement(FakeDoc doc, int page, string text)
+        => doc.Add(page, [(BlockRole.Text, 50, 100, 500, 60)], new() { [0] = text });
+
+    [Fact]
+    public void Statement_ResolvesToTheBlockOpeningWithItsHeader()
+    {
+        var doc = WithStatement(new FakeDoc(4), 2, "Definition 3. (Trace) A trace is a finite sequence.");
+        Assert.Equal(new ReferenceIndex.Target(2, 0, 0), Resolve(new(), doc, new Ref(RefKind.Definition, "3"), 3));
+    }
+
+    [Fact]
+    public void Statement_HeaderMayStartMidBlock()
+    {
+        var doc = WithStatement(new FakeDoc(4), 1, "closing words of the paragraph before.\nTheorem 2. Let D be a deduction system.");
+        Assert.Equal(1, Resolve(new(), doc, new Ref(RefKind.Theorem, "2"), 1)!.Value.Page);
+    }
+
+    [Fact]
+    public void Statement_MentionInBodyTextIsNotAHeader()
+    {
+        var doc = WithStatement(new FakeDoc(4), 1, "Theorem 2 shows that the algorithm terminates.");
+        Assert.Null(Resolve(new(), doc, new Ref(RefKind.Theorem, "2"), 1));
+    }
+
+    [Fact]
+    public void Statement_HeaderRepeatedOnOnePageIsAmbiguousAndAbstains()
+    {
+        var doc = new FakeDoc(3).Add(1,
+            [(BlockRole.Text, 50, 100, 500, 40), (BlockRole.Text, 50, 200, 500, 40)],
+            new() { [0] = "Lemma 1. First statement.", [1] = "Lemma 1. Restated here." });
+        Assert.Null(Resolve(new(), doc, new Ref(RefKind.Lemma, "1"), 1));
+    }
+
+    [Fact]
+    public void Statement_RepeatedLabelAcrossPapersTakesTheNearest()
+    {
+        var doc = WithStatement(WithStatement(new FakeDoc(60), 3, "Definition 1. Old paper."), 40, "Definition 1. This paper.");
+        Assert.Equal(40, Resolve(new(), doc, new Ref(RefKind.Definition, "1"), 44)!.Value.Page);
+    }
+
+    [Fact]
+    public void Statement_KindsAreKeptApart()
+    {
+        var doc = WithStatement(new FakeDoc(3), 1, "Lemma 2. Something.");
+        Assert.Null(Resolve(new(), doc, new Ref(RefKind.Theorem, "2"), 1));
+    }
+
+    [Fact]
+    public void Statement_WrappedMentionAtLineStartIsNotAHeader()
+    {
+        // "…are given in" wraps, leaving "Remark 2.15. We will see…" at the start of the next line.
+        var doc = WithStatement(new FakeDoc(4), 1,
+            "Comments on Definition 2.14 are given in\nRemark 2.15. We will see in Section 3.2 that these");
+        Assert.Null(Resolve(new(), doc, new Ref(RefKind.Remark, "2.15"), 1));
+    }
+
+    [Fact]
+    public void Statement_HeaderAfterASentenceEndingLineIsAHeader()
+    {
+        var doc = WithStatement(new FakeDoc(4), 1, "which closes the previous paragraph.\nRemark 2.15. Let us analyse these.");
+        Assert.Equal(1, Resolve(new(), doc, new Ref(RefKind.Remark, "2.15"), 1)!.Value.Page);
+    }
+
+    [Theory]
+    [InlineData(BlockRole.Heading)]
+    [InlineData(BlockRole.Caption)]
+    public void Statement_HeaderTypedAsHeadingOrCaptionStillCounts(BlockRole role)
+    {
+        var doc = new FakeDoc(3).Add(1, [(role, 50, 100, 500, 20)], new() { [0] = "Definition 2.14 (derived operations)." });
+        Assert.Equal(1, Resolve(new(), doc, new Ref(RefKind.Definition, "2.14"), 1)!.Value.Page);
+    }
+
+    [Fact]
+    public void Scan_OwnHeaderDoesNotHideALaterMentionOnTheSamePage()
+    {
+        // The header line of Definition 4 parses as a "mention" of itself; the genuine mention in the
+        // note after it must still be reported.
+        var doc = new FakeDoc(2).Add(0,
+            [(BlockRole.Text, 50, 100, 500, 40), (BlockRole.Text, 50, 200, 500, 40)],
+            new() { [0] = "Definition 4. Let E be a finite set.", [1] = "Note that B can be empty in Definition 4. If so, done." });
+        var results = ReferenceBenchmark.Scan(doc, new ReferenceIndex());
+        var m = Assert.Single(results);
+        Assert.Equal(("Definition", "4", "resolved"), (m.Kind, m.Number, m.Status));
+        Assert.Equal(1, m.Block);
+    }
+
+    // --- statement extent (what the preview shows) ---
+
+    private static FakeDoc ExtentPage(params (BlockRole Role, string? Text)[] blocks)
+    {
+        var geometry = blocks.Select((b, i) => (b.Role, 50f, 100f + i * 60f, 500f, 40f)).ToArray();
+        var texts = new Dictionary<int, string>();
+        for (int i = 0; i < blocks.Length; i++)
+            if (blocks[i].Text is { } t) texts[i] = t;
+        return new FakeDoc(1).Add(0, geometry, texts);
+    }
+
+    [Fact]
+    public void StatementExtent_RunsOverContinuationBlocksUpToTheNextStatement()
+    {
+        var doc = ExtentPage(
+            (BlockRole.Text, "Definition 3. Let D be a system such that"),
+            (BlockRole.Text, "(i) D is a set of rules and"),
+            (BlockRole.DisplayMath, "x = y"),
+            (BlockRole.Text, "Definition 4. Let E be a set."));
+        Assert.Equal(2, ReferenceIndex.StatementExtentEnd(doc, 0, 0));
+    }
+
+    [Theory]
+    [InlineData(BlockRole.Heading, "2 Next section")]
+    [InlineData(BlockRole.Figure, null)]
+    [InlineData(BlockRole.Caption, "Figure 1: Something.")]
+    [InlineData(BlockRole.Footer, "12")]
+    public void StatementExtent_StopsAtHeadingsFloatsAndFurniture(BlockRole stopper, string? text)
+    {
+        var doc = ExtentPage((BlockRole.Text, "Theorem 1. If a then b."), (stopper, text));
+        Assert.Equal(0, ReferenceIndex.StatementExtentEnd(doc, 0, 0));
+    }
+
+    [Fact]
+    public void StatementExtent_StopsAtProof()
+    {
+        var doc = ExtentPage(
+            (BlockRole.Text, "Lemma 2. Let x be given."),
+            (BlockRole.Text, "so that y holds."),
+            (BlockRole.Text, "Proof. By induction."));
+        Assert.Equal(1, ReferenceIndex.StatementExtentEnd(doc, 0, 0));
+    }
+
+    [Fact]
+    public void StatementExtent_IsCappedAndSurvivesAMissingPage()
+    {
+        var many = Enumerable.Range(0, 20).Select(_ => (BlockRole.Text, (string?)"continued text of the statement")).ToList();
+        many.Insert(0, (BlockRole.Text, "Theorem 1. Long statement."));
+        Assert.Equal(8, ReferenceIndex.StatementExtentEnd(ExtentPage([.. many]), 0, 0));
+        Assert.Equal(3, ReferenceIndex.StatementExtentEnd(new FakeDoc(1), 5, 3));   // page not analysed
     }
 }

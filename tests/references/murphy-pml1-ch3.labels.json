@@ -159,11 +159,51 @@
    "number": "3.17",
    "target_page": 27,
    "target_block": 2
+  },
+  {
+   "page": 0,
+   "kind": "Exercise",
+   "number": "3.4",
+   "target_page": 27,
+   "target_block": 4
+  },
+  {
+   "page": 1,
+   "kind": "Exercise",
+   "number": "3.2",
+   "target_page": 26,
+   "target_block": 10
+  },
+  {
+   "page": 1,
+   "kind": "Exercise",
+   "number": "3.3",
+   "target_page": 26,
+   "target_block": 10
+  },
+  {
+   "page": 2,
+   "kind": "Exercise",
+   "number": "3.1",
+   "target_page": 26,
+   "target_block": 10
+  },
+  {
+   "page": 4,
+   "kind": "Exercise",
+   "number": "3.6",
+   "target_page": 27,
+   "target_block": 16
+  },
+  {
+   "page": 5,
+   "kind": "Exercise",
+   "number": "3.2",
+   "target_page": 26,
+   "target_block": 10
   }
  ],
  "empty_pages": [
-  0,
-  4,
   6,
   9,
   10,
