@@ -439,4 +439,36 @@ public class ReferenceIndexTests
     [InlineData("Theorem A.2 (Main result). Let", "Theorem", "a.2")]
     public void ParseStatementHeader_AppendixLetteredNumbers(string line, string kind, string number)
         => Assert.Equal(new Ref(Enum.Parse<RefKind>(kind), number), ReferenceIndex.ParseStatementHeader(line));
+
+    // --- guards found by auditing a third batch of unseen papers ---
+
+    [Fact]
+    public void ParseLine_AListItemIntroducedByAConjunctionIsNotAnEquation()
+        => Assert.DoesNotContain(ReferenceIndex.ParseLine("an output value minus execution cost, and (2) time saving, the expert"),
+            r => r.Kind == RefKind.Equation);
+
+    [Theory]
+    [InlineData("a monotone function (Coogan & Arcak, 2015, Def. 1). For an input")]
+    [InlineData("see (Runje and Shankaranarayana, 2023, Thm. 2) for details")]
+    [InlineData("see (Smith, 2019, Theorem 3)")]
+    public void ParseLine_MultiAuthorCitationsNameTheirOwnResults(string line)
+        => Assert.Empty(ReferenceIndex.ParseLine(line));
+
+    [Fact]
+    public void ParseLine_AChainedMentionAfterItsFirstStillCounts()
+        => Assert.Equal(["2", "3"],
+            ReferenceIndex.ParseLine("combining the formula (2) and (3) gives").Where(r => r.Kind == RefKind.Equation).Select(r => r.Number));
+
+    [Theory]
+    [InlineData("• Theorem 4.1 (Biased Walk Formula): for fixed p, represent")]   // a contributions-summary bullet
+    [InlineData("- Lemma 4.2 (Continuity at p = 1/2): Pp(L = k)")]
+    [InlineData("– Corollary 4.5 (Exact Series): for any")]
+    public void ParseStatementHeader_ASummaryBulletIsNotTheStatement(string line)
+        => Assert.Null(ReferenceIndex.ParseStatementHeader(line));
+
+    [Theory]
+    [InlineData("“Theorem 1. If a then b", "Theorem", "1")]
+    [InlineData("(Definition 2.3 (match). A match", "Definition", "2.3")]
+    public void ParseStatementHeader_ExtractionNoiseBeforeAHeaderIsTolerated(string line, string kind, string number)
+        => Assert.Equal(new Ref(Enum.Parse<RefKind>(kind), number), ReferenceIndex.ParseStatementHeader(line));
 }

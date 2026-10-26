@@ -87,6 +87,38 @@ Remaining EPTCS figure/table misses (7, all abstentions): the detector gave a fi
 kind sits by the caption. That is a detector limit; the resolver now abstains instead of binding
 the wrong float. Closing it would need captions to accept any non-text block as their float.
 
+## Unlabelled holdout audit (110 unseen arXiv papers)
+
+Hand-labelling does not scale, so four batches of **October 2026** arXiv papers (math.ST, stat.ME,
+math.PR, cs.LG, econ.EM, math.OC, stat.ML, newest-first at four different offsets, 10–60 pages, no
+overlap; 110 papers / 3,489 pages) were run with no labels, and a **stratified sample of resolved
+mentions was read by eye** (mention context beside the start of the block it resolved to; every
+multi-candidate resolution included). The PDFs are not redistributed.
+
+| Batch | Docs / pages | Mentions | Resolved | Sample read | Wrong, before that batch's fixes |
+|---|---|---|---|---|---|
+| A | 30 / 935 | 2,725 | 2,285 (84%) | 218 (33 multi-candidate) | ~20 (9%; the multi-candidate rows were oversampled) |
+| B | 26 / 840 | 1,803 | 1,391 (77%) | 180 | 4 (2%) |
+| C | 28 / 862 | 1,985 | 1,604 (81%) | 189 | ~7 (4%) |
+| D | 26 / 852 | 2,063 | 1,620 (79%) | 210 | ~4 (2%) |
+
+Every batch was audited *before* its findings were fixed, so each row is the error rate on documents
+the code had not been tuned against; each batch still turned up one or two new patterns. Expect
+roughly 2–4 wrong pins in 100 on a new document (mostly rare patterns), not zero. Fixed patterns
+(each with a unit test): contents lines read as mentions; `Proposition 1(d).` read as a header;
+superscript indices (`µ (2)`), numbered conditions (`conditions (1) and (3)`, `(1)–(3)`),
+asymptotic notation (`oP (1)`, `log (2)`) and a conjunction-led list item (`…cost, and (2) time`)
+read as equations; mentions merged into a display block read as tags; an equation number defined
+twice in the window; appendix-lettered headers (`Lemma C.1.`) not indexed; `Tables A-2 and B-1`
+parsed as a range; non-ASCII citation keys; multi-author citation parentheticals
+(`(Coogan & Arcak, 2015, Def. 1)`); summary bullets (`• Theorem 4.1 (…):`) read as the theorem.
+
+Recall (abstentions where an independent text search finds the label): most abstentions are
+dangling references to other works. About a quarter of batch B's 412 abstentions were flat-numbered
+references more than 12 pages from their target, which the cap deliberately drops: the price of
+protecting proceedings volumes. A cap applied only to documents whose labels restart elsewhere
+would win most of that back; not done.
+
 ## Limits
 
 - On the single-paper documents the baselines tie or trail the resolver. The EPTCS volume separates

@@ -48,7 +48,7 @@ internal sealed partial class ReferenceIndex
     // A statement header opening a line: full kind word, number, then ".", ":" or an opening bracket
     // ("Definition 2.1 (graph).", "Theorem 1. If", "Exercise 3.1 [Title]"). Body sentences such as
     // "Theorem 1 shows that" and citations such as "Definition 17 of [4]" do not match.
-    [GeneratedRegex(@"^[\s\p{P}]{0,3}(?<kind>(?-i:Theorem|Lemma|Proposition|Corollary|Definition|Exercise|Example|Remark))\s*(?<num>(?:[A-Z]\.)?\d+(?:\.\d+)*)(?=\s*[.:]|\s+[(\[])")]
+    [GeneratedRegex(@"^(?:[\s\p{P}-[•·▪◦‣⁃*\-–—]]){0,3}(?<kind>(?-i:Theorem|Lemma|Proposition|Corollary|Definition|Exercise|Example|Remark))\s*(?<num>(?:[A-Z]\.)?\d+(?:\.\d+)*)(?=\s*[.:]|\s+[(\[])")]
     private static partial Regex StatementHeaderRegex();
 
     // "… of [4]", "… in Smith (2019)", "… from Smith et al. [3]": the number names a statement in some
@@ -140,8 +140,8 @@ internal sealed partial class ReferenceIndex
     [GeneratedRegex(@"\[\s*(?:see\s+)?(?:\d+|\p{Lu}\p{L}*(?:\+\p{L}*)?\d{2,4}[a-z]?)(?:\s*[-–—]\s*\d+)?\s*,(?<q>[^\[\]]{1,180})\]")]
     private static partial Regex BracketCitationRegex();
 
-    // "(Smith 2019, Theorem 3)", "(Smith et al. 2019, Eq. (4))".
-    [GeneratedRegex(@"\([A-Z][A-Za-z'’\-]+(?:\s+et\s+al\.?)?\s+(?:19|20)\d{2}[a-z]?\s*,[^()]*(?:\([^()]*\)[^()]*)*\)")]
+    // "(Smith 2019, Theorem 3)", "(Smith et al. 2019, Eq. (4))", "(Coogan & Arcak, 2015, Def. 1)".
+    [GeneratedRegex(@"\(\p{Lu}[\p{L}'’\-]+(?:(?:,\s*|\s+)(?:&|and)\s+\p{Lu}[\p{L}'’\-]+|\s+et\s+al\.?)?,?\s+(?:19|20)\d{2}[a-z]?\s*,[^()]*(?:\([^()]*\)[^()]*)*\)")]
     private static partial Regex AuthorYearCitationRegex();
 
     private static List<(int Start, int End)> CitationSpans(string text)
@@ -280,6 +280,9 @@ internal sealed partial class ReferenceIndex
         "case", "cases", "part", "parts", "step", "steps", "claim", "claims", "axiom", "axioms", "point",
         "points", "statement", "statements", "clause", "clauses", "requirement", "requirements",
         "hypothesis", "hypotheses", "criterion", "criteria",
+        // a conjunction directly before a number opens a new list item ("…cost, and (2) time saving"):
+        // a real chain ("formula (2) and (3)") is skipped back to its word before this check
+        "and", "or", "but", "nor", "then", "also", "both", "either", "neither", "plus", "while", "whereas",
         // asymptotic notation and functions applied to a number: "oP (1)", "log (2)", "Var (1)"
         "op", "oo", "ln", "log", "lg", "exp", "sin", "cos", "tan", "max", "min", "sup", "inf", "det",
         "tr", "rank", "dim", "var", "cov", "pr", "std", "deg", "mod", "gcd", "lcm", "lim", "sgn", "abs",
