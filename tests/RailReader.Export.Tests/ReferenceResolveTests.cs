@@ -55,6 +55,14 @@ public class ReferenceResolveTests
             return this;
         }
 
+        /// <summary>Analyse every page not added yet (as empty), as when a whole document is analysed.</summary>
+        public FakeDoc Complete()
+        {
+            for (int p = 0; p < pageCount; p++)
+                if (!_pages.ContainsKey(p)) Add(p, []);
+            return this;
+        }
+
         /// <summary>A one-figure page: the float above its caption.</summary>
         public FakeDoc AddFigure(int page, string label)
             => Add(page, [(BlockRole.Figure, 50, 100, 500, 300), (BlockRole.Caption, 50, 410, 500, 20)],
@@ -402,5 +410,69 @@ public class ReferenceResolveTests
     {
         var doc = new FakeDoc(30).AddFigure(10, "Figure 1: A.").AddFigure(14, "Figure 1: B.");
         Assert.Equal(14, Resolve(new(), doc, new Ref(RefKind.Figure, "1"), 15)!.Value.Page);
+    }
+
+    // --- adaptive flat-number cap ---
+
+    [Fact]
+    public void AdaptiveCap_ADocumentWhoseLabelsNeverRestartResolvesAtAnyDistance()
+    {
+        var doc = new FakeDoc(60).AddFigure(2, "Figure 4: Mine.").AddFigure(5, "Figure 5: Other.").Complete();
+        var index = new ReferenceIndex { MaxFlatNumberPageDistance = 12 };
+        Assert.Equal(2, Resolve(index, doc, new Ref(RefKind.Figure, "4"), 50)!.Value.Page);
+    }
+
+    [Fact]
+    public void AdaptiveCap_ARestartingDocumentKeepsTheCap()
+    {
+        // "Figure 1" is defined on pages 2 and 30: a proceedings volume. "Figure 4" exists once (page 2),
+        // but a mention on page 40 belongs to whichever paper it sits in.
+        var doc = new FakeDoc(60).AddFigure(2, "Figure 1: A.").AddFigure(3, "Figure 4: B.").AddFigure(30, "Figure 1: C.").Complete();
+        var index = new ReferenceIndex { MaxFlatNumberPageDistance = 12 };
+        Assert.Null(Resolve(index, doc, new Ref(RefKind.Figure, "4"), 40));
+        Assert.Equal(3, Resolve(index, doc, new Ref(RefKind.Figure, "4"), 10)!.Value.Page);   // inside the window
+    }
+
+    [Fact]
+    public void AdaptiveCap_AnUnfinishedAnalysisKeepsTheCap()
+    {
+        var doc = new FakeDoc(60).AddFigure(2, "Figure 4: Mine.");   // 1 of 60 pages analysed
+        Assert.Null(Resolve(new ReferenceIndex { MaxFlatNumberPageDistance = 12 }, doc, new Ref(RefKind.Figure, "4"), 50));
+    }
+
+    [Fact]
+    public void AdaptiveCap_CanBeSwitchedOff()
+    {
+        var doc = new FakeDoc(60).AddFigure(2, "Figure 4: Mine.").Complete();
+        var index = new ReferenceIndex { MaxFlatNumberPageDistance = 12, AdaptiveCap = false };
+        Assert.Null(Resolve(index, doc, new Ref(RefKind.Figure, "4"), 50));
+    }
+
+    [Fact]
+    public void AdaptiveCap_AUniqueEquationFarAwayResolves_AnEquationDefinedTwiceFarApartDoesNot()
+    {
+        var unique = WithDisplay(new FakeDoc(80), 5, "a = b (7)").Complete();
+        Assert.Equal(5, Resolve(new ReferenceIndex(), unique, new Ref(RefKind.Equation, "7"), 70)!.Value.Page);
+
+        var twice = WithDisplay(WithDisplay(new FakeDoc(80), 5, "a = b (7)"), 60, "c = d (7)").Complete();
+        Assert.Equal(60, Resolve(new ReferenceIndex(), twice, new Ref(RefKind.Equation, "7"), 62)!.Value.Page);   // inside the window
+        Assert.Null(Resolve(new ReferenceIndex(), twice, new Ref(RefKind.Equation, "7"), 35));                    // far from both
+    }
+
+    [Fact]
+    public void AdaptiveCap_ScopedNumbersWereNeverCapped()
+    {
+        var doc = new FakeDoc(80).AddFigure(2, "Figure 4.1: Chapter figure.").AddFigure(30, "Figure 1: A.").AddFigure(60, "Figure 1: B.").Complete();
+        Assert.Equal(2, Resolve(new ReferenceIndex(), doc, new Ref(RefKind.Figure, "4.1"), 75)!.Value.Page);
+    }
+
+    [Fact]
+    public void AdaptiveCap_AnEquationDefinedTwiceCloseTogetherIsAmbiguousFromFarAway()
+    {
+        // (7) on pages 3 and 5: no restart evidence (they are within the cap of each other), so a
+        // mention on page 40 sees both and abstains instead of taking the nearer.
+        var doc = WithDisplay(WithDisplay(new FakeDoc(60), 3, "a = b (7)"), 5, "c = d (7)").Complete();
+        Assert.Null(Resolve(new ReferenceIndex(), doc, new Ref(RefKind.Equation, "7"), 40));
+        Assert.Null(Resolve(new ReferenceIndex(), doc, new Ref(RefKind.Equation, "7"), 8));
     }
 }

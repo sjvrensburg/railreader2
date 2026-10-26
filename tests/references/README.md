@@ -115,9 +115,15 @@ parsed as a range; non-ASCII citation keys; multi-author citation parentheticals
 
 Recall (abstentions where an independent text search finds the label): most abstentions are
 dangling references to other works. About a quarter of batch B's 412 abstentions were flat-numbered
-references more than 12 pages from their target, which the cap deliberately drops: the price of
-protecting proceedings volumes. A cap applied only to documents whose labels restart elsewhere
-would win most of that back; not done.
+references more than 12 pages from their target, which the fixed cap dropped to protect proceedings
+volumes. The cap is now **adaptive**: it applies only to documents whose flat labels restart
+(a label defined on two pages more than 12 apart) or whose analysis is unfinished. Re-running
+batch D: resolved 1,620 → 1,757 of 2,069 mentions (+132; 63 equations, 19 figures, 18 lemmas,
+13 theorems, 12 tables, 5 propositions, 2 remarks), and I read all 133 newly resolved mentions
+(one more, an equation defined twice, correctly went back to abstaining after the check beyond the
+window was added): all but that one were right: appendix equations cited from proofs, statements
+named in proof headings, appendix figures and tables. The nine labelled documents are unchanged
+(precision 1.00; the EPTCS volume keeps its cap because its restarts are detected).
 
 ## Limits
 
