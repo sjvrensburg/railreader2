@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using RailReader2.References;
 
 namespace RailReader.Cli.Commands;
 
@@ -11,4 +12,6 @@ namespace RailReader.Cli.Commands;
 [JsonSerializable(typeof(VlmOutput))]
 [JsonSerializable(typeof(OutlineEntryOutput))]
 [JsonSerializable(typeof(BBoxOutput))]
+[JsonSerializable(typeof(ReferenceReport))]
+[JsonSerializable(typeof(GroundTruth))]
 internal partial class CliJsonContext : JsonSerializerContext;

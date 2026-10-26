@@ -17,4 +17,7 @@
     <PackageReference Include="RailReader.Core.Vlm.OpenAI" Version="0.71.0" />
     <PackageReference Include="RailReader.Export" Version="0.71.0" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../RailReader2.References/RailReader2.References.csproj" />
+  </ItemGroup>
 </Project>

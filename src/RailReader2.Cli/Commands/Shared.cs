@@ -139,11 +139,11 @@ internal static class Shared
     /// corresponding ONNX model is available. Returns null and prints a warning
     /// otherwise.
     /// </summary>
-    internal static ILayoutAnalyzer? CreateAnalyzer(bool requested)
+    internal static ILayoutAnalyzer? CreateAnalyzer(bool requested, LayoutModelChoice.Builtin? choiceOverride = null)
     {
         if (!requested) return null;
 
-        var choice = LayoutModelChoice.LoadChoice();
+        var choice = choiceOverride ?? LayoutModelChoice.LoadChoice();
 
         if (choice == LayoutModelChoice.Builtin.Heron)
         {

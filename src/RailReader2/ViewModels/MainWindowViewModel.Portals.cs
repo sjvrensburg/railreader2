@@ -505,23 +505,12 @@ public sealed partial class MainWindowViewModel
         if (lines.Count == 0) return; // defensive: BlockPostProcessor guarantees >=1 line in practice
         int lineIdx = Math.Min(srcLine, lines.Count - 1);
 
-        static string? LineText(PageText text, LineInfo line)
-        {
-            float top = line.Y - line.Height / 2f;
-            return text.ExtractTextInRect(line.X, top, line.X + line.Width, top + line.Height);
-        }
-
-        string? lineText = LineText(pageText, lines[lineIdx]);
-        if (string.IsNullOrEmpty(lineText)) return;
-
-        // Append the block's next line so a mention split across the break ("…see Figure ⏎ 3 shows…")
-        // is caught; the start limit keeps mentions wholly on the next line from firing a line early.
-        int startLimit = lineText.Length;
-        if (lineIdx + 1 < lines.Count && LineText(pageText, lines[lineIdx + 1]) is { Length: > 0 } next)
-            lineText = lineText + " " + next;
+        string? lineText = ReferenceIndex.LineTextWithLookahead(pageText, lines, lineIdx, out int startLimit);
+        if (lineText is null) return;
 
         var refs = ReferenceIndex.ParseLine(lineText, startLimit);
         if (refs.Count == 0) return;
+        var source = new DocumentModelReferenceSource(doc);
 
         // Resolve every mention first: if ANY of this line's references is the one already shown,
         // stay pinned (pin-until-different) — never let an earlier-in-line mention that resolves
@@ -530,7 +519,7 @@ public sealed partial class MainWindowViewModel
         var candidates = new List<(ReferenceIndex.Reference Ref, ReferenceIndex.Target Target)>();
         foreach (var reference in refs)
         {
-            var target = _referenceIndex.Resolve(doc, reference, srcPage, out bool incomplete);
+            var target = _referenceIndex.Resolve(source, reference, srcPage, out bool incomplete);
             anyIncomplete |= incomplete;
             if (target is not { } t) continue;
             if (t.Page == srcPage && t.CaptionBlock == srcBlock) continue;   // reading the (pseudo-)caption itself
