@@ -49,8 +49,8 @@ public sealed class Portal
 
 /// <summary>
 /// Per-document set of portals. Shell-managed sidecar, mirroring
-/// <see cref="CustomLayoutModelConfig"/> and the annotations sidecar: keyed by the SHA-256 of the
-/// PDF's absolute path, stored at <c>ConfigDir/portals/&lt;sha256&gt;.json</c>. No RailReaderCore change.
+/// <see cref="CustomLayoutModelConfig"/> and the annotations sidecar: keyed by the document's content
+/// id (<see cref="DocumentIdentity"/>), stored at <c>ConfigDir/portals/&lt;id&gt;.json</c>. No RailReaderCore change.
 /// </summary>
 public sealed class PortalSet
 {
@@ -59,18 +59,31 @@ public sealed class PortalSet
 
     private static string Dir => System.IO.Path.Combine(AppConfig.ConfigDir, "portals");
 
-    /// <summary>Sidecar path for a PDF, keyed by the SHA-256 of its absolute path (full lowercase hex).
-    /// Same hash input as the annotations sidecar (the PDF's absolute path), but its own directory and
-    /// filename — the shell computes the hash itself.</summary>
-    public static string PathFor(string pdfPath)
+    /// <summary>Legacy sidecar path, keyed by the SHA-256 of the PDF's absolute path (full lowercase hex).
+    /// Read only to migrate old sets forward.</summary>
+    internal static string LegacyPathFor(string pdfPath)
     {
         string full = System.IO.Path.GetFullPath(pdfPath);
         byte[] hash = SHA256.HashData(Encoding.UTF8.GetBytes(full));
         return System.IO.Path.Combine(Dir, Convert.ToHexStringLower(hash) + ".json");
     }
 
+    /// <summary>Sidecar path for a PDF: keyed by its content id (<see cref="DocumentIdentity"/>) so the set
+    /// follows the file when it is moved or copied. Falls back to the path hash when the document has not
+    /// been resolved (never in the open path, which resolves first).</summary>
+    public static string PathFor(string pdfPath)
+        => DocumentIdentity.Peek(pdfPath) is { } id
+            ? System.IO.Path.Combine(Dir, id + ".json")
+            : LegacyPathFor(pdfPath);
+
     public static PortalSet Load(string pdfPath)
-        => JsonSidecar.Load(PathFor(pdfPath), PortalJsonContext.Default.PortalSet, static () => new PortalSet());
+    {
+        string path = PathFor(pdfPath), legacy = LegacyPathFor(pdfPath);
+        // First open under content ids: carry the path-keyed set forward (kept in place, never rewritten).
+        if (!File.Exists(path) && path != legacy && File.Exists(legacy))
+            return JsonSidecar.Load(legacy, PortalJsonContext.Default.PortalSet, static () => new PortalSet());
+        return JsonSidecar.Load(path, PortalJsonContext.Default.PortalSet, static () => new PortalSet());
+    }
 
     public void Save(string pdfPath)
         => JsonSidecar.Save(PathFor(pdfPath), this, PortalJsonContext.Default.PortalSet);

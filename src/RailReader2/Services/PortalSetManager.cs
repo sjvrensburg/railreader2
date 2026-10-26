@@ -26,7 +26,7 @@ internal sealed class PortalSetManager
         public int RefCount;
     }
 
-    private static string Key(string pdfPath) => System.IO.Path.GetFullPath(pdfPath);
+    private static string Key(string pdfPath) => DocumentIdentity.Peek(pdfPath) ?? System.IO.Path.GetFullPath(pdfPath);
 
     /// <summary>Check out the shared <see cref="PortalSet"/> for <paramref name="pdfPath"/>, loading it
     /// from disk on first use. Each call must be paired with a <see cref="Release"/>.</summary>
