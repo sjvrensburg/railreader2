@@ -201,17 +201,72 @@
    "number": "3.2",
    "target_page": 26,
    "target_block": 10
+  },
+  {
+   "page": 1,
+   "kind": "Equation",
+   "number": "11.27"
+  },
+  {
+   "page": 4,
+   "kind": "Equation",
+   "number": "3.12",
+   "target_page": 4,
+   "target_block": 9
+  },
+  {
+   "page": 4,
+   "kind": "Equation",
+   "number": "3.11",
+   "target_page": 4,
+   "target_block": 7
+  },
+  {
+   "page": 9,
+   "kind": "Equation",
+   "number": "3.28",
+   "target_page": 7,
+   "target_block": 11
+  },
+  {
+   "page": 10,
+   "kind": "Equation",
+   "number": "3.37",
+   "target_page": 10,
+   "target_block": 4
+  },
+  {
+   "page": 11,
+   "kind": "Equation",
+   "number": "3.28",
+   "target_page": 7,
+   "target_block": 11
+  },
+  {
+   "page": 16,
+   "kind": "Equation",
+   "number": "3.71",
+   "target_page": 16,
+   "target_block": 8
+  },
+  {
+   "page": 18,
+   "kind": "Equation",
+   "number": "3.86",
+   "target_page": 18,
+   "target_block": 9
+  },
+  {
+   "page": 19,
+   "kind": "Equation",
+   "number": "3.94",
+   "target_page": 19,
+   "target_block": 12
   }
  ],
  "empty_pages": [
   6,
-  9,
-  10,
-  11,
-  16,
   17,
-  18,
-  19,
   27,
   28,
   29

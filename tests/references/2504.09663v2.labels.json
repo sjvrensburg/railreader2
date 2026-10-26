@@ -27,6 +27,111 @@
    "number": "2",
    "target_page": 26,
    "target_block": 1
+  },
+  {
+   "page": 4,
+   "kind": "Equation",
+   "number": "2",
+   "target_page": 4,
+   "target_block": 1
+  },
+  {
+   "page": 5,
+   "kind": "Equation",
+   "number": "7",
+   "target_page": 4,
+   "target_block": 11
+  },
+  {
+   "page": 6,
+   "kind": "Equation",
+   "number": "8",
+   "target_page": 5,
+   "target_block": 2
+  },
+  {
+   "page": 6,
+   "kind": "Equation",
+   "number": "10",
+   "target_page": 6,
+   "target_block": 2
+  },
+  {
+   "page": 9,
+   "kind": "Equation",
+   "number": "20",
+   "target_page": 10,
+   "target_block": 5
+  },
+  {
+   "page": 10,
+   "kind": "Equation",
+   "number": "20",
+   "target_page": 10,
+   "target_block": 5
+  },
+  {
+   "page": 14,
+   "kind": "Equation",
+   "number": "28",
+   "target_page": 13,
+   "target_block": 10
+  },
+  {
+   "page": 14,
+   "kind": "Equation",
+   "number": "8",
+   "target_page": 5,
+   "target_block": 2
+  },
+  {
+   "page": 14,
+   "kind": "Equation",
+   "number": "16",
+   "target_page": 8,
+   "target_block": 7
+  },
+  {
+   "page": 14,
+   "kind": "Equation",
+   "number": "17",
+   "target_page": 9,
+   "target_block": 8
+  },
+  {
+   "page": 15,
+   "kind": "Equation",
+   "number": "28",
+   "target_page": 13,
+   "target_block": 10
+  },
+  {
+   "page": 16,
+   "kind": "Equation",
+   "number": "6",
+   "target_page": 4,
+   "target_block": 8
+  },
+  {
+   "page": 17,
+   "kind": "Equation",
+   "number": "20",
+   "target_page": 10,
+   "target_block": 5
+  },
+  {
+   "page": 19,
+   "kind": "Equation",
+   "number": "33",
+   "target_page": 18,
+   "target_block": 5
+  },
+  {
+   "page": 21,
+   "kind": "Equation",
+   "number": "35",
+   "target_page": 20,
+   "target_block": 8
   }
  ],
  "empty_pages": [
@@ -34,12 +139,23 @@
   1,
   2,
   3,
-  4,
-  5,
-  6,
   7,
   8,
-  9,
-  10
+  12,
+  13,
+  18,
+  20,
+  22,
+  23,
+  24,
+  25,
+  28,
+  29,
+  30,
+  31,
+  32,
+  33,
+  34,
+  35
  ]
 }
