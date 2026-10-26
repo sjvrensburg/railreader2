@@ -166,11 +166,339 @@
    "number": "4",
    "target_page": 6,
    "target_block": 3
+  },
+  {
+   "page": 1,
+   "kind": "Citation",
+   "number": "vinnikov+:2002",
+   "target_page": 10,
+   "target_block": 27
+  },
+  {
+   "page": 1,
+   "kind": "Citation",
+   "number": "trenberth+:2007",
+   "target_page": 10,
+   "target_block": 25
+  },
+  {
+   "page": 1,
+   "kind": "Citation",
+   "number": "sinclair+:1976",
+   "target_page": 10,
+   "target_block": 24
+  },
+  {
+   "page": 1,
+   "kind": "Citation",
+   "number": "medvigy+:2010",
+   "target_page": 10,
+   "target_block": 14
+  },
+  {
+   "page": 1,
+   "kind": "Citation",
+   "number": "gupta+:2002",
+   "target_page": 10,
+   "target_block": 0
+  },
+  {
+   "page": 1,
+   "kind": "Citation",
+   "number": "rahman+:2007",
+   "target_page": 10,
+   "target_block": 16
+  },
+  {
+   "page": 1,
+   "kind": "Citation",
+   "number": "boettcher+:2010",
+   "target_page": 9,
+   "target_block": 13
+  },
+  {
+   "page": 1,
+   "kind": "Citation",
+   "number": "marani+:1997",
+   "target_page": 10,
+   "target_block": 10
+  },
+  {
+   "page": 1,
+   "kind": "Citation",
+   "number": "margulis&entekhabi:2001",
+   "target_page": 10,
+   "target_block": 11
+  },
+  {
+   "page": 1,
+   "kind": "Citation",
+   "number": "koenraadt&harrington:2008",
+   "target_page": 10,
+   "target_block": 7
+  },
+  {
+   "page": 1,
+   "kind": "Citation",
+   "number": "lee+:2004",
+   "target_page": 10,
+   "target_block": 8
+  },
+  {
+   "page": 1,
+   "kind": "Citation",
+   "number": "wettstein&mearns:2002",
+   "target_page": 10,
+   "target_block": 29
+  },
+  {
+   "page": 1,
+   "kind": "Citation",
+   "number": "goswami+:2006",
+   "target_page": 9,
+   "target_block": 23
+  },
+  {
+   "page": 1,
+   "kind": "Citation",
+   "number": "dupignygiroux+:2003",
+   "target_page": 9,
+   "target_block": 20
+  },
+  {
+   "page": 2,
+   "kind": "Citation",
+   "number": "zhang+:1995",
+   "target_page": 10,
+   "target_block": 32
+  },
+  {
+   "page": 2,
+   "kind": "Citation",
+   "number": "evan+:2007",
+   "target_page": 9,
+   "target_block": 21
+  },
+  {
+   "page": 2,
+   "kind": "Citation",
+   "number": "medvigy+:2010",
+   "target_page": 10,
+   "target_block": 14
+  },
+  {
+   "page": 2,
+   "kind": "Citation",
+   "number": "gupta+:2006",
+   "target_page": 10,
+   "target_block": 1
+  },
+  {
+   "page": 2,
+   "kind": "Citation",
+   "number": "whitlock+:1995",
+   "target_page": 10,
+   "target_block": 30
+  },
+  {
+   "page": 2,
+   "kind": "Citation",
+   "number": "desormeaux+:1993",
+   "target_page": 9,
+   "target_block": 19
+  },
+  {
+   "page": 2,
+   "kind": "Citation",
+   "number": "brest+:1997",
+   "target_page": 9,
+   "target_block": 15
+  },
+  {
+   "page": 2,
+   "kind": "Citation",
+   "number": "huffman+:1997",
+   "target_page": 10,
+   "target_block": 4
+  },
+  {
+   "page": 2,
+   "kind": "Citation",
+   "number": "adler+:2001",
+   "target_page": 9,
+   "target_block": 10
+  },
+  {
+   "page": 2,
+   "kind": "Citation",
+   "number": "yin+:2004",
+   "target_page": 10,
+   "target_block": 31
+  },
+  {
+   "page": 2,
+   "kind": "Citation",
+   "number": "petty:1995",
+   "target_page": 10,
+   "target_block": 15
+  },
+  {
+   "page": 2,
+   "kind": "Citation",
+   "number": "joyce+:2004",
+   "target_page": 10,
+   "target_block": 6
+  },
+  {
+   "page": 3,
+   "kind": "Citation",
+   "number": "mcphee&margulis:2005",
+   "target_page": 10,
+   "target_block": 13
+  },
+  {
+   "page": 3,
+   "kind": "Citation",
+   "number": "bolvin+:2009",
+   "target_page": 9,
+   "target_block": 14
+  },
+  {
+   "page": 3,
+   "kind": "Citation",
+   "number": "royston:1982",
+   "target_page": 10,
+   "target_block": 23
+  },
+  {
+   "page": 3,
+   "kind": "Citation",
+   "number": "ljung&box:1978",
+   "target_page": 10,
+   "target_block": 9
+  },
+  {
+   "page": 3,
+   "kind": "Citation",
+   "number": "breusch&pagan:1979",
+   "target_page": 9,
+   "target_block": 16
+  },
+  {
+   "page": 3,
+   "kind": "Citation",
+   "number": "akaike:1974",
+   "target_page": 9,
+   "target_block": 12
+  },
+  {
+   "page": 3,
+   "kind": "Citation",
+   "number": "burnham&anderson:2004",
+   "target_page": 9,
+   "target_block": 17
+  },
+  {
+   "page": 5,
+   "kind": "Citation",
+   "number": "wang+:2008",
+   "target_page": 10,
+   "target_block": 28
+  },
+  {
+   "page": 6,
+   "kind": "Citation",
+   "number": "hahn+:2001",
+   "target_page": 10,
+   "target_block": 2
+  },
+  {
+   "page": 7,
+   "kind": "Citation",
+   "number": "tselioudis+:2010",
+   "target_page": 10,
+   "target_block": 26
+  },
+  {
+   "page": 7,
+   "kind": "Citation",
+   "number": "delgenio+:2007",
+   "target_page": 9,
+   "target_block": 18
+  },
+  {
+   "page": 8,
+   "kind": "Citation",
+   "number": "goldenberg+:2001",
+   "target_page": 9,
+   "target_block": 22
+  },
+  {
+   "page": 8,
+   "kind": "Citation",
+   "number": "evan+:2007",
+   "target_page": 9,
+   "target_block": 21
+  },
+  {
+   "page": 8,
+   "kind": "Citation",
+   "number": "delgenio+:2007",
+   "target_page": 9,
+   "target_block": 18
+  },
+  {
+   "page": 9,
+   "kind": "Citation",
+   "number": "held&soden:2006",
+   "target_page": 10,
+   "target_block": 3
+  },
+  {
+   "page": 9,
+   "kind": "Citation",
+   "number": "medvigy+:2010",
+   "target_page": 10,
+   "target_block": 14
+  },
+  {
+   "page": 9,
+   "kind": "Citation",
+   "number": "ianetz+:2000",
+   "target_page": 10,
+   "target_block": 5
+  },
+  {
+   "page": 9,
+   "kind": "Citation",
+   "number": "matiasovsky:1996",
+   "target_page": 10,
+   "target_block": 12
+  },
+  {
+   "page": 9,
+   "kind": "Citation",
+   "number": "gu+:2003",
+   "target_page": 9,
+   "target_block": 24
+  },
+  {
+   "page": 9,
+   "kind": "Citation",
+   "number": "vinnikov+:2002",
+   "target_page": 10,
+   "target_block": 27
+  },
+  {
+   "page": 9,
+   "kind": "Citation",
+   "number": "goswami+:2006",
+   "target_page": 9,
+   "target_block": 23
   }
  ],
  "empty_pages": [
   0,
-  1,
-  2
+  10
  ]
 }

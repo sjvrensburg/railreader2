@@ -13,7 +13,7 @@ namespace RailReader2.References;
 /// </summary>
 internal sealed partial class ReferenceIndex
 {
-    internal enum RefKind { Figure, Table, Theorem, Lemma, Proposition, Corollary, Definition, Example, Remark, Exercise, Equation }
+    internal enum RefKind { Figure, Table, Theorem, Lemma, Proposition, Corollary, Definition, Example, Remark, Exercise, Equation, Citation }
 
     /// <summary>Numbered statements (as opposed to captioned floats): their target is the text block
     /// whose line opens with the header ("Definition 2.1 (graph)."), not a float beside a caption.</summary>
@@ -22,12 +22,24 @@ internal sealed partial class ReferenceIndex
     /// <summary>Display equations: their target is a display-maths block carrying the printed tag "(3.2)".</summary>
     internal static bool IsEquation(RefKind kind) => kind == RefKind.Equation;
 
+    /// <summary>Citations: their target is an entry of the reference list.</summary>
+    internal static bool IsCitation(RefKind kind) => kind == RefKind.Citation;
+
     /// <summary>A parsed reference label, e.g. (Figure, "3.2"). Numbers are normalized to lowercase
     /// (suffix letters, appendix prefixes, roman numerals) so an in-text mention and a caption label
     /// compare equal.</summary>
     internal readonly record struct Reference(RefKind Kind, string Number)
     {
-        public override string ToString() => $"{Kind} {Number}";
+        public override string ToString() => Kind == RefKind.Citation ? CitationDisplay(Number) : $"{Kind} {Number}";
+    }
+
+    /// <summary>A citation key as a reader would say it: "[12]", "[ik99]", "smith et al. 2019".</summary>
+    private static string CitationDisplay(string key)
+    {
+        int colon = key.IndexOf(':');
+        if (colon < 0) return $"[{key}]";
+        string who = key[..colon].Replace("+", " et al.").Replace("&", " & ");
+        return $"{who} {key[(colon + 1)..]}";
     }
 
     /// <summary>A resolved reference target: the figure/table block plus the caption that named it.</summary>
@@ -110,6 +122,9 @@ internal sealed partial class ReferenceIndex
         _pages.Clear();
         _noMatch.Clear();
         _restartEvidence = null;
+        _bib = null;
+        _bibHeadings.Clear();
+        _bibEntries.Clear();
     }
 
     /// <summary>All figure/table references mentioned in a text run, in reading order. Plural
@@ -127,10 +142,11 @@ internal sealed partial class ReferenceIndex
         ParseCaptionedMentions(text, startLimit, found);
         ParseParenthesisedStatements(text, startLimit, found);
         ParseEquationMentions(text, startLimit, found);
+        ParseCitationMentions(text, startLimit, found);
         // A result named inside a citation ("[IK99, Lemma 1.15]", "(Smith 2019, Theorem 3)") belongs to
         // the cited work, not this document.
         var citations = CitationSpans(text);
-        found.RemoveAll(f => citations.Any(c => f.Index >= c.Start && f.Index < c.End));
+        found.RemoveAll(f => f.Ref.Kind != RefKind.Citation && citations.Any(c => f.Index >= c.Start && f.Index < c.End));
         found.Sort((a, b) => a.Index.CompareTo(b.Index));
         return [.. found.Select(f => f.Ref)];
     }
@@ -221,6 +237,14 @@ internal sealed partial class ReferenceIndex
     // bracket ("O(1)", "AR(1)", "f(0)", "3(2)").
     [GeneratedRegex(@"(?<![\w)\]])\(\s*(?<num>" + EquationNumberPattern + @")\s*\)")]
     private static partial Regex ParenthesisedNumberRegex();
+
+    private static void ParseCitationMentions(string text, int startLimit, List<(int Index, Reference Ref)> refs)
+    {
+        foreach (var (index, key) in CitationMentions.Brackets(text, startLimit))
+            refs.Add((index, new Reference(RefKind.Citation, key)));
+        foreach (var (index, key) in CitationMentions.AuthorYear(text, startLimit))
+            refs.Add((index, new Reference(RefKind.Citation, key)));
+    }
 
     private static void ParseEquationMentions(string text, int startLimit, List<(int Index, Reference Ref)> refs)
     {
@@ -510,6 +534,7 @@ internal sealed partial class ReferenceIndex
     {
         incomplete = false;
         int budget = MaxPageBuildsPerResolve;
+        if (IsCitation(reference.Kind)) return ResolveCitation(doc, reference, nearPage, ref budget, ref incomplete);
         var exact = ResolveExact(doc, reference, nearPage, ref budget, ref incomplete);
         if (exact is not null || incomplete) return exact;
         return PanelParent(reference) is { } parent

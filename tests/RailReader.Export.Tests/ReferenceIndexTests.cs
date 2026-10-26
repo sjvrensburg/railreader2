@@ -296,11 +296,11 @@ public class ReferenceIndexTests
     [InlineData("Theorem A states that")]               // digitless
     [InlineData("Example I presented earlier")]
     public void ParseLine_IgnoresStatementLookalikes(string line)
-        => Assert.Empty(ReferenceIndex.ParseLine(line));
+        => Assert.DoesNotContain(ReferenceIndex.ParseLine(line), r => r.Kind != RefKind.Citation);
 
     [Fact]
     public void ParseLine_ForeignCitationAlsoSkipsFloats()
-        => Assert.Empty(ReferenceIndex.ParseLine("shown in Figure 2 of [7]"));
+        => Assert.DoesNotContain(ReferenceIndex.ParseLine("shown in Figure 2 of [7]"), r => r.Kind == RefKind.Figure);
 
     // --- numbered statements: headers ---
 
@@ -363,7 +363,7 @@ public class ReferenceIndexTests
     [InlineData("as (Smith 2019, Theorem 3) proves")]
     [InlineData("as (Smith et al. 2019, Eq. (4)) shows")]
     public void ParseLine_IgnoresResultsNamedInsideACitation(string line)
-        => Assert.Empty(ReferenceIndex.ParseLine(line));
+        => Assert.DoesNotContain(ReferenceIndex.ParseLine(line), r => r.Kind != RefKind.Citation);
 
     [Fact]
     public void ParseLine_AnIntervalIsNotACitation()
@@ -432,7 +432,7 @@ public class ReferenceIndexTests
 
     [Fact]
     public void ParseLine_NonAsciiCitationKeysAreStillCitations()
-        => Assert.Empty(ReferenceIndex.ParseLine("by John–Nirenberg [Lê22, Theorem 3.4] one"));
+        => Assert.Equal([new Ref(RefKind.Citation, "lê22")], ReferenceIndex.ParseLine("by John–Nirenberg [Lê22, Theorem 3.4] one"));
 
     [Theory]
     [InlineData("Lemma C.1. Under Assumption A", "Lemma", "c.1")]
@@ -452,7 +452,7 @@ public class ReferenceIndexTests
     [InlineData("see (Runje and Shankaranarayana, 2023, Thm. 2) for details")]
     [InlineData("see (Smith, 2019, Theorem 3)")]
     public void ParseLine_MultiAuthorCitationsNameTheirOwnResults(string line)
-        => Assert.Empty(ReferenceIndex.ParseLine(line));
+        => Assert.DoesNotContain(ReferenceIndex.ParseLine(line), r => r.Kind != RefKind.Citation);
 
     [Fact]
     public void ParseLine_AChainedMentionAfterItsFirstStillCounts()
@@ -471,4 +471,87 @@ public class ReferenceIndexTests
     [InlineData("(Definition 2.3 (match). A match", "Definition", "2.3")]
     public void ParseStatementHeader_ExtractionNoiseBeforeAHeaderIsTolerated(string line, string kind, string number)
         => Assert.Equal(new Ref(Enum.Parse<RefKind>(kind), number), ReferenceIndex.ParseStatementHeader(line));
+
+    // --- citations: mentions ---
+
+    private static List<string> CiteKeys(string line)
+        => [.. ReferenceIndex.ParseLine(line).Where(r => r.Kind == RefKind.Citation).Select(r => r.Number)];
+
+    [Theory]
+    [InlineData("recurrent models [13] and gated", "13")]
+    [InlineData("translation [35, 2, 5]. Numerous", "35,2,5")]
+    [InlineData("as in [4–7] and", "4,7")]
+    [InlineData("Goldfeld and Quandt [8] for", "8")]
+    [InlineData("see [12, p. 165, eq. (4.21)] for", "12")]
+    [InlineData("From Amemiya [2, eqs. (5) and (6)] it", "2")]
+    [InlineData("shown in [IK99] and [Bis06, Mur12].", "ik99,bis06,mur12")]
+    [InlineData("In [2, 9], the authors show", "2,9")]
+    [InlineData("the line of work initiated in [3, 2] where", "3,2")]
+    [InlineData("can be verified similarly to [5, 7]. If", "5,7")]
+    public void ParseLine_NumericAndKeyedBracketCitations(string line, string keys)
+        => Assert.Equal(keys.Split(','), CiteKeys(line));
+
+    [Theory]
+    [InlineData("on the interval [0, 1] we have")]       // zero cannot be an entry
+    [InlineData("for x ∈ [1, 2] the map")]              // after a math symbol
+    [InlineData("a function on [1, 2] is")]              // a bare pair after "on"
+    [InlineData("the set {x : x ≥ [3]}")]
+    [InlineData("a table [A, B] of values")]             // letters, not an entry key
+    public void ParseLine_IntervalsAreNotCitations(string line)
+        => Assert.Empty(CiteKeys(line));
+
+    [Theory]
+    [InlineData("popularized by Vaswani et al. (2017) has", "vaswani+:2017")]
+    [InlineData("Garnelo and Czarnecki (2023) expanded", "garnelo&czarnecki:2023")]
+    [InlineData("Fallahgoul (2025), who study", "fallahgoul:2025")]
+    [InlineData("literature (Tsai et al., 2019; Choromanski et al., 2020).", "tsai+:2019,choromanski+:2020")]
+    [InlineData("(Wahba and Wang, 2019)", "wahba&wang:2019")]
+    [InlineData("(Zhang et al. 2004, 2007)", "zhang+:2004,zhang+:2007")]
+    [InlineData("Goulet Coulombe et al. (2024a)", "gouletcoulombe+:2024a")]
+    [InlineData("(Goulet Coulombe, 2024a,c)", "gouletcoulombe:2024a,gouletcoulombe:2024c")]
+    [InlineData("(e.g., Gupta et al. 2006)", "gupta+:2006")]
+    [InlineData("Following Hahn et al. (2001), we", "hahn+:2001")]
+    [InlineData("see Schölkopf et al. (2001, p. 4)", "scholkopf+:2001")]
+    [InlineData("(van der Laan and Gruber, 2012)", "vanderlaan&gruber:2012")]
+    public void ParseLine_AuthorYearCitations(string line, string keys)
+        => Assert.Equal(keys.Split(','), CiteKeys(line));
+
+    [Theory]
+    [InlineData("in 2019 (Manuscript received 6 October 2010, in final form 16 September 2011)")]
+    [InlineData("the value (0.52) and Random Forest (0.45)")]
+    [InlineData("see Table 3 (2019) for")]                // not a surname before the year
+    [InlineData("estimated (in 2019) as")]
+    public void ParseLine_NonCitationsInParentheses(string line)
+        => Assert.DoesNotContain(CiteKeys(line), k => k.Contains(':') && !k.StartsWith("table"));
+
+    [Fact]
+    public void ParseLine_ABracketCitationKeepsItsInnerResultOut()
+    {
+        // "[IK99, Lemma 1.15]" cites a paper; the lemma belongs to that paper, the citation stays
+        var refs = ReferenceIndex.ParseLine("by [IK99, Lemma 1.15] we");
+        Assert.Equal([new Ref(RefKind.Citation, "ik99")], refs);
+    }
+
+    [Fact]
+    public void ParseLine_LimitStopsAtTheLineBoundaryForBothStyles()
+    {
+        string text = "see (Vaswani et al., 2017). Then Guijarro-Ordonez et al. (2021) showed";
+        var refs = ReferenceIndex.ParseLine(text, text.IndexOf("Then", StringComparison.Ordinal));
+        Assert.Equal(["vaswani+:2017"], refs.Where(r => r.Kind == RefKind.Citation).Select(r => r.Number));
+    }
+
+    [Theory]
+    [InlineData("of [6, 15 and 16], or", "6,15,16")]
+    [InlineData("as in [7, 8, and 19]. The", "7,8,19")]
+    [InlineData("by Quandt and Goldfeld [15 and 16] we", "15,16")]
+    public void ParseLine_NumberListsMayUseAnd(string line, string keys)
+        => Assert.Equal(keys.Split(','), CiteKeys(line));
+
+    [Fact]
+    public void ParseLine_ASpacingDiaeresisStandsForAnAccent()
+        => Assert.Equal(["scholkopf+:2001"], CiteKeys("samples (Scho\u00a8lkopf et al., 2001). This"));
+
+    [Fact]
+    public void ParseLine_AWordEndingInDeIsNotAParticle()
+        => Assert.Equal(["kelly+:2025"], CiteKeys("this direction include Kelly et al. (2025) and"));
 }

@@ -89,6 +89,8 @@ internal static class ReferenceBenchmark
     /// located at its first occurrence.</summary>
     internal static List<MentionResult> Scan(IReferenceDocument doc, ReferenceIndex index)
     {
+        // A reference list cites nothing of its own: its entries' "[3]" and "Smith (2019)" are labels.
+        index.PrepareBibliography(doc);
         var results = new List<MentionResult>();
         var seen = new HashSet<(int, ReferenceIndex.Reference)>();
         for (int page = 0; page < doc.PageCount; page++)
@@ -98,7 +100,7 @@ internal static class ReferenceBenchmark
             for (int b = 0; b < analysis.Blocks.Count; b++)
             {
                 var block = analysis.Blocks[b];
-                if (block.Role is BlockRole.Caption or BlockRole.DisplayMath) continue;
+                if (block.Role is BlockRole.Caption or BlockRole.DisplayMath || index.IsBibliographyBlock(page, b)) continue;
                 for (int l = 0; l < block.Lines.Count; l++)
                 {
                     text ??= doc.GetText(page);

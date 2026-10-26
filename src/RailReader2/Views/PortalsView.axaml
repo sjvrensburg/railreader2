@@ -31,6 +31,11 @@
                   Content="Auto-pin numbered equations"
                   ToolTip.Tip="While rail-reading, automatically show the numbered display equation the current line refers to (e.g. “Equation 3.2”, “from (4)”). Shows nothing when the number is unclear." />
 
+        <CheckBox DockPanel.Dock="Top" Margin="8,0,8,2" FontSize="12"
+                  IsChecked="{Binding AutoPinCitations}"
+                  Content="Auto-pin cited references"
+                  ToolTip.Tip="While rail-reading, automatically show the reference-list entry the current line cites (e.g. “[12]”, “Smith et al. (2019)”). Shows nothing when the citation matches no entry or more than one." />
+
         <!-- Empty-state hint when no portals exist -->
         <TextBlock Name="NoPortalsLabel" DockPanel.Dock="Top" Margin="8,4"
                    Opacity="0.6" TextWrapping="Wrap" IsVisible="False"

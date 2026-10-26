@@ -475,4 +475,180 @@ public class ReferenceResolveTests
         Assert.Null(Resolve(new ReferenceIndex(), doc, new Ref(RefKind.Equation, "7"), 40));
         Assert.Null(Resolve(new ReferenceIndex(), doc, new Ref(RefKind.Equation, "7"), 8));
     }
+
+    // --- citations ---
+
+    private static FakeDoc RefList(FakeDoc doc, int page, params string[] entries)
+    {
+        var blocks = new List<(BlockRole, float, float, float, float)> { (BlockRole.Heading, 50, 60, 200, 14) };
+        var texts = new Dictionary<int, string> { [0] = "References" };
+        for (int i = 0; i < entries.Length; i++)
+        {
+            blocks.Add((BlockRole.Text, 50, 90 + i * 40, 500, 30));
+            texts[i + 1] = entries[i];
+        }
+        return doc.Add(page, [.. blocks], texts);
+    }
+
+    private static Ref Cite(string key) => new(RefKind.Citation, key);
+
+    [Fact]
+    public void Citation_NumericLabelResolvesToItsEntryBlock()
+    {
+        var doc = RefList(new FakeDoc(6), 4, "[1] Smith, J. (2019). A title.", "[2] Jones, K. and Lee, M. (2020). Another.").Complete();
+        Assert.Equal(new ReferenceIndex.Target(4, 2, 2), Resolve(new(), doc, Cite("2"), 1));
+        Assert.Null(Resolve(new(), doc, Cite("9"), 1));
+    }
+
+    [Fact]
+    public void Citation_WithoutAReferencesHeadingNothingIsAnEntry()
+    {
+        var doc = new FakeDoc(4).Add(2, [(BlockRole.Text, 50, 90, 500, 30)], new() { [0] = "[1] Smith, J. (2019). A title." }).Complete();
+        Assert.Null(Resolve(new(), doc, Cite("1"), 0));
+    }
+
+    [Fact]
+    public void Citation_AListEndsAtTheNextHeading()
+    {
+        var doc = new FakeDoc(5).Add(3,
+            [(BlockRole.Heading, 50, 60, 200, 14), (BlockRole.Text, 50, 90, 500, 30), (BlockRole.Heading, 50, 150, 200, 14), (BlockRole.Text, 50, 180, 500, 30)],
+            new() { [0] = "References", [1] = "[1] Smith, J. (2019). A title.", [2] = "Appendix A", [3] = "[7] Not a reference, J. (2018). Proof detail." }).Complete();
+        Assert.NotNull(Resolve(new(), doc, Cite("1"), 0));
+        Assert.Null(Resolve(new(), doc, Cite("7"), 0));
+    }
+
+    [Fact]
+    public void Citation_ABlockHoldingTwoLabelledLinesIsSplit()
+    {
+        var doc = new FakeDoc(4).Add(2,
+            [(BlockRole.Heading, 50, 60, 200, 14), (BlockRole.Text, 50, 90, 500, 60)],
+            new() { [0] = "References", [1] = "[3] Smith, J. (2019). First.\n[4] Jones, K. (2020). Second." }).Complete();
+        Assert.Equal(new ReferenceIndex.Target(2, 1, 1), Resolve(new(), doc, Cite("4"), 0));
+        Assert.Equal(new ReferenceIndex.Target(2, 1, 1), Resolve(new(), doc, Cite("3"), 0));
+    }
+
+    [Fact]
+    public void Citation_AuthorYear_SingleAuthorEtAlAndTwoAuthorsAreKeptApart()
+    {
+        var doc = RefList(new FakeDoc(5), 3,
+            "Goulet Coulombe, P. (2024a). The macroeconomy as a random forest.",
+            "Goulet Coulombe, P., Goebel, M., and Klieber, K. (2024a). Dual interpretation.",
+            "Klieber, K. and Lee, S. (2025). Two authors.").Complete();
+        var index = new ReferenceIndex();
+        Assert.Equal(1, Resolve(index, doc, Cite("gouletcoulombe:2024a"), 0)!.Value.TargetBlock);
+        Assert.Equal(2, Resolve(index, doc, Cite("gouletcoulombe+:2024a"), 0)!.Value.TargetBlock);
+        Assert.Equal(3, Resolve(index, doc, Cite("klieber&lee:2025"), 0)!.Value.TargetBlock);
+        Assert.Null(Resolve(index, doc, Cite("klieber&park:2025"), 0));
+    }
+
+    [Fact]
+    public void Citation_AYearThatMatchesTwoSuffixedEntriesIsAmbiguousUnlessSuffixed()
+    {
+        var doc = RefList(new FakeDoc(5), 3,
+            "Zhang, Y. (2024a). First paper.", "Zhang, Y. (2024b). Second paper.").Complete();
+        var index = new ReferenceIndex();
+        Assert.Null(Resolve(index, doc, Cite("zhang:2024"), 0));
+        Assert.Equal(2, Resolve(index, doc, Cite("zhang:2024b"), 0)!.Value.TargetBlock);
+    }
+
+    [Fact]
+    public void Citation_AmsStyleEntriesWithInitialsFirstSecondAuthors()
+    {
+        var doc = RefList(new FakeDoc(5), 3,
+            "Brest, C. L., W. B. Rossow, and M. D. Roiter, 1997: Update of radiance calibrations.",
+            "Zhang, Y., W. B. Rossow, and A. A. Lacis, 1995: Calculation of fluxes.").Complete();
+        var index = new ReferenceIndex();
+        Assert.Equal(2, Resolve(index, doc, Cite("zhang+:1995"), 0)!.Value.TargetBlock);
+        Assert.Equal(1, Resolve(index, doc, Cite("brest+:1997"), 0)!.Value.TargetBlock);
+        Assert.Null(Resolve(index, doc, Cite("rossow+:1997"), 0));      // second authors are not first authors
+    }
+
+    [Fact]
+    public void Citation_AVolumeTakesTheNextReferenceListAfterTheMention()
+    {
+        var doc = RefList(RefList(new FakeDoc(60), 10, "[1] Old, A. (2001). Paper one."), 40, "[1] New, B. (2002). Paper two.").Complete();
+        var index = new ReferenceIndex();
+        Assert.Equal(10, Resolve(index, doc, Cite("1"), 8)!.Value.Page);      // paper one's list follows
+        Assert.Equal(40, Resolve(index, doc, Cite("1"), 30)!.Value.Page);     // paper two's
+        Assert.Equal(40, Resolve(index, doc, Cite("1"), 20)!.Value.Page);   // the list after the mention, within reach
+    }
+
+    [Fact]
+    public void Citation_AMentionTooFarFromTheNextListBelongsToAnotherPaper()
+    {
+        var doc = RefList(RefList(new FakeDoc(120), 10, "[1] Old, A. (2001). Paper one."), 100, "[1] New, B. (2002). Paper two.").Complete();
+        Assert.Null(Resolve(new(), doc, Cite("1"), 60));                       // 40 pages from list two, past list one
+    }
+
+    [Fact]
+    public void Scan_AReferenceListCitesNothingOfItsOwn()
+    {
+        var doc = RefList(new FakeDoc(3), 2, "[1] Smith, J. (2019). Cited work.", "[2] Jones, K. (2020). See Smith (2019) and [1].").Complete();
+        Assert.Empty(ReferenceBenchmark.Scan(doc, new ReferenceIndex()));
+    }
+
+    [Fact]
+    public void Citation_AmsAndCoauthorsEntriesCountAsManyAuthors()
+    {
+        var doc = RefList(new FakeDoc(5), 3, "Trenberth, K. E., and Coauthors, 2007: Observations: Surface and atmospheric climate change.").Complete();
+        Assert.Equal(1, Resolve(new(), doc, Cite("trenberth+:2007"), 0)!.Value.TargetBlock);
+        Assert.Null(Resolve(new(), doc, Cite("trenberth:2007"), 0));   // a single-author citation is not this entry
+    }
+
+    [Fact]
+    public void Citation_RightAfterAListIsAnAppendixThePaperOpeningOrAmbiguous()
+    {
+        var doc = RefList(RefList(new FakeDoc(60), 10, "[1] Old, A. (2001). Paper one."), 40, "[1] New, B. (2002). Paper two.")
+            .Add(14, [(BlockRole.Heading, 50, 60, 200, 14)], new() { [0] = "1 Introduction" })
+            .Complete();
+        var index = new ReferenceIndex();
+        Assert.Equal(10, Resolve(index, doc, Cite("1"), 10)!.Value.Page);   // after the list on its own page: paper one's appendix
+        Assert.Null(Resolve(index, doc, Cite("1"), 12));                    // two pages on, no paper start yet: ambiguous
+        Assert.Equal(40, Resolve(index, doc, Cite("1"), 15)!.Value.Page);   // paper two began at 14
+        Assert.Equal(40, Resolve(index, doc, Cite("1"), 30)!.Value.Page);   // far past the list: the next one
+    }
+
+    [Theory]
+    [InlineData("1Introduction", true)]
+    [InlineData("1 Introduction", true)]
+    [InlineData("Introduction", true)]
+    [InlineData("I. INTRODUCTION", true)]
+    [InlineData("2 Related work", false)]
+    [InlineData("1.1 Notation", false)]
+    [InlineData("A Appendix", false)]
+    public void PaperStart_RecognisesFirstSections(string heading, bool expected)
+        => Assert.Equal(expected, BibliographyParser.IsPaperStart(heading));
+
+    [Fact]
+    public void Citation_InitialsFirstEntriesWithTheYearAtTheEnd()
+    {
+        var doc = RefList(new FakeDoc(5), 3,
+            "Y. Peng. Near-minimax-optimal rates for asynchronous TD learning. arXiv preprint arXiv:2605.00001, 2026.",
+            "G. Qu and A. Wierman. Finite-time analysis of asynchronous stochastic approximation. In Proceedings, 2020.",
+            "G. Li, Y. Wei, Y. Chi, Y. Gu, and Y. Chen. Sample complexity of asynchronous Q-learning. Advances, 2020.",
+            "J. N. Tsitsiklis. Asynchronous stochastic approximation and Q-learning. Machine Learning, 16(3):185–202, 1994.").Complete();
+        var index = new ReferenceIndex();
+        Assert.Equal(1, Resolve(index, doc, Cite("peng:2026"), 0)!.Value.TargetBlock);
+        Assert.Equal(2, Resolve(index, doc, Cite("qu&wierman:2020"), 0)!.Value.TargetBlock);
+        Assert.Equal(3, Resolve(index, doc, Cite("li+:2020"), 0)!.Value.TargetBlock);
+        Assert.Equal(4, Resolve(index, doc, Cite("tsitsiklis:1994"), 0)!.Value.TargetBlock);
+        Assert.Null(Resolve(index, doc, Cite("li:2020"), 0));                   // a single author is not this five-author entry
+    }
+
+    [Fact]
+    public void Citation_AParenthesisedYearBeatsAnArxivNumber()
+    {
+        var doc = RefList(new FakeDoc(5), 3, "Smith, J. and Lee, K. (2019). A title. arXiv:2301.00001.").Complete();
+        Assert.NotNull(Resolve(new(), doc, Cite("smith&lee:2019"), 0));
+        Assert.Null(Resolve(new(), doc, Cite("smith&lee:2023"), 0));
+    }
+
+    [Fact]
+    public void Citation_ADoiYearIsNotThePublicationYear()
+    {
+        var doc = RefList(new FakeDoc(5), 3,
+            "A. Abadie, A. Diamond, and J. Hainmueller. Synthetic Control Methods. Journal of the American Statistical Association, 105(490):493–505, 2010. doi: 10.1198/jasa.2009.ap08746.").Complete();
+        Assert.NotNull(Resolve(new(), doc, Cite("abadie+:2010"), 0));
+        Assert.Null(Resolve(new(), doc, Cite("abadie+:2009"), 0));
+    }
 }
