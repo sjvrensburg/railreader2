@@ -211,7 +211,7 @@ internal sealed partial class ReferenceIndex
     /// <paramref name="incomplete"/> is true when the scan ran out of its per-call page-build budget
     /// before covering every analysed page — the caller should retry (progress is cached). A
     /// complete miss is negative-cached until the set of analysed pages changes.</summary>
-    public Target? Resolve(DocumentModel doc, Reference reference, int nearPage, out bool incomplete)
+    public Target? Resolve(IReferenceDocument doc, Reference reference, int nearPage, out bool incomplete)
     {
         incomplete = false;
         int analysed = doc.AnalysedPageCount;
@@ -233,7 +233,7 @@ internal sealed partial class ReferenceIndex
         return null;
     }
 
-    private Target? FindOnPage(DocumentModel doc, int page, Reference reference,
+    private Target? FindOnPage(IReferenceDocument doc, int page, Reference reference,
         ref int budget, ref bool incomplete)
     {
         if (!doc.TryGetAnalysis(page, out var analysis)) return null;
@@ -258,13 +258,13 @@ internal sealed partial class ReferenceIndex
     /// Text-role blocks that read like a caption AND hug a float, covering detector misclassification.
     /// Both passes require the float to overlap the caption horizontally within a bounded vertical
     /// gap, so a label whose own float was misdetected is dropped rather than bound to an unrelated
-    /// block across the page. Text extraction is cached per page (DocumentModel.GetOrExtractText),
+    /// block across the page. Text extraction is cached per page (IReferenceDocument.GetText),
     /// so rebuilds after the first touch are regex + geometry only.</summary>
-    private static PageLabels BuildPage(DocumentModel doc, int page, PageAnalysis analysis)
+    private static PageLabels BuildPage(IReferenceDocument doc, int page, PageAnalysis analysis)
     {
         List<(Reference Ref, int TargetBlock, int CaptionBlock)> labels = [];
         PageText? pageText = null;
-        PageText Text() => pageText ??= doc.GetOrExtractText(page);
+        PageText Text() => pageText ??= doc.GetText(page);
 
         double captionMaxGap = analysis.PageHeight * CaptionMaxGapFraction;
         for (int i = 0; i < analysis.Blocks.Count; i++)
@@ -297,6 +297,28 @@ internal sealed partial class ReferenceIndex
         }
 
         return new PageLabels(analysis, labels);
+    }
+
+    /// <summary>The text of line <paramref name="lineIdx"/> of a block, followed by the next line so a
+    /// mention split across the break ("…see Figure ⏎ 3 shows…") is caught. <paramref name="startLimit"/>
+    /// is the first line's length, for <see cref="ParseLine"/>, so a mention wholly on the next line
+    /// doesn't fire a line early. Null when the line has no text.</summary>
+    internal static string? LineTextWithLookahead(PageText pageText, IReadOnlyList<LineInfo> lines,
+        int lineIdx, out int startLimit)
+    {
+        static string? LineText(PageText text, LineInfo line)
+        {
+            float top = line.Y - line.Height / 2f;
+            return text.ExtractTextInRect(line.X, top, line.X + line.Width, top + line.Height);
+        }
+
+        startLimit = 0;
+        string? lineText = LineText(pageText, lines[lineIdx]);
+        if (string.IsNullOrEmpty(lineText)) return null;
+        startLimit = lineText.Length;
+        if (lineIdx + 1 < lines.Count && LineText(pageText, lines[lineIdx + 1]) is { Length: > 0 } next)
+            lineText = lineText + " " + next;
+        return lineText;
     }
 
     /// <summary>Back-compat shim for tests: index of the nearest kind-matching float.</summary>
