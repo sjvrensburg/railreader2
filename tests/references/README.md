@@ -14,10 +14,27 @@ The PDFs themselves are not in the repo (`experiments/PDFs/` is gitignored). Run
 | Attention_is_all_you_need | 10 | ML, two-column, 4 tables, multi-panel Figure 2 (`also_accept_blocks`) |
 | Medvigy-TrendsDailySolar-2012 | 22 | climate, `FIG. N.` captions, panel mentions ("Fig. 2a") |
 | Breusch-SimpleTestHeteroscedasticity-1979 | 5 | econometrics, roman-numeral `TABLE I` captions |
+| applsci-15-05957 | 21 | MDPI survey, 18 figures, stacked floats with captions below, "Figures 5 and 6" plurals, table continued over two pages |
+| Foundation Models ... Tutorial and Survey | 7 | two-column, float on the first page, full-page taxonomy figure |
+| 2504.09663v2 | 4 | arXiv, appendix Table 1 continued over three pages ("Table 1 (continued)") |
+| svd_ols_ridge_pcr | 0 | negative control: lecture notes with no floats; every page must resolve nothing |
 
-Current result (Heron): precision 1.00 on all three. Recall 1.00 on Attention and Breusch, 0.50 on
-Medvigy. All 11 misses are **panel mentions** (`Fig. 2a` → number `2a` never matches caption `2`).
+## Current result (Heron INT8)
 
-Known limits: the three papers are easy, and both baselines (first/nearest caption match) tie the
-resolver on them. The set needs harder documents — repeated numbering, dangling references, scans —
-before it can show the resolver beating a naive match.
+Precision 1.00 on every paper except applsci (0.95). Recall 1.00 except Medvigy (0.50) and applsci (0.95).
+
+- **Panel mentions** (Medvigy, 11 misses): `Fig. 2a` has number `2a`, which never matches caption `2`.
+- **Stacked floats** (applsci, 1 false positive): Figure 17 and Figure 18 plots are stacked with
+  captions below. Figure 17's caption is nearer the *next* plot by a few points, so it resolves to
+  Figure 18's plot. The caption sits below its own float, so a below-caption/above-caption
+  preference would fix it.
+
+## Limits
+
+- Both baselines tie the resolver everywhere, including the applsci error: they share its
+  nearest-float geometry. They only differ on label choice (first vs nearest caption), which this
+  corpus never exercises. A baseline that picks the nearest float by plain distance, and documents
+  with repeated labels (appendices restating "Table 1", chapter-numbered books) are needed before
+  the comparison says anything.
+- Nothing yet tests abstention on ambiguous labels, only on pages with no mentions.
+- Scanned pages (OCR) are not covered: `references` uses the PDF text layer.

@@ -9,7 +9,11 @@ for labels in tests/references/*.labels.json; do
   pdf="experiments/PDFs/$name.pdf"
   [ -f "$pdf" ] || { echo "skip $name (no $pdf)"; continue; }
   echo "== $name"
+  rc=0
   dotnet run -c Release --project src/RailReader2.Cli -- references "$pdf" \
-    --layout heron --ground-truth "$labels" "$@" || status=$?
+    --layout heron --ground-truth "$labels" --output /dev/null "$@" 2>&1 \
+    | { grep -vE "Analysing page|written to" || true; } || rc=$?
+  rc=${PIPESTATUS[0]:-$rc}
+  [ "$rc" -eq 0 ] || status=$rc
 done
 exit $status

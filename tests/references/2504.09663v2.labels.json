@@ -1,0 +1,45 @@
+{
+ "mentions": [
+  {
+   "page": 11,
+   "kind": "Figure",
+   "number": "1",
+   "target_page": 11,
+   "target_block": 0
+  },
+  {
+   "page": 26,
+   "kind": "Figure",
+   "number": "2",
+   "target_page": 26,
+   "target_block": 1
+  },
+  {
+   "page": 26,
+   "kind": "Table",
+   "number": "1",
+   "target_page": 33,
+   "target_block": 2
+  },
+  {
+   "page": 27,
+   "kind": "Figure",
+   "number": "2",
+   "target_page": 26,
+   "target_block": 1
+  }
+ ],
+ "empty_pages": [
+  0,
+  1,
+  2,
+  3,
+  4,
+  5,
+  6,
+  7,
+  8,
+  9,
+  10
+ ]
+}
