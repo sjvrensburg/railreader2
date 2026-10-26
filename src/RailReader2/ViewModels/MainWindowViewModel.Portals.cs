@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using RailReader.Core;
 using RailReader.Core.Models;
 using RailReader.Renderer.Skia;
+using RailReader2.References;
 using RailReader2.Services;
 
 namespace RailReader2.ViewModels;

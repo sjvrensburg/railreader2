@@ -2,7 +2,7 @@ using System.Text.RegularExpressions;
 using RailReader.Core;
 using RailReader.Core.Models;
 
-namespace RailReader2.Services;
+namespace RailReader2.References;
 
 /// <summary>
 /// Resolves in-text references like "Figure 3" / "Table 2.1" to the detected figure/table block they

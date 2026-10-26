@@ -29,7 +29,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Lets the test project exercise internal shell helpers (e.g. ReferenceIndex parsing). -->
+    <!-- Lets the test project exercise internal shell helpers (e.g. SpellCheckService). -->
     <InternalsVisibleTo Include="RailReader.Export.Tests" />
   </ItemGroup>
 
@@ -44,6 +44,7 @@
 
   <ItemGroup>
     <PackageReference Include="RailReader.Core" Version="0.71.0" />
+    <ProjectReference Include="../RailReader2.References/RailReader2.References.csproj" />
     <PackageReference Include="RailReader.Core.Pdfium" Version="0.71.0" />
     <PackageReference Include="RailReader.Core.Analysis" Version="0.71.0" />
     <PackageReference Include="RailReader.Core.Analysis.WebGpu" Version="0.71.0" />
