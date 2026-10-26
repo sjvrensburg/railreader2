@@ -1,8 +1,8 @@
 using RailReader.Core.Models;
-using RailReader2.Services;
+using RailReader2.References;
 using Xunit;
-using Ref = RailReader2.Services.ReferenceIndex.Reference;
-using RefKind = RailReader2.Services.ReferenceIndex.RefKind;
+using Ref = RailReader2.References.ReferenceIndex.Reference;
+using RefKind = RailReader2.References.ReferenceIndex.RefKind;
 
 namespace RailReader.Export.Tests;
 
