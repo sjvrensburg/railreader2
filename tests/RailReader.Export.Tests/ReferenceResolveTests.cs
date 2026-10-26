@@ -80,6 +80,19 @@ public class ReferenceResolveTests
         return null;
     }
 
+    [Fact]
+    public void ReanalysisWithSameAnalysedCount_InvalidatesCachedMiss()
+    {
+        var index = new ReferenceIndex();
+        var doc = new FakeDoc(3).AddFigure(1, "Figure 3: Other.");
+        Assert.Null(Resolve(index, doc, new Ref(RefKind.Figure, "2"), 1));
+
+        // Same page re-analysed (e.g. OCR text landing): new analysis instance,
+        // AnalysedPageCount unchanged. The cached miss must not survive it.
+        doc.AddFigure(1, "Figure 2: Now defined.");
+        Assert.Equal(1, Resolve(index, doc, new Ref(RefKind.Figure, "2"), 1)!.Value.Page);
+    }
+
     // --- panel mentions ---
 
     [Fact]

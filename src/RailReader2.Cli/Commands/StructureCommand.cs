@@ -30,7 +30,7 @@ public static class StructureCommand
         analyze = analyzer is not null;
 
         IPdfTextService? textService = null;
-        if (includeText)
+        if (includeText || analyze)
             textService = factory.CreatePdfTextService();
 
         var result = new StructureOutput

@@ -75,7 +75,7 @@ Once a PDF is open, scroll through pages with `PgDn`/`PgUp`, zoom with `+`/`-` o
 
 ### Margin cropping
 
-Press `Ctrl+Shift+M` to toggle **margin cropping**, or enable it in Settings. When on, fit/centre operations (the `F` and `0` keys, plus the page-flip on edge-hold) target the detected content area instead of the full page, so whitespace margins don't waste screen space at high zoom.
+Press `Ctrl+Shift+M` to toggle **margin cropping**, or enable it in Settings. When on, fit/centre operations (the `0` key, plus the page-flip on edge-hold) target the detected content area instead of the full page, so whitespace margins don't waste screen space at high zoom.
 
 The crop is computed from the analysed layout blocks and grows automatically as more pages are analysed — it never clips content.
 
@@ -157,7 +157,7 @@ You don't have to zoom past the threshold to rail-read. Press `R` (or **Rail > S
 
 ### Reading guide (pointer-driven, any zoom)
 
-If you read at low magnification (around 1.25–2×) and don't want to chase the text with the mouse, use the **reading guide** instead of rail mode. Turn it on with the **Reading guide** toolbar button (beside Browse and Text Select), **Rail > Reading Guide**, or `K`. Click the word you want to start on, then hold `Shift` and **nudge** the pointer: the pointer becomes an invisible joystick. Push a little to the right and the guide flows **word by word** through the text — on to the next line, the next paragraph, the next page — at your reading pace; push further to go faster; push left to go back; up or down to step lines. Bring the pointer back to where you pressed `Shift` and it stops. The **word** the guide is on and its **line** are marked, and the page only scrolls when the guide nears the edge of the view. Release `Shift` and the guide **parks** where it is; click another word to jump. The mouse cursor is hidden while you hold `Shift`, so a small **steering indicator** stands in for it: a square marks where you pressed `Shift` (the still zone), a dot follows your pointer, and a line joins them once you push past the square. It takes its colour from your colour effect, so it stays easy to see on every one.
+The reading guide is **experimental**: first enable it under Settings ▸ Reading ▸ Experimental ▸ "Enable experimental features" (the toolbar button, menu item and `K` shortcut stay hidden until then). If you read at low magnification (around 1.25–2×) and don't want to chase the text with the mouse, use the **reading guide** instead of rail mode. Turn it on with the **Reading guide** toolbar button (beside Browse and Text Select), **Rail > Reading Guide**, or `K`. Click the word you want to start on, then hold `Shift` and **nudge** the pointer: the pointer becomes an invisible joystick. Push a little to the right and the guide flows **word by word** through the text — on to the next line, the next paragraph, the next page — at your reading pace; push further to go faster; push left to go back; up or down to step lines. Bring the pointer back to where you pressed `Shift` and it stops. The **word** the guide is on and its **line** are marked, and the page only scrolls when the guide nears the edge of the view. Release `Shift` and the guide **parks** where it is; click another word to jump. The mouse cursor is hidden while you hold `Shift`, so a small **steering indicator** stands in for it: a square marks where you pressed `Shift` (the still zone), a dot follows your pointer, and a line joins them once you push past the square. It takes its colour from your colour effect, so it stays easy to see on every one.
 
 **Pausing at each new line.** When the guide moves to a new line, block or page by itself, it **pauses** there: the square turns heavier and the dot shows a pause mark. That gives you time to find your place and, if you like, reposition the mouse. Bring the pointer back inside the square, then push again to carry on. A line you step to with an up or down nudge doesn't pause, and a nudge while paused is honoured straight away.
 
@@ -506,7 +506,7 @@ To glance at a block without saving a link, right-click it and choose **Open in 
 
 ### Managing portals
 
-The Portals pane lists every portal in the document. Rename one inline, click **Go to source** to jump to and frame its reference, or **Delete** to remove it. Portals are saved per-document in a sidecar keyed by the PDF's path, so they persist across sessions.
+The Portals pane lists every portal in the document. Rename one inline, click **Go to source** to jump to and frame its reference, or **Delete** to remove it. Portals are saved per-document in a sidecar keyed by the PDF's content (SHA-256), so they persist across sessions and survive the file being moved, renamed or copied.
 
 > **Acknowledgement:** the portal concept — and the name — is borrowed from [Sioyek](https://sioyek.info/), a PDF reader for research papers whose Portals feature inspired this one.
 
@@ -618,6 +618,8 @@ railreader2-cli annotations <pdf> [options]
 | `--format <json\|pdf>` | Export format (default: json) |
 | `--include-text` | Extract text under each annotation |
 | `--include-blocks` | Correlate annotations with layout blocks (implies ONNX analysis) |
+| `--pages <range>` | Only export annotations on these pages, e.g. `"1,3,5-10"` |
+| `--password <pwd>` | Password for an encrypted source PDF (annotated-PDF export of an encrypted source is refused) |
 
 ```bash
 # Rich JSON export with text and layout context
@@ -696,6 +698,32 @@ railreader2-cli vlm paper.pdf --from-structure structure.json --all --output vlm
 
 When `--api-key` is not set, the command falls back to the `OPENAI_API_KEY` environment variable before finally consulting the saved AppConfig — letting you run the command without putting your key on the command line or in shell history.
 
+### references — resolve figure/table mentions
+
+Detects mentions of figures and tables in the text ("see Figure 3"), resolves each one to the caption and block that define it, and reports mentions it cannot resolve as abstentions. With `--ground-truth`, it also scores the resolver against a labels file.
+
+```
+railreader2-cli references <pdf> [options]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--pages <range>` | Pages to analyse (default: all) |
+| `--layout <model>` | Layout model: `heron`, `ppdoclayout` or `pps` (default: your configured model) |
+| `--ground-truth <path>` | Labels JSON; adds precision/recall/F1, a failure list and naive baselines |
+| `--min-precision <0-1>` | Exit with code 2 if overall precision is lower (needs `--ground-truth`) |
+| `--output <path>` | Output JSON file path (default: stdout) |
+
+Labels are 0-based: `{"mentions":[{"page":2,"kind":"Figure","number":"3","target_page":1,"target_block":4}], "empty_pages":[5]}` — omit `target_*` to require abstention; `empty_pages` must resolve nothing.
+
+```bash
+# Report every resolved and abstained mention
+railreader2-cli references paper.pdf --output references.json
+
+# Benchmark the resolver against labels, failing the run below 90% precision
+railreader2-cli references paper.pdf --ground-truth labels.json --min-precision 0.9
+```
+
 ### export — convert PDF to Markdown
 
 Exports a PDF to structured Markdown using layout analysis, VLM transcription, and annotation extraction. Heading hierarchy is resolved by matching detected heading blocks against the PDF outline tree. Degrades gracefully depending on available tools.
@@ -710,6 +738,7 @@ railreader2-cli export <pdf> [options]
 |--------|-------------|
 | `--output <path>` | Markdown output file (default: stdout) |
 | `--pages <range>` | Page range (e.g. `1,3,5-10`) |
+| `--password <pwd>` | Password for an encrypted source PDF |
 | `--no-page-breaks` | Omit page break markers (`---`) between pages |
 
 **Content:**

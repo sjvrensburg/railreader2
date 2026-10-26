@@ -23,6 +23,7 @@
     <PackageReference Include="RailReader.Export" Version="0.71.0" />
     <!-- For shell-internal helpers under test (SpellCheckService); pulls Avalonia in but stays headless. -->
     <ProjectReference Include="../../src/RailReader2/RailReader2.csproj" />
+    <ProjectReference Include="../../src/RailReader2.Cli/RailReader2.Cli.csproj" />
     <ProjectReference Include="../../src/RailReader2.References/RailReader2.References.csproj" />
   </ItemGroup>
 

@@ -1061,8 +1061,22 @@ public sealed partial class MainWindowViewModel
     public void DeletePortal(string id)
     {
         if (ActiveTab is not { } tab) return;
+        var removed = tab.Portals.Portals.Where(p => p.Id == id).ToList();
         if (tab.Portals.Portals.RemoveAll(p => p.Id == id) == 0) return;
         tab.Portals.Save(tab.FilePath);
+        // Portals have no undo stack; offer recovery on the toast instead of a modal confirm.
+        string label = removed[0].Label;
+        ShowStatusToast($"Portal deleted: {label}", "Undo", () =>
+        {
+            // The tab's portal set is released on close; restoring into it then would save a stale
+            // set over whatever a reopened tab has written since.
+            if (!Tabs.Contains(tab)) return;
+            tab.Portals.Portals.AddRange(removed);
+            tab.Portals.Save(tab.FilePath);
+            NotifyPortalsChanged();
+            InvalidatePortalMarkers();
+            EvaluatePortals(forceRender: true);
+        });
         // Drop the pin identity if the deleted portal is the one shown; the forced evaluation below
         // does the single image render-or-clear swap (never two swaps in one pass).
         if (_displayedPortalId == id)

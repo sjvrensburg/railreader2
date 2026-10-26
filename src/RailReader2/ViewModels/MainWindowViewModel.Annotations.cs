@@ -12,6 +12,10 @@ namespace RailReader2.ViewModels;
 // Annotations: mode, tools, markup, pointer handlers, browse mode, undo/redo, review state, export/import
 public sealed partial class MainWindowViewModel
 {
+    // Tabs with an annotated-PDF export running on a background thread (see ExportAnnotated);
+    // CloseTab refuses to dispose a model out from under one.
+    private readonly HashSet<TabViewModel> _exportingTabs = [];
+
     public void ToggleAnnotationMode()
     {
         // Core refuses annotation authoring while the view is rotated (stored geometry is the
@@ -828,6 +832,11 @@ public sealed partial class MainWindowViewModel
     public async Task ExportAnnotated()
     {
         if (_window is null || ActiveTab is not { } tab) return;
+        if (_exportingTabs.Contains(tab))
+        {
+            ShowStatusToast("An annotated export of this tab is already running.");
+            return;
+        }
 
         var file = await _window.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
         {
@@ -850,6 +859,15 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
+        // The export reads tab.Pdf/tab.Annotations on a background thread; closing the tab would
+        // dispose the model under it. CloseTab refuses while a tab is in this set. A set, not a
+        // count: refuse a second concurrent export, whose `finally` would otherwise drop the guard
+        // while the first is still running.
+        if (!_exportingTabs.Add(tab))
+        {
+            ShowStatusToast("An annotated export of this tab is already running.");
+            return;
+        }
         try
         {
             await Task.Run(() =>
@@ -869,6 +887,11 @@ public sealed partial class MainWindowViewModel
         catch (Exception ex)
         {
             _logger.Error("[Export] Failed", ex);
+            ShowStatusToast("Annotated export failed — see the log for details. Your annotations are saved inside the original PDF.");
+        }
+        finally
+        {
+            _exportingTabs.Remove(tab);
         }
     }
 

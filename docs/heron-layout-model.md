@@ -57,7 +57,7 @@ You need exactly one file: the ONNX weights. The filename must be
 ### Option A: helper script (Linux / macOS, source build)
 
 ```bash
-./scripts/download-model.sh heron
+./scripts/download-model.sh
 # Produces ./models/docling-layout-heron-int8.onnx
 ```
 

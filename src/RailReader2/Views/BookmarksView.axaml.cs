@@ -137,14 +137,33 @@ public partial class BookmarksView : PaneRefreshView
         }
     }
 
-    private void OnDeleteBookmarkClick(object? sender, RoutedEventArgs e)
+    private async void OnDeleteBookmarkClick(object? sender, RoutedEventArgs e)
     {
         e.Handled = true;
-        if (_vm is not { } vm) return;
-        if (ResolveBookmarkIndex(sender) is not (var bm, var index)) return;
+        try
+        {
+            if (_vm is not { } vm) return;
+            if (ResolveBookmarkIndex(sender) is not (var bm, _)) return;
+            if (TopLevel.GetTopLevel(this) is not Window window) return;
 
-        vm.Controller.RemoveBookmark(index);
-        UpdateBookmarkSource();
+            // Bookmarks have no undo stack, so confirm before the permanent delete.
+            var confirm = new ConfirmDialog("Delete bookmark?",
+                $"Delete the bookmark “{bm.Name}”? This cannot be undone.", "Delete")
+                { FontSize = vm.CurrentFontSize };
+            if (await confirm.ShowDialog<bool>(window) != true) return;
+
+            // Re-resolve after the await: the list can change while the dialog is open (a tear-off
+            // window still takes the B key), and a stale index would delete a different bookmark.
+            int index = vm.ActiveTab?.Annotations.Bookmarks.IndexOf(bm) ?? -1;
+            if (index < 0) return;
+            vm.Controller.RemoveBookmark(index);
+            UpdateBookmarkSource();
+            vm.ShowStatusToast($"Bookmark deleted: {bm.Name}");
+        }
+        catch (Exception ex)
+        {
+            RailReaderLogging.Logger.Error("[Bookmarks] Delete bookmark failed", ex);
+        }
     }
 
     private async void OnRenameBookmarkClick(object? sender, RoutedEventArgs e)

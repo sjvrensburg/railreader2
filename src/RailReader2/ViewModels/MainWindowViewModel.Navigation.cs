@@ -138,7 +138,10 @@ public sealed partial class MainWindowViewModel
     {
         if (ZoomBlockedByFreeze()) return;
         if (ActiveTab is not { } tab) return;
-        double current = tab.Camera.Zoom;
+        // HandleZoom acts on the focused viewport (split pane / tear-off may differ from the
+        // tab's own viewport), and the status bar displays that viewport's zoom — derive the
+        // relative delta from it, not from the tab's camera.
+        double current = _controller.FocusedViewport?.Camera.Zoom ?? tab.Camera.Zoom;
         if (current <= 0) return;
         double target = Math.Clamp(percent / 100.0, 0.5, 20.0); // mirrors Core's HandleZoom clamp
         double delta = ((target / current) - 1.0) / ZoomDeltaScale;
@@ -447,6 +450,9 @@ public sealed partial class MainWindowViewModel
         JumpMode = _controller.JumpMode;
         OnPropertyChanged(nameof(AutoScrollActive));
         RequestAnimationFrame();
+        // From the toolbar button, menu or a key pressed while a slider held focus, the next keys
+        // (arrows, D/S) should drive the rail, not the control that had focus.
+        RequestViewportFocus();
     }
 
     public void ToggleJumpModeExclusive()
@@ -459,6 +465,7 @@ public sealed partial class MainWindowViewModel
         _controller.ToggleJumpModeExclusive();
         JumpMode = _controller.JumpMode;
         OnPropertyChanged(nameof(AutoScrollActive));
+        RequestViewportFocus();
     }
 
     /// <summary>Saves a display toggle made from a key/menu into the config and hands Core the new

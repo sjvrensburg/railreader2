@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using RailReader.Core;
 using RailReader.Core.Analysis.WebGpu;
@@ -741,6 +742,12 @@ public partial class SettingsWindow : Window
     /// the HTTP copy + hash would run to completion against a window the user has already dismissed.</summary>
     protected override void OnClosed(EventArgs e)
     {
+        // Flush a pending debounced slider save so a drag-then-close can't lose it.
+        if (_sliderPersistTimer is { IsEnabled: true })
+        {
+            _sliderPersistTimer.Stop();
+            if (Vm is { } vm) vm.OnConfigChanged();
+        }
         // Closing with the name box still focused may not raise its LostFocus first.
         CommitAuthorName();
         _downloadCts?.Cancel();
@@ -951,11 +958,28 @@ public partial class SettingsWindow : Window
         vm.OnLinkPrefsChanged();
     }
 
+    private DispatcherTimer? _sliderPersistTimer;
+
     private void OnSliderChanged(Avalonia.AvaloniaPropertyChangedEventArgs e, Action<AppConfig> apply)
     {
         if (e.Property.Name != "Value" || Vm is not { } vm || _loading) return;
         apply(vm.AppConfig);
-        vm.OnConfigChanged();
+        // Live-apply and repaint on every tick (cheap), but debounce the heavy OnConfigChanged
+        // (config file save + broadcast invalidation) until the drag settles.
+        vm.OnSettingsSliderPreview();
+        if (_sliderPersistTimer is null)
+        {
+            _sliderPersistTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };
+            _sliderPersistTimer.Tick += OnSliderPersistTick;
+        }
+        _sliderPersistTimer.Stop();
+        _sliderPersistTimer.Start();
+    }
+
+    private void OnSliderPersistTick(object? sender, EventArgs e)
+    {
+        _sliderPersistTimer?.Stop();
+        if (Vm is { } vm) vm.OnConfigChanged();
     }
 
     private void OnBlurIntensityChanged(object? sender, Avalonia.AvaloniaPropertyChangedEventArgs e)
@@ -1367,9 +1391,16 @@ public partial class SettingsWindow : Window
         UpdateModelsOverview();
     }
 
-    private void OnResetDefaults(object? sender, RoutedEventArgs e)
+    private async void OnResetDefaults(object? sender, RoutedEventArgs e)
     {
         if (Vm is not { } vm) return;
+        // Resetting persists immediately (OnConfigChanged saves) and clears the VLM API key,
+        // OCR pack and accelerator choices — confirm first; there is no undo afterwards.
+        var confirm = new ConfirmDialog("Reset all settings?",
+            "Reset every setting to its default? This clears your VLM API key and OCR language-pack "
+            + "and GPU choices, and cannot be undone.",
+            "Reset All") { FontSize = FontSize };
+        if (await confirm.ShowDialog<bool>(this) != true) return;
         var defaults = new AppConfig();
         vm.AppConfig.RailZoomThreshold = defaults.RailZoomThreshold;
         vm.AppConfig.SnapDurationMs = defaults.SnapDurationMs;

@@ -84,10 +84,36 @@ static class Program
     internal static bool HasHelpFlag(string[] args)
         => HasFlag(args, "help") || args.Contains("-h");
 
+    // Options that consume the following token as their value (every GetOption call site).
+    // GetRequiredPdf must skip those values or `--output-dir out in.pdf` mistakes "out" for the PDF.
+    private static readonly HashSet<string> ValueOptions =
+    [
+        "output", "output-dir", "pages", "page", "block", "dpi", "effect", "intensity",
+        "format", "password", "figure-dir", "concurrency", "endpoint", "model", "api-key",
+        "equation-endpoint", "equation-model", "equation-api-key",
+        "table-endpoint", "table-model", "table-api-key",
+        "figure-endpoint", "figure-model", "figure-api-key",
+        "prompt-style", "dump-crops", "min-confidence", "from-structure",
+        "ground-truth", "layout", "min-precision", "classes",
+    ];
+
     internal static string GetRequiredPdf(string[] args)
     {
-        var pdfPath = args.FirstOrDefault(a => !a.StartsWith('-'))
-            ?? throw new InvalidOperationException("PDF path is required as the first argument.");
+        string? pdfPath = null;
+        for (int i = 0; i < args.Length; i++)
+        {
+            string a = args[i];
+            if (a.StartsWith("--", StringComparison.Ordinal))
+            {
+                if (ValueOptions.Contains(a[2..])) i++; // skip this option's value
+                continue;
+            }
+            if (a.StartsWith('-')) continue;
+            pdfPath = a;
+            break;
+        }
+        if (pdfPath is null)
+            throw new InvalidOperationException("PDF path is required as the first argument.");
 
         if (!File.Exists(pdfPath))
             throw new FileNotFoundException($"PDF not found: {pdfPath}");

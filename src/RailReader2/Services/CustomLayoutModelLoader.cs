@@ -177,9 +177,16 @@ public static class CustomLayoutModelLoader
     {
         if (accelerator != AcceleratorPreference.Gpu) return null;
 
+        // Only Heron and PP-DocLayoutV3 have a WebGPU path (PP-DocLayout-S and the custom-model
+        // path always run on CPU). Do NOT gate on descriptor Id equality: since Core 0.60.2 the
+        // V3 GPU route resolves to the same FP32 descriptor/file as CPU, so an Id check would
+        // silently disable GPU for the default V3 model. TryEnable inside the deferred factory
+        // makes the final device decision.
+        if (architecture is not (LayoutModelArchitecture.Heron or LayoutModelArchitecture.PPDocLayoutV3))
+            return null;
+
         var gpuDesc = LayoutModelRegistry.Resolve(architecture, AcceleratorPreference.Gpu);
         var cpuDesc = LayoutModelRegistry.Resolve(architecture, AcceleratorPreference.Cpu);
-        if (gpuDesc.Id == cpuDesc.Id) return null; // no GPU/FP16 variant for this architecture
 
         if (!WebGpuAccelerator.IsAvailable)
         {

@@ -99,6 +99,15 @@ public sealed class ViewportImages : IDisposable
     /// </summary>
     public List<SKImage> SyncWindowImages(IReadOnlyList<VisiblePage> visiblePages, int anchorPage)
     {
+        // Single-page fast path (the common case): no window wraps exist and none are wanted,
+        // so skip the per-frame List/HashSet scratch entirely.
+        if (_windowImages.Count == 0)
+        {
+            bool anyWanted = false;
+            foreach (var v in visiblePages)
+                if (v.Page != anchorPage && v.Bitmap is SkiaRenderedPage) { anyWanted = true; break; }
+            if (!anyWanted) return [];
+        }
         var retired = new List<SKImage>();
         var wanted = new HashSet<int>();
         foreach (var vp in visiblePages)

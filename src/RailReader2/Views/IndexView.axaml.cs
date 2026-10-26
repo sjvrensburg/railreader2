@@ -13,16 +13,38 @@ using SkiaSharp;
 
 namespace RailReader2.Views;
 
-public class PeekEntryViewModel
+public class PeekEntryViewModel : INotifyPropertyChanged
 {
+    public event PropertyChangedEventHandler? PropertyChanged;
+
     public required string Label { get; init; }
     public required string PageDisplay { get; init; }
-    public Bitmap? Thumbnail { get; set; }
-    public string? ExtractedText { get; set; }
+
+    private Bitmap? _thumbnail;
+    public Bitmap? Thumbnail
+    {
+        get => _thumbnail;
+        set { _thumbnail = value; PropertyChanged?.Invoke(this, new(nameof(Thumbnail))); PropertyChanged?.Invoke(this, new(nameof(HasThumbnail))); }
+    }
+
+    private string? _extractedText;
+    public string? ExtractedText
+    {
+        get => _extractedText;
+        set { _extractedText = value; PropertyChanged?.Invoke(this, new(nameof(ExtractedText))); PropertyChanged?.Invoke(this, new(nameof(HasExtractedText))); PropertyChanged?.Invoke(this, new(nameof(ShowOcrNote))); }
+    }
+
     public bool HasThumbnail => Thumbnail is not null;
     public bool HasExtractedText => ExtractedText is not null;
+
+    private bool _isOcrText;
     /// <summary>The text was read by OCR, not taken from the PDF: shown in italics under an "unverified" note.</summary>
-    public bool IsOcrText { get; set; }
+    public bool IsOcrText
+    {
+        get => _isOcrText;
+        set { _isOcrText = value; PropertyChanged?.Invoke(this, new(nameof(IsOcrText))); PropertyChanged?.Invoke(this, new(nameof(TextFontStyle))); PropertyChanged?.Invoke(this, new(nameof(ShowOcrNote))); }
+    }
+
     public Avalonia.Media.FontStyle TextFontStyle => IsOcrText ? Avalonia.Media.FontStyle.Italic : Avalonia.Media.FontStyle.Normal;
     public bool ShowOcrNote => IsOcrText && HasExtractedText;
     public required PeekEntry Entry { get; init; }
@@ -245,8 +267,30 @@ public partial class IndexView : PaneRefreshView
         if (signature != _lastPeekSignature)
         {
             _lastPeekSignature = signature;
-            GenerateThumbnails(entries, doc);
+            // Show the entries immediately; thumbnails/equation text fill in progressively
+            // (see GenerateThumbnailsProgressively) instead of blocking the UI thread on a
+            // full synchronous render pass over every entry.
             PeekEntryList.ItemsSource = entries;
+            GenerateThumbnailsProgressively(entries, doc);
+        }
+    }
+
+    private int _thumbGeneration;
+
+    /// <summary>Fill thumbnails/extracted text in small chunks, yielding to the UI thread
+    /// between chunks so a document-wide index (hundreds of entries after Scan All) never
+    /// freezes the app in one synchronous pass. A newer refresh supersedes an in-flight
+    /// pass via <see cref="_thumbGeneration"/>.</summary>
+    private async void GenerateThumbnailsProgressively(List<PeekEntryViewModel> entries, DocumentModel doc)
+    {
+        int generation = ++_thumbGeneration;
+        const int chunk = 8;
+        for (int i = 0; i < entries.Count; i += chunk)
+        {
+            if (generation != _thumbGeneration) return;
+            GenerateThumbnails(entries.GetRange(i, Math.Min(chunk, entries.Count - i)), doc);
+            if (i + chunk < entries.Count)
+                await Dispatcher.UIThread.InvokeAsync(static () => { }, DispatcherPriority.Background);
         }
     }
 
@@ -394,11 +438,26 @@ public partial class IndexView : PaneRefreshView
             using var cropped = new SKBitmap();
             if (!bitmap.ExtractSubset(cropped, cropRect)) return null;
 
-            using var data = cropped.Encode(SKEncodedImageFormat.Png, 90);
-            if (data is null) return null;
-
-            using var stream = new MemoryStream(data.ToArray());
-            return new Bitmap(stream);
+            // Copy pixels straight into a WriteableBitmap — no PNG encode/decode round-trip.
+            using var bgra = cropped.Copy(SKColorType.Bgra8888);
+            if (bgra is null) return null;
+            var wb = new WriteableBitmap(
+                new Avalonia.PixelSize(bgra.Width, bgra.Height),
+                new Avalonia.Vector(96, 96),
+                Avalonia.Platform.PixelFormat.Bgra8888,
+                Avalonia.Platform.AlphaFormat.Premul);
+            using (var fb = wb.Lock())
+            {
+                int rowBytes = bgra.RowBytes;
+                int copyBytes = Math.Min(rowBytes, fb.RowBytes);
+                var row = new byte[copyBytes];
+                for (int y = 0; y < bgra.Height; y++)
+                {
+                    System.Runtime.InteropServices.Marshal.Copy(bgra.GetPixels() + y * rowBytes, row, 0, copyBytes);
+                    System.Runtime.InteropServices.Marshal.Copy(row, 0, fb.Address + y * fb.RowBytes, copyBytes);
+                }
+            }
+            return wb;
         }
         catch
         {
@@ -408,6 +467,7 @@ public partial class IndexView : PaneRefreshView
 
     private void ClearThumbnailCache()
     {
+        _thumbGeneration++; // stop any in-flight progressive pass for the old document
         foreach (var bmp in _thumbnailCache.Values)
             bmp?.Dispose();
         _thumbnailCache.Clear();

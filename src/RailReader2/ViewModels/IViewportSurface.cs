@@ -1,4 +1,5 @@
 using RailReader.Core;
+using SkiaSharp;
 
 namespace RailReader2.ViewModels;
 
@@ -37,6 +38,11 @@ public interface IViewportSurface
     /// cheap per-frame path for the steer indicator (no line-focus page-state rebuild).</summary>
     void RenderReadingGuideLayer();
     void NotifyAccessibility();
+
+    /// <summary>Dispose <paramref name="images"/> on this surface's composition thread (FIFO after
+    /// any state already queued, so a texture is freed only once the layer has stopped drawing it).
+    /// Used for a closed tab's page/minimap wraps, which the primary surface was drawing borrowed.</summary>
+    void RetireImages(IReadOnlyList<SKImage> images);
 
     /// <summary>Show or hide this surface's focused-pane affordance (a border accent). The VM only
     /// turns it on when more than one surface is live — a lone viewport has no focus ambiguity.</summary>

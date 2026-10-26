@@ -2,7 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="RailReader2.Views.GoToPageDialog"
         Title="Go to Page"
-        Width="280" Height="140"
+        Width="280" SizeToContent="Height" MinHeight="140"
         WindowStartupLocation="CenterOwner"
         CanResize="False">
     <DockPanel Margin="16">
@@ -11,6 +11,9 @@
             <Button Content="OK" MinWidth="80" HorizontalContentAlignment="Center" Click="OnOkClick" />
             <Button Content="Cancel" MinWidth="80" HorizontalContentAlignment="Center" Click="OnCancelClick" />
         </StackPanel>
-        <TextBox x:Name="PageInput" />
+        <StackPanel Spacing="8">
+            <TextBox x:Name="PageInput" />
+            <TextBlock x:Name="ErrorText" Foreground="Red" TextWrapping="Wrap" IsVisible="False" />
+        </StackPanel>
     </DockPanel>
 </Window>

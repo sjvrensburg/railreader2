@@ -10,7 +10,11 @@ public partial class ConfirmUrlDialog : Window
         InitializeComponent();
         DialogStacking.KeepAboveFullscreenOwner(this);
         UrlDisplay.Text = url;
-        DialogKeyboard.EnableEscEnterClose(this, cancelResult: false, confirmResult: () => true);
+        // This dialog guards an external launch, so Enter must never confirm from anywhere:
+        // no window-wide Enter binding, and initial focus sits on Cancel (Enter/Space then
+        // activates Cancel). Opening requires an explicit click / Tab+Enter on Open.
+        DialogKeyboard.EnableEscEnterClose(this, cancelResult: false, confirmResult: null);
+        DialogKeyboard.FocusOnOpen(this, CancelButton);
     }
 
     public ConfirmUrlDialog() : this("") { }

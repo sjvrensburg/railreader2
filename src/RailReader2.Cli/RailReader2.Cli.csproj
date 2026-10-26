@@ -18,6 +18,10 @@
     <PackageReference Include="RailReader.Export" Version="0.71.0" />
   </ItemGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="RailReader.Export.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="../RailReader2.References/RailReader2.References.csproj" />
   </ItemGroup>
 </Project>
