@@ -377,4 +377,30 @@ public class ReferenceResolveTests
         var doc = WithDisplay(new FakeDoc(2), 0, "a = b (3.1)");
         Assert.Empty(ReferenceBenchmark.Scan(doc, new ReferenceIndex()));
     }
+
+    [Fact]
+    public void Equation_MentionMergedIntoADisplayIsNotATag()
+    {
+        var doc = WithDisplay(new FakeDoc(2), 0, "Thus (C.1) and (C.2) give x = y (C.3)");
+        var index = new ReferenceIndex();
+        Assert.Null(Resolve(index, doc, new Ref(RefKind.Equation, "c.1"), 0));
+        Assert.Null(Resolve(index, doc, new Ref(RefKind.Equation, "c.2"), 0));
+        Assert.Equal(0, Resolve(index, doc, new Ref(RefKind.Equation, "c.3"), 0)!.Value.Page);
+    }
+
+    [Fact]
+    public void Equation_DefinedTwiceWithinReachAbstains_ButAFarCopyDoesNot()
+    {
+        var doc = WithDisplay(WithDisplay(WithDisplay(new FakeDoc(80), 10, "a = b (7)"), 14, "c = d (7)"), 70, "e = f (7)");
+        var index = new ReferenceIndex { MaxFlatNumberPageDistance = 12 };
+        Assert.Null(Resolve(index, doc, new Ref(RefKind.Equation, "7"), 12));            // two inside the window
+        Assert.Equal(70, Resolve(index, doc, new Ref(RefKind.Equation, "7"), 72)!.Value.Page);   // only one in reach
+    }
+
+    [Fact]
+    public void Figure_RestartingLabelStillTakesTheNearest()
+    {
+        var doc = new FakeDoc(30).AddFigure(10, "Figure 1: A.").AddFigure(14, "Figure 1: B.");
+        Assert.Equal(14, Resolve(new(), doc, new Ref(RefKind.Figure, "1"), 15)!.Value.Page);
+    }
 }

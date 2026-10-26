@@ -15,6 +15,13 @@ internal sealed class MentionResult
     public int? TargetPage { get; set; }
     public int? TargetBlock { get; set; }
     public int? CaptionBlock { get; set; }
+    /// <summary>How many places in the document define this label (resolved mentions only). Above 1
+    /// the label restarts and the resolver chose by distance.</summary>
+    public int? Candidates { get; set; }
+    /// <summary>The line the mention was read from, and the start of the block it resolved to — for
+    /// auditing a run by eye. Not scored.</summary>
+    public string? Context { get; set; }
+    public string? TargetText { get; set; }
     /// <summary>Scoring outcome when ground truth is supplied: tp, fp, tn, unlabelled.</summary>
     public string? Outcome { get; set; }
 }
@@ -105,7 +112,18 @@ internal static class ReferenceBenchmark
                         // hide a later genuine mention of the same label on this page.
                         if (target is { } self && self.Page == page && self.CaptionBlock == b) continue;
                         seen.Add((page, reference));
-                        results.Add(ToResult(page, b, l, reference, target));
+                        var result = ToResult(page, b, l, reference, target);
+                        result.Context = lineText.Length > 260 ? lineText[..260] : lineText;
+                        if (target is { } t)
+                        {
+                            result.Candidates = index.CandidateCount(doc, reference);
+                            if (doc.TryGetAnalysis(t.Page, out var targetPage) && t.TargetBlock < targetPage.Blocks.Count)
+                            {
+                                string targetText = doc.GetText(t.Page).ExtractBlockText(targetPage.Blocks[t.TargetBlock]);
+                                result.TargetText = targetText.Length > 90 ? targetText[..90] : targetText;
+                            }
+                        }
+                        results.Add(result);
                     }
                 }
             }

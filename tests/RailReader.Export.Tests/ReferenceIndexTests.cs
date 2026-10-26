@@ -386,4 +386,57 @@ public class ReferenceIndexTests
     public void ParseStatementHeader_AnEllipsisInTheBodyIsStillAHeader()
         => Assert.Equal(new Ref(RefKind.Definition, "1"),
             ReferenceIndex.ParseStatementHeader("Definition 1. Let x1, …, xn be given"));
+
+    // --- guards found by auditing 30 unseen papers ---
+
+    [Theory]
+    [InlineData("C.8 Proof of Lemma 3.8 . . . . . . . . . . . . 41")]    // contents entry
+    [InlineData("1.2 Theorem 4 and Figure 2 …… 17")]
+    public void ParseLine_ContentsLinesCiteNothing(string line)
+        => Assert.Empty(ReferenceIndex.ParseLine(line));
+
+    [Fact]
+    public void ParseStatementHeader_SubItemMarkerIsNotATitle()
+    {
+        Assert.Null(ReferenceIndex.ParseStatementHeader("Proposition 1(d). Let A be randomized"));
+        Assert.Equal(new Ref(RefKind.Proposition, "1"), ReferenceIndex.ParseStatementHeader("Proposition 1 (Identification). Suppose"));
+    }
+
+    [Theory]
+    [InlineData("the dependence on µ (2) and π (1) is")]     // superscript indices after a symbol
+    [InlineData("it verifies conditions (1) and (3) of")]    // numbered conditions
+    [InlineData("the estimator satisfies (1)–(3): then")]    // a range of items
+    [InlineData("this shows (1) of Assumption 2.2 holds")]   // an item of a named assumption
+    [InlineData("in each case (1) holds")]
+    public void ParseLine_NumberedItemsAreNotEquations(string line)
+        => Assert.DoesNotContain(ReferenceIndex.ParseLine(line), r => r.Kind == RefKind.Equation);
+
+    [Fact]
+    public void ParseLine_ChainedEquationMentionsKeepTheirWord()
+        => Assert.Equal(["2", "3"],
+            ReferenceIndex.ParseLine("using the formula (2) and (3) we").Where(r => r.Kind == RefKind.Equation).Select(r => r.Number));
+
+    // --- guards found by auditing a second batch of unseen papers ---
+
+    [Theory]
+    [InlineData("so that Dn = 1 + oP (1) and then")]
+    [InlineData("the remainder is OP (1) uniformly")]
+    [InlineData("we have log (2) bits and Var (1) terms")]
+    public void ParseLine_AsymptoticNotationAndFunctionsAreNotEquations(string line)
+        => Assert.DoesNotContain(ReferenceIndex.ParseLine(line), r => r.Kind == RefKind.Equation);
+
+    [Fact]
+    public void ParseLine_AppendixLabelsWithAHyphenAreOneNumber()
+        => Assert.Equal([new Ref(RefKind.Table, "a-2"), new Ref(RefKind.Table, "b-1")],
+            ReferenceIndex.ParseLine("method: Tables A-2 and B-1"));
+
+    [Fact]
+    public void ParseLine_NonAsciiCitationKeysAreStillCitations()
+        => Assert.Empty(ReferenceIndex.ParseLine("by John–Nirenberg [Lê22, Theorem 3.4] one"));
+
+    [Theory]
+    [InlineData("Lemma C.1. Under Assumption A", "Lemma", "c.1")]
+    [InlineData("Theorem A.2 (Main result). Let", "Theorem", "a.2")]
+    public void ParseStatementHeader_AppendixLetteredNumbers(string line, string kind, string number)
+        => Assert.Equal(new Ref(Enum.Parse<RefKind>(kind), number), ReferenceIndex.ParseStatementHeader(line));
 }
