@@ -9,7 +9,7 @@ namespace RailReader2.Services;
 /// <summary>
 /// Per-document view-rotation persistence (Core 0.47.0: persisting <c>DocumentModel.ViewRotation</c>
 /// across sessions is the host's job). One shell-managed sidecar map (<c>ConfigDir/view_rotations.json</c>,
-/// full path → clockwise quarter-turns) rather than a file per document — a rotation is a single int,
+/// content id (or full path for pre-identity entries) → clockwise quarter-turns) rather than a file per document — a rotation is a single int,
 /// and unlike portals/annotations there is no per-document payload worth sharding. Entries are removed
 /// when a document returns to rotation 0, so the map only ever holds the exceptions.
 ///
@@ -25,7 +25,8 @@ public static class ViewRotationStore
     {
         Debug.Assert(Dispatcher.UIThread.CheckAccess(), "ViewRotationStore is UI-thread only.");
         var map = LoadMap();
-        return map.TryGetValue(System.IO.Path.GetFullPath(pdfPath), out int turns) ? turns : 0;
+        return map.TryGetValue(KeyFor(pdfPath), out int turns) ? turns
+            : map.TryGetValue(System.IO.Path.GetFullPath(pdfPath), out turns) ? turns : 0;   // path key: pre-identity entries
     }
 
     /// <summary>Saves (or, at rotation 0, forgets) a document's view rotation.</summary>
@@ -33,10 +34,12 @@ public static class ViewRotationStore
     {
         Debug.Assert(Dispatcher.UIThread.CheckAccess(), "ViewRotationStore is UI-thread only.");
         var map = LoadMap();
-        var key = System.IO.Path.GetFullPath(pdfPath);
+        var key = KeyFor(pdfPath);
         if (quarterTurns == 0)
         {
-            if (!map.Remove(key)) return;
+            bool removed = map.Remove(key);
+            removed |= map.Remove(System.IO.Path.GetFullPath(pdfPath));
+            if (!removed) return;
         }
         else
         {
@@ -44,6 +47,10 @@ public static class ViewRotationStore
         }
         JsonSidecar.Save(Path, map, ViewRotationJsonContext.Default.DictionaryStringInt32);
     }
+
+    /// <summary>Content id when the document has been resolved, else its full path.</summary>
+    private static string KeyFor(string pdfPath)
+        => DocumentIdentity.Peek(pdfPath) ?? System.IO.Path.GetFullPath(pdfPath);
 
     private static Dictionary<string, int> LoadMap()
         => JsonSidecar.Load(Path, ViewRotationJsonContext.Default.DictionaryStringInt32,

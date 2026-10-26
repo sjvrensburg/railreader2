@@ -310,6 +310,9 @@ public class ReferenceIndexTests
     [InlineData("Theorem 1. If a D-reachability", "Theorem", "1")]
     [InlineData("Example 2.2. We introduce here", "Example", "2.2")]
     [InlineData("Exercise 3.1 [Uncorrelated does not imply independent]", "Exercise", "3.1")]
+    [InlineData("T H E O R E M 1.1 (Learning subspace property (LSP))", "Theorem", "1.1")]
+    [InlineData("DEFINITION 2.3 (Mercer kernel)", "Definition", "2.3")]
+    [InlineData("L E M M A 4.2. Let K be", "Lemma", "4.2")]
     public void ParseStatementHeader_RecognisesHeaders(string line, string kind, string number)
         => Assert.Equal(new Ref(Enum.Parse<RefKind>(kind), number), ReferenceIndex.ParseStatementHeader(line));
 
@@ -319,6 +322,9 @@ public class ReferenceIndexTests
     [InlineData("Definition 17 of [4]")]
     [InlineData("Examples are given below")]
     [InlineData("Theorem")]
+    [InlineData("T H E O R E M 1 shows that")]
+    [InlineData("THEOREMS 2 and 3")]
+    [InlineData("A B C D 1.1 (Table of results)")]
     public void ParseStatementHeader_RejectsBodyText(string line)
         => Assert.Null(ReferenceIndex.ParseStatementHeader(line));
 
