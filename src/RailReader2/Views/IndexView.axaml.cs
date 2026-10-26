@@ -21,6 +21,10 @@ public class PeekEntryViewModel
     public string? ExtractedText { get; set; }
     public bool HasThumbnail => Thumbnail is not null;
     public bool HasExtractedText => ExtractedText is not null;
+    /// <summary>The text was read by OCR, not taken from the PDF: shown in italics under an "unverified" note.</summary>
+    public bool IsOcrText { get; set; }
+    public Avalonia.Media.FontStyle TextFontStyle => IsOcrText ? Avalonia.Media.FontStyle.Italic : Avalonia.Media.FontStyle.Normal;
+    public bool ShowOcrNote => IsOcrText && HasExtractedText;
     public required PeekEntry Entry { get; init; }
 }
 
@@ -319,6 +323,7 @@ public partial class IndexView : PaneRefreshView
                         _textCache[cacheKey] = cachedText;
                 }
                 vm.ExtractedText = cachedText;
+                vm.IsOcrText = !string.IsNullOrEmpty(cachedText) && Services.OcrProvenance.IsOcrText(doc, vm.Entry.PageIndex);
                 continue;
             }
 

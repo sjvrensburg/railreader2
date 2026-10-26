@@ -42,6 +42,10 @@ public sealed class CommentEntryViewModel
             : string.IsNullOrWhiteSpace(OwnAuthorName) ? "You" : OwnAuthorName!)
         : Annotation.Author!;
 
+    /// <summary>The reader's name for this annotation's colour, when it has one.</summary>
+    public string? Category { get; init; }
+    public bool HasCategory => !string.IsNullOrEmpty(Category);
+
     public string Body => Annotation.EffectiveContents;
     public bool HasBody => !string.IsNullOrWhiteSpace(Body);
 
@@ -109,6 +113,7 @@ public partial class CommentsView : PaneRefreshView
 
         _vm.PropertyChanged += OnVmPropertyChanged;
         _vm.AnnotationsMutated += OnAnnotationsMutated;
+        _vm.ColourNamesChanged += OnAnnotationsMutated;
         _watchedTab = _vm.ActiveTab;
         RefreshIfVisible();
     }
@@ -118,6 +123,7 @@ public partial class CommentsView : PaneRefreshView
         if (_vm is null) return;
         _vm.PropertyChanged -= OnVmPropertyChanged;
         _vm.AnnotationsMutated -= OnAnnotationsMutated;
+        _vm.ColourNamesChanged -= OnAnnotationsMutated;
         _vm = null;
         _watchedTab = null;
     }
@@ -154,7 +160,7 @@ public partial class CommentsView : PaneRefreshView
             entries.Add(new CommentEntryViewModel
             {
                 Annotation = thread.Root, PageIndex = thread.Page, Depth = 0,
-                ReplyCount = thread.Replies.Count, OwnAuthorName = me,
+                Category = _vm.ColourName(thread.Root.Color), ReplyCount = thread.Replies.Count, OwnAuthorName = me,
             });
             foreach (var reply in thread.Replies)
             {
@@ -162,20 +168,25 @@ public partial class CommentsView : PaneRefreshView
                 {
                     Annotation = reply,
                     PageIndex = PageOfAnnotation(file, reply, ref pageOf) ?? thread.Page,
-                    Depth = 1, OwnAuthorName = me,
+                    Depth = 1, OwnAuthorName = me, Category = _vm.ColourName(reply.Color),
                 });
             }
         }
 
-        // The filter applies to a thread's first comment; replies follow it, so a reviewer's thread
+        RefreshCategoryFilter(entries);
+        string? category = CategoryFilter.SelectedIndex > 0 ? CategoryFilter.SelectedItem as string : null;
+
+        // The filters apply to a thread's first comment; replies follow it, so a reviewer's thread
         // still shows your answers.
-        if (filter != 0)
+        if (filter != 0 || category is not null)
         {
             var kept = new List<CommentEntryViewModel>();
             bool keep = false;
             foreach (var e in entries)
             {
-                if (!e.IsReply) keep = e.IsReviewerComment == (filter == 1);
+                if (!e.IsReply)
+                    keep = (filter == 0 || e.IsReviewerComment == (filter == 1))
+                        && (category is null || e.Category == category);
                 if (keep) kept.Add(e);
             }
             entries = kept;
@@ -183,6 +194,30 @@ public partial class CommentsView : PaneRefreshView
 
         CommentEntryList.ItemsSource = entries;
         CommentEmptyLabel.IsVisible = entries.Count == 0;
+    }
+
+    private bool _updatingCategories;
+
+    /// <summary>Lists the colour names in use in this document, keeping the current choice when it
+    /// is still among them. Hidden when no colour has a name.</summary>
+    private void RefreshCategoryFilter(List<CommentEntryViewModel> entries)
+    {
+        var names = entries.Where(e => !e.IsReply && e.HasCategory).Select(e => e.Category!)
+            .Distinct().Order(StringComparer.CurrentCultureIgnoreCase).ToList();
+        string? current = CategoryFilter.SelectedIndex > 0 ? CategoryFilter.SelectedItem as string : null;
+        _updatingCategories = true;
+        try
+        {
+            CategoryFilter.ItemsSource = new[] { "All categories" }.Concat(names).ToList();
+            CategoryFilter.SelectedIndex = current is not null && names.Contains(current) ? names.IndexOf(current) + 1 : 0;
+            CategoryFilter.IsVisible = names.Count > 0;
+        }
+        finally { _updatingCategories = false; }
+    }
+
+    private void OnCategoryFilterChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (_vm is not null && !_updatingCategories) RefreshComments();
     }
 
     private static int? PageOfAnnotation(AnnotationFile file, Annotation ann, ref Dictionary<Annotation, int>? map)

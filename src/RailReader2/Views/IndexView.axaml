@@ -80,8 +80,11 @@
                                                TextTrimming="CharacterEllipsis" />
                                     <TextBlock Text="{Binding PageDisplay}" Opacity="0.6" />
                                     <!-- Extracted text for equations -->
+                                    <TextBlock Text="OCR text, unverified" FontSize="10" Opacity="0.7"
+                                               IsVisible="{Binding ShowOcrNote}" />
                                     <TextBlock Text="{Binding ExtractedText}"
                                                IsVisible="{Binding HasExtractedText}"
+                                               FontStyle="{Binding TextFontStyle}"
                                                Opacity="0.8"
                                                TextWrapping="Wrap"
                                                MaxLines="3"

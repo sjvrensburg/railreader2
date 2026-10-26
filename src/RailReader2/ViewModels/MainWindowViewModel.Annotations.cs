@@ -555,6 +555,28 @@ public sealed partial class MainWindowViewModel
         }
     }
 
+    /// <summary>Raised after a palette colour is named or renamed, so open views can relabel.</summary>
+    public event Action? ColourNamesChanged;
+
+    /// <summary>The reader's name for an annotation colour (Settings ▸ Reading ▸ Annotations), or null.</summary>
+    public string? ColourName(string? hexColour) => _annotationPrefs.NameFor(hexColour);
+
+    /// <summary>Palette entry <paramref name="index"/> as shown to the reader: its built-in colour name,
+    /// followed by their own category name when they gave it one ("Yellow — Definition").</summary>
+    public string ColourLabel(int index)
+    {
+        string builtIn = AnnotationColourNames[index];
+        return ColourName(AnnotationInteractionHandler.AnnotationColors[index]) is { } own ? $"{builtIn} — {own}" : builtIn;
+    }
+
+    public void SetColourName(string hexColour, string? name)
+    {
+        if (string.Equals(ColourName(hexColour), string.IsNullOrWhiteSpace(name) ? null : name.Trim(), StringComparison.Ordinal)) return;
+        _annotationPrefs.SetName(hexColour, name);
+        _annotationPrefs.Save();
+        ColourNamesChanged?.Invoke();
+    }
+
     /// <summary>The reader's name, stamped by Core onto every annotation and reply they author
     /// (<c>AppConfig.AnnotationAuthor</c>, Settings ▸ Reading ▸ Annotations). Null/blank = unnamed; the
     /// Comments pane then shows "You".</summary>

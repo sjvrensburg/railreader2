@@ -527,7 +527,7 @@ public class ViewportPanel : Panel
                             Background = new SolidColorBrush(Color.Parse(palette[i])),
                             BorderBrush = Brushes.Gray, BorderThickness = new Thickness(1),
                         },
-                        new TextBlock { Text = MainWindowViewModel.AnnotationColourNames[i] },
+                        new TextBlock { Text = vm.ColourLabel(i) },
                     },
                 },
                 ToggleType = MenuItemToggleType.Radio,

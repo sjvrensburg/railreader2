@@ -135,6 +135,7 @@ public partial class SettingsWindow : Window
         LoadLineStyle(c, FocusedDocument);
         LoadReadingGuidePrefs(vm);
         AuthorNameBox.Text = vm.AnnotationAuthorName;
+        BuildColourNameRows(vm);
         LinkClickCombo.SelectedIndex = (int)vm.LinkPrefs.LinkClick;
 
         BuildRoleCheckboxes(_roleItems, c.NavigableRoles,
@@ -898,6 +899,41 @@ public partial class SettingsWindow : Window
         if (e.Key != Avalonia.Input.Key.Enter) return;
         CommitAuthorName();
         e.Handled = true;
+    }
+
+    /// <summary>One row per palette colour: a swatch, its built-in name, and a box for the reader's own category name.</summary>
+    private void BuildColourNameRows(MainWindowViewModel vm)
+    {
+        ColourNamesPanel.Children.Clear();
+        var palette = RailReader.Core.AnnotationInteractionHandler.AnnotationColors;
+        for (int i = 0; i < palette.Length; i++)
+        {
+            string hex = palette[i];
+            var box = new TextBox
+            {
+                Width = 220, PlaceholderText = "No name", Text = vm.ColourName(hex),
+            };
+            Avalonia.Automation.AutomationProperties.SetName(box, $"Name for {MainWindowViewModel.AnnotationColourNames[i]}");
+            void Commit() { if (!_loading) vm.SetColourName(hex, box.Text); }
+            box.LostFocus += (_, _) => Commit();
+            box.KeyDown += (_, e) => { if (e.Key == Avalonia.Input.Key.Enter) { Commit(); e.Handled = true; } };
+            ColourNamesPanel.Children.Add(new StackPanel
+            {
+                Orientation = Avalonia.Layout.Orientation.Horizontal, Spacing = 8,
+                Children =
+                {
+                    new Border
+                    {
+                        Width = 18, Height = 18, CornerRadius = new Avalonia.CornerRadius(3),
+                        Background = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse(hex)),
+                        BorderBrush = Avalonia.Media.Brushes.Gray, BorderThickness = new Avalonia.Thickness(1),
+                        VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+                    },
+                    new TextBlock { Text = MainWindowViewModel.AnnotationColourNames[i], Width = 70, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center },
+                    box,
+                },
+            });
+        }
     }
 
     private void CommitAuthorName()
