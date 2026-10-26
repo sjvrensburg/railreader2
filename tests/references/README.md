@@ -125,6 +125,28 @@ window was added): all but that one were right: appendix equations cited from pr
 named in proof headings, appendix figures and tables. The nine labelled documents are unchanged
 (precision 1.00; the EPTCS volume keeps its cap because its restarts are detected).
 
+## Citations
+
+Citations (`[12]`, `[3, 7–9]`, `[IK99]`, `Smith et al. (2019)`, `(Smith and Jones, 2019a; Lee, 2020)`)
+resolve to the matching entry of the document's reference list. The list is found by its heading
+and runs to the next heading; a citation resolves to the next list after it, and abstains when that
+is ambiguous (a proceedings volume with one list per paper) or more than 25 pages away. Author-year
+citations are matched on first-author surname and year, with the author count (single, two, et al.)
+told apart; an unsuffixed year matching 2024a and 2024b abstains.
+
+Labelled citations: Attention, Breusch, applsci, the foundation-model survey, 2504.09663v2, Medvigy,
+the EPTCS volume (243 labels) and svd. Precision is 1.00 on all of them; recall is 1.00 except the EPTCS
+volume (the first pages of a paper right after another paper's list, and one `X [8]` form not detected).
+
+Unseen batch D (26 arXiv papers): read by eye from random samples of resolved citations,
+numeric and author-year. Findings that became rules and tests: intervals such as `[2, 9]` after a
+math symbol or "in/on" are not citations; DOIs and arXiv ids are not publication years;
+initials-first entries (`G. Qu and A. Wierman. … 2020.`) and AMS "and Coauthors" are parsed. The
+entry parser change resolved 86 more author-year citations, which I read: all were right.
+
+Limits: author-year matching depends on the entry parser reading the first author and year, so
+unusual entry layouts abstain; multi-list volumes depend on detecting each paper's first section.
+
 ## Limits
 
 - On the single-paper documents the baselines tie or trail the resolver. The EPTCS volume separates

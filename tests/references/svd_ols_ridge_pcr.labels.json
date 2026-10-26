@@ -1,6 +1,14 @@
 {
  "pdf_sha256": "11e3210e4dc3e6aaf2d47c3e38e2ab0a6c95ed4a85891c33349822def82e7f81",
- "mentions": [],
+ "mentions": [
+  {
+   "page": 19,
+   "kind": "Citation",
+   "number": "gouletcoulombe:2025",
+   "target_page": 19,
+   "target_block": 7
+  }
+ ],
  "empty_pages": [
   0,
   1,
@@ -20,7 +28,6 @@
   15,
   16,
   17,
-  18,
-  19
+  18
  ]
 }

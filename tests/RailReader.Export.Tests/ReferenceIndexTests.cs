@@ -485,6 +485,9 @@ public class ReferenceIndexTests
     [InlineData("see [12, p. 165, eq. (4.21)] for", "12")]
     [InlineData("From Amemiya [2, eqs. (5) and (6)] it", "2")]
     [InlineData("shown in [IK99] and [Bis06, Mur12].", "ik99,bis06,mur12")]
+    [InlineData("In [2, 9], the authors show", "2,9")]
+    [InlineData("the line of work initiated in [3, 2] where", "3,2")]
+    [InlineData("can be verified similarly to [5, 7]. If", "5,7")]
     public void ParseLine_NumericAndKeyedBracketCitations(string line, string keys)
         => Assert.Equal(keys.Split(','), CiteKeys(line));
 

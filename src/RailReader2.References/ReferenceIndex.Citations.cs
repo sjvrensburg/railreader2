@@ -11,10 +11,12 @@ internal sealed partial class ReferenceIndex
     /// paper's.</summary>
     internal const int MaxPagesToReferenceList = 25;
 
-    private sealed record BibState(int Analysed, List<BibRegion> Regions, HashSet<(int Page, int Block)> Blocks);
+    private enum HeadingKind { Reference, Other, PaperStart }
+
+    private sealed record BibState(int Analysed, List<BibRegion> Regions, HashSet<(int Page, int Block)> Blocks, List<int> PaperStarts);
 
     private BibState? _bib;
-    private readonly Dictionary<int, (PageAnalysis Analysis, List<(int Block, bool IsReferenceHeading)> Headings)> _bibHeadings = [];
+    private readonly Dictionary<int, (PageAnalysis Analysis, List<(int Block, HeadingKind Kind)> Headings)> _bibHeadings = [];
     private readonly Dictionary<int, (PageAnalysis Analysis, List<BibEntry> Entries)> _bibEntries = [];
 
     /// <summary>Index the document's reference lists, spending at most <paramref name="budget"/> page
@@ -26,6 +28,7 @@ internal sealed partial class ReferenceIndex
 
         List<BibRegion> regions = [];
         HashSet<(int, int)> blocks = [];
+        List<int> paperStarts = [];
         BibRegion? current = null;
         bool inRegion = false;
         for (int page = 0; page < doc.PageCount; page++)
@@ -37,7 +40,7 @@ internal sealed partial class ReferenceIndex
                 budget--;
                 _bibHeadings[page] = h = (analysis, FindHeadings(doc, page, analysis));
             }
-            bool entersRegion = h.Headings.Any(x => x.IsReferenceHeading);
+            bool entersRegion = h.Headings.Any(x => x.Kind == HeadingKind.Reference);
             List<BibEntry> entries = [];
             if (inRegion || entersRegion)
             {
@@ -51,11 +54,15 @@ internal sealed partial class ReferenceIndex
             }
             for (int b = 0; b < analysis.Blocks.Count; b++)
             {
-                foreach (var (block, isReference) in h.Headings)
+                foreach (var (block, kind) in h.Headings)
                 {
                     if (block != b) continue;
-                    if (isReference) { current = new BibRegion(page, []); regions.Add(current); inRegion = true; }
-                    else inRegion = false;
+                    if (kind == HeadingKind.Reference) { current = new BibRegion(page, []); regions.Add(current); inRegion = true; }
+                    else
+                    {
+                        inRegion = false;
+                        if (kind == HeadingKind.PaperStart) paperStarts.Add(page);
+                    }
                 }
                 if (!inRegion) continue;
                 var role = analysis.Blocks[b].Role;
@@ -64,12 +71,12 @@ internal sealed partial class ReferenceIndex
                     if (entry.Block == b) current!.Entries.Add(entry);
             }
         }
-        return _bib = new BibState(analysed, regions, blocks);
+        return _bib = new BibState(analysed, regions, blocks, paperStarts);
     }
 
-    private static List<(int Block, bool IsReferenceHeading)> FindHeadings(IReferenceDocument doc, int page, PageAnalysis analysis)
+    private static List<(int Block, HeadingKind Kind)> FindHeadings(IReferenceDocument doc, int page, PageAnalysis analysis)
     {
-        List<(int, bool)> found = [];
+        List<(int, HeadingKind)> found = [];
         PageText? text = null;
         for (int i = 0; i < analysis.Blocks.Count; i++)
         {
@@ -78,8 +85,8 @@ internal sealed partial class ReferenceIndex
             bool shortLine = block.Role == BlockRole.Text && block.BBox.H <= 22;
             if (!heading && !shortLine) continue;
             string t = (text ??= doc.GetText(page)).ExtractBlockText(block).Trim();
-            if (BibliographyParser.IsReferenceHeading(t)) found.Add((i, true));
-            else if (heading) found.Add((i, false));
+            if (BibliographyParser.IsReferenceHeading(t)) found.Add((i, HeadingKind.Reference));
+            else if (heading) found.Add((i, BibliographyParser.IsPaperStart(t) ? HeadingKind.PaperStart : HeadingKind.Other));
         }
         return found;
     }
@@ -121,9 +128,22 @@ internal sealed partial class ReferenceIndex
         if (EnsureBibliography(doc, ref budget, ref incomplete) is not { } bib || bib.Regions.Count == 0) return null;
 
         // The reference list a citation belongs to is the next one after it; after the last one, the last.
+        // Just after a list the mention may be that paper's appendix or the next paper's opening pages
+        // (a volume): on the list's last page it is the former, a "1 Introduction" heading since the list
+        // makes it the latter, and in between it is ambiguous, so it abstains.
         BibRegion? region = bib.Regions.FirstOrDefault(r => r.StartPage >= nearPage);
         if (region is null) region = bib.Regions[^1];
-        else if (bib.Regions.Count > 1 && region.StartPage - nearPage > MaxPagesToReferenceList) return null;
+        else
+        {
+            var previous = bib.Regions.LastOrDefault(r => r.StartPage < nearPage);
+            if (previous is not null)
+            {
+                if (nearPage <= previous.EndPage) region = previous;
+                else if (!bib.PaperStarts.Any(p => p > previous.StartPage && p <= nearPage) && nearPage <= previous.EndPage + 2)
+                    return null;
+            }
+            if (bib.Regions.Count > 1 && region.StartPage - nearPage > MaxPagesToReferenceList) return null;
+        }
 
         var matches = MatchEntries(region.Entries, reference.Number);
         return matches.Count == 1 ? new Target(matches[0].Page, matches[0].Block, matches[0].Block) : null;

@@ -36,8 +36,7 @@ internal static partial class CitationMentions
     // A bracket that follows these is an interval or a set, not a citation ("x ∈ [1, 2]", "on [0, 1]").
     private static readonly HashSet<string> IntervalWords = new(StringComparer.OrdinalIgnoreCase)
     {
-        "in", "over", "on", "within", "interval", "intervals", "set", "domain", "range", "to", "by", "of",
-        "is", "be", "are", "with", "for", "from", "into", "than", "at", "between",
+        "on", "over", "within", "interval", "intervals", "set", "domain", "range", "between", "into", "than", "at",
     };
     private const string MathBefore = "∈∉=⊂⊆≤≥<>+-*/×∪∩({|^_\\";
 

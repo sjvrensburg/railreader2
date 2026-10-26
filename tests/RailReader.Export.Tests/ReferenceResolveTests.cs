@@ -594,4 +594,61 @@ public class ReferenceResolveTests
         Assert.Equal(1, Resolve(new(), doc, Cite("trenberth+:2007"), 0)!.Value.TargetBlock);
         Assert.Null(Resolve(new(), doc, Cite("trenberth:2007"), 0));   // a single-author citation is not this entry
     }
+
+    [Fact]
+    public void Citation_RightAfterAListIsAnAppendixThePaperOpeningOrAmbiguous()
+    {
+        var doc = RefList(RefList(new FakeDoc(60), 10, "[1] Old, A. (2001). Paper one."), 40, "[1] New, B. (2002). Paper two.")
+            .Add(14, [(BlockRole.Heading, 50, 60, 200, 14)], new() { [0] = "1 Introduction" })
+            .Complete();
+        var index = new ReferenceIndex();
+        Assert.Equal(10, Resolve(index, doc, Cite("1"), 10)!.Value.Page);   // after the list on its own page: paper one's appendix
+        Assert.Null(Resolve(index, doc, Cite("1"), 12));                    // two pages on, no paper start yet: ambiguous
+        Assert.Equal(40, Resolve(index, doc, Cite("1"), 15)!.Value.Page);   // paper two began at 14
+        Assert.Equal(40, Resolve(index, doc, Cite("1"), 30)!.Value.Page);   // far past the list: the next one
+    }
+
+    [Theory]
+    [InlineData("1Introduction", true)]
+    [InlineData("1 Introduction", true)]
+    [InlineData("Introduction", true)]
+    [InlineData("I. INTRODUCTION", true)]
+    [InlineData("2 Related work", false)]
+    [InlineData("1.1 Notation", false)]
+    [InlineData("A Appendix", false)]
+    public void PaperStart_RecognisesFirstSections(string heading, bool expected)
+        => Assert.Equal(expected, BibliographyParser.IsPaperStart(heading));
+
+    [Fact]
+    public void Citation_InitialsFirstEntriesWithTheYearAtTheEnd()
+    {
+        var doc = RefList(new FakeDoc(5), 3,
+            "Y. Peng. Near-minimax-optimal rates for asynchronous TD learning. arXiv preprint arXiv:2605.00001, 2026.",
+            "G. Qu and A. Wierman. Finite-time analysis of asynchronous stochastic approximation. In Proceedings, 2020.",
+            "G. Li, Y. Wei, Y. Chi, Y. Gu, and Y. Chen. Sample complexity of asynchronous Q-learning. Advances, 2020.",
+            "J. N. Tsitsiklis. Asynchronous stochastic approximation and Q-learning. Machine Learning, 16(3):185–202, 1994.").Complete();
+        var index = new ReferenceIndex();
+        Assert.Equal(1, Resolve(index, doc, Cite("peng:2026"), 0)!.Value.TargetBlock);
+        Assert.Equal(2, Resolve(index, doc, Cite("qu&wierman:2020"), 0)!.Value.TargetBlock);
+        Assert.Equal(3, Resolve(index, doc, Cite("li+:2020"), 0)!.Value.TargetBlock);
+        Assert.Equal(4, Resolve(index, doc, Cite("tsitsiklis:1994"), 0)!.Value.TargetBlock);
+        Assert.Null(Resolve(index, doc, Cite("li:2020"), 0));                   // a single author is not this five-author entry
+    }
+
+    [Fact]
+    public void Citation_AParenthesisedYearBeatsAnArxivNumber()
+    {
+        var doc = RefList(new FakeDoc(5), 3, "Smith, J. and Lee, K. (2019). A title. arXiv:2301.00001.").Complete();
+        Assert.NotNull(Resolve(new(), doc, Cite("smith&lee:2019"), 0));
+        Assert.Null(Resolve(new(), doc, Cite("smith&lee:2023"), 0));
+    }
+
+    [Fact]
+    public void Citation_ADoiYearIsNotThePublicationYear()
+    {
+        var doc = RefList(new FakeDoc(5), 3,
+            "A. Abadie, A. Diamond, and J. Hainmueller. Synthetic Control Methods. Journal of the American Statistical Association, 105(490):493–505, 2010. doi: 10.1198/jasa.2009.ap08746.").Complete();
+        Assert.NotNull(Resolve(new(), doc, Cite("abadie+:2010"), 0));
+        Assert.Null(Resolve(new(), doc, Cite("abadie+:2009"), 0));
+    }
 }

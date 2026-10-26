@@ -23,6 +23,13 @@ internal static partial class BibliographyParser
     [GeneratedRegex(@"^\s*(?:\d+\.?|[IVX]+\.?|[A-Z]\.)?\s*(?:references?(?:\s+and\s+notes)?|bibliography|literature\s+cited|works\s+cited|reference\s+list|sources)\s*:?\s*$", RegexOptions.IgnoreCase)]
     private static partial Regex ReferenceHeadingRegex();
 
+    [GeneratedRegex(@"^\s*(?:(?:1|I)\.?\s*\p{Lu}|(?i:introduction|abstract)\s*$)")]
+    private static partial Regex PaperStartRegex();
+
+    /// <summary>A heading that opens a paper ("1 Introduction", "Abstract"): in a volume it marks where one
+    /// paper ends and the next begins.</summary>
+    internal static bool IsPaperStart(string text) => text.Length <= 60 && PaperStartRegex().IsMatch(text);
+
     /// <summary>True when a block's text is a short "References"-style title.</summary>
     internal static bool IsReferenceHeading(string text) => text.Length <= 48 && ReferenceHeadingRegex().IsMatch(text);
 
@@ -90,40 +97,78 @@ internal static partial class BibliographyParser
         if (label is { Length: 0 }) label = null;
 
         // authors and year, when the entry is written author-year (also read for labelled entries)
-        string? first = null, second = null, year = null;
-        int count = 0;
-        string head = body.Length > 320 ? body[..320] : body;
-        var ym = YearRegex().Match(head);
-        if (ym.Success)
-        {
-            string authors = head[..ym.Index];
-            var groups = InitialsGroupRegex().Matches(authors);
-            if (groups.Count > 0 && SurnameCommaInitialsRegex().Match(authors) is { Success: true } f && f.Index < 6)
-            {
-                first = CitationMentions.NormaliseSurname(f.Groups["s"].Value);
-                count = groups.Count + (EtAlRegex().IsMatch(authors) ? 1 : 0);
-                year = ym.Value;
-                var after = authors[(f.Index + f.Length)..];
-                second = SecondAuthor(after);
-            }
-        }
+        var authors = ParseAuthors(body);
+        string? first = authors?.First, second = authors?.Second, year = null;
+        int count = authors?.Count ?? 0;
+        if (authors is not null) year = PickYear(body, authors.End);
+        if (year is null) { first = null; second = null; count = 0; }
         if (label is null && first is null) return null;
         return new BibEntry(page, block, label, first, second, count, year);
     }
 
-    /// <summary>The second author's surname from the text after the first author's initials:
-    /// "Cho, K., and Bengio, Y." (surname first) or "and W. B. Rossow" (initials first).</summary>
-    private static string? SecondAuthor(string after)
+    private sealed record Authors(string First, string? Second, int Count, int End);
+
+    [GeneratedRegex(@"^\s*(?:" + Initials + @")(?<s>" + Surname + ")")]
+    private static partial Regex InitialsFirstStartRegex();
+
+    [GeneratedRegex(@"\G(?:\s*,\s*(?:and\s+)?|\s*\band\s+|\s*&\s*)(?:" + Initials + @")(?<s>" + Surname + ")")]
+    private static partial Regex NextInitialsFirstAuthorRegex();
+
+    [GeneratedRegex(@"\G(?:\s*,\s*(?:and\s+)?|\s*\band\s+|\s*&\s*)(?:(?<s>" + Surname + @")\s*,\s*" + Initials + "|" + Initials + @"(?<s2>" + Surname + "))")]
+    private static partial Regex NextAuthorRegex();
+
+    [GeneratedRegex(@"(?i)(?:doi:?\s*|https?://|arxiv:?\s*)\S+|\b10\.\d{4,}/\S+")]
+    private static partial Regex IdentifierRegex();
+
+    [GeneratedRegex(@"\(\s*((?:19|20)\d\d[a-z]?)\s*\)")]
+    private static partial Regex ParenthesisedYearRegex();
+
+    /// <summary>The entry's authors, whichever way it writes them: "Surname, I., Surname, I." (APA, AMS)
+    /// or "I. Surname, I. Surname and I. Surname." (initials first).</summary>
+    private static Authors? ParseAuthors(string body)
     {
-        var apa = Regex.Match(after, @"(?:,|\band\b|&)\s*(?<s>" + Surname + @")\s*,\s*" + Initials);
-        var ams = InitialsSurnameRegex().Match(after);
-        Match? best = (apa.Success, ams.Success) switch
+        string head = body.Length > 400 ? body[..400] : body;
+        // style A: the first author is "Surname, Initials"; the next ones follow in either order
+        if (SurnameCommaInitialsRegex().Match(head) is { Success: true } f && head[..f.Index].Trim().Length == 0)
         {
-            (true, true) => apa.Index <= ams.Index ? apa : ams,
-            (true, false) => apa,
-            (false, true) => ams,
-            _ => null,
-        };
-        return best is null ? null : CitationMentions.NormaliseSurname(best.Groups["s"].Value);
+            string? second = null;
+            int count = 1, pos = f.Index + f.Length;
+            while (NextAuthorRegex().Match(head, pos) is { Success: true } next)
+            {
+                count++;
+                second ??= CitationMentions.NormaliseSurname(next.Groups["s"].Success ? next.Groups["s"].Value : next.Groups["s2"].Value);
+                pos = next.Index + next.Length;
+            }
+            if (EtAlRegex().IsMatch(head[pos..Math.Min(head.Length, pos + 24)])) count++;
+            return new Authors(CitationMentions.NormaliseSurname(f.Groups["s"].Value), second, count, pos);
+        }
+        // style B: "I. I. Surname, I. Surname and I. Surname. Title"
+        if (InitialsFirstStartRegex().Match(head) is { Success: true } b)
+        {
+            string first = CitationMentions.NormaliseSurname(b.Groups["s"].Value);
+            string? second = null;
+            int n = 1, pos = b.Index + b.Length;
+            while (NextInitialsFirstAuthorRegex().Match(head, pos) is { Success: true } next)
+            {
+                n++; second ??= CitationMentions.NormaliseSurname(next.Groups["s"].Value); pos = next.Index + next.Length;
+            }
+            if (EtAlRegex().IsMatch(head[pos..Math.Min(head.Length, pos + 12)])) n++;
+            return new Authors(first, second, n, pos);
+        }
+        return null;
+    }
+
+    /// <summary>The publication year: one in parentheses, else the first right after the authors
+    /// ("…Roiter, 1997:"), else the last year in the entry ("…, 2026.").</summary>
+    private static string? PickYear(string body, int authorsEnd)
+    {
+        string head = body.Length > 400 ? body[..400] : body;
+        head = IdentifierRegex().Replace(head, m => new string(' ', m.Length));   // years inside a DOI, URL or arXiv id are not the year
+        if (ParenthesisedYearRegex().Match(head) is { Success: true } p) return p.Groups[1].Value;
+        var all = YearRegex().Matches(head);
+        if (all.Count == 0) return null;
+        foreach (Match m in all)
+            if (m.Index >= authorsEnd - 2 && m.Index - authorsEnd <= 24) return m.Value;
+        return all[^1].Value;
     }
 }
