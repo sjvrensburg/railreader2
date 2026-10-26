@@ -133,25 +133,364 @@
    "number": "35",
    "target_page": 20,
    "target_block": 8
+  },
+  {
+   "page": 1,
+   "kind": "Citation",
+   "number": "vaswani+:2017",
+   "target_page": 32,
+   "target_block": 0
+  },
+  {
+   "page": 2,
+   "kind": "Citation",
+   "number": "gouletcoulombe+:2024a",
+   "target_page": 30,
+   "target_block": 13
+  },
+  {
+   "page": 2,
+   "kind": "Citation",
+   "number": "marion+:2024",
+   "target_page": 31,
+   "target_block": 11
+  },
+  {
+   "page": 2,
+   "kind": "Citation",
+   "number": "garnelo&czarnecki:2023",
+   "target_page": 30,
+   "target_block": 8
+  },
+  {
+   "page": 2,
+   "kind": "Citation",
+   "number": "tsai+:2019",
+   "target_page": 31,
+   "target_block": 16
+  },
+  {
+   "page": 2,
+   "kind": "Citation",
+   "number": "choromanski+:2020",
+   "target_page": 30,
+   "target_block": 4
+  },
+  {
+   "page": 2,
+   "kind": "Citation",
+   "number": "peng+:2021",
+   "target_page": 31,
+   "target_block": 13
+  },
+  {
+   "page": 2,
+   "kind": "Citation",
+   "number": "scholkopf+:2001",
+   "target_page": 31,
+   "target_block": 14
+  },
+  {
+   "page": 2,
+   "kind": "Citation",
+   "number": "wahba&wang:2019",
+   "target_page": 32,
+   "target_block": 1
+  },
+  {
+   "page": 3,
+   "kind": "Citation",
+   "number": "kwon+:2024",
+   "target_page": 31,
+   "target_block": 8
+  },
+  {
+   "page": 3,
+   "kind": "Citation",
+   "number": "ludwig+:2025",
+   "target_page": 31,
+   "target_block": 10
+  },
+  {
+   "page": 3,
+   "kind": "Citation",
+   "number": "kelly+:2025",
+   "target_page": 31,
+   "target_block": 6
+  },
+  {
+   "page": 3,
+   "kind": "Citation",
+   "number": "fallahgoul:2025",
+   "target_page": 30,
+   "target_block": 5
+  },
+  {
+   "page": 5,
+   "kind": "Citation",
+   "number": "gouletcoulombe+:2024a",
+   "target_page": 30,
+   "target_block": 13
+  },
+  {
+   "page": 5,
+   "kind": "Citation",
+   "number": "hastie+:2009",
+   "target_page": 31,
+   "target_block": 3
+  },
+  {
+   "page": 6,
+   "kind": "Citation",
+   "number": "bai+:2008",
+   "target_page": 30,
+   "target_block": 3
+  },
+  {
+   "page": 7,
+   "kind": "Citation",
+   "number": "guijarroordonez+:2021",
+   "target_page": 31,
+   "target_block": 0
+  },
+  {
+   "page": 7,
+   "kind": "Citation",
+   "number": "bahdanau+:2014",
+   "target_page": 30,
+   "target_block": 2
+  },
+  {
+   "page": 7,
+   "kind": "Citation",
+   "number": "vaswani+:2017",
+   "target_page": 32,
+   "target_block": 0
+  },
+  {
+   "page": 8,
+   "kind": "Citation",
+   "number": "goodfellow+:2016",
+   "target_page": 30,
+   "target_block": 9
+  },
+  {
+   "page": 8,
+   "kind": "Citation",
+   "number": "tsai+:2019",
+   "target_page": 31,
+   "target_block": 16
+  },
+  {
+   "page": 8,
+   "kind": "Citation",
+   "number": "choromanski+:2020",
+   "target_page": 30,
+   "target_block": 4
+  },
+  {
+   "page": 8,
+   "kind": "Citation",
+   "number": "katharopoulos+:2020",
+   "target_page": 31,
+   "target_block": 5
+  },
+  {
+   "page": 8,
+   "kind": "Citation",
+   "number": "peng+:2021",
+   "target_page": 31,
+   "target_block": 13
+  },
+  {
+   "page": 9,
+   "kind": "Citation",
+   "number": "garnelo&czarnecki:2023",
+   "target_page": 30,
+   "target_block": 8
+  },
+  {
+   "page": 14,
+   "kind": "Citation",
+   "number": "gouletcoulombe+:2024a",
+   "target_page": 30,
+   "target_block": 13
+  },
+  {
+   "page": 15,
+   "kind": "Citation",
+   "number": "hastie+:2009",
+   "target_page": 31,
+   "target_block": 3
+  },
+  {
+   "page": 17,
+   "kind": "Citation",
+   "number": "vaswani+:2017",
+   "target_page": 32,
+   "target_block": 0
+  },
+  {
+   "page": 18,
+   "kind": "Citation",
+   "number": "hamilton:2018",
+   "target_page": 31,
+   "target_block": 1
+  },
+  {
+   "page": 18,
+   "kind": "Citation",
+   "number": "gu&dao:2023",
+   "target_page": 30,
+   "target_block": 17
+  },
+  {
+   "page": 18,
+   "kind": "Citation",
+   "number": "feinashley+:2025",
+   "target_page": 30,
+   "target_block": 6
+  },
+  {
+   "page": 18,
+   "kind": "Citation",
+   "number": "wolpert:1992",
+   "target_page": 32,
+   "target_block": 2
+  },
+  {
+   "page": 18,
+   "kind": "Citation",
+   "number": "granger&ramanathan:1984",
+   "target_page": 30,
+   "target_block": 16
+  },
+  {
+   "page": 19,
+   "kind": "Citation",
+   "number": "mikolov:2013",
+   "target_page": 31,
+   "target_block": 12
+  },
+  {
+   "page": 19,
+   "kind": "Citation",
+   "number": "levy+:2015",
+   "target_page": 31,
+   "target_block": 9
+  },
+  {
+   "page": 20,
+   "kind": "Citation",
+   "number": "sims:1980",
+   "target_page": 31,
+   "target_block": 15
+  },
+  {
+   "page": 22,
+   "kind": "Citation",
+   "number": "gu+:2020",
+   "target_page": 30,
+   "target_block": 18
+  },
+  {
+   "page": 22,
+   "kind": "Citation",
+   "number": "hewamalage+:2022",
+   "target_page": 31,
+   "target_block": 4
+  },
+  {
+   "page": 23,
+   "kind": "Citation",
+   "number": "vaswani+:2017",
+   "target_page": 32,
+   "target_block": 0
+  },
+  {
+   "page": 23,
+   "kind": "Citation",
+   "number": "kelly+:2025",
+   "target_page": 31,
+   "target_block": 6
+  },
+  {
+   "page": 23,
+   "kind": "Citation",
+   "number": "harvey:1990",
+   "target_page": 31,
+   "target_block": 2
+  },
+  {
+   "page": 27,
+   "kind": "Citation",
+   "number": "kim+:2018",
+   "target_page": 31,
+   "target_block": 7
+  },
+  {
+   "page": 27,
+   "kind": "Citation",
+   "number": "gouletcoulombe:2024b",
+   "target_page": 30,
+   "target_block": 11
+  },
+  {
+   "page": 28,
+   "kind": "Citation",
+   "number": "fischer+:2023",
+   "target_page": 30,
+   "target_block": 7
+  },
+  {
+   "page": 28,
+   "kind": "Citation",
+   "number": "aruoba&drechsel:2024",
+   "target_page": 30,
+   "target_block": 1
+  },
+  {
+   "page": 29,
+   "kind": "Citation",
+   "number": "gouletcoulombe&klieber:2025",
+   "target_page": 30,
+   "target_block": 14
+  },
+  {
+   "page": 29,
+   "kind": "Citation",
+   "number": "gu&dao:2023",
+   "target_page": 30,
+   "target_block": 17
+  },
+  {
+   "page": 29,
+   "kind": "Citation",
+   "number": "feinashley+:2025",
+   "target_page": 30,
+   "target_block": 6
+  },
+  {
+   "page": 15,
+   "kind": "Citation",
+   "number": "gouletcoulombe:2024a",
+   "target_page": 30,
+   "target_block": 10
+  },
+  {
+   "page": 15,
+   "kind": "Citation",
+   "number": "gouletcoulombe:2024c",
+   "target_page": 30,
+   "target_block": 12
   }
  ],
  "empty_pages": [
   0,
-  1,
-  2,
-  3,
-  7,
-  8,
   12,
   13,
-  18,
-  20,
-  22,
-  23,
   24,
   25,
-  28,
-  29,
   30,
   31,
   32,

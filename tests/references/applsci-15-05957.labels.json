@@ -147,13 +147,709 @@
    "number": "3",
    "target_page": 27,
    "target_block": 4
+  },
+  {
+   "page": 1,
+   "kind": "Citation",
+   "number": "1",
+   "target_page": 28,
+   "target_block": 10
+  },
+  {
+   "page": 1,
+   "kind": "Citation",
+   "number": "2",
+   "target_page": 28,
+   "target_block": 11
+  },
+  {
+   "page": 1,
+   "kind": "Citation",
+   "number": "3",
+   "target_page": 28,
+   "target_block": 12
+  },
+  {
+   "page": 1,
+   "kind": "Citation",
+   "number": "67",
+   "target_page": 31,
+   "target_block": 6
+  },
+  {
+   "page": 2,
+   "kind": "Citation",
+   "number": "68",
+   "target_page": 31,
+   "target_block": 7
+  },
+  {
+   "page": 2,
+   "kind": "Citation",
+   "number": "71",
+   "target_page": 31,
+   "target_block": 10
+  },
+  {
+   "page": 2,
+   "kind": "Citation",
+   "number": "72",
+   "target_page": 31,
+   "target_block": 11
+  },
+  {
+   "page": 2,
+   "kind": "Citation",
+   "number": "81",
+   "target_page": 31,
+   "target_block": 20
+  },
+  {
+   "page": 3,
+   "kind": "Citation",
+   "number": "82",
+   "target_page": 31,
+   "target_block": 21
+  },
+  {
+   "page": 3,
+   "kind": "Citation",
+   "number": "83",
+   "target_page": 31,
+   "target_block": 22
+  },
+  {
+   "page": 3,
+   "kind": "Citation",
+   "number": "84",
+   "target_page": 31,
+   "target_block": 23
+  },
+  {
+   "page": 4,
+   "kind": "Citation",
+   "number": "45",
+   "target_page": 30,
+   "target_block": 10
+  },
+  {
+   "page": 4,
+   "kind": "Citation",
+   "number": "65",
+   "target_page": 31,
+   "target_block": 4
+  },
+  {
+   "page": 4,
+   "kind": "Citation",
+   "number": "85",
+   "target_page": 31,
+   "target_block": 24
+  },
+  {
+   "page": 5,
+   "kind": "Citation",
+   "number": "86",
+   "target_page": 31,
+   "target_block": 25
+  },
+  {
+   "page": 5,
+   "kind": "Citation",
+   "number": "87",
+   "target_page": 31,
+   "target_block": 26
+  },
+  {
+   "page": 5,
+   "kind": "Citation",
+   "number": "88",
+   "target_page": 32,
+   "target_block": 2
+  },
+  {
+   "page": 5,
+   "kind": "Citation",
+   "number": "28",
+   "target_page": 29,
+   "target_block": 20
+  },
+  {
+   "page": 5,
+   "kind": "Citation",
+   "number": "33",
+   "target_page": 29,
+   "target_block": 25
+  },
+  {
+   "page": 5,
+   "kind": "Citation",
+   "number": "70",
+   "target_page": 31,
+   "target_block": 9
+  },
+  {
+   "page": 5,
+   "kind": "Citation",
+   "number": "74",
+   "target_page": 31,
+   "target_block": 13
+  },
+  {
+   "page": 5,
+   "kind": "Citation",
+   "number": "77",
+   "target_page": 31,
+   "target_block": 16
+  },
+  {
+   "page": 6,
+   "kind": "Citation",
+   "number": "27",
+   "target_page": 29,
+   "target_block": 19
+  },
+  {
+   "page": 6,
+   "kind": "Citation",
+   "number": "61",
+   "target_page": 30,
+   "target_block": 26
+  },
+  {
+   "page": 6,
+   "kind": "Citation",
+   "number": "6",
+   "target_page": 28,
+   "target_block": 15
+  },
+  {
+   "page": 6,
+   "kind": "Citation",
+   "number": "19",
+   "target_page": 29,
+   "target_block": 11
+  },
+  {
+   "page": 6,
+   "kind": "Citation",
+   "number": "33",
+   "target_page": 29,
+   "target_block": 25
+  },
+  {
+   "page": 6,
+   "kind": "Citation",
+   "number": "36",
+   "target_page": 29,
+   "target_block": 28
+  },
+  {
+   "page": 6,
+   "kind": "Citation",
+   "number": "48",
+   "target_page": 30,
+   "target_block": 13
+  },
+  {
+   "page": 6,
+   "kind": "Citation",
+   "number": "51",
+   "target_page": 30,
+   "target_block": 16
+  },
+  {
+   "page": 6,
+   "kind": "Citation",
+   "number": "55",
+   "target_page": 30,
+   "target_block": 20
+  },
+  {
+   "page": 6,
+   "kind": "Citation",
+   "number": "59",
+   "target_page": 30,
+   "target_block": 24
+  },
+  {
+   "page": 6,
+   "kind": "Citation",
+   "number": "60",
+   "target_page": 30,
+   "target_block": 25
+  },
+  {
+   "page": 6,
+   "kind": "Citation",
+   "number": "62",
+   "target_page": 30,
+   "target_block": 27
+  },
+  {
+   "page": 6,
+   "kind": "Citation",
+   "number": "65",
+   "target_page": 31,
+   "target_block": 4
+  },
+  {
+   "page": 6,
+   "kind": "Citation",
+   "number": "30",
+   "target_page": 29,
+   "target_block": 22
+  },
+  {
+   "page": 6,
+   "kind": "Citation",
+   "number": "64",
+   "target_page": 31,
+   "target_block": 3
+  },
+  {
+   "page": 6,
+   "kind": "Citation",
+   "number": "66",
+   "target_page": 31,
+   "target_block": 5
+  },
+  {
+   "page": 6,
+   "kind": "Citation",
+   "number": "73",
+   "target_page": 31,
+   "target_block": 12
+  },
+  {
+   "page": 6,
+   "kind": "Citation",
+   "number": "37",
+   "target_page": 30,
+   "target_block": 2
+  },
+  {
+   "page": 6,
+   "kind": "Citation",
+   "number": "78",
+   "target_page": 31,
+   "target_block": 17
+  },
+  {
+   "page": 15,
+   "kind": "Citation",
+   "number": "9",
+   "target_page": 28,
+   "target_block": 18
+  },
+  {
+   "page": 16,
+   "kind": "Citation",
+   "number": "4",
+   "target_page": 28,
+   "target_block": 13
+  },
+  {
+   "page": 16,
+   "kind": "Citation",
+   "number": "20",
+   "target_page": 29,
+   "target_block": 12
+  },
+  {
+   "page": 16,
+   "kind": "Citation",
+   "number": "29",
+   "target_page": 29,
+   "target_block": 21
+  },
+  {
+   "page": 16,
+   "kind": "Citation",
+   "number": "43",
+   "target_page": 30,
+   "target_block": 8
+  },
+  {
+   "page": 16,
+   "kind": "Citation",
+   "number": "45",
+   "target_page": 30,
+   "target_block": 10
+  },
+  {
+   "page": 16,
+   "kind": "Citation",
+   "number": "51",
+   "target_page": 30,
+   "target_block": 16
+  },
+  {
+   "page": 16,
+   "kind": "Citation",
+   "number": "55",
+   "target_page": 30,
+   "target_block": 20
+  },
+  {
+   "page": 16,
+   "kind": "Citation",
+   "number": "66",
+   "target_page": 31,
+   "target_block": 5
+  },
+  {
+   "page": 16,
+   "kind": "Citation",
+   "number": "67",
+   "target_page": 31,
+   "target_block": 6
+  },
+  {
+   "page": 16,
+   "kind": "Citation",
+   "number": "74",
+   "target_page": 31,
+   "target_block": 13
+  },
+  {
+   "page": 17,
+   "kind": "Citation",
+   "number": "4",
+   "target_page": 28,
+   "target_block": 13
+  },
+  {
+   "page": 17,
+   "kind": "Citation",
+   "number": "20",
+   "target_page": 29,
+   "target_block": 12
+  },
+  {
+   "page": 17,
+   "kind": "Citation",
+   "number": "29",
+   "target_page": 29,
+   "target_block": 21
+  },
+  {
+   "page": 17,
+   "kind": "Citation",
+   "number": "67",
+   "target_page": 31,
+   "target_block": 6
+  },
+  {
+   "page": 17,
+   "kind": "Citation",
+   "number": "43",
+   "target_page": 30,
+   "target_block": 8
+  },
+  {
+   "page": 17,
+   "kind": "Citation",
+   "number": "45",
+   "target_page": 30,
+   "target_block": 10
+  },
+  {
+   "page": 17,
+   "kind": "Citation",
+   "number": "74",
+   "target_page": 31,
+   "target_block": 13
+  },
+  {
+   "page": 17,
+   "kind": "Citation",
+   "number": "51",
+   "target_page": 30,
+   "target_block": 16
+  },
+  {
+   "page": 17,
+   "kind": "Citation",
+   "number": "55",
+   "target_page": 30,
+   "target_block": 20
+  },
+  {
+   "page": 17,
+   "kind": "Citation",
+   "number": "66",
+   "target_page": 31,
+   "target_block": 5
+  },
+  {
+   "page": 19,
+   "kind": "Citation",
+   "number": "21",
+   "target_page": 29,
+   "target_block": 13
+  },
+  {
+   "page": 19,
+   "kind": "Citation",
+   "number": "33",
+   "target_page": 29,
+   "target_block": 25
+  },
+  {
+   "page": 19,
+   "kind": "Citation",
+   "number": "73",
+   "target_page": 31,
+   "target_block": 12
+  },
+  {
+   "page": 19,
+   "kind": "Citation",
+   "number": "78",
+   "target_page": 31,
+   "target_block": 17
+  },
+  {
+   "page": 19,
+   "kind": "Citation",
+   "number": "45",
+   "target_page": 30,
+   "target_block": 10
+  },
+  {
+   "page": 20,
+   "kind": "Citation",
+   "number": "44",
+   "target_page": 30,
+   "target_block": 9
+  },
+  {
+   "page": 20,
+   "kind": "Citation",
+   "number": "80",
+   "target_page": 31,
+   "target_block": 19
+  },
+  {
+   "page": 20,
+   "kind": "Citation",
+   "number": "81",
+   "target_page": 31,
+   "target_block": 20
+  },
+  {
+   "page": 20,
+   "kind": "Citation",
+   "number": "45",
+   "target_page": 30,
+   "target_block": 10
+  },
+  {
+   "page": 20,
+   "kind": "Citation",
+   "number": "48",
+   "target_page": 30,
+   "target_block": 13
+  },
+  {
+   "page": 20,
+   "kind": "Citation",
+   "number": "72",
+   "target_page": 31,
+   "target_block": 11
+  },
+  {
+   "page": 20,
+   "kind": "Citation",
+   "number": "73",
+   "target_page": 31,
+   "target_block": 12
+  },
+  {
+   "page": 20,
+   "kind": "Citation",
+   "number": "74",
+   "target_page": 31,
+   "target_block": 13
+  },
+  {
+   "page": 20,
+   "kind": "Citation",
+   "number": "65",
+   "target_page": 31,
+   "target_block": 4
+  },
+  {
+   "page": 22,
+   "kind": "Citation",
+   "number": "15",
+   "target_page": 29,
+   "target_block": 7
+  },
+  {
+   "page": 22,
+   "kind": "Citation",
+   "number": "16",
+   "target_page": 29,
+   "target_block": 8
+  },
+  {
+   "page": 22,
+   "kind": "Citation",
+   "number": "67",
+   "target_page": 31,
+   "target_block": 6
+  },
+  {
+   "page": 23,
+   "kind": "Citation",
+   "number": "89",
+   "target_page": 32,
+   "target_block": 3
+  },
+  {
+   "page": 23,
+   "kind": "Citation",
+   "number": "8",
+   "target_page": 28,
+   "target_block": 17
+  },
+  {
+   "page": 23,
+   "kind": "Citation",
+   "number": "15",
+   "target_page": 29,
+   "target_block": 7
+  },
+  {
+   "page": 23,
+   "kind": "Citation",
+   "number": "37",
+   "target_page": 30,
+   "target_block": 2
+  },
+  {
+   "page": 23,
+   "kind": "Citation",
+   "number": "74",
+   "target_page": 31,
+   "target_block": 13
+  },
+  {
+   "page": 23,
+   "kind": "Citation",
+   "number": "51",
+   "target_page": 30,
+   "target_block": 16
+  },
+  {
+   "page": 23,
+   "kind": "Citation",
+   "number": "3",
+   "target_page": 28,
+   "target_block": 12
+  },
+  {
+   "page": 23,
+   "kind": "Citation",
+   "number": "23",
+   "target_page": 29,
+   "target_block": 15
+  },
+  {
+   "page": 23,
+   "kind": "Citation",
+   "number": "44",
+   "target_page": 30,
+   "target_block": 9
+  },
+  {
+   "page": 24,
+   "kind": "Citation",
+   "number": "90",
+   "target_page": 32,
+   "target_block": 4
+  },
+  {
+   "page": 24,
+   "kind": "Citation",
+   "number": "91",
+   "target_page": 32,
+   "target_block": 5
+  },
+  {
+   "page": 25,
+   "kind": "Citation",
+   "number": "92",
+   "target_page": 32,
+   "target_block": 6
+  },
+  {
+   "page": 27,
+   "kind": "Citation",
+   "number": "28",
+   "target_page": 29,
+   "target_block": 20
+  },
+  {
+   "page": 27,
+   "kind": "Citation",
+   "number": "33",
+   "target_page": 29,
+   "target_block": 25
+  },
+  {
+   "page": 27,
+   "kind": "Citation",
+   "number": "70",
+   "target_page": 31,
+   "target_block": 9
+  },
+  {
+   "page": 27,
+   "kind": "Citation",
+   "number": "74",
+   "target_page": 31,
+   "target_block": 13
+  },
+  {
+   "page": 27,
+   "kind": "Citation",
+   "number": "77",
+   "target_page": 31,
+   "target_block": 16
+  },
+  {
+   "page": 28,
+   "kind": "Citation",
+   "number": "93",
+   "target_page": 32,
+   "target_block": 7
+  },
+  {
+   "page": 28,
+   "kind": "Citation",
+   "number": "94",
+   "target_page": 32,
+   "target_block": 8
+  },
+  {
+   "page": 28,
+   "kind": "Citation",
+   "number": "95",
+   "target_page": 32,
+   "target_block": 9
   }
  ],
  "empty_pages": [
   0,
-  1,
-  3,
-  5,
-  6
+  8,
+  13,
+  21,
+  29,
+  30,
+  31,
+  32
  ]
 }
