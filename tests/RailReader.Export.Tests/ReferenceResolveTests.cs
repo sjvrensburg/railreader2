@@ -330,4 +330,51 @@ public class ReferenceResolveTests
         Assert.Equal(8, ReferenceIndex.StatementExtentEnd(ExtentPage([.. many]), 0, 0));
         Assert.Equal(3, ReferenceIndex.StatementExtentEnd(new FakeDoc(1), 5, 3));   // page not analysed
     }
+
+    // --- display equations ---
+
+    private static FakeDoc WithDisplay(FakeDoc doc, int page, params string[] displays)
+        => doc.Add(page,
+            [.. displays.Select((_, i) => (BlockRole.DisplayMath, 50f, 100f + i * 60f, 500f, 40f))],
+            displays.Select((d, i) => (d, i)).ToDictionary(x => x.i, x => x.d));
+
+    [Fact]
+    public void Equation_ResolvesToTheDisplayBlockCarryingItsTag()
+        => Assert.Equal(new ReferenceIndex.Target(2, 1, 1),
+            Resolve(new(), WithDisplay(new FakeDoc(4), 2, "a = b (3.1)", "x = y + z (3.2)"), new Ref(RefKind.Equation, "3.2"), 3));
+
+    [Fact]
+    public void Equation_TagAtTheLeftMarginCounts()
+        => Assert.Equal(1, Resolve(new(), WithDisplay(new FakeDoc(4), 1, "(1) y = X b + u"), new Ref(RefKind.Equation, "1"), 2)!.Value.Page);
+
+    [Fact]
+    public void Equation_TheSameNumberTwiceOnAPageIsAmbiguous()
+        => Assert.Null(Resolve(new(), WithDisplay(new FakeDoc(4), 1, "a = b (4)", "c = d (4)"), new Ref(RefKind.Equation, "4"), 1));
+
+    [Theory]
+    [InlineData("f(0) = 1")]            // a function argument is attached to its function
+    [InlineData("R2 = 0.52 (0.52)")]    // a decimal value
+    [InlineData("see Smith (2019)")]    // a year
+    public void Equation_NonTagsInADisplayAreNotLabels(string display)
+    {
+        var doc = WithDisplay(new FakeDoc(3), 1, display);
+        foreach (string n in new[] { "0", "0.52", "2019" })
+            Assert.Null(Resolve(new(), doc, new Ref(RefKind.Equation, n), 1));
+    }
+
+    [Fact]
+    public void Equation_FlatNumberBeyondTheCapAbstainsButADottedOneDoesNot()
+    {
+        var doc = WithDisplay(WithDisplay(new FakeDoc(60), 2, "a = b (5)"), 3, "c = d (5.1)");
+        var index = new ReferenceIndex { MaxFlatNumberPageDistance = 12 };
+        Assert.Null(Resolve(index, doc, new Ref(RefKind.Equation, "5"), 40));
+        Assert.Equal(3, Resolve(index, doc, new Ref(RefKind.Equation, "5.1"), 40)!.Value.Page);
+    }
+
+    [Fact]
+    public void Scan_AnEquationTagIsNotAMentionOfItself()
+    {
+        var doc = WithDisplay(new FakeDoc(2), 0, "a = b (3.1)");
+        Assert.Empty(ReferenceBenchmark.Scan(doc, new ReferenceIndex()));
+    }
 }

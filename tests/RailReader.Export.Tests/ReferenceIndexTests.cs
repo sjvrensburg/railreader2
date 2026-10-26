@@ -321,4 +321,69 @@ public class ReferenceIndexTests
     [InlineData("Theorem")]
     public void ParseStatementHeader_RejectsBodyText(string line)
         => Assert.Null(ReferenceIndex.ParseStatementHeader(line));
+
+    // --- equations: mentions ---
+
+    [Theory]
+    [InlineData("as shown in Equation 3.28, we", "3.28")]
+    [InlineData("from Equation (3.12) we get", "3.12")]
+    [InlineData("the problem in equation (20) is", "20")]
+    [InlineData("see Eq. (4) above", "4")]
+    [InlineData("by (3.2) the claim", "3.2")]
+    [InlineData("using the formula (2) as", "2")]
+    [InlineData("Equation (28) represents", "28")]
+    public void ParseLine_RecognisesEquationMentions(string line, string number)
+        => Assert.Contains(new Ref(RefKind.Equation, number), ReferenceIndex.ParseLine(line));
+
+    [Fact]
+    public void ParseLine_ExpandsPluralEquationMentions()
+        => Assert.Equal(["3.2", "4", "6"],
+            ReferenceIndex.ParseLine("see Eq. (3.2) and Eqs. (4)–(6) for").Select(r => r.Number));
+
+    [Theory]
+    [InlineData("(1) first, (2) second")]                    // list markers open their clause
+    [InlineData("(1) f ∈ W follows")]                        // a proof step
+    [InlineData("a bound of order O(1) holds")]              // attached to a word
+    [InlineData("the AR(1) model")]
+    [InlineData("where f(0) = 1")]
+    [InlineData("Vaswani et al. (2017) showed")]            // a year
+    [InlineData("Random Forest (0.45), and OLS (0.28)")]     // decimal values
+    [InlineData("Econometrica, 44(2):461–466")]              // journal issue, attached
+    [InlineData("see Table 1 (2) below")]                    // after a digit
+    public void ParseLine_IgnoresEquationLookalikes(string line)
+        => Assert.DoesNotContain(ReferenceIndex.ParseLine(line), r => r.Kind == RefKind.Equation);
+
+    // --- citations name results of the cited work ---
+
+    [Theory]
+    [InlineData("it follows from [12, Theorem 3.2] that")]
+    [InlineData("by [IK99, Lemma 1.15] we")]
+    [InlineData("From Amemiya [2, eqs. (5) and (6)] it follows")]
+    [InlineData("(see Goldberger [12, p. 165, eq. (4.21)])")]
+    [InlineData("as (Smith 2019, Theorem 3) proves")]
+    [InlineData("as (Smith et al. 2019, Eq. (4)) shows")]
+    public void ParseLine_IgnoresResultsNamedInsideACitation(string line)
+        => Assert.Empty(ReferenceIndex.ParseLine(line));
+
+    [Fact]
+    public void ParseLine_AnIntervalIsNotACitation()
+        => Assert.Contains(new Ref(RefKind.Theorem, "2"), ReferenceIndex.ParseLine("on [0, 1] Theorem 2 gives"));
+
+    [Fact]
+    public void ParseLine_ParenthesisedStatementNumber()
+        => Assert.Equal([new Ref(RefKind.Theorem, "3.2")], ReferenceIndex.ParseLine("by Theorem (3.2) we"));
+
+    // --- contents entries are not statement headers ---
+
+    [Theory]
+    [InlineData("Definition 6.1 . . . . . . . . 12")]
+    [InlineData("Theorem 3.2. Compactness ........ 41")]
+    [InlineData("Lemma 4 …… 57")]
+    public void ParseStatementHeader_RejectsContentsEntries(string line)
+        => Assert.Null(ReferenceIndex.ParseStatementHeader(line));
+
+    [Fact]
+    public void ParseStatementHeader_AnEllipsisInTheBodyIsStillAHeader()
+        => Assert.Equal(new Ref(RefKind.Definition, "1"),
+            ReferenceIndex.ParseStatementHeader("Definition 1. Let x1, …, xn be given"));
 }

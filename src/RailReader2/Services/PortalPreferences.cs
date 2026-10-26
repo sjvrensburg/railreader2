@@ -21,6 +21,10 @@ public sealed class PortalPreferences
     /// tables, and a wrong preview costs a long pan to check.</summary>
     public bool AutoPinStatements { get; set; }
 
+    /// <summary>When true, a line that mentions "Equation 3.2" / "Eq. (4)" / "by (3.2)" shows that
+    /// numbered display equation. Off by default, like statements.</summary>
+    public bool AutoPinEquations { get; set; }
+
     public static string Path => System.IO.Path.Combine(AppConfig.ConfigDir, "portal_prefs.json");
 
     public static PortalPreferences Load()

@@ -58,6 +58,13 @@ public static class ReferencesCommand
                 ?? throw new InvalidOperationException("Ground truth file is empty.");
         }
 
+        if (truth?.PdfSha256 is { Length: > 0 } expected)
+        {
+            string actual = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(pdfPath)));
+            if (!string.Equals(expected, actual, StringComparison.OrdinalIgnoreCase))
+                return Program.Fail($"Ground truth was written for a different PDF (sha256 {expected[..12]}…, this file is {actual[..12]}…).");
+        }
+
         var (pages, rangeError) = PageRangeParser.Parse(Program.GetOption(args, "pages"), pdf.PageCount);
         if (rangeError != null)
             return Program.Fail(rangeError);
@@ -137,7 +144,7 @@ public static class ReferencesCommand
         Console.WriteLine("  --min-precision <0-1>    Exit with code 2 if overall precision is lower (needs --ground-truth)");
         Console.WriteLine("  --output <path>          Output JSON file path (default: stdout)");
         Console.WriteLine();
-        Console.WriteLine("Ground truth: {\"mentions\":[{\"page\":2,\"kind\":\"Figure\",\"number\":\"3\",");
+        Console.WriteLine("Ground truth: {\"pdf_sha256\":\"…\" (optional, refuses a different PDF), \"mentions\":[{\"page\":2,\"kind\":\"Figure\",\"number\":\"3\",");
         Console.WriteLine("  \"target_page\":1,\"target_block\":4}], \"empty_pages\":[5]}  (pages are 0-based;");
         Console.WriteLine("  omit target_* to require abstention; empty_pages must resolve nothing)");
     }

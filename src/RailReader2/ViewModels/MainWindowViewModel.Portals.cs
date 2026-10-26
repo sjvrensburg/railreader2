@@ -168,6 +168,21 @@ public sealed partial class MainWindowViewModel
     private static string AutoPinId(ReferenceIndex.Reference r, ReferenceIndex.Target t)
         => $"auto:{r.Kind}:{r.Number}:p{t.Page}b{t.TargetBlock}";
 
+    /// <summary>What an auto pin points at; each class has its own persisted toggle.</summary>
+    private enum AutoPinClass { FiguresTables, Statements, Equations }
+
+    private static AutoPinClass ClassOf(ReferenceIndex.RefKind kind)
+        => ReferenceIndex.IsEquation(kind) ? AutoPinClass.Equations
+         : ReferenceIndex.IsStatement(kind) ? AutoPinClass.Statements
+         : AutoPinClass.FiguresTables;
+
+    private bool IsAutoPinEnabled(AutoPinClass cls) => cls switch
+    {
+        AutoPinClass.Statements => _portalPrefs.AutoPinStatements,
+        AutoPinClass.Equations => _portalPrefs.AutoPinEquations,
+        _ => _portalPrefs.AutoPinFiguresTables,
+    };
+
     /// <summary>Toggle for automatic figure/table pinning, persisted app-wide (sidecar). Turning it off
     /// clears a currently shown figure/table auto pin; saved portals are unaffected either way.</summary>
     public bool AutoPinPortals
@@ -179,7 +194,7 @@ public sealed partial class MainWindowViewModel
             _portalPrefs.AutoPinFiguresTables = value;
             _portalPrefs.Save();
             OnPropertyChanged(nameof(AutoPinPortals));
-            DropDisplayedAutoPinOnToggleOff(value, statements: false);
+            DropDisplayedAutoPinOnToggleOff(value, AutoPinClass.FiguresTables);
         }
     }
 
@@ -194,26 +209,41 @@ public sealed partial class MainWindowViewModel
             _portalPrefs.AutoPinStatements = value;
             _portalPrefs.Save();
             OnPropertyChanged(nameof(AutoPinStatements));
-            DropDisplayedAutoPinOnToggleOff(value, statements: true);
+            DropDisplayedAutoPinOnToggleOff(value, AutoPinClass.Statements);
         }
     }
 
-    /// <summary>Toggling a kind off drops a displayed auto pin of that kind — unless the view is locked:
+    /// <summary>Toggle for automatic pinning of numbered display equations ("Equation 3.2", "by (4)"),
+    /// persisted app-wide. Off by default; independent of the other two.</summary>
+    public bool AutoPinEquations
+    {
+        get => _portalPrefs.AutoPinEquations;
+        set
+        {
+            if (_portalPrefs.AutoPinEquations == value) return;
+            _portalPrefs.AutoPinEquations = value;
+            _portalPrefs.Save();
+            OnPropertyChanged(nameof(AutoPinEquations));
+            DropDisplayedAutoPinOnToggleOff(value, AutoPinClass.Equations);
+        }
+    }
+
+    /// <summary>Toggling a class off drops a displayed auto pin of that class — unless the view is locked:
     /// the lock's freeze contract wins, and the pin then simply stays until something replaces it after
     /// unlock. Fields only — the forced evaluation performs the single image render-or-clear swap,
     /// preserving the one-behind disposal guarantee.</summary>
-    private void DropDisplayedAutoPinOnToggleOff(bool nowOn, bool statements)
+    private void DropDisplayedAutoPinOnToggleOff(bool nowOn, AutoPinClass cls)
     {
-        if (!nowOn && !_isPortalViewLocked && _autoPin is not null && DisplayedAutoPinIsStatement() == statements)
+        if (!nowOn && !_isPortalViewLocked && _autoPin is not null && DisplayedAutoPinClass() == cls)
             ResetDisplayedPortal();
         EvaluatePortals(forceRender: true);
     }
 
-    /// <summary>True when the displayed auto pin (id "auto:{Kind}:…") names a numbered statement.</summary>
-    private bool DisplayedAutoPinIsStatement()
+    /// <summary>The class of the displayed auto pin (id "auto:{Kind}:…"), or null when none is shown.</summary>
+    private AutoPinClass? DisplayedAutoPinClass()
         => _displayedPortalId is { } id && id.StartsWith("auto:", StringComparison.Ordinal)
            && id.Split(':') is [_, var kind, ..]
-           && Enum.TryParse<ReferenceIndex.RefKind>(kind, out var k) && ReferenceIndex.IsStatement(k);
+           && Enum.TryParse<ReferenceIndex.RefKind>(kind, out var k) ? ClassOf(k) : null;
 
     /// <summary>True when the sync loop is waiting on background analysis — for a saved portal's
     /// target page or an automatic reference's caption page — so the analysis poll should force a
@@ -520,10 +550,10 @@ public sealed partial class MainWindowViewModel
     /// stays up meanwhile. UI thread only.</summary>
     private void TryAutoPin(DocumentModel doc, int srcPage, int srcBlock, int srcLine)
     {
-        if ((!AutoPinPortals && !AutoPinStatements) || srcBlock < 0 || srcLine < 0) return;
+        if ((!AutoPinPortals && !AutoPinStatements && !AutoPinEquations) || srcBlock < 0 || srcLine < 0) return;
         if (!doc.TryGetAnalysis(srcPage, out var analysis)
             || srcBlock >= analysis.Blocks.Count
-            || analysis.Blocks[srcBlock].Role == BlockRole.Caption)
+            || analysis.Blocks[srcBlock].Role is BlockRole.Caption or BlockRole.DisplayMath)
             return;
 
         var pageText = doc.GetOrExtractText(srcPage);
@@ -535,7 +565,7 @@ public sealed partial class MainWindowViewModel
         if (lineText is null) return;
 
         var refs = ReferenceIndex.ParseLine(lineText, startLimit);
-        refs.RemoveAll(r => ReferenceIndex.IsStatement(r.Kind) ? !AutoPinStatements : !AutoPinPortals);
+        refs.RemoveAll(r => !IsAutoPinEnabled(ClassOf(r.Kind)));
         if (refs.Count == 0) return;
         var source = new DocumentModelReferenceSource(doc);
 

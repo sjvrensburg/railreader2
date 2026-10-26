@@ -35,6 +35,11 @@ internal sealed class LabelledMention
 
 internal sealed class GroundTruth
 {
+    /// <summary>SHA-256 of the PDF the labels were written for. When present the runner refuses a
+    /// different file: page and block indices mean nothing against another PDF (or another version
+    /// of the same one), and a silently misaligned run would read as a regression.</summary>
+    public string? PdfSha256 { get; set; }
+
     public List<LabelledMention> Mentions { get; set; } = [];
     /// <summary>Pages that must produce no resolved reference at all (hard negatives).</summary>
     public List<int> EmptyPages { get; set; } = [];
@@ -86,7 +91,7 @@ internal static class ReferenceBenchmark
             for (int b = 0; b < analysis.Blocks.Count; b++)
             {
                 var block = analysis.Blocks[b];
-                if (block.Role == BlockRole.Caption) continue;
+                if (block.Role is BlockRole.Caption or BlockRole.DisplayMath) continue;
                 for (int l = 0; l < block.Lines.Count; l++)
                 {
                     text ??= doc.GetText(page);
@@ -148,6 +153,12 @@ internal static class ReferenceBenchmark
                     && ReferenceIndex.ParseStatementHeader(text.ExtractBlockText(analysis.Blocks[i])) is { } header)
                 {
                     captions.Add((header, page, i, i));
+                    continue;
+                }
+                if (analysis.Blocks[i].Role == BlockRole.DisplayMath)
+                {
+                    foreach (string tag in ReferenceIndex.EquationTagsIn(text.ExtractBlockText(analysis.Blocks[i])))
+                        captions.Add((new ReferenceIndex.Reference(ReferenceIndex.RefKind.Equation, tag), page, i, i));
                     continue;
                 }
                 if (analysis.Blocks[i].Role != BlockRole.Caption) continue;
