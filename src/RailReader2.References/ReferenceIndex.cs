@@ -701,8 +701,28 @@ internal sealed partial class ReferenceIndex
     [GeneratedRegex(@"\G.*?(?:(?:\.\s?){4,}|…+|\.{3,})\s*\d+\s*$")]
     private static partial Regex DotLeaderRegex();
 
-    [GeneratedRegex(@"\b(?:Theorem|Lemma|Proposition|Corollary|Definition|Exercise|Example|Remark)\s*\d")]
+    [GeneratedRegex(@"\b(?:Theorem|Lemma|Proposition|Corollary|Definition|Exercise|Example|Remark)\s*\d|\b(?:[A-Z]\s){3,}[A-Z]\s*\d|\b(?:THEOREM|LEMMA|PROPOSITION|COROLLARY|DEFINITION|EXERCISE|EXAMPLE|REMARK)\s*\d")]
     private static partial Regex StatementWordRegex();
+
+    // Books set the kind word in letter-spaced or all capitals ("T H E O R E M 1.1 (…)", "DEFINITION 2.3").
+    [GeneratedRegex(@"^(?<lead>(?:[\s\p{P}-[•·▪◦‣⁃*\-–—]]){0,3})(?<word>(?:[A-Z]\s){2,}[A-Z]|[A-Z]{4,})(?=\s*\d)")]
+    private static partial Regex ShoutedKindRegex();
+
+    private static readonly string[] s_statementKinds =
+        ["Theorem", "Lemma", "Proposition", "Corollary", "Definition", "Exercise", "Example", "Remark"];
+
+    /// <summary>Rewrites a leading letter-spaced or all-caps kind word to its ordinary form; a line that
+    /// does not open with one is returned unchanged.</summary>
+    internal static string NormaliseShoutedKind(string line)
+    {
+        var m = ShoutedKindRegex().Match(line);
+        if (!m.Success) return line;
+        string word = m.Groups["word"].Value.Replace(" ", "");
+        foreach (var kind in s_statementKinds)
+            if (string.Equals(kind, word, StringComparison.OrdinalIgnoreCase))
+                return m.Groups["lead"].Value + kind + line[m.Length..];
+        return line;
+    }
 
     /// <summary>Index the numbered statements on a page: any line of a Text block that opens with a
     /// header ("Definition 2.1 (graph).") labels that block — a header may start mid-block when the
@@ -741,6 +761,7 @@ internal sealed partial class ReferenceIndex
     /// (Definition, "2.1"); null when the line is not a statement header.</summary>
     internal static Reference? ParseStatementHeader(string lineText)
     {
+        lineText = NormaliseShoutedKind(lineText);
         var m = StatementHeaderRegex().Match(lineText);
         // A contents entry ("Definition 6.1 . . . . . 12", "Theorem 3.2 …… 41") is not a header.
         if (m.Success && DotLeaderRegex().IsMatch(lineText, m.Index + m.Length)) return null;
