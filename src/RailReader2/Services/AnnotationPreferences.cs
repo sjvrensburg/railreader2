@@ -18,6 +18,27 @@ public sealed class AnnotationPreferences
     /// result a fresh identity, which matters for reviewers' highlights that live in the PDF.</summary>
     public bool AutoMergeTextMarkup { get; set; }
 
+    /// <summary>Optional reader-given names for the shared annotation palette ("definition", "question",
+    /// "result"…), keyed by upper-case hex colour. Purely a label: the annotation still stores only its
+    /// colour, so renaming a category relabels every annotation of that colour, and an unnamed colour is
+    /// simply unlabelled.</summary>
+    public Dictionary<string, string> ColourNames { get; set; } = [];
+
+    // Upper-cased so a lookup survives a JSON round trip (which rebuilds the dictionary case-sensitive).
+    private static string Key(string hexColour) => hexColour.Trim().ToUpperInvariant();
+
+    /// <summary>The name given to <paramref name="hexColour"/>, or null.</summary>
+    public string? NameFor(string? hexColour)
+        => hexColour is not null && ColourNames.TryGetValue(Key(hexColour), out var n) && !string.IsNullOrWhiteSpace(n) ? n : null;
+
+    /// <summary>Names a colour; a blank name removes it.</summary>
+    public void SetName(string hexColour, string? name)
+    {
+        name = name?.Trim();
+        if (string.IsNullOrEmpty(name)) ColourNames.Remove(Key(hexColour));
+        else ColourNames[Key(hexColour)] = name;
+    }
+
     public static string Path => System.IO.Path.Combine(AppConfig.ConfigDir, "annotation_prefs.json");
 
     public static AnnotationPreferences Load()

@@ -251,6 +251,9 @@ public partial class ToolBarView : UserControl
                 BorderBrush = Brushes.Gray,
                 BorderThickness = new Thickness(1),
             };
+            string label = _vm.ColourLabel(i);
+            ToolTip.SetTip(swatch, label);
+            Avalonia.Automation.AutomationProperties.SetName(swatch, label);
             swatch.Click += (_, _) =>
             {
                 _vm.Controller.Annotations.SetAnnotationColorIndex(tool, idx);

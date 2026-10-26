@@ -14,6 +14,11 @@
             <ComboBoxItem Content="Yours" />
         </ComboBox>
 
+        <ComboBox Name="CategoryFilter" DockPanel.Dock="Top"
+                  Margin="4,0,4,4" IsVisible="False"
+                  HorizontalAlignment="Stretch"
+                  SelectionChanged="OnCategoryFilterChanged" />
+
         <TextBlock Name="CommentEmptyLabel" DockPanel.Dock="Top"
                    Text="No comments in this document."
                    Opacity="0.6" Margin="8" IsVisible="False" />
@@ -44,6 +49,8 @@
                                     <TextBlock Text="{Binding Author}" FontSize="11" Opacity="0.8"
                                                TextTrimming="CharacterEllipsis" />
                                 </DockPanel>
+                                <TextBlock Text="{Binding Category}" IsVisible="{Binding HasCategory}"
+                                           FontSize="11" FontStyle="Italic" Opacity="0.8" />
                                 <TextBlock Text="{Binding Body}"
                                            IsVisible="{Binding HasBody}"
                                            TextWrapping="Wrap" MaxLines="3"
