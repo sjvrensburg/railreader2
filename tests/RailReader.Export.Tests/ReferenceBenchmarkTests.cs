@@ -79,4 +79,13 @@ public class ReferenceBenchmarkTests
         Assert.Equal(1.0, m.ByKind["Figure"].Precision);
         Assert.Equal(0.0, m.ByKind["Table"].Precision);
     }
+
+    [Fact]
+    public void Score_AcceptsAlternateBlocksOfASplitFloat()
+    {
+        var label = Label(1, "Figure", "2", 1, 2);
+        label.AlsoAcceptBlocks = [1];
+        var m = ReferenceBenchmark.Score([Resolved(1, "Figure", "2", 1, 1)], new GroundTruth { Mentions = [label] }, null);
+        Assert.Equal(1, m.Overall.TruePositives);
+    }
 }

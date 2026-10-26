@@ -1,0 +1,175 @@
+{
+ "mentions": [
+  {
+   "page": 3,
+   "kind": "Figure",
+   "number": "1",
+   "target_page": 3,
+   "target_block": 7
+  },
+  {
+   "page": 4,
+   "kind": "Figure",
+   "number": "2a",
+   "target_page": 4,
+   "target_block": 7
+  },
+  {
+   "page": 4,
+   "kind": "Figure",
+   "number": "2b",
+   "target_page": 4,
+   "target_block": 7
+  },
+  {
+   "page": 4,
+   "kind": "Figure",
+   "number": "2c",
+   "target_page": 4,
+   "target_block": 7
+  },
+  {
+   "page": 4,
+   "kind": "Figure",
+   "number": "2",
+   "target_page": 4,
+   "target_block": 7
+  },
+  {
+   "page": 4,
+   "kind": "Figure",
+   "number": "1",
+   "target_page": 3,
+   "target_block": 7
+  },
+  {
+   "page": 4,
+   "kind": "Figure",
+   "number": "3",
+   "target_page": 5,
+   "target_block": 3,
+   "also_accept_blocks": [
+    2
+   ]
+  },
+  {
+   "page": 5,
+   "kind": "Figure",
+   "number": "3",
+   "target_page": 5,
+   "target_block": 3,
+   "also_accept_blocks": [
+    2
+   ]
+  },
+  {
+   "page": 5,
+   "kind": "Figure",
+   "number": "4a",
+   "target_page": 6,
+   "target_block": 3
+  },
+  {
+   "page": 5,
+   "kind": "Figure",
+   "number": "4b",
+   "target_page": 6,
+   "target_block": 3
+  },
+  {
+   "page": 5,
+   "kind": "Figure",
+   "number": "4c",
+   "target_page": 6,
+   "target_block": 3
+  },
+  {
+   "page": 5,
+   "kind": "Figure",
+   "number": "4d",
+   "target_page": 6,
+   "target_block": 3
+  },
+  {
+   "page": 5,
+   "kind": "Figure",
+   "number": "5",
+   "target_page": 7,
+   "target_block": 2
+  },
+  {
+   "page": 5,
+   "kind": "Figure",
+   "number": "6",
+   "target_page": 7,
+   "target_block": 5
+  },
+  {
+   "page": 5,
+   "kind": "Figure",
+   "number": "6a",
+   "target_page": 7,
+   "target_block": 5
+  },
+  {
+   "page": 5,
+   "kind": "Figure",
+   "number": "6b",
+   "target_page": 7,
+   "target_block": 5
+  },
+  {
+   "page": 7,
+   "kind": "Figure",
+   "number": "7",
+   "target_page": 8,
+   "target_block": 2
+  },
+  {
+   "page": 7,
+   "kind": "Figure",
+   "number": "3",
+   "target_page": 5,
+   "target_block": 3,
+   "also_accept_blocks": [
+    2
+   ]
+  },
+  {
+   "page": 7,
+   "kind": "Figure",
+   "number": "8a",
+   "target_page": 8,
+   "target_block": 3
+  },
+  {
+   "page": 7,
+   "kind": "Figure",
+   "number": "8b",
+   "target_page": 8,
+   "target_block": 3
+  },
+  {
+   "page": 8,
+   "kind": "Figure",
+   "number": "3",
+   "target_page": 5,
+   "target_block": 3,
+   "also_accept_blocks": [
+    2
+   ]
+  },
+  {
+   "page": 8,
+   "kind": "Figure",
+   "number": "4",
+   "target_page": 6,
+   "target_block": 3
+  }
+ ],
+ "empty_pages": [
+  0,
+  1,
+  2
+ ]
+}

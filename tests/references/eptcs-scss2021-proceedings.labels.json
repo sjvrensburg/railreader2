@@ -1,0 +1,471 @@
+{
+ "mentions": [
+  {
+   "page": 20,
+   "kind": "Table",
+   "number": "2",
+   "target_page": 20,
+   "target_block": 4
+  },
+  {
+   "page": 21,
+   "kind": "Figure",
+   "number": "1",
+   "target_page": 21,
+   "target_block": 2
+  },
+  {
+   "page": 21,
+   "kind": "Table",
+   "number": "1",
+   "target_page": 20,
+   "target_block": 1
+  },
+  {
+   "page": 21,
+   "kind": "Table",
+   "number": "3",
+   "target_page": 22,
+   "target_block": 2
+  },
+  {
+   "page": 22,
+   "kind": "Table",
+   "number": "4",
+   "target_page": 22,
+   "target_block": 4
+  },
+  {
+   "page": 23,
+   "kind": "Figure",
+   "number": "3",
+   "target_page": 23,
+   "target_block": 2
+  },
+  {
+   "page": 24,
+   "kind": "Table",
+   "number": "5",
+   "target_page": 25,
+   "target_block": 2
+  },
+  {
+   "page": 48,
+   "kind": "Figure",
+   "number": "1",
+   "target_page": 48,
+   "target_block": 10
+  },
+  {
+   "page": 48,
+   "kind": "Table",
+   "number": "2",
+   "target_page": 53,
+   "target_block": 4
+  },
+  {
+   "page": 49,
+   "kind": "Table",
+   "number": "1",
+   "target_page": 49,
+   "target_block": 3
+  },
+  {
+   "page": 53,
+   "kind": "Table",
+   "number": "2",
+   "target_page": 53,
+   "target_block": 4
+  },
+  {
+   "page": 53,
+   "kind": "Table",
+   "number": "3",
+   "target_page": 53,
+   "target_block": 8
+  },
+  {
+   "page": 71,
+   "kind": "Figure",
+   "number": "1",
+   "target_page": 72,
+   "target_block": 2
+  },
+  {
+   "page": 72,
+   "kind": "Figure",
+   "number": "1",
+   "target_page": 72,
+   "target_block": 2
+  },
+  {
+   "page": 73,
+   "kind": "Figure",
+   "number": "2",
+   "target_page": 74,
+   "target_block": 2
+  },
+  {
+   "page": 74,
+   "kind": "Figure",
+   "number": "3",
+   "target_page": 75,
+   "target_block": 2
+  },
+  {
+   "page": 75,
+   "kind": "Figure",
+   "number": "4",
+   "target_page": 76,
+   "target_block": 2
+  },
+  {
+   "page": 76,
+   "kind": "Figure",
+   "number": "3",
+   "target_page": 75,
+   "target_block": 2
+  },
+  {
+   "page": 76,
+   "kind": "Figure",
+   "number": "5",
+   "target_page": 76,
+   "target_block": 6
+  },
+  {
+   "page": 77,
+   "kind": "Figure",
+   "number": "6",
+   "target_page": 77,
+   "target_block": 9
+  },
+  {
+   "page": 78,
+   "kind": "Figure",
+   "number": "7",
+   "target_page": 78,
+   "target_block": 6
+  },
+  {
+   "page": 78,
+   "kind": "Figure",
+   "number": "8",
+   "target_page": 79,
+   "target_block": 2
+  },
+  {
+   "page": 79,
+   "kind": "Figure",
+   "number": "6",
+   "target_page": 77,
+   "target_block": 9
+  },
+  {
+   "page": 79,
+   "kind": "Figure",
+   "number": "7",
+   "target_page": 78,
+   "target_block": 6
+  },
+  {
+   "page": 79,
+   "kind": "Figure",
+   "number": "5",
+   "target_page": 76,
+   "target_block": 6
+  },
+  {
+   "page": 84,
+   "kind": "Figure",
+   "number": "1",
+   "target_page": 85,
+   "target_block": 2
+  },
+  {
+   "page": 86,
+   "kind": "Figure",
+   "number": "2",
+   "target_page": 87,
+   "target_block": 2
+  },
+  {
+   "page": 87,
+   "kind": "Table",
+   "number": "1",
+   "target_page": 88,
+   "target_block": 2
+  },
+  {
+   "page": 95,
+   "kind": "Figure",
+   "number": "1",
+   "target_page": 96,
+   "target_block": 2
+  },
+  {
+   "page": 97,
+   "kind": "Figure",
+   "number": "1",
+   "target_page": 96,
+   "target_block": 2
+  },
+  {
+   "page": 109,
+   "kind": "Figure",
+   "number": "1",
+   "target_page": 110,
+   "target_block": 2
+  },
+  {
+   "page": 111,
+   "kind": "Figure",
+   "number": "4",
+   "target_page": 116,
+   "target_block": 3
+  },
+  {
+   "page": 111,
+   "kind": "Figure",
+   "number": "5",
+   "target_page": 117,
+   "target_block": 2
+  },
+  {
+   "page": 111,
+   "kind": "Figure",
+   "number": "2",
+   "target_page": 112,
+   "target_block": 2
+  },
+  {
+   "page": 113,
+   "kind": "Figure",
+   "number": "3",
+   "target_page": 113,
+   "target_block": 2
+  },
+  {
+   "page": 113,
+   "kind": "Figure",
+   "number": "6",
+   "target_page": 118,
+   "target_block": 2
+  },
+  {
+   "page": 122,
+   "kind": "Figure",
+   "number": "1",
+   "target_page": 123,
+   "target_block": 2
+  },
+  {
+   "page": 127,
+   "kind": "Table",
+   "number": "1",
+   "target_page": 128,
+   "target_block": 3
+  },
+  {
+   "page": 127,
+   "kind": "Table",
+   "number": "2",
+   "target_page": 128,
+   "target_block": 7
+  },
+  {
+   "page": 130,
+   "kind": "Figure",
+   "number": "2",
+   "target_page": 131,
+   "target_block": 3
+  },
+  {
+   "page": 135,
+   "kind": "Table",
+   "number": "1",
+   "target_page": 136,
+   "target_block": 3
+  },
+  {
+   "page": 136,
+   "kind": "Figure",
+   "number": "1",
+   "target_page": 136,
+   "target_block": 6
+  },
+  {
+   "page": 136,
+   "kind": "Figure",
+   "number": "4",
+   "target_page": 138,
+   "target_block": 8
+  },
+  {
+   "page": 136,
+   "kind": "Figure",
+   "number": "5",
+   "target_page": 139,
+   "target_block": 5
+  },
+  {
+   "page": 137,
+   "kind": "Figure",
+   "number": "2",
+   "target_page": 137,
+   "target_block": 3
+  },
+  {
+   "page": 137,
+   "kind": "Figure",
+   "number": "3",
+   "target_page": 137,
+   "target_block": 6
+  },
+  {
+   "page": 137,
+   "kind": "Figure",
+   "number": "4",
+   "target_page": 138,
+   "target_block": 8
+  },
+  {
+   "page": 137,
+   "kind": "Figure",
+   "number": "1",
+   "target_page": 136,
+   "target_block": 6
+  },
+  {
+   "page": 138,
+   "kind": "Figure",
+   "number": "4",
+   "target_page": 138,
+   "target_block": 8
+  },
+  {
+   "page": 139,
+   "kind": "Figure",
+   "number": "5",
+   "target_page": 139,
+   "target_block": 5
+  },
+  {
+   "page": 139,
+   "kind": "Figure",
+   "number": "4",
+   "target_page": 138,
+   "target_block": 8
+  }
+ ],
+ "empty_pages": [
+  0,
+  1,
+  2,
+  3,
+  4,
+  5,
+  6,
+  7,
+  8,
+  9,
+  10,
+  11,
+  12,
+  13,
+  14,
+  15,
+  16,
+  17,
+  18,
+  19,
+  25,
+  26,
+  27,
+  28,
+  29,
+  30,
+  31,
+  32,
+  33,
+  34,
+  35,
+  36,
+  37,
+  38,
+  39,
+  40,
+  41,
+  42,
+  43,
+  44,
+  45,
+  46,
+  47,
+  50,
+  51,
+  52,
+  54,
+  55,
+  56,
+  57,
+  58,
+  59,
+  60,
+  61,
+  62,
+  63,
+  64,
+  65,
+  66,
+  67,
+  68,
+  69,
+  70,
+  80,
+  81,
+  82,
+  83,
+  85,
+  88,
+  89,
+  90,
+  91,
+  92,
+  93,
+  94,
+  96,
+  98,
+  99,
+  100,
+  101,
+  102,
+  103,
+  104,
+  105,
+  106,
+  107,
+  108,
+  110,
+  112,
+  114,
+  115,
+  116,
+  117,
+  118,
+  119,
+  120,
+  121,
+  123,
+  124,
+  125,
+  126,
+  128,
+  129,
+  131,
+  132,
+  133,
+  134,
+  140
+ ]
+}

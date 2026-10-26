@@ -83,7 +83,7 @@ internal sealed partial class ReferenceIndex
     // changed analysed-page count (new background results, or a re-analysis trim) invalidates the
     // entry, so late-arriving captions are still found — but steady re-reads of a dangling mention
     // ("see Figure 99" with no such caption) cost a dictionary probe instead of a full scan.
-    private readonly Dictionary<Reference, int> _noMatch = [];
+    private readonly Dictionary<(Reference Ref, int Near), int> _noMatch = [];
 
     public void Clear()
     {
@@ -204,32 +204,73 @@ internal sealed partial class ReferenceIndex
 
     private static string NormalizeNumber(string number) => number.ToLowerInvariant();
 
+    /// <summary>Flat numbers ("3", "2a", "ii") restart in every paper of a proceedings volume and every
+    /// chapter of a manuscript-style thesis, so a match this many pages away or further is more likely
+    /// another document's float than the one meant. Numbers that carry their own scope ("3.2", "A.1")
+    /// are not capped. Beyond the cap the resolver abstains rather than show a plausible wrong float.</summary>
+    internal const int DefaultMaxFlatNumberPageDistance = 12;
+
+    public int MaxFlatNumberPageDistance { get; init; } = DefaultMaxFlatNumberPageDistance;
+
     /// <summary>Resolve a reference to its defining caption + figure/table block, scanning analysed
     /// pages outward from <paramref name="nearPage"/> (nearest match wins; the preceding page is tried
     /// before the following one at each distance, since a referenced float most often sits before or
-    /// at the reference). Returns null when no analysed page carries the label;
-    /// <paramref name="incomplete"/> is true when the scan ran out of its per-call page-build budget
-    /// before covering every analysed page — the caller should retry (progress is cached). A
-    /// complete miss is negative-cached until the set of analysed pages changes.</summary>
+    /// at the reference). A panel mention ("Fig. 2a") resolves to the lettered caption when one exists,
+    /// else to the figure its panel belongs to. Returns null when no analysed page carries the label
+    /// within reach (see <see cref="MaxFlatNumberPageDistance"/>); <paramref name="incomplete"/> is true
+    /// when the scan stopped at a page it had no budget to index — the caller should retry (progress is
+    /// cached). The scan never skips such a page to return a farther match: a nearer one may be hiding
+    /// there. A complete miss is negative-cached until the set of analysed pages changes.</summary>
     public Target? Resolve(IReferenceDocument doc, Reference reference, int nearPage, out bool incomplete)
     {
         incomplete = false;
+        int budget = MaxPageBuildsPerResolve;
+        var exact = ResolveExact(doc, reference, nearPage, ref budget, ref incomplete);
+        if (exact is not null || incomplete) return exact;
+        return PanelParent(reference) is { } parent
+            ? ResolveExact(doc, parent, nearPage, ref budget, ref incomplete)
+            : null;
+    }
+
+    /// <summary>The figure a panel mention belongs to ("2a" → "2", "4.1b" → "4.1"), or null when the
+    /// number isn't a digit-led value with a trailing panel letter.</summary>
+    private static Reference? PanelParent(Reference reference)
+    {
+        string n = reference.Number;
+        if (n.Length < 2 || !char.IsAsciiLetter(n[^1]) || !char.IsAsciiDigit(n[^2])) return null;
+        return reference with { Number = n[..^1] };
+    }
+
+    private static bool IsFlatNumber(string number) => !number.Contains('.') && !number.Contains('-');
+
+    private Target? ResolveExact(IReferenceDocument doc, Reference reference, int nearPage,
+        ref int budget, ref bool incomplete)
+    {
         int analysed = doc.AnalysedPageCount;
-        if (_noMatch.TryGetValue(reference, out int seenAt) && seenAt == analysed)
+        int pageCount = doc.PageCount;
+        bool capped = IsFlatNumber(reference.Number) && MaxFlatNumberPageDistance < pageCount - 1;
+        int reach = capped ? MaxFlatNumberPageDistance : pageCount - 1;
+        // A capped miss only covers the window around nearPage, so it is keyed by it; an uncapped
+        // scan covered the whole document and serves every caller.
+        var missKey = (reference, capped ? nearPage : -1);
+        if (_noMatch.TryGetValue(missKey, out int seenAt) && seenAt == analysed)
             return null;
 
-        int budget = MaxPageBuildsPerResolve;
-        int pageCount = doc.PageCount;
-        for (int d = 0; d < pageCount; d++)
+        for (int d = 0; d <= reach; d++)
         {
             int before = nearPage - d, after = nearPage + d;
-            if (before >= 0 && FindOnPage(doc, before, reference, ref budget, ref incomplete) is { } t1)
-                return t1;
-            if (d > 0 && after < pageCount && FindOnPage(doc, after, reference, ref budget, ref incomplete) is { } t2)
-                return t2;
+            if (before >= 0)
+            {
+                if (FindOnPage(doc, before, reference, ref budget, ref incomplete) is { } t1) return t1;
+                if (incomplete) return null;
+            }
+            if (d > 0 && after < pageCount)
+            {
+                if (FindOnPage(doc, after, reference, ref budget, ref incomplete) is { } t2) return t2;
+                if (incomplete) return null;
+            }
         }
-        if (!incomplete)
-            _noMatch[reference] = analysed;
+        _noMatch[missKey] = analysed;
         return null;
     }
 
@@ -258,26 +299,28 @@ internal sealed partial class ReferenceIndex
     /// Text-role blocks that read like a caption AND hug a float, covering detector misclassification.
     /// Both passes require the float to overlap the caption horizontally within a bounded vertical
     /// gap, so a label whose own float was misdetected is dropped rather than bound to an unrelated
-    /// block across the page. Text extraction is cached per page (IReferenceDocument.GetText),
-    /// so rebuilds after the first touch are regex + geometry only.</summary>
+    /// block across the page. Each float is bound to at most one caption, nearest pair first: with
+    /// stacked floats whose captions sit below, a caption is slightly nearer the NEXT float than its
+    /// own, but that float's own caption is nearer still and claims it. Text extraction is cached per
+    /// page (IReferenceDocument.GetText), so rebuilds after the first touch are regex + geometry only.</summary>
     private static PageLabels BuildPage(IReferenceDocument doc, int page, PageAnalysis analysis)
     {
         List<(Reference Ref, int TargetBlock, int CaptionBlock)> labels = [];
+        HashSet<int> claimed = [];
         PageText? pageText = null;
         PageText Text() => pageText ??= doc.GetText(page);
 
-        double captionMaxGap = analysis.PageHeight * CaptionMaxGapFraction;
+        List<(int Block, Reference Ref)> captions = [];
         for (int i = 0; i < analysis.Blocks.Count; i++)
         {
             if (analysis.Blocks[i].Role != BlockRole.Caption) continue;
-            if (ParseCaptionLabel(Text().ExtractBlockText(analysis.Blocks[i])) is not { } reference)
-                continue;
-            var (target, gap, overlapX) = FindNearestTarget(analysis, i, reference.Kind);
-            if (target >= 0 && overlapX && gap <= captionMaxGap)
-                labels.Add((reference, target, i));
+            if (ParseCaptionLabel(Text().ExtractBlockText(analysis.Blocks[i])) is { } reference)
+                captions.Add((i, reference));
         }
+        Bind(analysis, captions, analysis.PageHeight * CaptionMaxGapFraction, claimed, labels);
 
         double pseudoMaxGap = analysis.PageHeight * PseudoCaptionMaxGapFraction;
+        List<(int Block, Reference Ref)> pseudo = [];
         for (int i = 0; i < analysis.Blocks.Count; i++)
         {
             if (analysis.Blocks[i].Role != BlockRole.Text) continue;
@@ -293,11 +336,48 @@ internal sealed partial class ReferenceIndex
                 continue;
             if (reference.Kind == RefKind.Figure ? !nearFig : !nearTab) continue;   // kind must match the hugged float
             if (labels.Any(l => l.Ref == reference)) continue;                      // detected captions win
-            labels.Add((reference, reference.Kind == RefKind.Figure ? fig.Index : tab.Index, i));
+            pseudo.Add((i, reference));
         }
+        Bind(analysis, pseudo, pseudoMaxGap, claimed, labels);
 
         return new PageLabels(analysis, labels);
     }
+
+    /// <summary>Bind captions to floats one-to-one, smallest vertical gap first. Only kind-matched
+    /// floats that overlap the caption horizontally within <paramref name="maxGap"/> are candidates;
+    /// floats in <paramref name="claimed"/> (taken by an earlier pass) are skipped.</summary>
+    private static void Bind(PageAnalysis analysis, List<(int Block, Reference Ref)> captions, double maxGap,
+        HashSet<int> claimed, List<(Reference Ref, int TargetBlock, int CaptionBlock)> labels)
+    {
+        List<(double Gap, int Caption, int Float)> pairs = [];
+        for (int c = 0; c < captions.Count; c++)
+        {
+            for (int j = 0; j < analysis.Blocks.Count; j++)
+            {
+                if (claimed.Contains(j) || !IsFloat(analysis.Blocks[j].Role, captions[c].Ref.Kind)) continue;
+                var (gap, overlapX) = Gap(analysis.Blocks[captions[c].Block].BBox, analysis.Blocks[j].BBox);
+                if (overlapX && gap <= maxGap) pairs.Add((gap, c, j));
+            }
+        }
+        pairs.Sort((x, y) => x.Gap != y.Gap ? x.Gap.CompareTo(y.Gap)
+            : x.Caption != y.Caption ? x.Caption.CompareTo(y.Caption) : x.Float.CompareTo(y.Float));
+
+        HashSet<int> bound = [];
+        foreach (var (_, c, j) in pairs)
+        {
+            if (bound.Contains(c) || !claimed.Add(j)) continue;
+            bound.Add(c);
+            labels.Add((captions[c].Ref, j, captions[c].Block));
+        }
+    }
+
+    private static bool IsFloat(BlockRole role, RefKind kind) => kind == RefKind.Figure
+        ? role is BlockRole.Figure or BlockRole.Chart
+        : role is BlockRole.Table;
+
+    private static (double Gap, bool OverlapX) Gap(BBox cap, BBox b)
+        => (Math.Max(0, Math.Max(cap.Y - (b.Y + b.H), b.Y - (cap.Y + cap.H))),
+            Math.Min(cap.X + cap.W, b.X + b.W) > Math.Max(cap.X, b.X));
 
     /// <summary>The text of line <paramref name="lineIdx"/> of a block, followed by the next line so a
     /// mention split across the break ("…see Figure ⏎ 3 shows…") is caught. <paramref name="startLimit"/>
@@ -341,15 +421,9 @@ internal sealed partial class ReferenceIndex
         for (int j = 0; j < analysis.Blocks.Count; j++)
         {
             if (j == captionIndex) continue;
-            var role = analysis.Blocks[j].Role;
-            bool kindMatch = kind == RefKind.Figure
-                ? role is BlockRole.Figure or BlockRole.Chart
-                : role is BlockRole.Table;
-            if (!kindMatch) continue;
+            if (!IsFloat(analysis.Blocks[j].Role, kind)) continue;
 
-            var b = analysis.Blocks[j].BBox;
-            double gap = Math.Max(0, Math.Max(cap.Y - (b.Y + b.H), b.Y - (cap.Y + cap.H)));
-            bool overlapX = Math.Min(cap.X + cap.W, b.X + b.W) > Math.Max(cap.X, b.X);
+            var (gap, overlapX) = Gap(cap, analysis.Blocks[j].BBox);
             // Horizontally-overlapping candidates always beat non-overlapping ones; within each tier,
             // the smallest vertical gap wins.
             double score = gap + (overlapX ? 0 : 1e6);

@@ -1,0 +1,158 @@
+{
+ "mentions": [
+  {
+   "page": 2,
+   "kind": "Figure",
+   "number": "1",
+   "target_page": 2,
+   "target_block": 5
+  },
+  {
+   "page": 4,
+   "kind": "Figure",
+   "number": "2",
+   "target_page": 4,
+   "target_block": 4
+  },
+  {
+   "page": 7,
+   "kind": "Figure",
+   "number": "3",
+   "target_page": 7,
+   "target_block": 8
+  },
+  {
+   "page": 7,
+   "kind": "Figure",
+   "number": "4",
+   "target_page": 8,
+   "target_block": 3
+  },
+  {
+   "page": 9,
+   "kind": "Figure",
+   "number": "5",
+   "target_page": 9,
+   "target_block": 4
+  },
+  {
+   "page": 9,
+   "kind": "Figure",
+   "number": "6",
+   "target_page": 9,
+   "target_block": 6
+  },
+  {
+   "page": 10,
+   "kind": "Table",
+   "number": "1",
+   "target_page": 10,
+   "target_block": 6
+  },
+  {
+   "page": 10,
+   "kind": "Figure",
+   "number": "7",
+   "target_page": 11,
+   "target_block": 4
+  },
+  {
+   "page": 11,
+   "kind": "Figure",
+   "number": "8",
+   "target_page": 12,
+   "target_block": 2
+  },
+  {
+   "page": 11,
+   "kind": "Figure",
+   "number": "9",
+   "target_page": 12,
+   "target_block": 4
+  },
+  {
+   "page": 12,
+   "kind": "Figure",
+   "number": "10",
+   "target_page": 13,
+   "target_block": 2
+  },
+  {
+   "page": 12,
+   "kind": "Figure",
+   "number": "11",
+   "target_page": 13,
+   "target_block": 4
+  },
+  {
+   "page": 14,
+   "kind": "Figure",
+   "number": "12",
+   "target_page": 14,
+   "target_block": 5
+  },
+  {
+   "page": 14,
+   "kind": "Figure",
+   "number": "13",
+   "target_page": 14,
+   "target_block": 7
+  },
+  {
+   "page": 15,
+   "kind": "Figure",
+   "number": "14",
+   "target_page": 16,
+   "target_block": 2
+  },
+  {
+   "page": 15,
+   "kind": "Figure",
+   "number": "15",
+   "target_page": 16,
+   "target_block": 4
+  },
+  {
+   "page": 16,
+   "kind": "Table",
+   "number": "2",
+   "target_page": 17,
+   "target_block": 4
+  },
+  {
+   "page": 17,
+   "kind": "Figure",
+   "number": "16",
+   "target_page": 18,
+   "target_block": 2
+  },
+  {
+   "page": 18,
+   "kind": "Figure",
+   "number": "17",
+   "target_page": 19,
+   "target_block": 3
+  },
+  {
+   "page": 18,
+   "kind": "Figure",
+   "number": "18",
+   "target_page": 19,
+   "target_block": 5
+  },
+  {
+   "page": 26,
+   "kind": "Table",
+   "number": "3",
+   "target_page": 27,
+   "target_block": 4
+  }
+ ],
+ "empty_pages": [
+  0,
+  1,
+  3,
+  5,
+  6
+ ]
+}

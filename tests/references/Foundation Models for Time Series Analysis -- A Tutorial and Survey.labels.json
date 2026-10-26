@@ -1,0 +1,56 @@
+{
+ "mentions": [
+  {
+   "page": 2,
+   "kind": "Table",
+   "number": "1",
+   "target_page": 2,
+   "target_block": 2
+  },
+  {
+   "page": 2,
+   "kind": "Figure",
+   "number": "1",
+   "target_page": 1,
+   "target_block": 10
+  },
+  {
+   "page": 2,
+   "kind": "Figure",
+   "number": "2",
+   "target_page": 3,
+   "target_block": 1
+  },
+  {
+   "page": 3,
+   "kind": "Figure",
+   "number": "3",
+   "target_page": 4,
+   "target_block": 2
+  },
+  {
+   "page": 6,
+   "kind": "Figure",
+   "number": "4",
+   "target_page": 6,
+   "target_block": 1
+  },
+  {
+   "page": 6,
+   "kind": "Figure",
+   "number": "3",
+   "target_page": 4,
+   "target_block": 2
+  },
+  {
+   "page": 8,
+   "kind": "Figure",
+   "number": "5",
+   "target_page": 8,
+   "target_block": 10
+  }
+ ],
+ "empty_pages": [
+  0
+ ]
+}

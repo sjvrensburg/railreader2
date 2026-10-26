@@ -98,6 +98,14 @@ public static class ReferencesCommand
         }
 
         Shared.WriteJsonOutput(report, outputPath, CliJsonContext.Default.ReferenceReport, "References");
+        if (report.Metrics is { } scored)
+        {
+            Console.Error.WriteLine($"  resolver       {Summarise(scored.Overall)}");
+            foreach (var (name, m) in report.Baselines)
+                Console.Error.WriteLine($"  {name,-14} {Summarise(m.Overall)}");
+            foreach (var failure in report.Failures)
+                Console.Error.WriteLine($"  miss: {failure}");
+        }
 
         if (minPrecision is { } min)
         {
@@ -112,6 +120,9 @@ public static class ReferencesCommand
         }
         return 0;
     }
+
+    static string Summarise(Metrics m) =>
+        $"P={m.Precision:F2} R={m.Recall:F2} F1={m.F1:F2} (tp {m.TruePositives}, fp {m.FalsePositives}, fn {m.FalseNegatives})";
 
     static void PrintHelp()
     {

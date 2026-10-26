@@ -28,6 +28,9 @@ internal sealed class LabelledMention
     public string Number { get; set; } = "";
     public int? TargetPage { get; set; }
     public int? TargetBlock { get; set; }
+    /// <summary>Further blocks on <see cref="TargetPage"/> that also count as correct, for floats the
+    /// layout model splits into several blocks (multi-panel figures, a colour-bar strip).</summary>
+    public List<int> AlsoAcceptBlocks { get; set; } = [];
 }
 
 internal sealed class GroundTruth
@@ -197,7 +200,8 @@ internal static class ReferenceBenchmark
                 continue;
             }
 
-            if (resolved && p!.TargetPage == l.TargetPage && p.TargetBlock == l.TargetBlock)
+            if (resolved && p!.TargetPage == l.TargetPage
+                && (p.TargetBlock == l.TargetBlock || l.AlsoAcceptBlocks.Contains(p.TargetBlock ?? -1)))
             {
                 Bump(kind, 0); p.Outcome = "tp";
             }
