@@ -1246,7 +1246,10 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         // Already showing this exact message → keep it as-is. Without this, a repeated trigger (e.g. every
         // scroll-wheel notch while zoom is frozen-locked) would dispose+recreate the timer on each call,
         // churning timers and re-arming the same toast indefinitely.
-        if (message == StatusToast && actionLabel == StatusToastActionLabel) return;
+        // A different action (e.g. "Undo" for a second deletion with the same label) must replace the
+        // shown one, or clicking it would run the stale closure.
+        if (message == StatusToast && actionLabel == StatusToastActionLabel
+            && ReferenceEquals(action, _statusToastAction)) return;
         StatusToast = message;
         StatusToastActionLabel = actionLabel;
         _statusToastAction = action;
@@ -1324,6 +1327,16 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     }
 
     public void OnSliderChanged() => _controller.OnSliderChanged(_appConfig.ToCoreSettings());
+
+    /// <summary>Live preview for a Settings slider drag: applies the value to Core and repaints the
+    /// page/overlay layers that read it (line-focus dim, line padding, highlight opacity), without
+    /// <see cref="OnConfigChanged"/>'s config save and full broadcast — the caller debounces that.</summary>
+    public void OnSettingsSliderPreview()
+    {
+        OnSliderChanged();
+        InvalidatePage();
+        InvalidateOverlay();
+    }
 
     // --- Scan All ---
 

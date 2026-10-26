@@ -1068,6 +1068,9 @@ public sealed partial class MainWindowViewModel
         string label = removed[0].Label;
         ShowStatusToast($"Portal deleted: {label}", "Undo", () =>
         {
+            // The tab's portal set is released on close; restoring into it then would save a stale
+            // set over whatever a reopened tab has written since.
+            if (!Tabs.Contains(tab)) return;
             tab.Portals.Portals.AddRange(removed);
             tab.Portals.Save(tab.FilePath);
             NotifyPortalsChanged();

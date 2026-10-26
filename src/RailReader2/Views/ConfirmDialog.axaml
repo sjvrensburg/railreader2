@@ -2,7 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="RailReader2.Views.ConfirmDialog"
         Title="Confirm"
-        Width="450" Height="180"
+        Width="450" SizeToContent="Height" MinHeight="150"
         WindowStartupLocation="CenterOwner"
         CanResize="False">
     <DockPanel Margin="16">

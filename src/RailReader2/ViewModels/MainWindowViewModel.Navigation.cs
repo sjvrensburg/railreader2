@@ -450,6 +450,9 @@ public sealed partial class MainWindowViewModel
         JumpMode = _controller.JumpMode;
         OnPropertyChanged(nameof(AutoScrollActive));
         RequestAnimationFrame();
+        // From the toolbar button, menu or a key pressed while a slider held focus, the next keys
+        // (arrows, D/S) should drive the rail, not the control that had focus.
+        RequestViewportFocus();
     }
 
     public void ToggleJumpModeExclusive()
@@ -462,6 +465,7 @@ public sealed partial class MainWindowViewModel
         _controller.ToggleJumpModeExclusive();
         JumpMode = _controller.JumpMode;
         OnPropertyChanged(nameof(AutoScrollActive));
+        RequestViewportFocus();
     }
 
     /// <summary>Saves a display toggle made from a key/menu into the config and hands Core the new

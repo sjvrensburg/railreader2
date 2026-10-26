@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
+using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Media;
@@ -160,6 +161,7 @@ public partial class RailToolBar : UserControl
         ToolTip.SetTip(_speedSlider, "Scroll speed ([ / ] keys)");
         AutomationProperties.SetName(_speedSlider, "Scroll speed");
         _speedSlider.PropertyChanged += OnSpeedSliderPropertyChanged;
+        _speedSlider.AddHandler(PointerReleasedEvent, OnSliderPointerReleased, RoutingStrategies.Bubble, handledEventsToo: true);
         SliderPanel.Children.Add(_speedSlider);
 
         // Blur slider
@@ -179,6 +181,7 @@ public partial class RailToolBar : UserControl
         ToolTip.SetTip(_blurSlider, "Motion blur intensity (Shift+[ / Shift+] keys)");
         AutomationProperties.SetName(_blurSlider, "Motion blur intensity");
         _blurSlider.PropertyChanged += OnBlurSliderPropertyChanged;
+        _blurSlider.AddHandler(PointerReleasedEvent, OnSliderPointerReleased, RoutingStrategies.Bubble, handledEventsToo: true);
         SliderPanel.Children.Add(_blurSlider);
     }
 
@@ -194,11 +197,24 @@ public partial class RailToolBar : UserControl
     protected override void OnUnloaded(Avalonia.Interactivity.RoutedEventArgs e)
     {
         if (_speedSlider is not null)
+        {
             _speedSlider.PropertyChanged -= OnSpeedSliderPropertyChanged;
+            _speedSlider.RemoveHandler(PointerReleasedEvent, OnSliderPointerReleased);
+        }
         if (_blurSlider is not null)
+        {
             _blurSlider.PropertyChanged -= OnBlurSliderPropertyChanged;
+            _blurSlider.RemoveHandler(PointerReleasedEvent, OnSliderPointerReleased);
+        }
         base.OnUnloaded(e);
     }
+
+    /// <summary>A mouse drag on a slider hands keyboard focus back to the document when it ends, so the
+    /// arrows drive the rail again instead of nudging the slider — the window leaves arrows to a focused
+    /// slider. Tabbing onto a slider still keeps it for keyboard adjustment.
+    /// Handled-too: the slider's thumb marks the release handled.</summary>
+    private void OnSliderPointerReleased(object? sender, PointerReleasedEventArgs e)
+        => ViewModel?.RequestViewportFocus();
 
     private void OnSpeedSliderPropertyChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
     {

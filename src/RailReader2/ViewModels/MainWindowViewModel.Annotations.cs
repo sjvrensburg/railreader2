@@ -832,6 +832,11 @@ public sealed partial class MainWindowViewModel
     public async Task ExportAnnotated()
     {
         if (_window is null || ActiveTab is not { } tab) return;
+        if (_exportingTabs.Contains(tab))
+        {
+            ShowStatusToast("An annotated export of this tab is already running.");
+            return;
+        }
 
         var file = await _window.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
         {
@@ -855,8 +860,14 @@ public sealed partial class MainWindowViewModel
         }
 
         // The export reads tab.Pdf/tab.Annotations on a background thread; closing the tab would
-        // dispose the model under it. CloseTab refuses while a tab is in this set.
-        _exportingTabs.Add(tab);
+        // dispose the model under it. CloseTab refuses while a tab is in this set. A set, not a
+        // count: refuse a second concurrent export, whose `finally` would otherwise drop the guard
+        // while the first is still running.
+        if (!_exportingTabs.Add(tab))
+        {
+            ShowStatusToast("An annotated export of this tab is already running.");
+            return;
+        }
         try
         {
             await Task.Run(() =>

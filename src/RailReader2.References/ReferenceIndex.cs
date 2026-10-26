@@ -521,6 +521,42 @@ internal sealed partial class ReferenceIndex
         return restarts;
     }
 
+    /// <summary>Drop the count-keyed caches (negative, restart evidence, bibliography) when any
+    /// already-indexed page has been re-analysed (a new <see cref="PageAnalysis"/> instance at the
+    /// same analysed-page count — OCR landing, a re-run). Those caches are keyed only on
+    /// <see cref="IReferenceDocument.AnalysedPageCount"/>, so without this a same-count replacement
+    /// would keep serving a stale result. The stale per-page entries are evicted too (they are rebuilt
+    /// lazily on next touch), so one re-analysis drops the caches once — not on every later call
+    /// while a stale page outside the scan window waits to be rebuilt.</summary>
+    private void DropStaleCaches(IReferenceDocument doc)
+    {
+        if (_noMatch.Count > 0 || _restartEvidence is not null)
+        {
+            List<int>? stale = null;
+            foreach (var (page, entry) in _pages)
+                if (doc.TryGetAnalysis(page, out var analysis) && !ReferenceEquals(entry.Analysis, analysis))
+                    (stale ??= []).Add(page);
+            if (stale is not null)
+            {
+                foreach (int page in stale) _pages.Remove(page);
+                _noMatch.Clear();
+                _restartEvidence = null;
+            }
+        }
+        // The bibliography state rebuilds every page's heading entry, so a stale one means _bib is stale.
+        if (_bib is not null)
+        {
+            foreach (var (page, h) in _bibHeadings)
+            {
+                if (doc.TryGetAnalysis(page, out var analysis) && !ReferenceEquals(h.Analysis, analysis))
+                {
+                    _bib = null;
+                    break;
+                }
+            }
+        }
+    }
+
     /// <summary>Resolve a reference to its defining caption + figure/table block, scanning analysed
     /// pages outward from <paramref name="nearPage"/> (nearest match wins; the preceding page is tried
     /// before the following one at each distance, since a referenced float most often sits before or
@@ -530,28 +566,9 @@ internal sealed partial class ReferenceIndex
     /// when the scan stopped at a page it had no budget to index — the caller should retry (progress is
     /// cached). The scan never skips such a page to return a farther match: a nearer one may be hiding
     /// there. A complete miss is negative-cached until the set of analysed pages changes.</summary>
-    /// <summary>Drop the negative/restart caches when any already-indexed page has been
-    /// re-analysed (a new <see cref="PageAnalysis"/> instance at the same analysed-page count —
-    /// OCR landing, a re-run). Those caches are keyed only on <see cref="IReferenceDocument.AnalysedPageCount"/>,
-    /// so without this a same-count replacement would keep serving a stale miss. Per-page entries
-    /// themselves are rebuilt lazily by the <see cref="PageLabels.Analysis"/> identity check.</summary>
-    private void DropStaleNegativeCaches(IReferenceDocument doc)
-    {
-        if (_noMatch.Count == 0 && _restartEvidence is null) return;
-        foreach (var (page, entry) in _pages)
-        {
-            if (doc.TryGetAnalysis(page, out var analysis) && !ReferenceEquals(entry.Analysis, analysis))
-            {
-                _noMatch.Clear();
-                _restartEvidence = null;
-                return;
-            }
-        }
-    }
-
     public Target? Resolve(IReferenceDocument doc, Reference reference, int nearPage, out bool incomplete)
     {
-        DropStaleNegativeCaches(doc);
+        DropStaleCaches(doc);
         incomplete = false;
         int budget = MaxPageBuildsPerResolve;
         if (IsCitation(reference.Kind)) return ResolveCitation(doc, reference, nearPage, ref budget, ref incomplete);

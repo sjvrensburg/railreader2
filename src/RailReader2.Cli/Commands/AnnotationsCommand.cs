@@ -118,7 +118,7 @@ public static class AnnotationsCommand
 
                 PageText? pageText = null;
                 if ((includeText || includeBlocks) && textService != null)
-                    pageText = textService.ExtractPageText(pdf2.PdfBytes, pageIdx);
+                    pageText = textService.ExtractPageText(pdf2.PdfBytes, pageIdx, password);
 
                 PageAnalysis? analysis = null;
                 if (includeBlocks && analyzer != null)

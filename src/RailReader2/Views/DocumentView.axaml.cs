@@ -50,17 +50,13 @@ public partial class DocumentView : UserControl, IViewportSurface
     private double _lastMinimapZoom;
     private SKImage? _lastMinimapImage;
 
-    // Cache for the z-ordered annotation list. The sort only changes when the
-    // page's annotation set changes (add/remove); pan/zoom frames reuse it.
-    private int _annoSortPage = -1;
-    private object? _annoSortSource;
-    private List<Annotation>? _annoSortSnapshot; // the source's members, in order, at sort time
-    private List<Annotation>? _annoSortResult;
-
-    // Same z-order cache for continuous-scroll neighbour pages, keyed by page (the anchor keeps
-    // the single-slot cache above). Snapshots are member lists, like the anchor's.
-    private readonly Dictionary<int, (object? Source, List<Annotation>? Snapshot, List<Annotation>? Result)>
+    // Cache for the z-ordered annotation list of each visible page (the anchor and any
+    // continuous-scroll neighbours). The sort only changes when the page's annotation set changes
+    // (add/remove/merge); pan/zoom frames reuse it. Snapshot = the source's members, in order, at
+    // sort time. Pruned to the visible pages on every build so it never outgrows the window.
+    private readonly Dictionary<int, (List<Annotation> Source, List<Annotation> Snapshot, List<Annotation> Result)>
         _annoSortByPage = [];
+    private readonly List<int> _annoSortStale = [];
 
     // Cache for the active search-match local index. Only changes on match
     // navigation or page change, not while the camera moves.
@@ -813,40 +809,17 @@ public partial class DocumentView : UserControl, IViewportSurface
                 tab.Annotations.Pages.TryGetValue(vpg.Page, out var pageAnnotations);
 
                 // Pre-sort by z-order on the UI thread so the compositor doesn't need LINQ. Cache the
-                // result per page: z-order only changes when the page's annotation
-                // set changes, so pan/zoom frames (which re-send camera every tick) reuse it.
-                // Non-anchor pages (continuous-scroll neighbours) use the _annoSortByPage cache — cheap for
-                // the small annotation counts a visible neighbour page typically carries.
-                List<Annotation>? sorted;
-                if (isAnchor)
-                {
-                    if (pageAnnotations is { Count: > 1 }
-                        && ReferenceEquals(pageAnnotations, _annoSortSource)
-                        && vp.CurrentPage == _annoSortPage
-                        && SameMembers(pageAnnotations, _annoSortSnapshot))
-                    {
-                        sorted = _annoSortResult;
-                    }
-                    else
-                    {
-                        // Covers both the recompute path (Count > 1, cache miss) and the Count <= 1
-                        // path (0 or 1 annotations need no sorting). Both must update the cache
-                        // fields. Core mutates pageAnnotations in place, so its reference survives
-                        // every edit; the hit test is therefore a reference-by-reference comparison
-                        // against a snapshot of the members, not the count — a merge of a new
-                        // highlight into one existing partner (Core 0.64.0 auto-merge) replaces one
-                        // object with another at the same count, and a count-keyed cache kept drawing
-                        // the removed highlight while the merged one (now the selection) was never
-                        // drawn, so no selection outline could match. O(n) references per frame
-                        // beats the sort it guards, and it needs no allocation on a hit.
-                        sorted = pageAnnotations is { Count: > 1 } ? AnnotationRenderer.SortByZOrder(pageAnnotations) : pageAnnotations;
-                        _annoSortSource = pageAnnotations;
-                        _annoSortSnapshot = pageAnnotations is null ? null : [.. pageAnnotations];
-                        _annoSortPage = vp.CurrentPage;
-                        _annoSortResult = sorted;
-                    }
-                }
-                else if (pageAnnotations is { Count: > 1 })
+                // result per page: z-order only changes when the page's annotation set changes, so
+                // pan/zoom frames (which re-send camera every tick) reuse it. Core mutates
+                // pageAnnotations in place, so its reference survives every edit; the hit test is
+                // therefore a reference-by-reference comparison against a snapshot of the members,
+                // not the count — a merge of a new highlight into one existing partner (Core 0.64.0
+                // auto-merge) replaces one object with another at the same count, and a count-keyed
+                // cache kept drawing the removed highlight while the merged one (now the selection)
+                // was never drawn. O(n) references per frame beats the sort it guards, and it needs
+                // no allocation on a hit. 0 or 1 annotations need no sorting.
+                List<Annotation>? sorted = pageAnnotations;
+                if (pageAnnotations is { Count: > 1 })
                 {
                     if (_annoSortByPage.TryGetValue(vpg.Page, out var c)
                         && ReferenceEquals(pageAnnotations, c.Source)
@@ -860,14 +833,11 @@ public partial class DocumentView : UserControl, IViewportSurface
                         _annoSortByPage[vpg.Page] = (pageAnnotations, [.. pageAnnotations], sorted);
                     }
                 }
-                else
-                {
-                    sorted = pageAnnotations;
-                }
 
                 pages.Add(new AnnotationPageState(vpg.Page, isAnchor, PageCamera(vp, vpg), sorted));
             }
         }
+        PruneAnnotationSortCache(pages);
 
         return new AnnotationRenderState(
             Pages: pages,
@@ -880,6 +850,24 @@ public partial class DocumentView : UserControl, IViewportSurface
     }
 
     /// <summary>Same objects in the same order (reference equality) — the sort-cache hit test.</summary>
+    /// <summary>Drop sort-cache entries for pages no longer drawn, so continuous scrolling through a
+    /// long document doesn't retain every visited page's annotation lists. Allocation-free when
+    /// nothing is stale (the common single-page case).</summary>
+    private void PruneAnnotationSortCache(List<AnnotationPageState> drawn)
+    {
+        if (_annoSortByPage.Count == 0) return;
+        foreach (var page in _annoSortByPage.Keys)
+        {
+            bool visible = false;
+            foreach (var d in drawn)
+                if (d.Page == page) { visible = true; break; }
+            if (!visible) _annoSortStale.Add(page);
+        }
+        if (_annoSortStale.Count == 0) return;
+        foreach (int page in _annoSortStale) _annoSortByPage.Remove(page);
+        _annoSortStale.Clear();
+    }
+
     private static bool SameMembers(List<Annotation> live, List<Annotation>? snapshot)
     {
         if (snapshot is null || snapshot.Count != live.Count) return false;

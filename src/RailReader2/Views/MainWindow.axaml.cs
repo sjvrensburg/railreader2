@@ -89,7 +89,10 @@ public partial class MainWindow : Window
         RailToolBar.UpdateToggleStates();
     }
 
-    private void OnViewportFocusRequested() => Document.FocusViewport();
+    /// <summary>Focus the focused split pane's viewport when it lives in this window, else the primary
+    /// pane's — so handing focus back after a toolbar/pane action doesn't jump to another pane.</summary>
+    private void OnViewportFocusRequested()
+        => (Vm?.FocusedSurface is DocumentView pane && TopLevel.GetTopLevel(pane) == this ? pane : Document).FocusViewport();
 
     /// <summary>
     /// Build the granular invalidation callbacks passed to the ViewModel. Each
@@ -585,13 +588,16 @@ public partial class MainWindow : Window
             else if (e.KeyModifiers.HasFlag(KeyModifiers.Shift)) vm.CancelGuideChord();
         }
 
-        // A focused text box owns its keys — including Ctrl+C/X/V/Z/Y and plain typing. Without
-        // this, the Ctrl tier below pastes/cuts annotations instead of text in the search, status
-        // bar and portal-rename boxes, and plain keys (p, Space, Backspace) trigger rail actions
-        // while renaming. Global shortcuts resume once focus leaves the box.
-        if (IsInControl<TextBox>(e)) return false;
+        // A focused text box owns its editing keys: Ctrl+A/C/X/V/Z/Y and caret chords edit the text
+        // (otherwise the Ctrl tier pastes/cuts annotations in the search, status-bar and portal-rename
+        // boxes), and the plain-key navigation tier is skipped so typing never drives the rail.
+        // Non-editing Ctrl shortcuts (Ctrl+W/O/F/Tab, …) and the global tier still run — its Escape
+        // chain (unfreeze, exit fullscreen/modes) is documented as the exit that works from a text field.
+        bool inTextBox = IsInControl<TextBox>(e);
 
-        if (e.KeyModifiers.HasFlag(KeyModifiers.Control) && HandleCtrlShortcut(vm, e))
+        if (e.KeyModifiers.HasFlag(KeyModifiers.Control)
+            && !(inTextBox && IsTextEditingChord(e.Key))
+            && HandleCtrlShortcut(vm, e))
             { RailToolBar.SyncState(); return true; }
 
         // Alt+Arrow: navigation history (back/forward)
@@ -604,15 +610,17 @@ public partial class MainWindow : Window
         // When the search TextBox has focus, let text input keys through. Also require the
         // Search section to actually be the open pane, so a stale focus flag (Search collapsed
         // while the box held focus) can't keep swallowing nav keys.
-        bool textInputFocused = (vm.ShowOutline && vm.IsSearchInputFocused && vm.ActivePane == SidePane.Search)
+        bool textInputFocused = inTextBox
+            || (vm.ShowOutline && vm.IsSearchInputFocused && vm.ActivePane == SidePane.Search)
             || StatusBar.IsEditing;
 
-        // Controls that consume arrows/Space themselves (slider, list, tree, combo) own those
-        // keys while focused; a button owns Space (activation). Rail/page keys resume once the
-        // viewport is clicked again.
-        bool controlOwnsKey = IsInControl<Slider>(e) || IsInControl<ListBox>(e)
-            || IsInControl<TreeView>(e) || IsInControl<ComboBox>(e)
-            || (e.Key == Key.Space && IsInControl<Button>(e));
+        // Controls that consume arrows/Space/Home/End themselves (slider, list, tree, combo) own
+        // just those keys while focused; a button owns Space (activation). Every other rail key
+        // (P, F, H, +/-, …) still works, and arrows return to the rail once the viewport is clicked.
+        bool controlOwnsKey = e.Key is Key.Up or Key.Down or Key.Left or Key.Right or Key.Space or Key.Home or Key.End
+            && (IsInControl<Slider>(e) || IsInControl<ListBox>(e)
+                || IsInControl<TreeView>(e) || IsInControl<ComboBox>(e)
+                || (e.Key == Key.Space && IsInControl<Button>(e)));
 
         if (!textInputFocused && !controlOwnsKey && HandleNavigationKey(vm, e))
             { RailToolBar.SyncState(); return true; }
@@ -622,6 +630,11 @@ public partial class MainWindow : Window
 
         return false;
     }
+
+    /// <summary>Ctrl chords a text box uses for editing (clipboard, undo, select-all, caret moves) —
+    /// left to the focused box instead of the window's Ctrl shortcuts.</summary>
+    private static bool IsTextEditingChord(Key key) => key is Key.A or Key.C or Key.X or Key.V
+        or Key.Z or Key.Y or Key.Left or Key.Right or Key.Home or Key.End or Key.Back or Key.Delete;
 
     /// <summary>True when the key event originated inside a control of type <typeparamref name="T"/>
     /// (walking the visual parent chain, so template parts like a TextBox's presenter match).</summary>

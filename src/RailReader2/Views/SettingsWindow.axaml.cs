@@ -964,13 +964,15 @@ public partial class SettingsWindow : Window
     {
         if (e.Property.Name != "Value" || Vm is not { } vm || _loading) return;
         apply(vm.AppConfig);
-        // Live-apply to the controller on every tick (cheap), but debounce the heavy
-        // OnConfigChanged (config file save + broadcast invalidation) until the drag settles.
-        vm.OnSliderChanged();
-        _sliderPersistTimer?.Stop();
-        _sliderPersistTimer ??= new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };
-        _sliderPersistTimer.Tick -= OnSliderPersistTick;
-        _sliderPersistTimer.Tick += OnSliderPersistTick;
+        // Live-apply and repaint on every tick (cheap), but debounce the heavy OnConfigChanged
+        // (config file save + broadcast invalidation) until the drag settles.
+        vm.OnSettingsSliderPreview();
+        if (_sliderPersistTimer is null)
+        {
+            _sliderPersistTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };
+            _sliderPersistTimer.Tick += OnSliderPersistTick;
+        }
+        _sliderPersistTimer.Stop();
         _sliderPersistTimer.Start();
     }
 
@@ -1397,7 +1399,7 @@ public partial class SettingsWindow : Window
         var confirm = new ConfirmDialog("Reset all settings?",
             "Reset every setting to its default? This clears your VLM API key and OCR language-pack "
             + "and GPU choices, and cannot be undone.",
-            "Reset All");
+            "Reset All") { FontSize = FontSize };
         if (await confirm.ShowDialog<bool>(this) != true) return;
         var defaults = new AppConfig();
         vm.AppConfig.RailZoomThreshold = defaults.RailZoomThreshold;
