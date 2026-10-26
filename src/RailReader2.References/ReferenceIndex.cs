@@ -13,11 +13,14 @@ namespace RailReader2.References;
 /// </summary>
 internal sealed partial class ReferenceIndex
 {
-    internal enum RefKind { Figure, Table, Theorem, Lemma, Proposition, Corollary, Definition, Example, Remark, Exercise }
+    internal enum RefKind { Figure, Table, Theorem, Lemma, Proposition, Corollary, Definition, Example, Remark, Exercise, Equation }
 
     /// <summary>Numbered statements (as opposed to captioned floats): their target is the text block
     /// whose line opens with the header ("Definition 2.1 (graph)."), not a float beside a caption.</summary>
-    internal static bool IsStatement(RefKind kind) => kind >= RefKind.Theorem;
+    internal static bool IsStatement(RefKind kind) => kind is >= RefKind.Theorem and <= RefKind.Exercise;
+
+    /// <summary>Display equations: their target is a display-maths block carrying the printed tag "(3.2)".</summary>
+    internal static bool IsEquation(RefKind kind) => kind == RefKind.Equation;
 
     /// <summary>A parsed reference label, e.g. (Figure, "3.2"). Numbers are normalized to lowercase
     /// (suffix letters, appendix prefixes, roman numerals) so an in-text mention and a caption label
@@ -33,7 +36,7 @@ internal sealed partial class ReferenceIndex
     // Number forms a figure/table label can take: arabic with an optional appendix-letter prefix and
     // sub-figure suffix ("3", "2.1", "A.4", "4b"), or — case-sensitively, to avoid swallowing common
     // words — uppercase roman numerals / a bare uppercase letter (IEEE "TABLE II", appendix "Figure A").
-    private const string NumberPattern = @"(?:(?:[A-Za-z]\.)?\d+(?:\.\d+)*[a-z]?|(?-i:[IVXLC]+|[A-Z]))\b";
+    private const string NumberPattern = @"(?:(?:[A-Za-z][.\-])?\d+(?:\.\d+)*[a-z]?|(?-i:[IVXLC]+|[A-Z]))\b";
 
     // In-text mentions: "Figure 3", "Fig. 2.1", "Figs 4a", "Table 12", "Tab. 3", "TABLE II".
     // Statement kind words are matched case-sensitively and capitalised ("Theorem 2", "Ex. 3", "Defs. 2.12"):
@@ -45,7 +48,7 @@ internal sealed partial class ReferenceIndex
     // A statement header opening a line: full kind word, number, then ".", ":" or an opening bracket
     // ("Definition 2.1 (graph).", "Theorem 1. If", "Exercise 3.1 [Title]"). Body sentences such as
     // "Theorem 1 shows that" and citations such as "Definition 17 of [4]" do not match.
-    [GeneratedRegex(@"^[\s\p{P}]{0,3}(?<kind>(?-i:Theorem|Lemma|Proposition|Corollary|Definition|Exercise|Example|Remark))\s*(?<num>\d+(?:\.\d+)*)(?=\s*[.:(\[])")]
+    [GeneratedRegex(@"^(?:[\s\p{P}-[•·▪◦‣⁃*\-–—]]){0,3}(?<kind>(?-i:Theorem|Lemma|Proposition|Corollary|Definition|Exercise|Example|Remark))\s*(?<num>(?:[A-Z]\.)?\d+(?:\.\d+)*)(?=\s*[.:]|\s+[(\[])")]
     private static partial Regex StatementHeaderRegex();
 
     // "… of [4]", "… in Smith (2019)", "… from Smith et al. [3]": the number names a statement in some
@@ -117,7 +120,58 @@ internal sealed partial class ReferenceIndex
     /// without firing early for mentions that wholly belong to the next line.</summary>
     public static List<Reference> ParseLine(string text, int startLimit = int.MaxValue)
     {
-        List<Reference> refs = [];
+        // A contents entry ("C.8 Proof of Lemma 3.8 . . . . . . . 41") lists headings; it cites nothing.
+        if (DotLeaderAnywhereRegex().IsMatch(text)) return [];
+        List<(int Index, Reference Ref)> found = [];
+        ParseCaptionedMentions(text, startLimit, found);
+        ParseParenthesisedStatements(text, startLimit, found);
+        ParseEquationMentions(text, startLimit, found);
+        // A result named inside a citation ("[IK99, Lemma 1.15]", "(Smith 2019, Theorem 3)") belongs to
+        // the cited work, not this document.
+        var citations = CitationSpans(text);
+        found.RemoveAll(f => citations.Any(c => f.Index >= c.Start && f.Index < c.End));
+        found.Sort((a, b) => a.Index.CompareTo(b.Index));
+        return [.. found.Select(f => f.Ref)];
+    }
+
+    // "[12, Theorem 3.2]", "[IK99, Lemma 1.15]", "[2, eqs. (5) and (6)]": a bibliography key plus a
+    // qualifier naming a result. A bare key ("[12]") names nothing local; an interval ("[0, 1]") is not
+    // a citation, so the qualifier must contain a letter or a parenthesis.
+    [GeneratedRegex(@"\[\s*(?:see\s+)?(?:\d+|\p{Lu}\p{L}*(?:\+\p{L}*)?\d{2,4}[a-z]?)(?:\s*[-–—]\s*\d+)?\s*,(?<q>[^\[\]]{1,180})\]")]
+    private static partial Regex BracketCitationRegex();
+
+    // "(Smith 2019, Theorem 3)", "(Smith et al. 2019, Eq. (4))", "(Coogan & Arcak, 2015, Def. 1)".
+    [GeneratedRegex(@"\(\p{Lu}[\p{L}'’\-]+(?:(?:,\s*|\s+)(?:&|and)\s+\p{Lu}[\p{L}'’\-]+|\s+et\s+al\.?)?,?\s+(?:19|20)\d{2}[a-z]?\s*,[^()]*(?:\([^()]*\)[^()]*)*\)")]
+    private static partial Regex AuthorYearCitationRegex();
+
+    private static List<(int Start, int End)> CitationSpans(string text)
+    {
+        List<(int, int)> spans = [];
+        foreach (Match m in BracketCitationRegex().Matches(text))
+        {
+            string q = m.Groups["q"].Value;
+            if (q.Any(char.IsLetter) || q.Contains('(')) spans.Add((m.Index, m.Index + m.Length));
+        }
+        foreach (Match m in AuthorYearCitationRegex().Matches(text))
+            spans.Add((m.Index, m.Index + m.Length));
+        return spans;
+    }
+
+    // "Theorem (3.2)" prints the statement number in parentheses.
+    [GeneratedRegex(@"\b(?<kind>(?-i:Theorem|Lemma|Proposition|Corollary|Definition|Exercise|Example|Remark))\s*\(\s*(?<num>\d+(?:\.\d+)*)\s*\)")]
+    private static partial Regex ParenthesisedStatementRegex();
+
+    private static void ParseParenthesisedStatements(string text, int startLimit, List<(int Index, Reference Ref)> refs)
+    {
+        foreach (Match m in ParenthesisedStatementRegex().Matches(text))
+        {
+            if (m.Index >= startLimit) break;
+            refs.Add((m.Index, new Reference(KindOfWord(m.Groups["kind"].Value), NormalizeNumber(m.Groups["num"].Value))));
+        }
+    }
+
+    private static void ParseCaptionedMentions(string text, int startLimit, List<(int Index, Reference Ref)> refs)
+    {
         foreach (Match m in LineReferenceRegex().Matches(text))
         {
             if (m.Index >= startLimit) break;
@@ -128,7 +182,7 @@ internal sealed partial class ReferenceIndex
             int endIndex = m.Index + m.Length;
             headNumber = MergeChapterDashSuffix(text, kindWord, headNumber, ref endIndex);
             if (ForeignCitationRegex().IsMatch(text, endIndex)) continue;
-            refs.Add(new Reference(kind, NormalizeNumber(headNumber)));
+            refs.Add((m.Index, new Reference(kind, NormalizeNumber(headNumber))));
 
             bool plural = IsPluralKindWord(kindWord);
             // Singular kind words still expand a lettered sub-part series ("Fig 3a and 3b") — the
@@ -145,11 +199,170 @@ internal sealed partial class ReferenceIndex
                 string contNumber = c.Groups["num"].Value;
                 if (letterSeries && !EndsWithLetterSuffix(contNumber)) break;
                 if (!AcceptNumber(kind, kindWord, contNumber)) break;
-                refs.Add(new Reference(kind, NormalizeNumber(contNumber)));
+                refs.Add((c.Index, new Reference(kind, NormalizeNumber(contNumber))));
                 pos = c.Index + c.Length;
             }
         }
-        return refs;
+    }
+
+    // Equation numbers: arabic with optional dotted scope and panel letter ("4", "3.28", "2a"), or an
+    // appendix-scoped form ("A.1").
+    private const string EquationNumberPattern = @"(?:[A-Z]\.)?\d+(?:\.\d+)*[a-z]?";
+
+    // "Equation (3.12)", "Eq. 4", "equations (7)", "Eqs. (3)–(5)": the word names the target.
+    [GeneratedRegex(@"\b(?<cue>eqs?|equations?)\.?\s*\(?\s*(?<num>" + EquationNumberPattern + @")\s*\)?", RegexOptions.IgnoreCase)]
+    private static partial Regex EquationCueRegex();
+
+    [GeneratedRegex(@"\G\s*(?:,|;|and|&|–|—|to|through|-)\s*\(?\s*(?<num>" + EquationNumberPattern + @")\s*\)?", RegexOptions.IgnoreCase)]
+    private static partial Regex EquationContinuationRegex();
+
+    // A parenthesised number standing on its own — not attached to a preceding word or closing
+    // bracket ("O(1)", "AR(1)", "f(0)", "3(2)").
+    [GeneratedRegex(@"(?<![\w)\]])\(\s*(?<num>" + EquationNumberPattern + @")\s*\)")]
+    private static partial Regex ParenthesisedNumberRegex();
+
+    private static void ParseEquationMentions(string text, int startLimit, List<(int Index, Reference Ref)> refs)
+    {
+        List<(int Start, int End)> covered = [];
+        foreach (Match m in EquationCueRegex().Matches(text))
+        {
+            if (m.Index >= startLimit) break;
+            string number = m.Groups["num"].Value;
+            if (!IsPlausibleEquationNumber(number)) continue;
+            int end = m.Index + m.Length;
+            if (ForeignCitationRegex().IsMatch(text, end)) continue;
+            refs.Add((m.Index, new Reference(RefKind.Equation, NormalizeNumber(number))));
+            if (m.Groups["cue"].Value.EndsWith('s') || m.Groups["cue"].Value.EndsWith('S'))
+            {
+                for (int pos = end;;)
+                {
+                    var c = EquationContinuationRegex().Match(text, pos);
+                    if (!c.Success || !IsPlausibleEquationNumber(c.Groups["num"].Value)) break;
+                    refs.Add((c.Index, new Reference(RefKind.Equation, NormalizeNumber(c.Groups["num"].Value))));
+                    pos = c.Index + c.Length;
+                    end = pos;
+                }
+            }
+            covered.Add((m.Index, end));
+        }
+        foreach (Match m in ParenthesisedNumberRegex().Matches(text))
+        {
+            if (m.Index >= startLimit) break;
+            if (covered.Any(c => m.Index >= c.Start && m.Index < c.End)) continue;
+            // "(1) first … ; (2) second" and "(1) f ∈ W": a list marker or proof step opens its clause
+            // (line start, or after punctuation). A mention follows the word that points at it.
+            if (!FollowsAWord(text, m.Index)) continue;
+            // "conditions (1) and (3)", "(1) of Assumption 2.2", "(1)–(3)": numbered items, not equations.
+            if (IsItemMarker(text, m)) continue;
+            // "Theorem (3.2)", "Section (4)": the parenthesis belongs to the word before it.
+            if (NumberedThingWordBeforeRegex().IsMatch(text.AsSpan(0, m.Index))) continue;
+            string number = m.Groups["num"].Value;
+            if (!IsPlausibleEquationNumber(number)) continue;
+            if (ForeignCitationRegex().IsMatch(text, m.Index + m.Length)) continue;
+            refs.Add((m.Index, new Reference(RefKind.Equation, NormalizeNumber(number))));
+        }
+    }
+
+    [GeneratedRegex(@"\b(?:Theorems?|Lemmas?|Propositions?|Corollar(?:y|ies)|Definitions?|Exercises?|Examples?|Remarks?|Fig(?:ures?|s)?|Tab(?:les?|s)?|Sections?|Sec|Chapters?|Appendix|Pages?|pp?)\.?\s*$", RegexOptions.IgnoreCase)]
+    private static partial Regex NumberedThingWordBeforeRegex();
+
+    // The word a parenthesised number hangs off, skipping a chain of earlier numbers joined by and/or/commas:
+    // "verify conditions (1) and (3)" → "conditions" for both.
+    [GeneratedRegex(@"(?<w>[A-Za-z]{2,})\s*(?:\(\s*[\w.]+\s*\)\s*(?:,|and|or|&|–|—|-|to)\s*)*$")]
+    private static partial Regex GoverningWordRegex();
+
+    [GeneratedRegex(@"^\s*(?:of|in|from)\s+(?:Assumptions?|Conditions?|Theorems?|Lemmas?|Propositions?|Definitions?|Axioms?)\b|^\s*[-–—]\s*\(\s*\d", RegexOptions.IgnoreCase)]
+    private static partial Regex ItemMarkerFollowRegex();
+
+    private static readonly HashSet<string> ItemWords = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "condition", "conditions", "assumption", "assumptions", "item", "items", "property", "properties",
+        "case", "cases", "part", "parts", "step", "steps", "claim", "claims", "axiom", "axioms", "point",
+        "points", "statement", "statements", "clause", "clauses", "requirement", "requirements",
+        "hypothesis", "hypotheses", "criterion", "criteria",
+        // a conjunction directly before a number opens a new list item ("…cost, and (2) time saving"):
+        // a real chain ("formula (2) and (3)") is skipped back to its word before this check
+        "and", "or", "but", "nor", "then", "also", "both", "either", "neither", "plus", "while", "whereas",
+        // asymptotic notation and functions applied to a number: "oP (1)", "log (2)", "Var (1)"
+        "op", "oo", "ln", "log", "lg", "exp", "sin", "cos", "tan", "max", "min", "sup", "inf", "det",
+        "tr", "rank", "dim", "var", "cov", "pr", "std", "deg", "mod", "gcd", "lcm", "lim", "sgn", "abs",
+        "diag", "vec", "poly", "polylog", "loglog", "argmax", "argmin", "prob", "mse", "mae",
+    };
+
+    private static bool IsItemMarker(string text, Match m)
+    {
+        var governing = GoverningWordRegex().Match(text, 0, m.Index);
+        if (governing.Success && ItemWords.Contains(governing.Groups["w"].Value)) return true;
+        return ItemMarkerFollowRegex().IsMatch(text.AsSpan(m.Index + m.Length));
+    }
+
+    /// <summary>A mention follows a real word of two or more letters ("formula (2)", "in (2)", "from (1)").
+    /// A single letter or a Greek symbol before it is a superscript index ("µ (2)", "π (2)").</summary>
+    private static bool FollowsAWord(string text, int index)
+    {
+        int i = index - 1;
+        while (i >= 0 && char.IsWhiteSpace(text[i])) i--;
+        int end = i;
+        while (i >= 0 && char.IsAsciiLetter(text[i])) i--;
+        return end - i >= 2;
+    }
+
+    /// <summary>A printed equation number is small and never a year ("(2019)") or a decimal value
+    /// ("(0.52)").</summary>
+    private static bool IsPlausibleEquationNumber(string number)
+    {
+        if (number.Length >= 4 && number.All(char.IsAsciiDigit)) return false;
+        if (number[0] == '0') return false;
+        return true;
+    }
+
+    /// <summary>The equation numbers printed in a display-maths block's text: parenthesised numbers
+    /// standing on their own. Order as printed; a repeated number appears repeatedly.</summary>
+    internal static List<string> EquationTagsIn(string blockText)
+        => [.. ParenthesisedNumberRegex().Matches(blockText).Cast<Match>()
+            .Select(m => m.Groups["num"].Value).Where(IsPlausibleEquationNumber).Select(NormalizeNumber)];
+
+    [GeneratedRegex(@"^\s*\(\s*(?<num>" + EquationNumberPattern + @")\s*\)")]
+    private static partial Regex LeadingTagRegex();
+
+    [GeneratedRegex(@"\(\s*(?<num>" + EquationNumberPattern + @")\s*\)\s*$")]
+    private static partial Regex TrailingTagRegex();
+
+    /// <summary>Equation numbers a display-maths block prints: a parenthesised number that opens or
+    /// closes one of its lines (right- or left-margin tag). A number in the middle of a line —
+    /// "Thus (C.1) and (C.2) give …" — is a mention that the detector merged into the display.</summary>
+    private static IEnumerable<string> EdgeTags(string lineText)
+    {
+        if (TrailingTagRegex().Match(lineText) is { Success: true } end && !AttachedToPrecedingWord(lineText, end.Index))
+            yield return NormalizeNumber(end.Groups["num"].Value);
+        if (LeadingTagRegex().Match(lineText) is { Success: true } start)
+            yield return NormalizeNumber(start.Groups["num"].Value);
+    }
+
+    private static bool AttachedToPrecedingWord(string text, int index) => index > 0 && char.IsLetterOrDigit(text[index - 1]);
+
+    private static void AddEquationLabels(PageAnalysis analysis, Func<PageText> text,
+        List<(Reference Ref, int TargetBlock, int CaptionBlock)> labels)
+    {
+        Dictionary<Reference, (int Block, int Count)> found = [];
+        for (int i = 0; i < analysis.Blocks.Count; i++)
+        {
+            var block = analysis.Blocks[i];
+            if (block.Role != BlockRole.DisplayMath) continue;
+            IEnumerable<string> lineTexts = block.Lines.Count > 0
+                ? block.Lines.Select(l => LineText(text(), l) ?? "")
+                : [text().ExtractBlockText(block)];
+            foreach (string lineText in lineTexts)
+                foreach (string tag in EdgeTags(lineText))
+                {
+                    if (!IsPlausibleEquationNumber(tag)) continue;
+                    var reference = new Reference(RefKind.Equation, tag);
+                    found[reference] = found.TryGetValue(reference, out var prior) ? (prior.Block, prior.Count + 1) : (i, 1);
+                }
+        }
+        foreach (var (reference, (block, count)) in found)
+            if (count == 1 && !labels.Any(l => l.Ref == reference))
+                labels.Add((reference, block, block));
     }
 
     /// <summary>True when <paramref name="kindWord"/> is the plural form ("Figures"/"Tables", any
@@ -288,22 +501,49 @@ internal sealed partial class ReferenceIndex
         if (_noMatch.TryGetValue(missKey, out int seenAt) && seenAt == analysed)
             return null;
 
+        // Floats and statements legitimately restart (every paper of a volume has a "Figure 1"), so the
+        // nearest definition wins. A display-equation number that is defined twice inside the window is
+        // more often a numbered list of conditions typed as display maths than two real equations, so
+        // it is ambiguous and shows nothing.
+        bool uniqueRequired = IsEquation(reference.Kind);
+        Target? first = null;
         for (int d = 0; d <= reach; d++)
         {
-            int before = nearPage - d, after = nearPage + d;
-            if (before >= 0)
+            foreach (int page in d == 0 ? [nearPage] : new[] { nearPage - d, nearPage + d })
             {
-                if (FindOnPage(doc, before, reference, ref budget, ref incomplete) is { } t1) return t1;
+                if (page < 0 || page >= pageCount) continue;
+                var t = FindOnPage(doc, page, reference, ref budget, ref incomplete);
                 if (incomplete) return null;
-            }
-            if (d > 0 && after < pageCount)
-            {
-                if (FindOnPage(doc, after, reference, ref budget, ref incomplete) is { } t2) return t2;
-                if (incomplete) return null;
+                if (t is not { } found) continue;
+                if (!uniqueRequired) return found;
+                if (first is null) first = found;
+                else if (first.Value != found) return null;
             }
         }
+        if (first is not null) return first;
         _noMatch[missKey] = analysed;
         return null;
+    }
+
+    /// <summary>How many places in the document define <paramref name="reference"/> (a panel mention
+    /// falls back to its parent figure), indexing every analysed page. More than one means the label
+    /// restarts somewhere — the resolver picked the nearest, and an audit should look at that choice.</summary>
+    internal int CandidateCount(IReferenceDocument doc, Reference reference)
+    {
+        int Count(Reference r)
+        {
+            int n = 0;
+            for (int page = 0; page < doc.PageCount; page++)
+            {
+                if (!doc.TryGetAnalysis(page, out var analysis)) continue;
+                if (!_pages.TryGetValue(page, out var entry) || !ReferenceEquals(entry.Analysis, analysis))
+                    _pages[page] = entry = BuildPage(doc, page, analysis);
+                n += entry.Labels.Count(l => l.Ref == r);
+            }
+            return n;
+        }
+        int exact = Count(reference);
+        return exact > 0 || PanelParent(reference) is not { } parent ? exact : Count(parent);
     }
 
     private Target? FindOnPage(IReferenceDocument doc, int page, Reference reference,
@@ -373,9 +613,16 @@ internal sealed partial class ReferenceIndex
         Bind(analysis, pseudo, pseudoMaxGap, claimed, labels);
 
         AddStatementLabels(analysis, Text, labels);
+        AddEquationLabels(analysis, Text, labels);
 
         return new PageLabels(analysis, labels);
     }
+
+    [GeneratedRegex(@"(?:\.\s?){5,}|…{2,}")]
+    private static partial Regex DotLeaderAnywhereRegex();
+
+    [GeneratedRegex(@"\G.*?(?:(?:\.\s?){4,}|…+|\.{3,})\s*\d+\s*$")]
+    private static partial Regex DotLeaderRegex();
 
     [GeneratedRegex(@"\b(?:Theorem|Lemma|Proposition|Corollary|Definition|Exercise|Example|Remark)\s*\d")]
     private static partial Regex StatementWordRegex();
@@ -418,6 +665,8 @@ internal sealed partial class ReferenceIndex
     internal static Reference? ParseStatementHeader(string lineText)
     {
         var m = StatementHeaderRegex().Match(lineText);
+        // A contents entry ("Definition 6.1 . . . . . 12", "Theorem 3.2 …… 41") is not a header.
+        if (m.Success && DotLeaderRegex().IsMatch(lineText, m.Index + m.Length)) return null;
         return m.Success
             ? new Reference(KindOfWord(m.Groups["kind"].Value), NormalizeNumber(m.Groups["num"].Value))
             : null;

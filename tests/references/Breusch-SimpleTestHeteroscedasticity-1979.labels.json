@@ -1,4 +1,5 @@
 {
+ "pdf_sha256": "7907172f40992ed2586f4c18ec121adf829f60f7e5fdb6030f61d53b2d90d015",
  "mentions": [
   {
    "page": 5,
@@ -34,12 +35,46 @@
    "number": "iii",
    "target_page": 7,
    "target_block": 4
+  },
+  {
+   "page": 2,
+   "kind": "Equation",
+   "number": "2",
+   "target_page": 2,
+   "target_block": 6
+  },
+  {
+   "page": 2,
+   "kind": "Equation",
+   "number": "1",
+   "target_page": 2,
+   "target_block": 4
+  },
+  {
+   "page": 3,
+   "kind": "Equation",
+   "number": "1",
+   "target_page": 2,
+   "target_block": 4
+  },
+  {
+   "page": 3,
+   "kind": "Equation",
+   "number": "2",
+   "target_page": 2,
+   "target_block": 6
+  },
+  {
+   "page": 4,
+   "kind": "Equation",
+   "number": "3",
+   "target_page": 3,
+   "target_block": 15
   }
  ],
  "empty_pages": [
   0,
   1,
-  2,
-  3
+  8
  ]
 }

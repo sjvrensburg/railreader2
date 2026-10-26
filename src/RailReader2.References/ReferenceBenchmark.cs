@@ -15,6 +15,13 @@ internal sealed class MentionResult
     public int? TargetPage { get; set; }
     public int? TargetBlock { get; set; }
     public int? CaptionBlock { get; set; }
+    /// <summary>How many places in the document define this label (resolved mentions only). Above 1
+    /// the label restarts and the resolver chose by distance.</summary>
+    public int? Candidates { get; set; }
+    /// <summary>The line the mention was read from, and the start of the block it resolved to — for
+    /// auditing a run by eye. Not scored.</summary>
+    public string? Context { get; set; }
+    public string? TargetText { get; set; }
     /// <summary>Scoring outcome when ground truth is supplied: tp, fp, tn, unlabelled.</summary>
     public string? Outcome { get; set; }
 }
@@ -35,6 +42,11 @@ internal sealed class LabelledMention
 
 internal sealed class GroundTruth
 {
+    /// <summary>SHA-256 of the PDF the labels were written for. When present the runner refuses a
+    /// different file: page and block indices mean nothing against another PDF (or another version
+    /// of the same one), and a silently misaligned run would read as a regression.</summary>
+    public string? PdfSha256 { get; set; }
+
     public List<LabelledMention> Mentions { get; set; } = [];
     /// <summary>Pages that must produce no resolved reference at all (hard negatives).</summary>
     public List<int> EmptyPages { get; set; } = [];
@@ -86,7 +98,7 @@ internal static class ReferenceBenchmark
             for (int b = 0; b < analysis.Blocks.Count; b++)
             {
                 var block = analysis.Blocks[b];
-                if (block.Role == BlockRole.Caption) continue;
+                if (block.Role is BlockRole.Caption or BlockRole.DisplayMath) continue;
                 for (int l = 0; l < block.Lines.Count; l++)
                 {
                     text ??= doc.GetText(page);
@@ -100,7 +112,18 @@ internal static class ReferenceBenchmark
                         // hide a later genuine mention of the same label on this page.
                         if (target is { } self && self.Page == page && self.CaptionBlock == b) continue;
                         seen.Add((page, reference));
-                        results.Add(ToResult(page, b, l, reference, target));
+                        var result = ToResult(page, b, l, reference, target);
+                        result.Context = lineText.Length > 260 ? lineText[..260] : lineText;
+                        if (target is { } t)
+                        {
+                            result.Candidates = index.CandidateCount(doc, reference);
+                            if (doc.TryGetAnalysis(t.Page, out var targetPage) && t.TargetBlock < targetPage.Blocks.Count)
+                            {
+                                string targetText = doc.GetText(t.Page).ExtractBlockText(targetPage.Blocks[t.TargetBlock]);
+                                result.TargetText = targetText.Length > 90 ? targetText[..90] : targetText;
+                            }
+                        }
+                        results.Add(result);
                     }
                 }
             }
@@ -148,6 +171,12 @@ internal static class ReferenceBenchmark
                     && ReferenceIndex.ParseStatementHeader(text.ExtractBlockText(analysis.Blocks[i])) is { } header)
                 {
                     captions.Add((header, page, i, i));
+                    continue;
+                }
+                if (analysis.Blocks[i].Role == BlockRole.DisplayMath)
+                {
+                    foreach (string tag in ReferenceIndex.EquationTagsIn(text.ExtractBlockText(analysis.Blocks[i])))
+                        captions.Add((new ReferenceIndex.Reference(ReferenceIndex.RefKind.Equation, tag), page, i, i));
                     continue;
                 }
                 if (analysis.Blocks[i].Role != BlockRole.Caption) continue;
