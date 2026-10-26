@@ -1,0 +1,84 @@
+{
+ "mentions": [
+  {
+   "page": 2,
+   "kind": "Figure",
+   "number": "1",
+   "target_page": 2,
+   "target_block": 0
+  },
+  {
+   "page": 3,
+   "kind": "Figure",
+   "number": "2",
+   "target_page": 3,
+   "target_block": 2,
+   "also_accept_blocks": [
+    1
+   ]
+  },
+  {
+   "page": 4,
+   "kind": "Figure",
+   "number": "2",
+   "target_page": 3,
+   "target_block": 2,
+   "also_accept_blocks": [
+    1
+   ]
+  },
+  {
+   "page": 5,
+   "kind": "Table",
+   "number": "3",
+   "target_page": 8,
+   "target_block": 1
+  },
+  {
+   "page": 5,
+   "kind": "Table",
+   "number": "1",
+   "target_page": 5,
+   "target_block": 1
+  },
+  {
+   "page": 6,
+   "kind": "Table",
+   "number": "3",
+   "target_page": 8,
+   "target_block": 1
+  },
+  {
+   "page": 7,
+   "kind": "Table",
+   "number": "2",
+   "target_page": 7,
+   "target_block": 1
+  },
+  {
+   "page": 7,
+   "kind": "Table",
+   "number": "3",
+   "target_page": 8,
+   "target_block": 1
+  },
+  {
+   "page": 8,
+   "kind": "Table",
+   "number": "3",
+   "target_page": 8,
+   "target_block": 1
+  },
+  {
+   "page": 9,
+   "kind": "Table",
+   "number": "4",
+   "target_page": 9,
+   "target_block": 1
+  }
+ ],
+ "empty_pages": [
+  0,
+  1
+ ]
+}
