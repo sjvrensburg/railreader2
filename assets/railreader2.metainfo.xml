@@ -101,6 +101,9 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="3.82.0.0" date="2026-10-27">
+      <description><p>Annotations on PDFs that can't be written to, such as read-only or signed files, now stay with the document when you move, rename or copy it, just as portals and view rotation already do. Annotations saved before this update still load. The command-line tool finds them the same way. Exporting a PDF with annotations is also more reliable: you can keep annotating while the export runs.</p></description>
+    </release>
     <release version="3.81.1.0" date="2026-10-26">
       <description><p>Fixes from a code audit. Typing in a search or rename box no longer triggers rail keys or pastes annotations, and shortcuts like Escape, F11 and Ctrl+W still work while a text box has focus. After dragging a toolbar slider or toggling jump mode or auto-scroll, the arrow keys go straight back to the document. Resetting all settings and deleting a bookmark now ask first, deleting a portal can be undone, and Go to page keeps its box open with a message on a bad page number. PP-DocLayoutV3 GPU acceleration no longer silently falls back to the CPU, closing a tab during an export or while pages are still drawing no longer risks a crash, and figure and reference auto-pins update when OCR re-reads a page. The Index pane fills in its thumbnails faster.</p></description>
     </release>
