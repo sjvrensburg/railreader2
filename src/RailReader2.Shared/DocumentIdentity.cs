@@ -71,6 +71,20 @@ public static class DocumentIdentity
             return Map().Files.TryGetValue(full, out var e) ? e.Id : null;
     }
 
+    /// <summary>Read-only <see cref="Resolve"/>: the id last resolved for this path, else the id an
+    /// earlier open recorded for these exact bytes (a moved, renamed or copied file), else null. Hashes
+    /// the file only when the path is unknown, and never writes the map — for the CLI, which may run
+    /// while the app holds the map in memory.</summary>
+    public static string? Lookup(string pdfPath)
+    {
+        if (Peek(pdfPath) is { } id) return id;
+        string full = System.IO.Path.GetFullPath(pdfPath);
+        if (!File.Exists(full)) return null;
+        string hash = HashFile(full);
+        lock (s_lock)
+            return Map().Aliases.TryGetValue(hash, out var aliased) ? aliased : null;
+    }
+
     /// <summary>Other paths this document has been opened from, most recent first.</summary>
     public static IReadOnlyList<string> KnownPaths(string id)
     {

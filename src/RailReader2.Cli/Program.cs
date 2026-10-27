@@ -15,6 +15,10 @@ static class Program
         var logger = new ConsoleLogger();
         RailReaderLogging.Logger = logger;
 
+        // Read the app's sidecar annotations under the same content-identity key it writes them with
+        // (read-only lookup: never touches the app's identity map).
+        AnnotationService.Default.DocumentKeyResolver = RailReader2.Services.DocumentIdentity.Lookup;
+
         var factory = new SkiaPdfServiceFactory();
 
         bool verbose = HasFlag(args, "verbose");

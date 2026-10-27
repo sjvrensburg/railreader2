@@ -473,6 +473,13 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         _appConfig = config;
         _logger = logger ?? RailReaderLogging.Logger;
         ColourEffects = new ColourEffectShaders(_logger);
+        // Sidecar annotations (PDFs the store can't write back into) are named by content identity, not
+        // path (Core 0.72.0), so they follow a moved, renamed or copied file like portals and rotation do.
+        // OpenDocument resolves the identity before loading annotations, so Peek (no file access) is
+        // enough here. A failed lookup is surfaced rather than silently reading or writing elsewhere.
+        AnnotationService.Default.DocumentKeyResolver = DocumentIdentity.Peek;
+        AnnotationService.Default.OnResolverFailure = (path, ex) => Dispatcher.UIThread.Post(() =>
+            ShowStatusToast($"Couldn't locate the saved annotations for {Path.GetFileName(path)} — see the log."));
         _controller = new DocumentController(config.ToCoreSettings(), config, CompositeAnnotationStore.Default,
             new AvaloniaThreadMarshaller(), new RailReader.Renderer.Skia.SkiaPdfServiceFactory(), _logger);
         var ocrPrefs = OcrPreferences.Load();
