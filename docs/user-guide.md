@@ -379,7 +379,7 @@ Text markup isn't copied as an annotation; `Ctrl+C` on a selected highlight copi
 
 ### Persistence
 
-Annotations are saved automatically to internal storage (`~/.config/railreader2/annotations/` on Linux, `%APPDATA%\railreader2\annotations\` on Windows). They load automatically when you reopen the file. When the same PDF is open in multiple tabs, all tabs share the same annotation data — edits in one tab are immediately visible in the other, with independent undo/redo stacks per tab.
+Annotations are saved automatically to internal storage (`~/.config/railreader2/annotations/` on Linux, `%APPDATA%\railreader2\annotations\` on Windows). They load automatically when you reopen the file, even after it has been moved, renamed or copied, because they are matched to the file's content rather than its location. When the same PDF is open in multiple tabs, all tabs share the same annotation data — edits in one tab are immediately visible in the other, with independent undo/redo stacks per tab.
 
 ### Export
 

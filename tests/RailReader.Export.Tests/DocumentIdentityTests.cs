@@ -75,4 +75,40 @@ public sealed class DocumentIdentityTests : IDisposable
         Assert.Equal(id, DocumentIdentity.Peek(a));
         Assert.Contains(Path.GetFullPath(a), DocumentIdentity.KnownPaths(id));
     }
+
+    [Fact]
+    public void LookupFindsAMovedFileByContentWithoutWritingTheMap()
+    {
+        string a = Write("a.pdf", "known bytes");
+        string id = DocumentIdentity.Resolve(a);
+        string map = DocumentIdentity.MapPath;
+        var mapWritten = File.GetLastWriteTimeUtc(map);
+
+        string moved = Path.Combine(_dir, "moved.pdf");
+        File.Move(a, moved);
+        Assert.Equal(id, DocumentIdentity.Lookup(moved));
+        Assert.Null(DocumentIdentity.Peek(moved));           // not recorded
+        Assert.Equal(mapWritten, File.GetLastWriteTimeUtc(map));
+
+        Assert.Null(DocumentIdentity.Lookup(Write("other.pdf", "unknown bytes")));
+        Assert.Null(DocumentIdentity.Lookup(Path.Combine(_dir, "missing.pdf")));
+    }
+
+    [Fact]
+    public void SidecarAnnotationsOfAMovedFileResolveToTheSameStorage()
+    {
+        // The app keys Core's sidecar annotations by Peek after resolving at open; the CLI by Lookup.
+        string a = Write("a.pdf", "sidecar bytes");
+        DocumentIdentity.Resolve(a);
+        string moved = Path.Combine(_dir, "renamed.pdf");
+        File.Copy(a, moved);
+
+        var app = new RailReader.Core.Services.AnnotationService { DocumentKeyResolver = DocumentIdentity.Peek };
+        var cli = new RailReader.Core.Services.AnnotationService { DocumentKeyResolver = DocumentIdentity.Lookup };
+        string stored = app.GetStoragePath(a);
+        Assert.NotEqual(RailReader.Core.Services.AnnotationService.GetInternalPath(a), stored);
+        Assert.Equal(stored, cli.GetStoragePath(moved));
+        DocumentIdentity.Resolve(moved);                     // the app opening the renamed copy
+        Assert.Equal(stored, app.GetStoragePath(moved));
+    }
 }
