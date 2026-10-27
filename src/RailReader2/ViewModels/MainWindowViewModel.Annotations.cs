@@ -13,7 +13,7 @@ namespace RailReader2.ViewModels;
 public sealed partial class MainWindowViewModel
 {
     // Tabs with an annotated-PDF export running on a background thread (see ExportAnnotated);
-    // CloseTab refuses to dispose a model out from under one.
+    // CloseTab refuses to dispose a model (and its PDF) out from under one.
     private readonly HashSet<TabViewModel> _exportingTabs = [];
 
     public void ToggleAnnotationMode()
@@ -859,10 +859,10 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        // The export reads tab.Pdf/tab.Annotations on a background thread; closing the tab would
-        // dispose the model under it. CloseTab refuses while a tab is in this set. A set, not a
-        // count: refuse a second concurrent export, whose `finally` would otherwise drop the guard
-        // while the first is still running.
+        // The export runs on a background thread (Core serialises its PDFium calls on PdfiumGate),
+        // and closing the tab would dispose tab.Pdf under it. CloseTab refuses while a tab is in
+        // this set. A set, not a count: refuse a second concurrent export, whose `finally` would
+        // otherwise drop the guard while the first is still running.
         if (!_exportingTabs.Add(tab))
         {
             ShowStatusToast("An annotated export of this tab is already running.");
@@ -870,9 +870,12 @@ public sealed partial class MainWindowViewModel
         }
         try
         {
+            // The reader can keep annotating while the export runs, so it gets a copy taken here on
+            // the UI thread rather than the live lists, which it would otherwise walk mid-edit.
+            var annotations = SnapshotForExport(tab.Annotations);
             await Task.Run(() =>
             {
-                AnnotationExportService.Export(tab.Pdf, tab.Annotations, outputPath,
+                AnnotationExportService.Export(tab.Pdf, annotations, outputPath,
                     onProgress: (page, total) =>
                         _logger.Debug($"[Export] Page {page + 1} of {total}..."));
             });
@@ -893,6 +896,36 @@ public sealed partial class MainWindowViewModel
         {
             _exportingTabs.Remove(tab);
         }
+    }
+
+    /// <summary>Deep copy of a document's annotations for a background export. Each annotation goes
+    /// through Core's polymorphic clone, then gets back the identity and provenance that
+    /// <see cref="Annotation.CloneForPaste"/> resets for a paste — the export needs them (it skips
+    /// <see cref="AnnotationSource.InPdf"/> annotations, which arrive with the imported pages).</summary>
+    private static AnnotationFile SnapshotForExport(AnnotationFile live)
+    {
+        var snapshot = new AnnotationFile
+        {
+            Version = live.Version,
+            SourcePdf = live.SourcePdf,
+            SourcePdfPath = live.SourcePdfPath,
+        };
+        foreach (var (page, anns) in live.Pages)
+        {
+            var copies = new List<Annotation>(anns.Count);
+            foreach (var a in anns)
+            {
+                var copy = Annotation.CloneForPaste(a);
+                copy.NativeId = a.NativeId;
+                copy.Source = a.Source;
+                copy.InReplyTo = a.InReplyTo;
+                copy.CreatedUtc = a.CreatedUtc;
+                copy.ModifiedUtc = a.ModifiedUtc;
+                copies.Add(copy);
+            }
+            snapshot.Pages[page] = copies;
+        }
+        return snapshot;
     }
 
     [RelayCommand]

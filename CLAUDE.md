@@ -276,11 +276,11 @@ Key fields: `rail_zoom_threshold`, `snap_duration_ms`, `scroll_speed_start/max`,
 
 ## Thread Safety
 
-- **UI thread**: All Avalonia UI, keyboard/mouse, state building, PDFium calls
+- **UI thread**: All Avalonia UI, keyboard/mouse, state building, and the PDFium calls the shell makes itself (text, links, outline)
 - **Composition thread**: `CompositionCustomVisualHandler.OnRender()` draws via Skia. Receives immutable state snapshots from UI thread via `SendHandlerMessage()`. Disposes retired `SKImage` instances. Never accesses `DocumentModel` directly.
 - **Analysis Worker**: Two dedicated stage threads (Core 0.57.0+), each fed by its own `Channel<T>` — an OCR stage and a layout-inference stage. `AnalysisWorker.Submit` routes a request that already carries char boxes straight to layout, so a scanned page's recognition never blocks another document's inference. **Results arrive out of submission order** — every `AnalysisResult` carries its own `(file, page, params)` key, so nothing downstream may depend on ordering.
 - **Thread pool**: `RenderPagePixmap()` and DPI upgrades via `Task.Run()`
-- **Critical**: Never call `PdfService` from background threads (PDFium crashes). Never modify `DocumentModel` from the analysis worker — use `IThreadMarshaller` to post to UI thread. Never dispose `SKImage` on the UI thread if the composition thread may still be drawing it — use `RetireImage` message for deferred disposal.
+- **Critical**: PDFium is not thread-safe even across documents, so every PDFium call must run inside Core's process-wide `lock (PdfiumGate.Lock)`. Core's own services (rendering, text, links, outline, annotation read/write/export) already take it, which is why page renders and the annotated-PDF export can run on the thread pool; never P/Invoke PDFium from the shell outside that gate. Hand a background job a snapshot of any live model state it reads (the annotated export copies the annotation lists on the UI thread first), not the live collections. Never modify `DocumentModel` from the analysis worker — use `IThreadMarshaller` to post to UI thread. Never dispose `SKImage` on the UI thread if the composition thread may still be drawing it — use `RetireImage` message for deferred disposal.
 - The `DocumentModel` analysis cache is written via UI thread marshalling, read during animation frame polls — no locks needed.
 
 ## CI / Release Packaging
