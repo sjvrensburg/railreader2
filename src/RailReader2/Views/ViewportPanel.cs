@@ -118,6 +118,7 @@ public class ViewportPanel : Panel
     {
         base.OnPointerWheelChanged(e);
         if (ViewModel is null) return;
+        ViewModel.OnCtrlChorded(); // a Ctrl+wheel zoom is not a lone Ctrl hold
 
         double scrollY = e.Delta.Y * 30.0;
         var pos = e.GetPosition(this);
@@ -144,6 +145,7 @@ public class ViewportPanel : Panel
     {
         base.OnPointerPressed(e);
         Focus();
+        ViewModel?.OnCtrlChorded(); // a Ctrl+drag / Ctrl+click is not a lone Ctrl hold
 
         var point = e.GetCurrentPoint(this);
 
