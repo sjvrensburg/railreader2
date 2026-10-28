@@ -49,6 +49,10 @@ public sealed partial class MainWindowViewModel
                 return;
             }
         }
+        // Open by the absolute path: Core keys the recent-files entry (and its saved reading position)
+        // by the path as given, so a relative command-line path made an entry that only reopened from
+        // the same working directory.
+        path = full;
 
         try
         {
@@ -289,6 +293,21 @@ public sealed partial class MainWindowViewModel
     }
 
     public void SaveAllReadingPositions() => _controller.SaveAllReadingPositions();
+
+    /// <summary>
+    /// Persists the focused view's reading position (page, camera, the document's colour effect) now.
+    /// Core saves it only when a document closes or the app shuts down cleanly, so a crash lost
+    /// everything since the document was opened. Called on every page change of the focused view and
+    /// on a colour-effect change; the write is a few KB of config.json, cheap at page-turn rate.
+    /// Same record Core writes on close, so a clean exit still overwrites it with the final camera.
+    /// </summary>
+    private void SaveFocusedReadingPosition()
+    {
+        if (_controller.FocusedViewport is not { } vp) return;
+        var doc = vp.Owner;
+        AppConfig.SaveReadingPosition(doc.FilePath, vp.CurrentPage,
+            vp.Camera.Zoom, vp.Camera.OffsetX, vp.Camera.OffsetY, doc.ColourEffect);
+    }
 
     [RelayCommand]
     public void SelectTab(int index)

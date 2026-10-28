@@ -80,20 +80,8 @@ public sealed partial class TabViewModel : ObservableObject, IDisposable
     /// </summary>
     public (SKImage? Current, SKImage? Retired) GetCachedImage() => Images.GetCachedImage();
 
-    /// <summary>
-    /// Returns the current cached image without lifecycle management.
-    /// Use only when no image transition is expected (e.g. minimap snapshot).
-    /// </summary>
+    /// <summary>The current page wrap, without lifecycle management.</summary>
     public SKImage? CachedImage => Images.CachedImage;
-
-    public SKBitmap? MinimapBitmap => Images.MinimapBitmap;
-
-    /// <summary>
-    /// Returns <see cref="MinimapBitmap"/> wrapped as an SKImage so the canvas
-    /// can use sampling-aware DrawImage. Re-wraps when the underlying bitmap
-    /// changes; previous wrappers are disposed.
-    /// </summary>
-    public SKImage? MinimapImage => Images.MinimapImage;
 
     public Action? OnDpiRenderComplete
     {

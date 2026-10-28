@@ -29,8 +29,7 @@ public partial class DocumentView : UserControl, IViewportSurface
     private TabViewModel? _tab;
     // True when _images is owned by this view (a detached/secondary surface created its own) and
     // must be retired (composition-thread dispose, not UI-thread — railreader2#191) on rebind/teardown;
-    // false when borrowed from _tab.Images (the primary surface shares the document's images with the
-    // minimap and must NOT dispose them).
+    // false when borrowed from _tab.Images (the primary surface's, which it must NOT dispose).
     private bool _ownsImages;
     // A freshly-bound secondary viewport that had no layout size yet: centre it on first SizeChanged.
     private bool _pendingCenter;
@@ -39,8 +38,8 @@ public partial class DocumentView : UserControl, IViewportSurface
     // Per-view geometry (camera/rail/page/dims) is read from here; model + focused state
     // (annotations, analysis cache, selection, search, display prefs) stays on _tab / _shared.
     private CoreViewport? _viewport;
-    // Per-view GPU-image lifecycle for _viewport (shared with the minimap via _tab.Images
-    // while _viewport is the Primary view; a detached surface gets its own).
+    // Per-view GPU-image lifecycle for _viewport (_tab.Images while _viewport is the Primary view;
+    // a detached surface gets its own).
     private ViewportImages? _images;
     private bool _wired;
 
@@ -109,7 +108,7 @@ public partial class DocumentView : UserControl, IViewportSurface
         Minimap.OwnerView = this; // so the minimap reflects + drives THIS pane's viewport, not the primary
         ToolBar.ViewModel = shared;
 
-        _ownsImages = false; // borrowing tab.Images (shared with the minimap)
+        _ownsImages = false; // borrowing tab.Images
         // Size THIS pane's own viewport (Phase 3: no controller ambient size any more).
         _viewport?.SetSize(Viewport.Bounds.Width, Viewport.Bounds.Height);
         if (!_wired)
@@ -147,7 +146,7 @@ public partial class DocumentView : UserControl, IViewportSurface
         }
         if (_ownsImages)
         {
-            // Retire (don't UI-thread Dispose) the owned page/minimap textures — the compositor may
+            // Retire (don't UI-thread Dispose) the owned page textures — the compositor may
             // still be drawing them on a reading-driven portal teardown (railreader2#191).
             if (_images is { } owned) RetireOwnedImages(owned);
             _images = null;
@@ -196,11 +195,6 @@ public partial class DocumentView : UserControl, IViewportSurface
 
     public (double Width, double Height) SurfaceSize => (Viewport.Bounds.Width, Viewport.Bounds.Height);
 
-    /// <summary>This surface's GPU image wraps, for its OWN embedded minimap: a detached pane owns its
-    /// <see cref="ViewportImages"/>, the primary borrows the document's. Null before binding.</summary>
-    internal SKImage? SurfaceMinimapImage => _images?.MinimapImage;
-    internal SKImage? SurfacePageImage => _images?.CachedImage;
-
     public void SetFocusedVisual(bool focused)
         => FocusBorder.BorderThickness = new Thickness(focused ? 2 : 0);
 
@@ -245,8 +239,8 @@ public partial class DocumentView : UserControl, IViewportSurface
 
     /// <summary>
     /// Disposes a now-detached OWNED <see cref="ViewportImages"/> (a secondary / tear-off / portal
-    /// surface's own page+minimap wraps) on a thread-safe boundary. Both textures are drawn on the
-    /// composition/render thread, so a direct UI-thread <c>Dispose()</c> could free one mid-render — the
+    /// surface's own page wraps) on a thread-safe boundary. They are drawn on the composition
+    /// thread, so a direct UI-thread <c>Dispose()</c> could free one mid-render — the
     /// same hazard the page and freeze layers avoid with <c>RetireImage</c> (railreader2#191; the portal
     /// view made this teardown reading-driven, widening the window). Drops the page layer's image
     /// reference first (a null-image state, which also frees the layer's GPU upload), then hands each wrap

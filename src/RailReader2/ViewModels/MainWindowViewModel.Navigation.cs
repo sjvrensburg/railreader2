@@ -587,6 +587,7 @@ public sealed partial class MainWindowViewModel
     public void SetColourEffect(ColourEffect effect)
     {
         _controller.SetColourEffect(effect);
+        SaveFocusedReadingPosition();
         InvalidatePage();
         InvalidateOverlay();
     }
@@ -594,6 +595,7 @@ public sealed partial class MainWindowViewModel
     public ColourEffect CycleColourEffect()
     {
         var effect = _controller.CycleColourEffect();
+        SaveFocusedReadingPosition();
         InvalidatePage();
         InvalidateOverlay();
         return effect;
