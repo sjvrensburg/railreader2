@@ -101,6 +101,9 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="3.83.0.0" date="2026-10-28">
+      <description><p>Scanned PDFs can now be made searchable for good: File, Add a Text Layer reads the pages that have no text and saves the text, invisibly, in a copy that any PDF reader can search, select and highlight, with no recognition cost on later reads. The command-line tool does the same with its new ocr command. Clicking an annotation now only selects it where it is drawn, so a highlight that wraps onto the next line no longer catches clicks across both whole lines, and the empty middle of a rectangle no longer selects it. Holding Ctrl on its own for about a second keeps free pan on until you tap Ctrl again. Fixes: a crash while a portal was popped out; the page and colour filter are now saved as you read, so they survive a crash; detected blocks on documents whose pages differ in size, such as JSTOR downloads with a cover page, are no longer drawn shifted off the text; and a document opened from a relative path on the command line now reopens from recent files.</p></description>
+    </release>
     <release version="3.82.0.0" date="2026-10-27">
       <description><p>Annotations on PDFs that can't be written to, such as read-only or signed files, now stay with the document when you move, rename or copy it, just as portals and view rotation already do. Annotations saved before this update still load. The command-line tool finds them the same way. Exporting a PDF with annotations is also more reliable: you can keep annotating while the export runs.</p></description>
     </release>
