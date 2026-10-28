@@ -49,6 +49,10 @@ public sealed partial class MainWindowViewModel
                 return;
             }
         }
+        // Open by the absolute path: Core keys the recent-files entry (and its saved reading position)
+        // by the path as given, so a relative command-line path made an entry that only reopened from
+        // the same working directory.
+        path = full;
 
         try
         {
