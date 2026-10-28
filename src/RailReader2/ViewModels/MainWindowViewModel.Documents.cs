@@ -213,6 +213,11 @@ public sealed partial class MainWindowViewModel
             ShowStatusToast("An annotated export of this tab is still running — it can be closed when the export finishes.");
             return;
         }
+        if (_textLayerTabs.Contains(tab))
+        {
+            ShowStatusToast("A text layer is being added to this document — cancel it first, or wait until it finishes.");
+            return;
+        }
         Tabs.RemoveAt(index);
 
         // Model lifecycle (decision #1): several tabs may share one DocumentModel. Dispose the model

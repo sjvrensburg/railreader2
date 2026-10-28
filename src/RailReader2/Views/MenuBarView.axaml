@@ -14,6 +14,8 @@
             <MenuItem Header="Export Annotations as _JSON..." Command="{Binding ExportAnnotationsJsonCommand}" IsEnabled="{Binding HasDocument}" />
             <MenuItem Header="_Import Annotations..." Command="{Binding ImportAnnotationsJsonCommand}" IsEnabled="{Binding HasDocument}" />
             <Separator />
+            <MenuItem Header="Add a _Text Layer (OCR)..." Command="{Binding AddTextLayerCommand}" IsEnabled="{Binding HasDocument}" />
+            <Separator />
             <MenuItem Header="_Close Tab" InputGesture="Ctrl+W" Click="OnCloseTab" IsEnabled="{Binding HasDocument}" />
             <Separator />
             <MenuItem Header="_Settings..." InputGesture="Ctrl+OemComma" Click="OnShowSettings" />

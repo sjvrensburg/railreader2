@@ -847,6 +847,12 @@ A scanned page is a picture of text. It carries no text layer, so everything bui
 
   If you select a pack but never download it, the app quietly falls back to the bundled recogniser rather than turning OCR off; the log says so at startup.
 
+- **Saving the text into a copy:** Reading the text on the fly costs time every time you open the scan. **File ▸ Add a Text Layer (OCR)…** reads the pages without text once and saves the text, invisibly over the printed words, in a copy named `<name>_ocr.pdf` beside the original. The copy opens in place of the original's tab and can be searched, selected and highlighted in any PDF reader, with no OCR cost from then on; the original is not changed. Pages that already have text are left alone, and running it again on the copy replaces the earlier layer. The same action is offered when you try to highlight a page that has no text.
+
+  The dialog lets you pick an installed language pack and shows a rough time for the whole document, then a running estimate once the first page is done. You can keep reading while it works; **Cancel** (or closing the dialog) stops it without saving anything. Recognition is CPU-heavy; on a laptop the bundled pack takes a few seconds a page, Medium a few minutes. Mathematics is mostly misread, and the app marks recognised text as unverified. If the original is digitally signed, the copy's signatures are no longer valid, and the app says so. Annotations stored inside the PDF are carried into the copy; annotations the app keeps beside a read-only PDF stay with the original.
+
+  From the command line: `railreader2-cli ocr scan.pdf [--pack default|tiny|small|medium] [--output copy.pdf]`.
+
 ### Spelling
 - **Check spelling in notes** (on by default) and **Dictionary** (British and American English bundled). *Advanced:* the folder for extra Hunspell dictionaries, and your personal dictionary (add or remove words). See [Spell checking in notes](#spell-checking-in-notes).
 

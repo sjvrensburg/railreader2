@@ -367,7 +367,7 @@ public partial class IndexView : PaneRefreshView
                         _textCache[cacheKey] = cachedText;
                 }
                 vm.ExtractedText = cachedText;
-                vm.IsOcrText = !string.IsNullOrEmpty(cachedText) && Services.OcrProvenance.IsOcrText(doc, vm.Entry.PageIndex);
+                vm.IsOcrText = !string.IsNullOrEmpty(cachedText) && doc.GetOrExtractText(vm.Entry.PageIndex).FromOcr;
                 continue;
             }
 
