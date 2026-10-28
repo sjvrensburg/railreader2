@@ -5,9 +5,12 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.Rendering.Composition;
 using Avalonia.Rendering.SceneGraph;
 using Avalonia.Skia;
+using Avalonia.Threading;
 using RailReader.Core;
+using RailReader.Renderer.Skia;
 using RailReader2.ViewModels;
 using SkiaSharp;
 
@@ -51,8 +54,21 @@ public partial class MinimapControl : UserControl
     // Mipmapped GPU texture for the high-DPI source bitmap. Without this,
     // every redraw resamples a multi-megapixel CPU image from scratch on the
     // UI thread, which stutters during rail scrolling when the minimap is large.
+    // Created and replaced on the render thread (GetOrUploadTexture).
     private SKImage? _gpuTexture;
     private SKImage? _gpuTextureSource;
+
+    // The minimap wraps Core's thumbnail and page bitmaps itself rather than borrowing another
+    // owner's SKImage. Its draw op is replayed on the render thread until the control next renders,
+    // so an image freed under it crashes natively (sk_image_get_width on a null handle): the page
+    // layer retires its own wrap on every page or DPI change, regardless of the minimap. A replaced
+    // wrap is disposed only after a later composition batch has rendered (RetireAfterRender).
+    // Core's bitmaps are immutable, so a wrap shares their pixels instead of copying them.
+    private SKImage? _thumbImage;
+    private SKBitmap? _thumbSource;
+    private SKImage? _pageImage;
+    private SKBitmap? _pageSource;
+    private Compositor? _compositor;
 
     public MinimapControl()
     {
@@ -66,10 +82,56 @@ public partial class MinimapControl : UserControl
         };
         DetachedFromVisualTree += (_, _) =>
         {
-            _gpuTexture?.Dispose();
-            _gpuTexture = null;
+            // The render thread may still be drawing the last op (and owns _gpuTexture), so nothing is
+            // disposed here directly.
+            var retired = new List<SKImage>(3);
+            if (Interlocked.Exchange(ref _gpuTexture, null) is { } texture) retired.Add(texture);
             _gpuTextureSource = null;
+            if (_thumbImage is not null) retired.Add(_thumbImage);
+            if (_pageImage is not null) retired.Add(_pageImage);
+            _thumbImage = _pageImage = null;
+            _thumbSource = _pageSource = null;
+            RetireAfterRender(retired);
         };
+    }
+
+    /// <summary>Returns this control's own wrap of <paramref name="bitmap"/>, re-wrapping when the
+    /// bitmap changes and retiring the previous wrap. UI thread only.</summary>
+    private SKImage? Wrap(SKBitmap? bitmap, ref SKImage? image, ref SKBitmap? source)
+    {
+        if (ReferenceEquals(bitmap, source)) return image;
+        if (image is not null) RetireAfterRender([image]);
+        image = bitmap is null ? null : SKImage.FromBitmap(bitmap);
+        source = bitmap;
+        return image;
+    }
+
+    /// <summary>
+    /// Disposes images the current draw op no longer references once a later batch has rendered,
+    /// after which the op that did reference them can't be drawn again. Posted rather than run inline:
+    /// <see cref="Render"/> runs inside the render pass, before the commit carrying the new op, so a
+    /// batch requested from here could be the one still holding the old op.
+    /// </summary>
+    private void RetireAfterRender(List<SKImage> images)
+    {
+        if (images.Count == 0) return;
+        var compositor = _compositor;
+        Dispatcher.UIThread.Post(() => _ = DisposeAfterRenderAsync(compositor, images), DispatcherPriority.Background);
+    }
+
+    private static async Task DisposeAfterRenderAsync(Compositor? compositor, List<SKImage> images)
+    {
+        try
+        {
+            // No compositor means this control never rendered, so nothing can be drawing the images.
+            if (compositor is not null)
+                await compositor.RequestCompositionBatchCommitAsync().Rendered;
+        }
+        catch (Exception ex)
+        {
+            RailReaderLogging.Logger.Error("[Minimap] Waiting for a rendered batch failed", ex);
+        }
+        foreach (var image in images) image.Dispose();
     }
 
     /// <summary>
@@ -123,14 +185,18 @@ public partial class MinimapControl : UserControl
             docCentreFraction = Math.Clamp((docYTop + docYBottom) / 2.0 / layout.TotalHeight, 0, 1);
         }
 
-        // Snapshot THIS pane's viewport + its own image wraps on the UI thread (a split pane / tear-off
+        // Snapshot THIS pane's viewport + its page/thumbnail on the UI thread (a split pane / tear-off
         // reflects its own page/camera, not the primary's).
+        _compositor ??= ElementComposition.GetElementVisual(this)?.Compositor;
+        var paneVp = PaneViewport;
+        var thumbImage = Wrap((paneVp?.MinimapPage as SkiaRenderedPage)?.Bitmap, ref _thumbImage, ref _thumbSource);
+        var pageImage = Wrap((paneVp?.CachedPage as SkiaRenderedPage)?.Bitmap, ref _pageImage, ref _pageSource);
         context.Custom(new MinimapDrawOperation(
             new Rect(0, 0, Bounds.Width, Bounds.Height),
             this,
-            PaneViewport,
-            OwnerView?.SurfaceMinimapImage,
-            OwnerView?.SurfacePageImage,
+            paneVp,
+            thumbImage,
+            pageImage,
             showChrome: _hover || dragging,
             drag: dragging,
             resizeCorner: ResizeCornerInside(),

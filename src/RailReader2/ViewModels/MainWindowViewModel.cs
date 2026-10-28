@@ -837,7 +837,11 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         vp.HistoryChanged += RefreshHistoryAvailability;
     }
 
-    private void OnFocusedViewportPageChanged(int _) => OnReadingContextChanged();
+    private void OnFocusedViewportPageChanged(int _)
+    {
+        SaveFocusedReadingPosition();
+        OnReadingContextChanged();
+    }
     private void OnFocusedViewportReadingPositionChanged(ReadingPosition _) => OnReadingContextChanged();
 
     /// <summary>Drop the focused-viewport reading-context subscription, releasing the strong reference

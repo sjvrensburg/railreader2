@@ -1030,7 +1030,7 @@ public partial class SettingsWindow : Window
         if (Vm is not { } vm || _loading) return;
         var effect = (ColourEffect)EffectCombo.SelectedIndex;
         vm.AppConfig.ColourEffect = effect;
-        vm.Controller.SetColourEffect(effect);
+        vm.SetColourEffect(effect);
         SaveToConfig();
     }
     private void OnIntensityChanged(object? sender, Avalonia.AvaloniaPropertyChangedEventArgs e)
@@ -1413,7 +1413,7 @@ public partial class SettingsWindow : Window
         vm.AppConfig.UiFontScale = defaults.UiFontScale;
         vm.SetDarkMode(defaults.DarkMode);
         vm.AppConfig.ColourEffect = defaults.ColourEffect;
-        vm.Controller.SetColourEffect(defaults.ColourEffect);
+        vm.SetColourEffect(defaults.ColourEffect);
         vm.AppConfig.ColourEffectIntensity = defaults.ColourEffectIntensity;
         vm.AppConfig.RenderQuality = App.DefaultRenderQuality; // desktop ships High, not Core's Quality
         vm.AppConfig.CustomMaxRenderDpi = defaults.CustomMaxRenderDpi;
