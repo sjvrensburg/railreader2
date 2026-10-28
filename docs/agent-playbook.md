@@ -132,7 +132,7 @@ Focus the window first (click the viewport or `#DocumentViewport`).
 `Down`/`S` next line · `Up`/`W` previous line · `Right`/`D` hold-scroll forward ·
 `Left`/`A` hold-scroll back · `Home`/`End` line start/end · `P` auto-scroll (then `D`/`S` to
 continue when parked) · `J` jump mode · `H` line highlight · `F` line focus dim · `B` bookmark ·
-`Z` freeze panes · `C` cycle colour effect · `Ctrl`+drag free pan ·
+`Z` freeze panes · `C` cycle colour effect · `Ctrl`+drag free pan (hold `Ctrl` alone ~1 s to keep it on; tap to end) ·
 `[`/`]` speed · `Shift+[`/`Shift+]` blur ·
 `Ctrl+Shift+H`/`G`/`T`/`E` jump to next heading/figure/table/equation.
 

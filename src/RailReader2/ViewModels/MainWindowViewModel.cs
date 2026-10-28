@@ -347,6 +347,47 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     public void ResumeRailFromPause()
         => Dispatch(_controller.ResumeRailFromPause, InvalidateCameraAndTab, animate: true);
 
+    // Latched free pan: Ctrl held on its own for FreePanLatchHold, then released, leaves free pan on
+    // (Core's BeginFreePan) until the next Ctrl release. Any other key, a press or a Ctrl+wheel while
+    // Ctrl is down makes it a chord instead, so shortcuts and Ctrl-drag / Ctrl-zoom are unchanged. A
+    // Ctrl release a dialog swallowed (a note opened mid free pan) leaves the pan on the same way.
+    private static readonly TimeSpan FreePanLatchHold = TimeSpan.FromSeconds(1);
+    private bool _ctrlHeld;
+    private long _ctrlAloneSince; // 0 = this Ctrl press can no longer latch
+
+    public void OnCtrlPressed()
+    {
+        if (_ctrlHeld) return; // key repeat, or a press whose release went to a dialog
+        _ctrlHeld = true;
+        _ctrlAloneSince = Stopwatch.GetTimestamp();
+    }
+
+    /// <summary>Ctrl is part of a chord (another key, a press, a Ctrl+wheel): no latch on release.</summary>
+    public void OnCtrlChorded() => _ctrlAloneSince = 0;
+
+    /// <summary>Ends a free pan, or latches one after a lone hold. True when it did either.</summary>
+    public bool OnCtrlReleased()
+    {
+        bool latch = _ctrlAloneSince != 0 && Stopwatch.GetElapsedTime(_ctrlAloneSince) >= FreePanLatchHold;
+        _ctrlHeld = false;
+        _ctrlAloneSince = 0;
+        if (RailPaused)
+        {
+            ResumeRailFromPause();
+            return true;
+        }
+        if (!latch || IsScanAllActive || !_controller.BeginFreePan()) return false;
+        InvalidateCameraAndTab();
+        return true;
+    }
+
+    /// <summary>The window lost focus: its Ctrl release may never arrive, so forget the press.</summary>
+    public void ResetCtrlTracking()
+    {
+        _ctrlHeld = false;
+        _ctrlAloneSince = 0;
+    }
+
     [ObservableProperty] private bool _jumpMode;
     partial void OnJumpModeChanged(bool value) => _controller.JumpMode = value;
 

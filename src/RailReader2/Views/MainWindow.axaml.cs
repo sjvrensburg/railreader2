@@ -44,7 +44,11 @@ public partial class MainWindow : Window
         AddHandler(PointerPressedEvent, OnHistoryButtonPressed, Avalonia.Interactivity.RoutingStrategies.Bubble);
         // A Shift held when the window loses focus never gets its key-up here: release the reading
         // guide's follow so it parks instead of following on the next move back in.
-        Deactivated += (_, _) => Vm?.SetGuideShiftHeld(false);
+        Deactivated += (_, _) =>
+        {
+            Vm?.SetGuideShiftHeld(false);
+            Vm?.ResetCtrlTracking();
+        };
     }
 
     private MainWindowViewModel? Vm => DataContext as MainWindowViewModel;
@@ -588,6 +592,10 @@ public partial class MainWindow : Window
             else if (e.KeyModifiers.HasFlag(KeyModifiers.Shift)) vm.CancelGuideChord();
         }
 
+        // Latched free pan: a lone Ctrl hold latches on release; any other key makes Ctrl a chord.
+        if (e.Key is Key.LeftCtrl or Key.RightCtrl) vm.OnCtrlPressed();
+        else vm.OnCtrlChorded();
+
         // A focused text box owns its editing keys: Ctrl+A/C/X/V/Z/Y and caret chords edit the text
         // (otherwise the Ctrl tier pastes/cuts annotations in the search, status-bar and portal-rename
         // boxes), and the plain-key navigation tier is skipped so typing never drives the rail.
@@ -937,12 +945,9 @@ public partial class MainWindow : Window
             e.Handled = true;
         }
 
-        // Resume rail mode when Ctrl is released after free pan
-        if (vm is { RailPaused: true } && e.Key is Key.LeftCtrl or Key.RightCtrl)
-        {
-            vm.ResumeRailFromPause();
+        // Releasing Ctrl ends a free pan, or latches one after Ctrl was held on its own for a second
+        if (e.Key is Key.LeftCtrl or Key.RightCtrl && vm.OnCtrlReleased())
             e.Handled = true;
-        }
 
         return e.Handled;
     }

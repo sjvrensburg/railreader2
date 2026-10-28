@@ -131,6 +131,8 @@ Rail mode is the core feature of railreader2. When you zoom past the threshold (
 
 Hold `Ctrl` and drag to temporarily pan freely, even zooming out below the rail threshold. While you pan, the page is drawn clean — the rail dim and line overlay are suppressed so nothing obscures the figure you're inspecting. This lets you quickly check a figure, equation, or footnote elsewhere on the same page without losing your place. Release `Ctrl` to snap back to your original reading position and zoom level.
 
+To stay in free pan without holding the key, hold `Ctrl` on its own for about a second and let go: free pan stays on, and plain drags pan freely (handy while you add notes or highlights around a figure). Tap `Ctrl` to snap back. Pressing another key or clicking while holding `Ctrl` keeps the usual shortcut and drag behaviour.
+
 ### Zoom position preservation
 
 Zooming while reading a line now preserves your horizontal scroll position, so you can adjust magnification without losing your place in the text.
@@ -955,6 +957,7 @@ The log is overwritten at the start of each session. Old `.log` files are automa
 | `F` | Toggle line focus dim |
 | `H` | Toggle line highlight |
 | `Ctrl+Drag` | Free pan (release Ctrl to snap back) |
+| Hold `Ctrl` ~1 s | Keep free pan on (tap Ctrl to snap back) |
 | `[` / `]` | Adjust speed or jump distance |
 | `Shift+[` / `Shift+]` | Adjust blur intensity |
 | Click | Jump to block |
