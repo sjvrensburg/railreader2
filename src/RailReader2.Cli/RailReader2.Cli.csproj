@@ -16,6 +16,7 @@
     <PackageReference Include="RailReader.Renderer.Skia" Version="0.74.1" />
     <PackageReference Include="RailReader.Core.Vlm.OpenAI" Version="0.74.1" />
     <PackageReference Include="RailReader.Export" Version="0.74.1" />
+    <PackageReference Include="RailReader.Core.Ocr.RapidOcr" Version="0.74.1" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="RailReader.Export.Tests" />

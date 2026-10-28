@@ -173,8 +173,8 @@ public sealed partial class MainWindowViewModel
         {
             ShowStatusToast(
                 "No selectable text on this page — try Pen/Rectangle, or",
-                "set scanned pages to Read the text",
-                () => OpenSettingsTab("Scanned Pages"));
+                "add a text layer…",
+                () => FireAndForget(AddTextLayer(), nameof(AddTextLayer)));
             return;
         }
 

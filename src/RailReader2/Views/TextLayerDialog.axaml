@@ -1,0 +1,29 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="RailReader2.Views.TextLayerDialog"
+        Title="Add a Text Layer"
+        Width="480" SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False">
+    <StackPanel Margin="16" Spacing="10">
+        <TextBlock x:Name="IntroText" TextWrapping="Wrap" />
+        <StackPanel Spacing="4">
+            <TextBlock Text="Language pack" FontWeight="SemiBold" />
+            <ComboBox x:Name="PackCombo" HorizontalAlignment="Stretch"
+                      AutomationProperties.Name="Language pack"
+                      SelectionChanged="OnPackChanged" />
+        </StackPanel>
+        <TextBlock x:Name="EstimateText" TextWrapping="Wrap" />
+        <TextBlock TextWrapping="Wrap" Opacity="0.75"
+                   Text="Mathematics is mostly misread. RailReader2 marks recognised text as unverified OCR text." />
+        <ProgressBar x:Name="JobProgress" Minimum="0" Maximum="1" IsVisible="False"
+                     AutomationProperties.Name="Progress" />
+        <TextBlock x:Name="StatusText" TextWrapping="Wrap" IsVisible="False" />
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,4,0,0">
+            <Button x:Name="StartButton" Content="Add Text Layer" MinWidth="100"
+                    HorizontalContentAlignment="Center" Click="OnStartClick" IsDefault="True" />
+            <Button x:Name="CancelButton" Content="Cancel" MinWidth="80"
+                    HorizontalContentAlignment="Center" Click="OnCancelClick" />
+        </StackPanel>
+    </StackPanel>
+</Window>
