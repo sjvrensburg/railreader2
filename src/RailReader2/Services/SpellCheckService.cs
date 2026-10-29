@@ -392,7 +392,7 @@ public sealed class SpellCheckService
 
     private void SavePersonalWords()
     {
-        var tmpPath = _personalWordsPath + ".tmp";
+        var tmpPath = $"{_personalWordsPath}.{Guid.NewGuid():N}.tmp";
         try
         {
             if (Path.GetDirectoryName(_personalWordsPath) is { Length: > 0 } dir)

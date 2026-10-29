@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- Shell services the app and the CLI both need (content-based document identity and the JSON
-       sidecar helper it saves with). Core-only, no Avalonia. -->
+  <!-- Shell services the app and the CLI both need (the OCR text-layer job). Core-only, no Avalonia.
+       Document identity and the JSON sidecar helper now live in RailReader.Core.Pdfium. -->
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
@@ -13,7 +13,7 @@
     <InternalsVisibleTo Include="RailReader.Export.Tests" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="RailReader.Core" Version="0.74.1" />
-    <PackageReference Include="RailReader.Core.Pdfium" Version="0.74.1" />
+    <PackageReference Include="RailReader.Core" Version="0.75.0" />
+    <PackageReference Include="RailReader.Core.Pdfium" Version="0.75.0" />
   </ItemGroup>
 </Project>

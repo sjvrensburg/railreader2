@@ -95,7 +95,7 @@ public sealed partial class MainWindowViewModel
             _logger.Debug($"[OpenDocument] Loaded: {tab.PageCount} pages, {tab.PageWidth}x{tab.PageHeight}");
             // Content identity first: the portal set and view rotation below are keyed by it, so they follow
             // a moved or copied file. Hashes only when size/mtime changed since the last open.
-            await Task.Run(() => Services.DocumentIdentity.Resolve(tab.FilePath));
+            await Task.Run(() => DocumentIdentity.Resolve(tab.FilePath));
             tab.LoadAnnotations(_controller.AnnotationManager);
             // Linked-context portals (shell sidecar, keyed by PDF SHA-256). One reference-counted set is
             // shared across all tabs/panes of the same PDF, so saves from duplicate tabs don't clobber

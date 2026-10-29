@@ -11,6 +11,6 @@
     <InternalsVisibleTo Include="RailReader.Export.Tests" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="RailReader.Core" Version="0.74.1" />
+    <PackageReference Include="RailReader.Core" Version="0.75.0" />
   </ItemGroup>
 </Project>
