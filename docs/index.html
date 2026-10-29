@@ -176,21 +176,10 @@
           <p class="feature-row__eyebrow label-sm">Rail reading</p>
           <h3>One line at a time</h3>
           <p>Past your zoom threshold, navigation locks to the detected blocks and advances line by line. Optional line-focus dimming fades all but the current line, so your eye never loses its place.</p>
-          <p>Hold Ctrl to free-pan a figure; release to snap back. Press R to start rail reading at whatever zoom you're at.</p>
+          <p>Hold Ctrl and drag to free-pan a figure; release to snap back. Hold Ctrl on its own for a second to keep free pan on while you annotate around it, and tap Ctrl to return. Press R to start rail reading at whatever zoom you're at.</p>
         </div>
         <div class="feature-row__media">
           <figure class="frame"><img src="img/line_focus_blur.png" alt="railreader2 rail mode with line-focus dimming — the active line stays lit while surrounding lines fade" loading="lazy" width="1440" height="980" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}"></figure>
-        </div>
-      </div>
-      <div class="feature-row" data-reveal>
-        <div class="feature-row__text">
-          <p class="feature-row__eyebrow label-sm">Reading guide</p>
-          <h3>Steer the page with your pointer</h3>
-          <p>For reading at lower zoom, turn on the reading guide (<code>K</code>), click a word, then hold Shift and nudge the mouse: the pointer becomes an invisible joystick that carries a word-by-word highlight along the text at your pace. Above the rail threshold, the same nudge drives rail mode.</p>
-          <p>A small indicator shows where you pressed Shift and how far you are pushing, in the colours of your colour effect. When the guide reaches a new line it pauses, so you can find your place and re-centre the mouse before pushing on.</p>
-        </div>
-        <div class="feature-row__media">
-          <figure class="frame"><img src="img/steer_indicator.png" alt="railreader2 reading guide steering along a line of a two-column paper, with a square, dot and line showing how far the pointer has been pushed" loading="lazy" width="1440" height="926" onclick="openLightbox(this)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(this);}"></figure>
         </div>
       </div>
       <div class="feature-row" data-reveal>
@@ -486,7 +475,7 @@
       <tbody>
         <tr><th colspan="2" scope="rowgroup">Rail Mode</th></tr>
         <tr><td>R</td><td>Start rail here at the current zoom (press again or Escape to exit)</td></tr>
-        <tr><td>K</td><td>Reading guide on/off (click a word, hold Shift and nudge the pointer to read)</td></tr>
+        <tr><td>K</td><td>Reading guide on/off (experimental; enable it in Settings first)</td></tr>
         <tr><td>Down / S</td><td>Next line</td></tr>
         <tr><td>Up / W</td><td>Previous line</td></tr>
         <tr><td>Right / D</td><td>Scroll forward (hold)</td></tr>
@@ -503,6 +492,7 @@
         <tr><td>U</td><td>Rotate to read the current sideways rail block (press again to reset)</td></tr>
         <tr><td>Z</td><td>Freeze panes (rows and columns) / unfreeze</td></tr>
         <tr><td>Ctrl+Drag</td><td>Free pan/zoom in rail mode (release to snap back)</td></tr>
+        <tr><td>Hold Ctrl ~1 s</td><td>Keep free pan on (tap Ctrl to snap back)</td></tr>
         <tr><td>Escape</td><td>Stop auto-scroll</td></tr>
         <tr><td>[ / ]</td><td>Adjust scroll speed or jump distance (&plusmn;5)</td></tr>
         <tr><td>Ctrl+[ / ]</td><td>Fine adjust speed or jump distance (&plusmn;1)</td></tr>

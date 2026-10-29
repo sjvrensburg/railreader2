@@ -157,16 +157,6 @@ Click on any detected block in rail mode to jump directly to it. The view snaps 
 
 You don't have to zoom past the threshold to rail-read. Press `R` (or **Rail > Start Rail Here**) to start rail mode on the block nearest the centre of the view at your current zoom — the camera doesn't lurch to a higher magnification. To choose the starting block yourself, click the **Start rail here** button on the toolbar, then click where you want to begin. Press `R` again or `Escape` to leave.
 
-### Reading guide (pointer-driven, any zoom)
-
-The reading guide is **experimental**: first enable it under Settings ▸ Reading ▸ Experimental ▸ "Enable experimental features" (the toolbar button, menu item and `K` shortcut stay hidden until then). If you read at low magnification (around 1.25–2×) and don't want to chase the text with the mouse, use the **reading guide** instead of rail mode. Turn it on with the **Reading guide** toolbar button (beside Browse and Text Select), **Rail > Reading Guide**, or `K`. Click the word you want to start on, then hold `Shift` and **nudge** the pointer: the pointer becomes an invisible joystick. Push a little to the right and the guide flows **word by word** through the text — on to the next line, the next paragraph, the next page — at your reading pace; push further to go faster; push left to go back; up or down to step lines. Bring the pointer back to where you pressed `Shift` and it stops. The **word** the guide is on and its **line** are marked, and the page only scrolls when the guide nears the edge of the view. Release `Shift` and the guide **parks** where it is; click another word to jump. The mouse cursor is hidden while you hold `Shift`, so a small **steering indicator** stands in for it: a square marks where you pressed `Shift` (the still zone), a dot follows your pointer, and a line joins them once you push past the square. It takes its colour from your colour effect, so it stays easy to see on every one.
-
-**Pausing at each new line.** When the guide moves to a new line, block or page by itself, it **pauses** there: the square turns heavier and the dot shows a pause mark. That gives you time to find your place and, if you like, reposition the mouse. Bring the pointer back inside the square, then push again to carry on. A line you step to with an up or down nudge doesn't pause, and a nudge while paused is honoured straight away.
-
-The pace follows **Reading pace** in Settings > Reading (Relaxed / Normal / Brisk), and a long word is given a little longer than a short one. The guide uses the same line highlight colour and **Dim the other lines** setting as rail mode (Settings > Reading > Current Line), so turning the dim on quiets the rest of the page around the guide line. In Settings > Reading > **Reading Guide** you can switch to **pointing** instead of steering — the guide then sits on the word under the pointer while you hold `Shift` (or **always**, with no key to hold; the cursor stays visible), snapped to the detected text so an unsteady hand never flickers between lines, with the margin marking just the line like a reading ruler — and switch the word marking off. Two advanced settings fine-tune steering: **Steer sensitivity** (how far you push before it starts, and how far for full speed — lower is calmer) and **Pause at each new line** (the pause described above, on by default). Press `K` or `Escape` to leave the mode. On a scanned page without a text layer, or while the view is rotated, the guide marks lines only.
-
-**In rail mode too.** Zoom past the rail threshold (or use **Start Rail Here**) with the reading guide on, and the same gesture drives the rail: hold `Shift` and push right to scroll along the line — gently for a slow read, further for faster — and the rail turns the line's end into the next line for you, then pauses there (bring the pointer back inside the square and push again to continue); push left to read back; push up or down to step lines. Where semi-auto scroll would stop (an equation, a table, a figure, a heading, a new page) the rail stops too; bring the pointer back to where you pressed `Shift` and push again to carry on. The **word** passing the reading point is marked on the rail line as you steer (the same **Mark the word** setting as below the threshold). There's no need for the arrow keys or `D`/`S`, though they still work.
-
 ### Horizontal scrolling
 
 Holding `Right`/`D` scrolls horizontally along the current line with speed ramping — it starts slow and accelerates. `Ctrl + mouse wheel` also scrolls horizontally. The speed ramp time and max speed are configurable in Settings.
@@ -176,6 +166,10 @@ Holding `Right`/`D` scrolls horizontally along the current line with speed rampi
 ### Rail toolbar
 
 When rail mode is active, a floating toolbar appears with **P** (auto-scroll), **J** (jump mode), **F** (line focus dim), and **H** (line highlight) toggle buttons, plus a speed/distance slider.
+
+### Reading guide (experimental)
+
+The reading guide is an **experimental** feature for reading at lower zoom, hidden unless you tick **Enable experimental features** under Settings > Reading (shown with **Show advanced settings**). Once enabled, turn it on with the **Reading guide** toolbar button, **Rail > Reading Guide**, or `K`. Click a word, then hold `Shift` and nudge the pointer like a joystick to carry a word-and-line highlight along the text at your reading pace; above the rail threshold the same nudge scrolls the rail. Settings > Reading > **Reading Guide** can switch it to simply marking the word under the pointer instead. Press `K` or `Escape` to leave the mode. It may change or be removed in a later release.
 
 ---
 
@@ -802,7 +796,8 @@ Colour effect, margin cropping and the current-line style are kept per document 
 - **Mark the line you're on:** Don't mark it / Highlight it / Dim the other lines / Highlight and dim — the same two effects as the `H` and `F` keys. **Highlight colour:** Auto, Yellow, Cyan, Green, None. *Advanced:* highlight opacity, dim amount, and the space kept around the line (it sizes both the highlight band and the undimmed area).
 - **Crop page margins:** Fit pages to their detected content.
 - **Scroll continuously from page to page:** Off by default. Lets browse-mode mouse-wheel scrolling flow smoothly across page boundaries instead of jumping page to page — see [Continuous scrolling](#continuous-scrolling) under Basic Navigation for the full behaviour.
-- **Reading Guide:** How the guide follows the pointer — **steer** (the default), **point** while holding `Shift`, or point **always** — and whether to mark the word being read (see [Reading guide](#reading-guide-pointer-driven-any-zoom)). *Advanced:* **Line stickiness** (point modes), **Steer sensitivity** (lower is calmer), and **Pause at each new line**.
+- **Reading Guide** (only shown once experimental features are enabled): how the guide follows the pointer — **steer**, **point** while holding `Shift`, or point **always** — and whether to mark the word being read (see [Reading guide](#reading-guide-experimental)).
+- *Advanced:* **Enable experimental features** — shows features that are still rough around the edges and may change or be removed. Currently adds the [reading guide](#reading-guide-experimental).
 - *Advanced:* **Jump distance** — percentage of the visible width for jump mode (5–80%).
 
 ### Appearance
@@ -945,7 +940,7 @@ The log is overwritten at the start of each session. Old `.log` files are automa
 | Key | Action |
 |-----|--------|
 | `R` | Start rail here at the current zoom (press again or `Escape` to exit) |
-| `K` | Reading guide on/off — click a word, hold `Shift` and nudge the pointer to read word by word (any zoom) |
+| `K` | Reading guide on/off (experimental; enable it in Settings first) |
 | `U` | Rotate to read the current sideways rail block (press again to reset) |
 | `Z` | Freeze panes (both axes) / unfreeze |
 | `Down` / `S` | Next line |
