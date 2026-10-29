@@ -73,7 +73,7 @@ jobs:
           # Windows installer don't have to change.
           APP_ID="io.github.sjvrensburg.RailReader2"
 
-          mkdir -p AppDir/usr/share/applications AppDir/usr/share/icons/hicolor/256x256/apps AppDir/usr/share/metainfo
+          mkdir -p AppDir/usr/share/applications AppDir/usr/share/icons/hicolor/256x256/apps AppDir/usr/share/metainfo AppDir/usr/share/mime/packages
           # Rewrite the desktop file's Icon= to match the new icon basename.
           sed "s/^Icon=.*/Icon=${APP_ID}/" assets/railreader2.desktop > "AppDir/usr/share/applications/${APP_ID}.desktop"
           cp assets/railreader2.png "AppDir/usr/share/icons/hicolor/256x256/apps/${APP_ID}.png"
@@ -82,6 +82,9 @@ jobs:
           # that warning is harmless. Shipping both names makes consumers see the
           # component twice (the AppImage catalog read the licence as "MITMIT").
           cp assets/railreader2.metainfo.xml "AppDir/usr/share/metainfo/${APP_ID}.metainfo.xml"
+          # The .railreading type; registered only when a desktop integrator (appimaged, Gear Lever)
+          # installs it, since an AppImage can't register MIME types by itself.
+          cp assets/railreader2-mime.xml "AppDir/usr/share/mime/packages/${APP_ID}.xml"
           # Top-level copies are what appimagetool embeds into the AppImage runtime.
           cp "AppDir/usr/share/applications/${APP_ID}.desktop" "AppDir/${APP_ID}.desktop"
           cp "AppDir/usr/share/icons/hicolor/256x256/apps/${APP_ID}.png" "AppDir/${APP_ID}.png"

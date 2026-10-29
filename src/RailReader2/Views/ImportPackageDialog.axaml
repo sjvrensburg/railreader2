@@ -1,0 +1,20 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="RailReader2.Views.ImportPackageDialog"
+        Title="Open Reading Package"
+        Width="480" SizeToContent="Height" MinHeight="150"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False">
+    <DockPanel Margin="16">
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal"
+                    HorizontalAlignment="Right" Spacing="8" Margin="0,12,0,0">
+            <Button x:Name="MergeButton" Content="Add to My Copy" MinWidth="100" HorizontalContentAlignment="Center" Click="OnMergeClick" />
+            <Button x:Name="CancelButton" Content="Cancel" MinWidth="80" HorizontalContentAlignment="Center" Click="OnCancelClick" IsCancel="True" />
+        </StackPanel>
+        <StackPanel Spacing="8">
+            <TextBlock TextWrapping="Wrap"
+                       Text="You already have this document. Add the package's notes, bookmarks and portals to your copy, and go to where the package left off?" />
+            <TextBox x:Name="PathDisplay" IsReadOnly="True" TextWrapping="Wrap" />
+        </StackPanel>
+    </DockPanel>
+</Window>

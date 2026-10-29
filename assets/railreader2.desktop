@@ -6,5 +6,5 @@ Exec=RailReader2 %f
 Icon=railreader2
 Categories=Office;Viewer;
 Keywords=PDF;reader;viewer;rail reading;annotations;magnification;
-MimeType=application/pdf;
+MimeType=application/pdf;application/x-railreading;
 Terminal=false

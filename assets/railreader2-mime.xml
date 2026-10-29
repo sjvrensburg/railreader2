@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Reading package (.railreading): a zip holding a PDF and its RailReader2 reading session. -->
+<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
+  <mime-type type="application/x-railreading">
+    <comment>RailReader2 reading package</comment>
+    <sub-class-of type="application/zip"/>
+    <generic-icon name="x-office-document"/>
+    <glob pattern="*.railreading"/>
+  </mime-type>
+</mime-info>

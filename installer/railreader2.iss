@@ -51,6 +51,12 @@ Root: HKA; Subkey: "Software\Classes\.pdf\OpenWithProgids"; ValueType: string; V
 Root: HKA; Subkey: "Software\Classes\RailReader2.PDF"; ValueType: string; ValueName: ""; ValueData: "PDF Document"; Flags: uninsdeletekey; Tasks: pdfassoc
 Root: HKA; Subkey: "Software\Classes\RailReader2.PDF\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0"; Tasks: pdfassoc
 Root: HKA; Subkey: "Software\Classes\RailReader2.PDF\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Tasks: pdfassoc
+; Reading packages are RailReader2's own file type, so they are always associated (no task).
+Root: HKA; Subkey: "Software\Classes\.railreading"; ValueType: string; ValueName: ""; ValueData: "RailReader2.Package"; Flags: uninsdeletevalue
+Root: HKA; Subkey: "Software\Classes\.railreading\OpenWithProgids"; ValueType: string; ValueName: "RailReader2.Package"; ValueData: ""; Flags: uninsdeletevalue
+Root: HKA; Subkey: "Software\Classes\RailReader2.Package"; ValueType: string; ValueName: ""; ValueData: "RailReader2 Reading Package"; Flags: uninsdeletekey
+Root: HKA; Subkey: "Software\Classes\RailReader2.Package\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0"
+Root: HKA; Subkey: "Software\Classes\RailReader2.Package\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent

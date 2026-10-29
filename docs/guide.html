@@ -817,6 +817,26 @@
         document &mdash; your annotations are preserved, and the imported ones are added alongside
         them. Duplicate bookmarks (same name and page) are skipped.
       </p>
+
+      <h3 id="reading-package">Moving a reading session to another computer</h3>
+      <p>
+        Use <strong>File &rarr; Save Reading Package&hellip;</strong> to bundle the PDF with
+        everything RailReader2 keeps for it: your annotations and bookmarks, portals, view rotation,
+        colour filter and the page and zoom you were at. The result is a single
+        <code>.railreading</code> file you can copy to another computer or send to someone.
+      </p>
+      <p>
+        Open the package with <strong>File &rarr; Open</strong> (or double-click it, where your
+        system has registered the file type). If that computer already has the same document,
+        RailReader2 offers to <strong>add the package to your copy</strong>: your notes stay, the
+        package's are added alongside them (ones your copy already has are skipped), and you go to
+        where the package left off. Otherwise it asks where to save the PDF and opens it with
+        everything restored.
+      </p>
+      <p>
+        A password-protected PDF stays encrypted inside the package, and the password is not
+        included, but your notes are stored as plain text, so RailReader2 asks before packaging one.
+      </p>
     </section>
 
     <!-- 10. PDF Links -->
@@ -1256,6 +1276,28 @@ railreader2-cli export paper.pdf --figure-dir ./figures --output paper.md</code>
         and figures become placeholders and tables render as code blocks. Without either,
         the output is plain text per page with heading markers from the PDF outline.
       </p>
+
+      <h3>package / unpack &mdash; reading packages</h3>
+      <p>
+        <code>package</code> bundles a PDF with the annotations, bookmarks, portals, rotation and
+        reading position RailReader2 has stored for it into a <code>.railreading</code> file
+        (see <a href="#reading-package">Moving a reading session to another computer</a>).
+        <code>unpack</code> checks a package and extracts its PDF and JSON files. It doesn't add
+        anything to RailReader2's own storage: open the package in the app to restore the session.
+      </p>
+      <pre><code>railreader2-cli package &lt;pdf&gt; [options]
+railreader2-cli unpack &lt;package&gt; [options]</code></pre>
+      <table class="shortcuts-table">
+        <thead class="sr-only">
+          <tr><th>Option</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>--output &lt;path&gt;</code></td><td><code>package</code>: file to write (default: <code>&lt;name&gt;.railreading</code> beside the PDF)</td></tr>
+          <tr><td><code>--allow-encrypted</code></td><td><code>package</code>: package a password-protected PDF (it stays encrypted; notes are stored as plain text)</td></tr>
+          <tr><td><code>--password &lt;pwd&gt;</code></td><td><code>package</code>: password of an encrypted PDF, to read its annotations</td></tr>
+          <tr><td><code>--output-dir &lt;dir&gt;</code></td><td><code>unpack</code>: where to extract (default: a folder named after the package)</td></tr>
+        </tbody>
+      </table>
     </section>
 
     <!-- 12. Settings -->

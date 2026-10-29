@@ -956,6 +956,18 @@ public sealed partial class MainWindowViewModel
         }
     }
 
+    /// <summary>After merging into a document's annotations (JSON import, reading package): save, redraw,
+    /// and refresh the panes.</summary>
+    private void ApplyMergedAnnotations(TabViewModel tab)
+    {
+        tab.State.MarkAnnotationsDirty();
+        InvalidateAnnotations();
+        NotifyAnnotationsMutated();
+        // MergeInto also appends imported bookmarks; the Bookmarks pane only listens to
+        // BookmarksChanged, so signal it explicitly or imported bookmarks won't appear.
+        NotifyBookmarksChanged();
+    }
+
     [RelayCommand]
     public async Task ImportAnnotationsJson()
     {
@@ -982,12 +994,7 @@ public sealed partial class MainWindowViewModel
             }
 
             int added = AnnotationService.MergeInto(tab.State.Annotations, imported);
-            tab.State.MarkAnnotationsDirty();
-            InvalidateAnnotations();
-            NotifyAnnotationsMutated();
-            // MergeInto also appends imported bookmarks; the Bookmarks pane only listens to
-            // BookmarksChanged, so signal it explicitly or imported bookmarks won't appear.
-            NotifyBookmarksChanged();
+            ApplyMergedAnnotations(tab);
             ShowStatusToast(added > 0
                 ? $"Imported {added} annotation(s) from {Path.GetFileName(inputPath)}"
                 : "No new annotations found in file");
