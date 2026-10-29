@@ -13,6 +13,7 @@
             <MenuItem Header="_Export with Annotations..." Command="{Binding ExportAnnotatedCommand}" IsEnabled="{Binding CanExportAnnotated}" />
             <MenuItem Header="Export Annotations as _JSON..." Command="{Binding ExportAnnotationsJsonCommand}" IsEnabled="{Binding HasDocument}" />
             <MenuItem Header="_Import Annotations..." Command="{Binding ImportAnnotationsJsonCommand}" IsEnabled="{Binding HasDocument}" />
+            <MenuItem Header="Save Reading _Package..." Command="{Binding SaveReadingPackageCommand}" IsEnabled="{Binding HasDocument}" />
             <Separator />
             <MenuItem Header="Add a _Text Layer (OCR)..." Command="{Binding AddTextLayerCommand}" IsEnabled="{Binding HasDocument}" />
             <Separator />

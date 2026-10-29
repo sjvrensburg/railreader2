@@ -8,15 +8,17 @@
     <AssemblyName>RailReader2.Cli</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <PublishAot>true</PublishAot>
+    <!-- Same version as the app (its csproj is the single source of truth); a reading package records it. -->
+    <Version>$([System.Text.RegularExpressions.Regex]::Match($([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)../RailReader2/RailReader2.csproj')), '&lt;Version&gt;([^&lt;]+)&lt;/Version&gt;').Groups[1].Value)</Version>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="RailReader.Core" Version="0.75.2" />
-    <PackageReference Include="RailReader.Core.Pdfium" Version="0.75.2" />
-    <PackageReference Include="RailReader.Core.Analysis" Version="0.75.2" />
-    <PackageReference Include="RailReader.Renderer.Skia" Version="0.75.2" />
-    <PackageReference Include="RailReader.Core.Vlm.OpenAI" Version="0.75.2" />
-    <PackageReference Include="RailReader.Export" Version="0.75.2" />
-    <PackageReference Include="RailReader.Core.Ocr.RapidOcr" Version="0.75.2" />
+    <PackageReference Include="RailReader.Core" Version="0.76.0" />
+    <PackageReference Include="RailReader.Core.Pdfium" Version="0.76.0" />
+    <PackageReference Include="RailReader.Core.Analysis" Version="0.76.0" />
+    <PackageReference Include="RailReader.Renderer.Skia" Version="0.76.0" />
+    <PackageReference Include="RailReader.Core.Vlm.OpenAI" Version="0.76.0" />
+    <PackageReference Include="RailReader.Export" Version="0.76.0" />
+    <PackageReference Include="RailReader.Core.Ocr.RapidOcr" Version="0.76.0" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="RailReader.Export.Tests" />

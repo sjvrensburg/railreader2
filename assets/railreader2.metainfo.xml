@@ -96,6 +96,8 @@
 
   <provides>
     <binary>RailReader2</binary>
+    <mediatype>application/pdf</mediatype>
+    <mediatype>application/x-railreading</mediatype>
   </provides>
 
   <content_rating type="oars-1.1" />

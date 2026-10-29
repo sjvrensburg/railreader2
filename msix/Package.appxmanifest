@@ -51,6 +51,15 @@
             </uap:SupportedFileTypes>
           </uap:FileTypeAssociation>
         </uap:Extension>
+        <!-- Reading package (.railreading) association -->
+        <uap:Extension Category="windows.fileTypeAssociation">
+          <uap:FileTypeAssociation Name="railreading">
+            <uap:DisplayName>RailReader2 Reading Package</uap:DisplayName>
+            <uap:SupportedFileTypes>
+              <uap:FileType>.railreading</uap:FileType>
+            </uap:SupportedFileTypes>
+          </uap:FileTypeAssociation>
+        </uap:Extension>
       </Extensions>
 
     </Application>

@@ -83,6 +83,7 @@ Everything runs on your own computer. The layout model is included in the downlo
 - Comments on highlights (double-click one), and merging of overlapping highlights.
 - Spell checking in notes (British and American English included, and you can add other Hunspell dictionaries).
 - Annotations save automatically. You can export them into a copy of the PDF or share them as a file, and comments already in a PDF (from a reviewer, say) appear in the comments list alongside your own.
+- Take a reading session to another computer: **File → Save Reading Package** bundles the PDF with your notes, bookmarks, portals and place into one `.railreading` file. Open it on the other machine to carry on where you stopped.
 
 **Equations, tables and figures**
 - Copy an equation as LaTeX, a table as Markdown, or a figure as a description, using an AI vision model of your choice: a cloud service, or a local one through Ollama or vLLM. This is optional and off until you configure it.
@@ -212,6 +213,10 @@ railreader2-cli render paper.pdf --pages 1-5 --dpi 300 --effect amber --output-d
 
 # Resolve figure/table mentions to the blocks they refer to
 railreader2-cli references paper.pdf --output references.json
+
+# Bundle a PDF with your notes, portals and place, or unpack such a bundle
+railreader2-cli package paper.pdf --output paper.railreading
+railreader2-cli unpack paper.railreading --output-dir ./paper
 ```
 
 Encrypted PDFs take `--password`. Run `railreader2-cli <command> --help` for every option, or see the [CLI section of the User Guide](https://sjvrensburg.github.io/railreader2/guide.html#cli-tool). The JSON formats are stable: breaking changes only happen in major versions, so other tools can build on them. [RailMark](https://sjvrensburg.github.io/railmark/), for example, turns your annotations into a Markdown summary.

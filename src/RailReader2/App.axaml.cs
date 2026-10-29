@@ -109,18 +109,20 @@ public partial class App : Application
             window.Closing += (_, _) => vm.Dispose();
             desktop.MainWindow = window;
 
-            // First non-flag argument that names an existing file is the PDF to open.
+            // First non-flag argument that names an existing file is the PDF (or reading package) to open.
             var docPath = args?.FirstOrDefault(a => !a.StartsWith("--") && File.Exists(a));
             if (docPath is not null)
             {
                 // Optional known-state startup flags (for agents / scripted launches):
                 //   --page <n> (1-based)   --zoom <percent, e.g. 300>   --rail
                 var (startPage, startZoom, startRail) = ParseStartupFlags(args!);
-                window.Opened += (_, _) => vm.FireAndForget(OpenStartupDocument(), nameof(vm.OpenDocument));
+                window.Opened += (_, _) => vm.FireAndForget(OpenStartupDocument(), nameof(vm.OpenPath));
 
                 async System.Threading.Tasks.Task OpenStartupDocument()
                 {
-                    await vm.OpenDocument(docPath);
+                    await vm.OpenPath(docPath);
+                    // A reading package brings its own position.
+                    if (Services.ReadingPackage.IsPackagePath(docPath)) return;
                     if (startPage is not null || startZoom is not null || startRail)
                         vm.ApplyStartupView(startPage, startZoom, startRail);
                 }

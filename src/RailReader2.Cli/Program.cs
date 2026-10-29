@@ -34,6 +34,8 @@ static class Program
                 "references" => Commands.ReferencesCommand.Execute(args[1..], factory, logger),
                 "export" => Commands.ExportCommand.Execute(args[1..], factory, logger),
                 "ocr" => Commands.OcrCommand.Execute(args[1..], factory, logger),
+                "package" => Commands.PackageCommand.Execute(args[1..], factory, logger),
+                "unpack" => Commands.UnpackCommand.Execute(args[1..], factory, logger),
                 _ => Fail($"Unknown command: '{args[0]}'. Run with --help for usage.")
             };
         }
@@ -57,6 +59,8 @@ static class Program
         Console.WriteLine("  export <pdf>          Export PDF to structured Markdown");
         Console.WriteLine("  references <pdf>      Detect figure/table mentions, resolve them, and benchmark against labels");
         Console.WriteLine("  ocr <pdf>             Add an invisible OCR text layer to a copy of a scanned PDF");
+        Console.WriteLine("  package <pdf>         Bundle a PDF and its reading session into a .railreading file");
+        Console.WriteLine("  unpack <package>      Extract a .railreading package");
         Console.WriteLine();
         Console.WriteLine("Run 'railreader2-cli <command> --help' for command-specific options.");
         return 0;
@@ -103,7 +107,7 @@ static class Program
         "ground-truth", "layout", "min-precision", "classes", "pack",
     ];
 
-    internal static string GetRequiredPdf(string[] args)
+    internal static string GetRequiredPdf(string[] args, string kind = "PDF")
     {
         string? pdfPath = null;
         for (int i = 0; i < args.Length; i++)
@@ -119,10 +123,10 @@ static class Program
             break;
         }
         if (pdfPath is null)
-            throw new InvalidOperationException("PDF path is required as the first argument.");
+            throw new InvalidOperationException($"{kind} path is required as the first argument.");
 
         if (!File.Exists(pdfPath))
-            throw new FileNotFoundException($"PDF not found: {pdfPath}");
+            throw new FileNotFoundException($"{kind} not found: {pdfPath}");
 
         return Path.GetFullPath(pdfPath);
     }

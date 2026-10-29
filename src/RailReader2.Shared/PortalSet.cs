@@ -48,9 +48,12 @@ public sealed class Portal
 }
 
 /// <summary>
-/// Per-document set of portals. Shell-managed sidecar, mirroring
-/// <see cref="CustomLayoutModelConfig"/> and the annotations sidecar: keyed by the document's content
-/// id (<see cref="DocumentIdentity"/>), stored at <c>ConfigDir/portals/&lt;id&gt;.json</c>. No RailReaderCore change.
+/// Per-document set of portals. Shell-managed sidecar, mirroring the annotations sidecar: keyed by
+/// the document's content id (<see cref="DocumentIdentity"/>), stored at
+/// <c>ConfigDir/portals/&lt;id&gt;.json</c>. No RailReaderCore change. Lives in Shared so the CLI can
+/// read it (the reading package); the app's per-PDF sharing layer is <c>PortalSetManager</c>.
+/// <para><c>keyOf</c> maps a PDF path to its content id and defaults to <see cref="DocumentIdentity.Peek"/>;
+/// a process that does not own the identity map (the CLI) passes <see cref="DocumentIdentity.Lookup"/>.</para>
 /// </summary>
 public sealed class PortalSet
 {
@@ -71,22 +74,22 @@ public sealed class PortalSet
     /// <summary>Sidecar path for a PDF: keyed by its content id (<see cref="DocumentIdentity"/>) so the set
     /// follows the file when it is moved or copied. Falls back to the path hash when the document has not
     /// been resolved (never in the open path, which resolves first).</summary>
-    public static string PathFor(string pdfPath)
-        => DocumentIdentity.Peek(pdfPath) is { } id
+    public static string PathFor(string pdfPath, Func<string, string?>? keyOf = null)
+        => (keyOf ?? DocumentIdentity.Peek)(pdfPath) is { } id
             ? System.IO.Path.Combine(Dir, id + ".json")
             : LegacyPathFor(pdfPath);
 
-    public static PortalSet Load(string pdfPath)
+    public static PortalSet Load(string pdfPath, Func<string, string?>? keyOf = null)
     {
-        string path = PathFor(pdfPath), legacy = LegacyPathFor(pdfPath);
+        string path = PathFor(pdfPath, keyOf), legacy = LegacyPathFor(pdfPath);
         // First open under content ids: carry the path-keyed set forward (kept in place, never rewritten).
         if (!File.Exists(path) && path != legacy && File.Exists(legacy))
             return JsonSidecar.Load(legacy, PortalJsonContext.Default.PortalSet, static () => new PortalSet());
         return JsonSidecar.Load(path, PortalJsonContext.Default.PortalSet, static () => new PortalSet());
     }
 
-    public void Save(string pdfPath)
-        => JsonSidecar.Save(PathFor(pdfPath), this, PortalJsonContext.Default.PortalSet);
+    public void Save(string pdfPath, Func<string, string?>? keyOf = null)
+        => JsonSidecar.Save(PathFor(pdfPath, keyOf), this, PortalJsonContext.Default.PortalSet);
 }
 
 [JsonSourceGenerationOptions(

@@ -190,7 +190,12 @@ public sealed partial class MainWindowViewModel
         var files = await _window.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
         {
             Title = "Open PDF",
-            FileTypeFilter = [new FilePickerFileType("PDF Files") { Patterns = ["*.pdf"] }],
+            FileTypeFilter =
+            [
+                new FilePickerFileType("PDFs and Reading Packages") { Patterns = ["*.pdf", "*" + Services.ReadingPackage.Extension] },
+                new FilePickerFileType("PDF Files") { Patterns = ["*.pdf"] },
+                new FilePickerFileType("Reading Packages") { Patterns = ["*" + Services.ReadingPackage.Extension] },
+            ],
             AllowMultiple = false,
         });
         if (files is { Count: > 0 })
@@ -198,7 +203,7 @@ public sealed partial class MainWindowViewModel
             var path = files[0].TryGetLocalPath()
                        ?? files[0].Path.LocalPath;
             _logger.Debug($"[OpenFile] Selected: {path}");
-            if (path is not null) await OpenDocument(path);
+            if (path is not null) await OpenPath(path);
         }
     }
 
