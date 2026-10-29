@@ -56,11 +56,10 @@ Everything runs on your own computer. The layout model is included in the downlo
 - Line-by-line rail reading through paragraphs, columns and pages, in reading order.
 - Semi-automatic scrolling (`P`): flows through prose on its own and stops at equations, tables, figures and headings until you press a key to continue.
 - Jump mode (`J`) for reading in short hops instead of a continuous scroll.
-- Reading guide (`K`, experimental — enable it under Settings ▸ Reading ▸ Experimental) for lower zoom: hold `Shift` and nudge the pointer, like an invisible joystick, to carry a word-by-word highlight along the text at your pace. A small indicator shows how far you are pushing, and the guide pauses at each new line so you can find your place. Above the rail threshold, the same nudge drives rail mode.
 - Line focus (`F`) and line highlight (`H`) keep your eye on the current line.
 - Freeze panes (toolbar snowflake): pin a table's header row or label column while the rest scrolls, like in a spreadsheet.
 - Portals: keep a figure or table in view while you read the paragraph that refers to it. "See Figure 3" can pin Figure 3 automatically.
-- Hold `Ctrl` and drag to look around freely, then let go to snap back to where you were.
+- Hold `Ctrl` and drag to look around freely, then let go to snap back to where you were. Hold `Ctrl` on its own for a second to stay in free pan while you annotate around a figure; tap `Ctrl` to snap back.
 
 **Easy on the eyes**
 - Colour filters (high contrast, high visibility, amber, invert), cycled with `C` and remembered per document.
@@ -88,12 +87,6 @@ Everything runs on your own computer. The layout model is included in the downlo
 **Equations, tables and figures**
 - Copy an equation as LaTeX, a table as Markdown, or a figure as a description, using an AI vision model of your choice: a cloud service, or a local one through Ollama or vLLM. This is optional and off until you configure it.
 - Command-line tool to turn a whole PDF into structured Markdown, or extract its annotations and structure as JSON.
-
-<p align="center">
-  <img src="docs/img/steer_indicator.png" alt="The reading guide steering along a line: a square shows where Shift was pressed, and a dot and line show how far the pointer has been pushed" width="45%">
-  &nbsp;
-  <img src="docs/img/steer_parked.png" alt="The reading guide paused at the start of the next line, with a pause mark on the dot" width="45%">
-</p>
 
 <p align="center">
   <img src="docs/img/colour_effect_high_contrast.png" alt="High-contrast colour filter in rail mode" width="45%">
@@ -144,11 +137,11 @@ Press **F1** at any time for the full list of keyboard shortcuts. These are the 
 | `Space`, `PgDn` / `PgUp` | Next line or page / previous page |
 | `+` / `-` / `0` | Zoom in / zoom out / fit page |
 | `R` | Start rail reading here, at the current zoom |
-| `K` | Reading guide on / off (experimental; hold `Shift` and nudge the pointer to read) |
 | `P` / `J` | Auto-scroll / jump mode |
 | `F` / `H` | Line focus / line highlight |
 | `[` / `]` | Slower / faster scrolling |
 | `Ctrl`+drag | Look around freely, then let go to snap back |
+| Hold `Ctrl` ~1 s | Stay in free pan (tap `Ctrl` to snap back) |
 | `C` | Cycle colour filters |
 | `Z` | Freeze panes / unfreeze |
 | `B` | Bookmark this page |
@@ -161,7 +154,7 @@ Press **F1** at any time for the full list of keyboard shortcuts. These are the 
 
 ## Settings
 
-**Settings** (`Ctrl+,`) opens with the options most readers change: reading pace, how the current line is marked, colours and text size, when auto-scroll stops, scanned pages, and spelling. Tick **Show advanced settings** for everything else, including render quality, layout models, GPU acceleration and the AI assistant.
+**Settings** (`Ctrl+,`) opens with the options most readers change: reading pace, how the current line is marked, colours and text size, when auto-scroll stops, scanned pages, and spelling. Tick **Show advanced settings** for everything else, including render quality, layout models, GPU acceleration and the AI assistant. The advanced view also has **Enable experimental features** (Settings ▸ Reading), which currently adds a pointer-driven reading guide for lower zoom (`K`); it may change or be removed.
 
 The [User Guide](https://sjvrensburg.github.io/railreader2/guide.html) explains every setting.
 
