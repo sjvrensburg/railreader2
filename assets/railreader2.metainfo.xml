@@ -103,6 +103,9 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="3.84.1.0" date="2026-10-31">
+      <description><p>A page whose layout analysis fails no longer leaves the reader waiting for a rail that never comes: the page is tried once more, then released, and reading continues; analysis of the rest of the document no longer stalls behind it. If the layout model fails to load, text recognition of scanned pages already queued is stopped instead of running to completion for nothing. The analysis engine moves to ONNX Runtime 1.31; layout detection results are unchanged.</p></description>
+    </release>
     <release version="3.84.0.0" date="2026-10-29">
       <description><p>Reading sessions can now move between computers. File, Save Reading Package bundles a PDF with your annotations, bookmarks, portals, view rotation, colour filter and place into one .railreading file. Open it on another computer to carry on where you stopped. If that computer already has the document, the package is added to your copy, skipping notes it already has; otherwise you choose where to save the PDF. The command-line tool gains package and unpack commands, and the installers register the new file type.</p></description>
     </release>
