@@ -554,8 +554,9 @@ public partial class SettingsWindow : Window
     /// model whose files are missing/invalid, or PP-DocLayout-S with a missing file, both of which
     /// can still land on a GPU-eligible built-in). Every call site that decides whether OCR may
     /// claim the mutually-exclusive GPU slot must use this, not
-    /// <see cref="CustomLayoutModelLoader.CanConfigShapeUseGpu"/> — getting this one wrong risks the
-    /// onnxruntime#32561 concurrent-WebGPU-session crash, not just a stale checkbox.
+    /// <see cref="CustomLayoutModelLoader.CanConfigShapeUseGpu"/> — getting this one wrong puts both
+    /// worker stages on WebGPU at once, a configuration Core's <c>AnalysisWorker</c> does not support
+    /// (and a process crash on ONNX Runtime ≤1.29, onnxruntime#32561), not just a stale checkbox.
     /// </summary>
     private bool WouldLayoutUseGpu()
         => Vm is { } vm && CustomLayoutModelLoader.ResolveModel(vm.AppConfig, RailReaderLogging.Logger).IsGpu;
