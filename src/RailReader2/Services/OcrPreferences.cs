@@ -27,12 +27,13 @@ public sealed class OcrPreferences
     /// GPU acceleration preference for OCR detection/recognition, via
     /// <c>RailReader.Core.Analysis.WebGpu</c>'s native WebGPU execution provider — the same OCR
     /// model weights run under either backend, no separate download. <b>Mutually exclusive with
-    /// <see cref="CustomLayoutModelConfig.Accelerator"/></b>: calling <c>Session.Run()</c> on two
-    /// WebGPU-backed sessions from two threads at once segfaults the process (confirmed,
-    /// cross-device and same-device — see <c>WebGpuAccelerator</c>'s doc comment and
-    /// <see href="https://github.com/microsoft/onnxruntime/issues/32561">microsoft/onnxruntime#32561</see>),
-    /// and <c>AnalysisWorker</c> runs OCR and layout inference on two independent, genuinely
-    /// concurrent threads — exactly that shape. Settings enforces "only one of the two on GPU at
+    /// <see cref="CustomLayoutModelConfig.Accelerator"/></b>: <c>AnalysisWorker</c> runs OCR and
+    /// layout inference on two independent, genuinely concurrent threads, and Core does not yet run
+    /// both stages on WebGPU. (On ONNX Runtime ≤1.29 two concurrent WebGPU <c>Session.Run()</c>
+    /// calls crashed the process — see <c>WebGpuAccelerator</c>'s doc comment and
+    /// <see href="https://github.com/microsoft/onnxruntime/issues/32561">microsoft/onnxruntime#32561</see>;
+    /// Core 0.79.0's ORT 1.31 + WebGPU plugin 0.5 fixed that upstream, but enabling the dual-GPU
+    /// pipeline is a separate Core change.) Settings enforces "only one of the two on GPU at
     /// a time" by unchecking whichever wasn't just turned on; <see cref="ViewModels.MainWindowViewModel"/>
     /// enforces it again defensively at startup in case a sidecar file was hand-edited. Takes
     /// effect on next launch, like <see cref="Mode"/> and <see cref="ModelSetId"/>.

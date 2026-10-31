@@ -12,13 +12,13 @@
     <Version>$([System.Text.RegularExpressions.Regex]::Match($([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)../RailReader2/RailReader2.csproj')), '&lt;Version&gt;([^&lt;]+)&lt;/Version&gt;').Groups[1].Value)</Version>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="RailReader.Core" Version="0.76.0" />
-    <PackageReference Include="RailReader.Core.Pdfium" Version="0.76.0" />
-    <PackageReference Include="RailReader.Core.Analysis" Version="0.76.0" />
-    <PackageReference Include="RailReader.Renderer.Skia" Version="0.76.0" />
-    <PackageReference Include="RailReader.Core.Vlm.OpenAI" Version="0.76.0" />
-    <PackageReference Include="RailReader.Export" Version="0.76.0" />
-    <PackageReference Include="RailReader.Core.Ocr.RapidOcr" Version="0.76.0" />
+    <PackageReference Include="RailReader.Core" Version="0.79.0" />
+    <PackageReference Include="RailReader.Core.Pdfium" Version="0.79.0" />
+    <PackageReference Include="RailReader.Core.Analysis" Version="0.79.0" />
+    <PackageReference Include="RailReader.Renderer.Skia" Version="0.79.0" />
+    <PackageReference Include="RailReader.Core.Vlm.OpenAI" Version="0.79.0" />
+    <PackageReference Include="RailReader.Export" Version="0.79.0" />
+    <PackageReference Include="RailReader.Core.Ocr.RapidOcr" Version="0.79.0" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="RailReader.Export.Tests" />

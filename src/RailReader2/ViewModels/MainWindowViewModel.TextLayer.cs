@@ -16,8 +16,9 @@ internal sealed record TextLayerPack(string? Id, string DisplayName, RapidOcrMod
 
 // "Add a Text Layer…" (railreader2#273): recognise a scanned PDF once and save the text as an invisible
 // layer in a copy, which then opens in place of the original. The job runs on the thread pool with its own
-// RapidOcrService (the analysis worker's isn't thread-safe), on the CPU (two WebGPU sessions running at once
-// crash, see onnxruntime#32561). Shared logic lives in RailReader2.Shared's OcrTextLayer, which the CLI's
+// RapidOcrService (the analysis worker's isn't thread-safe), on the CPU (it may run alongside the worker's own
+// GPU session, and Core only validates one WebGPU session at a time — onnxruntime#32561 is the crash this
+// guarded against on ONNX Runtime ≤1.29). Shared logic lives in RailReader2.Shared's OcrTextLayer, which the CLI's
 // `ocr` command also uses.
 public partial class MainWindowViewModel
 {
