@@ -103,6 +103,9 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="3.84.3.0" date="2026-11-02">
+      <description><p>Saving annotations into a PDF is more thorough: every annotation already in the file is now stored in a form other viewers (such as MuPDF-based ones) can see, replies keep their links to the comment they answer, and comments on text insertions (carets) survive a save. Encrypted PDFs are handled more carefully, so a save never drops a reply link.</p></description>
+    </release>
     <release version="3.84.1.0" date="2026-10-31">
       <description><p>A page whose layout analysis fails no longer leaves the reader waiting for a rail that never comes: the page is tried once more, then released, and reading continues; analysis of the rest of the document no longer stalls behind it. If the layout model fails to load, text recognition of scanned pages already queued is stopped instead of running to completion for nothing. The analysis engine moves to ONNX Runtime 1.31; layout detection results are unchanged.</p></description>
     </release>
