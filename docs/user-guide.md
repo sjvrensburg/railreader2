@@ -151,7 +151,7 @@ When you reach the last line of a block, pressing `Down` advances to the next na
 
 ### Click to jump
 
-Click on any detected block in rail mode to jump directly to it. The view snaps to the clicked block's first line.
+Click on any detected block in rail mode to jump directly to it. The view snaps to the line you clicked and keeps your place along it; press `Home` for the start of the line.
 
 ### Start rail here (any zoom)
 

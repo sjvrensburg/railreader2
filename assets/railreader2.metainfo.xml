@@ -103,6 +103,9 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="3.84.4.0" date="2026-11-10">
+      <description><p>Clicking a line in rail mode keeps your place on it: the line comes to the reading position, but the view no longer jumps back to the start of the line. Double-clicking a highlight to open its comment no longer throws the view to the line start before the note editor opens. Home still takes you to the start of the line.</p></description>
+    </release>
     <release version="3.84.3.0" date="2026-11-02">
       <description><p>Saving annotations into a PDF is more thorough: every annotation already in the file is now stored in a form other viewers (such as MuPDF-based ones) can see, replies keep their links to the comment they answer, and comments on text insertions (carets) survive a save. Encrypted PDFs are handled more carefully, so a save never drops a reply link.</p></description>
     </release>
