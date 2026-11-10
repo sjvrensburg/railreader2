@@ -216,6 +216,7 @@ public static class UpdateRelaunch
         try
         {
             RailReaderLogging.Logger.Info($"[Update] Starting {psi.FileName} {string.Join(' ', psi.ArgumentList)}");
+            if (!OperatingSystem.IsWindows()) MarkInheritedDescriptorsCloseOnExec();
             using var _ = Process.Start(psi);
         }
         catch (Exception ex)
@@ -223,4 +224,29 @@ public static class UpdateRelaunch
             RailReaderLogging.Logger.Error("[Update] Couldn't start the update after exit", ex);
         }
     }
+
+    /// <summary>
+    /// Native libraries (GPU driver, PulseAudio, inotify) open descriptors without O_CLOEXEC, and the
+    /// AppImage runtime hands the app its keep-alive pipe; .NET's Process.Start passes all of them to the
+    /// child. A relaunched AppImage that inherits the old runtime's keep-alive pipe keeps the old FUSE
+    /// mount (and its own runtime) alive forever after both apps have exited. This process is exiting,
+    /// so marking every descriptor above stderr close-on-exec loses nothing.
+    /// </summary>
+    private static void MarkInheritedDescriptorsCloseOnExec()
+    {
+        const int F_SETFD = 2, FD_CLOEXEC = 1;
+        try
+        {
+            foreach (var entry in Directory.GetFiles("/proc/self/fd"))
+                if (int.TryParse(Path.GetFileName(entry), out int fd) && fd > 2)
+                    _ = fcntl(fd, F_SETFD, FD_CLOEXEC);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or DllNotFoundException)
+        {
+            RailReaderLogging.Logger.Warn($"[Update] Couldn't mark descriptors close-on-exec: {ex.Message}");
+        }
+    }
+
+    [System.Runtime.InteropServices.DllImport("libc", SetLastError = true)]
+    private static extern int fcntl(int fd, int cmd, int arg);
 }
