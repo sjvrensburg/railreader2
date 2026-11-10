@@ -132,6 +132,9 @@ jobs:
           mkdir -p publish/models
           cp models/$MODEL_NAME publish/models/
           chmod +x publish/RailReader2
+          # Tells the app it was installed from the tarball (Services/Updates/UpdateChannel.cs):
+          # it can't replace itself, so update checks point at the release page.
+          echo tarball > publish/install-kind
           mv publish railreader2-linux-x64
           tar czf railreader2-linux-x64.tar.gz railreader2-linux-x64
 
@@ -312,10 +315,34 @@ jobs:
     needs: [build-linux, build-windows, build-cli-linux, build-cli-windows]
     runs-on: ubuntu-24.04
     steps:
+      - uses: actions/checkout@v6
+        with:
+          path: src
+          sparse-checkout: |
+            scripts
+            src/RailReader2/Services/Updates
+
       - name: Download all artifacts
         uses: actions/download-artifact@v8
         with:
           merge-multiple: true
+
+      # In-app updates read update-manifest.json from the latest release and verify its signature with
+      # the public key built into the app. A release without a valid manifest would break update checks
+      # for everyone, so a missing secret or a key mismatch fails the release.
+      - name: Write and sign update manifest
+        env:
+          UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
+        run: |
+          test -n "$UPDATE_SIGNING_KEY" || { echo "::error::The UPDATE_SIGNING_KEY secret is not set (scripts/generate-update-signing-key.sh)"; exit 1; }
+          python3 src/scripts/write-update-manifest.py "${{ github.ref_name }}" . update-manifest.json
+          umask 077
+          printf '%s\n' "$UPDATE_SIGNING_KEY" > "$RUNNER_TEMP/update-key.pem"
+          openssl dgst -sha256 -sign "$RUNNER_TEMP/update-key.pem" -out update-manifest.json.sig update-manifest.json
+          rm -f "$RUNNER_TEMP/update-key.pem"
+          openssl dgst -sha256 -verify src/src/RailReader2/Services/Updates/update-signing-key.pub.pem \
+            -signature update-manifest.json.sig update-manifest.json
+          cat update-manifest.json
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
@@ -329,3 +356,5 @@ jobs:
             railreader2-setup-x64.exe
             railreader2-cli-linux-x64.tar.gz
             railreader2-cli-win-x64.zip
+            update-manifest.json
+            update-manifest.json.sig

@@ -140,6 +140,7 @@
         </MenuItem>
         <MenuItem Header="_Help">
             <MenuItem Header="_Keyboard Shortcuts" InputGesture="F1" Click="OnShowShortcuts" />
+            <MenuItem Header="Check for _Updates..." Click="OnCheckForUpdates" />
             <MenuItem Header="_About" Click="OnShowAbout" />
             <Separator />
             <MenuItem Header="Export _Diagnostic Log..." Command="{Binding ExportDiagnosticLogCommand}" />

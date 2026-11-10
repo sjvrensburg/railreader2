@@ -1,0 +1,27 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="RailReader2.Views.UpdateDialog"
+        Title="Check for Updates"
+        Width="460" SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False">
+    <StackPanel Margin="16" Spacing="10">
+        <TextBlock x:Name="HeadingText" FontWeight="SemiBold" TextWrapping="Wrap" />
+        <TextBlock x:Name="BodyText" TextWrapping="Wrap" IsVisible="False" />
+        <HyperlinkButton x:Name="NotesLink" Padding="0"
+                Content="What's new in this release" IsVisible="False" Click="OnNotesClick"
+                AutomationProperties.Name="What's new in this release" />
+        <!-- Determinate only: an indeterminate ProgressBar keeps Avalonia's animation clock alive (X11 busy-loop). -->
+        <ProgressBar x:Name="DownloadProgress" Minimum="0" Maximum="1" IsVisible="False"
+                     AutomationProperties.Name="Download progress" />
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,4,0,0">
+            <Button x:Name="SkipButton" Content="Skip This Version" IsVisible="False" Click="OnSkipClick" />
+            <Button x:Name="SecondaryButton" MinWidth="80" HorizontalContentAlignment="Center"
+                    IsVisible="False" Click="OnSecondaryClick" />
+            <Button x:Name="PrimaryButton" MinWidth="100" HorizontalContentAlignment="Center"
+                    IsVisible="False" Click="OnPrimaryClick" IsDefault="True" />
+            <Button x:Name="CloseButton" Content="Close" MinWidth="80" HorizontalContentAlignment="Center"
+                    Click="OnCloseClick" />
+        </StackPanel>
+    </StackPanel>
+</Window>

@@ -42,6 +42,18 @@ The AI layout model is bundled in all packages.
 - **Windows (Microsoft Store):** Install directly from the [Microsoft Store](https://apps.microsoft.com/store/detail/9P9J8KZ6RVZP) for automatic updates, no SmartScreen warnings, and clean install/uninstall. The Store release may lag behind the GitHub release by a few days due to certification review.
 - **Windows (standalone installer):** Download `railreader2-setup-x64.exe` from [GitHub Releases](https://github.com/sjvrensburg/railreader2/releases/latest) and run it. Optionally associate `.pdf` files during setup. This always has the latest version immediately.
 
+### Updates
+
+A few seconds after its first start, RailReader2 asks whether it should check for a new version once a day. Until you say yes it makes no network requests. The check asks GitHub for the latest release and sends nothing about you or your documents. Change your answer under **Settings → Reading → Updates**, or check any time with **Help → Check for Updates…**.
+
+When there is a new version:
+- **AppImage:** RailReader2 downloads the new AppImage, checks it against the signed release information, and replaces the file you run. **Restart Now** reopens it at the document you were reading. If it can't write to the AppImage's folder, it points you to the download page instead.
+- **Windows installer:** RailReader2 downloads and checks the new installer, then installs it silently when it closes. **Restart and Install** closes RailReader2, installs and reopens it; **Install When I Close** waits until you're done.
+- **Linux tarball:** you're pointed to the release page to download the new archive.
+- **Microsoft Store:** the Store updates RailReader2; **Help → Check for Updates…** opens its Store page.
+
+**Skip This Version** stops the daily check mentioning that version. Your annotations and settings are saved before any restart.
+
 ### Opening a PDF
 
 Use **File > Open** or press `Ctrl+O` to open a PDF. You can also pass a file path as a command-line argument. When no file is open, a welcome panel shows an **Open a PDF…** button and a few quick hints for getting started with rail reading.
@@ -821,6 +833,7 @@ Colour effect, margin cropping and the current-line style are kept per document 
 - **Crop page margins:** Fit pages to their detected content.
 - **Scroll continuously from page to page:** Off by default. Lets browse-mode mouse-wheel scrolling flow smoothly across page boundaries instead of jumping page to page — see [Continuous scrolling](#continuous-scrolling) under Basic Navigation for the full behaviour.
 - **Reading Guide** (only shown once experimental features are enabled): how the guide follows the pointer — **steer**, **point** while holding `Shift`, or point **always** — and whether to mark the word being read (see [Reading guide](#reading-guide-experimental)).
+- **Updates:** **Check for updates once a day**, and **Check Now** (see [Updates](#updates)). The Microsoft Store version is updated by the Store.
 - *Advanced:* **Enable experimental features** — shows features that are still rough around the edges and may change or be removed. Currently adds the [reading guide](#reading-guide-experimental).
 - *Advanced:* **Jump distance** — percentage of the visible width for jump mode (5–80%).
 
@@ -1016,7 +1029,7 @@ Every command is reachable from the menu bar by name — handy for discovery, ke
 - **View** — zoom and fit, **Rotate**, side panels, minimap, fullscreen, **Split Editor** (split right, move pane to a new window, close panes), debug overlay, colour effects.
 - **Rail** — **Start Rail Here**, **Reading Guide**, and **Rotate to Read Block** (`R` / `K` / `U`), then the rail-reading toggles: **Auto-Scroll**, **Jump Mode**, **Line Focus Dim**, **Line Highlight**, and **Add Bookmark** (mirroring the `P` / `J` / `F` / `H` / `B` shortcuts).
 - **Navigation** — go to / previous / next / first / last page, and semantic **Jump to Next / Previous** heading, figure, table, or equation.
-- **Help** — keyboard shortcuts, about, diagnostic log, clean-up.
+- **Help** — keyboard shortcuts, check for updates, about, diagnostic log, clean-up.
 
 **Availability.** Menu items grey out when their action isn't currently possible: *Export with Annotations* is disabled for an encrypted (password-protected) PDF — a flattened copy would be unencrypted, so it's refused; the block-copy items need a configured VLM endpoint; and document-dependent commands are disabled when no document is open.
 

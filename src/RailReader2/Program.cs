@@ -53,6 +53,8 @@ internal sealed class Program
         {
             BuildAvaloniaApp()
                 .StartWithClassicDesktopLifetime(args);
+            // After a normal shutdown, so the saves are done before the new version starts.
+            Services.Updates.UpdateRelaunch.RunPending();
         }
         catch (Exception ex)
         {

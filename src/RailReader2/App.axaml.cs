@@ -106,6 +106,7 @@ public partial class App : Application
             vm.SetWindow(window);
 
             window.Opened += (_, _) => splash.Close();
+            window.Opened += (_, _) => vm.FireAndForget(vm.RunStartupUpdateCheckAsync(), nameof(vm.RunStartupUpdateCheckAsync));
             window.Closing += (_, _) => vm.Dispose();
             desktop.MainWindow = window;
 

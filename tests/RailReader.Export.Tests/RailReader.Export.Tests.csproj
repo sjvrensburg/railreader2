@@ -16,6 +16,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Update-manifest fixtures, made by scripts/write-update-manifest.py and signed with openssl as CI does
+         (throwaway test key; only its public half is kept). -->
+    <None Include="Updates/Fixtures/**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="RailReader.Core" Version="0.83.0" />
     <PackageReference Include="RailReader.Core.Pdfium" Version="0.83.0" />
     <PackageReference Include="RailReader.Core.Analysis" Version="0.83.0" />
