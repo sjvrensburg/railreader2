@@ -216,8 +216,16 @@ public static class UpdateRelaunch
         try
         {
             RailReaderLogging.Logger.Info($"[Update] Starting {psi.FileName} {string.Join(' ', psi.ArgumentList)}");
-            if (!OperatingSystem.IsWindows()) MarkInheritedDescriptorsCloseOnExec();
-            using var _ = Process.Start(psi);
+            if (!OperatingSystem.IsWindows())
+            {
+                MarkInheritedDescriptorsCloseOnExec();
+                // Program.Main ignores SIGTERM, and an ignored signal stays ignored across exec. The relaunched
+                // AppImage's runtime stops its FUSE helper by sending it SIGTERM once the app exits; inheriting
+                // SIG_IGN, the helper (libfuse keeps an ignored disposition) never stopped and its mount stayed.
+                // This process is exiting, so restoring the default costs nothing.
+                _ = signal(15 /* SIGTERM */, IntPtr.Zero /* SIG_DFL */);
+            }
+            using var process = Process.Start(psi);
         }
         catch (Exception ex)
         {
@@ -249,4 +257,7 @@ public static class UpdateRelaunch
 
     [System.Runtime.InteropServices.DllImport("libc", SetLastError = true)]
     private static extern int fcntl(int fd, int cmd, int arg);
+
+    [System.Runtime.InteropServices.DllImport("libc", SetLastError = true)]
+    private static extern IntPtr signal(int signum, IntPtr handler);
 }
