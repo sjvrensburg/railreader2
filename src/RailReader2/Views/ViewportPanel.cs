@@ -769,8 +769,9 @@ public class ViewportPanel : Panel
     /// <summary>Double-click target: smoothly zoom into rail mode at the point under
     /// <paramref name="screenPos"/> of the detected block there (a centred frame for non-navigable figures/tables — the
     /// fallback in <c>SmoothlyFrameBlock</c>). The mouse-driven way to zoom onto a specific block,
-    /// which has no keyboard equivalent. Returns false (so the normal click handler runs) when no
-    /// block is there.</summary>
+    /// which has no keyboard equivalent. While the rail is already drawing, a double-click on a
+    /// navigable block is swallowed without changing the zoom (the first click seated the rail).
+    /// Returns false (so the normal click handler runs) when no block is there.</summary>
     private bool TryFrameBlockAt(Point screenPos)
     {
         if (ViewModel is not { } vm) return false;
