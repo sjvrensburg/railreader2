@@ -33,7 +33,17 @@ public sealed class ReadingLinePicker : RangeBase
     private static readonly IBrush s_textBrush = new SolidColorBrush(Color.FromRgb(0x70, 0x70, 0x70));
     private static readonly IBrush s_dimBrush = new SolidColorBrush(Color.FromArgb(0x70, 0x30, 0x30, 0x30));
 
+    private static readonly IPen s_tickHaloPen = new Pen(Brushes.White, 3);
+    private static readonly IPen s_tickPen = new Pen(s_textBrush, 1.5);
+    private static readonly IPen s_gripOutlinePen = new Pen(Brushes.White, 1.5);
+    private static readonly IPen s_framePen = new Pen(s_textBrush, 1);
+
     private bool _dragging;
+
+    // Accent-coloured brushes and pens, rebuilt only when the accent changes (theme switch), not per frame.
+    private Color _cachedAccent;
+    private IBrush? _accentBrush, _bandBrush;
+    private IPen? _accentPen, _focusPen;
 
     static ReadingLinePicker()
     {
@@ -69,12 +79,23 @@ public sealed class ReadingLinePicker : RangeBase
 
     private double LineY => Math.Clamp(Value, 0, 1) * Bounds.Height;
 
+    private void EnsureAccentResources()
+    {
+        var accent = Accent;
+        if (_accentBrush is not null && accent == _cachedAccent) return;
+        _cachedAccent = accent;
+        _accentBrush = new SolidColorBrush(accent);
+        _bandBrush = new SolidColorBrush(accent, 0.18);
+        _accentPen = new Pen(_accentBrush, 1.5);
+        _focusPen = new Pen(_accentBrush, 2);
+    }
+
     public override void Render(DrawingContext context)
     {
         var bounds = new Rect(Bounds.Size);
         if (bounds.Width <= 0 || bounds.Height <= 0) return;
-        var accent = Accent;
-        var accentPen = new Pen(new SolidColorBrush(accent), 1.5);
+        EnsureAccentResources();
+        var accentPen = _accentPen!;
 
         // The window, showing a page at rail zoom: the page fills the width, with lines of text.
         context.DrawRectangle(s_pageBrush, null, bounds, 4, 4);
@@ -93,26 +114,24 @@ public sealed class ReadingLinePicker : RangeBase
         var band = new Rect(0, lineY - BandHeight / 2, bounds.Width, BandHeight);
         context.DrawRectangle(s_dimBrush, null, new Rect(0, 0, bounds.Width, Math.Max(0, band.Top)));
         context.DrawRectangle(s_dimBrush, null, new Rect(0, band.Bottom, bounds.Width, Math.Max(0, bounds.Height - band.Bottom)));
-        context.DrawRectangle(new SolidColorBrush(accent, 0.18), null, band);
+        context.DrawRectangle(_bandBrush, null, band);
         context.DrawLine(accentPen, band.TopLeft, band.TopRight);
         context.DrawLine(accentPen, band.BottomLeft, band.BottomRight);
 
         // A tick on the left edge marks the middle (the default).
         double midY = Centre * bounds.Height;
-        context.DrawLine(new Pen(Brushes.White, 3), new Point(0, midY), new Point(6, midY));
-        context.DrawLine(new Pen(s_textBrush, 1.5), new Point(0, midY), new Point(6, midY));
+        context.DrawLine(s_tickHaloPen, new Point(0, midY), new Point(6, midY));
+        context.DrawLine(s_tickPen, new Point(0, midY), new Point(6, midY));
 
         // A grip on the right says "drag me up or down".
         var grip = new Rect(bounds.Width - 26, lineY - 9, 20, 18);
-        context.DrawRectangle(new SolidColorBrush(accent), new Pen(Brushes.White, 1.5), grip, 4, 4);
+        context.DrawRectangle(_accentBrush, s_gripOutlinePen, grip, 4, 4);
         double cx = grip.Center.X;
         DrawTriangle(context, Brushes.White, cx, grip.Top + 3, grip.Top + 7.5);      // up
         DrawTriangle(context, Brushes.White, cx, grip.Bottom - 3, grip.Bottom - 7.5); // down
 
         // Frame; the accent, thicker, while the control has keyboard focus.
-        var framePen = IsFocused
-            ? new Pen(new SolidColorBrush(accent), 2)
-            : new Pen(s_textBrush, 1);
+        var framePen = IsFocused ? _focusPen! : s_framePen;
         context.DrawRectangle(null, framePen, bounds.Deflate(framePen.Thickness / 2), 4, 4);
     }
 

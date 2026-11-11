@@ -749,6 +749,7 @@ public partial class SettingsWindow : Window
         if (_sliderPersistTimer is { IsEnabled: true })
         {
             _sliderPersistTimer.Stop();
+            _readingLinePending = false;
             if (Vm is { } vm) vm.OnConfigChanged();
         }
         // Closing with the name box still focused may not raise its LostFocus first.
@@ -990,14 +991,23 @@ public partial class SettingsWindow : Window
     }
 
     private DispatcherTimer? _sliderPersistTimer;
+    private bool _readingLinePending;
 
     private void OnSliderChanged(Avalonia.AvaloniaPropertyChangedEventArgs e, Action<AppConfig> apply)
     {
         if (e.Property.Name != "Value" || Vm is not { } vm || _loading) return;
         apply(vm.AppConfig);
         // Live-apply and repaint on every tick (cheap), but debounce the heavy OnConfigChanged
-        // (config file save + broadcast invalidation) until the drag settles.
-        vm.OnSettingsSliderPreview();
+        // (config file save + broadcast invalidation) until the drag settles. A reading-line change
+        // still waiting on the debounce must go through OnConfigChanged first: the preview would hand
+        // Core the new line without re-seating, and the debounced OnConfigChanged would then see no change.
+        if (_readingLinePending)
+        {
+            _readingLinePending = false;
+            vm.OnConfigChanged();
+        }
+        else
+            vm.OnSettingsSliderPreview();
         RestartSliderPersistTimer();
     }
 
@@ -1021,6 +1031,7 @@ public partial class SettingsWindow : Window
         if (e.Property.Name != "Value" || Vm is not { } vm || _loading) return;
         vm.AppConfig.RailReadingLineFraction = ReadingLinePicker.Value;
         UpdateReadingLineReadout();
+        _readingLinePending = true;
         RestartSliderPersistTimer();
     }
 
@@ -1035,6 +1046,7 @@ public partial class SettingsWindow : Window
     private void OnSliderPersistTick(object? sender, EventArgs e)
     {
         _sliderPersistTimer?.Stop();
+        _readingLinePending = false;
         if (Vm is { } vm) vm.OnConfigChanged();
     }
 
