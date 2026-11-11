@@ -447,7 +447,8 @@ public class ViewportPanel : Panel
             }
             else if (isClick && _pressClickCount >= 2 && TryFrameBlockAt(pos))
             {
-                // Double-click on a detected block → smooth zoom into rail mode at the clicked point.
+                // Double-click on a detected block → smooth zoom into rail mode at the clicked point
+                // (already in rail mode: no zoom change — see TryFrameBlockAt).
             }
             else if (isClick)
             {
@@ -778,6 +779,14 @@ public class ViewportPanel : Panel
         var (pageX, pageY) = DoubleClickPagePoint(screenPos);
         int index = vm.FindBlockIndexAt(pageX, pageY);
         if (index < 0) return false;
+        // Already reading on the rail (at any zoom, incl. a "start rail here" below the threshold):
+        // a double-click on text must not change the magnification. The first click has already
+        // seated the rail on the clicked block/line (Core's HandleClick), so nothing more is needed —
+        // swallow the second click rather than let it fall through to HandleClick, whose fresh
+        // hit-test would land elsewhere now the camera has snapped. A figure/table (which the rail
+        // can't seat) still gets the centred fit-to-block framing below.
+        if (ActiveViewport is { Rail.VisualsVisible: true } && vm.IsNavigableBlock(index))
+            return true;
         // A gentler ease than the native 180ms zoom — a double-click is a deliberate framing
         // gesture, so it reads as intentional rather than a snap.
         // The clicked line, and on a line wider than the window the clicked x stays in view rather than
