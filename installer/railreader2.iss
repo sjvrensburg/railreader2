@@ -1,5 +1,11 @@
 #define MyAppName "railreader2"
-#define MyAppVersion GetEnv('APP_VERSION')
+; CI passes the version as /DAPP_VERSION=<tag> (a preprocessor define); an APP_VERSION environment
+; variable also works. GetEnv alone ignored the /D define, so installers were stamped with the fallback.
+#ifdef APP_VERSION
+  #define MyAppVersion APP_VERSION
+#else
+  #define MyAppVersion GetEnv('APP_VERSION')
+#endif
 #if MyAppVersion == ""
   #define MyAppVersion "2.0.0"
 #endif
@@ -60,7 +66,7 @@ Root: HKA; Subkey: "Software\Classes\RailReader2.Package\shell\open\command"; Va
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
-; In-app update (Services/Updates/UpdateInstaller.cs): the app runs this installer silently after it exits,
+; In-app update (src/RailReader2.Shared/Updates/UpdateInstaller.cs): the app runs this installer silently after it exits,
 ; with /RELAUNCH=1 when the reader chose "Restart and Install". runasoriginaluser: an all-users install
 ; is elevated, but the reopened app must not be.
 Filename: "{app}\{#MyAppExeName}"; Flags: nowait runasoriginaluser; Check: ShouldRelaunch

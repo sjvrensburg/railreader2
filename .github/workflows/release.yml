@@ -132,7 +132,7 @@ jobs:
           mkdir -p publish/models
           cp models/$MODEL_NAME publish/models/
           chmod +x publish/RailReader2
-          # Tells the app it was installed from the tarball (Services/Updates/UpdateChannel.cs):
+          # Tells the app it was installed from the tarball (src/RailReader2.Shared/Updates/UpdateChannel.cs):
           # it can't replace itself, so update checks point at the release page.
           echo tarball > publish/install-kind
           mv publish railreader2-linux-x64
@@ -320,7 +320,7 @@ jobs:
           path: src
           sparse-checkout: |
             scripts
-            src/RailReader2/Services/Updates
+            src/RailReader2.Shared/Updates
 
       - name: Download all artifacts
         uses: actions/download-artifact@v8
@@ -340,7 +340,7 @@ jobs:
           printf '%s\n' "$UPDATE_SIGNING_KEY" > "$RUNNER_TEMP/update-key.pem"
           openssl dgst -sha256 -sign "$RUNNER_TEMP/update-key.pem" -out update-manifest.json.sig update-manifest.json
           rm -f "$RUNNER_TEMP/update-key.pem"
-          openssl dgst -sha256 -verify src/src/RailReader2/Services/Updates/update-signing-key.pub.pem \
+          openssl dgst -sha256 -verify src/src/RailReader2.Shared/Updates/update-signing-key.pub.pem \
             -signature update-manifest.json.sig update-manifest.json
           cat update-manifest.json
 

@@ -816,6 +816,20 @@ railreader2-cli unpack <package> [options]
 | `--password <pwd>` | `package`: password of an encrypted PDF, to read its annotations |
 | `--output-dir <dir>` | `unpack`: where to extract (default: a folder named after the package) |
 
+### update — check for a new release
+
+`update check` asks GitHub for the latest release, verifies its signed release information, and lists the files it offers. Its exit code is 0 when you're up to date, 2 when a newer version exists and 1 on an error, so scripts can act on it. `update download` also fetches one file and checks its size and checksum against the signed information. Neither installs anything: the RailReader2 app updates its own installation (see [Updates](#updates)).
+
+```
+railreader2-cli update check
+railreader2-cli update download --channel appimage --output-dir ~/Downloads
+```
+
+| Option | Description |
+|--------|-------------|
+| `--channel <name>` | `download`: `appimage`, `inno` (the Windows installer) or `tarball` |
+| `--output-dir <dir>` | `download`: where to save the file (default: the current folder) |
+
 ---
 
 ## Settings

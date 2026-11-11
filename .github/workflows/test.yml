@@ -47,3 +47,17 @@ jobs:
 
       - name: Test
         run: dotnet test RailReader2.slnx -c Release --no-build --verbosity normal
+
+  # The Inno installer is otherwise only compiled by release.yml. This compiles it and runs the silent
+  # in-app update the way the app does (wait for the app's PID, upgrade in place, relaunch) on real Windows.
+  installer:
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Inno Setup
+        run: choco install innosetup -y --no-progress
+
+      - name: Silent update test
+        shell: pwsh
+        run: ./installer/test-silent-update.ps1

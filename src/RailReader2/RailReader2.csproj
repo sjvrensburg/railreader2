@@ -29,14 +29,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Public half of the ECDSA P-256 key that signs update-manifest.json (scripts/generate-update-signing-key.sh
-         writes it; the private half is the UPDATE_SIGNING_KEY Actions secret). A build without it can't verify
-         updates and says so in Help ▸ Check for Updates. -->
-    <EmbeddedResource Include="Services/Updates/update-signing-key.pub.pem" LogicalName="RailReader2.UpdateSigningKey.pem"
-                      Condition="Exists('Services/Updates/update-signing-key.pub.pem')" />
-  </ItemGroup>
-
-  <ItemGroup>
     <!-- Lets the test project exercise internal shell helpers (e.g. SpellCheckService). -->
     <InternalsVisibleTo Include="RailReader.Export.Tests" />
   </ItemGroup>

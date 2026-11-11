@@ -1,13 +1,20 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!-- Shell services the app and the CLI both need (the OCR text-layer job, portals, view rotation,
-       the reading package). Core-only, no Avalonia.
+       the reading package, in-app update checking/verification). Core-only, no Avalonia.
        Document identity and the JSON sidecar helper now live in RailReader.Core.Pdfium. -->
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <IsAotCompatible>true</IsAotCompatible>
+    <!-- The app's version (its csproj is the single source of truth): Updates/UpdateVersion reports it. -->
+    <Version>$([System.Text.RegularExpressions.Regex]::Match($([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)../RailReader2/RailReader2.csproj')), '&lt;Version&gt;([^&lt;]+)&lt;/Version&gt;').Groups[1].Value)</Version>
   </PropertyGroup>
+  <ItemGroup>
+    <!-- Public half of the ECDSA P-256 key that signs update-manifest.json (scripts/generate-update-signing-key.sh
+         writes it; the private half is the UPDATE_SIGNING_KEY Actions secret). -->
+    <EmbeddedResource Include="Updates/update-signing-key.pub.pem" LogicalName="RailReader2.UpdateSigningKey.pem" />
+  </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="RailReader2" />
     <InternalsVisibleTo Include="RailReader2.Cli" />

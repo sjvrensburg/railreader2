@@ -55,8 +55,9 @@ public static class UpdateInstaller
                 }
                 try
                 {
-                    File.SetUnixFileMode(part, File.GetUnixFileMode(target) | UnixFileMode.UserExecute
-                        | UnixFileMode.UserRead | UnixFileMode.UserWrite);
+                    if (!OperatingSystem.IsWindows()) // AppImage is Linux-only
+                        File.SetUnixFileMode(part, File.GetUnixFileMode(target) | UnixFileMode.UserExecute
+                            | UnixFileMode.UserRead | UnixFileMode.UserWrite);
                     // The running instance keeps its open (now unlinked) file; the next launch gets the new one.
                     File.Move(part, target, overwrite: true);
                 }

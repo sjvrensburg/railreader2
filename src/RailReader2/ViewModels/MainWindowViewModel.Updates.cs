@@ -7,7 +7,7 @@ namespace RailReader2.ViewModels;
 // one-time prompt (the privacy page promises no network requests by default), and never for the Store build
 // (Store policy) or a dev build. Help ▸ Check for Updates… works on every channel. Installing in place is
 // AppImage (replace own file) and Inno (silent reinstall after exit) only; the tarball and dev builds get the
-// release page, the Store build the Store page. Mechanics: Services/Updates/.
+// release page, the Store build the Store page. Mechanics: src/RailReader2.Shared/Updates/.
 public partial class MainWindowViewModel
 {
     internal const string StoreProductUri = "ms-windows-store://pdp/?ProductId=9P9J8KZ6RVZP";

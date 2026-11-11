@@ -35,13 +35,16 @@ public static class UpdateFeed
 
     internal static HttpClient Client => Http;
 
-    public static async Task<UpdateCheckResult> CheckAsync(CancellationToken ct)
+    /// <param name="feed">URL prefix or local directory holding the manifest; default <c>RR_UPDATE_FEED</c>,
+    /// else the latest GitHub release.</param>
+    /// <param name="publicKeyPem">Key to verify against; default <c>RR_UPDATE_PUBLIC_KEY_FILE</c>, else the built-in one.</param>
+    public static async Task<UpdateCheckResult> CheckAsync(CancellationToken ct, string? feed = null, string? publicKeyPem = null)
     {
         try
         {
-            var feed = Environment.GetEnvironmentVariable("RR_UPDATE_FEED") is { Length: > 0 } f ? f : DefaultFeed;
+            feed ??= Environment.GetEnvironmentVariable("RR_UPDATE_FEED") is { Length: > 0 } f ? f : DefaultFeed;
             var (manifestBytes, signature) = await FetchAsync(feed, ct);
-            var manifest = UpdateManifestReader.ReadVerified(manifestBytes, signature, PublicKeyPem());
+            var manifest = UpdateManifestReader.ReadVerified(manifestBytes, signature, publicKeyPem ?? PublicKeyPem());
             RailReaderLogging.Logger.Info($"[Update] Latest release {manifest.Version}, this build {UpdateVersion.Current}");
             if (manifest.FormatVersion > UpdateManifest.SupportedFormat)
                 return new(UpdateCheckStatus.Available, manifest,
@@ -56,7 +59,13 @@ public static class UpdateFeed
             RailReaderLogging.Logger.Warn($"[Update] Verification failed: {ex.Message}");
             return UpdateCheckResult.Fail(ex.Message);
         }
-        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException)
+        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            RailReaderLogging.Logger.Warn($"[Update] No update information at the feed: {ex.Message}");
+            return UpdateCheckResult.Fail("The latest release has no update information. Check the release page instead.");
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException
+                                       or UnauthorizedAccessException)
         {
             RailReaderLogging.Logger.Warn($"[Update] Check failed: {ex.Message}");
             return UpdateCheckResult.Fail("Couldn't reach GitHub. Check your connection and try again.");

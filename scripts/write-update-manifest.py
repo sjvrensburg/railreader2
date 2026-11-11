@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Write update-manifest.json for a release (read by src/RailReader2/Services/Updates).
+"""Write update-manifest.json for a release (read by src/RailReader2.Shared/Updates).
 
 Usage: write-update-manifest.py <tag> <assets-dir> <output>
 
