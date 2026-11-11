@@ -778,7 +778,9 @@ public class ViewportPanel : Panel
         // Release-time hit-test for the SAME press/release gesture ScreenToPage pinned at press —
         // stay on that page rather than re-resolving (and potentially re-anchoring) at release.
         var (pageX, pageY) = DoubleClickPagePoint(screenPos);
-        if (vm.FindBlockAt(pageX, pageY) is not { } hit) return false;
+        // Prefer a text block over a figure/table whose box overlaps it: in rail mode the first click
+        // seated the rail on that text, and framing the figure instead would zoom (see below).
+        if (vm.FindBlockAt(pageX, pageY, preferNavigable: true) is not { } hit) return false;
         var (index, block) = hit;
         // Already reading on the rail (at any zoom, incl. a "start rail here" below the threshold):
         // a double-click on text must not change the magnification. The first click has already

@@ -54,21 +54,27 @@ public sealed partial class MainWindowViewModel
 
     /// <summary>The detected block at the given page-space point on the focused view's page, or null
     /// when there is none (or no analysis). One analysis lookup gives both the block and its index,
-    /// so callers needing either or both hit-test once.</summary>
-    public BlockHit? FindBlockAt(double pageX, double pageY)
+    /// so callers needing either or both hit-test once. Where block boxes overlap, the first in
+    /// analysis order wins — unless <paramref name="preferNavigable"/> is set, in which case the first
+    /// navigable block (one the rail can seat — what Core's own click seating picks from) under the
+    /// point wins over a figure/table whose box also covers it.</summary>
+    public BlockHit? FindBlockAt(double pageX, double pageY, bool preferNavigable = false)
     {
         var vp = _controller.FocusedViewport;
         if (vp is null || !vp.Owner.TryGetAnalysis(vp.CurrentPage, vp.AnalysisParams, out var analysis))
             return null;
 
+        BlockHit? first = null;
         for (int i = 0; i < analysis.Blocks.Count; i++)
         {
             var b = analysis.Blocks[i];
-            if (pageX >= b.BBox.X && pageX <= b.BBox.X + b.BBox.W
-                && pageY >= b.BBox.Y && pageY <= b.BBox.Y + b.BBox.H)
-                return new BlockHit(i, b);
+            if (pageX < b.BBox.X || pageX > b.BBox.X + b.BBox.W
+                || pageY < b.BBox.Y || pageY > b.BBox.Y + b.BBox.H)
+                continue;
+            if (!preferNavigable || IsNavigableBlock(b)) return new BlockHit(i, b);
+            first ??= new BlockHit(i, b);
         }
-        return null;
+        return first;
     }
 
     /// <summary>True when <paramref name="block"/> has a navigable role — one the rail can seat
