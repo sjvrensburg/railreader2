@@ -804,7 +804,7 @@ public class ViewportPanel : Panel
         // The clicked line, and on a line wider than the window the clicked x stays in view rather than
         // the landing snapping back to the line start.
         return vm.SmoothlyFrameBlock(index, durationMs: FrameZoomDurationMs,
-            line: MainWindowViewModel.FindNearestLineIndex(block, pageY), focusPageX: pageX);
+            line: RailReader.Core.Services.RailNav.FindNearestLine(block, pageY), focusPageX: pageX);
     }
 
     /// <summary>Resolves a screen point to page-local coordinates for an actual interaction dispatch

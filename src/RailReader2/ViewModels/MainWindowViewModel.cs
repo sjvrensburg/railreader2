@@ -1382,7 +1382,20 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         ConfigChanged?.Invoke();
     }
 
-    public void OnSliderChanged() => _controller.OnSliderChanged(_appConfig.ToCoreSettings());
+    /// <summary>Hands Core a live slider value without <see cref="OnConfigChanged"/>'s save and broadcast.
+    /// Core's <c>OnSliderChanged</c> stores the settings without re-seating the rail, so when the
+    /// reading line (<see cref="CoreSettings.RailReadingLineFraction"/>) has changed since Core last saw
+    /// it — the reading-line picker is still waiting on its debounce — this goes through
+    /// <see cref="OnConfigChanged"/> instead; otherwise the later debounced <c>OnConfigChanged</c> would
+    /// see no change and the line would never move.</summary>
+    public void OnSliderChanged()
+    {
+        var settings = _appConfig.ToCoreSettings();
+        if (settings.RailReadingLineFraction != _controller.Config.RailReadingLineFraction)
+            OnConfigChanged();
+        else
+            _controller.OnSliderChanged(settings);
+    }
 
     /// <summary>Live preview for a Settings slider drag: applies the value to Core and repaints the
     /// page/overlay layers that read it (line-focus dim, line padding, highlight opacity), without

@@ -2,6 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:RailReader2.ViewModels"
         xmlns:v="using:RailReader2.Views"
+        xmlns:c="using:RailReader2.Controls"
         x:Class="RailReader2.Views.SettingsWindow"
         x:DataType="vm:MainWindowViewModel"
         Title="Settings"
@@ -82,6 +83,20 @@
                                            FormatString="F1" Width="130"
                                            ValueChanged="OnSettingChanged" />
                             <TextBlock Text="× zoom" VerticalAlignment="Center" />
+                        </StackPanel>
+                        <StackPanel Spacing="6" Margin="0,8,0,0">
+                            <TextBlock Text="Where the rail places the line you're reading:" />
+                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                <c:ReadingLinePicker Name="ReadingLinePicker" Width="200" Height="130"
+                                                     AutomationProperties.Name="Reading line height"
+                                                     ToolTip.Tip="Drag the line up or down. Double-click to put it back in the middle."
+                                                     PropertyChanged="OnReadingLineChanged" />
+                                <StackPanel Spacing="4" VerticalAlignment="Center" MaxWidth="220">
+                                    <TextBlock Name="ReadingLineReadout" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                    <TextBlock Classes="hint" TextWrapping="Wrap"
+                                               Text="Drag the line, or use the arrow keys. Dragging the page while reading still moves it for that page." />
+                                </StackPanel>
+                            </StackPanel>
                         </StackPanel>
 
                         <TextBlock Classes="section" Text="Reading Pace" />

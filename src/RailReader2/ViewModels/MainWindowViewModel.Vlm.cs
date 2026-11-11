@@ -83,22 +83,6 @@ public sealed partial class MainWindowViewModel
     public bool IsNavigableBlock(LayoutBlock block)
         => _controller.Config.NavigableRoles.Contains(block.Role);
 
-    /// <summary>Index of the line of <paramref name="block"/> whose centre is nearest
-    /// <paramref name="pageY"/> — the <c>line</c> <see cref="SmoothlyFrameBlock"/> takes — or 0 when
-    /// the block has no lines. Mirrors Core's rail click seating (<c>RailNav.FindNearestLine</c>).</summary>
-    public static int FindNearestLineIndex(LayoutBlock block, double pageY)
-    {
-        var lines = block.Lines;
-        int best = 0;
-        double bestDist = double.MaxValue;
-        for (int i = 0; i < lines.Count; i++)
-        {
-            double d = Math.Abs(lines[i].Y - pageY); // LineInfo.Y is the line centre
-            if (d < bestDist) { bestDist = d; best = i; }
-        }
-        return best;
-    }
-
     public async Task CopyBlockWithAction(LayoutBlock block, BlockAction action)
     {
         var doc = _controller.FocusedViewport?.Owner;

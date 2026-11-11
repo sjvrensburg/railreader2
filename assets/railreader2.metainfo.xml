@@ -103,6 +103,9 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="3.86.0.0" date="2026-11-11">
+      <description><p>You can now choose where the rail places the line you're reading: Settings, Reading shows a small picture of the window, and you drag its line up or down. Each new page starts with the line at that height. You can also drag a page a little past its top or bottom edge, so a toolbar no longer hides the top of the page and the line can sit above the middle even at the bottom of a page. In rail mode a double-click on text moves the rail there without changing the zoom, and a double-click on a figure or table centres it and zooms to fit. In full screen, Escape now leaves annotation mode first and full screen only on a second press.</p></description>
+    </release>
     <release version="3.85.0.0" date="2026-11-11">
       <description><p>RailReader2 can now update itself. On its first start it asks whether to check for a new version once a day; until you agree it makes no network requests. Help, Check for Updates works at any time. The AppImage replaces itself and restarts on the document you were reading; the Windows installer installs the update silently when RailReader2 closes. Every update is checked against a signed release description before anything is installed. The command-line tool gains an update command that checks for, and downloads, a new release. Closing RailReader2 while it is still analysing pages no longer crashes it. A PDF path with spaces now opens from the command line even when it isn't quoted, and the Windows installer records its real version.</p></description>
     </release>
