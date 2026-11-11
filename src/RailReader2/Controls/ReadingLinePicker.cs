@@ -138,15 +138,25 @@ public sealed class ReadingLinePicker : RangeBase
     /// <summary>A small isosceles triangle with its tip at <paramref name="tipY"/> and its base at <paramref name="baseY"/>.</summary>
     private static void DrawTriangle(DrawingContext context, IBrush brush, double cx, double tipY, double baseY)
     {
+        // One shared unit triangle (tip at the origin, base 1 below), placed with a transform so a
+        // drag doesn't allocate two geometries per frame.
+        using (context.PushTransform(Matrix.CreateScale(1, baseY - tipY) * Matrix.CreateTranslation(cx, tipY)))
+            context.DrawGeometry(brush, null, s_unitTriangle);
+    }
+
+    private static readonly StreamGeometry s_unitTriangle = CreateUnitTriangle();
+
+    private static StreamGeometry CreateUnitTriangle()
+    {
         var g = new StreamGeometry();
         using (var ctx = g.Open())
         {
-            ctx.BeginFigure(new Point(cx, tipY), true);
-            ctx.LineTo(new Point(cx + 4, baseY));
-            ctx.LineTo(new Point(cx - 4, baseY));
+            ctx.BeginFigure(new Point(0, 0), true);
+            ctx.LineTo(new Point(4, 1));
+            ctx.LineTo(new Point(-4, 1));
             ctx.EndFigure(true);
         }
-        context.DrawGeometry(brush, null, g);
+        return g;
     }
 
     private void SetFromPointer(Point p)

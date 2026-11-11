@@ -749,7 +749,6 @@ public partial class SettingsWindow : Window
         if (_sliderPersistTimer is { IsEnabled: true })
         {
             _sliderPersistTimer.Stop();
-            _readingLinePending = false;
             if (Vm is { } vm) vm.OnConfigChanged();
         }
         // Closing with the name box still focused may not raise its LostFocus first.
@@ -991,23 +990,15 @@ public partial class SettingsWindow : Window
     }
 
     private DispatcherTimer? _sliderPersistTimer;
-    private bool _readingLinePending;
 
     private void OnSliderChanged(Avalonia.AvaloniaPropertyChangedEventArgs e, Action<AppConfig> apply)
     {
         if (e.Property.Name != "Value" || Vm is not { } vm || _loading) return;
         apply(vm.AppConfig);
         // Live-apply and repaint on every tick (cheap), but debounce the heavy OnConfigChanged
-        // (config file save + broadcast invalidation) until the drag settles. A reading-line change
-        // still waiting on the debounce must go through OnConfigChanged first: the preview would hand
-        // Core the new line without re-seating, and the debounced OnConfigChanged would then see no change.
-        if (_readingLinePending)
-        {
-            _readingLinePending = false;
-            vm.OnConfigChanged();
-        }
-        else
-            vm.OnSettingsSliderPreview();
+        // (config file save + broadcast invalidation) until the drag settles. (A reading-line change
+        // still waiting on the debounce is re-seated by the VM's OnSliderChanged.)
+        vm.OnSettingsSliderPreview();
         RestartSliderPersistTimer();
     }
 
@@ -1023,15 +1014,14 @@ public partial class SettingsWindow : Window
     }
 
     /// <summary>The rail reading line (Core #200). Unlike the sliders this skips the live
-    /// preview: Core's <c>OnSliderChanged</c> stores the new settings without re-snapping, so the
-    /// debounced <c>OnConfigChanged</c> would then see no change and never move the line. Going
-    /// straight to the debounced <c>OnConfigChanged</c> re-seats every active rail once the drag settles.</summary>
+    /// preview: Core's <c>OnSliderChanged</c> doesn't re-snap, so the VM routes a reading-line change
+    /// through the full <c>OnConfigChanged</c> (save + re-seat), which is too heavy per drag tick.
+    /// The debounced <c>OnConfigChanged</c> re-seats every active rail once the drag settles.</summary>
     private void OnReadingLineChanged(object? sender, Avalonia.AvaloniaPropertyChangedEventArgs e)
     {
         if (e.Property.Name != "Value" || Vm is not { } vm || _loading) return;
         vm.AppConfig.RailReadingLineFraction = ReadingLinePicker.Value;
         UpdateReadingLineReadout();
-        _readingLinePending = true;
         RestartSliderPersistTimer();
     }
 
@@ -1046,7 +1036,6 @@ public partial class SettingsWindow : Window
     private void OnSliderPersistTick(object? sender, EventArgs e)
     {
         _sliderPersistTimer?.Stop();
-        _readingLinePending = false;
         if (Vm is { } vm) vm.OnConfigChanged();
     }
 
