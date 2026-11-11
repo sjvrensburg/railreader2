@@ -1,0 +1,27 @@
+{
+  "format_version": 1,
+  "version": "99.0.0.0",
+  "tag": "v99.0.0.0",
+  "release_url": "https://github.com/sjvrensburg/railreader2/releases/tag/v99.0.0.0",
+  "published_utc": "2026-11-10T11:25:23Z",
+  "assets": {
+    "appimage": {
+      "name": "railreader2-x86_64.AppImage",
+      "url": "https://github.com/sjvrensburg/railreader2/releases/download/v99.0.0.0/railreader2-x86_64.AppImage",
+      "size": 41,
+      "sha256": "1ea003ca35f1471f3a14f4fbcf70dc9459d6c8aa978a6e332c4475c6a380494d"
+    },
+    "inno": {
+      "name": "railreader2-setup-x64.exe",
+      "url": "https://github.com/sjvrensburg/railreader2/releases/download/v99.0.0.0/railreader2-setup-x64.exe",
+      "size": 39,
+      "sha256": "fd6c7fd45d6c59904f83ddab7cc3f622a0ac2eb15475e0c8165d44e4e55d93d8"
+    },
+    "tarball": {
+      "name": "railreader2-linux-x64.tar.gz",
+      "url": "https://github.com/sjvrensburg/railreader2/releases/download/v99.0.0.0/railreader2-linux-x64.tar.gz",
+      "size": 42,
+      "sha256": "ff96672fd762b79b31177796f3159b2bc825e4bdc23e1f45ba519aea0acd55b6"
+    }
+  }
+}

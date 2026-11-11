@@ -19,6 +19,7 @@ internal sealed class Program
     [STAThread]
     public static void Main(string[] args)
     {
+        // Inherited by anything this process starts: UpdateRelaunch restores the default before relaunching.
         if (!OperatingSystem.IsWindows())
             signal(15 /* SIGTERM */, new IntPtr(1) /* SIG_IGN */);
 
@@ -53,6 +54,8 @@ internal sealed class Program
         {
             BuildAvaloniaApp()
                 .StartWithClassicDesktopLifetime(args);
+            // After a normal shutdown, so the saves are done before the new version starts.
+            Services.Updates.UpdateRelaunch.RunPending();
         }
         catch (Exception ex)
         {

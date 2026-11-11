@@ -36,6 +36,7 @@ static class Program
                 "ocr" => Commands.OcrCommand.Execute(args[1..], factory, logger),
                 "package" => Commands.PackageCommand.Execute(args[1..], factory, logger),
                 "unpack" => Commands.UnpackCommand.Execute(args[1..], factory, logger),
+                "update" => Commands.UpdateCommand.Execute(args[1..], logger),
                 _ => Fail($"Unknown command: '{args[0]}'. Run with --help for usage.")
             };
         }
@@ -61,6 +62,7 @@ static class Program
         Console.WriteLine("  ocr <pdf>             Add an invisible OCR text layer to a copy of a scanned PDF");
         Console.WriteLine("  package <pdf>         Bundle a PDF and its reading session into a .railreading file");
         Console.WriteLine("  unpack <package>      Extract a .railreading package");
+        Console.WriteLine("  update check|download Check for, or download and verify, a new RailReader2 release");
         Console.WriteLine();
         Console.WriteLine("Run 'railreader2-cli <command> --help' for command-specific options.");
         return 0;
@@ -105,6 +107,7 @@ static class Program
         "figure-endpoint", "figure-model", "figure-api-key",
         "prompt-style", "dump-crops", "min-confidence", "from-structure",
         "ground-truth", "layout", "min-precision", "classes", "pack",
+        "feed", "public-key", "channel",
     ];
 
     internal static string GetRequiredPdf(string[] args, string kind = "PDF")

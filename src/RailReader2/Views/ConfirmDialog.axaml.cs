@@ -8,13 +8,14 @@ namespace RailReader2.Views;
 /// can only confirm when the user has explicitly tabbed to the confirm button.</summary>
 public partial class ConfirmDialog : Window
 {
-    public ConfirmDialog(string title, string message, string confirmText)
+    public ConfirmDialog(string title, string message, string confirmText, string cancelText = "Cancel")
     {
         InitializeComponent();
         DialogStacking.KeepAboveFullscreenOwner(this);
         Title = title;
         MessageText.Text = message;
         ConfirmButton.Content = confirmText;
+        CancelButton.Content = cancelText;
         DialogKeyboard.EnableEscEnterClose(this, cancelResult: false, confirmResult: null);
         DialogKeyboard.FocusOnOpen(this, CancelButton);
     }

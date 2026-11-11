@@ -839,6 +839,7 @@ public partial class SettingsWindow : Window
     {
         var p = vm.ReadingGuidePrefs;
         ExperimentalCheck.IsChecked = vm.ExperimentalFeaturesEnabled;
+        LoadUpdateSettings(vm);
         GuideSection.IsVisible = vm.ExperimentalFeaturesEnabled;
         GuideFollowCombo.SelectedIndex = p.Follow switch
         {
@@ -851,6 +852,33 @@ public partial class SettingsWindow : Window
         GuideSteerSensitivitySlider.Value = p.SteerSensitivity;
         GuideParkCheck.IsChecked = p.ParkAtNewLine;
     }
+
+    private void LoadUpdateSettings(MainWindowViewModel vm)
+    {
+        var kind = Services.Updates.UpdateChannel.Current;
+        bool background = Services.Updates.UpdateChannel.SupportsBackgroundCheck(kind);
+        AutoUpdateCheck.IsVisible = background;
+        AutoUpdateCheck.IsChecked = background && vm.UpdatePrefs.CheckAutomatically == true;
+        UpdateChannelHint.Text = kind switch
+        {
+            Services.Updates.InstallKind.AppImage => "Updates replace this AppImage file and take effect when RailReader2 restarts.",
+            Services.Updates.InstallKind.Inno => "Updates install silently when RailReader2 closes, then reopen it.",
+            Services.Updates.InstallKind.Tarball => "This copy can't update itself: you'll be pointed to the download page.",
+            Services.Updates.InstallKind.Msix => "Updates come from the Microsoft Store.",
+            Services.Updates.InstallKind.Disabled => "Update checks are turned off for this installation.",
+            _ => "This is a development build, so it doesn't check for updates by itself.",
+        };
+        CheckUpdatesNowButton.Content = kind == Services.Updates.InstallKind.Msix ? "Open the Store" : "Check Now";
+        CheckUpdatesNowButton.IsVisible = kind != Services.Updates.InstallKind.Disabled;
+    }
+
+    private void OnAutoUpdateChanged(object? sender, RoutedEventArgs e)
+    {
+        if (Vm is not { } vm || _loading) return;
+        vm.SetCheckForUpdatesAutomatically(AutoUpdateCheck.IsChecked == true);
+    }
+
+    private void OnCheckUpdatesNow(object? sender, RoutedEventArgs e) => Vm?.CheckForUpdates();
 
     private void OnExperimentalChanged(object? sender, RoutedEventArgs e)
     {

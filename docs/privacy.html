@@ -37,7 +37,7 @@
 
   <main class="content" id="main-content">
     <h1>Privacy Policy</h1>
-    <p class="subtitle">Last updated: 10 April 2026</p>
+    <p class="subtitle">Last updated: 10 November 2026</p>
 
     <section class="guide-section">
       <h2>Summary</h2>
@@ -89,14 +89,26 @@
       <p>
         By default, railreader2 makes <strong>no network requests</strong>. PDF rendering,
         layout analysis (via the bundled ONNX model), and all other features run entirely on
-        your device. The application does not check for updates, send crash reports, or
-        communicate with any server.
+        your device. The application does not send crash reports or usage statistics.
       </p>
       <p>
-        The only network activity that can occur is when you explicitly enable and invoke the
-        optional Vision Language Model integration described below. Until you configure a VLM
-        endpoint in Settings, no network requests are made.
+        Network activity happens only in these cases, each of which you start or agree to:
       </p>
+      <ul>
+        <li><strong>Update checks.</strong> On its first start the application asks whether it
+          may check for a new version once a day. Only if you agree (or choose
+          <strong>Help &rarr; Check for Updates</strong>) does it download a small, signed
+          release description from GitHub (<code>github.com</code>), and, if you choose to
+          update, the new version itself. These requests carry nothing about you or your
+          documents beyond what any web request does (your IP address and the application
+          version). GitHub&rsquo;s own privacy policy applies to them. The Microsoft Store version
+          does not check: the Store updates it.</li>
+        <li><strong>Model and language-pack downloads.</strong> Optional layout models and OCR
+          language packs are downloaded from Hugging Face only when you press their
+          <strong>Download</strong> button in Settings.</li>
+        <li><strong>Vision Language Model integration</strong>, when you configure an endpoint and
+          use it, as described below.</li>
+      </ul>
     </section>
 
     <section class="guide-section" id="vlm">

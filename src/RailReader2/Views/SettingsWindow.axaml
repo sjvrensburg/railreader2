@@ -235,6 +235,15 @@
                             </ComboBox>
                         </Grid>
 
+                        <TextBlock Classes="section" Text="Updates" />
+                        <Separator />
+                        <CheckBox Name="AutoUpdateCheck" Content="Check for updates once a day"
+                                  ToolTip.Tip="Asks GitHub for the latest release. Nothing about you or your documents is sent."
+                                  IsCheckedChanged="OnAutoUpdateChanged" />
+                        <TextBlock Name="UpdateChannelHint" Classes="hint" TextWrapping="Wrap" />
+                        <Button Name="CheckUpdatesNowButton" Content="Check Now" HorizontalAlignment="Left"
+                                Click="OnCheckUpdatesNow" />
+
                         <StackPanel Classes="adv" Spacing="8">
                             <TextBlock Classes="section" Text="Experimental" />
                             <Separator />

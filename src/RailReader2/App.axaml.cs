@@ -23,6 +23,24 @@ public partial class App : Application
     /// Quality. Any existing config is left untouched (pre-0.24.0 configs simply fall through to Core's
     /// Quality), so an explicit selection is never clobbered. Keyed on file existence rather than the
     /// serialized field, so it can't silently re-seed if Core ever renames the persisted property.</summary>
+    /// <summary>The first non-flag argument that names an existing file. Failing that, the non-flag
+    /// arguments joined by spaces: an unquoted path with spaces ("Teaching 2026/…") reaches us split into
+    /// several arguments, none of which exists.</summary>
+    internal static string? FindStartupDocument(string[]? args)
+    {
+        if (args is null) return null;
+        var plain = args.Where(a => !a.StartsWith("--")).ToList();
+        if (plain.FirstOrDefault(File.Exists) is { } path) return path;
+        // Flag values (--page 3) are not part of a path: try each run of words between flags' values too.
+        for (int start = 0; start < plain.Count; start++)
+            for (int end = plain.Count; end > start + 1; end--)
+            {
+                var joined = string.Join(' ', plain.Skip(start).Take(end - start));
+                if (File.Exists(joined)) return joined;
+            }
+        return null;
+    }
+
     private static bool IsFirstRun()
     {
         try { return !System.IO.File.Exists(AppConfig.ConfigPath); }
@@ -106,11 +124,12 @@ public partial class App : Application
             vm.SetWindow(window);
 
             window.Opened += (_, _) => splash.Close();
+            window.Opened += (_, _) => vm.FireAndForget(vm.RunStartupUpdateCheckAsync(), nameof(vm.RunStartupUpdateCheckAsync));
             window.Closing += (_, _) => vm.Dispose();
             desktop.MainWindow = window;
 
             // First non-flag argument that names an existing file is the PDF (or reading package) to open.
-            var docPath = args?.FirstOrDefault(a => !a.StartsWith("--") && File.Exists(a));
+            var docPath = FindStartupDocument(args);
             if (docPath is not null)
             {
                 // Optional known-state startup flags (for agents / scripted launches):

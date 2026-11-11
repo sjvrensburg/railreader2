@@ -1,0 +1,2 @@
+# Signed bytes: a line-ending conversion on checkout breaks the signature.
+tests/RailReader.Export.Tests/Updates/Fixtures/** binary

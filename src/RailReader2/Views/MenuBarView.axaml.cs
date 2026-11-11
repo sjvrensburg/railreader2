@@ -150,6 +150,7 @@ public partial class MenuBarView : UserControl
     { if (Vm is { } vm) vm.ShowShortcuts = true; }
     private void OnShowAbout(object? s, RoutedEventArgs e)
     { if (Vm is { } vm) vm.ShowAbout = true; }
+    private void OnCheckForUpdates(object? s, RoutedEventArgs e) => Vm?.CheckForUpdates();
 
     // Edit menu handlers
     private void OnShowFind(object? s, RoutedEventArgs e) => Vm?.OpenSearch();
