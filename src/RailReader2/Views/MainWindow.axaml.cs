@@ -899,8 +899,6 @@ public partial class MainWindow : Window
                 vm.ArmActivateRailClick = false; e.Handled = true; return true;
             case Key.Escape when vm.AutoScrollActive:
                 vm.StopAutoScroll(); e.Handled = true; return true;
-            case Key.Escape when vm.IsFullScreen:
-                vm.IsFullScreen = false; e.Handled = true; return true;
             case Key.Escape when vm.IsReadingGuideMode:
                 vm.IsReadingGuideMode = false; e.Handled = true; return true;
             case Key.Escape when vm.IsAnnotating:
@@ -913,6 +911,12 @@ public partial class MainWindow : Window
                 e.Handled = true; return true;
             case Key.Escape when vm.ForcedRailActive:
                 vm.ExitForcedRail(); e.Handled = true; return true;
+            // Full screen is the outermost state, so it goes last: Escape first closes or leaves every
+            // state above it (link peek, armed/active freeze, armed "start rail here", auto-scroll,
+            // reading guide, annotation tool → annotation mode, search, forced rail), and only a
+            // further Escape leaves full screen.
+            case Key.Escape when vm.IsFullScreen:
+                vm.IsFullScreen = false; e.Handled = true; return true;
             default: return false;
         }
     }

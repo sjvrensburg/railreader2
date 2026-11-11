@@ -87,6 +87,19 @@ public sealed partial class MainWindowViewModel
         return -1;
     }
 
+    /// <summary>True when page block <paramref name="pageBlockIndex"/> of the focused view's page has a
+    /// navigable role — one the rail can seat (text, headings, …) rather than a figure/table/chart,
+    /// which framing centres geometrically instead. False when there is no analysis or the index is
+    /// out of range.</summary>
+    public bool IsNavigableBlock(int pageBlockIndex)
+    {
+        var vp = _controller.FocusedViewport;
+        if (vp is null || !vp.Owner.TryGetAnalysis(vp.CurrentPage, vp.AnalysisParams, out var analysis)
+            || (uint)pageBlockIndex >= (uint)analysis.Blocks.Count)
+            return false;
+        return _controller.Config.NavigableRoles.Contains(analysis.Blocks[pageBlockIndex].Role);
+    }
+
     /// <summary>Index of the line of page block <paramref name="pageBlockIndex"/> whose centre is
     /// nearest <paramref name="pageY"/> — the <c>line</c> <see cref="SmoothlyFrameBlock"/> takes — or 0
     /// when the block has no lines or there is no analysis. Mirrors Core's rail click seating
