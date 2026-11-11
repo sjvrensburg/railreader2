@@ -47,71 +47,42 @@ public sealed partial class MainWindowViewModel
         await CopyBlockAsImage(block);
     }
 
-    public LayoutBlock? FindBlockAt(double pageX, double pageY)
-    {
-        var doc = _controller.FocusedViewport?.Owner;
-        var vp = _controller.FocusedViewport;
-        if (doc is null || vp is null) return null;
+    /// <summary>A detected block on the focused view's page, with its page-block index — the value
+    /// <see cref="SmoothlyFrameBlock"/> and the portal actions take (Core's <c>analysis.Blocks</c>
+    /// index space).</summary>
+    public readonly record struct BlockHit(int Index, LayoutBlock Block);
 
-        if (!doc.TryGetAnalysis(vp.CurrentPage, vp.AnalysisParams, out var analysis))
+    /// <summary>The detected block at the given page-space point on the focused view's page, or null
+    /// when there is none (or no analysis). One analysis lookup gives both the block and its index,
+    /// so callers needing either or both hit-test once.</summary>
+    public BlockHit? FindBlockAt(double pageX, double pageY)
+    {
+        var vp = _controller.FocusedViewport;
+        if (vp is null || !vp.Owner.TryGetAnalysis(vp.CurrentPage, vp.AnalysisParams, out var analysis))
             return null;
-
-        foreach (var b in analysis.Blocks)
-        {
-            if (pageX >= b.BBox.X && pageX <= b.BBox.X + b.BBox.W
-                && pageY >= b.BBox.Y && pageY <= b.BBox.Y + b.BBox.H)
-                return b;
-        }
-        return null;
-    }
-
-    /// <summary>Page-block index — the value <see cref="SmoothlyFrameBlock"/> takes — of the
-    /// detected block at the given page-space point, or -1 if none. Shares its index space with
-    /// <see cref="FindBlockAt"/> and Core's <c>analysis.Blocks</c>.</summary>
-    public int FindBlockIndexAt(double pageX, double pageY)
-    {
-        var doc = _controller.FocusedViewport?.Owner;
-        var vp = _controller.FocusedViewport;
-        if (doc is null || vp is null) return -1;
-
-        if (!doc.TryGetAnalysis(vp.CurrentPage, vp.AnalysisParams, out var analysis))
-            return -1;
 
         for (int i = 0; i < analysis.Blocks.Count; i++)
         {
             var b = analysis.Blocks[i];
             if (pageX >= b.BBox.X && pageX <= b.BBox.X + b.BBox.W
                 && pageY >= b.BBox.Y && pageY <= b.BBox.Y + b.BBox.H)
-                return i;
+                return new BlockHit(i, b);
         }
-        return -1;
+        return null;
     }
 
-    /// <summary>True when page block <paramref name="pageBlockIndex"/> of the focused view's page has a
-    /// navigable role — one the rail can seat (text, headings, …) rather than a figure/table/chart,
-    /// which framing centres geometrically instead. False when there is no analysis or the index is
-    /// out of range.</summary>
-    public bool IsNavigableBlock(int pageBlockIndex)
-    {
-        var vp = _controller.FocusedViewport;
-        if (vp is null || !vp.Owner.TryGetAnalysis(vp.CurrentPage, vp.AnalysisParams, out var analysis)
-            || (uint)pageBlockIndex >= (uint)analysis.Blocks.Count)
-            return false;
-        return _controller.Config.NavigableRoles.Contains(analysis.Blocks[pageBlockIndex].Role);
-    }
+    /// <summary>True when <paramref name="block"/> has a navigable role — one the rail can seat
+    /// (text, headings, …) rather than a figure/table/chart, which framing centres geometrically
+    /// instead.</summary>
+    public bool IsNavigableBlock(LayoutBlock block)
+        => _controller.Config.NavigableRoles.Contains(block.Role);
 
-    /// <summary>Index of the line of page block <paramref name="pageBlockIndex"/> whose centre is
-    /// nearest <paramref name="pageY"/> — the <c>line</c> <see cref="SmoothlyFrameBlock"/> takes — or 0
-    /// when the block has no lines or there is no analysis. Mirrors Core's rail click seating
-    /// (<c>RailNav.FindNearestLine</c>).</summary>
-    public int FindNearestLineIndex(int pageBlockIndex, double pageY)
+    /// <summary>Index of the line of <paramref name="block"/> whose centre is nearest
+    /// <paramref name="pageY"/> — the <c>line</c> <see cref="SmoothlyFrameBlock"/> takes — or 0 when
+    /// the block has no lines. Mirrors Core's rail click seating (<c>RailNav.FindNearestLine</c>).</summary>
+    public static int FindNearestLineIndex(LayoutBlock block, double pageY)
     {
-        var vp = _controller.FocusedViewport;
-        if (vp is null || !vp.Owner.TryGetAnalysis(vp.CurrentPage, vp.AnalysisParams, out var analysis)
-            || (uint)pageBlockIndex >= (uint)analysis.Blocks.Count)
-            return 0;
-
-        var lines = analysis.Blocks[pageBlockIndex].Lines;
+        var lines = block.Lines;
         int best = 0;
         double bestDist = double.MaxValue;
         for (int i = 0; i < lines.Count; i++)

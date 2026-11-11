@@ -611,8 +611,9 @@ public class ViewportPanel : Panel
             menu.Items.Add(new Separator());
 
         // Block actions (Copy as LaTeX / Markdown / Description / Image) when over a detected block.
-        if (vm.FindBlockAt(pageX, pageY) is { } block)
+        if (vm.FindBlockAt(pageX, pageY) is { } hit)
         {
+            var (blockIndex, block) = hit;
             var latexItem = new MenuItem { Header = "Copy as LaTeX" };
             latexItem.Click += (_, _) => vm.FireAndForget(vm.CopyBlockWithAction(block, BlockAction.LaTeX), nameof(vm.CopyBlockWithAction));
             menu.Items.Add(latexItem);
@@ -630,11 +631,10 @@ public class ViewportPanel : Panel
             menu.Items.Add(imageItem);
 
             // Portals authoring path B: link this detected block to a reading position. The block is
-            // on the current page; FindBlockIndexAt shares analysis.Blocks' index space. Actions that
+            // on the current page; FindBlockAt's index is in analysis.Blocks' index space. Actions that
             // capture the current reading position are disabled (with an explanatory tooltip) unless
             // rail mode is active, since there is no reading position outside it.
             menu.Items.Add(new Separator());
-            int blockIndex = vm.FindBlockIndexAt(pageX, pageY);
             // The clicked pane is focused (PointerPressed → FocusSurface), so the focused viewport's
             // page matches FindBlockAt's lookup — a split pane / tear-off on a different page than the
             // primary anchors its portal on its OWN page, not the primary's.
@@ -778,22 +778,22 @@ public class ViewportPanel : Panel
         // Release-time hit-test for the SAME press/release gesture ScreenToPage pinned at press —
         // stay on that page rather than re-resolving (and potentially re-anchoring) at release.
         var (pageX, pageY) = DoubleClickPagePoint(screenPos);
-        int index = vm.FindBlockIndexAt(pageX, pageY);
-        if (index < 0) return false;
+        if (vm.FindBlockAt(pageX, pageY) is not { } hit) return false;
+        var (index, block) = hit;
         // Already reading on the rail (at any zoom, incl. a "start rail here" below the threshold):
         // a double-click on text must not change the magnification. The first click has already
         // seated the rail on the clicked block/line (Core's HandleClick), so nothing more is needed —
         // swallow the second click rather than let it fall through to HandleClick, whose fresh
         // hit-test would land elsewhere now the camera has snapped. A figure/table (which the rail
         // can't seat) still gets the centred fit-to-block framing below.
-        if (ActiveViewport is { Rail.VisualsVisible: true } && vm.IsNavigableBlock(index))
+        if (ActiveViewport is { Rail.VisualsVisible: true } && vm.IsNavigableBlock(block))
             return true;
         // A gentler ease than the native 180ms zoom — a double-click is a deliberate framing
         // gesture, so it reads as intentional rather than a snap.
         // The clicked line, and on a line wider than the window the clicked x stays in view rather than
         // the landing snapping back to the line start.
         return vm.SmoothlyFrameBlock(index, durationMs: FrameZoomDurationMs,
-            line: vm.FindNearestLineIndex(index, pageY), focusPageX: pageX);
+            line: MainWindowViewModel.FindNearestLineIndex(block, pageY), focusPageX: pageX);
     }
 
     /// <summary>Resolves a screen point to page-local coordinates for an actual interaction dispatch
