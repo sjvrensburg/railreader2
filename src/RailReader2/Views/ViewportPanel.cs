@@ -775,6 +775,15 @@ public class ViewportPanel : Panel
     private bool TryFrameBlockAt(Point screenPos)
     {
         if (ViewModel is not { } vm) return false;
+        // Everything below must describe ONE view: the block lookup and Core's SmoothlyFrameBlock act
+        // on the controller's focused viewport (Core has no per-viewport framing overload), and the
+        // page point / rail check come from this pane's own. The press already focused this pane
+        // (DocumentView.OnViewportPressedForFocus, a tunnel handler), so they normally agree; if focus
+        // moved between press and release, do nothing (true: consumed) rather than frame or seat a
+        // block of another view — falling through to HandleClick would act on that view too.
+        var vp = vm.Controller.FocusedViewport;
+        if (vp is null) return false;
+        if (!ReferenceEquals(ActiveViewport, vp)) return true;
         // Release-time hit-test for the SAME press/release gesture ScreenToPage pinned at press —
         // stay on that page rather than re-resolving (and potentially re-anchoring) at release.
         var (pageX, pageY) = DoubleClickPagePoint(screenPos);
@@ -788,7 +797,7 @@ public class ViewportPanel : Panel
         // swallow the second click rather than let it fall through to HandleClick, whose fresh
         // hit-test would land elsewhere now the camera has snapped. A figure/table (which the rail
         // can't seat) still gets the centred fit-to-block framing below.
-        if (ActiveViewport is { Rail.VisualsVisible: true } && vm.IsNavigableBlock(block))
+        if (vp.Rail.VisualsVisible && vm.IsNavigableBlock(block))
             return true;
         // A gentler ease than the native 180ms zoom — a double-click is a deliberate framing
         // gesture, so it reads as intentional rather than a snap.
