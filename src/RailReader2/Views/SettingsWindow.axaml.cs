@@ -126,6 +126,7 @@ public partial class SettingsWindow : Window
         MarginCroppingCheck.IsChecked = FocusedDocument?.MarginCropping ?? c.MarginCropping;
         LineFocusBlurSlider.Value = c.LineFocusBlurIntensity;
         LinePaddingSlider.Value = c.LinePadding;
+        ReadingLineSlider.Value = c.RailReadingLineFraction;
         AutoScrollTriggerCheck.IsChecked = c.AutoScrollTriggerEnabled;
         AutoScrollTriggerDelay.Value = (decimal)c.AutoScrollTriggerDelayMs;
         JumpPercentage.Value = (decimal)c.JumpPercentage;
@@ -996,6 +997,11 @@ public partial class SettingsWindow : Window
         // Live-apply and repaint on every tick (cheap), but debounce the heavy OnConfigChanged
         // (config file save + broadcast invalidation) until the drag settles.
         vm.OnSettingsSliderPreview();
+        RestartSliderPersistTimer();
+    }
+
+    private void RestartSliderPersistTimer()
+    {
         if (_sliderPersistTimer is null)
         {
             _sliderPersistTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };
@@ -1003,6 +1009,17 @@ public partial class SettingsWindow : Window
         }
         _sliderPersistTimer.Stop();
         _sliderPersistTimer.Start();
+    }
+
+    /// <summary>The rail reading line (Core #200). Unlike the other sliders this skips the live
+    /// preview: Core's <c>OnSliderChanged</c> stores the new settings without re-snapping, so the
+    /// debounced <c>OnConfigChanged</c> would then see no change and never move the line. Going
+    /// straight to the debounced <c>OnConfigChanged</c> re-seats every active rail once the drag settles.</summary>
+    private void OnReadingLineChanged(object? sender, Avalonia.AvaloniaPropertyChangedEventArgs e)
+    {
+        if (e.Property.Name != "Value" || Vm is not { } vm || _loading) return;
+        vm.AppConfig.RailReadingLineFraction = ReadingLineSlider.Value;
+        RestartSliderPersistTimer();
     }
 
     private void OnSliderPersistTick(object? sender, EventArgs e)
@@ -1432,6 +1449,8 @@ public partial class SettingsWindow : Window
         if (await confirm.ShowDialog<bool>(this) != true) return;
         var defaults = new AppConfig();
         vm.AppConfig.RailZoomThreshold = defaults.RailZoomThreshold;
+        vm.AppConfig.RailReadingLineFraction = defaults.RailReadingLineFraction;
+        vm.AppConfig.VerticalOverscrollFraction = defaults.VerticalOverscrollFraction;
         vm.AppConfig.SnapDurationMs = defaults.SnapDurationMs;
         vm.AppConfig.ScrollSpeedStart = defaults.ScrollSpeedStart;
         vm.AppConfig.ScrollSpeedMax = defaults.ScrollSpeedMax;

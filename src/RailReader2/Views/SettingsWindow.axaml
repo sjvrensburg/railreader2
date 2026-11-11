@@ -83,6 +83,19 @@
                                            ValueChanged="OnSettingChanged" />
                             <TextBlock Text="× zoom" VerticalAlignment="Center" />
                         </StackPanel>
+                        <Border Classes="advblock adv">
+                            <StackPanel Spacing="4">
+                                <Grid ColumnDefinitions="Auto,8,*">
+                                    <TextBlock Grid.Column="0" Text="Reading line height:" VerticalAlignment="Center" />
+                                    <Slider Grid.Column="2" Name="ReadingLineSlider" Minimum="0.2" Maximum="0.8"
+                                            Value="0.5" MinWidth="120"
+                                            ToolTip.Tip="Left: near the top of the window. Middle: the centre (the default). Right: near the bottom."
+                                            PropertyChanged="OnReadingLineChanged" />
+                                </Grid>
+                                <TextBlock Classes="hint" TextWrapping="Wrap"
+                                           Text="Where the rail places the line you're reading. Slide left to keep it higher in the window. Dragging the page still moves it for the current page." />
+                            </StackPanel>
+                        </Border>
 
                         <TextBlock Classes="section" Text="Reading Pace" />
                         <Separator />
