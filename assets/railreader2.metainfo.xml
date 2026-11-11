@@ -103,6 +103,9 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="3.85.0.0" date="2026-11-11">
+      <description><p>RailReader2 can now update itself. On its first start it asks whether to check for a new version once a day; until you agree it makes no network requests. Help, Check for Updates works at any time. The AppImage replaces itself and restarts on the document you were reading; the Windows installer installs the update silently when RailReader2 closes. Every update is checked against a signed release description before anything is installed. The command-line tool gains an update command that checks for, and downloads, a new release. Closing RailReader2 while it is still analysing pages no longer crashes it. A PDF path with spaces now opens from the command line even when it isn't quoted, and the Windows installer records its real version.</p></description>
+    </release>
     <release version="3.84.4.0" date="2026-11-10">
       <description><p>Clicking a line in rail mode keeps your place on it: the line comes to the reading position, but the view no longer jumps back to the start of the line. Double-clicking a highlight to open its comment no longer throws the view to the line start before the note editor opens. Home still takes you to the start of the line.</p></description>
     </release>
