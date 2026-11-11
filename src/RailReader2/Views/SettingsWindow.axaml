@@ -2,6 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:RailReader2.ViewModels"
         xmlns:v="using:RailReader2.Views"
+        xmlns:c="using:RailReader2.Controls"
         x:Class="RailReader2.Views.SettingsWindow"
         x:DataType="vm:MainWindowViewModel"
         Title="Settings"
@@ -84,16 +85,19 @@
                             <TextBlock Text="× zoom" VerticalAlignment="Center" />
                         </StackPanel>
                         <Border Classes="advblock adv">
-                            <StackPanel Spacing="4">
-                                <Grid ColumnDefinitions="Auto,8,*">
-                                    <TextBlock Grid.Column="0" Text="Reading line height:" VerticalAlignment="Center" />
-                                    <Slider Grid.Column="2" Name="ReadingLineSlider" Minimum="0.2" Maximum="0.8"
-                                            Value="0.5" MinWidth="120"
-                                            ToolTip.Tip="Left: near the top of the window. Middle: the centre (the default). Right: near the bottom."
-                                            PropertyChanged="OnReadingLineChanged" />
-                                </Grid>
-                                <TextBlock Classes="hint" TextWrapping="Wrap"
-                                           Text="Where the rail places the line you're reading. Slide left to keep it higher in the window. Dragging the page still moves it for the current page." />
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="Where the rail places the line you're reading:" />
+                                <StackPanel Orientation="Horizontal" Spacing="12">
+                                    <c:ReadingLinePicker Name="ReadingLinePicker" Width="200" Height="130"
+                                                         AutomationProperties.Name="Reading line height"
+                                                         ToolTip.Tip="Drag the line up or down. Double-click to put it back in the middle."
+                                                         PropertyChanged="OnReadingLineChanged" />
+                                    <StackPanel Spacing="4" VerticalAlignment="Center" MaxWidth="220">
+                                        <TextBlock Name="ReadingLineReadout" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                        <TextBlock Classes="hint" TextWrapping="Wrap"
+                                                   Text="Drag the line, or use the arrow keys. Dragging the page while reading still moves it for that page." />
+                                    </StackPanel>
+                                </StackPanel>
                             </StackPanel>
                         </Border>
 
