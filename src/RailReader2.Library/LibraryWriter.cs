@@ -92,6 +92,7 @@ public sealed class LibraryWriter : IDisposable
     public void DocumentOpened(string path, string contentId, bool encrypted, AnnotationFile? annotations, int? page)
         => Enqueue(index =>
         {
+            index.Unremove(contentId); // opening a removed document brings it back (design §3)
             if (encrypted)
             {
                 if (index.NeedsIndex(contentId, path)) index.ReplaceDocument(Locked(path, contentId));
@@ -136,6 +137,7 @@ public sealed class LibraryWriter : IDisposable
     /// entry at it and re-index it if the file differs from what was indexed.</summary>
     public void Relocate(string contentId, string path) => Enqueue(index =>
     {
+        index.Unremove(contentId);
         index.SetPath(contentId, path);
         if (index.NeedsIndex(contentId, path)) IndexFromDisk(index, path, contentId, _cts.Token);
     });
@@ -300,7 +302,7 @@ public sealed class LibraryWriter : IDisposable
             if (!index.BackfillEnabled) return false;
             if (!File.Exists(path)) return false;
             if (DocumentIdentity.Peek(path) is not { } id) return false;
-            if (!index.NeedsIndex(id, path)) return false;
+            if (index.IsRemoved(id) || !index.NeedsIndex(id, path)) return false;
             IndexFromDisk(index, path, id, token);
             return true;
         }

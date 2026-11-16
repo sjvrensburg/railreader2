@@ -188,6 +188,34 @@ public sealed class LibraryWindowSupportTests : IDisposable
     }
 
     [Fact]
+    public void Removed_StaysOutUntilOpened_AndClearForgetsTheMarker()
+    {
+        using (var index = LibraryIndex.OpenWritable(Db, out _))
+        {
+            index.ReplaceDocument(Doc("a", "a.pdf", "words"));
+            Assert.False(index.IsRemoved("a"));
+            index.Remove("a");
+            Assert.True(index.IsRemoved("a")); // the backfill checks this and skips the document
+            index.Clear(backfill: true);
+            Assert.False(index.IsRemoved("a"));
+            index.ReplaceDocument(Doc("a", "a.pdf", "words"));
+            index.Remove("a");
+        }
+        SqliteConnection.ClearAllPools();
+
+        // Opening the document again brings it back.
+        var pdf = MakePdf("a.pdf", "spectral words");
+        using (var w = new LibraryWriter(Db, new SkiaPdfServiceFactory()))
+        {
+            w.DocumentOpened(pdf, "a", false, null, 0);
+            Assert.True(w.WaitForForeground(Wait));
+        }
+        using var reopened = LibraryIndex.OpenWritable(Db, out _);
+        Assert.False(reopened.IsRemoved("a"));
+        Assert.Single(reopened.Search(LibraryQuery.Parse("spectral")));
+    }
+
+    [Fact]
     public void Writer_ReportsBackfillProgress_ThenResets()
     {
         using var w = new LibraryWriter(Db, new SkiaPdfServiceFactory()) { BusyRecheck = TimeSpan.FromMilliseconds(50) };

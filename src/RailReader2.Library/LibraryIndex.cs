@@ -104,6 +104,8 @@ public sealed class LibraryIndex : IDisposable
             if (version > SchemaVersion)
                 throw new UnreadableIndexException($"schema {version} is newer than {SchemaVersion}");
             if (version == 0) CreateSchema(conn);
+            // Added after schema 1 shipped on the branch; harmless to create on any open.
+            Exec(conn, "create table if not exists removed (content_id text primary key)");
             // Quick structural check: a damaged file usually fails here rather than mid-search.
             if (Scalar(conn, "pragma quick_check") is not "ok")
                 throw new UnreadableIndexException("quick_check failed");
@@ -485,8 +487,31 @@ public sealed class LibraryIndex : IDisposable
             cmd.Parameters.AddWithValue("$k", key);
             cmd.ExecuteNonQuery();
         }
+        using (var cmd = Command("insert or ignore into removed(content_id) values ($id)", tx))
+        {
+            cmd.Parameters.AddWithValue("$id", contentId);
+            cmd.ExecuteNonQuery();
+        }
         tx.Commit();
         return true;
+    }
+
+    /// <summary>True when the reader removed this document from the library: the backfill leaves it out
+    /// until the reader opens it again (<see cref="Unremove"/>).</summary>
+    public bool IsRemoved(string contentId)
+    {
+        using var cmd = Command("select count(*) from removed where content_id = $id");
+        cmd.Parameters.AddWithValue("$id", contentId);
+        return Convert.ToInt64(cmd.ExecuteScalar(), CultureInfo.InvariantCulture) > 0;
+    }
+
+    /// <summary>The reader opened (or located) a removed document: it belongs to the library again.</summary>
+    public void Unremove(string contentId)
+    {
+        EnsureWritable();
+        using var cmd = Command("delete from removed where content_id = $id");
+        cmd.Parameters.AddWithValue("$id", contentId);
+        cmd.ExecuteNonQuery();
     }
 
     /// <summary>Points a document at a new file (the reader located a moved file).</summary>
@@ -503,7 +528,7 @@ public sealed class LibraryIndex : IDisposable
         EnsureWritable();
         using (var tx = _conn.BeginTransaction())
         {
-            foreach (var t in new[] { "page_fts", "outline_fts", "note_fts", "name_fts", "documents" })
+            foreach (var t in new[] { "page_fts", "outline_fts", "note_fts", "name_fts", "documents", "removed" })
                 Exec(_conn, $"delete from {t}", tx);
             SetMeta("backfill", backfill ? "on" : "off", tx);
             tx.Commit();

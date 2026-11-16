@@ -37,6 +37,8 @@ public partial class SearchView : UserControl
     private CancellationTokenSource? _searchCts;
     private bool _applyingActivation;
     private int? _pendingStartPage; // a library hit's page: show its first match once the search has run
+    // The reader's own Regex / Case toggles, saved when a library hit set them; restored on their next search.
+    private (bool? Regex, bool? Case)? _readerToggles;
 
     public SearchView()
     {
@@ -97,8 +99,10 @@ public partial class SearchView : UserControl
     {
         if (_vm is null) return;
         var (prefill, focus, useRegex, startPage) = _vm.ConsumeSearchActivation();
+        if (useRegex is null) RestoreReaderToggles(); // Ctrl+F / search-selection: the reader's own search
         if (startPage is not null || useRegex is not null)
         {
+            _readerToggles ??= (RegexToggle.IsChecked, CaseSensitiveToggle.IsChecked);
             // Set the box and toggles without each change starting its own search, then run once.
             _applyingActivation = true;
             try
@@ -137,6 +141,7 @@ public partial class SearchView : UserControl
     {
         if (_applyingActivation) return;
         _pendingStartPage = null; // the reader typed: their own search, not the library hit's
+        RestoreReaderToggles();
         if (_debounceTimer is null)
         {
             _debounceTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(200) };
@@ -187,9 +192,23 @@ public partial class SearchView : UserControl
     /// <see cref="MainWindowViewModel.SearchCleared"/> (so window-level Escape clears the box too).</summary>
     private void ClearSearchUi()
     {
+        RestoreReaderToggles();
         SearchInput.Text = "";
         SearchResultsList.ItemsSource = null;
         SearchMatchCount.Text = "";
+    }
+
+    private void RestoreReaderToggles()
+    {
+        if (_readerToggles is not { } saved) return;
+        _readerToggles = null;
+        _applyingActivation = true; // no search of its own: the caller's change runs one
+        try
+        {
+            RegexToggle.IsChecked = saved.Regex;
+            CaseSensitiveToggle.IsChecked = saved.Case;
+        }
+        finally { _applyingActivation = false; }
     }
 
     private void OnPrevMatchClick(object? sender, RoutedEventArgs e)

@@ -191,7 +191,9 @@ public partial class LibraryWindow : Window
         var cts = _queryCts = new CancellationTokenSource();
         var query = LibraryQuery.Parse(QueryBox.Text);
         var sources = SelectedSources();
-        string? category = CategoryFilter.SelectedItem as string is { } c && c != AnyCategory ? c : null;
+        // A colour category is a property of notes, so it applies only while notes are searched.
+        CategoryFilter.IsEnabled = NoteFilter.IsChecked == true;
+        string? category = CategoryFilter.IsEnabled && CategoryFilter.SelectedItem as string is { } c && c != AnyCategory ? c : null;
         bool withNotes = WithNotesFilter.IsChecked == true;
         string? reader = _vm?.LibraryReaderName;
         try
