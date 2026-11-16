@@ -211,6 +211,55 @@ public sealed class LibraryIndexTests : IDisposable
         Assert.True(recovered);
     }
 
+    [Fact]
+    public void OlderSchema_IsRebuiltInPlace_NotMovedAside()
+    {
+        // A schema-1 index (rows filtered by an unindexed doc_key) predates the rowid layout.
+        using (var c = new SqliteConnection($"Data Source={Db};Pooling=False"))
+        {
+            c.Open();
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = """
+                create table meta (key text primary key, value text);
+                insert into meta values ('schema_version', '1');
+                create table documents (doc_key integer primary key, content_id text);
+                create virtual table page_fts using fts5(body, doc_key unindexed);
+                insert into page_fts(body, doc_key) values ('stale words', 1);
+                """;
+            cmd.ExecuteNonQuery();
+        }
+        using var index = LibraryIndex.OpenWritable(Db, out bool recovered);
+        Assert.False(recovered);
+        Assert.False(File.Exists(Db + ".unreadable"));
+        Assert.Empty(index.Search(LibraryQuery.Parse("stale")));
+        index.ReplaceDocument(Doc("a", "a.pdf", "fresh words"));
+        Assert.Single(index.Search(LibraryQuery.Parse("fresh")));
+    }
+
+    [Fact]
+    public void Rewriting_OneDocument_LeavesItsNeighboursAlone()
+    {
+        // Rows are keyed by rowid ranges per document; a range off by one would eat a neighbour's rows.
+        using var index = Open();
+        foreach (var id in new[] { "a", "b", "c" })
+            index.ReplaceDocument(Doc(id, $"{id}.pdf", $"first {id}words", $"second {id}words") with
+            {
+                Outline = [new OutlineItem($"chapter {id}words", 0)],
+                Notes = [new NoteEntry(0, "textnote", null, $"note {id}words", null, null, null, NoteSource.RailReader)],
+            });
+        index.ReplaceDocument(Doc("b", "b.pdf", "replaced bwords"));
+        index.Remove("a");
+        index.ReplaceNotes("c", []);
+        Assert.Equal(1, index.AddOcrPages("c", [new PageEntry(1, "ocr cwords dup", true), new PageEntry(5, "ocr cwords", true)]));
+
+        Assert.Empty(index.Search(LibraryQuery.Parse("awords")));
+        Assert.Equal(["b"], index.Search(LibraryQuery.Parse("bwords")).Select(h => h.ContentId).Distinct());
+        Assert.Single(index.Search(LibraryQuery.Parse("bwords"))); // only the replaced page; old outline/notes gone
+        var c = index.Search(LibraryQuery.Parse("cwords"));
+        Assert.Equal(4, c.Count); // two pages, the outline entry, and the OCR page 5 (page 1 already had text)
+        Assert.DoesNotContain(c, h => h.Source == HitSource.Note);
+    }
+
     [Theory]
     [InlineData("Breusch-SimpleTestHeteroscedasticity-1979.pdf", "Breusch Simple Test Heteroscedasticity 1979")]
     [InlineData("CRT zhang.pdf", "CRT zhang")]

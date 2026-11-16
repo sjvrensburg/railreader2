@@ -196,12 +196,18 @@ public partial class LibraryWindow : Window
         string? category = CategoryFilter.IsEnabled && CategoryFilter.SelectedItem as string is { } c && c != AnyCategory ? c : null;
         bool withNotes = WithNotesFilter.IsChecked == true;
         string? reader = _vm?.LibraryReaderName;
+        // The totals, categories and note counts scan whole tables, so they are read once and again only
+        // after the index changed (quiet = a writer change), not on every keystroke.
+        if (quiet) _metaStale = true; // stays set until a fresh read lands, even if this refresh is overtaken
+        var meta = _metaStale ? null : _meta;
         try
         {
             if (debounce) await Task.Delay(200, cts.Token);
-            var result = await Task.Run(() => Search(query, sources, category, withNotes, reader), cts.Token);
+            var result = await Task.Run(() => Search(query, sources, category, withNotes, reader, meta), cts.Token);
             if (cts.IsCancellationRequested) return;
             _query = query;
+            _meta = result.Meta;
+            if (meta is null) _metaStale = false;
             Show(result, quiet);
         }
         catch (OperationCanceledException) { }
@@ -224,25 +230,32 @@ public partial class LibraryWindow : Window
         return set;
     }
 
-    sealed record SearchResult(
-        IReadOnlyList<object> Rows, int Documents, int Matches, LibraryStatus? Status, IReadOnlyList<string> Categories,
-        bool Unavailable);
+    /// <summary>Whole-index facts, cached between keystrokes (<see cref="_meta"/>).</summary>
+    sealed record IndexMeta(LibraryStatus Status, IReadOnlyList<string> Categories, IReadOnlyDictionary<string, int> NoteCounts);
+
+    IndexMeta? _meta;
+    bool _metaStale = true;
+
+    sealed record SearchResult(IReadOnlyList<object> Rows, int Documents, int Matches, IndexMeta? Meta, bool Unavailable)
+    {
+        public LibraryStatus? Status => Meta?.Status;
+        public IReadOnlyList<string> Categories => Meta?.Categories ?? [];
+    }
 
     static SearchResult Search(LibraryQuery query, HashSet<HitSource>? sources, string? category, bool withNotes,
-        string? reader)
+        string? reader, IndexMeta? meta)
     {
         using var index = LibraryIndex.OpenReadOnly(LibraryIndex.DefaultPath);
-        if (index is null) return new SearchResult([], 0, 0, null, [], Unavailable: true);
-        var status = index.GetStatus();
-        var categories = index.Categories();
-        if (query.IsEmpty || sources is { Count: 0 }) return new SearchResult([], 0, 0, status, categories, false);
+        if (index is null) return new SearchResult([], 0, 0, null, Unavailable: true);
+        meta ??= new IndexMeta(index.GetStatus(), index.Categories(), index.NoteCounts());
+        if (query.IsEmpty || sources is { Count: 0 }) return new SearchResult([], 0, 0, meta, false);
 
         // A category filter only applies to notes, so it narrows the search to them.
         if (category is not null) sources = [HitSource.Note];
         var hits = index.Search(query, SearchLimit, HighlightedText.Open.ToString(), HighlightedText.Close.ToString(), sources);
         if (category is not null)
             hits = hits.Where(h => string.Equals(h.Category, category, StringComparison.OrdinalIgnoreCase)).ToList();
-        var noteCounts = index.NoteCounts();
+        var noteCounts = meta.NoteCounts;
         if (withNotes) hits = hits.Where(h => noteCounts.ContainsKey(h.ContentId)).ToList();
 
         var groups = LibraryResults.Group(hits, noteCounts: noteCounts);
@@ -253,7 +266,7 @@ public partial class LibraryWindow : Window
             foreach (var h in g.Hits)
                 if (h.Source != HitSource.Name) rows.Add(new LibraryHitRow(g, h, LibraryResults.Label(h, reader)));
         }
-        return new SearchResult(rows, groups.Count, hits.Count, status, categories, false);
+        return new SearchResult(rows, groups.Count, hits.Count, meta, false);
     }
 
     void Show(SearchResult result, bool quiet)

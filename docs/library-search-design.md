@@ -264,6 +264,22 @@ Built: `Views/RecentDocumentsView` in the welcome panel (between the Open button
 - **Live-app check (2026-11-16):** with an empty index, the dashboard filled in thumbnails, page counts ("page 23 of 23 · 20 notes") and a greyed missing file as the backfill ran; a card opened its document at the saved page; paging on and closing the tab brought the dashboard back with that document first at its new page ("page 3 of 15").
 - **Not done:** title/author from PDF metadata (Core exposes none; file names stand in); no "remove from recents" on a card (the File ▸ Recent menu has none either).
 
+## 11e. Performance follow-up (2026-11-16, code review)
+
+- **Schema 2: FTS rows are keyed by rowid ranges.** Each row's rowid is `(doc_key << 20) | n` (page number for pages, a counter for outline entries and notes), so a document's rows are one rowid range. Re-index, notes refresh, OCR fill-in and Remove delete or list by `rowid between …`, a b-tree range lookup. Schema 1 filtered on the `UNINDEXED doc_key` column, a full table scan, so each re-index cost grew with the library. An older index is dropped and rebuilt in place on open (not moved aside as unreadable); the next start's backfill refills it.
+- Measured with synthetic 20-page documents (400 words a page):
+
+| | schema 1, 1,000 docs | schema 2, 1,000 docs | schema 2, 3,000 docs |
+|---|---|---|---|
+| Re-index one document | 41 ms | 11 ms | 12 ms |
+| Notes refresh | 0.7 ms | 0.1 ms | 0.1 ms |
+| OCR fill-in | 27 ms | 0.4 ms | 1.5 ms |
+| Remove | 32 ms | 4.8 ms | 4.6 ms |
+| Build (all documents) | 23 s | 7.9 s | 24 s |
+
+- **The Library window caches the index totals** (status, colour categories, note counts: 84 ms at 60,000 pages) and re-reads them only after the writer reports a change, not on every keystroke. A stale flag survives a refresh that is overtaken by typing.
+- Search quality is unchanged (`library bench`: recall@10 97.9 %, MRR 0.938, p95 2.3 ms).
+
 ## 12. Decisions
 
 | # | Question | Decision (2026-11-16) |

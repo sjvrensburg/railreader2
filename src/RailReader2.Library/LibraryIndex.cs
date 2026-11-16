@@ -14,7 +14,14 @@ public sealed class LibraryIndex : IDisposable
     /// <summary>Bumped when extraction or normalisation changes, so documents are re-extracted.</summary>
     public const int IndexerVersion = 1;
     /// <summary>Bumped when the table layout changes. A newer schema than this is "unreadable".</summary>
-    public const int SchemaVersion = 1;
+    public const int SchemaVersion = 2;
+
+    // Every FTS row's rowid is (doc_key << RowShift) | n, so one document's rows are a single rowid range:
+    // deleting or listing them is a b-tree range lookup. Filtering on the UNINDEXED doc_key column instead
+    // scanned the whole table, so each re-index cost grew with the library (schema 2; 1 filtered).
+    const int RowShift = 20;
+    const long RowsPerDocument = 1L << RowShift; // pages are numbered from 0, so up to ~1M pages/notes each
+    static long RowId(long key, long n) => (key << RowShift) | n;
 
     const string Tokenizer = "tokenize = 'porter unicode61 remove_diacritics 2'";
 
@@ -103,9 +110,14 @@ public sealed class LibraryIndex : IDisposable
             int version = ReadSchemaVersion(conn);
             if (version > SchemaVersion)
                 throw new UnreadableIndexException($"schema {version} is newer than {SchemaVersion}");
+            if (version is > 0 and < SchemaVersion)
+            {
+                // An older layout. The index is only a copy of what is stored elsewhere, so it is rebuilt
+                // rather than migrated: the next backfill (every start) fills it in again.
+                DropAll(conn);
+                version = 0;
+            }
             if (version == 0) CreateSchema(conn);
-            // Added after schema 1 shipped on the branch; harmless to create on any open.
-            Exec(conn, "create table if not exists removed (content_id text primary key)");
             // Quick structural check: a damaged file usually fails here rather than mid-search.
             if (Scalar(conn, "pragma quick_check") is not "ok")
                 throw new UnreadableIndexException("quick_check failed");
@@ -119,6 +131,21 @@ public sealed class LibraryIndex : IDisposable
     }
 
     sealed class UnreadableIndexException(string message) : Exception(message);
+
+    static void DropAll(SqliteConnection conn)
+    {
+        var tables = new List<string>();
+        using (var cmd = conn.CreateCommand())
+        {
+            // Virtual tables first: dropping one drops its shadow tables with it.
+            cmd.CommandText = "select name from sqlite_schema where type = 'table' and sql like 'create virtual table%' collate nocase";
+            using var r = cmd.ExecuteReader();
+            while (r.Read()) tables.Add(r.GetString(0));
+        }
+        foreach (var t in tables) Exec(conn, $"drop table if exists \"{t}\"");
+        foreach (var t in new[] { "documents", "removed", "meta" }) Exec(conn, $"drop table if exists {t}");
+        Exec(conn, "vacuum");
+    }
 
     const int SqliteCorrupt = 11, SqliteNotADb = 26; // SQLITE_CORRUPT, SQLITE_NOTADB (primary codes)
 
@@ -135,6 +162,7 @@ public sealed class LibraryIndex : IDisposable
         foreach (var sql in new[]
         {
             "create table meta (key text primary key, value text)",
+            "create table removed (content_id text primary key)",
             """
             create table documents (
               doc_key         integer primary key,
@@ -350,27 +378,18 @@ public sealed class LibraryIndex : IDisposable
         long key = UpsertDocument(doc, tx);
         DeleteRows(key, tx, "page_fts", "outline_fts", "note_fts", "name_fts");
 
-        using (var cmd = Command("insert into page_fts(body, doc_key, page, from_ocr) values ($b, $k, $p, $o)", tx))
+        InsertPages(key, doc.Pages, tx, skip: null);
+        using (var cmd = Command("insert into outline_fts(rowid, title, doc_key, page) values ($r, $t, $k, $p)", tx))
         {
-            var b = cmd.Parameters.Add("$b", SqliteType.Text);
-            cmd.Parameters.AddWithValue("$k", key);
-            var p = cmd.Parameters.Add("$p", SqliteType.Integer);
-            var o = cmd.Parameters.Add("$o", SqliteType.Integer);
-            foreach (var page in doc.Pages)
-            {
-                if (page.Body.Length == 0) continue;
-                b.Value = page.Body; p.Value = page.Page; o.Value = page.FromOcr ? 1 : 0;
-                cmd.ExecuteNonQuery();
-            }
-        }
-        using (var cmd = Command("insert into outline_fts(title, doc_key, page) values ($t, $k, $p)", tx))
-        {
+            var r = cmd.Parameters.Add("$r", SqliteType.Integer);
             var t = cmd.Parameters.Add("$t", SqliteType.Text);
             cmd.Parameters.AddWithValue("$k", key);
             var p = cmd.Parameters.Add("$p", SqliteType.Integer);
+            long n = 0;
             foreach (var item in doc.Outline)
             {
-                t.Value = item.Title; p.Value = item.Page;
+                if (n >= RowsPerDocument) break;
+                r.Value = RowId(key, n++); t.Value = item.Title; p.Value = item.Page;
                 cmd.ExecuteNonQuery();
             }
         }
@@ -379,9 +398,33 @@ public sealed class LibraryIndex : IDisposable
         tx.Commit();
     }
 
+    /// <summary>Inserts pages keyed by page number (rowid = doc range + page); pages in
+    /// <paramref name="skip"/> are left out. Returns how many were inserted.</summary>
+    int InsertPages(long key, IReadOnlyList<PageEntry> pages, SqliteTransaction tx, HashSet<int>? skip)
+    {
+        int added = 0;
+        using var cmd = Command("insert into page_fts(rowid, body, doc_key, page, from_ocr) values ($r, $b, $k, $p, $o)", tx);
+        var r = cmd.Parameters.Add("$r", SqliteType.Integer);
+        var b = cmd.Parameters.Add("$b", SqliteType.Text);
+        cmd.Parameters.AddWithValue("$k", key);
+        var p = cmd.Parameters.Add("$p", SqliteType.Integer);
+        var o = cmd.Parameters.Add("$o", SqliteType.Integer);
+        var seen = new HashSet<int>();
+        foreach (var page in pages)
+        {
+            if (page.Body.Length == 0 || page.Page < 0 || page.Page >= RowsPerDocument || !seen.Add(page.Page)) continue;
+            if (skip is not null && !skip.Add(page.Page)) continue;
+            r.Value = RowId(key, page.Page); b.Value = page.Body; p.Value = page.Page; o.Value = page.FromOcr ? 1 : 0;
+            cmd.ExecuteNonQuery();
+            added++;
+        }
+        return added;
+    }
+
     void InsertName(long key, string path, SqliteTransaction tx)
     {
-        using var cmd = Command("insert into name_fts(name, doc_key) values ($n, $k)", tx);
+        using var cmd = Command("insert into name_fts(rowid, name, doc_key) values ($r, $n, $k)", tx);
+        cmd.Parameters.AddWithValue("$r", RowId(key, 0));
         cmd.Parameters.AddWithValue("$n", NameTerms(path));
         cmd.Parameters.AddWithValue("$k", key);
         cmd.ExecuteNonQuery();
@@ -430,26 +473,14 @@ public sealed class LibraryIndex : IDisposable
         if (KeyOf(contentId) is not { } key) return 0;
         using var tx = _conn.BeginTransaction();
         var existing = new HashSet<int>();
-        using (var cmd = Command("select page from page_fts where doc_key = $k", tx))
+        using (var cmd = Command("select page from page_fts where rowid between $lo and $hi", tx))
         {
-            cmd.Parameters.AddWithValue("$k", key);
+            cmd.Parameters.AddWithValue("$lo", RowId(key, 0));
+            cmd.Parameters.AddWithValue("$hi", RowId(key, RowsPerDocument - 1));
             using var r = cmd.ExecuteReader();
             while (r.Read()) existing.Add(r.GetInt32(0));
         }
-        int added = 0;
-        using (var cmd = Command("insert into page_fts(body, doc_key, page, from_ocr) values ($b, $k, $p, 1)", tx))
-        {
-            var b = cmd.Parameters.Add("$b", SqliteType.Text);
-            cmd.Parameters.AddWithValue("$k", key);
-            var p = cmd.Parameters.Add("$p", SqliteType.Integer);
-            foreach (var page in pages)
-            {
-                if (page.Body.Length == 0 || !existing.Add(page.Page)) continue;
-                b.Value = page.Body; p.Value = page.Page;
-                cmd.ExecuteNonQuery();
-                added++;
-            }
-        }
+        int added = InsertPages(key, pages.Select(pg => pg with { FromOcr = true }).ToList(), tx, skip: existing);
         tx.Commit();
         return added;
     }
@@ -576,9 +607,10 @@ public sealed class LibraryIndex : IDisposable
     void InsertNotes(long key, IReadOnlyList<NoteEntry> notes, Func<string?, string?>? categoryOf, SqliteTransaction tx)
     {
         using var cmd = Command("""
-            insert into note_fts(marked_text, comment, author, category, doc_key, page, kind, color, native_id, source)
-            values ($m, $c, $a, $cat, $k, $p, $kind, $col, $nm, $src)
+            insert into note_fts(rowid, marked_text, comment, author, category, doc_key, page, kind, color, native_id, source)
+            values ($r, $m, $c, $a, $cat, $k, $p, $kind, $col, $nm, $src)
             """, tx);
+        var r = cmd.Parameters.Add("$r", SqliteType.Integer);
         var m = cmd.Parameters.Add("$m", SqliteType.Text);
         var c = cmd.Parameters.Add("$c", SqliteType.Text);
         var a = cmd.Parameters.Add("$a", SqliteType.Text);
@@ -589,9 +621,12 @@ public sealed class LibraryIndex : IDisposable
         var col = cmd.Parameters.Add("$col", SqliteType.Text);
         var nm = cmd.Parameters.Add("$nm", SqliteType.Text);
         var src = cmd.Parameters.Add("$src", SqliteType.Integer);
+        long row = 0;
         foreach (var n in notes)
         {
             if (string.IsNullOrWhiteSpace(n.MarkedText) && string.IsNullOrWhiteSpace(n.Comment)) continue;
+            if (row >= RowsPerDocument) break;
+            r.Value = RowId(key, row++);
             m.Value = n.MarkedText ?? ""; c.Value = n.Comment ?? ""; a.Value = n.Author ?? "";
             cat.Value = categoryOf?.Invoke(n.Color) ?? "";
             p.Value = n.Page; kind.Value = n.Kind; col.Value = (object?)n.Color ?? "";
@@ -604,8 +639,9 @@ public sealed class LibraryIndex : IDisposable
     {
         foreach (var t in tables)
         {
-            using var cmd = Command($"delete from {t} where doc_key = $k", tx);
-            cmd.Parameters.AddWithValue("$k", key);
+            using var cmd = Command($"delete from {t} where rowid between $lo and $hi", tx);
+            cmd.Parameters.AddWithValue("$lo", RowId(key, 0));
+            cmd.Parameters.AddWithValue("$hi", RowId(key, RowsPerDocument - 1));
             cmd.ExecuteNonQuery();
         }
     }
