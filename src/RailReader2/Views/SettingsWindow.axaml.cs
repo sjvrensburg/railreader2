@@ -139,6 +139,7 @@ public partial class SettingsWindow : Window
         LoadLineStyle(c, FocusedDocument);
         LoadReadingGuidePrefs(vm);
         AuthorNameBox.Text = vm.AnnotationAuthorName;
+        UpdateSuggestedName(vm);
         BuildColourNameRows(vm);
         LinkClickCombo.SelectedIndex = (int)vm.LinkPrefs.LinkClick;
 
@@ -979,6 +980,25 @@ public partial class SettingsWindow : Window
     {
         if (Vm is not { } vm || _loading) return;
         vm.AnnotationAuthorName = AuthorNameBox.Text;
+        UpdateSuggestedName(vm);
+    }
+
+    /// <summary>While no name is set, the box's hint is the OS account's name and a button uses it.</summary>
+    private void UpdateSuggestedName(MainWindowViewModel vm)
+    {
+        string? suggested = vm.AnnotationAuthorName is null ? vm.SuggestedAuthorName : null;
+        AuthorNameBox.PlaceholderText = suggested ?? "You";
+        UseSuggestedNameButton.IsVisible = suggested is not null;
+        if (suggested is null) return;
+        UseSuggestedNameButton.Content = $"Use \u201c{suggested}\u201d";
+        Avalonia.Automation.AutomationProperties.SetName(UseSuggestedNameButton, $"Use {suggested} as your name");
+    }
+
+    private void OnUseSuggestedName(object? sender, RoutedEventArgs e)
+    {
+        if (Vm is not { } vm || vm.SuggestedAuthorName is not { } name) return;
+        AuthorNameBox.Text = name;
+        CommitAuthorName();
     }
 
     // --- Links (app-side sidecar, see LinkPreferences) ---

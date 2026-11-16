@@ -599,6 +599,43 @@ public sealed partial class MainWindowViewModel
         }
     }
 
+    // --- Author name prompt ---
+    // The author is written into every annotation saved into a PDF, so it travels with the file: never set it
+    // from the OS silently. While no name is set, offer the account's name once per session when the reader
+    // starts annotating (entering annotation mode, or a reply), before anything is signed. "Stay unnamed"
+    // is remembered (AnnotationPreferences.AuthorNameDeclined); letting the toast time out asks next session.
+
+    private const int AuthorPromptDurationMs = 15000;
+    private bool _authorPromptShown;
+
+    /// <summary>The name to suggest as the author: the OS account's (see <see cref="AccountNameDetector"/>).</summary>
+    public string? SuggestedAuthorName => AccountNameDetector.Detect();
+
+    private void OfferAuthorName()
+    {
+        if (_authorPromptShown || AnnotationAuthorName is not null || _annotationPrefs.AuthorNameDeclined) return;
+        _authorPromptShown = true;
+        var buttons = new List<ToastButton>();
+        string message;
+        if (SuggestedAuthorName is { } name)
+        {
+            message = $"Sign your notes as \u201c{name}\u201d? The name is saved with them, also in PDFs you share.";
+            buttons.Add(new ToastButton($"Use \u201c{name}\u201d", () => AnnotationAuthorName = name));
+            buttons.Add(new ToastButton("Another name\u2026", () => OpenSettingsTab("Reading")));
+        }
+        else
+        {
+            message = "Sign your notes with your name? It is saved with them, also in PDFs you share.";
+            buttons.Add(new ToastButton("Set a name\u2026", () => OpenSettingsTab("Reading")));
+        }
+        buttons.Add(new ToastButton("Stay unnamed", () =>
+        {
+            _annotationPrefs.AuthorNameDeclined = true;
+            _annotationPrefs.Save();
+        }));
+        ShowStatusToast(message, buttons, AuthorPromptDurationMs);
+    }
+
     // --- Reply threads (Core 0.71.0) ---
     // Threads are flat: a reply to a reply attaches to the thread's root (DocumentModel.AddReply).
     // Deleting a comment deletes its replies with it (one undo step), as Acrobat does.
@@ -616,6 +653,7 @@ public sealed partial class MainWindowViewModel
         doc ??= _controller.FocusedViewport?.Owner ?? ActiveTab?.State;
         if (doc is null) return;
 
+        OfferAuthorName();
         string who = string.IsNullOrWhiteSpace(parent.Author) ? "comment" : parent.Author!;
         var dialog = new TextNoteDialog("")
         {

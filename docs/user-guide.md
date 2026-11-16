@@ -383,6 +383,8 @@ Toggle **Annotation Mode** from the toolbar's Annotate button (or `Ctrl+E`, the 
 
 Underline, Strikethrough, Squiggly, and Text Box have no numeric shortcut — pick them from the toolbar.
 
+**Signing your notes.** Every note and reply is saved with the name in **Settings > Reading > Annotations > Your name**, and that name goes into the PDF with them, so people you send the file to can see it. While the name is blank, the first time you start annotating in a session RailReader2 offers your computer account's name in the status bar: choose **Use**, **Another name…** to type your own, or **Stay unnamed** (it won't ask again). It never fills in a name without asking. The same name is suggested next to the box in Settings.
+
 ### Tool cursors
 
 Each annotation tool shows a distinct mouse cursor so you always know the active mode:

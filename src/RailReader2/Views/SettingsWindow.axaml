@@ -225,8 +225,13 @@
                         <Grid ColumnDefinitions="Auto,8,*">
                             <TextBlock Grid.Column="0" Text="Your name:" VerticalAlignment="Center"
                                        ToolTip.Tip="Saved with every annotation and reply you write, and shown on them in the Comments pane. Leave blank to stay unnamed." />
-                            <TextBox Grid.Column="2" Name="AuthorNameBox" Width="220" HorizontalAlignment="Left"
-                                     PlaceholderText="You" LostFocus="OnAuthorNameChanged" KeyDown="OnAuthorNameKeyDown" />
+                            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
+                                <TextBox Name="AuthorNameBox" Width="220" HorizontalAlignment="Left"
+                                         PlaceholderText="You" LostFocus="OnAuthorNameChanged" KeyDown="OnAuthorNameKeyDown" />
+                                <!-- The OS account's name, offered while the box is empty; never filled in silently. -->
+                                <Button Name="UseSuggestedNameButton" IsVisible="False" Padding="8,2"
+                                        VerticalAlignment="Center" Click="OnUseSuggestedName" />
+                            </StackPanel>
                         </Grid>
 
                         <StackPanel Classes="adv" Spacing="6">

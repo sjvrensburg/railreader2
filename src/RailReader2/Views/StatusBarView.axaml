@@ -24,9 +24,8 @@
                        a:AutomationProperties.Name="Notification">
                 <TextBlock Name="ToastText" DockPanel.Dock="Left" FontWeight="Bold"
                            VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-                <TextBlock Name="ToastAction" DockPanel.Dock="Left" IsVisible="False"
-                           TextDecorations="Underline" Cursor="Hand"
-                           VerticalAlignment="Center" Margin="12,0,0,0" />
+                <StackPanel Name="ToastActions" DockPanel.Dock="Left" Orientation="Horizontal"
+                            Spacing="12" VerticalAlignment="Center" Margin="12,0,0,0" />
                 <Panel /> <!-- fills the rest of the bar -->
             </DockPanel>
         </Panel>
