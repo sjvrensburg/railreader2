@@ -345,6 +345,17 @@ public sealed class LibraryIndexTests : IDisposable
         => Assert.Equal(expected, DocumentInfoCleaner.CleanTitle(raw));
 
     [Fact]
+    public void InfoCleaner_DropsPlaceholderAuthors_KeepsRealOnes()
+    {
+        var info = DocumentInfoCleaner.From(new RailReader.Core.Services.PdfMetadata(
+            "Chapter 2 Literature Review", "python-docx", null, null, null, null));
+        Assert.Equal(("Chapter 2 Literature Review", (string?)null), (info.Title, info.Author));
+        Assert.Equal("Jane Q. Example", DocumentInfoCleaner.From(new RailReader.Core.Services.PdfMetadata(
+            null, "Jane Q. Example", null, null, null, null)).Author);
+        Assert.Null(DocumentInfoCleaner.From(new RailReader.Core.Services.PdfMetadata(null, "Administrator", null, null, null, null)).Author);
+    }
+
+    [Fact]
     public void Indexer_ReadsPdfMetadata()
     {
         var path = Path.Combine(_dir, "meta.pdf");

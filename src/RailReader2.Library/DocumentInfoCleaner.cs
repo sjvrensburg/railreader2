@@ -42,6 +42,7 @@ public static partial class DocumentInfoCleaner
     static readonly HashSet<string> PlaceholderAuthors = new(StringComparer.OrdinalIgnoreCase)
     {
         "user", "admin", "administrator", "owner", "author", "unknown", "anonymous", "windows user", "default",
+        "python-docx", // the library's default core-properties author, seen on a real generated report
     };
 
     // "Microsoft Word - ", "Microsoft PowerPoint - " … the remainder is usually the file name.
