@@ -97,11 +97,17 @@ public sealed partial class MainWindowViewModel
     public void RefreshCurrentPageSearchMatches()
         => _controller.Search.UpdateCurrentPageMatches();
 
+    /// <summary>Raised when the active match moves (next/previous from any entry point: the pane, the
+    /// search bar, F3/the menu, or a click on a result), so the Search pane can scroll its list to it
+    /// (#300). Not raised on page changes or redraws, unlike <see cref="SearchInvalidated"/>.</summary>
+    public event Action? ActiveSearchMatchChanged;
+
     public void NextMatch()
     {
         if (IsScanAllActive) return;
         _controller.Search.NextMatch();
         InvalidateAfterNavigation();
+        ActiveSearchMatchChanged?.Invoke();
     }
 
     public void PreviousMatch()
@@ -109,6 +115,7 @@ public sealed partial class MainWindowViewModel
         if (IsScanAllActive) return;
         _controller.Search.PreviousMatch();
         InvalidateAfterNavigation();
+        ActiveSearchMatchChanged?.Invoke();
     }
 
     public void GoToMatch(int matchIndex)
@@ -116,5 +123,6 @@ public sealed partial class MainWindowViewModel
         if (IsScanAllActive) return;
         _controller.Search.GoToMatch(matchIndex);
         InvalidateAfterNavigation();
+        ActiveSearchMatchChanged?.Invoke();
     }
 }

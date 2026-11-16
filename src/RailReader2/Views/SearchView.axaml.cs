@@ -2,6 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using RailReader.Core.Models;
 using RailReader.Core.Services;
 using RailReader2.ViewModels;
@@ -77,6 +78,7 @@ public partial class SearchView : UserControl
         _vm.SearchInvalidated += UpdateMatchDisplay;
         _vm.SearchActivated += HandleSearchActivation;
         _vm.SearchCleared += ClearSearchUi;
+        _vm.ActiveSearchMatchChanged += OnActiveMatchChanged;
         UpdateMatchDisplay();
         HandleSearchActivation();
     }
@@ -89,6 +91,7 @@ public partial class SearchView : UserControl
             _vm.SearchInvalidated -= UpdateMatchDisplay;
             _vm.SearchActivated -= HandleSearchActivation;
             _vm.SearchCleared -= ClearSearchUi;
+            _vm.ActiveSearchMatchChanged -= OnActiveMatchChanged;
             _vm = null;
         }
         _debounceTimer?.Stop();
@@ -259,6 +262,9 @@ public partial class SearchView : UserControl
         }
     }
 
+    // Diagnostic (opt-in, read once): RR_SEARCH_TIMING=1 logs where a search's time goes to session.log.
+    private static readonly bool SearchTiming = Environment.GetEnvironmentVariable("RR_SEARCH_TIMING") == "1";
+
     private async Task RunSearchAsync()
     {
         if (_vm is null) return;
@@ -297,19 +303,38 @@ public partial class SearchView : UserControl
         _vm.InvalidateSearchLayer();
         SearchMatchCount.Text = "Searching...";
 
+        using var searchWork = _vm.BeginSearchWork();
         var allMatches = new List<SearchMatch>();
         const int batchSize = 20;
+        var total = SearchTiming ? System.Diagnostics.Stopwatch.StartNew() : null;
+        var inSearch = new System.Diagnostics.Stopwatch();
+        var inYield = new System.Diagnostics.Stopwatch();
+        var pageMs = SearchTiming ? new List<double>(doc.PageCount) : null;
 
         for (int page = 0; page < doc.PageCount; page++)
         {
             if (token.IsCancellationRequested) return;
 
+            long before = inSearch.ElapsedTicks;
+            inSearch.Start();
             SearchService.SearchPage(doc, page, query, regex, comparison, allMatches);
+            inSearch.Stop();
+            pageMs?.Add((inSearch.ElapsedTicks - before) * 1000.0 / System.Diagnostics.Stopwatch.Frequency);
 
             // Yield to UI every batch to stay responsive
             if (page % batchSize == batchSize - 1)
+            {
+                inYield.Start();
                 await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Background);
+                inYield.Stop();
+            }
         }
+        if (total is not null && pageMs is { Count: > 0 })
+            RailReader.Core.RailReaderLogging.Logger.Info(
+                $"[Search] {doc.PageCount} pages, {allMatches.Count} matches: total {total.ElapsedMilliseconds} ms, " +
+                $"SearchPage {inSearch.ElapsedMilliseconds} ms, yields {inYield.ElapsedMilliseconds} ms; per page: " +
+                $"median {pageMs.Order().ElementAt(pageMs.Count / 2):F1} ms, max {pageMs.Max():F0} ms, " +
+                $"{pageMs.Count(t => t > 50)} pages > 50 ms ({pageMs.Where(t => t > 50).Sum():F0} ms)");
 
         if (token.IsCancellationRequested) return;
 
@@ -328,6 +353,35 @@ public partial class SearchView : UserControl
             _vm.GoToPage(hitPage);
         BuildResultGroups();
         UpdateMatchDisplay();
+        ScrollToActiveMatch(); // a library hit's match may be hundreds of results down (#300)
+    }
+
+    private void OnActiveMatchChanged()
+    {
+        UpdateMatchDisplay();
+        ScrollToActiveMatch();
+    }
+
+    /// <summary>Scrolls the result list so the active match's row is visible (#300). Runs after layout:
+    /// right after a search the rows don't exist yet.</summary>
+    private void ScrollToActiveMatch()
+    {
+        if (_vm is null || !_vm.HasActiveSearchMatch) return;
+        int active = _vm.ActiveMatchIndex;
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (_vm is null || _vm.ActiveMatchIndex != active
+                || SearchResultsList.ItemsSource is not IReadOnlyList<SearchResultGroup> groups) return;
+            for (int g = 0; g < groups.Count; g++)
+            {
+                int i = groups[g].Items.FindIndex(it => it.MatchIndex == active);
+                if (i < 0) continue;
+                if (SearchResultsList.ContainerFromIndex(g) is not Control groupContainer) return;
+                var inner = groupContainer.GetVisualDescendants().OfType<ItemsControl>().FirstOrDefault();
+                (inner?.ContainerFromIndex(i) as Control ?? groupContainer).BringIntoView();
+                return;
+            }
+        }, DispatcherPriority.Loaded);
     }
 
     private void BuildResultGroups()

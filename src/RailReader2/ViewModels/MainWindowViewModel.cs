@@ -999,9 +999,43 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
                 return;
             }
 
+            // A running in-document search extracts every page's text on the UI thread; read-ahead
+            // renders pages under the same process-wide PDFium lock, which made a long book's search
+            // 2-3x slower (#301). Hold it back until the search ends (EndSearchWork restarts it).
+            if (_searchWork > 0) return;
+
             if (_controller.Worker.IsIdle)
                 _controller.TrySubmitBackgroundReadAhead();
         };
+    }
+
+    private int _searchWork;
+
+    /// <summary>Marks an in-document search as running: background read-ahead and the library backfill
+    /// hold back so they don't compete with it for PDFium (#301). Dispose when the search ends.</summary>
+    public IDisposable BeginSearchWork()
+    {
+        _searchWork++;
+        SyncLibraryBusy();
+        return new SearchWorkScope(this);
+    }
+
+    private void EndSearchWork()
+    {
+        if (_searchWork == 0 || --_searchWork > 0) return;
+        SyncLibraryBusy();
+        StartBackgroundAnalysis();
+    }
+
+    private sealed class SearchWorkScope(MainWindowViewModel vm) : IDisposable
+    {
+        private bool _done;
+        public void Dispose()
+        {
+            if (_done) return;
+            _done = true;
+            vm.EndSearchWork();
+        }
     }
 
     // True while the background timer is stopped only because rail reading is in progress (with work
