@@ -125,6 +125,7 @@ public partial class App : Application
 
             window.Opened += (_, _) => splash.Close();
             window.Opened += (_, _) => vm.FireAndForget(vm.RunStartupUpdateCheckAsync(), nameof(vm.RunStartupUpdateCheckAsync));
+            window.Opened += (_, _) => vm.StartLibraryBackfill();
             window.Closing += (_, _) => vm.Dispose();
             desktop.MainWindow = window;
 

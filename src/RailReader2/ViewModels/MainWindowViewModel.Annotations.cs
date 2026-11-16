@@ -578,6 +578,7 @@ public sealed partial class MainWindowViewModel
         if (string.Equals(ColourName(hexColour), string.IsNullOrWhiteSpace(name) ? null : name.Trim(), StringComparison.Ordinal)) return;
         _annotationPrefs.SetName(hexColour, name);
         _annotationPrefs.Save();
+        LibraryCategoryRenamed(hexColour);
         ColourNamesChanged?.Invoke();
     }
 

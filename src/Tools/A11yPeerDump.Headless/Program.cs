@@ -79,6 +79,8 @@ bool PumpUntil(Func<bool> done, int maxTicks)
 }
 
 var appConfig = AppConfig.Load();
+// Headless tools must not index documents into the reader's real library database.
+Environment.SetEnvironmentVariable("RR_DISABLE_LIBRARY_INDEX", "1");
 var vm = new MainWindowViewModel(appConfig);
 var window = new MainWindow { DataContext = vm };
 vm.SetWindow(window);

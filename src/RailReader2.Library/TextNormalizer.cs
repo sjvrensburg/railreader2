@@ -3,7 +3,9 @@ using System.Text;
 namespace RailReader2.Library;
 
 /// <summary>Index-time text normalisation (design §4.1): NFKC, line-end de-hyphenation, whitespace
-/// collapse. Applied to what is indexed, never to the PDF.</summary>
+/// collapse. Applied to what is indexed, never to the PDF.
+/// <para>Known gap: a glyph with no Unicode mapping comes out of PDFium as a control character (a broken
+/// "fi" ligature: "uni\u001Ced"); it is treated as a space, so that word won't match.</para></summary>
 public static class TextNormalizer
 {
     public static string Normalize(string text)
@@ -15,6 +17,14 @@ public static class TextNormalizer
         for (int i = 0; i < s.Length; i++)
         {
             char c = s[i];
+            // PDFium reports a hyphen it found at the end of a line as U+0002, usually with no line
+            // break after it: "Trans\u0002formers". Treat it as a hyphen followed by a line break.
+            if (c == '\u0002')
+            {
+                if (pendingSpace || sb.Length == 0) { pendingSpace = true; continue; }
+                sb.Append('-');
+                c = '\n';
+            }
             if (c is '\r' or '\n')
             {
                 // "estima-\ntion" -> "estimation": a hyphen ending a line, lower-case letter after it.

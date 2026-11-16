@@ -523,6 +523,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             ShowStatusToast($"Couldn't locate the saved annotations for {Path.GetFileName(path)} — see the log."));
         _controller = new DocumentController(config.ToCoreSettings(), config, CompositeAnnotationStore.Default,
             new AvaloniaThreadMarshaller(), new RailReader.Renderer.Skia.SkiaPdfServiceFactory(), _logger);
+        InitLibrary();
         var ocrPrefs = OcrPreferences.Load();
         var ocrMode = ocrPrefs.Mode;
         // A non-default choice takes effect on next launch, not live — AnalysisWorker constructs
@@ -1112,6 +1113,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             ? (frameTime - last).TotalSeconds
             : 1.0 / 60.0;
         _lastFrameTime = frameTime;
+        if (_library is { } library) library.IsBusy = IsRailReading; // hold back library backfill while reading
         // Round to whole compositor frames: the timestamp carries dispatcher latency, and auto-scroll
         // turns any dt jitter into position jitter (see FramePacer).
         double dt = _framePacer.Pace(rawDt, presented: _lastFrameDrew);
@@ -1263,6 +1265,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         UnwireFocusedSignals();
         DisposePortalImages();
         DisposeFreezeImages();
+        ShutdownLibrary(); // before the models go: it snapshots their notes and OCR text
         _controller.Dispose();
     }
 

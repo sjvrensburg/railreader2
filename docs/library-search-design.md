@@ -1,6 +1,6 @@
 # Library search and recents dashboard (design)
 
-**Status:** Design agreed 2026-11-16 (open questions decided, §12). Phase 0 spike done (§11a).
+**Status:** Design agreed 2026-11-16 (open questions decided, §12). Phase 0 spike done (§11a); Phase 1 index + CLI done (§11b).
 **Roadmap item:** M7 (features adapted from the Cauchy viewer): library-wide full-text search and a recents dashboard keyed by content id.
 **Depends on:** content-based document identity (`DocumentIdentity`, Core 0.75.0+), sidecar annotations keyed by content id (Core 0.72.0+).
 
@@ -211,6 +211,32 @@ Spike: `src/RailReader2.Library` (`SqliteProbe`, `TextNormalizer`, `LibraryBench
 - **Query latency:** 0.01–5.4 ms median on 861 pages (prefix `contrast*` slowest). Far inside the 50 ms target; re-measure at 20k pages in Phase 1.
 - **Query syntax:** raw FTS5 syntax errors throw (`NEAR/5` is not FTS5 syntax). Phase 1's `LibraryQuery` must parse user input and quote terms itself, never pass it to `MATCH` as is.
 - **glibc floor (decided 2026-11-16: accept 2.34).** SQLitePCLRaw 2.1.12+ ships a `libe_sqlite3.so` built against **glibc 2.34** (`dlopen`/`pthread_*` symbols). Everything RailReader2 ships today needs at most 2.28 (ONNX Runtime; .NET itself needs 2.27). Using it unchanged drops Debian 11, Ubuntu 20.04 and RHEL/Alma/Rocky 8 (all past standard support except EL8, supported to 2029). 2.1.11's native library needs 2.28 but carries SQLite 3.49.1. **Decision:** take the current package and document glibc 2.34 as the Linux floor (Ubuntu 22.04+, Debian 12+, Fedora 35+, EL9+), rather than pin an older SQLite or build our own. The floor only bites where SQLite is loaded (the CLI's `library` commands now, the app from Phase 2), so the README's Linux requirements change with Phase 2.
+
+## 11b. Phase 1 results (2026-11-16)
+
+Built: `LibraryIndex` (schema §6.1 with an integer `doc_key` in every FTS row, plus a `name_fts` table for file names; read-only open; unreadable or newer-schema databases moved aside and rebuilt), `LibraryIndexer` (PDF → pages, outline, notes), `LibraryQuery` (reader input → quoted FTS5 terms: words, `"phrases"`, `prefix*`, `-excluded`; FTS5 operators are literal words, so no input can raise a syntax error), `LibraryWriter` (the app's single writer thread), CLI `library search|status|bench`, and 50 tests in `tests/RailReader.Export.Tests/Library/`.
+
+**Query set** `tests/library/queries.json`: 48 known-item queries (phrases, word bags, rare terms, authors, stemmed forms, section titles, the reader's notes) and 6 absent terms, over the published papers in `experiments/PDFs/`. Each query was taken from the labelled page by reading it; the absent terms were checked to occur nowhere in the corpus. The corpus's private documents (invoices, letters) are left out.
+
+| | |
+|---|---|
+| recall@10 | 97.9 % (47/48) |
+| MRR | 0.938 |
+| empty-result precision (absent terms) | 100 % (6/6) |
+| query latency p95, 861 pages | 1.5 ms |
+| search at 21,000 pages / 700 documents (corpus cloned 25×, 100 MB) | 10–60 ms per CLI call, process start included |
+| indexing incl. annotations | ~125 pages/s (single thread) |
+
+- **Ranking:** bm25 per table, merged with weights (outline 1.6, notes 1.4, file name 2.0) and a 1.5× first-page weight, which moved the "Vaswani" author query from rank 9 (citing papers' reference lists are denser in the name) to rank 1, MRR 0.929 → 0.938. 3.0 started costing section-title queries.
+- **The one miss** is a Porter stemmer limit: "diagnosing" (`diagnos`) does not match "diagnosis" (`diagnosi`). Kept in the set as a known miss.
+- **Normalisation fix found while labelling:** PDFium reports a line-end hyphen as U+0002 with no line break, so "Trans\u0002formers" had been indexed as two words. Now joined (kept as a hyphen before a capital). Known gap: a glyph with no Unicode mapping (a broken "fi" ligature) arrives as a control character and splits its word.
+
+**Deviations from §5:**
+- **Notes are re-indexed when a document's last tab closes and at shutdown**, not on each auto-save: Core has no "annotations saved" event (`AnnotationFileManager` saves on its own timer). Notes are also refreshed on every open. A crash loses only the index's copy of that session's note edits, which the next open restores.
+- **Backfill enumerates documents** from `DocumentIdentity`'s map file (read tolerantly: its `files` array; a format change finds nothing rather than failing) plus the recent-files list. Core has no public "list documents" call; worth adding upstream.
+- **No PDF metadata (Title/Author)** yet: the PDF service doesn't expose it and the shell must not call PDFium directly. File names are indexed instead. Another candidate for Core.
+- **Opening a document extracts it on the writer thread** even while rail reading (only the backfill pauses). PDFium calls are per page, so a render waits at most one page's extraction (~5 ms typical, ~70 ms worst seen).
+- Library tests live in the existing test project, beside the other shell tests, not a new one.
 
 ## 12. Decisions
 
