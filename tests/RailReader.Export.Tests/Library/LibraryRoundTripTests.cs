@@ -37,7 +37,11 @@ public sealed class LibraryRoundTripTests : IDisposable
             new SkiaPdfServiceFactory(), Path.Combine(_dir, "library.db"));
         Assert.True(ok, report);
         Assert.Contains("FTS5: yes", report);
-        Assert.Matches(@"Native SQLite loaded from: \S*(lib)?e_sqlite3\.(so|dll|dylib)", report); // the native library, not its managed wrapper
+        Assert.Contains("Native SQLite loaded from:", report);
+        // Never the managed wrapper (SQLitePCLRaw.provider.e_sqlite3.dll), which shares the name. Where the
+        // native file is loaded from depends on the host (the test host differs from the app); the app's own
+        // folder is checked on Windows by installer/test-library-probe.ps1.
+        Assert.False(report.Contains("provider.e_sqlite3", StringComparison.OrdinalIgnoreCase), report);
         Assert.Contains("1 hit(s)", report);
         Assert.EndsWith("OK" + Environment.NewLine, report);
     }
