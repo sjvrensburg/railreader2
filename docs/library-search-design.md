@@ -1,6 +1,6 @@
 # Library search and recents dashboard (design)
 
-**Status:** Draft for discussion, 2026-11-11. Nothing implemented.
+**Status:** Design agreed 2026-11-16 (open questions decided, §12). Phase 0 spike in progress.
 **Roadmap item:** M7 (features adapted from the Cauchy viewer): library-wide full-text search and a recents dashboard keyed by content id.
 **Depends on:** content-based document identity (`DocumentIdentity`, Core 0.75.0+), sidecar annotations keyed by content id (Core 0.72.0+).
 
@@ -18,7 +18,7 @@ M7 adds:
 ### Non-goals (v1)
 
 - **Semantic or "concept" search** (embeddings). See §9: the schema leaves room for it as a later opt-in download, but v1 is lexical.
-- Indexing PDFs the reader has never opened (no folder crawling). See §3, open question Q1.
+- Indexing PDFs the reader has never opened (no folder crawling). See §3 and Q1.
 - Running OCR just to index a scanned document.
 - Question answering over the library (that is M5's territory).
 
@@ -30,7 +30,7 @@ An embedding model (e.g. Google's EmbeddingGemma, ~300M parameters) would add co
 
 ## 3. What "the library" is
 
-**Proposal:** the library is every document RailReader2 has resolved an identity for, i.e. every PDF the reader has opened (the entries of `ConfigDir/document_ids.json`), plus any future one at its first open.
+The library is every document RailReader2 has resolved an identity for, i.e. every PDF the reader has opened (the entries of `ConfigDir/document_ids.json`), plus any future one at its first open.
 
 - No folder crawling or watched folders in v1. They raise permission, scale and "why is this paper here?" questions, and most readers' working set is what they have opened.
 - Backfill on first run: documents already in the identity map are indexed in the background from their last known path (§5.3).
@@ -87,7 +87,7 @@ At startup, after the main window opens, one background `Task` walks the identit
 
 ### 5.4 Encrypted PDFs
 
-The password is never persisted, and the index would store the document's text in plaintext. **Proposal:** do not index the page text of encrypted PDFs. Index only metadata that PDFium exposes without the password (file name), and mark the entry "locked: open to read". Open question Q4 asks whether to allow indexing after the reader opens it with the password, behind a per-document opt-in.
+The password is never persisted, and the index would store the document's text in plaintext. The page text of encrypted PDFs is not indexed. Only metadata available without the password (file name) is indexed, and the entry is marked "locked: open to read". Indexing after the reader opens it with the password, behind a per-document opt-in, is deferred (Q4) until a reader asks for it.
 
 ## 6. Storage
 
@@ -199,9 +199,9 @@ The v1 schema needs nothing for this beyond `indexer_version`.
 3. **Dashboard:** welcome-panel recents with thumbnails and progress.
 4. **Docs:** user guide section, privacy page (the index is local and holds document text; how to clear it), CLAUDE.md.
 
-## 12. Open questions
+## 12. Decisions
 
-| # | Question | Recommendation |
+| # | Question | Decision (2026-11-16) |
 |---|---|---|
 | Q1 | Library = opened documents only, or also watched folders? | Opened only for v1. Folders later if asked for. |
 | Q2 | Index reviewers' in-PDF comments, or only the reader's own notes? | Both, labelled ("your note" / "reviewer comment") and filterable. |
