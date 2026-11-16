@@ -233,8 +233,9 @@ Built: `LibraryIndex` (schema §6.1 with an integer `doc_key` in every FTS row, 
 
 **Deviations from §5:**
 - **Notes are re-indexed when a document's last tab closes and at shutdown**, not on each auto-save: Core has no "annotations saved" event (`AnnotationFileManager` saves on its own timer). Notes are also refreshed on every open. A crash loses only the index's copy of that session's note edits, which the next open restores.
-- **Backfill enumerates documents** from `DocumentIdentity`'s map file (read tolerantly: its `files` array; a format change finds nothing rather than failing) plus the recent-files list. Core has no public "list documents" call; worth adding upstream.
+- **Backfill enumerates documents** from `DocumentIdentity`'s map file (read tolerantly: the path keys of its `files` object; a format change finds nothing rather than failing — Phase 1 first read the wrong shape, and only the live-app test caught it, since the unit test had been written to the same assumption) plus the recent-files list. Core has no public "list documents" call; worth adding upstream.
 - **No PDF metadata (Title/Author)** yet: the PDF service doesn't expose it and the shell must not call PDFium directly. File names are indexed instead. Another candidate for Core.
+- **Live-app check (2026-11-16):** opening a PDF indexed it within ~2 s, the CLI read the index while the app had it open (WAL), a reviewer comment came back as "reviewer comment (Reviewer X)", closing the window shut down in ~1 s, and the backfill indexed all 15 surviving identity-map documents (1,024 pages, incl. a 615-page book) in ~30 s, skipping 10 missing files quietly. The rail-reading pause was not exercised live (covered by `LibraryWriterTests`).
 - **Opening a document extracts it on the writer thread** even while rail reading (only the backfill pauses). PDFium calls are per page, so a render waits at most one page's extraction (~5 ms typical, ~70 ms worst seen).
 - Library tests live in the existing test project, beside the other shell tests, not a new one.
 

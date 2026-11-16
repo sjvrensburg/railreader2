@@ -247,8 +247,10 @@ public sealed class LibraryIndexTests : IDisposable
     public void KnownDocuments_ReadsTheMapTolerantly()
     {
         var map = Path.Combine(_dir, "document_ids.json");
-        File.WriteAllText(map, """{"version":1,"files":[["/a.pdf",{"id":"x"}],["/b.pdf",{}],[42],"junk"],"aliases":[]}""");
+        File.WriteAllText(map, """{"version":1,"files":{"/a.pdf":{"size":1,"mtime_ticks":2,"id":"x"},"/b.pdf":{}},"aliases":{},"paths":{}}""");
         Assert.Equal(["/a.pdf", "/b.pdf"], KnownDocuments.FromIdentityMap(map));
+        File.WriteAllText(map, """{"version":1,"files":[["/a.pdf",{}]]}"""); // an unknown shape finds nothing
+        Assert.Empty(KnownDocuments.FromIdentityMap(map));
         File.WriteAllText(map, "{ not json");
         Assert.Empty(KnownDocuments.FromIdentityMap(map));
         Assert.Empty(KnownDocuments.FromIdentityMap(Path.Combine(_dir, "none.json")));
