@@ -313,7 +313,7 @@ Press `Ctrl+F` to open the **Search** section of the side panel (one of the acco
 
 ## Library Search
 
-Library search looks through every PDF you have opened in railreader2 at once. It finds words in the pages, the outline (table of contents), your notes and comments, comments that other people wrote into the PDF, your named bookmarks, and file names. Use it when you remember what a paper said but not which paper said it.
+Library search looks through every PDF you have opened in railreader2 at once. It finds words in the pages, the outline (table of contents), your notes and comments, comments that other people wrote into the PDF, your named bookmarks, file names, and the title, author and keywords stored in the PDF. Use it when you remember what a paper said but not which paper said it.
 
 Open it with `Ctrl+Shift+F`, **File > Search Library…**, the search box on the welcome screen, or **Search all documents ↗** in the Search panel (which carries your search over). The Library window works with no document open, and stays open while you read.
 
@@ -331,7 +331,7 @@ There is no special syntax to get wrong: any other punctuation is treated as ord
 
 Results are grouped by document, the best match first, with up to three snippets each. Matched words are in bold, and each snippet says where it came from: *page 12*, *outline*, *your note*, *reviewer comment (name)*, *bookmark*, or *OCR text, unverified* for text that was read from a scanned page. A note's colour category is shown too, if you have given its colour a name (**Settings > Reading > Annotations**, advanced view).
 
-Use the checkboxes to search only page text, notes and comments, the outline or file names; **Only documents with notes**; or, once you've named a colour, a single **colour category**.
+Use the checkboxes to search only page text, notes and comments, the outline, or titles and file names; **Only documents with notes**; or, once you've named a colour, a single **colour category**.
 
 Click a result, or move to it with the arrow keys and press `Enter`. The document opens (or its tab comes to the front) at that page:
 

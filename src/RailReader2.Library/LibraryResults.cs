@@ -1,10 +1,15 @@
 namespace RailReader2.Library;
 
 /// <summary>One document's results in the Library window (design §7.1): its best few hits, the number of
-/// hits in all, and whether its file is still where the index last saw it.</summary>
+/// hits in all, and whether its file is still where the index last saw it. <see cref="Title"/> and
+/// <see cref="Authors"/> come from the PDF's metadata (null when it has none worth showing).</summary>
 public sealed record LibraryResultGroup(
     string ContentId, string? LastPath, string FileName, int HitCount, double BestScore,
-    IReadOnlyList<LibraryHit> Hits, bool Missing, int NoteCount);
+    IReadOnlyList<LibraryHit> Hits, bool Missing, int NoteCount, string? Title = null, string? Authors = null)
+{
+    /// <summary>What to call the document: its metadata title, else its file name.</summary>
+    public string DisplayName => Title ?? FileName;
+}
 
 public static class LibraryResults
 {
@@ -34,14 +39,17 @@ public static class LibraryResults
             var all = byDoc[id];
             var chosen = new List<LibraryHit>();
             var pages = new HashSet<(HitSource, int?)>();
-            foreach (var h in all)
+            // Whole-document hits (file name, title/author) only fill slots page hits leave: the header
+            // row already shows them, so taking a slot would hide a page snippet.
+            var ranked = all.Where(h => h.Page is not null).Concat(all.Where(h => h.Page is null)).ToList();
+            foreach (var h in ranked)
                 if (chosen.Count < perDocument && pages.Add((h.Source, h.Page))) chosen.Add(h);
-            foreach (var h in all)
+            foreach (var h in ranked)
                 if (chosen.Count < perDocument && !chosen.Contains(h)) chosen.Add(h);
             var first = all[0];
             bool missing = first.LastPath is not { Length: > 0 } p || !SafeExists(exists, p);
             groups.Add(new LibraryResultGroup(id, first.LastPath, first.FileName, all.Count, first.Score, chosen,
-                missing, noteCounts?.GetValueOrDefault(id) ?? 0));
+                missing, noteCounts?.GetValueOrDefault(id) ?? 0, first.Title, first.Authors));
         }
         return groups;
     }
@@ -66,6 +74,7 @@ public static class LibraryResults
             HitSource.Note => $"{page} · {(IsReviewer(h, readerName) ? $"reviewer comment{(h.Author is { } a ? $" ({a})" : "")}" : "your note")}"
                 + (h.Category is { Length: > 0 } c ? $" · {c}" : ""),
             HitSource.Name => "file name",
+            HitSource.Details => "title, author or keywords",
             _ => page,
         };
     }

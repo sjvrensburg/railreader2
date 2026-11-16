@@ -313,22 +313,19 @@ public partial class SearchView : UserControl
 
         if (token.IsCancellationRequested) return;
 
-        _vm.Controller.Search.FinalizeSearch(doc, allMatches);
+        // Opened from a library hit: Core activates the first match on or after the hit's page
+        // (not the one after the view's current page, which hasn't moved there yet).
+        int? startPage = _pendingStartPage;
+        _pendingStartPage = null;
+        _vm.Controller.Search.FinalizeSearch(doc, allMatches, startPage);
         // FinalizeSearch auto-navigates the document to the first match's page, so we
         // need a full invalidation (page bitmap + camera + overlays), not just the
         // search layer — otherwise the new page's highlights paint over the old page.
         _vm.InvalidateAfterSearch();
-        if (_pendingStartPage is int startPage)
-        {
-            // Opened from a library hit: show the hit's page, not the document's first match.
-            _pendingStartPage = null;
-            var matches = _vm.SearchMatches;
-            int index = -1;
-            for (int i = 0; i < matches.Count && index < 0; i++) if (matches[i].PageIndex == startPage) index = i;
-            for (int i = 0; i < matches.Count && index < 0; i++) if (matches[i].PageIndex > startPage) index = i;
-            if (index >= 0) _vm.GoToMatch(index);
-            else _vm.GoToPage(startPage);
-        }
+        // Core wraps to the document's first match when none is on or after the hit's page (the
+        // highlight pattern didn't match the PDF's own text there): show the hit's page instead.
+        if (startPage is int hitPage && !allMatches.Any(m => m.PageIndex >= hitPage))
+            _vm.GoToPage(hitPage);
         BuildResultGroups();
         UpdateMatchDisplay();
     }

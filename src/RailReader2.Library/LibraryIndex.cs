@@ -12,9 +12,9 @@ namespace RailReader2.Library;
 public sealed class LibraryIndex : IDisposable
 {
     /// <summary>Bumped when extraction or normalisation changes, so documents are re-extracted.</summary>
-    public const int IndexerVersion = 1;
+    public const int IndexerVersion = 2; // 2: PDF metadata (title, author, subject, keywords)
     /// <summary>Bumped when the table layout changes. A newer schema than this is "unreadable".</summary>
-    public const int SchemaVersion = 2;
+    public const int SchemaVersion = 3; // 3: documents.title/authors + info_fts (migrated in place from 2)
 
     // Every FTS row's rowid is (doc_key << RowShift) | n, so one document's rows are a single rowid range:
     // deleting or listing them is a b-tree range lookup. Filtering on the UNINDEXED doc_key column instead
@@ -27,7 +27,7 @@ public sealed class LibraryIndex : IDisposable
 
     // How much a match counts by where it was found. bm25 is per table, so these only nudge the merge;
     // tuned with `library bench` against tests/library/queries.json.
-    const double PageWeight = 1.0, OutlineWeight = 1.6, NoteWeight = 1.4, NameWeight = 2.0;
+    const double PageWeight = 1.0, OutlineWeight = 1.6, NoteWeight = 1.4, NameWeight = 2.0, DetailsWeight = 2.0;
     // A paper's title, authors and abstract are on its first page; a citing paper's reference list
     // mentions the same names more densely. 1.5 took the author queries in the bench set from MRR 0.929 to 0.938; 3.0 started to cost section-title queries.
     const double FirstPageWeight = 1.5;
@@ -110,6 +110,14 @@ public sealed class LibraryIndex : IDisposable
             int version = ReadSchemaVersion(conn);
             if (version > SchemaVersion)
                 throw new UnreadableIndexException($"schema {version} is newer than {SchemaVersion}");
+            if (version == 2)
+            {
+                // 2 → 3 only adds metadata, so it is migrated rather than rebuilt: the open history, the
+                // removed list and the backfill setting survive. IndexerVersion went up with it, so the
+                // backfill re-extracts each document (now with its metadata) as it walks the library.
+                MigrateFrom2(conn);
+                version = SchemaVersion;
+            }
             if (version is > 0 and < SchemaVersion)
             {
                 // An older layout. The index is only a copy of what is stored elsewhere, so it is rebuilt
@@ -149,6 +157,18 @@ public sealed class LibraryIndex : IDisposable
 
     const int SqliteCorrupt = 11, SqliteNotADb = 26; // SQLITE_CORRUPT, SQLITE_NOTADB (primary codes)
 
+    const string InfoFtsSql = $"create virtual table info_fts using fts5(title, author, subject, keywords, doc_key unindexed, {Tokenizer})";
+
+    static void MigrateFrom2(SqliteConnection conn)
+    {
+        using var tx = conn.BeginTransaction();
+        Exec(conn, "alter table documents add column title text", tx);
+        Exec(conn, "alter table documents add column authors text", tx);
+        Exec(conn, InfoFtsSql, tx);
+        Exec(conn, $"update meta set value = '{SchemaVersion}' where key = 'schema_version'", tx);
+        tx.Commit();
+    }
+
     static int ReadSchemaVersion(SqliteConnection conn)
     {
         if (Scalar(conn, "select count(*) from sqlite_schema where type = 'table' and name = 'meta'") is not "1")
@@ -177,7 +197,9 @@ public sealed class LibraryIndex : IDisposable
               state           integer not null default 0,
               indexed_utc     text,
               last_opened_utc text,
-              last_page       integer)
+              last_page       integer,
+              title           text,
+              authors         text)
             """,
             // Integer doc_key, not the 64-character content id, in every FTS row (Phase 0: per-row ids
             // were a visible share of the database).
@@ -190,6 +212,7 @@ public sealed class LibraryIndex : IDisposable
                {Tokenizer})
              """,
             $"create virtual table name_fts using fts5(name, doc_key unindexed, {Tokenizer})",
+            InfoFtsSql,
             $"insert into meta(key, value) values ('schema_version', '{SchemaVersion}')",
         })
             Exec(conn, sql, tx);
@@ -228,7 +251,9 @@ public sealed class LibraryIndex : IDisposable
         (DocumentState)r.GetInt32(r.GetOrdinal("state")),
         Date(Str(r, "indexed_utc")),
         Date(Str(r, "last_opened_utc")),
-        r.IsDBNull(r.GetOrdinal("last_page")) ? null : r.GetInt32(r.GetOrdinal("last_page")));
+        r.IsDBNull(r.GetOrdinal("last_page")) ? null : r.GetInt32(r.GetOrdinal("last_page")),
+        Str(r, "title"),
+        Str(r, "authors"));
 
     /// <summary>True when <paramref name="contentId"/> has no current index entry for the file as it is
     /// now at <paramref name="path"/>: never indexed, indexed by an older indexer, or the file's size
@@ -303,7 +328,7 @@ public sealed class LibraryIndex : IDisposable
 
     // ---------------------------------------------------------------- searching
 
-    /// <summary>Searches page text, outlines, notes and file names. Hits are merged across sources by a
+    /// <summary>Searches page text, outlines, notes, file names and document metadata (title, author, subject, keywords). Hits are merged across sources by a
     /// weighted bm25 (higher <see cref="LibraryHit.Score"/> is better); at most
     /// <paramref name="limit"/> are returned. An empty query returns nothing.</summary>
     /// <para><paramref name="sources"/> limits the search to some sources (null = all).</para>
@@ -317,39 +342,54 @@ public sealed class LibraryIndex : IDisposable
 
         if (Want(HitSource.Page)) Collect(hits, $"""
             select d.content_id, d.last_path, d.file_name, f.page, snippet(page_fts, 0, $o, $c, '…', 16),
-                   bm25(page_fts), f.from_ocr
+                   bm25(page_fts), f.from_ocr, d.title, d.authors
             from page_fts f join documents d on d.doc_key = f.doc_key
             where page_fts match $q order by bm25(page_fts) limit $n
             """, match, limit, open, close,
             r => new LibraryHit(r.GetString(0), Str(r, 1), r.GetString(2), r.GetInt32(3), HitSource.Page,
-                r.GetString(4), -r.GetDouble(5) * PageWeight * (r.GetInt32(3) == 0 ? FirstPageWeight : 1.0), FromOcr: r.GetInt32(6) != 0));
+                r.GetString(4), -r.GetDouble(5) * PageWeight * (r.GetInt32(3) == 0 ? FirstPageWeight : 1.0), FromOcr: r.GetInt32(6) != 0,
+                Title: Str(r, 7), Authors: Str(r, 8)));
 
         if (Want(HitSource.Outline)) Collect(hits, $"""
-            select d.content_id, d.last_path, d.file_name, f.page, highlight(outline_fts, 0, $o, $c), bm25(outline_fts)
+            select d.content_id, d.last_path, d.file_name, f.page, highlight(outline_fts, 0, $o, $c), bm25(outline_fts),
+                   d.title, d.authors
             from outline_fts f join documents d on d.doc_key = f.doc_key
             where outline_fts match $q order by bm25(outline_fts) limit $n
             """, match, limit, open, close,
             r => new LibraryHit(r.GetString(0), Str(r, 1), r.GetString(2), r.GetInt32(3), HitSource.Outline,
-                r.GetString(4), -r.GetDouble(5) * OutlineWeight));
+                r.GetString(4), -r.GetDouble(5) * OutlineWeight, Title: Str(r, 6), Authors: Str(r, 7)));
 
         // Comments count double against the text under a highlight; author/category are labels.
         if (Want(HitSource.Note)) Collect(hits, $"""
             select d.content_id, d.last_path, d.file_name, f.page, snippet(note_fts, -1, $o, $c, '…', 16),
-                   bm25(note_fts, 1.0, 2.0, 0.5, 1.0), f.kind, f.author, f.source, f.native_id, f.category
+                   bm25(note_fts, 1.0, 2.0, 0.5, 1.0), f.kind, f.author, f.source, f.native_id, f.category,
+                   d.title, d.authors
             from note_fts f join documents d on d.doc_key = f.doc_key
             where note_fts match $q order by bm25(note_fts, 1.0, 2.0, 0.5, 1.0) limit $n
             """, match, limit, open, close,
             r => new LibraryHit(r.GetString(0), Str(r, 1), r.GetString(2), r.GetInt32(3), HitSource.Note,
                 r.GetString(4), -r.GetDouble(5) * NoteWeight, NoteKind: Str(r, 6), Author: Str(r, 7),
-                NoteOrigin: (NoteSource)r.GetInt32(8), NativeId: Str(r, 9), Category: Str(r, 10)));
+                NoteOrigin: (NoteSource)r.GetInt32(8), NativeId: Str(r, 9), Category: Str(r, 10),
+                Title: Str(r, 11), Authors: Str(r, 12)));
 
         if (Want(HitSource.Name)) Collect(hits, $"""
-            select d.content_id, d.last_path, d.file_name, highlight(name_fts, 0, $o, $c), bm25(name_fts)
+            select d.content_id, d.last_path, d.file_name, highlight(name_fts, 0, $o, $c), bm25(name_fts),
+                   d.title, d.authors
             from name_fts f join documents d on d.doc_key = f.doc_key
             where name_fts match $q order by bm25(name_fts) limit $n
             """, match, limit, open, close,
             r => new LibraryHit(r.GetString(0), Str(r, 1), r.GetString(2), null, HitSource.Name,
-                r.GetString(3), -r.GetDouble(4) * NameWeight));
+                r.GetString(3), -r.GetDouble(4) * NameWeight, Title: Str(r, 5), Authors: Str(r, 6)));
+
+        // Title and author count like a file name; subject and keywords are looser descriptions.
+        if (Want(HitSource.Details)) Collect(hits, $"""
+            select d.content_id, d.last_path, d.file_name, snippet(info_fts, -1, $o, $c, '…', 16),
+                   bm25(info_fts, 1.0, 1.0, 0.5, 0.5), d.title, d.authors
+            from info_fts f join documents d on d.doc_key = f.doc_key
+            where info_fts match $q order by bm25(info_fts, 1.0, 1.0, 0.5, 0.5) limit $n
+            """, match, limit, open, close,
+            r => new LibraryHit(r.GetString(0), Str(r, 1), r.GetString(2), null, HitSource.Details,
+                r.GetString(3), -r.GetDouble(4) * DetailsWeight, Title: Str(r, 5), Authors: Str(r, 6)));
 
         hits.Sort((a, b) => b.Score.CompareTo(a.Score));
         return hits.Count > limit ? hits.GetRange(0, limit) : hits;
@@ -376,7 +416,7 @@ public sealed class LibraryIndex : IDisposable
         EnsureWritable();
         using var tx = _conn.BeginTransaction();
         long key = UpsertDocument(doc, tx);
-        DeleteRows(key, tx, "page_fts", "outline_fts", "note_fts", "name_fts");
+        DeleteRows(key, tx, "page_fts", "outline_fts", "note_fts", "name_fts", "info_fts");
 
         InsertPages(key, doc.Pages, tx, skip: null);
         using (var cmd = Command("insert into outline_fts(rowid, title, doc_key, page) values ($r, $t, $k, $p)", tx))
@@ -395,6 +435,17 @@ public sealed class LibraryIndex : IDisposable
         }
         InsertNotes(key, doc.Notes, categoryOf, tx);
         InsertName(key, doc.Path, tx);
+        if (doc.Info is { IsEmpty: false } info)
+        {
+            using var cmd = Command("insert into info_fts(rowid, title, author, subject, keywords, doc_key) values ($r, $t, $a, $s, $kw, $k)", tx);
+            cmd.Parameters.AddWithValue("$r", RowId(key, 0));
+            cmd.Parameters.AddWithValue("$t", info.Title ?? "");
+            cmd.Parameters.AddWithValue("$a", info.Author ?? "");
+            cmd.Parameters.AddWithValue("$s", info.Subject ?? "");
+            cmd.Parameters.AddWithValue("$kw", info.Keywords ?? "");
+            cmd.Parameters.AddWithValue("$k", key);
+            cmd.ExecuteNonQuery();
+        }
         tx.Commit();
     }
 
@@ -512,7 +563,7 @@ public sealed class LibraryIndex : IDisposable
         EnsureWritable();
         if (KeyOf(contentId) is not { } key) return false;
         using var tx = _conn.BeginTransaction();
-        DeleteRows(key, tx, "page_fts", "outline_fts", "note_fts", "name_fts");
+        DeleteRows(key, tx, "page_fts", "outline_fts", "note_fts", "name_fts", "info_fts");
         using (var cmd = Command("delete from documents where doc_key = $k", tx))
         {
             cmd.Parameters.AddWithValue("$k", key);
@@ -559,7 +610,7 @@ public sealed class LibraryIndex : IDisposable
         EnsureWritable();
         using (var tx = _conn.BeginTransaction())
         {
-            foreach (var t in new[] { "page_fts", "outline_fts", "note_fts", "name_fts", "documents", "removed" })
+            foreach (var t in new[] { "page_fts", "outline_fts", "note_fts", "name_fts", "info_fts", "documents", "removed" })
                 Exec(_conn, $"delete from {t}", tx);
             SetMeta("backfill", backfill ? "on" : "off", tx);
             tx.Commit();
@@ -572,7 +623,7 @@ public sealed class LibraryIndex : IDisposable
     public void Optimize()
     {
         EnsureWritable();
-        foreach (var t in new[] { "page_fts", "outline_fts", "note_fts", "name_fts" })
+        foreach (var t in new[] { "page_fts", "outline_fts", "note_fts", "name_fts", "info_fts" })
             Exec(_conn, $"insert into {t}({t}) values ('optimize')");
         Exec(_conn, "pragma wal_checkpoint(truncate)");
         Exec(_conn, "vacuum");
@@ -582,13 +633,14 @@ public sealed class LibraryIndex : IDisposable
     {
         using var cmd = Command("""
             insert into documents(content_id, last_path, file_name, page_count, file_size, file_mtime,
-                                  indexer_version, encrypted, state, indexed_utc)
-            values ($id, $p, $f, $pc, $s, $m, $v, $e, $st, $t)
+                                  indexer_version, encrypted, state, indexed_utc, title, authors)
+            values ($id, $p, $f, $pc, $s, $m, $v, $e, $st, $t, $ti, $au)
             on conflict(content_id) do update set
               last_path = excluded.last_path, file_name = excluded.file_name, page_count = excluded.page_count,
               file_size = excluded.file_size, file_mtime = excluded.file_mtime,
               indexer_version = excluded.indexer_version, encrypted = excluded.encrypted,
-              state = excluded.state, indexed_utc = excluded.indexed_utc
+              state = excluded.state, indexed_utc = excluded.indexed_utc,
+              title = excluded.title, authors = excluded.authors
             returning doc_key
             """, tx);
         cmd.Parameters.AddWithValue("$id", doc.ContentId);
@@ -601,6 +653,8 @@ public sealed class LibraryIndex : IDisposable
         cmd.Parameters.AddWithValue("$e", doc.Encrypted ? 1 : 0);
         cmd.Parameters.AddWithValue("$st", (int)doc.State);
         cmd.Parameters.AddWithValue("$t", DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture));
+        cmd.Parameters.AddWithValue("$ti", (object?)doc.Info?.Title ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("$au", (object?)doc.Info?.Author ?? DBNull.Value);
         return Convert.ToInt64(cmd.ExecuteScalar(), CultureInfo.InvariantCulture);
     }
 

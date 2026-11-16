@@ -71,13 +71,31 @@ public sealed class LibraryWriterTests : IDisposable
     }
 
     [Fact]
+    public void NotesSaved_RefreshesNotes_OnlyForAnIndexedDocument()
+    {
+        var pdf = MakePdf("saved.pdf", "spectral clustering");
+        using (var w = new LibraryWriter(Db, new SkiaPdfServiceFactory()))
+        {
+            w.NotesSaved(pdf, "s1", Notes("too early")); // not indexed yet: its open job indexes the notes
+            Assert.True(w.WaitForForeground(Wait));
+            Assert.Empty(Search("early"));
+
+            w.DocumentOpened(pdf, "s1", encrypted: false, Notes("opening note"), page: 0);
+            w.NotesSaved(pdf, "s1", Notes("autosaved note"));
+            Assert.True(w.WaitForForeground(Wait));
+        }
+        Assert.Empty(Search("opening"));
+        Assert.Single(Search("autosaved"));
+    }
+
+    [Fact]
     public void Closed_AddsOcrOnlyText_AndRecordsThePage()
     {
         var pdf = MakePdf("scan.pdf", "native words", "");
         using (var w = new LibraryWriter(Db, new SkiaPdfServiceFactory()))
         {
             w.DocumentOpened(pdf, "scan", false, null, 0);
-            w.DocumentClosed(pdf, "scan", false, null, [new PageEntry(1, "recognised words", true)], page: 1);
+            w.DocumentClosed(pdf, "scan", false, [new PageEntry(1, "recognised words", true)], page: 1);
             Assert.True(w.WaitForForeground(Wait));
         }
         var hit = Assert.Single(Search("recognised"));
@@ -93,7 +111,8 @@ public sealed class LibraryWriterTests : IDisposable
         using (var w = new LibraryWriter(Db, new SkiaPdfServiceFactory()))
         {
             w.DocumentOpened(pdf, "secret", encrypted: true, Notes("private note"), 0);
-            w.DocumentClosed(pdf, "secret", encrypted: true, Notes("private note"), [new PageEntry(0, "ocr words", true)], 0);
+            w.NotesSaved(pdf, "secret", Notes("private note"));
+            w.DocumentClosed(pdf, "secret", encrypted: true, [new PageEntry(0, "ocr words", true)], 0);
             Assert.True(w.WaitForForeground(Wait));
         }
         Assert.Empty(Search("confidential"));

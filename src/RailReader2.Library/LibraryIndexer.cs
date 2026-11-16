@@ -47,7 +47,10 @@ public static class LibraryIndexer
             }
             var outline = FlattenOutline(pdf.Outline, pdf.PageCount);
             var notes = annotations is null ? [] : Notes(annotations, p => (uint)p < (uint)pageTexts.Length ? pageTexts[p] : null);
-            return new DocumentContent(contentId, path, size, mtime, pdf.PageCount, false, pages, outline, notes);
+            // Optional backend capability (Core 0.87.0): PDFium's text service has it. Reuses the document
+            // the text extraction above already opened (same bytes).
+            var info = text is IPdfMetadataService m ? DocumentInfoCleaner.From(m.GetMetadata(pdf.PdfBytes)) : null;
+            return new DocumentContent(contentId, path, size, mtime, pdf.PageCount, false, pages, outline, notes, Info: info);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
