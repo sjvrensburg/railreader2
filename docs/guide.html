@@ -41,7 +41,7 @@
         "description": "Complete user guide for railreader2 — a desktop PDF viewer with AI-guided rail reading. Covers rail mode, auto-scroll, jump mode, colour effects, annotations, search, bookmarks, portals, and all keyboard shortcuts.",
         "url": "https://sjvrensburg.github.io/railreader2/guide.html",
         "datePublished": "2026-02-26",
-        "dateModified": "2026-06-09",
+        "dateModified": "2026-11-16",
         "author": {
           "@type": "Person",
           "name": "Stéfan Janse van Rensburg"
@@ -122,6 +122,7 @@
         <li><a href="#freeze-panes">Freeze Panes</a></li>
         <li><a href="#colour-effects">Colour Effects</a></li>
         <li><a href="#search">Search</a></li>
+        <li><a href="#library-search">Library Search</a></li>
         <li><a href="#annotations">Annotations</a></li>
         <li><a href="#pdf-links">PDF Links</a></li>
         <li><a href="#text-selection">Text Selection</a></li>
@@ -165,7 +166,11 @@
         Use <strong>File &rarr; Open</strong> or press <code>Ctrl+O</code> to open a PDF.
         You can also pass a file path as a command-line argument.
         When no file is open, a welcome panel shows an <strong>Open a PDF&hellip;</strong> button and
-        a few quick hints for getting started with rail reading.
+        a few quick hints for getting started with rail reading. Once you have opened some documents,
+        it also lists your <strong>recent documents</strong> &mdash; each with a picture of its first
+        page, how far you&rsquo;ve read (&ldquo;page 41 of 230&rdquo;) and how many notes it has &mdash;
+        and a box for <a href="#library-search">searching all of them</a>. Click a document to open it
+        where you left off.
       </p>
 
       <h3>First steps</h3>
@@ -645,6 +650,98 @@
         <li><strong>Match count:</strong> The panel shows the current match index and total count (e.g. &ldquo;3 of 42&rdquo;).</li>
         <li><strong>Clear:</strong> Click the clear button (&times;) to remove all highlights and results, or press <code>Escape</code>.</li>
       </ul>
+    </section>
+
+    <!-- Library Search -->
+    <section class="guide-section" id="library-search">
+      <h2>Library Search</h2>
+      <p>
+        Library search looks through every PDF you have opened in railreader2 at once. It finds words
+        in the pages, the outline (table of contents), your notes and comments, comments that other
+        people wrote into the PDF, your named bookmarks, and file names. Use it when you remember what
+        a paper said but not which paper said it.
+      </p>
+      <p>
+        Open it with <code>Ctrl+Shift+F</code>, <strong>File &rarr; Search Library&hellip;</strong>, the
+        search box on the welcome screen, or <strong>Search all documents &nearr;</strong> in the Search
+        panel (which carries your search over). The Library window works with no document open, and
+        stays open while you read.
+      </p>
+
+      <h3>Typing a search</h3>
+      <ul>
+        <li>Every word must appear on the page (or in the note): <code>bootstrap confidence band</code>.</li>
+        <li>Put a phrase in quotes to find the words together: <code>"wild bootstrap"</code>.</li>
+        <li>End a word with <code>*</code> to find words that start with it: <code>heterosced*</code>.</li>
+        <li>Put <code>-</code> before a word to leave out results that contain it: <code>ridge -lasso</code>.</li>
+        <li>Capitals and accents don&rsquo;t matter, and common word endings are matched loosely:
+          <code>estimators</code> also finds <em>estimation</em>.</li>
+      </ul>
+      <p>There is no special syntax to get wrong: any other punctuation is treated as ordinary text.</p>
+
+      <h3>Results</h3>
+      <p>
+        Results are grouped by document, the best match first, with up to three snippets each. Matched
+        words are in bold, and each snippet says where it came from: <em>page 12</em>, <em>outline</em>,
+        <em>your note</em>, <em>reviewer comment (name)</em>, <em>bookmark</em>, or <em>OCR text,
+        unverified</em> for text that was read from a scanned page. A note&rsquo;s colour category is shown
+        too, if you have given its colour a name (<strong>Settings &gt; Reading &gt; Annotations</strong>,
+        advanced view).
+      </p>
+      <p>
+        Use the checkboxes to search only page text, notes and comments, the outline or file names;
+        <strong>Only documents with notes</strong>; or, once you&rsquo;ve named a colour, a single
+        <strong>colour category</strong>.
+      </p>
+      <p>
+        Click a result, or move to it with the arrow keys and press <code>Enter</code>. The document
+        opens (or its tab comes to the front) at that page:
+      </p>
+      <ul>
+        <li>for a note or comment, the note is selected, as in the <a href="#comments">Comments</a> panel;</li>
+        <li>otherwise the Search panel opens with your words highlighted on that page. In a long book
+          the highlighting can take a few seconds to appear.</li>
+      </ul>
+      <p>
+        A comment counts as <em>your note</em> when its author is the name in
+        <strong>Settings &gt; Reading &gt; Annotations</strong>; anyone else&rsquo;s is a
+        <em>reviewer comment</em>.
+      </p>
+
+      <h3>Which documents are included</h3>
+      <ul>
+        <li>Every PDF is added when you open it. The documents you had opened before this feature
+          existed are added in the background after the app starts; this pauses while you are rail
+          reading. The Library window shows &ldquo;Indexing 3 of 12&hellip;&rdquo; while it runs.</li>
+        <li>Your notes are brought up to date when you close the document.</li>
+        <li><strong>Password-protected PDFs</strong> are found only by file name: their text is never stored.</li>
+        <li><strong>Scanned pages</strong> are searchable only if they have a text layer (File &rarr; Add a
+          Text Layer) or were read with OCR while you had the document open.</li>
+      </ul>
+
+      <h3>Moved and deleted files</h3>
+      <p>A document whose file is no longer where it was is shown greyed, with two buttons:</p>
+      <ul>
+        <li><strong>Locate&hellip;</strong> &mdash; choose the file in its new place. It is accepted only
+          if it is the same document (the same contents), and nothing changes otherwise.</li>
+        <li><strong>Remove from Library</strong> &mdash; forgets the document&rsquo;s search entry. Your
+          notes, bookmarks and portals are kept, and the document comes back if you open it again.</li>
+      </ul>
+
+      <h3 id="library-privacy">Privacy</h3>
+      <p>
+        The library is stored only on your computer, in <code>library</code> inside the settings folder
+        (<code>~/.config/railreader2/library</code> on Linux, <code>%APPDATA%\railreader2\library</code>
+        on Windows). It holds a copy of your documents&rsquo; text and notes, and the first-page pictures
+        shown on the welcome screen. Nothing is sent anywhere. See also the
+        <a href="privacy.html">privacy policy</a>.
+      </p>
+      <p>
+        <strong>Settings &gt; Library</strong> (in the advanced view) shows its size and has two buttons.
+        <strong>Rebuild Index</strong> reads every document you have opened again. <strong>Clear
+        Index</strong> deletes it: documents come back only as you open them again. Neither touches your
+        PDFs, notes or portals.
+      </p>
     </section>
 
     <!-- 9. Annotations -->
@@ -1298,6 +1395,26 @@ railreader2-cli unpack &lt;package&gt; [options]</code></pre>
           <tr><td><code>--output-dir &lt;dir&gt;</code></td><td><code>unpack</code>: where to extract (default: a folder named after the package)</td></tr>
         </tbody>
       </table>
+
+      <h3>library &mdash; search the library from the command line</h3>
+      <p>
+        <code>library search</code> runs a <a href="#library-search">library search</a> and prints the
+        matches. <code>library status</code> shows how many documents, pages and notes the library holds
+        and its size. Both only read the app&rsquo;s library; they never change it, so they are safe to run
+        while the app is open.
+      </p>
+      <pre><code>railreader2-cli library search "wild bootstrap" [--json] [--limit 20]
+railreader2-cli library status [--documents]</code></pre>
+      <table class="shortcuts-table">
+        <thead class="sr-only">
+          <tr><th>Option</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>--json</code></td><td><code>search</code>: print the results as JSON</td></tr>
+          <tr><td><code>--limit &lt;n&gt;</code></td><td><code>search</code>: the most results to print (default: 20)</td></tr>
+          <tr><td><code>--documents</code></td><td><code>status</code>: also list every document</td></tr>
+        </tbody>
+      </table>
     </section>
 
     <!-- 12. Settings -->
@@ -1311,8 +1428,8 @@ railreader2-cli unpack &lt;package&gt; [options]</code></pre>
         Settings opens in a <strong>simple view</strong>: five pages &mdash; Reading, Appearance,
         Auto-Scroll, Scanned Pages, and Spelling &mdash; holding the settings most readers change.
         Turn on <strong>Show advanced settings</strong> at the bottom of the window to reveal the
-        fine-tuning controls on those pages and six more pages: Rendering, Analysis, Layout Model,
-        Performance, Models, and AI Assistant. The switch is remembered. Links from in-app notices
+        fine-tuning controls on those pages and seven more pages: Rendering, Analysis, Layout Model,
+        Performance, Models, AI Assistant, and Library. The switch is remembered. Links from in-app notices
         that point at an advanced page reveal the advanced view for that visit only.
       </p>
       <p>
@@ -1472,6 +1589,10 @@ railreader2-cli unpack &lt;package&gt; [options]</code></pre>
           each other.</li>
         <li><strong>AI Assistant:</strong> The vision-language-model endpoint for Copy as LaTeX &mdash;
           see <a href="#vlm">Copy as LaTeX (VLM)</a>.</li>
+        <li><strong>Library:</strong> How many documents, pages and notes the
+          <a href="#library-search">library search</a> holds and how much space it takes, with
+          <strong>Rebuild Index</strong> and <strong>Clear Index</strong> (see
+          <a href="#library-privacy">Privacy</a>).</li>
       </ul>
 
       <h3>Config file</h3>
@@ -1665,6 +1786,7 @@ railreader2-cli unpack &lt;package&gt; [options]</code></pre>
         <tbody>
           <tr><th colspan="2" scope="rowgroup">Search &amp; Annotations</th></tr>
           <tr><td>Ctrl+F</td><td>Open search panel</td></tr>
+          <tr><td>Ctrl+Shift+F</td><td>Search all your documents (Library)</td></tr>
           <tr><td>F3 / Shift+F3</td><td>Next / previous match</td></tr>
           <tr><td>Ctrl+E</td><td>Toggle annotation mode</td></tr>
           <tr><td>1 / 2 / 3 / 4 / 5</td><td>Highlight / Pen / Rectangle / Text Note / Eraser</td></tr>
@@ -1689,7 +1811,7 @@ railreader2-cli unpack &lt;package&gt; [options]</code></pre>
         navigation, and assistive technologies. There are six menus:
       </p>
       <ul>
-        <li><strong>File</strong> &mdash; open, recent files, duplicate / close tab, export &amp; import annotations, settings, quit.</li>
+        <li><strong>File</strong> &mdash; open, recent files, <strong>Search Library&hellip;</strong>, duplicate / close tab, export &amp; import annotations, settings, quit.</li>
         <li><strong>Edit</strong> &mdash; find, annotation mode, undo / redo, and <strong>Copy Block as LaTeX / Markdown / Description / Image</strong> (the same VLM block actions as the block right-click menu, acting on the current rail block).</li>
         <li><strong>View</strong> &mdash; zoom and fit, <strong>Rotate</strong>, side panels, minimap, fullscreen, <strong>Split Editor</strong> (split right, move pane to a new window, close panes), debug overlay, colour effects.</li>
         <li><strong>Rail</strong> &mdash; <strong>Start Rail Here</strong>, <strong>Reading Guide</strong> and <strong>Rotate to Read Block</strong> (<code>R</code> / <code>K</code> / <code>U</code>), then the rail-reading toggles: <strong>Auto-Scroll</strong>, <strong>Jump Mode</strong>, <strong>Line Focus Dim</strong>, <strong>Line Highlight</strong>, and <strong>Add Bookmark</strong> (mirroring the <code>P</code> / <code>J</code> / <code>F</code> / <code>H</code> / <code>B</code> shortcuts).</li>

@@ -16,19 +16,20 @@ Everything you need to know to get the most out of railreader2.
 8. [Freeze Panes](#freeze-panes)
 9. [Colour Effects](#colour-effects)
 10. [Search](#search)
-11. [Annotations](#annotations)
-12. [PDF Links](#pdf-links)
-13. [Text Selection](#text-selection)
-14. [Bookmarks](#bookmarks)
-15. [Index Pane](#index-pane)
-16. [Comments](#comments)
-17. [Portals](#portals)
-18. [Copy as LaTeX (VLM)](#copy-as-latex-vlm)
-19. [CLI Tool](#cli-tool)
-20. [Settings](#settings)
-21. [Troubleshooting](#troubleshooting)
-22. [Keyboard Shortcuts](#keyboard-shortcuts)
-23. [Menu Bar](#menu-bar)
+11. [Library Search](#library-search)
+12. [Annotations](#annotations)
+13. [PDF Links](#pdf-links)
+14. [Text Selection](#text-selection)
+15. [Bookmarks](#bookmarks)
+16. [Index Pane](#index-pane)
+17. [Comments](#comments)
+18. [Portals](#portals)
+19. [Copy as LaTeX (VLM)](#copy-as-latex-vlm)
+20. [CLI Tool](#cli-tool)
+21. [Settings](#settings)
+22. [Troubleshooting](#troubleshooting)
+23. [Keyboard Shortcuts](#keyboard-shortcuts)
+24. [Menu Bar](#menu-bar)
 
 ---
 
@@ -56,7 +57,7 @@ When there is a new version:
 
 ### Opening a PDF
 
-Use **File > Open** or press `Ctrl+O` to open a PDF. You can also pass a file path as a command-line argument. When no file is open, a welcome panel shows an **Open a PDF…** button and a few quick hints for getting started with rail reading.
+Use **File > Open** or press `Ctrl+O` to open a PDF. You can also pass a file path as a command-line argument. When no file is open, a welcome panel shows an **Open a PDF…** button and a few quick hints for getting started with rail reading. Once you have opened some documents, it also lists your **recent documents** — each with a picture of its first page, how far you've read ("page 41 of 230") and how many notes it has — and a box for [searching all of them](#library-search). Click a document to open it where you left off.
 
 ### First steps
 
@@ -307,6 +308,57 @@ Press `Ctrl+F` to open the **Search** section of the side panel (one of the acco
 - **Regex:** Toggle with the `.*` button for regular expression search.
 - **Match count:** The panel shows the current match index and total count (e.g. "3 of 42").
 - **Clear:** Click the clear button (✕) to remove all highlights and results, or press `Escape`.
+
+---
+
+## Library Search
+
+Library search looks through every PDF you have opened in railreader2 at once. It finds words in the pages, the outline (table of contents), your notes and comments, comments that other people wrote into the PDF, your named bookmarks, and file names. Use it when you remember what a paper said but not which paper said it.
+
+Open it with `Ctrl+Shift+F`, **File > Search Library…**, the search box on the welcome screen, or **Search all documents ↗** in the Search panel (which carries your search over). The Library window works with no document open, and stays open while you read.
+
+### Typing a search
+
+- Every word must appear on the page (or in the note): `bootstrap confidence band`.
+- Put a phrase in quotes to find the words together: `"wild bootstrap"`.
+- End a word with `*` to find words that start with it: `heterosced*`.
+- Put `-` before a word to leave out results that contain it: `ridge -lasso`.
+- Capitals and accents don't matter, and common word endings are matched loosely: `estimators` also finds *estimation*.
+
+There is no special syntax to get wrong: any other punctuation is treated as ordinary text.
+
+### Results
+
+Results are grouped by document, the best match first, with up to three snippets each. Matched words are in bold, and each snippet says where it came from: *page 12*, *outline*, *your note*, *reviewer comment (name)*, *bookmark*, or *OCR text, unverified* for text that was read from a scanned page. A note's colour category is shown too, if you have given its colour a name (**Settings > Reading > Annotations**, advanced view).
+
+Use the checkboxes to search only page text, notes and comments, the outline or file names; **Only documents with notes**; or, once you've named a colour, a single **colour category**.
+
+Click a result, or move to it with the arrow keys and press `Enter`. The document opens (or its tab comes to the front) at that page:
+
+- for a note or comment, the note is selected, as in the [Comments](#comments) panel;
+- otherwise the Search panel opens with your words highlighted on that page. In a long book the highlighting can take a few seconds to appear.
+
+A comment counts as *your note* when its author is the name in **Settings > Reading > Annotations**; anyone else's is a *reviewer comment*.
+
+### Which documents are included
+
+- Every PDF is added when you open it. The documents you had opened before this feature existed are added in the background after the app starts; this pauses while you are rail reading. The Library window shows "Indexing 3 of 12…" while it runs.
+- Your notes are brought up to date when you close the document.
+- **Password-protected PDFs** are found only by file name: their text is never stored.
+- **Scanned pages** are searchable only if they have a text layer ([Add a Text Layer](#scanned-pages)) or were read with OCR while you had the document open.
+
+### Moved and deleted files
+
+A document whose file is no longer where it was is shown greyed, with two buttons:
+
+- **Locate…** — choose the file in its new place. It is accepted only if it is the same document (the same contents), and nothing changes otherwise.
+- **Remove from Library** — forgets the document's search entry. Your notes, bookmarks and portals are kept, and the document comes back if you open it again.
+
+### Privacy
+
+The library is stored only on your computer, in `library` inside the settings folder (`~/.config/railreader2/library` on Linux, `%APPDATA%\railreader2\library` on Windows). It holds a copy of your documents' text and notes, and the first-page pictures shown on the welcome screen. Nothing is sent anywhere.
+
+**Settings > Library** (in the advanced view) shows its size and has two buttons. **Rebuild Index** reads every document you have opened again. **Clear Index** deletes it: documents come back only as you open them again. Neither touches your PDFs, notes or portals.
 
 ---
 
@@ -830,13 +882,28 @@ railreader2-cli update download --channel appimage --output-dir ~/Downloads
 | `--channel <name>` | `download`: `appimage`, `inno` (the Windows installer) or `tarball` |
 | `--output-dir <dir>` | `download`: where to save the file (default: the current folder) |
 
+### library — search the library from the command line
+
+`library search` runs a [library search](#library-search) and prints the matches. `library status` shows how many documents, pages and notes the library holds and its size. Both only read the app's library; they never change it, so they are safe to run while the app is open.
+
+```
+railreader2-cli library search "wild bootstrap" [--json] [--limit 20]
+railreader2-cli library status [--documents]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--json` | `search`: print the results as JSON |
+| `--limit <n>` | `search`: the most results to print (default: 20) |
+| `--documents` | `status`: also list every document |
+
 ---
 
 ## Settings
 
 Press `Ctrl+,` or use the menu to open Settings. Changes take effect immediately and are saved automatically.
 
-Settings opens in a **simple view**: five pages holding the settings most readers change. Turn on **Show advanced settings** at the bottom of the window to reveal the fine-tuning controls on those pages (shown indented beneath the simple ones) and six more pages — Rendering, Analysis, Layout Model, Performance, Models and AI Assistant. The switch is remembered. Links from in-app notices that point at an advanced page reveal the advanced view for that visit only.
+Settings opens in a **simple view**: five pages holding the settings most readers change. Turn on **Show advanced settings** at the bottom of the window to reveal the fine-tuning controls on those pages (shown indented beneath the simple ones) and seven more pages — Rendering, Analysis, Layout Model, Performance, Models, AI Assistant and Library. The switch is remembered. Links from in-app notices that point at an advanced page reveal the advanced view for that visit only.
 
 Colour effect, margin cropping and the current-line style are kept per document — `C`, `F`, `H` and the View/Rail menus change only the document you're looking at. Settings shows the focused document's values; changing one there sets both that document and the default for documents you open later.
 
@@ -909,6 +976,7 @@ A scanned page is a picture of text. It carries no text layer, so everything bui
 - **Performance — GPU acceleration:** Off by default. A preset picker (CPU only / Faster page navigation / Faster scanned-document OCR) or individual toggles run layout analysis *or* OCR on your GPU via WebGPU — not both at once. Layout on GPU is roughly 8–10x faster on supported hardware and applies only to Docling Heron and PP-DocLayoutV3 (PP-DocLayout-S and any custom model always run on CPU); everything falls back to CPU automatically if no compatible GPU is found. **Needs a restart.** Heron's GPU model is a separate one-time download (run `./scripts/download-model.sh heron-gpu` or use the in-app **Download GPU model** button); PP-DocLayoutV3 needs no extra download. On Linux laptops with two GPUs, **Display GPU** draws the window on the discrete GPU instead.
 - **Models:** Read-only — which layout model, OCR pack and accelerators are actually running this session, what a restart would change, and advisories for combinations that work against each other.
 - **AI Assistant:** The vision-language-model endpoint for Copy as LaTeX — see [Copy as LaTeX (VLM)](#copy-as-latex-vlm).
+- **Library:** How many documents, pages and notes the [library search](#library-search) holds and how much space it takes, with **Rebuild Index** and **Clear Index** (see [Privacy](#privacy)).
 
 ### Config file
 
@@ -1019,6 +1087,7 @@ The log is overwritten at the start of each session. Old `.log` files are automa
 | Key | Action |
 |-----|--------|
 | `Ctrl+F` | Open search panel |
+| `Ctrl+Shift+F` | Search all your documents (Library) |
 | `F3` / `Shift+F3` | Next / previous match |
 | `1` / `2` / `3` / `4` / `5` | Highlight / Pen / Rectangle / Text Note / Eraser |
 | Right-click | Annotation actions (copy / cut / delete / paste here) + block actions (Copy as LaTeX / Markdown / Description / Image) + toggle Annotation Mode |
@@ -1038,7 +1107,7 @@ The log is overwritten at the start of each session. Old `.log` files are automa
 
 Every command is reachable from the menu bar by name — handy for discovery, keyboard navigation, and assistive technologies. There are six menus:
 
-- **File** — open, recent files, duplicate / close tab, export & import annotations, settings, quit.
+- **File** — open, recent files, **Search Library…**, duplicate / close tab, export & import annotations, settings, quit.
 - **Edit** — find, annotation mode, undo / redo, and **Copy Block as LaTeX / Markdown / Description / Image** (the same VLM block actions as the block right-click menu, acting on the current rail block).
 - **View** — zoom and fit, **Rotate**, side panels, minimap, fullscreen, **Split Editor** (split right, move pane to a new window, close panes), debug overlay, colour effects.
 - **Rail** — **Start Rail Here**, **Reading Guide**, and **Rotate to Read Block** (`R` / `K` / `U`), then the rail-reading toggles: **Auto-Scroll**, **Jump Mode**, **Line Focus Dim**, **Line Highlight**, and **Add Bookmark** (mirroring the `P` / `J` / `F` / `H` / `B` shortcuts).

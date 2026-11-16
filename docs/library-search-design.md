@@ -1,6 +1,6 @@
 # Library search and recents dashboard (design)
 
-**Status:** Design agreed 2026-11-16 (open questions decided, §12). Phase 0 spike done (§11a); Phase 1 index + CLI done (§11b); Phase 2 Library window done (§11c); Phase 3 recents dashboard done (§11d).
+**Status:** Design agreed 2026-11-16 (open questions decided, §12). Phase 0 spike done (§11a); Phase 1 index + CLI done (§11b); Phase 2 Library window done (§11c); Phase 3 recents dashboard done (§11d); Phase 4 docs done (user guide §Library Search in `user-guide.md` and `guide.html`, privacy page, README, website feature card, about-page credit for SQLite).
 **Roadmap item:** M7 (features adapted from the Cauchy viewer): library-wide full-text search and a recents dashboard keyed by content id.
 **Depends on:** content-based document identity (`DocumentIdentity`, Core 0.75.0+), sidecar annotations keyed by content id (Core 0.72.0+).
 
