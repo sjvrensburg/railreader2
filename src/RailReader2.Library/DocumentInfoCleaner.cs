@@ -23,7 +23,7 @@ public static partial class DocumentInfoCleaner
         t = ToolPrefix().Replace(t, "");
         if (t.Length < 3 || !t.Any(char.IsLetter)) return null;
         if (FileLike().IsMatch(t) || t.Contains('\\') || t.StartsWith('/')) return null;
-        if (Placeholders.Contains(t)) return null;
+        if (Placeholders.Contains(t) || DefaultName().IsMatch(t)) return null;
         return t;
     }
 
@@ -48,6 +48,11 @@ public static partial class DocumentInfoCleaner
     // "Microsoft Word - ", "Microsoft PowerPoint - " … the remainder is usually the file name.
     [GeneratedRegex(@"^Microsoft\s+\w+\s+-\s+", RegexOptions.IgnoreCase)]
     private static partial Regex ToolPrefix();
+
+    // An authoring tool's name for a new, unsaved file ("Document1", "Presentation2", "Untitled-3"),
+    // what is left after "Microsoft Word - " when the reader never named the file.
+    [GeneratedRegex(@"^(document|presentation|book|untitled|slide)[\s_-]*\d+$", RegexOptions.IgnoreCase)]
+    private static partial Regex DefaultName();
 
     // A file name: no spaces needed, a document/source extension at the end ("main.tex", "ch3.dvi").
     [GeneratedRegex(@"\.(pdf|docx?|odt|rtf|txt|tex|dvi|e?ps|pptx?|key|pages|indd|qxd|md|html?)$", RegexOptions.IgnoreCase)]

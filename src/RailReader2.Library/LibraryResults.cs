@@ -39,9 +39,12 @@ public static class LibraryResults
             var all = byDoc[id];
             var chosen = new List<LibraryHit>();
             var pages = new HashSet<(HitSource, int?)>();
-            foreach (var h in all)
+            // Whole-document hits (file name, title/author) only fill slots page hits leave: the header
+            // row already shows them, so taking a slot would hide a page snippet.
+            var ranked = all.Where(h => h.Page is not null).Concat(all.Where(h => h.Page is null)).ToList();
+            foreach (var h in ranked)
                 if (chosen.Count < perDocument && pages.Add((h.Source, h.Page))) chosen.Add(h);
-            foreach (var h in all)
+            foreach (var h in ranked)
                 if (chosen.Count < perDocument && !chosen.Contains(h)) chosen.Add(h);
             var first = all[0];
             bool missing = first.LastPath is not { Length: > 0 } p || !SafeExists(exists, p);

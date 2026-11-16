@@ -45,6 +45,19 @@ public sealed class LibraryWindowSupportTests : IDisposable
     }
 
     [Fact]
+    public void Group_WholeDocumentHits_DontTakePageSnippetSlots()
+    {
+        var hits = new[]
+        {
+            Hit("a", null, 9, HitSource.Name), Hit("a", null, 8, HitSource.Details), Hit("a", 0, 3), Hit("a", 4, 2), Hit("a", 6, 1),
+        };
+        var a = Assert.Single(LibraryResults.Group(hits, perDocument: 3, exists: _ => true));
+        Assert.Equal(5, a.HitCount);
+        Assert.Equal([0, 4, 6], a.Hits.Select(h => h.Page!.Value));
+        Assert.Equal(9, a.BestScore);
+    }
+
+    [Fact]
     public void Group_MarksMissingFiles_AndCountsNotes()
     {
         var groups = LibraryResults.Group([Hit("a", 0, 1), Hit("b", 0, 1, path: "")],

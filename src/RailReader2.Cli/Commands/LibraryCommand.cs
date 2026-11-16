@@ -75,6 +75,8 @@ public static class LibraryCommand
                 w.WriteString("content_id", h.ContentId);
                 w.WriteString("path", h.LastPath);
                 w.WriteString("file", h.FileName);
+                if (h.Title is not null) w.WriteString("title", h.Title);
+                if (h.Authors is not null) w.WriteString("authors", h.Authors);
                 if (h.Page is int p) w.WriteNumber("page", p); else w.WriteNull("page");
                 w.WriteString("source", Label(h, me));
                 w.WriteString("snippet", h.Snippet);

@@ -95,6 +95,7 @@ public sealed class LibraryWriter : IDisposable
     public void DocumentOpened(string path, string contentId, bool encrypted, AnnotationFile? annotations, int? page)
         => Enqueue(index =>
         {
+            ForgetMarkupText(contentId); // a new session: the file may have changed since
             index.Unremove(contentId); // opening a removed document brings it back (design §3)
             if (encrypted)
             {
@@ -106,7 +107,7 @@ public sealed class LibraryWriter : IDisposable
             }
             else if (annotations is not null)
             {
-                index.ReplaceNotes(contentId, NotesWithMarkupText(path, annotations, _cts.Token), CategoryOf);
+                index.ReplaceNotes(contentId, NotesWithMarkupText(path, contentId, annotations, _cts.Token), CategoryOf);
             }
             index.RecordOpen(contentId, path, page, DateTime.UtcNow);
         });
@@ -120,7 +121,7 @@ public sealed class LibraryWriter : IDisposable
         => Enqueue(index =>
         {
             if (index.GetDocument(contentId) is not { State: not DocumentState.Locked, Encrypted: false }) return;
-            index.ReplaceNotes(contentId, NotesWithMarkupText(path, annotations, _cts.Token), CategoryOf);
+            index.ReplaceNotes(contentId, NotesWithMarkupText(path, contentId, annotations, _cts.Token), CategoryOf);
         });
 
     /// <summary>A document's last tab closed (or the app is closing): add any page text that only this
@@ -128,6 +129,7 @@ public sealed class LibraryWriter : IDisposable
     public void DocumentClosed(string path, string contentId, bool encrypted, IReadOnlyList<PageEntry> ocrPages, int? page)
         => Enqueue(index =>
         {
+            ForgetMarkupText(contentId);
             if (index.GetDocument(contentId) is null) return;
             if (!encrypted && ocrPages.Count > 0) index.AddOcrPages(contentId, ocrPages);
             index.RecordOpen(contentId, path, page, DateTime.UtcNow);
@@ -345,29 +347,51 @@ public sealed class LibraryWriter : IDisposable
     string? CategoryOf(string? hex)
         => hex is not null && Categories.TryGetValue(hex.Trim().ToUpperInvariant(), out var n) && n.Length > 0 ? n : null;
 
+    // Writer thread only. Text of the marked pages of the document whose notes were last re-indexed, so
+    // a run of auto-saves while the reader highlights doesn't re-open the PDF and re-read every marked
+    // page on each save (foreground jobs don't wait for IsBusy, so that work competes with rail
+    // rendering for PDFium). Keyed by content id, which an annotation write-back keeps; dropped when
+    // the document is opened or closed, so it lives for one reading session. A null value is a page
+    // outside the document.
+    string? _markupTextId;
+    readonly Dictionary<int, PageText?> _markupText = new();
+
+    void ForgetMarkupText(string contentId)
+    {
+        if (_markupTextId != contentId) return;
+        _markupTextId = null;
+        _markupText.Clear();
+    }
+
     /// <summary>Notes for an already-indexed document: page text is read only for pages carrying markup.</summary>
-    IReadOnlyList<NoteEntry> NotesWithMarkupText(string path, AnnotationFile annotations, CancellationToken ct)
+    IReadOnlyList<NoteEntry> NotesWithMarkupText(string path, string contentId, AnnotationFile annotations, CancellationToken ct)
     {
         var markupPages = annotations.Pages.Where(kv => kv.Value.Any(a => a is TextMarkupAnnotation)).Select(kv => kv.Key).ToHashSet();
         if (markupPages.Count == 0) return LibraryIndexer.Notes(annotations, _ => null);
+        if (_markupTextId != contentId)
+        {
+            _markupText.Clear();
+            _markupTextId = contentId;
+        }
+        var missing = markupPages.Where(p => !_markupText.ContainsKey(p)).ToList();
+        if (missing.Count == 0) return LibraryIndexer.Notes(annotations, p => _markupText.GetValueOrDefault(p));
         IPdfService? pdf = null;
         try
         {
             pdf = _factory.CreatePdfService(path, null);
             var text = _factory.CreatePdfTextService();
-            var cache = new Dictionary<int, PageText>();
-            foreach (var p in markupPages)
+            foreach (var p in missing)
             {
                 ct.ThrowIfCancellationRequested(); // Dispose's bounded wait must not leave us inside PDFium
-                if (p >= 0 && p < pdf.PageCount) cache[p] = text.ExtractPageText(pdf.PdfBytes, p, null);
+                _markupText[p] = p >= 0 && p < pdf.PageCount ? text.ExtractPageText(pdf.PdfBytes, p, null) : null;
             }
-            return LibraryIndexer.Notes(annotations, p => cache.GetValueOrDefault(p));
+            return LibraryIndexer.Notes(annotations, p => _markupText.GetValueOrDefault(p));
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            // Unreadable file or page: index the comments without the text under highlights, rather than
-            // failing the whole job (which would also skip recording the open).
-            return LibraryIndexer.Notes(annotations, _ => null);
+            // Unreadable file or page: index the comments without the text under highlights (beyond the
+            // pages already read), rather than failing the whole job (which would also skip recording the open).
+            return LibraryIndexer.Notes(annotations, p => _markupText.GetValueOrDefault(p));
         }
         finally
         {
