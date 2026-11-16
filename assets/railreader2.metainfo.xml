@@ -103,6 +103,9 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="3.88.0.0" date="2026-11-16">
+      <description><p>Library search now finds documents by the title, author, subject and keywords stored in the PDF, and the Library window and the recent documents on the welcome screen show a document's title instead of its file name when it has one. Titles that an authoring tool made up, such as "Microsoft Word - draft.docx" or "Untitled", are ignored. Notes are added to the search index each time they are saved rather than only when the document is closed, and opening a search result goes straight to the match on that page. Your existing index is updated in the background; nothing is lost.</p></description>
+    </release>
     <release version="3.87.0.0" date="2026-11-16">
       <description><p>You can now search every PDF you have opened at once. File, Search Library (Ctrl+Shift+F) looks through the pages, outlines, your notes and comments, comments that others wrote into the PDFs, your bookmarks and file names, and opens a result at its page with your words highlighted, or with the note selected. A file that has moved can be located again. The welcome screen now lists your recent documents with a picture of the first page, how far you have read and how many notes each has. The search index is kept only on your computer; password-protected PDFs are found by file name only, and Settings, Library can clear the index. The command-line tool gains a library command. On Linux, RailReader2 now needs glibc 2.34 or newer (Ubuntu 22.04, Debian 12, Fedora 35, RHEL 9 or later).</p></description>
     </release>
