@@ -48,6 +48,10 @@ jobs:
       - name: Test
         run: dotnet test RailReader2.slnx -c Release --no-build --verbosity normal
 
+      # The library search index (docs/library-search-design.md) needs FTS5 in the bundled SQLite.
+      - name: SQLite FTS5 probe
+        run: dotnet run --project src/RailReader2.Cli -c Release --no-build -- library probe
+
   # The Inno installer is otherwise only compiled by release.yml. This compiles it and runs the silent
   # in-app update the way the app does (wait for the app's PID, upgrade in place, relaunch) on real Windows.
   installer:

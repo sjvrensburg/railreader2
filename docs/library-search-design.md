@@ -1,6 +1,6 @@
 # Library search and recents dashboard (design)
 
-**Status:** Design agreed 2026-11-16 (open questions decided, §12). Phase 0 spike in progress.
+**Status:** Design agreed 2026-11-16 (open questions decided, §12). Phase 0 spike done (§11a); one packaging decision open (glibc floor).
 **Roadmap item:** M7 (features adapted from the Cauchy viewer): library-wide full-text search and a recents dashboard keyed by content id.
 **Depends on:** content-based document identity (`DocumentIdentity`, Core 0.75.0+), sidecar annotations keyed by content id (Core 0.72.0+).
 
@@ -198,6 +198,19 @@ The v1 schema needs nothing for this beyond `indexer_version`.
 2. **Library window:** search UI, opening hits with in-document highlighting, missing-file handling, Settings ▸ Library.
 3. **Dashboard:** welcome-panel recents with thumbnails and progress.
 4. **Docs:** user guide section, privacy page (the index is local and holds document text; how to clear it), CLAUDE.md.
+
+## 11a. Phase 0 results (2026-11-16)
+
+Spike: `src/RailReader2.Library` (`SqliteProbe`, `TextNormalizer`, `LibraryBench`) and the CLI's `library probe` / `library bench <folder>`. Measured on `experiments/PDFs/` (28 PDFs, 861 pages), Linux x64, single thread.
+
+- **FTS5 is available.** `Microsoft.Data.Sqlite` 10.0.15 → SQLitePCLRaw 2.1.13 → SQLite 3.53.3. `porter unicode61 remove_diacritics 2` works: `estimation AND cafe` matches "estimators … café". `SQLitePCL.Batteries_V2.Init()` is called explicitly, so it doesn't depend on reflection surviving AOT.
+- **Loads in the AOT CLI** (linux-x64 publish: probe and bench both run, no new trim/AOT warnings). The app's linux-x64 and win-x64 publishes carry the native library (`libe_sqlite3.so` / `e_sqlite3.dll`). The AppImage, Inno and both CLI archives pick it up through their existing wildcards; the MSIX holds the publish folder. Adds ~2.1 MB (Linux) / ~2.6 MB (Windows) per package.
+- **Windows loading** is checked in CI: `library probe` runs in test.yml on both OSes and after both AOT CLI publishes in release.yml. The GUI packages (Inno, MSIX) are not exercised until Phase 2 first uses the index from the app.
+- **Extraction throughput:** ~210–220 pages/s (4 s for the corpus, same under JIT and AOT). Outliers: MOMENT.pdf 38 ms/page, Programme_Final1.pdf 10 ms/page. One scanned PDF has no text layer (0 chars), as expected. Insert is ~10 % of extraction time.
+- **Size:** 4.1 MB after `optimize` + `VACUUM` for 2.45 M characters, **4.9 KB/page**. The FTS index itself is ~1.0 MB (~42 % of text, in line with the §6.1 estimate). The rest is FTS5's stored copy of the text (needed for `snippet()`) and per-row ids. So ~1,000 papers × 20 pages ≈ 100 MB before thumbnails, about twice the §6.1 estimate. Phase 1: store an integer document key in FTS rows, not the 64-character content id.
+- **Query latency:** 0.01–5.4 ms median on 861 pages (prefix `contrast*` slowest). Far inside the 50 ms target; re-measure at 20k pages in Phase 1.
+- **Query syntax:** raw FTS5 syntax errors throw (`NEAR/5` is not FTS5 syntax). Phase 1's `LibraryQuery` must parse user input and quote terms itself, never pass it to `MATCH` as is.
+- **Blocker to decide: glibc floor.** SQLitePCLRaw 2.1.12+ ships a `libe_sqlite3.so` built against **glibc 2.34** (`dlopen`/`pthread_*` symbols). Everything RailReader2 ships today needs at most 2.28 (ONNX Runtime; .NET itself needs 2.27). Using it unchanged drops Debian 11, Ubuntu 20.04 and RHEL/Alma/Rocky 8 (all past standard support except EL8, supported to 2029). 2.1.11's native library needs 2.28 but carries SQLite 3.49.1.
 
 ## 12. Decisions
 

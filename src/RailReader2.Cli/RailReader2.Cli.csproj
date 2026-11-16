@@ -27,5 +27,6 @@
   <ItemGroup>
     <ProjectReference Include="../RailReader2.References/RailReader2.References.csproj" />
     <ProjectReference Include="../RailReader2.Shared/RailReader2.Shared.csproj" />
+    <ProjectReference Include="../RailReader2.Library/RailReader2.Library.csproj" />
   </ItemGroup>
 </Project>

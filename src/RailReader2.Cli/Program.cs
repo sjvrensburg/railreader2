@@ -37,6 +37,7 @@ static class Program
                 "package" => Commands.PackageCommand.Execute(args[1..], factory, logger),
                 "unpack" => Commands.UnpackCommand.Execute(args[1..], factory, logger),
                 "update" => Commands.UpdateCommand.Execute(args[1..], logger),
+                "library" => Commands.LibraryCommand.Execute(args[1..], factory, logger),
                 _ => Fail($"Unknown command: '{args[0]}'. Run with --help for usage.")
             };
         }
@@ -107,7 +108,7 @@ static class Program
         "figure-endpoint", "figure-model", "figure-api-key",
         "prompt-style", "dump-crops", "min-confidence", "from-structure",
         "ground-truth", "layout", "min-precision", "classes", "pack",
-        "feed", "public-key", "channel",
+        "feed", "public-key", "channel", "db",
     ];
 
     internal static string GetRequiredPdf(string[] args, string kind = "PDF")

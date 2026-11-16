@@ -263,6 +263,10 @@ jobs:
       - name: Publish CLI
         run: dotnet publish src/RailReader2.Cli/RailReader2.Cli.csproj -c Release -r linux-x64 --self-contained -o publish-cli/
 
+      # The AOT build must still load the bundled SQLite with FTS5 (library search index).
+      - name: SQLite FTS5 probe
+        run: ./publish-cli/RailReader2.Cli library probe
+
       - name: Package
         run: |
           mkdir -p publish-cli/models
@@ -297,6 +301,10 @@ jobs:
 
       - name: Publish CLI
         run: dotnet publish src/RailReader2.Cli/RailReader2.Cli.csproj -c Release -r win-x64 --self-contained -o publish-cli/
+
+      # The AOT build must still load the bundled SQLite with FTS5 (library search index).
+      - name: SQLite FTS5 probe
+        run: .\publish-cli\RailReader2.Cli.exe library probe
 
       - name: Package
         run: |
