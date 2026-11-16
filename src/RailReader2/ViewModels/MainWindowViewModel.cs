@@ -801,6 +801,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         if (wireReadingSignals) WireFocusedSignals(vp);
         if (ReferenceEquals(_controller.FocusedViewport, vp)) return;
         _controller.FocusedViewport = vp;
+        SyncLibraryBusy();
         // The controller's ambient size (input geometry) now tracks this surface.
         var (w, h) = surface.SurfaceSize;
         if (w > 0 && h > 0) _controller.FocusedViewport?.SetSize(w, h);
@@ -830,6 +831,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         _controller.FocusedViewport = vp;
         WireFocusedSignals(vp);
         UpdateSurfaceFocusVisuals();
+        SyncLibraryBusy();
         // The focused document may carry a different view rotation than the previous one.
         NotifyViewRotationChanged();
     }
@@ -1113,7 +1115,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             ? (frameTime - last).TotalSeconds
             : 1.0 / 60.0;
         _lastFrameTime = frameTime;
-        if (_library is { } library) library.IsBusy = IsRailReading; // hold back library backfill while reading
+        SyncLibraryBusy(); // hold back library backfill while reading
         // Round to whole compositor frames: the timestamp carries dispatcher latency, and auto-scroll
         // turns any dt jitter into position jitter (see FramePacer).
         double dt = _framePacer.Pace(rawDt, presented: _lastFrameDrew);

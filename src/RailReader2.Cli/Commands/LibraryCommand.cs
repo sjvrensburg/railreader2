@@ -141,7 +141,10 @@ public static class LibraryCommand
         string? folder = Positional(args);
         if (folder is null || !Directory.Exists(folder)) return Program.Fail("library bench needs a folder of PDFs.");
         string db = Program.GetOption(args, "db") ?? Path.Combine(Path.GetTempPath(), "railreader2-library-bench.db");
-        if (Path.GetFullPath(db) == Path.GetFullPath(LibraryIndex.DefaultPath))
+        // Case-insensitive where the file system usually is: a differently-cased path is the same file.
+        var pathComparison = OperatingSystem.IsWindows() || OperatingSystem.IsMacOS()
+            ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        if (string.Equals(Path.GetFullPath(db), Path.GetFullPath(LibraryIndex.DefaultPath), pathComparison))
             return Program.Fail("library bench rebuilds its database from scratch; point --db somewhere other than the app's index.");
         string? queriesPath = Program.GetOption(args, "queries");
         var queries = queriesPath is null ? new BenchQuerySet() : LibraryBench.LoadQueries(queriesPath);

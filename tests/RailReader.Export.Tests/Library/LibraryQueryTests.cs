@@ -47,6 +47,8 @@ public class TextNormalizerTests
     [InlineData("and Trans\u0002formers [165]", "and Transformers [165]")]   // PDFium's line-end hyphen
     [InlineData("Marchenko\u0002Pastur law", "Marchenko- Pastur law")]
     [InlineData("\u0002lead", "lead")]
+    [InlineData("esti­mation of", "estimation of")]   // mid-line soft hyphen: invisible
+    [InlineData("estima­\ntion of", "estimation of")]
     [InlineData("", "")]
     public void Normalize(string input, string expected) => Assert.Equal(expected, TextNormalizer.Normalize(input));
 }

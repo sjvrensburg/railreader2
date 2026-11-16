@@ -291,7 +291,11 @@ public sealed partial class MainWindowViewModel
             else foreach (var img in retiredTabImages) img.Dispose();
         }
         if (Tabs.Count > 0) FocusViewport(Tabs[ActiveTabIndex].Viewport);
-        else UnwireFocusedSignals(); // no viewport to re-point to — release the disposed one
+        else
+        {
+            UnwireFocusedSignals(); // no viewport to re-point to — release the disposed one
+            SyncLibraryBusy(); // no rail left, and no frame may run to clear the backfill hold
+        }
 
         // Free the closed view's frozen-pane crops (#180) only AFTER the Document pane has rebound to the
         // now-active tab above — by then its FreezePaneLayer no longer references these crops, so this

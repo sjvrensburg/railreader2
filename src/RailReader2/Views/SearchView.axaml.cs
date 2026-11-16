@@ -39,6 +39,10 @@ public partial class SearchView : UserControl
     private int? _pendingStartPage; // a library hit's page: show its first match once the search has run
     // The reader's own Regex / Case toggles, saved when a library hit set them; restored on their next search.
     private (bool? Regex, bool? Case)? _readerToggles;
+    // The text an activation put in the box. TextBox can raise TextChanged later than the assignment (a
+    // freshly created pane does), after _applyingActivation is cleared, so a change to exactly this text is
+    // the activation's own echo, not the reader typing.
+    private string? _activationText;
 
     public SearchView()
     {
@@ -99,7 +103,9 @@ public partial class SearchView : UserControl
     {
         if (_vm is null) return;
         var (prefill, focus, useRegex, startPage) = _vm.ConsumeSearchActivation();
-        if (useRegex is null) RestoreReaderToggles(); // Ctrl+F / search-selection: the reader's own search
+        // Ctrl+F / search-selection: the reader's own search. Not on a bare re-attach (nothing pending),
+        // which would flip the toggles under the library hit's pattern still in the box and its results.
+        if (useRegex is null && (prefill is not null || focus)) RestoreReaderToggles();
         if (startPage is not null || useRegex is not null)
         {
             _readerToggles ??= (RegexToggle.IsChecked, CaseSensitiveToggle.IsChecked);
@@ -108,7 +114,7 @@ public partial class SearchView : UserControl
             try
             {
                 if (useRegex is { } rx) { RegexToggle.IsChecked = rx; CaseSensitiveToggle.IsChecked = false; }
-                if (prefill is not null) SearchInput.Text = prefill;
+                if (prefill is not null) SearchInput.Text = _activationText = prefill;
             }
             finally { _applyingActivation = false; }
             _debounceTimer?.Stop();
@@ -140,6 +146,11 @@ public partial class SearchView : UserControl
     private void OnSearchTextChanged(object? sender, TextChangedEventArgs e)
     {
         if (_applyingActivation) return;
+        if (_activationText is not null)
+        {
+            if (SearchInput.Text == _activationText) return; // the activation's own (late) TextChanged
+            _activationText = null;
+        }
         _pendingStartPage = null; // the reader typed: their own search, not the library hit's
         RestoreReaderToggles();
         if (_debounceTimer is null)

@@ -43,6 +43,15 @@ public static class TextNormalizer
                 pendingSpace = true;
                 continue;
             }
+            // A soft hyphen inside a line is an invisible hyphenation hint: dropped, or the tokenizer would
+            // split the word on it ("esti­mation" → "esti", "mation"). One ending a line is kept for
+            // the line-break branch above to join the word.
+            if (c == '­')
+            {
+                int k = i + 1;
+                while (k < s.Length && s[k] is ' ' or '\t') k++;
+                if (k < s.Length && s[k] is not ('\r' or '\n' or '\u0002')) continue;
+            }
             if (char.IsWhiteSpace(c) || char.IsControl(c)) { pendingSpace = true; continue; }
             if (pendingSpace && sb.Length > 0) sb.Append(' ');
             pendingSpace = false;

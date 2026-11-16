@@ -84,16 +84,26 @@ public partial class MainWindowViewModel
 
     /// <summary>Queues documents opened before the index existed (§5.3): the identity map's paths plus
     /// recent files. Called once after the main window opens; the writer runs them at low priority.</summary>
-    public void StartLibraryBackfill()
+    public void StartLibraryBackfill() => QueueKnownDocuments((library, paths) => library.Backfill(paths), "backfill");
+
+    /// <summary>Hands every document the reader has opened (recent files, then the identity map's paths,
+    /// read on the thread pool) to <paramref name="start"/>.</summary>
+    private void QueueKnownDocuments(Action<LibraryWriter, IEnumerable<string>> start, string what)
     {
-        if (_library is null) return;
+        if (_library is not { } library) return;
         var recents = _appConfig.RecentFiles.Select(r => r.FilePath).Where(p => !string.IsNullOrEmpty(p)).ToList();
-        var library = _library;
         _ = Task.Run(() =>
         {
-            try { library.Backfill(recents.Concat(KnownDocuments.FromIdentityMap())); }
-            catch (Exception ex) { _logger.Error("[Library] backfill could not start", ex); }
+            try { start(library, recents.Concat(KnownDocuments.FromIdentityMap())); }
+            catch (Exception ex) { _logger.Error($"[Library] {what} could not start", ex); }
         });
+    }
+
+    /// <summary>Holds the backfill back while the focused view is rail reading. Called from the frame
+    /// loop and on every focus change, since a tab switch or close may not run another frame.</summary>
+    private void SyncLibraryBusy()
+    {
+        if (_library is { } library) library.IsBusy = IsRailReading;
     }
 
     // ------------------------------------------------------------ Library window (Phase 2)
@@ -107,7 +117,7 @@ public partial class MainWindowViewModel
 
     /// <summary>False when the index writer isn't running (turned off with RR_DISABLE_LIBRARY_INDEX, or the
     /// database couldn't be opened): the window can still search, but nothing new is indexed.</summary>
-    public bool IsLibraryIndexing => _library is not null;
+    public bool IsLibraryIndexing => _library is { IsAvailable: true };
 
     /// <summary>Backfill progress for the Library window ("Indexing 3 of 12"); (0, 0) when idle.</summary>
     public (int Done, int Total) LibraryBackfillProgress => _library?.BackfillProgress ?? (0, 0);
@@ -180,6 +190,9 @@ public partial class MainWindowViewModel
         {
             if (DocumentIdentity.Peek(Tabs[i].FilePath) != contentId) continue;
             if (i != ActiveTabIndex) SelectTab(i);
+            // Already the active tab, but input may be on another document's pane, tear-off or portal:
+            // the page jump and search below act on the focused view, so focus this document's.
+            else if (!ReferenceEquals(_controller.FocusedViewport?.Owner, Tabs[i].State)) FocusViewport(Tabs[i].Viewport);
             return Tabs[i];
         }
         if (path is null || !File.Exists(path))
@@ -229,17 +242,7 @@ public partial class MainWindowViewModel
     public void RemoveFromLibrary(string contentId) => _library?.Remove(contentId);
 
     /// <summary>Settings ▸ Library ▸ Rebuild: empties the index and indexes every known document again.</summary>
-    public void RebuildLibrary()
-    {
-        if (_library is null) return;
-        var recents = _appConfig.RecentFiles.Select(r => r.FilePath).Where(p => !string.IsNullOrEmpty(p)).ToList();
-        var library = _library;
-        _ = Task.Run(() =>
-        {
-            try { library.Rebuild(recents.Concat(KnownDocuments.FromIdentityMap())); }
-            catch (Exception ex) { _logger.Error("[Library] rebuild could not start", ex); }
-        });
-    }
+    public void RebuildLibrary() => QueueKnownDocuments((library, paths) => library.Rebuild(paths), "rebuild");
 
     /// <summary>Settings ▸ Library ▸ Clear: empties the index; documents come back as they are opened.</summary>
     public void ClearLibrary() => _library?.Clear();

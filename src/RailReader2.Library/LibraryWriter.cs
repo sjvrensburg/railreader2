@@ -50,6 +50,9 @@ public sealed class LibraryWriter : IDisposable
     /// <summary>How long to wait before re-checking <see cref="IsBusy"/>.</summary>
     public TimeSpan BusyRecheck { get; init; } = TimeSpan.FromSeconds(3);
 
+    /// <summary>False once the database couldn't be opened: the writer has turned itself off.</summary>
+    public bool IsAvailable => !_disabled;
+
     /// <summary>Documents still waiting in the backfill queue.</summary>
     public int BackfillRemaining => _backfill.Count;
 
@@ -103,7 +106,7 @@ public sealed class LibraryWriter : IDisposable
             }
             else if (annotations is not null)
             {
-                index.ReplaceNotes(contentId, NotesWithMarkupText(path, annotations), CategoryOf);
+                index.ReplaceNotes(contentId, NotesWithMarkupText(path, annotations, _cts.Token), CategoryOf);
             }
             index.RecordOpen(contentId, path, page, DateTime.UtcNow);
         });
@@ -117,7 +120,7 @@ public sealed class LibraryWriter : IDisposable
             if (index.GetDocument(contentId) is null) return;
             if (!encrypted)
             {
-                if (annotations is not null) index.ReplaceNotes(contentId, NotesWithMarkupText(path, annotations), CategoryOf);
+                if (annotations is not null) index.ReplaceNotes(contentId, NotesWithMarkupText(path, annotations, _cts.Token), CategoryOf);
                 if (ocrPages.Count > 0) index.AddOcrPages(contentId, ocrPages);
             }
             index.RecordOpen(contentId, path, page, DateTime.UtcNow);
@@ -336,7 +339,7 @@ public sealed class LibraryWriter : IDisposable
         => hex is not null && Categories.TryGetValue(hex.Trim().ToUpperInvariant(), out var n) && n.Length > 0 ? n : null;
 
     /// <summary>Notes for an already-indexed document: page text is read only for pages carrying markup.</summary>
-    IReadOnlyList<NoteEntry> NotesWithMarkupText(string path, AnnotationFile annotations)
+    IReadOnlyList<NoteEntry> NotesWithMarkupText(string path, AnnotationFile annotations, CancellationToken ct)
     {
         var markupPages = annotations.Pages.Where(kv => kv.Value.Any(a => a is TextMarkupAnnotation)).Select(kv => kv.Key).ToHashSet();
         if (markupPages.Count == 0) return LibraryIndexer.Notes(annotations, _ => null);
@@ -347,7 +350,10 @@ public sealed class LibraryWriter : IDisposable
             var text = _factory.CreatePdfTextService();
             var cache = new Dictionary<int, PageText>();
             foreach (var p in markupPages)
+            {
+                ct.ThrowIfCancellationRequested(); // Dispose's bounded wait must not leave us inside PDFium
                 if (p >= 0 && p < pdf.PageCount) cache[p] = text.ExtractPageText(pdf.PdfBytes, p, null);
+            }
             return LibraryIndexer.Notes(annotations, p => cache.GetValueOrDefault(p));
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
