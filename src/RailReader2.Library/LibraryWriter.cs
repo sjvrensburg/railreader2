@@ -123,7 +123,11 @@ public sealed class LibraryWriter : IDisposable
     public void CategoryRenamed(string hexColour, string? name) => Enqueue(index => index.SetCategory(hexColour, name));
 
     /// <summary>Drops a document from the library (design §3): its index rows only.</summary>
-    public void Remove(string contentId) => Enqueue(index => index.Remove(contentId));
+    public void Remove(string contentId) => Enqueue(index =>
+    {
+        index.Remove(contentId);
+        TryDelete(() => File.Delete(RecentDocuments.ThumbnailPath(contentId, _dbPath)));
+    });
 
     /// <summary>The reader located a moved file (the caller checked it is the same document): point the
     /// entry at it and re-index it if the file differs from what was indexed.</summary>
@@ -138,15 +142,39 @@ public sealed class LibraryWriter : IDisposable
     public void Clear()
     {
         ClearBackfill();
-        Enqueue(index => index.Clear(backfill: false));
+        Enqueue(index =>
+        {
+            index.Clear(backfill: false);
+            DeleteThumbnails();
+        });
     }
 
     /// <summary>Empties the index and indexes <paramref name="paths"/> again in the background.</summary>
     public void Rebuild(IEnumerable<string> paths)
     {
         ClearBackfill();
-        Enqueue(index => index.Clear(backfill: true));
+        Enqueue(index =>
+        {
+            index.Clear(backfill: true);
+            DeleteThumbnails();
+        });
         Backfill(paths);
+    }
+
+    // Thumbnails are part of the index (they show the documents' first pages), so they go with it.
+    void DeleteThumbnails()
+    {
+        var dir = RecentDocuments.ThumbnailDirectory(_dbPath);
+        TryDelete(() => { if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true); });
+    }
+
+    void TryDelete(Action delete)
+    {
+        try { delete(); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            OnError?.Invoke("Couldn't delete a library thumbnail", ex);
+        }
     }
 
     void ClearBackfill()

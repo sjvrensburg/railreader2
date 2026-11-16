@@ -244,6 +244,93 @@ public partial class MainWindowViewModel
     /// <summary>Settings ▸ Library ▸ Clear: empties the index; documents come back as they are opened.</summary>
     public void ClearLibrary() => _library?.Clear();
 
+    // ------------------------------------------------------------ recents dashboard (Phase 3)
+
+    private readonly SemaphoreSlim _thumbnailGate = new(1, 1);
+
+    /// <summary>The welcome screen's recent documents (design §7.2): the recent-files list de-duplicated
+    /// by content id and joined to the index. Thread pool; never writes anything.</summary>
+    public Task<IReadOnlyList<RecentDocument>> LoadRecentDocumentsAsync()
+    {
+        var recents = _appConfig.RecentFiles.Select(r => (r.FilePath, r.Page)).ToList();
+        return Task.Run(() =>
+        {
+            try
+            {
+                using var index = LibraryIndex.OpenReadOnly(LibraryIndex.DefaultPath);
+                return RecentDocuments.Build(recents, DocumentIdentity.Peek, index);
+            }
+            catch (Exception ex)
+            {
+                _logger.Error("[Library] recent documents failed", ex);
+                return (IReadOnlyList<RecentDocument>)[];
+            }
+        });
+    }
+
+    /// <summary>A current first-page thumbnail for <paramref name="doc"/>, rendering it once if needed
+    /// (thread pool, one at a time). Null for a missing, locked or encrypted file — an encrypted
+    /// document's page is never written to disk — or when the index is off this session.</summary>
+    public async Task<string?> EnsureThumbnailAsync(RecentDocument doc)
+    {
+        if (doc.ContentId is not { } id) return null;
+        string thumb = RecentDocuments.ThumbnailPath(id);
+        if (RecentDocuments.ThumbnailIsCurrent(thumb, doc.Path)) return thumb;
+        if (_library is null || doc.Missing || doc.Locked) return File.Exists(thumb) ? thumb : null;
+
+        await _thumbnailGate.WaitAsync();
+        try
+        {
+            return await Task.Run(() =>
+            {
+                if (RecentDocuments.ThumbnailIsCurrent(thumb, doc.Path)) return thumb;
+                return RenderThumbnail(doc.Path, thumb) ? thumb : null;
+            });
+        }
+        finally { _thumbnailGate.Release(); }
+    }
+
+    private bool RenderThumbnail(string pdfPath, string thumbPath)
+    {
+        const int Width = 240; // ~2× the card's thumbnail width, for high-DPI screens
+        IPdfService? pdf = null;
+        try
+        {
+            pdf = _thumbnailFactory.CreatePdfService(pdfPath, null);
+            if (pdf.PageCount == 0) return false;
+            var (pageWidth, _) = pdf.GetPageSize(0); // points
+            int dpi = (int)Math.Clamp(Math.Round(Width * 72.0 / Math.Max(1, pageWidth)), 12, 150);
+            using var rendered = pdf.RenderPage(0, dpi) as RailReader.Renderer.Skia.SkiaRenderedPage;
+            if (rendered?.Bitmap is not { } bitmap) return false;
+            using var data = bitmap.Encode(SkiaSharp.SKEncodedImageFormat.Png, 90);
+            Directory.CreateDirectory(Path.GetDirectoryName(thumbPath)!);
+            string tmp = thumbPath + $".{Environment.ProcessId}.tmp";
+            using (var fs = File.Create(tmp)) data.SaveTo(fs);
+            File.Move(tmp, thumbPath, overwrite: true);
+            return true;
+        }
+        catch (PdfPasswordRequiredException) { return false; }
+        catch (Exception ex)
+        {
+            _logger.Error($"[Library] thumbnail failed for {Path.GetFileName(pdfPath)}", ex);
+            return false;
+        }
+        finally { (pdf as IDisposable)?.Dispose(); }
+    }
+
+    private readonly RailReader.Renderer.Skia.SkiaPdfServiceFactory _thumbnailFactory = new();
+
+    /// <summary>A card was clicked: opens the document at its saved position.</summary>
+    public async Task OpenRecentDocument(RecentDocument doc)
+    {
+        if (doc.Missing)
+        {
+            ShowStatusToast($"{Path.GetFileName(doc.Path)} is no longer where it was. Search the library (Ctrl+Shift+F) to locate it.");
+            return;
+        }
+        await OpenDocument(doc.Path);
+    }
+
     /// <summary>Indexes notes/OCR text of every open document, then stops the writer (bounded wait).</summary>
     private void ShutdownLibrary()
     {

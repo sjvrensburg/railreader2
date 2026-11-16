@@ -1,6 +1,6 @@
 # Library search and recents dashboard (design)
 
-**Status:** Design agreed 2026-11-16 (open questions decided, §12). Phase 0 spike done (§11a); Phase 1 index + CLI done (§11b); Phase 2 Library window done (§11c).
+**Status:** Design agreed 2026-11-16 (open questions decided, §12). Phase 0 spike done (§11a); Phase 1 index + CLI done (§11b); Phase 2 Library window done (§11c); Phase 3 recents dashboard done (§11d).
 **Roadmap item:** M7 (features adapted from the Cauchy viewer): library-wide full-text search and a recents dashboard keyed by content id.
 **Depends on:** content-based document identity (`DocumentIdentity`, Core 0.75.0+), sidecar annotations keyed by content id (Core 0.72.0+).
 
@@ -251,6 +251,16 @@ Built: `Views/LibraryWindow` (non-modal, single instance; Ctrl+Shift+F, File ▸
 - **Deviations:** no raw FTS5 pass-through (§7.1 said "only when the query contains it"); Phase 1's rule that no input reaches `MATCH` unquoted stands, and "couldn't read that query" never arises. The window is **not owned** by the main window: an owned window always stays above its owner, so it hid the document a result opened (found in the live test); it is closed in `ShutdownLibrary` instead. Library progress shows in the window's status line and in Settings, nowhere else (§5.3).
 - **Live-app check (2026-11-16):** with no document open, a reviewer comment in a moved file was found and shown greyed; Locate refused a different PDF ("its contents differ") and accepted the moved one, re-pointing the entry; Enter on the note hit opened the file and selected the highlight with its comment popup; "kernel ridge" opened a 615-page book at page 243 with both words highlighted on the page (match 1008 of 2212 active). Found and fixed: Enter was swallowed by the list (now a tunnelling handler), and the owned window covered the document.
 - **Not done:** the Search pane's own result list still scrolls to page 1 when a hit's match is activated (it doesn't follow `GoToMatch` from code); searching a 615-page book takes ~30 s in that pane, as it always has.
+
+## 11d. Phase 3 results (2026-11-16)
+
+Built: `Views/RecentDocumentsView` in the welcome panel (between the Open button and the shortcut hints; the panel now scrolls), `RecentDocuments` (cards from the recent-files list, de-duplicated by content id, newest entry winning, joined to `documents` and the note counts), thumbnails in `ConfigDir/library/thumbs/<content-id>.png`.
+
+- **Cards:** up to 12, newest first: thumbnail, file name (no PDF metadata is indexed yet), a thin progress bar and "page 41 of 230" (or "page 41" before the document is indexed), note count, greyed "File not found" for a missing file, "Password protected" (no thumbnail) for a locked one. Click opens at the saved position (`OpenDocument`, which restores it); a missing file points the reader to the Library window's Locate. Above them a search box that opens the Library window with the query.
+- **Hidden until there is history**, so a first launch and the AppImage catalogue screenshot are unchanged. Loads only while the welcome screen shows: on load, when the last tab closes (with this session's positions), and when the index changes (backfill bringing page/note counts), at most every ~2 s.
+- **Thumbnails:** first page at ~240 px wide, rendered on the thread pool one at a time through Core's `RenderPage` (PDFium gate), PNG written via temp file + rename, re-rendered when older than the PDF (an annotation write-back). Never for an encrypted PDF (it would put a page of it on disk), and not at all while indexing is off (`RR_DISABLE_LIBRARY_INDEX`). They are part of the index: Remove deletes the document's, Clear and Rebuild delete the folder. Decoded bitmaps are reused across reloads so cards don't flicker.
+- **Live-app check (2026-11-16):** with an empty index, the dashboard filled in thumbnails, page counts ("page 23 of 23 · 20 notes") and a greyed missing file as the backfill ran; a card opened its document at the saved page; paging on and closing the tab brought the dashboard back with that document first at its new page ("page 3 of 15").
+- **Not done:** title/author from PDF metadata (Core exposes none; file names stand in); no "remove from recents" on a card (the File ▸ Recent menu has none either).
 
 ## 12. Decisions
 

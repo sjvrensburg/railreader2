@@ -72,8 +72,10 @@
                     <Border Name="WelcomePanel"
                             Background="{DynamicResource SystemControlBackgroundAltHighBrush}"
                             IsVisible="{Binding !Tabs.Count}">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center"
-                                    Spacing="10" MaxWidth="520">
+                                    Spacing="10" Margin="24">
+                        <StackPanel HorizontalAlignment="Center" Spacing="10" MaxWidth="520">
                             <!-- The logo is black on transparent, so it sits on a light tile to stay
                                  visible in the dark theme -->
                             <Border Background="White" CornerRadius="22" Padding="10"
@@ -93,6 +95,10 @@
                                     a:AutomationProperties.AutomationId="WelcomeOpenButton" />
                             <TextBlock Text="or press Ctrl+O" Opacity="0.55"
                                        HorizontalAlignment="Center" />
+                        </StackPanel>
+                            <!-- Library search box + recent documents; hidden until there is history -->
+                            <v:RecentDocumentsView MaxWidth="860" Margin="0,10,0,0" />
+                        <StackPanel HorizontalAlignment="Center" Spacing="10" MaxWidth="520">
                             <Border Height="1" Opacity="0.2" Margin="0,16,0,6"
                                     Background="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
                             <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto"
@@ -110,6 +116,8 @@
                                 <TextBlock Grid.Row="4" Grid.Column="1" Text="Cycle colour effects for comfort" />
                             </Grid>
                         </StackPanel>
+                        </StackPanel>
+                        </ScrollViewer>
                     </Border>
                 </Panel>
             </DockPanel>
