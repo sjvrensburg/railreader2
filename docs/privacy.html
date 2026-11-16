@@ -37,7 +37,7 @@
 
   <main class="content" id="main-content">
     <h1>Privacy Policy</h1>
-    <p class="subtitle">Last updated: 10 November 2026</p>
+    <p class="subtitle">Last updated: 16 November 2026</p>
 
     <section class="guide-section">
       <h2>Summary</h2>
@@ -67,15 +67,26 @@
           you create on PDF documents, stored as JSON files in the application data directory.</li>
         <li><strong>Recent files list</strong> &mdash; paths to recently opened PDFs, stored in
           the configuration file for convenience. These are local file paths only.</li>
+        <li><strong>Library search index</strong> &mdash; so that
+          <strong>File &rarr; Search Library</strong> can search every PDF you have opened, the
+          application keeps an index in the <code>library</code> folder of the application data
+          directory. It holds <strong>a copy of the text</strong> of those documents (pages, outlines,
+          your notes and comments, and comments others wrote into the PDFs), their file names and
+          locations, the page you last read, and small pictures of their first pages for the
+          welcome screen. Password-protected PDFs are recorded by file name only: their text and
+          pages are never stored. <strong>Settings &gt; Library</strong> (advanced view) shows its
+          size and can clear it; <strong>Remove from Library</strong> in the Library window forgets
+          a single document.</li>
         <li><strong>VLM settings (if configured)</strong> &mdash; the endpoint URL, model name,
           and API key you enter in <strong>Settings &gt; VLM</strong> are stored in the same
           local configuration file. The API key is not transmitted to any party other than the
           endpoint you configured.</li>
       </ul>
       <p>
-        None of this data leaves your computer. You can delete all stored data at any time
-        via <strong>Help &rarr; Clean Up Temp Files</strong> in the application, or by
-        removing the configuration directory manually:
+        None of this data leaves your computer. <strong>Help &rarr; Clean Up Temp Files</strong>
+        removes caches, temporary files and old logs; the library index can be cleared in
+        <strong>Settings &gt; Library</strong>. To delete everything the application has stored,
+        remove its data directory:
       </p>
       <ul>
         <li><strong>Linux:</strong> <code>~/.config/railreader2/</code></li>

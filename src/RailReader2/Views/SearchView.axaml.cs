@@ -35,6 +35,14 @@ public partial class SearchView : UserControl
     private MainWindowViewModel? _vm;
     private DispatcherTimer? _debounceTimer;
     private CancellationTokenSource? _searchCts;
+    private bool _applyingActivation;
+    private int? _pendingStartPage; // a library hit's page: show its first match once the search has run
+    // The reader's own Regex / Case toggles, saved when a library hit set them; restored on their next search.
+    private (bool? Regex, bool? Case)? _readerToggles;
+    // The text an activation put in the box. TextBox can raise TextChanged later than the assignment (a
+    // freshly created pane does), after _applyingActivation is cleared, so a change to exactly this text is
+    // the activation's own echo, not the reader typing.
+    private string? _activationText;
 
     public SearchView()
     {
@@ -94,8 +102,26 @@ public partial class SearchView : UserControl
     private void HandleSearchActivation()
     {
         if (_vm is null) return;
-        var (prefill, focus) = _vm.ConsumeSearchActivation();
-        if (prefill is not null)
+        var (prefill, focus, useRegex, startPage) = _vm.ConsumeSearchActivation();
+        // Ctrl+F / search-selection: the reader's own search. Not on a bare re-attach (nothing pending),
+        // which would flip the toggles under the library hit's pattern still in the box and its results.
+        if (useRegex is null && (prefill is not null || focus)) RestoreReaderToggles();
+        if (startPage is not null || useRegex is not null)
+        {
+            _readerToggles ??= (RegexToggle.IsChecked, CaseSensitiveToggle.IsChecked);
+            // Set the box and toggles without each change starting its own search, then run once.
+            _applyingActivation = true;
+            try
+            {
+                if (useRegex is { } rx) { RegexToggle.IsChecked = rx; CaseSensitiveToggle.IsChecked = false; }
+                if (prefill is not null) SearchInput.Text = _activationText = prefill;
+            }
+            finally { _applyingActivation = false; }
+            _debounceTimer?.Stop();
+            _pendingStartPage = startPage;
+            RunSearch();
+        }
+        else if (prefill is not null)
             SearchInput.Text = prefill;
         if (focus)
             Dispatcher.UIThread.Post(FocusSearch, DispatcherPriority.Input);
@@ -119,6 +145,14 @@ public partial class SearchView : UserControl
 
     private void OnSearchTextChanged(object? sender, TextChangedEventArgs e)
     {
+        if (_applyingActivation) return;
+        if (_activationText is not null)
+        {
+            if (SearchInput.Text == _activationText) return; // the activation's own (late) TextChanged
+            _activationText = null;
+        }
+        _pendingStartPage = null; // the reader typed: their own search, not the library hit's
+        RestoreReaderToggles();
         if (_debounceTimer is null)
         {
             _debounceTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(200) };
@@ -132,7 +166,10 @@ public partial class SearchView : UserControl
         _debounceTimer.Start();
     }
 
-    private void OnSearchOptionChanged(object? sender, RoutedEventArgs e) => RunSearch();
+    private void OnSearchOptionChanged(object? sender, RoutedEventArgs e)
+    {
+        if (!_applyingActivation) RunSearch();
+    }
 
     private void OnSearchKeyDown(object? sender, KeyEventArgs e)
     {
@@ -153,6 +190,10 @@ public partial class SearchView : UserControl
         }
     }
 
+    // Carries the query over to the Library window (design §7.1); a regex is not a library query.
+    private void OnSearchLibraryClick(object? sender, RoutedEventArgs e)
+        => _vm?.ShowLibrary(RegexToggle.IsChecked == true ? null : SearchInput.Text);
+
     private void OnClearSearchClick(object? sender, RoutedEventArgs e)
     {
         _vm?.ClearSearch();
@@ -162,9 +203,23 @@ public partial class SearchView : UserControl
     /// <see cref="MainWindowViewModel.SearchCleared"/> (so window-level Escape clears the box too).</summary>
     private void ClearSearchUi()
     {
+        RestoreReaderToggles();
         SearchInput.Text = "";
         SearchResultsList.ItemsSource = null;
         SearchMatchCount.Text = "";
+    }
+
+    private void RestoreReaderToggles()
+    {
+        if (_readerToggles is not { } saved) return;
+        _readerToggles = null;
+        _applyingActivation = true; // no search of its own: the caller's change runs one
+        try
+        {
+            RegexToggle.IsChecked = saved.Regex;
+            CaseSensitiveToggle.IsChecked = saved.Case;
+        }
+        finally { _applyingActivation = false; }
     }
 
     private void OnPrevMatchClick(object? sender, RoutedEventArgs e)
@@ -263,6 +318,17 @@ public partial class SearchView : UserControl
         // need a full invalidation (page bitmap + camera + overlays), not just the
         // search layer — otherwise the new page's highlights paint over the old page.
         _vm.InvalidateAfterSearch();
+        if (_pendingStartPage is int startPage)
+        {
+            // Opened from a library hit: show the hit's page, not the document's first match.
+            _pendingStartPage = null;
+            var matches = _vm.SearchMatches;
+            int index = -1;
+            for (int i = 0; i < matches.Count && index < 0; i++) if (matches[i].PageIndex == startPage) index = i;
+            for (int i = 0; i < matches.Count && index < 0; i++) if (matches[i].PageIndex > startPage) index = i;
+            if (index >= 0) _vm.GoToMatch(index);
+            else _vm.GoToPage(startPage);
+        }
         BuildResultGroups();
         UpdateMatchDisplay();
     }

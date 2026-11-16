@@ -69,6 +69,7 @@ Everything runs on your own computer. The layout model is included in the downlo
 **Finding your way around**
 - Tabs, side-by-side split views (`Ctrl+\`), and views that can be torn off into their own window.
 - Outline, named bookmarks, full-text search, and a browsable index of every figure, table and equation.
+- Library search (`Ctrl+Shift+F`) across every PDF you have opened: page text, outlines, your notes and reviewers' comments, opening each result at its page. The welcome screen lists your recent documents with how far you've read. The index stays on your computer.
 - Jump straight to the next heading, figure, table or equation.
 - Clickable links and citations, with back and forward history.
 - Optional continuous scrolling from page to page.
@@ -120,6 +121,8 @@ chmod +x railreader2-x86_64.AppImage
 ```
 
 RailReader2 is also listed in the [AppImage catalogue](https://appimage.github.io/railreader2/), and the AppImage supports in-place updates with AppImageUpdate. If you'd rather not use an AppImage, a plain `railreader2-linux-x64.tar.gz` is on the same page.
+
+It needs a 64-bit (x86-64) Linux with glibc 2.34 or newer: Ubuntu 22.04, Debian 12, Fedora 35, RHEL/Alma/Rocky 9 or later.
 
 ## Getting started
 
@@ -217,6 +220,9 @@ railreader2-cli references paper.pdf --output references.json
 # Bundle a PDF with your notes, portals and place, or unpack such a bundle
 railreader2-cli package paper.pdf --output paper.railreading
 railreader2-cli unpack paper.railreading --output-dir ./paper
+
+# Search every PDF you have opened in the app (reads its library, never changes it)
+railreader2-cli library search "wild bootstrap" --json
 ```
 
 Encrypted PDFs take `--password`. Run `railreader2-cli <command> --help` for every option, or see the [CLI section of the User Guide](https://sjvrensburg.github.io/railreader2/guide.html#cli-tool). The JSON formats are stable: breaking changes only happen in major versions, so other tools can build on them. [RailMark](https://sjvrensburg.github.io/railmark/), for example, turns your annotations into a Markdown summary.
@@ -256,6 +262,7 @@ RailReader2 stands on the shoulders of a lot of open-source work. Thank you to:
 - **[ONNX Runtime](https://onnxruntime.ai/)**, **[Docling](https://github.com/docling-project/docling)** ([Heron layout model](docs/heron-layout-model.md)) and **[PaddlePaddle](https://github.com/PaddlePaddle/PaddleX)** (PP-DocLayoutV3 / PP-DocLayout-S), the layout-detection models rail mode is built on.
 - **[RapidOCR](https://github.com/RapidAI/RapidOCR)** and **[RapidOcrNet](https://github.com/BobLd/RapidOcrNet)** by BobLd, for reading scanned pages.
 - **[WeCantSpell.Hunspell](https://github.com/aarondandy/WeCantSpell.Hunspell)** and the [LibreOffice dictionaries](https://github.com/LibreOffice/dictionaries), for spell checking.
+- **[SQLite](https://sqlite.org/)** (via [Microsoft.Data.Sqlite](https://github.com/dotnet/efcore) and [SQLitePCLRaw](https://github.com/ericsink/SQLitePCL.raw)), whose FTS5 full-text index powers library search.
 - **[Lucide](https://lucide.dev/)**, for the icons.
 - **[CommunityToolkit.Mvvm](https://github.com/CommunityToolkit/dotnet)**, for MVVM plumbing.
 - **[Claude Code](https://docs.anthropic.com/en/docs/claude-code)**, which made it possible to build this project at all ([more here](https://sjvrensburg.github.io/railreader2/about.html)).

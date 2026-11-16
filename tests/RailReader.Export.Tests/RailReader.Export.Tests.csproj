@@ -31,6 +31,7 @@
     <ProjectReference Include="../../src/RailReader2/RailReader2.csproj" />
     <ProjectReference Include="../../src/RailReader2.Cli/RailReader2.Cli.csproj" />
     <ProjectReference Include="../../src/RailReader2.References/RailReader2.References.csproj" />
+    <ProjectReference Include="../../src/RailReader2.Library/RailReader2.Library.csproj" />
   </ItemGroup>
 
 </Project>

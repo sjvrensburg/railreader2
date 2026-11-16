@@ -115,6 +115,7 @@ public sealed partial class MainWindowViewModel
 
             _controller.AddDocument(tab.State);
             Tabs.Add(tab);
+            LibraryDocumentOpened(tab);
 
             // New tab inherits the current sidebar state
             tab.ShowSidePanel = ShowOutline;
@@ -253,6 +254,7 @@ public sealed partial class MainWindowViewModel
         Services.PortalSetManager.Default.Release(tab.FilePath); // drop our portal-set checkout
         if (!modelStillUsed)
         {
+            LibraryDocumentClosed(tab.State, tab.CurrentPage); // notes edited this session, OCR-only text
             // Tear the live portal view down FIRST if its viewport sits on this about-to-be-disposed
             // model: unregister its surface (stop ticking) + remove its viewport while the model is still
             // alive, so CloseDocument can't dispose the portal viewport out from under a still-registered
@@ -289,7 +291,11 @@ public sealed partial class MainWindowViewModel
             else foreach (var img in retiredTabImages) img.Dispose();
         }
         if (Tabs.Count > 0) FocusViewport(Tabs[ActiveTabIndex].Viewport);
-        else UnwireFocusedSignals(); // no viewport to re-point to — release the disposed one
+        else
+        {
+            UnwireFocusedSignals(); // no viewport to re-point to — release the disposed one
+            SyncLibraryBusy(); // no rail left, and no frame may run to clear the backfill hold
+        }
 
         // Free the closed view's frozen-pane crops (#180) only AFTER the Document pane has rebound to the
         // now-active tab above — by then its FreezePaneLayer no longer references these crops, so this

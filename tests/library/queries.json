@@ -1,0 +1,497 @@
+{
+ "_comment": "Known-item queries for `railreader2-cli library bench experiments/PDFs --queries tests/library/queries.json` (docs/library-search-design.md §8). Each query was taken from the labelled page by reading it, not from the engine's results. Pages are 0-based; a query without a page counts any page of the document (or a file-name hit). Absent queries must return nothing; each was checked to occur nowhere in the corpus.",
+ "queries": [
+  {
+   "q": "\"restricted attention module\"",
+   "expect": [
+    {
+     "doc": "2504.09663v2.pdf",
+     "page": 0
+    }
+   ],
+   "note": "phrase"
+  },
+  {
+   "q": "\"Lagrangian multiplier statistic\"",
+   "expect": [
+    {
+     "doc": "Breusch-SimpleTestHeteroscedasticity-1979.pdf",
+     "page": 2
+    }
+   ],
+   "note": "phrase"
+  },
+  {
+   "q": "\"least number of assumptions\"",
+   "expect": [
+    {
+     "doc": "murphy-pml1-ch3.pdf",
+     "page": 18
+    }
+   ],
+   "note": "phrase"
+  },
+  {
+   "q": "\"Bayesian Optimization outperformed\"",
+   "expect": [
+    {
+     "doc": "applsci-15-05957.pdf",
+     "page": 19
+    }
+   ],
+   "note": "phrase"
+  },
+  {
+   "q": "\"closed-form spectral\"",
+   "expect": [
+    {
+     "doc": "svd_ols_ridge_pcr.pdf",
+     "page": 10
+    }
+   ],
+   "note": "phrase; 'solution' is split across a line"
+  },
+  {
+   "q": "\"domain token\"",
+   "expect": [
+    {
+     "doc": "TimeBERT.pdf",
+     "page": 4
+    }
+   ],
+   "note": "phrase"
+  },
+  {
+   "q": "\"attentive neural datalog\"",
+   "expect": [
+    {
+     "doc": "Transformers-in-TS.pdf",
+     "page": 4
+    }
+   ],
+   "note": "phrase"
+  },
+  {
+   "q": "\"InfoNCE loss\"",
+   "expect": [
+    {
+     "doc": "CRT zhang.pdf",
+     "page": 1
+    }
+   ],
+   "note": "phrase"
+  },
+  {
+   "q": "\"temporal invariance\"",
+   "expect": [
+    {
+     "doc": "Time-series representation learning via Time-Frequency Fusion Contrasting.pdf",
+     "page": 2
+    }
+   ],
+   "note": "phrase"
+  },
+  {
+   "q": "\"spherical covariance matrix\"",
+   "expect": [
+    {
+     "doc": "murphy-pml1-ch3.pdf",
+     "page": 5
+    }
+   ],
+   "note": "phrase"
+  },
+  {
+   "q": "\"GRIN Norm\"",
+   "expect": [
+    {
+     "doc": "TimeGMM.pdf",
+     "page": 1
+    }
+   ],
+   "note": "phrase"
+  },
+  {
+   "q": "\"normalized waveforms\"",
+   "expect": [
+    {
+     "doc": "TOTEM.pdf",
+     "page": 4
+    }
+   ],
+   "note": "phrase"
+  },
+  {
+   "q": "\"filling of missing data\"",
+   "expect": [
+    {
+     "doc": "Medvigy-TrendsDailySolar-2012.pdf",
+     "page": 2
+    }
+   ],
+   "note": "phrase"
+  },
+  {
+   "q": "\"transferable segments\"",
+   "expect": [
+    {
+     "doc": "A_Survey_on_Time-Series_Pre-Trained_Models.pdf",
+     "page": 13
+    }
+   ],
+   "note": "phrase"
+  },
+  {
+   "q": "\"stack of N = 6 identical layers\"",
+   "expect": [
+    {
+     "doc": "Attention_is_all_you_need.pdf",
+     "page": 2
+    }
+   ],
+   "note": "phrase with a number and '='"
+  },
+  {
+   "q": "Bahdanau attention machine translation encoder decoder latent vector",
+   "expect": [
+    {
+     "doc": "Universal Time-Series Representation Learning.pdf",
+     "page": 9
+    }
+   ],
+   "note": "words"
+  },
+  {
+   "q": "neurological disorders physiological signals",
+   "expect": [
+    {
+     "doc": "Time-series representation learning via Time-Frequency Fusion Contrasting.pdf",
+     "page": 10
+    }
+   ],
+   "note": "words"
+  },
+  {
+   "q": "masking rates imputation mean squared error",
+   "expect": [
+    {
+     "doc": "MOMENT.pdf",
+     "page": 27
+    }
+   ],
+   "note": "words"
+  },
+  {
+   "q": "trend polynomial sine waves amplitude",
+   "expect": [
+    {
+     "doc": "MOMENT.pdf",
+     "page": 28
+    }
+   ],
+   "note": "words"
+  },
+  {
+   "q": "stable low-inflation regime 1990s",
+   "expect": [
+    {
+     "doc": "2504.09663v2.pdf",
+     "page": 21
+    }
+   ],
+   "note": "words with hyphen and number"
+  },
+  {
+   "q": "residual connections decoder third sub-layer",
+   "expect": [
+    {
+     "doc": "Attention_is_all_you_need.pdf",
+     "page": 2
+    }
+   ],
+   "note": "words"
+  },
+  {
+   "q": "KL divergence prior constraints distribution",
+   "expect": [
+    {
+     "doc": "murphy-pml1-ch3.pdf",
+     "page": 18
+    }
+   ],
+   "note": "words"
+  },
+  {
+   "q": "ridge penalty invariant orthogonal transformations",
+   "expect": [
+    {
+     "doc": "svd_ols_ridge_pcr.pdf",
+     "page": 10
+    }
+   ],
+   "note": "words"
+  },
+  {
+   "q": "homoscedastic",
+   "expect": [
+    {
+     "doc": "Breusch-SimpleTestHeteroscedasticity-1979.pdf"
+    }
+   ],
+   "note": "rare term, also cited elsewhere"
+  },
+  {
+   "q": "ChlorineConcentration",
+   "expect": [
+    {
+     "doc": "MOMENT.pdf"
+    }
+   ],
+   "note": "dataset name"
+  },
+  {
+   "q": "Hagenberg",
+   "expect": [
+    {
+     "doc": "eptcs-scss2021-proceedings.pdf",
+     "page": 0
+    }
+   ],
+   "note": "place"
+  },
+  {
+   "q": "InfoNCE",
+   "expect": [
+    {
+     "doc": "CRT zhang.pdf"
+    }
+   ],
+   "note": "rare term"
+  },
+  {
+   "q": "Vaswani",
+   "expect": [
+    {
+     "doc": "Attention_is_all_you_need.pdf"
+    }
+   ],
+   "note": "author, cited by many"
+  },
+  {
+   "q": "Breusch Pagan",
+   "expect": [
+    {
+     "doc": "Breusch-SimpleTestHeteroscedasticity-1979.pdf"
+    }
+   ],
+   "note": "authors; file name matches too"
+  },
+  {
+   "q": "Goulet Coulombe",
+   "expect": [
+    {
+     "doc": "2504.09663v2.pdf"
+    }
+   ],
+   "note": "author"
+  },
+  {
+   "q": "Medvigy Beaulieu",
+   "expect": [
+    {
+     "doc": "Medvigy-TrendsDailySolar-2012.pdf"
+    }
+   ],
+   "note": "authors"
+  },
+  {
+   "q": "Goswami Dubrawski",
+   "expect": [
+    {
+     "doc": "MOMENT.pdf"
+    }
+   ],
+   "note": "authors"
+  },
+  {
+   "q": "Talukder Gkioxari",
+   "expect": [
+    {
+     "doc": "TOTEM.pdf"
+    }
+   ],
+   "note": "authors"
+  },
+  {
+   "q": "Trirat",
+   "expect": [
+    {
+     "doc": "Universal Time-Series Representation Learning.pdf"
+    }
+   ],
+   "note": "author"
+  },
+  {
+   "q": "Kwok",
+   "expect": [
+    {
+     "doc": "A_Survey_on_Time-Series_Pre-Trained_Models.pdf"
+    }
+   ],
+   "note": "author, cited by others"
+  },
+  {
+   "q": "random coefficient variations",
+   "expect": [
+    {
+     "doc": "Breusch-SimpleTestHeteroscedasticity-1979.pdf"
+    }
+   ],
+   "note": "stemming: variation(s)"
+  },
+  {
+   "q": "decoders stacked identical layer",
+   "expect": [
+    {
+     "doc": "Attention_is_all_you_need.pdf",
+     "page": 2
+    }
+   ],
+   "note": "stemming"
+  },
+  {
+   "q": "optimizing embedding transformations",
+   "expect": [
+    {
+     "doc": "2504.09663v2.pdf",
+     "page": 10
+    }
+   ],
+   "note": "stemming: optimize/optimizing"
+  },
+  {
+   "q": "diagnosing neurological disorder",
+   "expect": [
+    {
+     "doc": "Time-series representation learning via Time-Frequency Fusion Contrasting.pdf",
+     "page": 10
+    }
+   ],
+   "note": "stemming"
+  },
+  {
+   "q": "masked patches imputation",
+   "expect": [
+    {
+     "doc": "MOMENT.pdf",
+     "page": 27
+    }
+   ],
+   "note": "stemming: masking/masked"
+  },
+  {
+   "q": "classifying sentences BERT",
+   "expect": [
+    {
+     "doc": "TimeBERT.pdf",
+     "page": 4
+    }
+   ],
+   "note": "stemming"
+  },
+  {
+   "q": "Mahalanobis distance",
+   "expect": [
+    {
+     "doc": "murphy-pml1-ch3.pdf",
+     "page": 6
+    }
+   ],
+   "note": "section title"
+  },
+  {
+   "q": "Simpson's paradox",
+   "expect": [
+    {
+     "doc": "murphy-pml1-ch3.pdf",
+     "page": 3
+    }
+   ],
+   "note": "section title with apostrophe"
+  },
+  {
+   "q": "truncated ridge combining PCR",
+   "expect": [
+    {
+     "doc": "svd_ols_ridge_pcr.pdf",
+     "page": 11
+    }
+   ],
+   "note": "section title"
+  },
+  {
+   "q": "OLS-Attention nexus",
+   "expect": [
+    {
+     "doc": "2504.09663v2.pdf",
+     "page": 9
+    }
+   ],
+   "note": "section title"
+  },
+  {
+   "q": "scaled dot-product attention",
+   "expect": [
+    {
+     "doc": "Attention_is_all_you_need.pdf",
+     "page": 3
+    }
+   ],
+   "note": "section title"
+  },
+  {
+   "q": "\"write text here\"",
+   "expect": [
+    {
+     "doc": "Attention_is_all_you_need.pdf",
+     "page": 0
+    }
+   ],
+   "note": "reader's own note on a highlight"
+  },
+  {
+   "q": "favor labor",
+   "expect": [
+    {
+     "doc": "Attention_is_all_you_need.pdf",
+     "page": 4
+    }
+   ],
+   "note": "reader's own text note"
+  },
+  {
+   "q": "marchenko",
+   "absent": true
+  },
+  {
+   "q": "zzqxnotaword",
+   "absent": true
+  },
+  {
+   "q": "kubernetes",
+   "absent": true
+  },
+  {
+   "q": "\"wavelet scattering\"",
+   "absent": true
+  },
+  {
+   "q": "\"attention is all you want\"",
+   "absent": true
+  },
+  {
+   "q": "sommelier",
+   "absent": true
+  }
+ ]
+}

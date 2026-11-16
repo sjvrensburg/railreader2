@@ -1,0 +1,52 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:v="using:RailReader2.Views"
+             x:Class="RailReader2.Views.RecentDocumentsView"
+             IsVisible="False">
+    <!-- Welcome-screen dashboard (library design §7.2): a library search box and the recent documents.
+         Stays hidden until there is history, so a first launch (and the AppImage catalogue's screenshot)
+         looks as before. -->
+    <StackPanel Spacing="10">
+        <TextBox x:Name="LibrarySearchBox" PlaceholderText="Search all your documents (Ctrl+Shift+F)"
+                 AutomationProperties.Name="Search all your documents"
+                 MaxWidth="520" HorizontalAlignment="Stretch" KeyDown="OnSearchKeyDown" />
+        <TextBlock Text="Recent documents" FontWeight="SemiBold" FontSize="15" Margin="4,6,0,0" />
+        <ItemsControl x:Name="Cards">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <WrapPanel Orientation="Horizontal" HorizontalAlignment="Center" />
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="v:RecentCard">
+                    <Button Width="156" Margin="5" Padding="8" Click="OnCardClick"
+                            HorizontalContentAlignment="Stretch" VerticalContentAlignment="Top"
+                            Background="Transparent"
+                            AutomationProperties.Name="{Binding AutomationName}"
+                            ToolTip.Tip="{Binding Doc.Path}" Opacity="{Binding CardOpacity}">
+                        <StackPanel Spacing="4">
+                            <Border Height="168" CornerRadius="3" ClipToBounds="True"
+                                    BorderThickness="1"
+                                    BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                                    Background="{DynamicResource SystemControlBackgroundBaseLowBrush}">
+                                <Panel>
+                                    <Image Source="{Binding Thumbnail}" Stretch="Uniform"
+                                           VerticalAlignment="Top" />
+                                    <TextBlock Text="{Binding Placeholder}" IsVisible="{Binding !HasThumbnail}"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center"
+                                               TextWrapping="Wrap" TextAlignment="Center" Opacity="0.6"
+                                               FontSize="12" Margin="8" />
+                                </Panel>
+                            </Border>
+                            <TextBlock Text="{Binding Doc.Title}" FontWeight="SemiBold" TextWrapping="Wrap"
+                                       MaxLines="2" TextTrimming="CharacterEllipsis" FontSize="13" />
+                            <ProgressBar Minimum="0" Maximum="1" Value="{Binding ProgressValue}"
+                                         IsVisible="{Binding HasProgress}" Height="3" MinHeight="3" />
+                            <TextBlock Text="{Binding Detail}" FontSize="11" Opacity="0.7" TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Button>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+    </StackPanel>
+</UserControl>

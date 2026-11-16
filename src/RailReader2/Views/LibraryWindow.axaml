@@ -1,0 +1,70 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:v="using:RailReader2.Views"
+        xmlns:c="using:RailReader2.Controls"
+        x:Class="RailReader2.Views.LibraryWindow"
+        Title="Library"
+        Width="760" Height="640" MinWidth="420" MinHeight="300"
+        WindowStartupLocation="CenterOwner">
+    <DockPanel Margin="12">
+        <!-- Query -->
+        <TextBox x:Name="QueryBox" DockPanel.Dock="Top"
+                 PlaceholderText="Search every document you have opened"
+                 AutomationProperties.Name="Search the library"
+                 TextChanged="OnQueryChanged" KeyDown="OnQueryKeyDown" />
+        <TextBlock DockPanel.Dock="Top" Margin="2,4,0,0" FontSize="11" Opacity="0.65" TextWrapping="Wrap"
+                   Text="All words must appear. Use &quot;quotes&quot; for a phrase, word* for a prefix, -word to leave a word out." />
+
+        <!-- Filters -->
+        <WrapPanel DockPanel.Dock="Top" Margin="0,8,0,4" Orientation="Horizontal">
+            <CheckBox x:Name="PageFilter" Content="Page text" IsChecked="True" Margin="0,0,12,0"
+                      IsCheckedChanged="OnFilterChanged" />
+            <CheckBox x:Name="NoteFilter" Content="Notes and comments" IsChecked="True" Margin="0,0,12,0"
+                      IsCheckedChanged="OnFilterChanged" />
+            <CheckBox x:Name="OutlineFilter" Content="Outline" IsChecked="True" Margin="0,0,12,0"
+                      IsCheckedChanged="OnFilterChanged" />
+            <CheckBox x:Name="NameFilter" Content="File names" IsChecked="True" Margin="0,0,12,0"
+                      IsCheckedChanged="OnFilterChanged" />
+            <CheckBox x:Name="WithNotesFilter" Content="Only documents with notes" Margin="0,0,12,0"
+                      IsCheckedChanged="OnFilterChanged" />
+            <ComboBox x:Name="CategoryFilter" MinWidth="160" IsVisible="False"
+                      AutomationProperties.Name="Colour category"
+                      SelectionChanged="OnCategoryChanged" />
+        </WrapPanel>
+
+        <!-- Status -->
+        <TextBlock x:Name="StatusText" DockPanel.Dock="Bottom" Margin="2,6,0,0" FontSize="12" Opacity="0.75"
+                   TextWrapping="Wrap" />
+
+        <!-- Results: one flat list (document headers + their snippets) so arrow keys walk everything. -->
+        <ListBox x:Name="ResultsList" AutomationProperties.Name="Library results"
+                 Tapped="OnResultsTapped">
+            <ListBox.DataTemplates>
+                <DataTemplate DataType="v:LibraryDocRow">
+                    <DockPanel Margin="0,8,0,0" Opacity="{Binding RowOpacity}">
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6"
+                                    VerticalAlignment="Center" IsVisible="{Binding Missing}">
+                            <Button Content="Locate…" Padding="8,2" Click="OnLocateClick"
+                                    AutomationProperties.Name="{Binding LocateName}" />
+                            <Button Content="Remove from Library" Padding="8,2" Click="OnRemoveClick"
+                                    AutomationProperties.Name="{Binding RemoveName}" />
+                        </StackPanel>
+                        <StackPanel Spacing="1">
+                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Text="{Binding Subtitle}" FontSize="11" Opacity="0.7"
+                                       TextTrimming="PathSegmentEllipsis" ToolTip.Tip="{Binding Group.LastPath}" />
+                        </StackPanel>
+                    </DockPanel>
+                </DataTemplate>
+                <DataTemplate DataType="v:LibraryHitRow">
+                    <StackPanel Margin="18,0,0,2" Spacing="1" Opacity="{Binding RowOpacity}">
+                        <TextBlock Text="{Binding Label}" FontSize="11" Opacity="0.75"
+                                   FontStyle="{Binding LabelStyle}" />
+                        <c:HighlightedText Snippet="{Binding Hit.Snippet}" TextWrapping="Wrap" MaxLines="3"
+                                           TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                </DataTemplate>
+            </ListBox.DataTemplates>
+        </ListBox>
+    </DockPanel>
+</Window>

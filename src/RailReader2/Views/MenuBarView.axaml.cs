@@ -154,6 +154,7 @@ public partial class MenuBarView : UserControl
 
     // Edit menu handlers
     private void OnShowFind(object? s, RoutedEventArgs e) => Vm?.OpenSearch();
+    private void OnShowLibrary(object? s, RoutedEventArgs e) => Vm?.ShowLibrary();
     private void OnFindNext(object? s, RoutedEventArgs e) => Vm?.NextMatch();
     private void OnFindPrevious(object? s, RoutedEventArgs e) => Vm?.PreviousMatch();
     private void OnToggleAnnotationMode(object? s, RoutedEventArgs e) => Vm?.ToggleAnnotationMode();

@@ -45,6 +45,8 @@ Fully automated. The `release` job downloads the AppImage and Inno Setup install
 
 No manual steps required.
 
+**Linux floor: glibc 2.34** (Ubuntu 22.04+, Debian 12+, Fedora 35+, EL9+), set by the bundled SQLite (`libe_sqlite3.so` from SQLitePCLRaw 2.1.12+, used by the library search index). Every other native library needs at most 2.28. Check with `objdump -T <lib>.so | grep -oE 'GLIBC_[0-9.]+' | sort -Vu | tail -1` when bumping a native dependency.
+
 ## Microsoft Store (Windows)
 
 The Store submission is currently a manual process. The CI builds the unsigned MSIX; you download it and upload to Partner Center.

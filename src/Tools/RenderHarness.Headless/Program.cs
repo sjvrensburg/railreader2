@@ -94,6 +94,8 @@ appConfig.LineFocusBlurIntensity = 0.8;
 const double BaseFontSize = 14.0;
 
 appConfig.UiFontScale = config.UiScale > 0 ? config.UiScale : 1.0f;
+// Headless tools must not index documents into the reader's real library database.
+Environment.SetEnvironmentVariable("RR_DISABLE_LIBRARY_INDEX", "1");
 var vm = new MainWindowViewModel(appConfig);
 var window = new MainWindow { DataContext = vm };
 vm.SetWindow(window);
@@ -118,7 +120,7 @@ if (GetOption("settings-shots") is { } settingsDir)
         foreach (var (advanced, pages) in new[]
         {
             (false, new[] { "Reading", "Appearance", "Auto-Scroll", "Scanned Pages", "Spelling" }),
-            (true, new[] { "Reading", "Auto-Scroll", "Performance" }),
+            (true, new[] { "Reading", "Auto-Scroll", "Performance", "Library" }),
         })
         {
             foreach (var page in pages)

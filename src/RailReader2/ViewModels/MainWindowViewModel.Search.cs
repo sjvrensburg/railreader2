@@ -8,18 +8,26 @@ public sealed partial class MainWindowViewModel
     // loaded Search pane attaches — the pane may not exist yet when Ctrl+F is pressed.
     private string? _pendingSearchPrefill;
     private bool _searchFocusPending;
+    private bool? _pendingSearchRegex;
+    private int? _pendingSearchStartPage;
 
     /// <summary>Raised when search is requested (Ctrl+F / menu / search-selection) so an
     /// already-loaded Search pane applies the pending prefill/focus immediately.</summary>
     public event Action? SearchActivated;
 
-    /// <summary>Consume the pending search activation: the prefill text to apply (null = leave
-    /// the box unchanged) and whether the input should be focused. One-shot.</summary>
-    public (string? Prefill, bool Focus) ConsumeSearchActivation()
+    /// <summary>A pending search activation: the prefill text to apply (null = leave the box unchanged),
+    /// whether to focus the input, the regex toggle to set (null = leave it), and — for a library hit —
+    /// the page whose first match to show once the search has run (null = the usual first match).</summary>
+    public readonly record struct SearchActivation(string? Prefill, bool Focus, bool? UseRegex, int? StartPage);
+
+    /// <summary>Consume the pending search activation. One-shot.</summary>
+    public SearchActivation ConsumeSearchActivation()
     {
-        var result = (_pendingSearchPrefill, _searchFocusPending);
+        var result = new SearchActivation(_pendingSearchPrefill, _searchFocusPending, _pendingSearchRegex, _pendingSearchStartPage);
         _pendingSearchPrefill = null;
         _searchFocusPending = false;
+        _pendingSearchRegex = null;
+        _pendingSearchStartPage = null;
         return result;
     }
 
@@ -31,10 +39,12 @@ public sealed partial class MainWindowViewModel
         RequestSearch(text);
     }
 
-    private void RequestSearch(string? prefill)
+    private void RequestSearch(string? prefill, bool focus = true, bool? useRegex = null, int? startPage = null)
     {
         _pendingSearchPrefill = prefill;
-        _searchFocusPending = true;
+        _searchFocusPending = focus;
+        _pendingSearchRegex = useRegex;
+        _pendingSearchStartPage = startPage;
         ActivePane = SidePane.Search;
         ShowOutline = true;
         SearchActivated?.Invoke();

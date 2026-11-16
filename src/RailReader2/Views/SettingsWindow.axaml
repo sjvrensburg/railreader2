@@ -802,6 +802,24 @@
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>
+            <TabItem Header="Library" Classes="adv">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Spacing="8" Margin="16">
+                        <TextBlock Classes="section first" Text="Library Search Index" />
+                        <Separator />
+                        <TextBlock Classes="hint"
+                                   Text="Library search (File ▸ Search Library…, Ctrl+Shift+F) keeps an index of the text, outline and notes of every document you open. It is stored only on this computer, and holds a copy of the documents' text. Encrypted PDFs are never indexed beyond their file name." />
+                        <TextBlock Name="LibraryStatusText" TextWrapping="Wrap" />
+                        <TextBlock Name="LibraryPathText" Classes="status" TextWrapping="Wrap" />
+                        <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
+                            <Button Name="LibraryRebuildButton" Content="Rebuild Index" Click="OnLibraryRebuild" />
+                            <Button Name="LibraryClearButton" Content="Clear Index" Click="OnLibraryClear" />
+                        </StackPanel>
+                        <TextBlock Classes="status" TextWrapping="Wrap"
+                                   Text="Rebuild reads every document you have opened again, in the background. Clear deletes the index: documents are added again only as you open them. Neither touches your documents, notes or portals." />
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
         </TabControl>
     </DockPanel>
 </Window>
