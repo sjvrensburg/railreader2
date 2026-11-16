@@ -65,6 +65,7 @@ public sealed class LibraryWindowSupportTests : IDisposable
         Assert.Equal("page 1 · OCR text, unverified", LibraryResults.Label(Hit("a", 0, 1) with { FromOcr = true }, null));
         Assert.Equal("page 2 · outline", LibraryResults.Label(Hit("a", 1, 1, HitSource.Outline), null));
         Assert.Equal("file name", LibraryResults.Label(Hit("a", null, 1, HitSource.Name), null));
+        Assert.Equal("title, author or keywords", LibraryResults.Label(Hit("a", null, 1, HitSource.Details), null));
     }
 
     // ------------------------------------------------------------ highlight pattern

@@ -95,8 +95,8 @@ public static class LibraryCommand
         if (hits.Count == 0) { Console.WriteLine("No matches."); return 0; }
         foreach (var h in hits)
         {
-            string where = h.Page is int p ? $"p. {p + 1}" : "name";
-            Console.WriteLine($"{h.FileName} — {where} — {Label(h, me)}{(h.FromOcr ? " (OCR text, unverified)" : "")}");
+            string where = h.Page is int p ? $"p. {p + 1}" : h.Source == HitSource.Details ? "details" : "name";
+            Console.WriteLine($"{h.FileName}{(h.Title is { } t ? $" ({t})" : "")} — {where} — {Label(h, me)}{(h.FromOcr ? " (OCR text, unverified)" : "")}");
             Console.WriteLine($"    {h.Snippet}");
         }
         return 0;
@@ -109,6 +109,7 @@ public static class LibraryCommand
         HitSource.Page => "page text",
         HitSource.Outline => "outline",
         HitSource.Name => "file name",
+        HitSource.Details => "title, author or keywords",
         HitSource.Note when h.NoteKind == "bookmark" => "bookmark",
         HitSource.Note when LibraryResults.IsReviewer(h, me)
             => $"reviewer comment{(h.Author is null ? "" : $" ({h.Author})")}",

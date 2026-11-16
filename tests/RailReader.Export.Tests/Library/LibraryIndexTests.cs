@@ -306,15 +306,114 @@ public sealed class LibraryIndexTests : IDisposable
     }
 
     [Fact]
-    public void KnownDocuments_ReadsTheMapTolerantly()
+    public void Details_TitleAndAuthorAreSearchable_AndLabelTheDocument()
     {
-        var map = Path.Combine(_dir, "document_ids.json");
-        File.WriteAllText(map, """{"version":1,"files":{"/a.pdf":{"size":1,"mtime_ticks":2,"id":"x"},"/b.pdf":{}},"aliases":{},"paths":{}}""");
-        Assert.Equal(["/a.pdf", "/b.pdf"], KnownDocuments.FromIdentityMap(map));
-        File.WriteAllText(map, """{"version":1,"files":[["/a.pdf",{}]]}"""); // an unknown shape finds nothing
-        Assert.Empty(KnownDocuments.FromIdentityMap(map));
-        File.WriteAllText(map, "{ not json");
-        Assert.Empty(KnownDocuments.FromIdentityMap(map));
-        Assert.Empty(KnownDocuments.FromIdentityMap(Path.Combine(_dir, "none.json")));
+        using var index = Open();
+        var info = new DocumentInfo("Attention Is All You Need", "Ashish Vaswani; Noam Shazeer", "Transformers", "attention, translation");
+        index.ReplaceDocument(Doc("a", "1706.03762v7.pdf", "the body text") with { Info = info });
+        var hit = Assert.Single(index.Search(LibraryQuery.Parse("vaswani")));
+        Assert.Equal((HitSource.Details, (int?)null), (hit.Source, hit.Page));
+        Assert.Equal(("Attention Is All You Need", "Ashish Vaswani; Noam Shazeer"), (hit.Title, hit.Authors));
+        Assert.Single(index.Search(LibraryQuery.Parse("translation")));
+        var doc = index.GetDocument("a")!;
+        Assert.Equal(("Attention Is All You Need", "Ashish Vaswani; Noam Shazeer"), (doc.Title, doc.Authors));
+
+        var group = Assert.Single(LibraryResults.Group(index.Search(LibraryQuery.Parse("body")), exists: _ => true));
+        Assert.Equal("Attention Is All You Need", group.DisplayName); // a page hit still carries the title
+
+        // A rename re-indexes the file name only; the metadata stays.
+        index.RecordOpen("a", "/papers/renamed.pdf", 0, DateTime.UtcNow);
+        Assert.Single(index.Search(LibraryQuery.Parse("vaswani")));
+
+        index.Remove("a");
+        Assert.Empty(index.Search(LibraryQuery.Parse("vaswani")));
+    }
+
+    [Theory]
+    [InlineData("Attention Is All You Need", "Attention Is All You Need")]
+    [InlineData("  Robust   Regression ", "Robust Regression")]
+    [InlineData("Microsoft Word - draft3.docx", null)]
+    [InlineData("Microsoft Word - Kernel Methods in Practice", "Kernel Methods in Practice")]
+    [InlineData("main.tex", null)]
+    [InlineData("paper.dvi", null)]
+    [InlineData("Untitled", null)]
+    [InlineData("C:\\Users\\me\\thesis", null)]
+    [InlineData("12", null)]
+    [InlineData("", null)]
+    [InlineData(null, null)]
+    public void InfoCleaner_DropsTitlesThatAreNotTitles(string? raw, string? expected)
+        => Assert.Equal(expected, DocumentInfoCleaner.CleanTitle(raw));
+
+    [Fact]
+    public void Indexer_ReadsPdfMetadata()
+    {
+        var path = Path.Combine(_dir, "meta.pdf");
+        using (var stream = File.Create(path))
+        using (var doc = SKDocument.CreatePdf(stream, new SKDocumentPdfMetadata
+               {
+                   Title = "Bootstrap Methods for Dependent Data", Author = "A. Statistician",
+                   Subject = "Resampling", Keywords = "bootstrap; time series",
+               }))
+        {
+            using var font = new SKFont { Size = 24 };
+            using var paint = new SKPaint { Color = SKColors.Black };
+            using (var canvas = doc.BeginPage(612, 792))
+                canvas.DrawText("Some body text", 72, 100, SKTextAlign.Left, font, paint);
+            doc.EndPage();
+            doc.Close();
+        }
+        var content = LibraryIndexer.Extract(path, "meta", new SkiaPdfServiceFactory());
+        Assert.Equal(new DocumentInfo("Bootstrap Methods for Dependent Data", "A. Statistician", "Resampling", "bootstrap; time series"),
+            content.Info);
+    }
+
+    [Fact]
+    public void Schema2_IsMigratedInPlace_KeepingHistory_AndMarkedForReextraction()
+    {
+        // A version-2 index as the previous release wrote it: one document opened before, one removed.
+        using (var conn = new SqliteConnection($"Data Source={Db};Pooling=False"))
+        {
+            conn.Open();
+            foreach (var sql in new[]
+            {
+                "create table meta (key text primary key, value text)",
+                "create table removed (content_id text primary key)",
+                """
+                create table documents (doc_key integer primary key, content_id text not null unique, last_path text,
+                  file_name text not null, page_count integer not null default 0, file_size integer not null default 0,
+                  file_mtime integer not null default 0, indexer_version integer not null default 0,
+                  encrypted integer not null default 0, state integer not null default 0, indexed_utc text,
+                  last_opened_utc text, last_page integer)
+                """,
+                "create virtual table page_fts using fts5(body, doc_key unindexed, page unindexed, from_ocr unindexed, tokenize = 'porter unicode61 remove_diacritics 2')",
+                "create virtual table outline_fts using fts5(title, doc_key unindexed, page unindexed, tokenize = 'porter unicode61 remove_diacritics 2')",
+                "create virtual table note_fts using fts5(marked_text, comment, author, category, doc_key unindexed, page unindexed, kind unindexed, color unindexed, native_id unindexed, source unindexed, tokenize = 'porter unicode61 remove_diacritics 2')",
+                "create virtual table name_fts using fts5(name, doc_key unindexed, tokenize = 'porter unicode61 remove_diacritics 2')",
+                "insert into meta values ('schema_version', '2'), ('backfill', 'off')",
+                "insert into removed values ('gone')",
+                "insert into documents(doc_key, content_id, last_path, file_name, page_count, indexer_version, last_opened_utc, last_page) values (1, 'a', '/papers/kept.pdf', 'kept.pdf', 3, 1, '2026-11-01T00:00:00.0000000Z', 2)",
+                "insert into name_fts(rowid, name, doc_key) values (1048576, 'kept', 1)",
+                "insert into page_fts(rowid, body, doc_key, page, from_ocr) values (1048576, 'still searchable', 1, 0, 0)",
+            })
+            {
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = sql;
+                cmd.ExecuteNonQuery();
+            }
+        }
+
+        using var index = LibraryIndex.OpenWritable(Db, out bool recovered);
+        Assert.False(recovered);
+        var doc = index.GetDocument("a")!;
+        Assert.Equal((2, (string?)null), (doc.LastPage, doc.Title));
+        Assert.NotNull(doc.LastOpenedUtc);
+        Assert.True(index.IsRemoved("gone"));
+        Assert.False(index.BackfillEnabled);
+        Assert.Single(index.Search(LibraryQuery.Parse("searchable")));
+        Assert.True(index.NeedsIndex("a", "/papers/kept.pdf")); // older indexer: re-extracted with its metadata
+
+        index.ReplaceDocument(Doc("a", "kept.pdf", "new text") with { Info = new DocumentInfo("Kept Paper", null, null, null) });
+        Assert.Equal("Kept Paper", index.GetDocument("a")!.Title);
+        Assert.Single(index.Search(LibraryQuery.Parse("kept paper"), sources: new HashSet<HitSource> { HitSource.Details }));
     }
 }

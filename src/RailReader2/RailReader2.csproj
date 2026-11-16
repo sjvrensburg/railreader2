@@ -43,16 +43,16 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="RailReader.Core" Version="0.85.0" />
+    <PackageReference Include="RailReader.Core" Version="0.87.0" />
     <ProjectReference Include="../RailReader2.References/RailReader2.References.csproj" />
     <ProjectReference Include="../RailReader2.Shared/RailReader2.Shared.csproj" />
     <ProjectReference Include="../RailReader2.Library/RailReader2.Library.csproj" />
-    <PackageReference Include="RailReader.Core.Pdfium" Version="0.85.0" />
-    <PackageReference Include="RailReader.Core.Analysis" Version="0.85.0" />
-    <PackageReference Include="RailReader.Core.Analysis.WebGpu" Version="0.85.0" />
-    <PackageReference Include="RailReader.Renderer.Skia" Version="0.85.0" />
-    <PackageReference Include="RailReader.Core.Vlm.OpenAI" Version="0.85.0" />
-    <PackageReference Include="RailReader.Core.Ocr.RapidOcr" Version="0.85.0" />
+    <PackageReference Include="RailReader.Core.Pdfium" Version="0.87.0" />
+    <PackageReference Include="RailReader.Core.Analysis" Version="0.87.0" />
+    <PackageReference Include="RailReader.Core.Analysis.WebGpu" Version="0.87.0" />
+    <PackageReference Include="RailReader.Renderer.Skia" Version="0.87.0" />
+    <PackageReference Include="RailReader.Core.Vlm.OpenAI" Version="0.87.0" />
+    <PackageReference Include="RailReader.Core.Ocr.RapidOcr" Version="0.87.0" />
   </ItemGroup>
 
 </Project>

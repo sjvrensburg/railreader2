@@ -38,7 +38,7 @@ public static class RecentDocuments
             var doc = id is null ? null : index?.GetDocument(id);
             bool locked = doc?.State == DocumentState.Locked;
             cards.Add(new RecentDocument(
-                path, id, System.IO.Path.GetFileNameWithoutExtension(path), Math.Max(0, page),
+                path, id, doc?.Title ?? System.IO.Path.GetFileNameWithoutExtension(path), Math.Max(0, page),
                 doc is { PageCount: > 0 } ? doc.PageCount : null,
                 id is not null && noteCounts is not null ? noteCounts.GetValueOrDefault(id) : 0,
                 !Safe(() => exists(path)), locked));

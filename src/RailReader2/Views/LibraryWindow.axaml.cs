@@ -16,7 +16,10 @@ namespace RailReader2.Views;
 public sealed class LibraryDocRow(LibraryResultGroup group)
 {
     public LibraryResultGroup Group { get; } = group;
-    public string Title => Group.FileName;
+    public string Title => Group.DisplayName;
+    /// <summary>The metadata authors, shown under the title; null hides the line.</summary>
+    public string? Authors => Group.Authors;
+    public bool HasAuthors => Group.Authors is not null;
     public bool Missing => Group.Missing;
     public double RowOpacity => Missing ? 0.55 : 1.0;
     public string Subtitle =>
@@ -25,7 +28,7 @@ public sealed class LibraryDocRow(LibraryResultGroup group)
         + (Group.NoteCount > 0 ? $" · {Count(Group.NoteCount, "note", "notes")}" : "");
     public string LocateName => $"Locate {Group.FileName}";
     public string RemoveName => $"Remove {Group.FileName} from the library";
-    public string AutomationName => $"{Group.FileName}, {Count(Group.HitCount, "match", "matches")}" + (Missing ? ", file not found" : "");
+    public string AutomationName => $"{Group.DisplayName}{(Group.Authors is { } a ? $", by {a}" : "")}, {Count(Group.HitCount, "match", "matches")}" + (Missing ? ", file not found" : "");
 
     internal static string Count(int n, string one, string many) => n == 1 ? $"1 {one}" : $"{n} {many}";
 }
@@ -38,7 +41,7 @@ public sealed class LibraryHitRow(LibraryResultGroup group, LibraryHit hit, stri
     public string Label { get; } = label;
     public FontStyle LabelStyle => Hit.FromOcr ? FontStyle.Italic : FontStyle.Normal;
     public double RowOpacity => Group.Missing ? 0.55 : 1.0;
-    public string AutomationName => $"{Group.FileName}, {Label}: {HighlightedText.Plain(Hit.Snippet)}";
+    public string AutomationName => $"{Group.DisplayName}, {Label}: {HighlightedText.Plain(Hit.Snippet)}";
 }
 
 /// <summary>
@@ -226,7 +229,7 @@ public partial class LibraryWindow : Window
         if (PageFilter.IsChecked == true) set.Add(HitSource.Page);
         if (NoteFilter.IsChecked == true) set.Add(HitSource.Note);
         if (OutlineFilter.IsChecked == true) set.Add(HitSource.Outline);
-        if (NameFilter.IsChecked == true) set.Add(HitSource.Name);
+        if (NameFilter.IsChecked == true) { set.Add(HitSource.Name); set.Add(HitSource.Details); }
         return set;
     }
 
@@ -264,7 +267,8 @@ public partial class LibraryWindow : Window
         {
             rows.Add(new LibraryDocRow(g));
             foreach (var h in g.Hits)
-                if (h.Source != HitSource.Name) rows.Add(new LibraryHitRow(g, h, LibraryResults.Label(h, reader)));
+                // Whole-document hits (file name, title/author) are what the header row already shows.
+                if (h.Source is not (HitSource.Name or HitSource.Details)) rows.Add(new LibraryHitRow(g, h, LibraryResults.Label(h, reader)));
         }
         return new SearchResult(rows, groups.Count, hits.Count, meta, false);
     }

@@ -16,8 +16,8 @@ namespace RailReader2.ViewModels;
 // Hooks: OpenDocument (after the content identity and annotations are loaded) → DocumentOpened;
 // CloseTab of a model's last tab and Dispose → DocumentClosed (notes edited this session, OCR-only text);
 // SetColourName → CategoryRenamed; RunAnimationFrame → IsBusy while rail reading (holds back backfill);
-// window Opened → StartLibraryBackfill. Core has no "annotations saved" event, so notes are re-indexed on
-// close rather than on each auto-save.
+// window Opened → StartLibraryBackfill; Core's AnnotationFileManager.Saved → NotesSaved (each auto-save,
+// the last tab closing, and the flush at shutdown).
 public partial class MainWindowViewModel
 {
     private LibraryWriter? _library;
@@ -33,6 +33,7 @@ public partial class MainWindowViewModel
                 OnRecovered = () => _logger.Info("[Library] index was unreadable; moved aside to library.db.unreadable and rebuilt"),
             };
             _library.Changed += OnLibraryWriterChanged;
+            _controller.AnnotationManager.Saved += OnAnnotationsSaved;
             PublishLibraryCategories();
         }
         catch (Exception ex)
@@ -67,6 +68,18 @@ public partial class MainWindowViewModel
             encrypted || model.Annotations is null ? null : LibraryIndexer.Snapshot(model.Annotations), tab.CurrentPage);
     }
 
+    /// <summary>Core's <c>AnnotationFileManager.Saved</c>: re-index the saved notes. Raised synchronously
+    /// where the save ran, which in this app is always the UI thread (auto-save is posted through
+    /// <see cref="AvaloniaThreadMarshaller"/>; Release/FlushAll are called from the UI thread), so the
+    /// snapshot of the live model is taken where the UI edits it. Encrypted documents are skipped by the
+    /// writer (indexed as locked).</summary>
+    private void OnAnnotationsSaved(object? sender, AnnotationsSavedEventArgs e)
+    {
+        if (_library is null) return;
+        if (DocumentIdentity.Peek(e.PdfPath) is not { } id) return;
+        _library.NotesSaved(e.PdfPath, id, LibraryIndexer.Snapshot(e.Annotations));
+    }
+
     /// <summary>UI thread, while <paramref name="model"/> is still alive (before CloseDocument/Dispose).</summary>
     private void LibraryDocumentClosed(DocumentModel model, int? page)
     {
@@ -78,8 +91,7 @@ public partial class MainWindowViewModel
             foreach (var (p, text) in model.TextCache)
                 if (text.FromOcr && !string.IsNullOrWhiteSpace(text.Text))
                     ocr.Add(new PageEntry(p, TextNormalizer.Normalize(text.Text), true));
-        _library.DocumentClosed(model.FilePath, id, encrypted,
-            encrypted || model.Annotations is null ? null : LibraryIndexer.Snapshot(model.Annotations), ocr, page);
+        _library.DocumentClosed(model.FilePath, id, encrypted, ocr, page);
     }
 
     /// <summary>Queues documents opened before the index existed (§5.3): the identity map's paths plus
@@ -94,7 +106,9 @@ public partial class MainWindowViewModel
         var recents = _appConfig.RecentFiles.Select(r => r.FilePath).Where(p => !string.IsNullOrEmpty(p)).ToList();
         _ = Task.Run(() =>
         {
-            try { start(library, recents.Concat(KnownDocuments.FromIdentityMap())); }
+            // Core's snapshot of the identity map. No Refresh(): this process owns the map (it calls
+            // Resolve), so its in-memory copy is already the newest.
+            try { start(library, recents.Concat(DocumentIdentity.KnownDocuments().Select(d => d.Path))); }
             catch (Exception ex) { _logger.Error($"[Library] {what} could not start", ex); }
         });
     }
@@ -339,6 +353,10 @@ public partial class MainWindowViewModel
     {
         _libraryWindow?.Close();
         if (_library is null) return;
+        // Save notes edited since the last auto-save now, while the writer is still running: Saved
+        // re-indexes them. (Core's own flush in DocumentController.Dispose comes after the writer stops.)
+        try { _controller.AnnotationManager.FlushAll(); }
+        catch (Exception ex) { _logger.Error("[Library] annotation flush at shutdown failed", ex); }
         try
         {
             var seen = new HashSet<DocumentModel>();

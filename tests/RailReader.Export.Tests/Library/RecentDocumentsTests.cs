@@ -46,6 +46,17 @@ public sealed class RecentDocumentsTests : IDisposable
     }
 
     [Fact]
+    public void Build_TitlesACardFromMetadata_ElseTheFileName()
+    {
+        using var index = LibraryIndex.OpenWritable(Db, out _);
+        index.ReplaceDocument(Doc("T", "/p/1706.03762.pdf", 2) with { Info = new DocumentInfo("Attention Is All You Need", null, null, null) });
+        index.ReplaceDocument(Doc("U", "/p/notes.pdf", 2));
+        var ids = new Dictionary<string, string> { ["/p/1706.03762.pdf"] = "T", ["/p/notes.pdf"] = "U" };
+        var cards = RecentDocuments.Build([("/p/1706.03762.pdf", 0), ("/p/notes.pdf", 0)], p => ids.GetValueOrDefault(p), index, _ => true);
+        Assert.Equal(["Attention Is All You Need", "notes"], cards.Select(c => c.Title));
+    }
+
+    [Fact]
     public void Build_WorksWithoutAnIndex_AndCapsTheCount()
     {
         var recents = Enumerable.Range(0, 20).Select(i => ($"/p/{i}.pdf", 0));

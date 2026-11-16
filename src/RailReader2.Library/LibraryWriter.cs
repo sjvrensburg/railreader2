@@ -111,18 +111,25 @@ public sealed class LibraryWriter : IDisposable
             index.RecordOpen(contentId, path, page, DateTime.UtcNow);
         });
 
-    /// <summary>A document's last tab closed (or the app is closing): re-index its notes and add any page
-    /// text that only this session's OCR produced (design Q6).</summary>
-    public void DocumentClosed(string path, string contentId, bool encrypted, AnnotationFile? annotations,
-        IReadOnlyList<PageEntry> ocrPages, int? page)
+    /// <summary>A document's annotations were saved (Core's <c>AnnotationFileManager.Saved</c>: each
+    /// debounced auto-save, the last tab closing, shutdown): re-index its notes from
+    /// <paramref name="annotations"/>, a snapshot taken on the saving thread (see
+    /// <see cref="LibraryIndexer.Snapshot"/>). Nothing for a document the index doesn't have yet (its open
+    /// job indexes the notes) or one indexed as locked (encrypted: only its name is indexed, §5.4).</summary>
+    public void NotesSaved(string path, string contentId, AnnotationFile annotations)
+        => Enqueue(index =>
+        {
+            if (index.GetDocument(contentId) is not { State: not DocumentState.Locked, Encrypted: false }) return;
+            index.ReplaceNotes(contentId, NotesWithMarkupText(path, annotations, _cts.Token), CategoryOf);
+        });
+
+    /// <summary>A document's last tab closed (or the app is closing): add any page text that only this
+    /// session's OCR produced (design Q6) and record the page. Notes arrive through <see cref="NotesSaved"/>.</summary>
+    public void DocumentClosed(string path, string contentId, bool encrypted, IReadOnlyList<PageEntry> ocrPages, int? page)
         => Enqueue(index =>
         {
             if (index.GetDocument(contentId) is null) return;
-            if (!encrypted)
-            {
-                if (annotations is not null) index.ReplaceNotes(contentId, NotesWithMarkupText(path, annotations, _cts.Token), CategoryOf);
-                if (ocrPages.Count > 0) index.AddOcrPages(contentId, ocrPages);
-            }
+            if (!encrypted && ocrPages.Count > 0) index.AddOcrPages(contentId, ocrPages);
             index.RecordOpen(contentId, path, page, DateTime.UtcNow);
         });
 
