@@ -117,7 +117,7 @@ public partial class MainWindowViewModel
     /// loop and on every focus change, since a tab switch or close may not run another frame.</summary>
     private void SyncLibraryBusy()
     {
-        if (_library is { } library) library.IsBusy = IsRailReading;
+        if (_library is { } library) library.IsBusy = IsRailReading || _searchWork > 0;
     }
 
     // ------------------------------------------------------------ Library window (Phase 2)

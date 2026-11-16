@@ -6,9 +6,10 @@ public sealed record PageEntry(int Page, string Body, bool FromOcr);
 /// <summary>One outline (bookmark-tree) entry: its title and target page.</summary>
 public sealed record OutlineItem(string Title, int Page);
 
-/// <summary>Where an annotation came from: written into the PDF (possibly by a reviewer), or authored
-/// in RailReader2 and kept in its sidecar.</summary>
-public enum NoteSource { RailReader = 0, InPdf = 1 }
+/// <summary>Where an annotation came from: authored in RailReader2 and kept in its sidecar, written into
+/// the PDF (possibly by a reviewer), or written into the PDF by RailReader (Core 0.88.0's origin mark).
+/// Stored as its number in <c>note_fts.source</c>; <see cref="InPdfByRailReader"/> needed no schema change.</summary>
+public enum NoteSource { RailReader = 0, InPdf = 1, InPdfByRailReader = 2 }
 
 /// <summary>One annotation or named bookmark, as indexed. <see cref="Kind"/> is a lower-case name
 /// ("highlight", "textnote", "freetext", "bookmark", …).</summary>

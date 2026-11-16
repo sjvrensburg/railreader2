@@ -2,6 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using RailReader.Core.Models;
 using RailReader.Core.Services;
 using RailReader2.ViewModels;
@@ -36,6 +37,9 @@ public partial class SearchView : UserControl
     private DispatcherTimer? _debounceTimer;
     private CancellationTokenSource? _searchCts;
     private bool _applyingActivation;
+    // True while a search's first match is shown but the rest of the document is still being searched:
+    // the counter says "Searching…" rather than a count of the partial list (#301).
+    private bool _filling;
     private int? _pendingStartPage; // a library hit's page: show its first match once the search has run
     // The reader's own Regex / Case toggles, saved when a library hit set them; restored on their next search.
     private (bool? Regex, bool? Case)? _readerToggles;
@@ -77,6 +81,7 @@ public partial class SearchView : UserControl
         _vm.SearchInvalidated += UpdateMatchDisplay;
         _vm.SearchActivated += HandleSearchActivation;
         _vm.SearchCleared += ClearSearchUi;
+        _vm.ActiveSearchMatchChanged += OnActiveMatchChanged;
         UpdateMatchDisplay();
         HandleSearchActivation();
     }
@@ -89,6 +94,7 @@ public partial class SearchView : UserControl
             _vm.SearchInvalidated -= UpdateMatchDisplay;
             _vm.SearchActivated -= HandleSearchActivation;
             _vm.SearchCleared -= ClearSearchUi;
+            _vm.ActiveSearchMatchChanged -= OnActiveMatchChanged;
             _vm = null;
         }
         _debounceTimer?.Stop();
@@ -206,6 +212,7 @@ public partial class SearchView : UserControl
         RestoreReaderToggles();
         SearchInput.Text = "";
         SearchResultsList.ItemsSource = null;
+        _filling = false;
         SearchMatchCount.Text = "";
     }
 
@@ -259,6 +266,9 @@ public partial class SearchView : UserControl
         }
     }
 
+    // Diagnostic (opt-in, read once): RR_SEARCH_TIMING=1 logs where a search's time goes to session.log.
+    private static readonly bool SearchTiming = Environment.GetEnvironmentVariable("RR_SEARCH_TIMING") == "1";
+
     private async Task RunSearchAsync()
     {
         if (_vm is null) return;
@@ -297,37 +307,127 @@ public partial class SearchView : UserControl
         _vm.InvalidateSearchLayer();
         SearchMatchCount.Text = "Searching...";
 
-        var allMatches = new List<SearchMatch>();
+        _filling = false;
+        using var searchWork = _vm.BeginSearchWork();
+        // A library hit's page (null for the reader's own search). Read now: typing a new query clears it.
+        int? hitPage = _pendingStartPage;
+        _pendingStartPage = null;
+        int pageCount = doc.PageCount;
+        // Search from the hit's page (or the page the reader is on) forwards, then wrap: the match Core
+        // activates — the first on or after that page — is then found first, and shown as soon as it is
+        // (#301), instead of after the whole document. The rest is installed without moving the view.
+        int first = Math.Clamp(hitPage ?? _vm.Controller.FocusedViewport?.CurrentPage ?? 0, 0, Math.Max(0, pageCount - 1));
+        var perPage = new List<SearchMatch>?[pageCount];
+        bool shown = false;
+        int found = 0;
         const int batchSize = 20;
+        var total = SearchTiming ? System.Diagnostics.Stopwatch.StartNew() : null;
+        var inSearch = new System.Diagnostics.Stopwatch();
+        var inYield = new System.Diagnostics.Stopwatch();
+        var pageMs = SearchTiming ? new List<double>(pageCount) : null;
+        long firstShownMs = -1;
 
-        for (int page = 0; page < doc.PageCount; page++)
+        for (int k = 0; k < pageCount; k++)
         {
             if (token.IsCancellationRequested) return;
+            int page = (first + k) % pageCount;
 
-            SearchService.SearchPage(doc, page, query, regex, comparison, allMatches);
+            var pageMatches = new List<SearchMatch>();
+            long before = inSearch.ElapsedTicks;
+            inSearch.Start();
+            SearchService.SearchPage(doc, page, query, regex, comparison, pageMatches);
+            inSearch.Stop();
+            pageMs?.Add((inSearch.ElapsedTicks - before) * 1000.0 / System.Diagnostics.Stopwatch.Frequency);
+            if (pageMatches.Count > 0) { perPage[page] = pageMatches; found += pageMatches.Count; }
+
+            // First match found: show it now. For a library hit, only one on or after its page — a wrapped
+            // match would jump to the start of the document and then back to the hit's page at the end.
+            if (!shown && pageMatches.Count > 0 && (hitPage is null || page >= first))
+            {
+                shown = true;
+                _vm.Controller.Search.FinalizeSearch(doc, Flatten(perPage), first);
+                _vm.InvalidateAfterSearch(); // it navigates: page bitmap + camera + overlays
+                _filling = true;
+                SearchMatchCount.Text = "Searching\u2026";
+                firstShownMs = total?.ElapsedMilliseconds ?? -1;
+            }
 
             // Yield to UI every batch to stay responsive
-            if (page % batchSize == batchSize - 1)
+            if (k % batchSize == batchSize - 1)
+            {
+                inYield.Start();
                 await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Background);
+                inYield.Stop();
+            }
         }
+        if (total is not null && pageMs is { Count: > 0 })
+            RailReader.Core.RailReaderLogging.Logger.Info(
+                $"[Search] {pageCount} pages, {found} matches: total {total.ElapsedMilliseconds} ms, " +
+                $"first shown {firstShownMs} ms, SearchPage {inSearch.ElapsedMilliseconds} ms, yields {inYield.ElapsedMilliseconds} ms; per page: " +
+                $"median {pageMs.Order().ElementAt(pageMs.Count / 2):F1} ms, max {pageMs.Max():F0} ms, " +
+                $"{pageMs.Count(t => t > 50)} pages > 50 ms ({pageMs.Where(t => t > 50).Sum():F0} ms)");
 
         if (token.IsCancellationRequested) return;
 
-        // Opened from a library hit: Core activates the first match on or after the hit's page
-        // (not the one after the view's current page, which hasn't moved there yet).
-        int? startPage = _pendingStartPage;
-        _pendingStartPage = null;
-        _vm.Controller.Search.FinalizeSearch(doc, allMatches, startPage);
-        // FinalizeSearch auto-navigates the document to the first match's page, so we
-        // need a full invalidation (page bitmap + camera + overlays), not just the
-        // search layer — otherwise the new page's highlights paint over the old page.
-        _vm.InvalidateAfterSearch();
-        // Core wraps to the document's first match when none is on or after the hit's page (the
-        // highlight pattern didn't match the PDF's own text there): show the hit's page instead.
-        if (startPage is int hitPage && !allMatches.Any(m => m.PageIndex >= hitPage))
-            _vm.GoToPage(hitPage);
+        var allMatches = Flatten(perPage);
+        _filling = false;
+        if (shown)
+        {
+            // Core 0.89.0: the full list, keeping the active match, without pulling a reader who has moved
+            // on since the first match was shown back to it.
+            _vm.Controller.Search.UpdateMatches(doc, allMatches);
+            _vm.InvalidateSearchLayer();
+        }
+        else
+        {
+            // Nothing shown yet: no matches at all, or a library hit with none on or after its page. Core
+            // then wraps to the document's first match (the highlight pattern didn't match the PDF's own
+            // text on the hit's page): show the hit's page instead.
+            _vm.Controller.Search.FinalizeSearch(doc, allMatches, first);
+            _vm.InvalidateAfterSearch();
+            if (hitPage is int p)
+                _vm.GoToPage(p);
+        }
         BuildResultGroups();
         UpdateMatchDisplay();
+        ScrollToActiveMatch(); // a library hit's match may be hundreds of results down (#300)
+    }
+
+    /// <summary>The matches found so far, in page order (Core needs a page-ordered list).</summary>
+    private static List<SearchMatch> Flatten(List<SearchMatch>?[] perPage)
+    {
+        var all = new List<SearchMatch>();
+        foreach (var list in perPage)
+            if (list is not null) all.AddRange(list);
+        return all;
+    }
+
+    private void OnActiveMatchChanged()
+    {
+        UpdateMatchDisplay();
+        ScrollToActiveMatch();
+    }
+
+    /// <summary>Scrolls the result list so the active match's row is visible (#300). Runs after layout:
+    /// right after a search the rows don't exist yet.</summary>
+    private void ScrollToActiveMatch()
+    {
+        if (_vm is null || !_vm.HasActiveSearchMatch) return;
+        int active = _vm.ActiveMatchIndex;
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (_vm is null || _vm.ActiveMatchIndex != active
+                || SearchResultsList.ItemsSource is not IReadOnlyList<SearchResultGroup> groups) return;
+            for (int g = 0; g < groups.Count; g++)
+            {
+                int i = groups[g].Items.FindIndex(it => it.MatchIndex == active);
+                if (i < 0) continue;
+                if (SearchResultsList.ContainerFromIndex(g) is not Control groupContainer) return;
+                var inner = groupContainer.GetVisualDescendants().OfType<ItemsControl>().FirstOrDefault();
+                (inner?.ContainerFromIndex(i) as Control ?? groupContainer).BringIntoView();
+                return;
+            }
+        }, DispatcherPriority.Loaded);
     }
 
     private void BuildResultGroups()
@@ -374,6 +474,7 @@ public partial class SearchView : UserControl
     private void UpdateMatchDisplay()
     {
         if (_vm is null) return;
+        if (_filling) { SearchMatchCount.Text = "Searching\u2026"; return; }
         int total = _vm.SearchMatches.Count;
         if (total == 0) { SearchMatchCount.Text = ""; return; }
         // A block-confined (portal) view can have matches but none reachable → ActiveMatchIndex == -1.

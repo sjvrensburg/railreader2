@@ -103,7 +103,8 @@ public static class LibraryIndexer
                 comment = string.IsNullOrWhiteSpace(comment) ? null : TextNormalizer.Normalize(comment);
                 if (marked is null && comment is null) continue;
                 notes.Add(new NoteEntry(page, KindOf(a), marked, comment, a.Author, a.Color, a.NativeId,
-                    a.Source == AnnotationSource.InPdf ? NoteSource.InPdf : NoteSource.RailReader));
+                    a.Source != AnnotationSource.InPdf ? NoteSource.RailReader
+                        : a.WrittenByRailReader ? NoteSource.InPdfByRailReader : NoteSource.InPdf));
             }
         }
         foreach (var b in file.Bookmarks)
