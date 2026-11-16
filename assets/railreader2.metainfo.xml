@@ -103,6 +103,9 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="3.89.0.0" date="2026-11-16">
+      <description><p>Searching a long document is faster: opening a library search result shows its highlight straight away while the rest of the document is searched, and the Search pane's result list now scrolls to the match you are on. When you start annotating without a name set, RailReader2 offers to sign your notes with your computer account's name (it never does so without asking, since the name is saved in PDFs you share), and Settings suggests the same name. Notes you save into a PDF without a name are now recognised as yours rather than as a reviewer's.</p></description>
+    </release>
     <release version="3.88.0.0" date="2026-11-16">
       <description><p>Library search now finds documents by the title, author, subject and keywords stored in the PDF, and the Library window and the recent documents on the welcome screen show a document's title instead of its file name when it has one. Titles that an authoring tool made up, such as "Microsoft Word - draft.docx" or "Untitled", are ignored. Notes are added to the search index each time they are saved rather than only when the document is closed, and opening a search result goes straight to the match on that page. Your existing index is updated in the background; nothing is lost.</p></description>
     </release>
