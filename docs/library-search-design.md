@@ -1,6 +1,6 @@
 # Library search and recents dashboard (design)
 
-**Status:** Design agreed 2026-11-16 (open questions decided, §12). Phase 0 spike done (§11a); one packaging decision open (glibc floor).
+**Status:** Design agreed 2026-11-16 (open questions decided, §12). Phase 0 spike done (§11a).
 **Roadmap item:** M7 (features adapted from the Cauchy viewer): library-wide full-text search and a recents dashboard keyed by content id.
 **Depends on:** content-based document identity (`DocumentIdentity`, Core 0.75.0+), sidecar annotations keyed by content id (Core 0.72.0+).
 
@@ -210,7 +210,7 @@ Spike: `src/RailReader2.Library` (`SqliteProbe`, `TextNormalizer`, `LibraryBench
 - **Size:** 4.1 MB after `optimize` + `VACUUM` for 2.45 M characters, **4.9 KB/page**. The FTS index itself is ~1.0 MB (~42 % of text, in line with the §6.1 estimate). The rest is FTS5's stored copy of the text (needed for `snippet()`) and per-row ids. So ~1,000 papers × 20 pages ≈ 100 MB before thumbnails, about twice the §6.1 estimate. Phase 1: store an integer document key in FTS rows, not the 64-character content id.
 - **Query latency:** 0.01–5.4 ms median on 861 pages (prefix `contrast*` slowest). Far inside the 50 ms target; re-measure at 20k pages in Phase 1.
 - **Query syntax:** raw FTS5 syntax errors throw (`NEAR/5` is not FTS5 syntax). Phase 1's `LibraryQuery` must parse user input and quote terms itself, never pass it to `MATCH` as is.
-- **Blocker to decide: glibc floor.** SQLitePCLRaw 2.1.12+ ships a `libe_sqlite3.so` built against **glibc 2.34** (`dlopen`/`pthread_*` symbols). Everything RailReader2 ships today needs at most 2.28 (ONNX Runtime; .NET itself needs 2.27). Using it unchanged drops Debian 11, Ubuntu 20.04 and RHEL/Alma/Rocky 8 (all past standard support except EL8, supported to 2029). 2.1.11's native library needs 2.28 but carries SQLite 3.49.1.
+- **glibc floor (decided 2026-11-16: accept 2.34).** SQLitePCLRaw 2.1.12+ ships a `libe_sqlite3.so` built against **glibc 2.34** (`dlopen`/`pthread_*` symbols). Everything RailReader2 ships today needs at most 2.28 (ONNX Runtime; .NET itself needs 2.27). Using it unchanged drops Debian 11, Ubuntu 20.04 and RHEL/Alma/Rocky 8 (all past standard support except EL8, supported to 2029). 2.1.11's native library needs 2.28 but carries SQLite 3.49.1. **Decision:** take the current package and document glibc 2.34 as the Linux floor (Ubuntu 22.04+, Debian 12+, Fedora 35+, EL9+), rather than pin an older SQLite or build our own. The floor only bites where SQLite is loaded (the CLI's `library` commands now, the app from Phase 2), so the README's Linux requirements change with Phase 2.
 
 ## 12. Decisions
 
