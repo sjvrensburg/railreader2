@@ -25,6 +25,13 @@ internal sealed class Program
 
         PdfiumResolver.Initialize();
 
+        // Headless self-check for CI (railreader2#298): no window, no logger, nothing in ConfigDir.
+        if (LibraryProbeMode.TryRun(args) is int probeExit)
+        {
+            Environment.ExitCode = probeExit;
+            return;
+        }
+
         var logger = new ConsoleLogger();
         RailReaderLogging.Logger = logger;
 

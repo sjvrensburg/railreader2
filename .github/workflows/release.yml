@@ -181,6 +181,12 @@ jobs:
           $version = "${{ github.ref_name }}".TrimStart('v')
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DAPP_VERSION="$version" installer\railreader2.iss
 
+      # Before the installer ships: install it silently and run the app's headless library round trip
+      # from the installed copy (railreader2#298).
+      - name: Library probe (published and installed)
+        shell: pwsh
+        run: ./installer/test-library-probe.ps1 -Setup installer\output\railreader2-setup-x64.exe
+
       - name: Upload artifact
         uses: actions/upload-artifact@v7
         with:

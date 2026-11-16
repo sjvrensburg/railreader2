@@ -65,3 +65,27 @@ jobs:
       - name: Silent update test
         shell: pwsh
         run: ./installer/test-silent-update.ps1
+
+  # The app (ReadyToRun, GUI subsystem) loads its native SQLite differently from the AOT CLI above, so the
+  # published app, and a silent install of the real installer built from it, each run a headless library
+  # round trip (`RailReader2.exe --library-probe`): railreader2#298.
+  app-library-probe:
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: "10.0.x"
+          dotnet-quality: "preview"
+
+      - name: Install Inno Setup
+        run: choco install innosetup -y --no-progress
+
+      - name: Publish app (as release.yml does)
+        run: dotnet publish src/RailReader2/RailReader2.csproj -c Release -r win-x64 --self-contained -o publish/
+
+      - name: Library probe (published and installed)
+        shell: pwsh
+        run: ./installer/test-library-probe.ps1
