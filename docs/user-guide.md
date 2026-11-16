@@ -338,7 +338,7 @@ Click a result, or move to it with the arrow keys and press `Enter`. The documen
 - for a note or comment, the note is selected, as in the [Comments](#comments) panel;
 - otherwise the Search panel opens with your words highlighted on that page. In a long book the highlighting can take a few seconds to appear.
 
-A comment counts as *your note* when its author is the name in **Settings > Reading > Annotations**; anyone else's is a *reviewer comment*.
+A comment counts as *your note* when its author is the name in **Settings > Reading > Annotations**, or when it has no author and RailReader2 saved it into the PDF; anyone else's is a *reviewer comment*. (Unsigned notes saved before version 3.89 carry no such mark and count as reviewer comments.)
 
 ### Which documents are included
 

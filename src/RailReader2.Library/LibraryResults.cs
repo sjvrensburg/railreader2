@@ -79,9 +79,8 @@ public static class LibraryResults
         };
     }
 
-    /// <summary>An in-PDF note counts as the reader's own when its author is the reader's name (their saved
-    /// notes read back as in-PDF), as in the Comments pane.</summary>
+    /// <summary>A reviewer's note rather than the reader's own; see <see cref="NoteOwnership"/>.</summary>
     public static bool IsReviewer(LibraryHit h, string? readerName)
-        => h.NoteOrigin == NoteSource.InPdf
-           && !(readerName is { Length: > 0 } me && string.Equals(h.Author?.Trim(), me.Trim(), StringComparison.OrdinalIgnoreCase));
+        => NoteOwnership.IsReviewer(h.NoteOrigin is NoteSource.InPdf or NoteSource.InPdfByRailReader,
+            h.NoteOrigin == NoteSource.InPdfByRailReader, h.Author, readerName);
 }

@@ -26,10 +26,10 @@ public sealed class CommentEntryViewModel
     public bool CanEdit => MainWindowViewModel.CanEditComment(Annotation);
     public Avalonia.Thickness RowMargin => new(2 + Math.Min(Depth, 1) * 14, 1, 2, 1);
 
-    // A comment you wrote reads back from the PDF as "in the PDF" once saved, so go by the author name too.
-    public bool IsReviewerComment => Annotation.Source == AnnotationSource.InPdf && !IsOwnByName;
-    private bool IsOwnByName => !string.IsNullOrWhiteSpace(OwnAuthorName)
-        && string.Equals(Annotation.Author?.Trim(), OwnAuthorName.Trim(), StringComparison.OrdinalIgnoreCase);
+    // A comment you wrote reads back from the PDF as "in the PDF" once saved: go by the author name, or by
+    // Core's RailReader origin mark when it has no author (shared rule: NoteOwnership).
+    public bool IsReviewerComment => RailReader2.Library.NoteOwnership.IsReviewer(
+        Annotation.Source == AnnotationSource.InPdf, Annotation.WrittenByRailReader, Annotation.Author, OwnAuthorName);
     public string SourceBadge => IsReviewerComment ? "Reviewer" : "You";
 
     private static readonly IBrush ReviewerBadgeBrush = new SolidColorBrush(Color.Parse("#2D5B88"));
@@ -38,7 +38,7 @@ public sealed class CommentEntryViewModel
     public IBrush BadgeBackground => IsReviewerComment ? ReviewerBadgeBrush : OwnBadgeBrush;
 
     public string Author => string.IsNullOrWhiteSpace(Annotation.Author)
-        ? (Annotation.Source == AnnotationSource.InPdf ? "Reviewer"
+        ? (IsReviewerComment ? "Reviewer"
             : string.IsNullOrWhiteSpace(OwnAuthorName) ? "You" : OwnAuthorName!)
         : Annotation.Author!;
 
