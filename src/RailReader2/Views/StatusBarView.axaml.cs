@@ -39,8 +39,6 @@ public partial class StatusBarView : UserControl
         InitializeComponent();
         DataContextChanged += (_, _) => { UpdateStatus(); UpdateToast(); };
         ToastText.Foreground = AmberBrush;
-        ToastAction.Foreground = RailModeBrush;
-        ToastAction.Tapped += (_, _) => _subscribedVm?.InvokeStatusToastAction();
     }
 
     /// <summary>Shows the VM's toast over the whole bar, or hides it. Independent of the status readout,
@@ -51,9 +49,25 @@ public partial class StatusBarView : UserControl
         ToastPanel.IsVisible = vm?.StatusToast is not null;
         ToastText.Text = vm?.StatusToast;
         ToolTip.SetTip(ToastText, vm?.StatusToast); // in case it's trimmed
-        ToastAction.IsVisible = vm?.StatusToastActionLabel is not null;
-        ToastAction.Text = vm?.StatusToastActionLabel;
-        Avalonia.Automation.AutomationProperties.SetName(ToastAction, vm?.StatusToastActionLabel);
+        ToastActions.Children.Clear();
+        foreach (var button in vm?.StatusToastButtons ?? [])
+        {
+            // A Button styled as a link, so it is keyboard- and AT-SPI/UIA-actionable (a Tapped TextBlock isn't).
+            var link = new Button
+            {
+                Content = new TextBlock { Text = button.Label, TextDecorations = TextDecorations.Underline },
+                Foreground = RailModeBrush,
+                Background = Brushes.Transparent,
+                BorderThickness = new Avalonia.Thickness(0),
+                Padding = new Avalonia.Thickness(0),
+                Cursor = new Cursor(StandardCursorType.Hand),
+                VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+            };
+            link.Classes.Add("toast-link");
+            Avalonia.Automation.AutomationProperties.SetName(link, button.Label);
+            link.Click += (_, _) => vm?.InvokeStatusToastAction(button);
+            ToastActions.Children.Add(link);
+        }
     }
 
     protected override void OnLoaded(RoutedEventArgs e)
@@ -81,7 +95,7 @@ public partial class StatusBarView : UserControl
     private void OnVmPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs args)
     {
         if (args.PropertyName is nameof(MainWindowViewModel.StatusToast) or
-            nameof(MainWindowViewModel.StatusToastActionLabel))
+            nameof(MainWindowViewModel.StatusToastButtons))
         {
             UpdateToast();
             return;

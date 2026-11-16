@@ -24,6 +24,10 @@ public sealed class AnnotationPreferences
     /// simply unlabelled.</summary>
     public Dictionary<string, string> ColourNames { get; set; } = [];
 
+    /// <summary>The reader answered the "sign your notes as …?" prompt with "Stay unnamed": don't ask
+    /// again. (Choosing a name needs no flag: the prompt only appears while no name is set.)</summary>
+    public bool AuthorNameDeclined { get; set; }
+
     // Upper-cased so a lookup survives a JSON round trip (which rebuilds the dictionary case-sensitive).
     private static string Key(string hexColour) => hexColour.Trim().ToUpperInvariant();
 

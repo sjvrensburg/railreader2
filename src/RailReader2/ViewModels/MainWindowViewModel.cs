@@ -212,6 +212,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     {
         // Annotation mode is a pointer mode too: entering it displaces the reading guide.
         if (value && IsReadingGuideMode) IsReadingGuideMode = false;
+        if (value) OfferAuthorName(); // before the first note is drawn, so it is signed if the reader agrees
         if (!value)
         {
             // Leaving annotation mode: drop any active tool and selected annotation
@@ -1287,9 +1288,11 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
     // --- Status toast ---
 
+    /// <summary>A clickable action shown beside a status toast's message.</summary>
+    public sealed record ToastButton(string Label, Action Run);
+
     [ObservableProperty] private string? _statusToast;
-    [ObservableProperty] private string? _statusToastActionLabel;
-    private Action? _statusToastAction;
+    [ObservableProperty] private IReadOnlyList<ToastButton> _statusToastButtons = [];
     private Timer? _toastTimer;
 
     // How long a status toast stays on screen. Long enough to read a short sentence to completion
@@ -1303,37 +1306,42 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     /// next to the message in the status bar — see <see cref="StatusBarView"/> and
     /// <see cref="InvokeStatusToastAction"/>.</summary>
     public void ShowStatusToast(string message, string? actionLabel, Action? action)
+        => ShowStatusToast(message, actionLabel is not null && action is not null ? [new ToastButton(actionLabel, action)] : [],
+            ToastDurationMs);
+
+    /// <summary>Shows a toast with several actions (a question the reader answers from the status bar),
+    /// for <paramref name="durationMs"/> — longer than a plain toast when it asks for a decision.</summary>
+    public void ShowStatusToast(string message, IReadOnlyList<ToastButton> buttons, int durationMs)
     {
         // Already showing this exact message → keep it as-is. Without this, a repeated trigger (e.g. every
         // scroll-wheel notch while zoom is frozen-locked) would dispose+recreate the timer on each call,
         // churning timers and re-arming the same toast indefinitely.
         // A different action (e.g. "Undo" for a second deletion with the same label) must replace the
-        // shown one, or clicking it would run the stale closure.
-        if (message == StatusToast && actionLabel == StatusToastActionLabel
-            && ReferenceEquals(action, _statusToastAction)) return;
+        // shown one, or clicking it would run the stale closure: ToastButton equality compares the
+        // delegates, and two closures are never equal.
+        if (message == StatusToast && buttons.SequenceEqual(StatusToastButtons)) return;
         StatusToast = message;
-        StatusToastActionLabel = actionLabel;
-        _statusToastAction = action;
+        StatusToastButtons = buttons;
         _toastTimer?.Dispose();
         _toastTimer = new Timer(_ =>
             Dispatcher.UIThread.Post(() =>
             {
+                // Only the toast this timer was armed for: a newer one has re-armed its own timer.
+                if (!ReferenceEquals(StatusToastButtons, buttons) || StatusToast != message) return;
                 StatusToast = null;
-                StatusToastActionLabel = null;
-                _statusToastAction = null;
+                StatusToastButtons = [];
             }),
-            null, ToastDurationMs, Timeout.Infinite);
+            null, durationMs, Timeout.Infinite);
     }
 
-    /// <summary>Invoked by <see cref="StatusBarView"/> when the user clicks a toast's action link.</summary>
-    public void InvokeStatusToastAction()
+    /// <summary>Invoked by <see cref="StatusBarView"/> when the user clicks one of the toast's actions.</summary>
+    public void InvokeStatusToastAction(ToastButton button)
     {
-        var action = _statusToastAction;
+        if (!StatusToastButtons.Contains(button)) return; // a stale click on a toast that has since changed
         _toastTimer?.Dispose();
         StatusToast = null;
-        StatusToastActionLabel = null;
-        _statusToastAction = null;
-        action?.Invoke();
+        StatusToastButtons = [];
+        button.Run();
     }
 
     // CompositeAnnotationStore.Default is a process-global singleton and its two signals are
