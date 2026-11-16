@@ -142,9 +142,11 @@ public partial class RecentDocumentsView : UserControl
                 catch (Exception) { return null; }
             });
             if (bitmap is null) continue;
-            if (_bitmaps.TryGetValue(path, out var old)) old.Bitmap.Dispose();
+            // Swap the card over even if this load is stale: it may be showing the old bitmap (from
+            // CachedBitmap), and a card left holding a disposed bitmap would draw it when shown again.
+            card.Thumbnail = bitmap;
+            if (_bitmaps.TryGetValue(path, out var old) && !ReferenceEquals(old.Bitmap, bitmap)) old.Bitmap.Dispose();
             _bitmaps[path] = (written, bitmap);
-            if (version == _loadVersion) card.Thumbnail = bitmap;
         }
     }
 

@@ -49,7 +49,10 @@ public sealed class LibraryIndex : IDisposable
         {
             return OpenAndMigrate(path);
         }
-        catch (Exception ex) when (ex is SqliteException or UnreadableIndexException)
+        // Only a damaged or foreign file is moved aside. A transient failure (disk full, permissions, a
+        // lock held by another instance) must not discard the index, nor delete a live connection's WAL.
+        catch (Exception ex) when (ex is UnreadableIndexException
+                                   || ex is SqliteException { SqliteErrorCode: var code } && (code & 0xFF) is SqliteCorrupt or SqliteNotADb)
         {
             recovered = true;
             string aside = path + ".unreadable";
@@ -114,6 +117,8 @@ public sealed class LibraryIndex : IDisposable
     }
 
     sealed class UnreadableIndexException(string message) : Exception(message);
+
+    const int SqliteCorrupt = 11, SqliteNotADb = 26; // SQLITE_CORRUPT, SQLITE_NOTADB (primary codes)
 
     static int ReadSchemaVersion(SqliteConnection conn)
     {
@@ -368,11 +373,37 @@ public sealed class LibraryIndex : IDisposable
             }
         }
         InsertNotes(key, doc.Notes, categoryOf, tx);
-        using (var cmd = Command("insert into name_fts(name, doc_key) values ($n, $k)", tx))
+        InsertName(key, doc.Path, tx);
+        tx.Commit();
+    }
+
+    void InsertName(long key, string path, SqliteTransaction tx)
+    {
+        using var cmd = Command("insert into name_fts(name, doc_key) values ($n, $k)", tx);
+        cmd.Parameters.AddWithValue("$n", NameTerms(path));
+        cmd.Parameters.AddWithValue("$k", key);
+        cmd.ExecuteNonQuery();
+    }
+
+    /// <summary>Points the entry at <paramref name="path"/> (last_path, file_name) and, when the file name
+    /// changed (a renamed or moved copy of the same bytes), re-indexes the name so search finds the new one.</summary>
+    void UpdatePath(string contentId, string path, string setExtra, Action<SqliteCommand>? bindExtra)
+    {
+        if (GetDocument(contentId) is not { } doc) return;
+        string fileName = System.IO.Path.GetFileName(path);
+        using var tx = _conn.BeginTransaction();
+        using (var cmd = Command($"update documents set last_path = $p, file_name = $f{setExtra} where doc_key = $k", tx))
         {
-            cmd.Parameters.AddWithValue("$n", NameTerms(doc.Path));
-            cmd.Parameters.AddWithValue("$k", key);
+            cmd.Parameters.AddWithValue("$p", path);
+            cmd.Parameters.AddWithValue("$f", fileName);
+            cmd.Parameters.AddWithValue("$k", doc.Key);
+            bindExtra?.Invoke(cmd);
             cmd.ExecuteNonQuery();
+        }
+        if (!string.Equals(doc.FileName, fileName, StringComparison.Ordinal))
+        {
+            DeleteRows(doc.Key, tx, "name_fts");
+            InsertName(doc.Key, path, tx);
         }
         tx.Commit();
     }
@@ -435,16 +466,11 @@ public sealed class LibraryIndex : IDisposable
     public void RecordOpen(string contentId, string path, int? lastPage, DateTime utcNow)
     {
         EnsureWritable();
-        using var cmd = Command("""
-            update documents set last_path = $p, file_name = $f, last_opened_utc = $t, last_page = coalesce($g, last_page)
-            where content_id = $id
-            """);
-        cmd.Parameters.AddWithValue("$p", path);
-        cmd.Parameters.AddWithValue("$f", System.IO.Path.GetFileName(path));
-        cmd.Parameters.AddWithValue("$t", utcNow.ToString("O", CultureInfo.InvariantCulture));
-        cmd.Parameters.AddWithValue("$g", (object?)lastPage ?? DBNull.Value);
-        cmd.Parameters.AddWithValue("$id", contentId);
-        cmd.ExecuteNonQuery();
+        UpdatePath(contentId, path, ", last_opened_utc = $t, last_page = coalesce($g, last_page)", cmd =>
+        {
+            cmd.Parameters.AddWithValue("$t", utcNow.ToString("O", CultureInfo.InvariantCulture));
+            cmd.Parameters.AddWithValue("$g", (object?)lastPage ?? DBNull.Value);
+        });
     }
 
     /// <summary>Drops a document's index rows. Never touches its annotations, portals or identity.</summary>
@@ -467,11 +493,7 @@ public sealed class LibraryIndex : IDisposable
     public void SetPath(string contentId, string path)
     {
         EnsureWritable();
-        using var cmd = Command("update documents set last_path = $p, file_name = $f where content_id = $id");
-        cmd.Parameters.AddWithValue("$p", path);
-        cmd.Parameters.AddWithValue("$f", System.IO.Path.GetFileName(path));
-        cmd.Parameters.AddWithValue("$id", contentId);
-        cmd.ExecuteNonQuery();
+        UpdatePath(contentId, path, "", null);
     }
 
     /// <summary>Empties the index. With <paramref name="backfill"/> false, earlier documents are not

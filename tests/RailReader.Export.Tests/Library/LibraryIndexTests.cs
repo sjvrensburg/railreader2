@@ -36,6 +36,19 @@ public sealed class LibraryIndexTests : IDisposable
     }
 
     [Fact]
+    public void RecordOpen_FromARenamedFile_ReindexesTheName()
+    {
+        using var index = Open();
+        index.ReplaceDocument(Doc("a", "draft.pdf", "some text"));
+        index.RecordOpen("a", "/papers/Smith-Regression-2020.pdf", 0, DateTime.UtcNow);
+        var names = new HashSet<HitSource> { HitSource.Name };
+        Assert.Single(index.Search(LibraryQuery.Parse("regression"), sources: names));
+        Assert.Empty(index.Search(LibraryQuery.Parse("draft"), sources: names));
+        index.SetPath("a", "/elsewhere/Renamed.pdf");
+        Assert.Single(index.Search(LibraryQuery.Parse("renamed"), sources: names));
+    }
+
+    [Fact]
     public void Search_RanksTheDenserPageFirst()
     {
         using var index = Open();

@@ -22,6 +22,9 @@ public sealed class LibraryWriter : IDisposable
     readonly ConcurrentQueue<string> _backfill = new();
     readonly SemaphoreSlim _signal = new(0);
     readonly CancellationTokenSource _cts = new();
+    // Cancelled as soon as Dispose starts: an in-flight backfill document must not hold up the
+    // foreground jobs (notes edited this session) queued behind it within Dispose's bounded wait.
+    readonly CancellationTokenSource _backfillCts = new();
     readonly Thread _thread;
     int _started;
     readonly ManualResetEventSlim _idle = new(true);
@@ -250,7 +253,7 @@ public sealed class LibraryWriter : IDisposable
                 {
                     if (_backfill.TryDequeue(out var path))
                     {
-                        bool indexed = BackfillOne(index, path, token);
+                        bool indexed = BackfillOne(index, path, _backfillCts.Token);
                         Interlocked.Increment(ref _batchDone);
                         if (_backfill.IsEmpty) { Volatile.Write(ref _batchTotal, 0); Volatile.Write(ref _batchDone, 0); }
                         if (indexed || _backfill.IsEmpty) RaiseChanged();
@@ -345,8 +348,10 @@ public sealed class LibraryWriter : IDisposable
                 if (p >= 0 && p < pdf.PageCount) cache[p] = text.ExtractPageText(pdf.PdfBytes, p, null);
             return LibraryIndexer.Notes(annotations, p => cache.GetValueOrDefault(p));
         }
-        catch (Exception) when (pdf is null)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
+            // Unreadable file or page: index the comments without the text under highlights, rather than
+            // failing the whole job (which would also skip recording the open).
             return LibraryIndexer.Notes(annotations, _ => null);
         }
         finally
@@ -367,6 +372,7 @@ public sealed class LibraryWriter : IDisposable
     public void Dispose(TimeSpan timeout)
     {
         _backfill.Clear();
+        _backfillCts.Cancel();
         _foreground.CompleteAdding();
         if (Volatile.Read(ref _started) == 0) { _cts.Cancel(); return; }
         _signal.Release();

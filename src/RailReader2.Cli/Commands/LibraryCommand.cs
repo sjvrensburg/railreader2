@@ -57,7 +57,9 @@ public static class LibraryCommand
         if (index is null) return Program.Fail($"No readable library index at {db}. Open some documents in RailReader2 first.");
 
         var query = LibraryQuery.Parse(text);
-        var hits = index.Search(query, limit, open: Program.HasFlag(args, "json") ? "[" : "\u001b[1m", close: Program.HasFlag(args, "json") ? "]" : "\u001b[0m");
+        // Bold only on a terminal: piped or JSON output gets plain [brackets], not escape codes.
+        bool plainMarks = Program.HasFlag(args, "json") || Console.IsOutputRedirected;
+        var hits = index.Search(query, limit, open: plainMarks ? "[" : "\u001b[1m", close: plainMarks ? "]" : "\u001b[0m");
         string me = SafeAuthor();
 
         if (Program.HasFlag(args, "json"))
