@@ -225,18 +225,62 @@ public sealed class LibraryIndex : IDisposable
             bytes);
     }
 
+    /// <summary>Indexed notes per document (content id → count); documents without notes are absent.</summary>
+    public IReadOnlyDictionary<string, int> NoteCounts()
+    {
+        var counts = new Dictionary<string, int>(StringComparer.Ordinal);
+        using var cmd = Command("""
+            select d.content_id, count(*) from note_fts f join documents d on d.doc_key = f.doc_key group by d.content_id
+            """);
+        using var r = cmd.ExecuteReader();
+        while (r.Read()) counts[r.GetString(0)] = r.GetInt32(1);
+        return counts;
+    }
+
+    /// <summary>The colour-category names in use on indexed notes, sorted.</summary>
+    public IReadOnlyList<string> Categories()
+    {
+        var list = new List<string>();
+        using var cmd = Command("select distinct category from note_fts where category <> '' order by category collate nocase");
+        using var r = cmd.ExecuteReader();
+        while (r.Read()) list.Add(r.GetString(0));
+        return list;
+    }
+
+    /// <summary>False after <see cref="Clear"/>: the backfill (§5.3) then leaves earlier documents out, so
+    /// only documents opened from then on come back. <see cref="Clear"/>(backfill: true) turns it back on.</summary>
+    public bool BackfillEnabled => GetMeta("backfill") != "off";
+
+    string? GetMeta(string key)
+    {
+        using var cmd = Command("select value from meta where key = $k");
+        cmd.Parameters.AddWithValue("$k", key);
+        return cmd.ExecuteScalar()?.ToString();
+    }
+
+    void SetMeta(string key, string value, SqliteTransaction? tx = null)
+    {
+        using var cmd = Command("insert into meta(key, value) values ($k, $v) on conflict(key) do update set value = excluded.value", tx);
+        cmd.Parameters.AddWithValue("$k", key);
+        cmd.Parameters.AddWithValue("$v", value);
+        cmd.ExecuteNonQuery();
+    }
+
     // ---------------------------------------------------------------- searching
 
     /// <summary>Searches page text, outlines, notes and file names. Hits are merged across sources by a
     /// weighted bm25 (higher <see cref="LibraryHit.Score"/> is better); at most
     /// <paramref name="limit"/> are returned. An empty query returns nothing.</summary>
-    public IReadOnlyList<LibraryHit> Search(LibraryQuery query, int limit = 50, string open = "[", string close = "]")
+    /// <para><paramref name="sources"/> limits the search to some sources (null = all).</para>
+    public IReadOnlyList<LibraryHit> Search(LibraryQuery query, int limit = 50, string open = "[", string close = "]",
+        IReadOnlySet<HitSource>? sources = null)
     {
         if (query.IsEmpty || limit <= 0) return [];
         var hits = new List<LibraryHit>();
         string match = query.MatchExpression!;
+        bool Want(HitSource s) => sources is null || sources.Contains(s);
 
-        Collect(hits, $"""
+        if (Want(HitSource.Page)) Collect(hits, $"""
             select d.content_id, d.last_path, d.file_name, f.page, snippet(page_fts, 0, $o, $c, '…', 16),
                    bm25(page_fts), f.from_ocr
             from page_fts f join documents d on d.doc_key = f.doc_key
@@ -245,7 +289,7 @@ public sealed class LibraryIndex : IDisposable
             r => new LibraryHit(r.GetString(0), Str(r, 1), r.GetString(2), r.GetInt32(3), HitSource.Page,
                 r.GetString(4), -r.GetDouble(5) * PageWeight * (r.GetInt32(3) == 0 ? FirstPageWeight : 1.0), FromOcr: r.GetInt32(6) != 0));
 
-        Collect(hits, $"""
+        if (Want(HitSource.Outline)) Collect(hits, $"""
             select d.content_id, d.last_path, d.file_name, f.page, highlight(outline_fts, 0, $o, $c), bm25(outline_fts)
             from outline_fts f join documents d on d.doc_key = f.doc_key
             where outline_fts match $q order by bm25(outline_fts) limit $n
@@ -254,17 +298,17 @@ public sealed class LibraryIndex : IDisposable
                 r.GetString(4), -r.GetDouble(5) * OutlineWeight));
 
         // Comments count double against the text under a highlight; author/category are labels.
-        Collect(hits, $"""
+        if (Want(HitSource.Note)) Collect(hits, $"""
             select d.content_id, d.last_path, d.file_name, f.page, snippet(note_fts, -1, $o, $c, '…', 16),
-                   bm25(note_fts, 1.0, 2.0, 0.5, 1.0), f.kind, f.author, f.source, f.native_id
+                   bm25(note_fts, 1.0, 2.0, 0.5, 1.0), f.kind, f.author, f.source, f.native_id, f.category
             from note_fts f join documents d on d.doc_key = f.doc_key
             where note_fts match $q order by bm25(note_fts, 1.0, 2.0, 0.5, 1.0) limit $n
             """, match, limit, open, close,
             r => new LibraryHit(r.GetString(0), Str(r, 1), r.GetString(2), r.GetInt32(3), HitSource.Note,
                 r.GetString(4), -r.GetDouble(5) * NoteWeight, NoteKind: Str(r, 6), Author: Str(r, 7),
-                NoteOrigin: (NoteSource)r.GetInt32(8), NativeId: Str(r, 9)));
+                NoteOrigin: (NoteSource)r.GetInt32(8), NativeId: Str(r, 9), Category: Str(r, 10)));
 
-        Collect(hits, $"""
+        if (Want(HitSource.Name)) Collect(hits, $"""
             select d.content_id, d.last_path, d.file_name, highlight(name_fts, 0, $o, $c), bm25(name_fts)
             from name_fts f join documents d on d.doc_key = f.doc_key
             where name_fts match $q order by bm25(name_fts) limit $n
@@ -417,6 +461,33 @@ public sealed class LibraryIndex : IDisposable
         }
         tx.Commit();
         return true;
+    }
+
+    /// <summary>Points a document at a new file (the reader located a moved file).</summary>
+    public void SetPath(string contentId, string path)
+    {
+        EnsureWritable();
+        using var cmd = Command("update documents set last_path = $p, file_name = $f where content_id = $id");
+        cmd.Parameters.AddWithValue("$p", path);
+        cmd.Parameters.AddWithValue("$f", System.IO.Path.GetFileName(path));
+        cmd.Parameters.AddWithValue("$id", contentId);
+        cmd.ExecuteNonQuery();
+    }
+
+    /// <summary>Empties the index. With <paramref name="backfill"/> false, earlier documents are not
+    /// indexed again by the backfill (see <see cref="BackfillEnabled"/>); with true, they are.</summary>
+    public void Clear(bool backfill)
+    {
+        EnsureWritable();
+        using (var tx = _conn.BeginTransaction())
+        {
+            foreach (var t in new[] { "page_fts", "outline_fts", "note_fts", "name_fts", "documents" })
+                Exec(_conn, $"delete from {t}", tx);
+            SetMeta("backfill", backfill ? "on" : "off", tx);
+            tx.Commit();
+        }
+        Exec(_conn, "pragma wal_checkpoint(truncate)");
+        Exec(_conn, "vacuum");
     }
 
     /// <summary>Merges FTS5 segments and compacts the file (after a bulk build).</summary>

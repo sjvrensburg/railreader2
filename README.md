@@ -121,6 +121,8 @@ chmod +x railreader2-x86_64.AppImage
 
 RailReader2 is also listed in the [AppImage catalogue](https://appimage.github.io/railreader2/), and the AppImage supports in-place updates with AppImageUpdate. If you'd rather not use an AppImage, a plain `railreader2-linux-x64.tar.gz` is on the same page.
 
+It needs a 64-bit (x86-64) Linux with glibc 2.34 or newer: Ubuntu 22.04, Debian 12, Fedora 35, RHEL/Alma/Rocky 9 or later.
+
 ## Getting started
 
 1. Open a PDF with **File → Open** (`Ctrl+O`), from your file manager, or on the command line: `railreader2 paper.pdf`.

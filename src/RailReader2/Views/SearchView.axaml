@@ -63,6 +63,9 @@
                     <c:Icon Data="{StaticResource IconChevronDown}" />
                 </Button>
             </StackPanel>
+            <HyperlinkButton Content="Search all documents ↗" Padding="2,2" Margin="0,2,0,0"
+                             ToolTip.Tip="Search every document you have opened (Ctrl+Shift+F)"
+                             Click="OnSearchLibraryClick" />
         </StackPanel>
 
         <!-- Results grouped by page -->

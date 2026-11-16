@@ -697,6 +697,8 @@ public partial class MainWindow : Window
                 vm.ShowMinimap = !vm.ShowMinimap; e.Handled = true; return true;
             case Key.OemComma:
                 vm.ShowSettings = true; e.Handled = true; return true;
+            case Key.F when shift:
+                vm.ShowLibrary(); e.Handled = true; return true;
             case Key.F:
                 vm.OpenSearch();
                 e.Handled = true; return true;

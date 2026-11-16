@@ -1,6 +1,6 @@
 # Library search and recents dashboard (design)
 
-**Status:** Design agreed 2026-11-16 (open questions decided, §12). Phase 0 spike done (§11a); Phase 1 index + CLI done (§11b).
+**Status:** Design agreed 2026-11-16 (open questions decided, §12). Phase 0 spike done (§11a); Phase 1 index + CLI done (§11b); Phase 2 Library window done (§11c).
 **Roadmap item:** M7 (features adapted from the Cauchy viewer): library-wide full-text search and a recents dashboard keyed by content id.
 **Depends on:** content-based document identity (`DocumentIdentity`, Core 0.75.0+), sidecar annotations keyed by content id (Core 0.72.0+).
 
@@ -238,6 +238,19 @@ Built: `LibraryIndex` (schema §6.1 with an integer `doc_key` in every FTS row, 
 - **Live-app check (2026-11-16):** opening a PDF indexed it within ~2 s, the CLI read the index while the app had it open (WAL), a reviewer comment came back as "reviewer comment (Reviewer X)", closing the window shut down in ~1 s, and the backfill indexed all 15 surviving identity-map documents (1,024 pages, incl. a 615-page book) in ~30 s, skipping 10 missing files quietly. The rail-reading pause was not exercised live (covered by `LibraryWriterTests`).
 - **Opening a document extracts it on the writer thread** even while rail reading (only the backfill pauses). PDFium calls are per page, so a render waits at most one page's extraction (~5 ms typical, ~70 ms worst seen).
 - Library tests live in the existing test project, beside the other shell tests, not a new one.
+
+## 11c. Phase 2 results (2026-11-16)
+
+Built: `Views/LibraryWindow` (non-modal, single instance; Ctrl+Shift+F, File ▸ Search Library…, and "Search all documents ↗" in the Search pane, which carries the query over), Settings ▸ Library (advanced view: counts and size, Rebuild, Clear), and on the library side `LibraryResults` (grouping and labels), source filters, note counts, categories, `Clear`, `SetPath`, and writer jobs `Remove`/`Relocate`/`Clear`/`Rebuild` with a `Changed` event and backfill progress. README states the Linux floor.
+
+- **Results:** grouped by document, best first, at most three snippets each preferring different pages, matched words in bold, labelled *page N*, *outline*, *your note*, *reviewer comment (author)*, *bookmark*, *OCR text, unverified* (italic), plus the colour category. Filters: page text / notes / outline / file names, "only documents with notes", colour category (shown when one is in use; narrows to notes). A flat list (document rows and snippet rows), so arrow keys walk everything; Enter or a click opens; rows carry automation names.
+- **Queries run off the UI thread** with their own read-only connection, 200 ms after typing stops (a `Task.Delay`, not a `DispatcherTimer`). A writer change (`Changed`, coalesced and posted at background priority) re-runs the query; the list is only replaced when the rows differ, so the reader keeps their place.
+- **Opening a hit:** an open tab of the document (matched by content id) is focused, else the file is opened. A note hit selects the annotation by its `/NM` (as the Comments pane does). Other hits go to the page and run the Search pane with a regex of the query's words (`LibraryQuery.HighlightPattern`: `\b(word|stem\w*|phrase[\s\-]+words)`; a crude suffix strip stands in for the index's stemmer), then show the first match **on the hit's page**, not the document's first match. A file-name hit opens at the saved position.
+- **Missing files** (design Q3): greyed, "Not found at …", with Locate… and Remove from Library. Locate hashes the picked file with `DocumentIdentity.Lookup` (no write) and accepts it only if it is the same content id; only then is it `Resolve`d (recorded in the identity map) and the entry re-pointed and re-indexed.
+- **Clear vs Rebuild:** Clear empties the index and sets `meta.backfill = off`, so earlier documents stay out until opened again (otherwise the next start's backfill would refill everything, and Clear would mean nothing). Rebuild empties it and re-queues every known document.
+- **Deviations:** no raw FTS5 pass-through (§7.1 said "only when the query contains it"); Phase 1's rule that no input reaches `MATCH` unquoted stands, and "couldn't read that query" never arises. The window is **not owned** by the main window: an owned window always stays above its owner, so it hid the document a result opened (found in the live test); it is closed in `ShutdownLibrary` instead. Library progress shows in the window's status line and in Settings, nowhere else (§5.3).
+- **Live-app check (2026-11-16):** with no document open, a reviewer comment in a moved file was found and shown greyed; Locate refused a different PDF ("its contents differ") and accepted the moved one, re-pointing the entry; Enter on the note hit opened the file and selected the highlight with its comment popup; "kernel ridge" opened a 615-page book at page 243 with both words highlighted on the page (match 1008 of 2212 active). Found and fixed: Enter was swallowed by the list (now a tunnelling handler), and the owned window covered the document.
+- **Not done:** the Search pane's own result list still scrolls to page 1 when a hit's match is activated (it doesn't follow `GoToMatch` from code); searching a 615-page book takes ~30 s in that pane, as it always has.
 
 ## 12. Decisions
 

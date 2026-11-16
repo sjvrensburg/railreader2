@@ -29,6 +29,42 @@ public sealed class LibraryQuery
 
     public bool IsEmpty => MatchExpression is null;
 
+    /// <summary>A regular expression (to be used case-insensitively) for the in-document search (Core's
+    /// <c>SearchService</c>) that marks the query's words on the opened page, or null when there are none.
+    /// Approximate by design: the index stems words ("estimators" finds "estimation"), a regex can't, so a
+    /// long word matches from its stem-ish start (suffixes such as -s, -ing, -ion dropped) onwards.</summary>
+    public string? HighlightPattern
+    {
+        get
+        {
+            var parts = new List<string>();
+            foreach (var t in PlainTerms)
+            {
+                bool prefix = t.EndsWith('*');
+                string raw = prefix ? t[..^1] : t;
+                var words = raw.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                if (words.Length == 0) continue;
+                if (words.Length > 1)
+                    parts.Add(string.Join(@"[\s\-]+", words.Select(System.Text.RegularExpressions.Regex.Escape)));
+                else
+                    parts.Add(System.Text.RegularExpressions.Regex.Escape(prefix ? raw : Stem(raw)) + (prefix || Stem(raw) != raw ? @"\w*" : ""));
+            }
+            // Shown in the Search pane's box, so kept short; the pane searches case-insensitively.
+            return parts.Count == 0 ? null : @"\b(" + string.Join("|", parts) + ")";
+        }
+    }
+
+    static readonly string[] Suffixes = ["ations", "ation", "ings", "ing", "ions", "ion", "ors", "ers", "ies", "es", "ed", "or", "er", "s"];
+
+    static string Stem(string word)
+    {
+        if (word.Length < 5 || !word.All(char.IsLetter)) return word;
+        foreach (var suf in Suffixes)
+            if (word.Length - suf.Length >= 4 && word.EndsWith(suf, StringComparison.OrdinalIgnoreCase))
+                return word[..^suf.Length];
+        return word;
+    }
+
     public static LibraryQuery Parse(string? input)
     {
         var terms = new List<string>();
@@ -64,7 +100,7 @@ public sealed class LibraryQuery
             if (!raw.Any(char.IsLetterOrDigit)) continue;
             string fts = "\"" + raw.Replace("\"", "\"\"") + "\"" + (prefix ? "*" : "");
             if (negate) excluded.Add(fts);
-            else { terms.Add(fts); plain.Add(raw); }
+            else { terms.Add(fts); plain.Add(prefix ? raw + "*" : raw); }
         }
         return new LibraryQuery(terms, excluded, plain);
     }

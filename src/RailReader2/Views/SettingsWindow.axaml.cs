@@ -86,6 +86,7 @@ public partial class SettingsWindow : Window
     {
         base.OnLoaded(e);
         LoadFromConfig();
+        LoadLibrarySettings();
         _loading = false;
     }
 

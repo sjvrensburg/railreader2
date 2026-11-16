@@ -120,7 +120,7 @@ if (GetOption("settings-shots") is { } settingsDir)
         foreach (var (advanced, pages) in new[]
         {
             (false, new[] { "Reading", "Appearance", "Auto-Scroll", "Scanned Pages", "Spelling" }),
-            (true, new[] { "Reading", "Auto-Scroll", "Performance" }),
+            (true, new[] { "Reading", "Auto-Scroll", "Performance", "Library" }),
         })
         {
             foreach (var page in pages)

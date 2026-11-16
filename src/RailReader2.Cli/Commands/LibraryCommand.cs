@@ -108,8 +108,7 @@ public static class LibraryCommand
         HitSource.Outline => "outline",
         HitSource.Name => "file name",
         HitSource.Note when h.NoteKind == "bookmark" => "bookmark",
-        HitSource.Note when h.NoteOrigin == NoteSource.InPdf
-            && !(me.Length > 0 && string.Equals(h.Author, me, StringComparison.OrdinalIgnoreCase))
+        HitSource.Note when LibraryResults.IsReviewer(h, me)
             => $"reviewer comment{(h.Author is null ? "" : $" ({h.Author})")}",
         _ => "your note",
     };

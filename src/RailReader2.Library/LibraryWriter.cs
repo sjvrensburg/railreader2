@@ -50,6 +50,23 @@ public sealed class LibraryWriter : IDisposable
     /// <summary>Documents still waiting in the backfill queue.</summary>
     public int BackfillRemaining => _backfill.Count;
 
+    int _batchTotal, _batchDone;
+
+    /// <summary>Backfill progress for the current batch ("indexing <c>Done</c> of <c>Total</c>"); both 0
+    /// when nothing is queued. Most entries are skipped in milliseconds when their index is current.</summary>
+    public (int Done, int Total) BackfillProgress
+    {
+        get
+        {
+            int total = Volatile.Read(ref _batchTotal);
+            return total == 0 ? (0, 0) : (Math.Min(Volatile.Read(ref _batchDone), total), total);
+        }
+    }
+
+    /// <summary>Raised on the writer thread after each job or backfill document that may have changed the
+    /// index, so an open Library window can refresh. Handlers must be quick and must not block.</summary>
+    public event Action? Changed;
+
     public LibraryWriter(string dbPath, IPdfServiceFactory factory)
     {
         _dbPath = dbPath;
@@ -105,11 +122,48 @@ public sealed class LibraryWriter : IDisposable
     /// <summary>A colour category was renamed (null = name removed).</summary>
     public void CategoryRenamed(string hexColour, string? name) => Enqueue(index => index.SetCategory(hexColour, name));
 
+    /// <summary>Drops a document from the library (design §3): its index rows only.</summary>
+    public void Remove(string contentId) => Enqueue(index => index.Remove(contentId));
+
+    /// <summary>The reader located a moved file (the caller checked it is the same document): point the
+    /// entry at it and re-index it if the file differs from what was indexed.</summary>
+    public void Relocate(string contentId, string path) => Enqueue(index =>
+    {
+        index.SetPath(contentId, path);
+        if (index.NeedsIndex(contentId, path)) IndexFromDisk(index, path, contentId, _cts.Token);
+    });
+
+    /// <summary>Empties the index (Settings ▸ Library ▸ Clear). Earlier documents stay out until the
+    /// reader opens them again or chooses Rebuild.</summary>
+    public void Clear()
+    {
+        ClearBackfill();
+        Enqueue(index => index.Clear(backfill: false));
+    }
+
+    /// <summary>Empties the index and indexes <paramref name="paths"/> again in the background.</summary>
+    public void Rebuild(IEnumerable<string> paths)
+    {
+        ClearBackfill();
+        Enqueue(index => index.Clear(backfill: true));
+        Backfill(paths);
+    }
+
+    void ClearBackfill()
+    {
+        _backfill.Clear();
+        Volatile.Write(ref _batchTotal, 0);
+        Volatile.Write(ref _batchDone, 0);
+    }
+
     /// <summary>Queues documents the reader opened before (paths; ids are looked up on the writer thread).
     /// Skips ones whose file is gone or whose index entry is current.</summary>
     public void Backfill(IEnumerable<string> paths)
     {
-        foreach (var p in paths.Distinct(StringComparer.Ordinal)) _backfill.Enqueue(p);
+        int n = 0;
+        foreach (var p in paths.Distinct(StringComparer.Ordinal)) { _backfill.Enqueue(p); n++; }
+        if (n == 0) return;
+        Interlocked.Add(ref _batchTotal, n);
         EnsureStarted();
         _signal.Release();
     }
@@ -166,7 +220,14 @@ public sealed class LibraryWriter : IDisposable
 
                 if (!_backfill.IsEmpty && !IsBusy)
                 {
-                    if (_backfill.TryDequeue(out var path)) BackfillOne(index, path, token);
+                    if (_backfill.TryDequeue(out var path))
+                    {
+                        bool indexed = BackfillOne(index, path, token);
+                        Interlocked.Increment(ref _batchDone);
+                        if (_backfill.IsEmpty) { Volatile.Write(ref _batchTotal, 0); Volatile.Write(ref _batchDone, 0); }
+                        if (indexed || _backfill.IsEmpty) RaiseChanged();
+                        if (!indexed) continue; // skipped in milliseconds: no pause needed
+                    }
                     if (Wait(BackfillPause, token)) continue;
                     break;
                 }
@@ -189,24 +250,40 @@ public sealed class LibraryWriter : IDisposable
         catch (Exception ex) { OnError?.Invoke("Library index job failed", ex); }
         finally
         {
+            RaiseChanged(); // before the job counts as done, so a WaitForForeground caller has seen it
             if (Interlocked.Decrement(ref _pendingForeground) == 0) _idle.Set();
         }
     }
 
-    void BackfillOne(LibraryIndex index, string path, CancellationToken token)
+    void RaiseChanged()
+    {
+        try { Changed?.Invoke(); }
+        catch (Exception ex) { OnError?.Invoke("Library change handler failed", ex); }
+    }
+
+    /// <summary>True when it indexed something (false: skipped, current, or failed).</summary>
+    bool BackfillOne(LibraryIndex index, string path, CancellationToken token)
     {
         try
         {
-            if (!File.Exists(path)) return;
-            if (DocumentIdentity.Peek(path) is not { } id) return;
-            if (!index.NeedsIndex(id, path)) return;
-            AnnotationFile? annotations = null;
-            try { annotations = CompositeAnnotationStore.Default.Load(path, null); }
-            catch (Exception) { /* encrypted or unreadable: index without notes */ }
-            index.ReplaceDocument(LibraryIndexer.Extract(path, id, _factory, annotations, token), CategoryOf);
+            if (!index.BackfillEnabled) return false;
+            if (!File.Exists(path)) return false;
+            if (DocumentIdentity.Peek(path) is not { } id) return false;
+            if (!index.NeedsIndex(id, path)) return false;
+            IndexFromDisk(index, path, id, token);
+            return true;
         }
         catch (OperationCanceledException) { }
         catch (Exception ex) { OnError?.Invoke($"Library backfill failed for {Path.GetFileName(path)}", ex); }
+        return false;
+    }
+
+    void IndexFromDisk(LibraryIndex index, string path, string id, CancellationToken token)
+    {
+        AnnotationFile? annotations = null;
+        try { annotations = CompositeAnnotationStore.Default.Load(path, null); }
+        catch (Exception) { /* encrypted or unreadable: index without notes */ }
+        index.ReplaceDocument(LibraryIndexer.Extract(path, id, _factory, annotations, token), CategoryOf);
     }
 
     void DrainWithoutRunning()

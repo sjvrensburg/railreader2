@@ -88,9 +88,11 @@
             </Grid>
 
             <TextBlock Text="Search" FontWeight="Bold" />
-            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto" Margin="8,0">
+            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" Margin="8,0">
                 <TextBlock Grid.Row="0" Grid.Column="0" Text="Ctrl+F" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
                 <TextBlock Grid.Row="0" Grid.Column="1" Text="Open search" Margin="0,2" />
+                <TextBlock Grid.Row="4" Grid.Column="0" Text="Ctrl+Shift+F" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
+                <TextBlock Grid.Row="4" Grid.Column="1" Text="Search all your documents (Library)" Margin="0,2" />
                 <TextBlock Grid.Row="1" Grid.Column="0" Text="Enter / F3" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />
                 <TextBlock Grid.Row="1" Grid.Column="1" Text="Next match" Margin="0,2" />
                 <TextBlock Grid.Row="2" Grid.Column="0" Text="Shift+Enter / Shift+F3" FontFamily="Consolas,monospace" FontWeight="Bold" Margin="0,2,20,2" />

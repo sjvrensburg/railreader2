@@ -38,6 +38,6 @@ public enum HitSource { Page, Outline, Note, Name }
 public sealed record LibraryHit(
     string ContentId, string? LastPath, string FileName, int? Page, HitSource Source, string Snippet,
     double Score, bool FromOcr = false, string? NoteKind = null, string? Author = null,
-    NoteSource? NoteOrigin = null, string? NativeId = null);
+    NoteSource? NoteOrigin = null, string? NativeId = null, string? Category = null);
 
 public sealed record LibraryStatus(int Documents, int Locked, int Failed, long Pages, long Notes, long DatabaseBytes);
