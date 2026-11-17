@@ -12,7 +12,7 @@ namespace RailReader2.Library;
 public sealed class LibraryIndex : IDisposable
 {
     /// <summary>Bumped when extraction or normalisation changes, so documents are re-extracted.</summary>
-    public const int IndexerVersion = 2; // 2: PDF metadata (title, author, subject, keywords)
+    public const int IndexerVersion = 3; // 2: PDF metadata (title, author, subject, keywords); 3: TeX ligature codes repaired
     /// <summary>Bumped when the table layout changes. A newer schema than this is "unreadable".</summary>
     public const int SchemaVersion = 3; // 3: documents.title/authors + info_fts (migrated in place from 2)
 
@@ -393,6 +393,34 @@ public sealed class LibraryIndex : IDisposable
 
         hits.Sort((a, b) => b.Score.CompareTo(a.Score));
         return hits.Count > limit ? hits.GetRange(0, limit) : hits;
+    }
+
+    /// <summary>The words (and phrases) <paramref name="query"/> matched on one page of a document, as they
+    /// appear in the indexed text, case-insensitively distinct: what the index found by stemming or by a
+    /// word's siblings, for <see cref="LibraryQuery.HighlightPatternFor"/>. Empty when the page didn't match.</summary>
+    public IReadOnlyList<string> MatchedForms(string contentId, int page, LibraryQuery query)
+    {
+        if (query.IsEmpty) return [];
+        using var cmd = Command("""
+            select highlight(page_fts, 0, char(1), char(2))
+            from page_fts f join documents d on d.doc_key = f.doc_key
+            where d.content_id = $id and f.page = $p and page_fts match $q limit 1
+            """);
+        cmd.Parameters.AddWithValue("$id", contentId);
+        cmd.Parameters.AddWithValue("$p", page);
+        cmd.Parameters.AddWithValue("$q", query.MatchExpression!);
+        if (cmd.ExecuteScalar() is not string text) return [];
+        var forms = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        for (int i = text.IndexOf('\u0001'); i >= 0; i = text.IndexOf('\u0001', i + 1))
+        {
+            int end = text.IndexOf('\u0002', i + 1);
+            if (end < 0) break;
+            string form = text[(i + 1)..end].Trim();
+            if (form.Length > 0 && seen.Add(form)) forms.Add(form);
+            i = end;
+        }
+        return forms;
     }
 
     void Collect(List<LibraryHit> into, string sql, string match, int limit, string open, string close,

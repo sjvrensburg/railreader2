@@ -3,9 +3,10 @@ using System.Text;
 namespace RailReader2.Library;
 
 /// <summary>Index-time text normalisation (design §4.1): NFKC, line-end de-hyphenation, whitespace
-/// collapse. Applied to what is indexed, never to the PDF.
-/// <para>Known gap: a glyph with no Unicode mapping comes out of PDFium as a control character (a broken
-/// "fi" ligature: "uni\u001Ced"); it is treated as a space, so that word won't match.</para></summary>
+/// collapse, broken-ligature repair. Applied to what is indexed, never to the PDF.
+/// <para>A TeX font without a Unicode map gives PDFium its raw codes, so a ligature comes out as a control
+/// character ("uni\u001Ced"). The codes of TeX's T1 (Cork) and OT1 encodings are mapped back when they
+/// touch a letter (<see cref="Ligature"/>); any other control character is a word break.</para></summary>
 public static class TextNormalizer
 {
     public static string Normalize(string text)
@@ -52,11 +53,39 @@ public static class TextNormalizer
                 while (k < s.Length && s[k] is ' ' or '\t') k++;
                 if (k < s.Length && s[k] is not ('\r' or '\n' or '\u0002')) continue;
             }
+            if (Ligature(s, i) is { } lig)
+            {
+                if (pendingSpace && sb.Length > 0) sb.Append(' ');
+                pendingSpace = false;
+                sb.Append(lig);
+                continue;
+            }
             if (char.IsWhiteSpace(c) || char.IsControl(c)) { pendingSpace = true; continue; }
             if (pendingSpace && sb.Length > 0) sb.Append(' ');
             pendingSpace = false;
             sb.Append(c);
         }
         return sb.ToString();
+    }
+
+    /// <summary>The ligature a TeX font's raw code at <paramref name="i"/> stands for, or null. T1 (Cork):
+    /// 0x1B ff, 0x1C fi, 0x1D fl, 0x1E ffi, 0x1F ffl. OT1: 0x0B ff, 0x0C fi, 0x0E ffi, 0x0F ffl (its fl is
+    /// 0x0D, a carriage return, so it is left alone). Only next to a letter: "de\u001Cne", "\u001Dat",
+    /// "o\u001B". Seen in pdfTeX output with Type 3 or unmapped Type 1 fonts.</summary>
+    static string? Ligature(string s, int i)
+    {
+        string? lig = s[i] switch
+        {
+            '\u001B' or '\u000B' => "ff",
+            '\u001C' or '\u000C' => "fi",
+            '\u001D' => "fl",
+            '\u001E' or '\u000E' => "ffi",
+            '\u001F' or '\u000F' => "ffl",
+            _ => null,
+        };
+        if (lig is null) return null;
+        bool before = i > 0 && char.IsLetter(s[i - 1]);
+        bool after = i + 1 < s.Length && char.IsLetter(s[i + 1]);
+        return before || after ? lig : null;
     }
 }

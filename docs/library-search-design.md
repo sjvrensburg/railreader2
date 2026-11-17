@@ -228,8 +228,8 @@ Built: `LibraryIndex` (schema §6.1 with an integer `doc_key` in every FTS row, 
 | indexing incl. annotations | ~125 pages/s (single thread) |
 
 - **Ranking:** bm25 per table, merged with weights (outline 1.6, notes 1.4, file name 2.0) and a 1.5× first-page weight, which moved the "Vaswani" author query from rank 9 (citing papers' reference lists are denser in the name) to rank 1, MRR 0.929 → 0.938. 3.0 started costing section-title queries.
-- **The one miss** is a Porter stemmer limit: "diagnosing" (`diagnos`) does not match "diagnosis" (`diagnosi`). Kept in the set as a known miss.
-- **Normalisation fix found while labelling:** PDFium reports a line-end hyphen as U+0002 with no line break, so "Trans\u0002formers" had been indexed as two words. Now joined (kept as a hyphen before a capital). Known gap: a glyph with no Unicode mapping (a broken "fi" ligature) arrives as a control character and splits its word.
+- **The one miss** is a Porter stemmer limit: "diagnosing" (`diagnos`) does not match "diagnosis" (`diagnosi`). Kept in the set as a known miss. *Fixed in §11g (word families).*
+- **Normalisation fix found while labelling:** PDFium reports a line-end hyphen as U+0002 with no line break, so "Trans\u0002formers" had been indexed as two words. Now joined (kept as a hyphen before a capital). Known gap: a glyph with no Unicode mapping (a broken "fi" ligature) arrives as a control character and splits its word. *TeX's ligature codes are mapped back since §11g.*
 
 **Deviations from §5:**
 - **Notes are re-indexed when a document's last tab closes and at shutdown**, not on each auto-save: Core has no "annotations saved" event (`AnnotationFileManager` saves on its own timer). Notes are also refreshed on every open. A crash loses only the index's copy of that session's note edits, which the next open restores. *Superseded by §11f: notes are now re-indexed on every save.*
@@ -292,6 +292,23 @@ RailReaderCore 0.87.0 added the four APIs the phases above asked for (#202–#20
   - **Search:** a new `HitSource.Details` (weight 2.0, as file names; bm25 column weights title 1, author 1, subject 0.5, keywords 0.5), labelled "title, author or keywords". The Library window's "Titles & file names" filter covers both whole-document sources, and neither gets a snippet row: the header shows the title (else file name) and an authors line. Recents cards show the title, else the file name.
   - `library bench` unchanged: recall@10 97.9 %, MRR 0.938.
 - **Search start page:** the Search pane passes the library hit's page to `SearchService.FinalizeSearch(doc, matches, startPage)` instead of re-activating a match afterwards. Core wraps to the document's first match when none is on or after that page; the pane then shows the hit's page itself, as before.
+
+## 11g. Search limits follow-up (2026-11-17, #302)
+
+Three limits recorded in §11b, fixed and measured with `library bench` on the same machine (50 known-item queries now, two added below; "before" is main at 3.90.0.0 on the same set). The ligature repair recovers two queries (MRR +0.04), the word families one (+0.03, part of it small rank gains elsewhere); the extra latency is the OR groups.
+
+| | before | after |
+|---|---|---|
+| recall@10 | 94.0 % (47/50) | 100 % (50/50) |
+| MRR | 0.900 | 0.970 |
+| empty-result precision (absent terms) | 100 % (6/6) | 100 % (6/6) |
+| query latency p95, 861 pages | 3.9 ms | 5.3 ms |
+| database size | 4.37 MB | 4.37 MB |
+
+- **Stemming (word families, query side).** FTS5's Porter stemmer leaves some forms apart ("diagnosing" → `diagnos`, "diagnosis" → `diagnosi`; "estimator" → `estim`, "estimate" → `estimat`). A truncated prefix query can't bridge them, because FTS5 stems the prefix too ("analy"* becomes `anali`* and finds nothing). Instead `LibraryQuery.Family` removes one ending from a plain word (longest first: `-ations … -sis -es -ed -or -er -is -e -s -y`; `-sis`/`-ses` keep their s) and ORs the root with each ending: `("diagnosing" OR "diagnos" OR "diagnosis" OR …)`. Forms that aren't words match nothing; the cost is a little query time. Not expanded: phrases, `prefix*` terms, `-excluded` terms, words with none of the endings (the stemmer already covers their inflections), words with a non-letter, and roots shorter than 5 letters. Terms are now joined with an explicit `AND`, since FTS5 doesn't join a parenthesised group implicitly. No schema or index change. The known "diagnosing" miss is now found.
+- **Broken ligatures (normalisation).** A pdfTeX font with no Unicode map hands PDFium its raw codes. In the corpus (`svd_ols_ridge_pcr.pdf`) these are TeX's T1 (Cork) codes: 0x1B ff, 0x1C fi, 0x1D fl, 0x1E ffi, 0x1F ffl ("De\u001Cnition", "coe\u001Ecient"). `TextNormalizer` maps them back, plus OT1's 0x0B/0x0C/0x0E/0x0F (OT1's fl is 0x0D, a carriage return, so it is left alone), only when the code touches a letter. Other control characters stay word breaks (that file's T1 0x10 quote and 0x15 en dash among them). `IndexerVersion` 3, so the backfill re-extracts. Two queries were added that only match through a repaired "fi" ("unified spectral perspective", "rank deficiency automatically"); both fail with the old normaliser. The same file emits U+FFFE for a hyphen through pypdfium2's text-range call; not handled, since the app's own path (U+0002, §11b) wasn't seen to produce it.
+- **Highlighting.** `LibraryIndex.MatchedForms(contentId, page, query)` reads FTS5's `highlight()` for the hit's page row and returns the words and phrases it marked, as they appear in the indexed text (stemmed forms and family members included). `LibraryQuery.HighlightPatternFor` turns them into `\b(form|form|…)\b` (whitespace in a phrase is `[\s\-]+`, longest first, at most 12 forms), so a page hit is highlighted with exactly what the index found. `HighlightPattern`'s suffix strip remains the fallback (outline hits, no index). Still unhighlighted: a word the index joined (a line-end hyphen, a repaired ligature), since the in-document search runs on the PDF's own text.
+- The trigram table §4.1 left open wasn't needed for these. It would still be the way to add partial-word matches.
 
 ## 12. Decisions
 
