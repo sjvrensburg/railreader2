@@ -1,3 +1,4 @@
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using RailReader.Core.Models;
@@ -20,13 +21,19 @@ public partial class MenuBarView : UserControl
         _vm = DataContext as MainWindowViewModel;
         UpdateRecentFiles();
         if (_vm is not null)
+        {
             _vm.PropertyChanged += OnVmPropertyChanged;
+            _vm.RecentFilesChanged += UpdateRecentFiles;
+        }
     }
 
     protected override void OnUnloaded(RoutedEventArgs e)
     {
         if (_vm is not null)
+        {
             _vm.PropertyChanged -= OnVmPropertyChanged;
+            _vm.RecentFilesChanged -= UpdateRecentFiles;
+        }
         base.OnUnloaded(e);
     }
 
@@ -49,19 +56,35 @@ public partial class MenuBarView : UserControl
             menu.Items.Add(new MenuItem { Header = "(No recent files)", IsEnabled = false });
             return;
         }
+        // "Remove from Recent" (#303) lists every entry, missing files included, so a stale entry can go too.
+        var remove = new MenuItem { Header = "_Remove from Recent" };
         foreach (var entry in files)
         {
             var filePath = entry.FilePath;
+            if (string.IsNullOrEmpty(filePath)) continue;
+            var label = RecentLabel(filePath);
+            var removeItem = new MenuItem { Header = label };
+            AutomationProperties.SetName(removeItem, $"Remove {label} from recent files");
+            removeItem.Click += (_, _) => vm!.RemoveRecentFile(filePath);
+            remove.Items.Add(removeItem);
+
             if (!System.IO.File.Exists(filePath)) continue;
-            var name = System.IO.Path.GetFileName(filePath);
-            var dir = System.IO.Path.GetDirectoryName(filePath);
-            var item = new MenuItem { Header = $"{name}  ({dir})" };
+            var item = new MenuItem { Header = label };
             item.Click += (_, _) => vm!.FireAndForget(vm.OpenDocument(filePath), nameof(vm.OpenDocument));
             menu.Items.Add(item);
         }
         if (menu.Items.Count == 0)
             menu.Items.Add(new MenuItem { Header = "(No recent files)", IsEnabled = false });
+        if (remove.Items.Count > 0)
+        {
+            menu.Items.Add(new Separator());
+            menu.Items.Add(remove);
+        }
     }
+
+    // A literal underscore in a file name must not become an access key.
+    private static string RecentLabel(string filePath)
+        => $"{System.IO.Path.GetFileName(filePath)}  ({System.IO.Path.GetDirectoryName(filePath)})".Replace("_", "__");
 
     private void OnCloseTab(object? s, RoutedEventArgs e) => Vm?.CloseTab(Vm.ActiveTabIndex);
 

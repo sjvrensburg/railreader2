@@ -285,6 +285,33 @@ public partial class MainWindowViewModel
         });
     }
 
+    /// <summary>Raised on the UI thread after the recent-files list was edited here (not on every open):
+    /// the File ▸ Recent menu and the welcome screen's cards rebuild from it.</summary>
+    public event Action? RecentFilesChanged;
+
+    /// <summary>"Remove from recent documents" (#303): drops <paramref name="path"/> from
+    /// <c>AppConfig.RecentFiles</c>, along with every other entry for the same document (the dashboard
+    /// shows one card per content id, so leaving an older path behind would bring the card straight
+    /// back). Touches only the list: the library index, notes, portals and thumbnail stay — that is
+    /// Remove from Library's job.</summary>
+    public void RemoveRecentFile(string path)
+    {
+        string? id = PeekId(path);
+        int removed = _appConfig.RecentFiles.RemoveAll(r =>
+            string.Equals(r.FilePath, path, StringComparison.Ordinal)
+            || (id is not null && PeekId(r.FilePath) == id));
+        if (removed == 0) return;
+        _appConfig.Save();
+        RecentFilesChanged?.Invoke();
+
+        static string? PeekId(string? p)
+        {
+            if (string.IsNullOrEmpty(p)) return null;
+            try { return DocumentIdentity.Peek(p); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException) { return null; }
+        }
+    }
+
     /// <summary>A current first-page thumbnail for <paramref name="doc"/>, rendering it once if needed
     /// (thread pool, one at a time). Null for a missing, locked or encrypted file — an encrypted
     /// document's page is never written to disk — or when the index is off this session.</summary>

@@ -61,6 +61,7 @@ public partial class RecentDocumentsView : UserControl
         _vm = vm;
         vm.Tabs.CollectionChanged += OnTabsChanged;
         vm.LibraryChanged += OnLibraryChanged;
+        vm.RecentFilesChanged += OnLibraryChanged;
         Reload();
     }
 
@@ -70,6 +71,7 @@ public partial class RecentDocumentsView : UserControl
         {
             _vm.Tabs.CollectionChanged -= OnTabsChanged;
             _vm.LibraryChanged -= OnLibraryChanged;
+            _vm.RecentFilesChanged -= OnLibraryChanged;
             _vm = null;
         }
         _loadVersion++;
@@ -85,7 +87,7 @@ public partial class RecentDocumentsView : UserControl
         else _loadVersion++; // stop any thumbnail work for a screen no one sees
     }
 
-    // Backfill indexed something: page and note counts may have arrived.
+    // Backfill indexed something (page and note counts may have arrived), or an entry was removed.
     private void OnLibraryChanged()
     {
         if (WelcomeShowing) Reload();
@@ -162,6 +164,13 @@ public partial class RecentDocumentsView : UserControl
     {
         if (_vm is not { } vm || (sender as Control)?.DataContext is not RecentCard card) return;
         vm.FireAndForget(vm.OpenRecentDocument(card.Doc), nameof(vm.OpenRecentDocument));
+    }
+
+    // The card's context menu (#303). The menu item's DataContext is the card, inherited from the button.
+    private void OnRemoveCard(object? sender, RoutedEventArgs e)
+    {
+        if (_vm is not { } vm || (sender as Control)?.DataContext is not RecentCard card) return;
+        vm.RemoveRecentFile(card.Doc.Path);
     }
 
     private void OnSearchKeyDown(object? sender, KeyEventArgs e)

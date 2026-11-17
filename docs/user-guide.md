@@ -57,7 +57,7 @@ When there is a new version:
 
 ### Opening a PDF
 
-Use **File > Open** or press `Ctrl+O` to open a PDF. You can also pass a file path as a command-line argument. When no file is open, a welcome panel shows an **Open a PDF…** button and a few quick hints for getting started with rail reading. Once you have opened some documents, it also lists your **recent documents** — each with a picture of its first page, how far you've read ("page 41 of 230") and how many notes it has — and a box for [searching all of them](#library-search). Click a document to open it where you left off.
+Use **File > Open** or press `Ctrl+O` to open a PDF. You can also pass a file path as a command-line argument. When no file is open, a welcome panel shows an **Open a PDF…** button and a few quick hints for getting started with rail reading. Once you have opened some documents, it also lists your **recent documents** — each with a picture of its first page, how far you've read ("page 41 of 230") and how many notes it has — and a box for [searching all of them](#library-search). Click a document to open it where you left off. To take one off the list, right-click it and choose **Remove from Recent Documents**, or use **File > Recent Files > Remove from Recent**. This only shortens the list: the document's notes, portals and library entry stay.
 
 ### First steps
 

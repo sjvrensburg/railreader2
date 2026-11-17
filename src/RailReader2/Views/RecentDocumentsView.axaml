@@ -24,6 +24,12 @@
                             Background="Transparent"
                             AutomationProperties.Name="{Binding AutomationName}"
                             ToolTip.Tip="{Binding Doc.Path}" Opacity="{Binding CardOpacity}">
+                        <Button.ContextMenu>
+                            <ContextMenu>
+                                <MenuItem Header="Remove from Recent Documents" Click="OnRemoveCard"
+                                          AutomationProperties.Name="Remove from recent documents" />
+                            </ContextMenu>
+                        </Button.ContextMenu>
                         <StackPanel Spacing="4">
                             <Border Height="168" CornerRadius="3" ClipToBounds="True"
                                     BorderThickness="1"
