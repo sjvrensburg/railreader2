@@ -103,6 +103,9 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="3.90.1.0" date="2026-11-17">
+      <description><p>Library search finds more: a word now also finds its related forms where it didn't before (diagnosing finds diagnosis, analysis finds analyses), and words broken by an unmapped "fi", "ff" or "fl" ligature in some LaTeX PDFs can now be found. Opening a result highlights the words the search actually matched on that page. The library is re-indexed in the background once after updating.</p></description>
+    </release>
     <release version="3.90.0.0" date="2026-11-17">
       <description><p>You can now take a document off the recent documents list: right-click its card on the welcome screen, or use File, Recent Files, Remove from Recent, which also lists files that have since moved or been deleted. Removing a document only shortens the list; its notes, portals and library entry stay. File names containing an underscore now show in full in the Recent Files menu.</p></description>
     </release>
