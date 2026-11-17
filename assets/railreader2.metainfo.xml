@@ -103,6 +103,9 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="3.90.0.0" date="2026-11-17">
+      <description><p>You can now take a document off the recent documents list: right-click its card on the welcome screen, or use File, Recent Files, Remove from Recent, which also lists files that have since moved or been deleted. Removing a document only shortens the list; its notes, portals and library entry stay. File names containing an underscore now show in full in the Recent Files menu.</p></description>
+    </release>
     <release version="3.89.1.0" date="2026-11-17">
       <description><p>Markdown export no longer writes the same text twice where two detected regions overlap, such as a list and a box around its last item. Rail reading no longer steps through the same lines twice when a page had a duplicate text block. Notes written without an author name now record when they were created.</p></description>
     </release>
