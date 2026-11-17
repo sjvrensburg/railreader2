@@ -377,7 +377,7 @@
      "page": 10
     }
    ],
-   "note": "stemming"
+   "note": "stemming: Porter misses diagnosing/diagnosis; found through the word family (#302)"
   },
   {
    "q": "masked patches imputation",
@@ -428,6 +428,26 @@
     }
    ],
    "note": "section title"
+  },
+  {
+   "q": "unified spectral perspective",
+   "expect": [
+    {
+     "doc": "svd_ols_ridge_pcr.pdf",
+     "page": 0
+    }
+   ],
+   "note": "broken 'fi' ligature: TeX T1 code 0x1C in the text layer"
+  },
+  {
+   "q": "rank deficiency automatically",
+   "expect": [
+    {
+     "doc": "svd_ols_ridge_pcr.pdf",
+     "page": 1
+    }
+   ],
+   "note": "broken 'fi' ligature: TeX T1 code 0x1C in the text layer"
   },
   {
    "q": "OLS-Attention nexus",

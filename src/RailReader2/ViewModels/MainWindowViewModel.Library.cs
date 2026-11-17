@@ -174,6 +174,8 @@ public partial class MainWindowViewModel
     /// <summary>Opens a library result: the document (an open tab of it if there is one), then the hit's
     /// page. A note hit selects the annotation, as the Comments pane does; other hits run the in-document
     /// search for the query's words so the matches on the page are highlighted (design §7.1).</summary>
+    private int _libraryHitGeneration;
+
     public async Task OpenLibraryHit(LibraryHit hit, LibraryQuery query)
     {
         if (await EnsureLibraryDocumentOpen(hit.ContentId, hit.LastPath) is not { } tab) return;
@@ -188,8 +190,31 @@ public partial class MainWindowViewModel
             return;
         }
         GoToPage(page);
-        if (hit.Source != HitSource.Note && query.HighlightPattern is { } pattern)
-            RequestSearch(pattern, focus: false, useRegex: true, startPage: page);
+        if (hit.Source == HitSource.Note) return;
+        // The words the index matched on that page (stemmed forms and siblings included), else the
+        // query's own words with a crude suffix strip.
+        int generation = ++_libraryHitGeneration;
+        string? pattern = hit.Source == HitSource.Page
+            ? await Task.Run(() => MatchedFormsPattern(hit.ContentId, hit.Page.Value, query))
+            : null;
+        // Another hit was opened, or the reader moved to another tab, while the index was read.
+        if (generation != _libraryHitGeneration || ActiveTab != tab) return;
+        if ((pattern ?? query.HighlightPattern) is { } p)
+            RequestSearch(p, focus: false, useRegex: true, startPage: page);
+    }
+
+    private static string? MatchedFormsPattern(string contentId, int page, LibraryQuery query)
+    {
+        try
+        {
+            using var index = LibraryIndex.OpenReadOnly(LibraryIndex.DefaultPath);
+            return index is null ? null : LibraryQuery.HighlightPatternFor(index.MatchedForms(contentId, page, query));
+        }
+        catch (Exception ex)
+        {
+            RailReaderLogging.Logger.Warn($"[Library] Matched forms for highlighting failed: {ex.Message}");
+            return null;
+        }
     }
 
     /// <summary>Opens a library document at its saved reading position.</summary>

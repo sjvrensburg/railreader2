@@ -102,6 +102,28 @@ public sealed class LibraryWindowSupportTests : IDisposable
     [Fact]
     public void HighlightPattern_IsNullWithoutTerms() => Assert.Null(LibraryQuery.Parse("-only -excluded").HighlightPattern);
 
+    [Fact]
+    public void MatchedForms_AreTheWordsTheIndexFound_AndHighlightThem()
+    {
+        using (var index = LibraryIndex.OpenWritable(Db, out _))
+            index.ReplaceDocument(Doc("a", "a.pdf",
+                "nothing here",
+                "The diagnosis came first; diagnosing took longer. Estimators of the confidence band."));
+        using var reader = LibraryIndex.OpenReadOnly(Db)!;
+        var q = LibraryQuery.Parse("diagnosing estimation \"confidence band\"");
+
+        var forms = reader.MatchedForms("a", 1, q);
+        Assert.Equal(["diagnosis", "diagnosing", "Estimators", "confidence band"], forms);
+        Assert.Empty(reader.MatchedForms("a", 0, q));
+        Assert.Empty(reader.MatchedForms("missing", 1, q));
+
+        var pattern = LibraryQuery.HighlightPatternFor(forms)!;
+        foreach (var text in new[] { "a diagnosis", "Diagnosing", "estimators", "confidence-band", "confidence\nband" })
+            Assert.Matches(new Regex(pattern, RegexOptions.IgnoreCase), text);
+        Assert.DoesNotMatch(new Regex(pattern, RegexOptions.IgnoreCase), "diagnosisx"); // whole words
+        Assert.Null(LibraryQuery.HighlightPatternFor([]));
+    }
+
     // ------------------------------------------------------------ index: filters, counts, clear
 
     [Fact]

@@ -323,7 +323,7 @@ Open it with `Ctrl+Shift+F`, **File > Search Library…**, the search box on the
 - Put a phrase in quotes to find the words together: `"wild bootstrap"`.
 - End a word with `*` to find words that start with it: `heterosced*`.
 - Put `-` before a word to leave out results that contain it: `ridge -lasso`.
-- Capitals and accents don't matter, and common word endings are matched loosely: `estimators` also finds *estimation*.
+- Capitals and accents don't matter, and common word endings are matched loosely: `estimators` also finds *estimation*, and `diagnosing` finds *diagnosis*.
 
 There is no special syntax to get wrong: any other punctuation is treated as ordinary text.
 
