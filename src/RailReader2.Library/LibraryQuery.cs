@@ -64,7 +64,9 @@ public sealed class LibraryQuery
     /// <summary>A regular expression marking exactly the <paramref name="forms"/> the index matched on a
     /// page (<see cref="LibraryIndex.MatchedForms"/>), so every word a search found by stemming is
     /// highlighted, not only the ones <see cref="HighlightPattern"/>'s suffix strip guesses. Whitespace in a
-    /// matched phrase may be any whitespace or a hyphen (a line break in the PDF). Null when there are none.</summary>
+    /// matched phrase may be any whitespace or a hyphen (a line break in the PDF). Forms are kept in the
+    /// order given (page order, from <see cref="LibraryIndex.MatchedForms"/>); the closing <c>\b</c> makes
+    /// the order irrelevant to matching. Null when there are none.</summary>
     public static string? HighlightPatternFor(IEnumerable<string> forms)
     {
         var parts = forms
@@ -72,8 +74,7 @@ public sealed class LibraryQuery
             .Where(w => w.Length > 0)
             .Select(w => string.Join(@"[\s\-]+", w.Select(Regex.Escape)))
             .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderByDescending(p => p.Length) // the longest alternative first: "models" before "model"
-            .Take(MaxHighlightForms)
+            .Take(MaxHighlightForms) // in page order, so the cap drops forms found late, not short ones
             .ToList();
         return parts.Count == 0 ? null : @"\b(" + string.Join("|", parts) + @")\b";
     }

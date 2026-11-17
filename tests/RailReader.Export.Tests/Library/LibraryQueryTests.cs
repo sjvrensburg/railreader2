@@ -78,9 +78,11 @@ public class TextNormalizerTests
     [InlineData("a uni\u001Ced view", "a unified view")]     // TeX T1 ligature codes
     [InlineData("coe\u001Ecient di\u001Berent \u001Dat su\u001Fe", "coefficient different flat suffle")]
     [InlineData("switches o\u001B entirely", "switches off entirely")]
-    [InlineData("De\u000Cnition", "Definition")]              // OT1
+    [InlineData("su\u000Ecient", "sufficient")]             // OT1 ffi
+    [InlineData("end\u000CNext a\u000Bb", "end Next a b")]     // form feed, vertical tab: word breaks
     [InlineData("Eckart\u0015Young \u0010quoted", "Eckart Young quoted")] // T1 dash and quote: separators
     [InlineData("a \u001C b", "a b")]                         // not touching a letter: a separator
+    [InlineData("coef\u0002\u001Ccient de-\n\u001Cnition", "coefficient definition")] // hyphenated before a ligature
     [InlineData("", "")]
     public void Normalize(string input, string expected) => Assert.Equal(expected, TextNormalizer.Normalize(input));
 }
