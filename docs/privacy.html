@@ -37,7 +37,7 @@
 
   <main class="content" id="main-content">
     <h1>Privacy Policy</h1>
-    <p class="subtitle">Last updated: 16 November 2026</p>
+    <p class="subtitle">Last updated: 18 November 2026</p>
 
     <section class="guide-section">
       <h2>Summary</h2>
@@ -47,10 +47,12 @@
         entirely on your device by default.
       </p>
       <p>
-        The only exception is the optional <strong>Vision Language Model (VLM)</strong>
-        integration, which is <strong>disabled by default</strong> and, when enabled, sends
-        data only to an endpoint you explicitly configure. See
-        <a href="#vlm">Vision Language Model integration</a> below for details.
+        There are two exceptions, both <strong>off by default</strong> and both under your control:
+        the optional <strong>Vision Language Model (VLM)</strong> integration, which sends data only
+        to an endpoint you explicitly configure (see <a href="#vlm">Vision Language Model
+        integration</a>), and <strong>AI tools</strong> you connect to your library, which then read
+        your notes and documents&rsquo; text and pass what they read to their AI provider (see
+        <a href="#ai-tools">AI tools</a>).
       </p>
     </section>
 
@@ -79,13 +81,20 @@
           pages are never stored. <strong>Settings &gt; Library</strong> (advanced view) shows its
           size and can clear it; <strong>Remove from Library</strong> in the Library window forgets
           a single document.</li>
+        <li><strong>AI tools settings</strong> &mdash; whether AI tools may read your library, and
+          the documents and folders you have hidden from them, in <code>ai_tools_prefs.json</code> in
+          the application data directory. When you connect a tool in <strong>Settings &gt; Library &gt;
+          AI Tools</strong>, railreader2 also adds one entry, named <code>railreader2</code>, to that
+          tool&rsquo;s own settings (Claude Code, Claude Desktop or Codex), and removes it when you
+          disconnect.</li>
         <li><strong>VLM settings (if configured)</strong> &mdash; the endpoint URL, model name,
           and API key you enter in <strong>Settings &gt; VLM</strong> are stored in the same
           local configuration file. The API key is not transmitted to any party other than the
           endpoint you configured.</li>
       </ul>
       <p>
-        None of this data leaves your computer. <strong>Help &rarr; Clean Up Temp Files</strong>
+        None of this data leaves your computer unless you connect an AI tool (see
+        <a href="#ai-tools">AI tools</a>). <strong>Help &rarr; Clean Up Temp Files</strong>
         removes caches, temporary files and old logs; the library index can be cleared in
         <strong>Settings &gt; Library</strong>. To delete everything the application has stored,
         remove its data directory:
@@ -122,6 +131,11 @@
         <li><strong>Vision Language Model integration</strong>, when you configure an endpoint and
           use it, as described below.</li>
       </ul>
+      <p>
+        The MCP server that AI tools connect to (<a href="#ai-tools">below</a>) makes no network
+        requests itself: it talks only to the program that started it, over that program&rsquo;s
+        input and output.
+      </p>
     </section>
 
     <section class="guide-section" id="vlm">
@@ -176,12 +190,48 @@
       </p>
     </section>
 
+    <section class="guide-section" id="ai-tools">
+      <h2>AI tools (MCP)</h2>
+      <p>
+        railreader2 includes an MCP server that lets AI tools such as Claude Code, Claude Desktop
+        and Codex read your library. It is <strong>off by default</strong>. Until you tick
+        <strong>Let AI tools read my library</strong> in <strong>Settings &gt; Library &gt; AI
+        Tools</strong> (or run <code>railreader2-mcp enable</code>), it refuses every request, even
+        from a tool that has been set up.
+      </p>
+      <p>
+        <strong>What a connected tool can read:</strong> your notes and comments (and others&rsquo;
+        comments written into your PDFs), with their replies, authors and colour categories; your
+        named bookmarks; the page text of the documents you have opened; and each document&rsquo;s
+        title, authors, file name and page count.
+      </p>
+      <p>
+        <strong>What it can never read:</strong> file paths or folder names, the PDF files
+        themselves or any images of them, anything from password-protected documents, and anything
+        from documents or folders you have hidden (<strong>Hide from AI Tools</strong> in the Library
+        window, <strong>Hide a Folder&hellip;</strong> in Settings). The server only reads; it cannot
+        change your documents, notes or settings.
+      </p>
+      <p>
+        <strong>Where it goes:</strong> what a tool reads becomes part of your conversation with it,
+        and is sent to that tool&rsquo;s AI provider (for example, Anthropic for Claude and OpenAI for
+        Codex). Their privacy policies and terms apply, and railreader2 is not responsible for them.
+        As with the VLM integration, consider the sensitivity of your documents, and whether your
+        institution permits sending their content to an AI service, before connecting a tool.
+      </p>
+      <p>
+        To stop it, untick <strong>Let AI tools read my library</strong>: requests are refused from
+        then on, including from tools that are already running. Unticking a tool&rsquo;s switch
+        removes railreader2&rsquo;s entry from that tool&rsquo;s settings.
+      </p>
+    </section>
+
     <section class="guide-section">
       <h2>Third-party services</h2>
       <p>
         railreader2 does not integrate with any advertising networks or analytics platforms.
-        The only third-party integration is the user-configurable VLM endpoint described
-        above, which is disabled by default.
+        Its only third-party integrations are the user-configurable VLM endpoint and the AI
+        tools you choose to connect, both described above and both off by default.
       </p>
     </section>
 
