@@ -526,15 +526,50 @@ public sealed partial class MainWindowViewModel
     /// <summary>The text under a markup annotation on the focused view's page, line by line
     /// (same per-quad extraction as the Markdown export), or null when there is none.</summary>
     private string? MarkupText(TextMarkupAnnotation markup)
+        => _controller.FocusedViewport is { } vp ? MarkupTextOn(vp.Owner, vp.CurrentPage, markup) : null;
+
+    /// <summary>The text under a markup annotation on <paramref name="page"/> of <paramref name="doc"/>, or null.
+    /// The text layer and the stored rects are both in the page's own (rotation-0) frame.</summary>
+    internal static string? MarkupTextOn(DocumentModel doc, int page, TextMarkupAnnotation markup)
     {
-        if (_controller.FocusedViewport is not { } vp) return null;
-        var pageText = vp.Owner.GetOrExtractText(vp.CurrentPage);
+        var pageText = doc.GetOrExtractText(page);
         var parts = new List<string>();
         foreach (var r in markup.Rects)
             if (pageText.ExtractTextInRect(r.X, r.Y, r.X + r.W, r.Y + r.H) is { Length: > 0 } t)
                 parts.Add(t);
         return parts.Count > 0 ? string.Join(" ", parts) : null;
     }
+
+    /// <summary>Comments pane ▸ Copy Notes for AI (roadmap M8): <paramref name="notes"/> as Markdown on the
+    /// clipboard, with the text each highlight marks, for an AI chat when no MCP client is connected.</summary>
+    public void CopyNotesAsMarkdown(IReadOnlyList<(Annotation Note, int Page, bool IsReply, bool IsReviewer, string? Category)> notes)
+    {
+        if (ActiveTab is not { } tab) return;
+        var doc = tab.State;
+        var export = notes.Select(n => new RailReader2.Library.NoteForExport(
+            n.Page, KindLabel(n.Note),
+            n.Note is TextMarkupAnnotation m ? MarkupTextOn(doc, n.Page, m) : null,
+            string.IsNullOrWhiteSpace(n.Note.EffectiveContents) ? null : n.Note.EffectiveContents,
+            n.Note.Author, n.IsReviewer, n.Category, n.IsReply,
+            (n.Note.ModifiedUtc ?? n.Note.CreatedUtc)?.UtcDateTime)).ToList();
+        CopyToClipboard?.Invoke(RailReader2.Library.NotesMarkdown.Build(tab.Title, export));
+        int threads = export.Count(e => !e.IsReply);
+        ShowStatusToast(threads == 1 ? "Copied 1 note as Markdown" : $"Copied {threads} notes as Markdown");
+    }
+
+    internal static string KindLabel(Annotation a) => a switch
+    {
+        HighlightAnnotation => "Highlight",
+        UnderlineAnnotation => "Underline",
+        StrikeOutAnnotation => "Strike-out",
+        SquigglyAnnotation => "Squiggly",
+        TextNoteAnnotation => "Note",
+        RectAnnotation => "Box",
+        FreehandAnnotation => "Drawing",
+        CaretAnnotation => "Caret",
+        FreeTextAnnotation => "Text box",
+        _ => "Annotation",
+    };
 
     // --- Merging overlapping text markup (Core 0.64.0) ---
     // Two highlights of the same kind and colour whose line bands overlap become one, keeping the

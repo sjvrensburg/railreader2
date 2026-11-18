@@ -67,7 +67,7 @@ public sealed record McpServerCommand(string Command, IReadOnlyList<string> Args
     internal JsonObject ToJsonEntry()
     {
         var args = new JsonArray();
-        foreach (var a in Args) args.Add(JsonValue.Create(a));
+        foreach (var a in Args) args.Add((JsonNode?)JsonValue.Create(a)); // the non-generic Add: Add<T> is not AOT-safe
         return new JsonObject { ["command"] = Command, ["args"] = args };
     }
 
