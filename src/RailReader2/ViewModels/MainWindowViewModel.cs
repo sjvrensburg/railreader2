@@ -550,9 +550,9 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         // through to a GPU-eligible built-in; PP-DocLayout-S selected but its file is missing falls
         // through to GPU-eligible PP-DocLayoutV3) — and a diverged prediction here is exactly the
         // shape that puts both worker stages on WebGPU at once — a process crash on ONNX Runtime
-        // ≤1.29 (onnxruntime#32561), and still a configuration Core's AnalysisWorker does not
-        // support: OCR grabs the GPU slot believing layout won't use it, while layout's real
-        // fallback lands on GPU too.
+        // ≤1.29 (onnxruntime#32561), and a configuration this app deliberately doesn't run (see the
+        // OCR GPU gate below): OCR grabs the GPU slot believing layout won't use it, while layout's
+        // real fallback lands on GPU too.
         CustomLayoutModelLoader.Resolution resolution;
         try
         {
@@ -566,11 +566,14 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         ActiveLayoutAccelerator = resolution.IsGpu ? AcceleratorPreference.Gpu : AcceleratorPreference.Cpu;
         ActiveLayoutArchitecture = resolution.Architecture;
 
-        // GPU for OCR and GPU for layout are mutually exclusive — Core's AnalysisWorker does not
-        // run both its stages on WebGPU. (On ONNX Runtime ≤1.29 two concurrent WebGPU
-        // Session.Run() calls crashed the process — onnxruntime#32561; Core 0.79.0's ORT 1.31 +
-        // WebGPU plugin 0.5 fixed that upstream, but enabling the dual-GPU pipeline is a separate,
-        // not-yet-made Core change.) Settings enforces "only one at a time" by
+        // GPU for OCR and GPU for layout are mutually exclusive — an app policy, not a Core limit.
+        // (On ONNX Runtime ≤1.29 two concurrent WebGPU Session.Run() calls crashed the process —
+        // onnxruntime#32561, fixed by ORT 1.31 + WebGPU plugin 0.5; Core 0.87.1 validated both
+        // AnalysisWorker stages on one GPU, RailReaderCore#193.) The rule stands because the
+        // payoff depends on the OCR pack: beside GPU layout, the bundled pack and Tiny run OCR
+        // slower on the GPU than on CPU, while Small and Medium still gain (see Core's
+        // WebGpuAccelerator docs, re-measured for Core 0.91.0). Lifting it needs per-pack
+        // placement, not just a removed check. Settings enforces "only one at a time" by
         // unchecking whichever wasn't just turned on, but a hand-edited sidecar file could still
         // have both set — reconcile defensively here too, with layout winning the tie (it's the
         // longer-standing feature, and its resolution is already computed above). See
@@ -581,7 +584,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             if (resolution.IsGpu)
             {
                 _logger.Warn("[WebGPU] OCR GPU acceleration requested but layout GPU acceleration " +
-                    "is also enabled — only one can run on GPU at a time (Core's AnalysisWorker does not yet run both stages on WebGPU). Using CPU for OCR.");
+                    "is also enabled — this app runs only one of the two on GPU at a time. Using CPU for OCR.");
                 ShowStatusToast(
                     "OCR GPU acceleration was skipped because layout GPU acceleration is already using the GPU slot —",
                     "review Performance settings", () => OpenSettingsTab("Performance"));
