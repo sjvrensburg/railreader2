@@ -23,6 +23,7 @@ public partial class SettingsWindow
         LibraryPathText.Text = LibraryIndex.DefaultPath;
         LibraryRebuildButton.IsEnabled = LibraryClearButton.IsEnabled = vm.IsLibraryIndexing;
         RefreshLibraryStatus();
+        LoadAiToolsSettings();
     }
 
     private async void RefreshLibraryStatus()

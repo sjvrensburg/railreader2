@@ -13,7 +13,7 @@ Prepared 26 October 2026. Based on [jerrydjin/cauchy](https://github.com/jerrydj
 | M5 Ask about a selection, with evidence labels | Not started |
 | M6 Portable reading session package | Shipped (v3.84.0.0) |
 | M7 Library-wide search and recents dashboard | Shipped (v3.87.0.0) |
-| M8 Notes over MCP | In progress: `railreader2-cli mcp` server, its four tools, consent switch and hide-from-AI (documents, folders) done; Settings switches and docs to come |
+| M8 Notes over MCP | In progress: `railreader2-cli mcp` server, its four tools, consent switch, hide-from-AI (documents, folders), `railreader2-mcp` in every package (MSIX alias, Inno, AppImage `--mcp`, tarball) and Settings ▸ Library ▸ AI Tools done; "Copy notes for AI", threaded replies and user docs to come |
 | M9 Reference cards with abstracts | Not started |
 | M10 Zotero and DOI citations | Not started |
 | Q1 OCR text marked unverified | Shipped |

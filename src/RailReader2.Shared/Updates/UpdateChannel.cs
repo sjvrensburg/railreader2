@@ -95,7 +95,7 @@ public static class UpdateChannel
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, ExactSpelling = true)]
     private static extern int GetCurrentPackageFullName(ref int packageFullNameLength, char[]? packageFullName);
 
-    private static bool IsMsixPackaged()
+    internal static bool IsMsixPackaged()
     {
         try
         {
