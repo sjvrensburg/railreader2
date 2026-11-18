@@ -199,42 +199,13 @@ public partial class LibraryWindow : Window
         if (group is null) return;
         e.Handled = true;
 
-        var prefs = AiToolsPreferences.Load();
-        bool byId = prefs.HiddenDocuments.Contains(group.ContentId);
-        bool byFolder = !byId && prefs.IsHidden(group.ContentId, group.LastPath);
         var open = new MenuItem { Header = "Open", IsEnabled = !group.Missing };
         open.Click += (_, _) => OpenRow(row);
-        var hide = new MenuItem
-        {
-            Header = byFolder ? "Hidden from AI Tools by a Folder Rule" : "Hide from AI Tools",
-            ToggleType = MenuItemToggleType.CheckBox,
-            IsChecked = byId || byFolder,
-            IsEnabled = !byFolder, // a folder rule is lifted in Settings ▸ Library, not per document
-        };
-        ToolTip.SetTip(hide, byFolder
-            ? "Its folder is hidden in Settings ▸ Library ▸ AI tools."
-            : "AI tools connected through railreader2-cli mcp never see this document's text or notes.");
-        hide.Click += (_, _) => SetHiddenFromAi(group, hide: !byId);
+        var hide = AiHideMenuItem.Create(group.ContentId, group.LastPath, group.DisplayName,
+            report: message => StatusText.Text = message,
+            changed: () => Refresh(debounce: false, quiet: true));
         var menu = new ContextMenu { ItemsSource = new object[] { open, new Separator(), hide } };
         menu.Open(e.Source as Control ?? ResultsList);
-    }
-
-    void SetHiddenFromAi(LibraryResultGroup group, bool hide)
-    {
-        try
-        {
-            AiToolsPreferences.Update(p => { if (hide) p.Hide(group.ContentId); else p.Unhide(group.ContentId); });
-            StatusText.Text = hide
-                ? $"{group.DisplayName} is hidden from AI tools: they can't read its text or notes."
-                : $"{group.DisplayName} is visible to AI tools again (while AI tools are on).";
-        }
-        catch (Exception ex)
-        {
-            RailReaderLogging.Logger.Error("[Library] saving AI tools preferences failed", ex);
-            StatusText.Text = "Couldn't save that change — see the log for details.";
-            return;
-        }
-        Refresh(debounce: false, quiet: true);
     }
 
     // ------------------------------------------------------------ querying

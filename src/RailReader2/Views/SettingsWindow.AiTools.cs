@@ -48,7 +48,7 @@ public partial class SettingsWindow
             : "This build has no MCP server beside it (a development build). Build it with "
               + "`dotnet build src/RailReader2.Mcp -c Release` and reopen Settings, or use `railreader2-cli mcp`.";
         AiCopySetupButton.IsEnabled = _mcpServer is not null;
-        RefreshHiddenFolders(prefs);
+        RefreshHidden(prefs);
         RefreshAgents();
     }
 
@@ -164,7 +164,97 @@ public partial class SettingsWindow
             AllowMultiple = false,
         });
         if (picked.Count == 0 || picked[0].TryGetLocalPath() is not { } folder) return;
-        try { RefreshHiddenFolders(AiToolsPreferences.Update(p => p.HideFolder(folder))); }
+        try { RefreshHidden(AiToolsPreferences.Update(p => p.HideFolder(folder))); }
+        catch (Exception ex)
+        {
+            RailReaderLogging.Logger.Error("[AI tools] saving preferences failed", ex);
+            AiToolsStatusText.Text = "Couldn't save that change — see the log for details.";
+        }
+    }
+
+    private void RefreshHidden(AiToolsPreferences prefs)
+    {
+        RefreshHiddenFolders(prefs);
+        RefreshHiddenDocuments(prefs);
+    }
+
+    private int _hiddenDocsVersion;
+
+    // Hidden documents, named from the library index (read off the UI thread). One no longer in the index is still
+    // listed, by its short id, so nothing can stay hidden out of sight.
+    private async void RefreshHiddenDocuments(AiToolsPreferences prefs)
+    {
+        int version = ++_hiddenDocsVersion;
+        var ids = prefs.HiddenDocuments.ToList();
+        AiHiddenDocumentsHeader.Text = ids.Count == 0 ? "Hidden documents" : $"Hidden documents ({ids.Count})";
+        AiUnhideAllButton.IsEnabled = ids.Count > 0;
+        Dictionary<string, LibraryDocument> docs = [];
+        if (ids.Count > 0)
+        {
+            try
+            {
+                docs = await Task.Run(() =>
+                {
+                    if (!File.Exists(LibraryIndex.DefaultPath)) return new Dictionary<string, LibraryDocument>();
+                    using var index = LibraryIndex.OpenReadOnly(LibraryIndex.DefaultPath);
+                    if (index is null) return new Dictionary<string, LibraryDocument>();
+                    return ids.Select(index.GetDocument).OfType<LibraryDocument>().ToDictionary(d => d.ContentId);
+                });
+            }
+            catch (Exception ex)
+            {
+                RailReaderLogging.Logger.Warn($"[AI tools] naming hidden documents: {ex.Message}");
+            }
+        }
+        if (version != _hiddenDocsVersion) return;
+
+        AiHiddenDocumentsPanel.Children.Clear();
+        if (ids.Count == 0)
+            AiHiddenDocumentsPanel.Children.Add(new TextBlock { Text = "None", Classes = { "status" } });
+        var rows = ids.Select(id => docs.TryGetValue(id, out var d)
+                ? (Id: id, Name: string.IsNullOrWhiteSpace(d.Title) ? d.FileName : $"{d.Title} · {d.FileName}", Path: d.LastPath, Known: true)
+                : (Id: id, Name: $"Not in the library · {id[..Math.Min(12, id.Length)]}", Path: (string?)null, Known: false))
+            .OrderBy(r => !r.Known).ThenBy(r => r.Name, StringComparer.CurrentCultureIgnoreCase);
+        foreach (var (id, name, path, _) in rows)
+        {
+            var unhide = new Button { Content = "Unhide", Padding = new Avalonia.Thickness(8, 2) };
+            Avalonia.Automation.AutomationProperties.SetName(unhide, $"Unhide {name}");
+            unhide.Click += (_, _) => SaveHidden(p => p.Unhide(id), after => after.IsHidden(id, path)
+                ? $"{name} is no longer hidden on its own, but its folder is still hidden."
+                : $"{name} is visible to AI tools again (while AI tools are on).");
+            AiHiddenDocumentsPanel.Children.Add(new StackPanel
+            {
+                Orientation = Avalonia.Layout.Orientation.Horizontal, Spacing = 8,
+                Children =
+                {
+                    new TextBlock { Text = name, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+                                    TextTrimming = Avalonia.Media.TextTrimming.CharacterEllipsis, MaxWidth = 460 },
+                    unhide,
+                },
+            });
+        }
+    }
+
+    private async void OnAiUnhideAll(object? sender, RoutedEventArgs e)
+    {
+        int count = AiToolsPreferences.Load().HiddenDocuments.Count;
+        if (count == 0) return;
+        var confirm = new ConfirmDialog("Unhide all documents?",
+            $"AI tools will be able to read all {count} hidden document{(count == 1 ? "" : "s")} again (while AI tools are on). "
+            + "Hidden folders stay hidden. To hide a document again, you'll need to find it and hide it one by one.",
+            "Unhide All") { FontSize = FontSize };
+        if (await confirm.ShowDialog<bool>(this) != true) return;
+        SaveHidden(p => p.HiddenDocuments.Clear(), _ => "No documents are hidden on their own now; documents in hidden folders stay hidden.");
+    }
+
+    private void SaveHidden(Action<AiToolsPreferences> change, Func<AiToolsPreferences, string> done)
+    {
+        try
+        {
+            var after = AiToolsPreferences.Update(change);
+            RefreshHidden(after);
+            AiToolsStatusText.Text = done(after);
+        }
         catch (Exception ex)
         {
             RailReaderLogging.Logger.Error("[AI tools] saving preferences failed", ex);
@@ -183,7 +273,7 @@ public partial class SettingsWindow
             Avalonia.Automation.AutomationProperties.SetName(remove, $"Stop hiding {folder}");
             remove.Click += (_, _) =>
             {
-                try { RefreshHiddenFolders(AiToolsPreferences.Update(p => p.UnhideFolder(folder))); }
+                try { RefreshHidden(AiToolsPreferences.Update(p => p.UnhideFolder(folder))); }
                 catch (Exception ex)
                 {
                     RailReaderLogging.Logger.Error("[AI tools] saving preferences failed", ex);

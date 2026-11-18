@@ -370,7 +370,7 @@ AI tools such as Claude Code, Claude Desktop and Codex can read your library whi
 
 **What a tool can read:** your notes and comments (with their replies, colour categories, and whether they are yours or a reviewer's), your named bookmarks, and the page text of the documents you have opened, with each document's title, authors and file name. **What it can't:** file paths or folder names, the PDF files themselves or any images, and anything at all from password-protected documents. It can only read; it can't change your documents or notes.
 
-**Hiding documents:** right-click a document in the Library window and choose **Hide from AI Tools**, or use **Hide a Folder…** under AI Tools to hide everything in a folder. A hidden document is treated as if it weren't in your library. Turning AI tools off, or hiding a document, applies at once, even to a tool that is already connected.
+**Hiding documents:** right-click a document in the Library window (**File ▸ Search Library…**, or `Ctrl+Shift+F`) or a recent document on the start screen and choose **Hide from AI Tools**, or use **Hide a Folder…** under AI Tools to hide everything in a folder. The same section lists every hidden folder and document, with **Remove** and **Unhide** buttons and **Unhide All Documents**. A hidden document is treated as if it weren't in your library. Turning AI tools off, or hiding a document, applies at once, even to a tool that is already connected.
 
 **Where your notes go:** what a tool reads is sent to that tool's AI provider (for example, Anthropic for Claude and OpenAI for Codex) under their terms. The MCP server itself makes no network connection: it talks only to the program that started it. See the [privacy policy](privacy.html).
 

@@ -840,10 +840,18 @@
                                    Text="Each switch adds or removes only RailReader2's own entry in that program's settings; tools that are already running pick it up when they next start. Copy Setup copies the entry for any other MCP client, and the Claude Code command." />
                         <TextBlock Text="Hidden folders" Margin="0,8,0,0" />
                         <TextBlock Classes="hint"
-                                   Text="AI tools can't see documents in these folders. To hide a single document, right-click it in the Library window." />
+                                   Text="AI tools can't see documents in these folders. Removing a folder makes its documents visible again." />
                         <StackPanel Name="AiHiddenFoldersPanel" Spacing="2" Margin="8,0,0,0" />
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <Button Content="Hide a Folder…" Click="OnAiHideFolder" />
+                        </StackPanel>
+                        <TextBlock Name="AiHiddenDocumentsHeader" Text="Hidden documents" Margin="0,8,0,0" />
+                        <TextBlock Classes="hint" TextWrapping="Wrap"
+                                   Text="AI tools can't see these documents. To hide one, right-click it in the Library window (File ▸ Search Library…) or on the start screen." />
+                        <StackPanel Name="AiHiddenDocumentsPanel" Spacing="2" Margin="8,0,0,0" />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button Name="AiUnhideAllButton" Content="Unhide All Documents" Click="OnAiUnhideAll"
+                                    AutomationProperties.Name="Unhide all hidden documents" />
                         </StackPanel>
                         <TextBlock Name="AiToolsStatusText" Classes="status" TextWrapping="Wrap" />
                     </StackPanel>
