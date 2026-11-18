@@ -86,6 +86,11 @@ jobs:
       - name: Publish app (as release.yml does)
         run: dotnet publish src/RailReader2/RailReader2.csproj -c Release -r win-x64 --self-contained -o publish/
 
+      - name: Publish railreader2-mcp (as release.yml does)
+        run: |
+          dotnet publish src/RailReader2.Mcp/RailReader2.Mcp.csproj -c Release -r win-x64 -o publish-mcp/
+          Copy-Item publish-mcp\RailReader2.Mcp.exe -Destination publish\
+
       - name: Library probe (published and installed)
         shell: pwsh
         run: ./installer/test-library-probe.ps1
