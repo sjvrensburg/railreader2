@@ -12,7 +12,7 @@ namespace RailReader2.Library;
 public sealed class LibraryIndex : IDisposable
 {
     /// <summary>Bumped when extraction or normalisation changes, so documents are re-extracted.</summary>
-    public const int IndexerVersion = 3; // 2: PDF metadata (title, author, subject, keywords); 3: TeX ligature codes repaired
+    public const int IndexerVersion = 4; // 2: PDF metadata (title, author, subject, keywords); 3: TeX ligature codes repaired; 4: reply threads (note_threads)
     /// <summary>Bumped when the table layout changes. A newer schema than this is "unreadable".</summary>
     public const int SchemaVersion = 3; // 3: documents.title/authors + info_fts (migrated in place from 2)
 
@@ -126,6 +126,7 @@ public sealed class LibraryIndex : IDisposable
                 version = 0;
             }
             if (version == 0) CreateSchema(conn);
+            EnsureThreadsTable(conn);
             // Quick structural check: a damaged file usually fails here rather than mid-search.
             if (Scalar(conn, "pragma quick_check") is not "ok")
                 throw new UnreadableIndexException("quick_check failed");
@@ -168,6 +169,22 @@ public sealed class LibraryIndex : IDisposable
         Exec(conn, $"update meta set value = '{SchemaVersion}' where key = 'schema_version'", tx);
         tx.Commit();
     }
+
+    /// <summary>Reply threads (IndexerVersion 4): which note answers which, by the PDF's annotation ids
+    /// (<c>/NM</c> → <c>/IRT</c>). A plain table beside the schema rather than a column on <c>note_fts</c>
+    /// (an FTS5 table can't gain one), so no schema bump: an older app opening this index ignores the table
+    /// instead of moving the index aside, and a reader of an index an older app made sees no threads. Stale
+    /// rows an older app leaves behind are harmless: a note's parent never changes, and rows are matched by
+    /// the note's own id.</summary>
+    static void EnsureThreadsTable(SqliteConnection conn) => Exec(conn, """
+        create table if not exists note_threads (
+          doc_key     integer not null,
+          native_id   text not null,
+          in_reply_to text not null,
+          primary key (doc_key, native_id)) without rowid
+        """);
+
+    bool HasThreadsTable() => Scalar(_conn, "select count(*) from sqlite_schema where type = 'table' and name = 'note_threads'") is "1";
 
     static int ReadSchemaVersion(SqliteConnection conn)
     {
@@ -331,21 +348,28 @@ public sealed class LibraryIndex : IDisposable
     /// <summary>Searches page text, outlines, notes, file names and document metadata (title, author, subject, keywords). Hits are merged across sources by a
     /// weighted bm25 (higher <see cref="LibraryHit.Score"/> is better); at most
     /// <paramref name="limit"/> are returned. An empty query returns nothing.</summary>
-    /// <para><paramref name="sources"/> limits the search to some sources (null = all).</para>
+    /// <para><paramref name="sources"/> limits the search to some sources (null = all), and
+    /// <paramref name="contentId"/> to one document (null = all).</para>
+    /// <para><paramref name="amongIds"/> limits it to those documents (null = all; the MCP server's visible set) and
+    /// <paramref name="noteKind"/> note hits to one kind ("highlight", "textnote", …). Both filter inside the query,
+    /// before the limit, so a filter never shortens the results while more matches exist.</para>
     public IReadOnlyList<LibraryHit> Search(LibraryQuery query, int limit = 50, string open = "[", string close = "]",
-        IReadOnlySet<HitSource>? sources = null)
+        IReadOnlySet<HitSource>? sources = null, string? contentId = null,
+        IReadOnlyCollection<string>? amongIds = null, string? noteKind = null)
     {
         if (query.IsEmpty || limit <= 0) return [];
+        if (amongIds is { Count: 0 }) return [];
         var hits = new List<LibraryHit>();
         string match = query.MatchExpression!;
+        var filter = new SearchFilter(contentId, amongIds is null ? null : IdsJson(amongIds), noteKind);
         bool Want(HitSource s) => sources is null || sources.Contains(s);
 
         if (Want(HitSource.Page)) Collect(hits, $"""
             select d.content_id, d.last_path, d.file_name, f.page, snippet(page_fts, 0, $o, $c, '…', 16),
                    bm25(page_fts), f.from_ocr, d.title, d.authors
             from page_fts f join documents d on d.doc_key = f.doc_key
-            where page_fts match $q order by bm25(page_fts) limit $n
-            """, match, limit, open, close,
+            where page_fts match $q and {DocFilter} order by bm25(page_fts) limit $n
+            """, match, limit, open, close, filter,
             r => new LibraryHit(r.GetString(0), Str(r, 1), r.GetString(2), r.GetInt32(3), HitSource.Page,
                 r.GetString(4), -r.GetDouble(5) * PageWeight * (r.GetInt32(3) == 0 ? FirstPageWeight : 1.0), FromOcr: r.GetInt32(6) != 0,
                 Title: Str(r, 7), Authors: Str(r, 8)));
@@ -354,8 +378,8 @@ public sealed class LibraryIndex : IDisposable
             select d.content_id, d.last_path, d.file_name, f.page, highlight(outline_fts, 0, $o, $c), bm25(outline_fts),
                    d.title, d.authors
             from outline_fts f join documents d on d.doc_key = f.doc_key
-            where outline_fts match $q order by bm25(outline_fts) limit $n
-            """, match, limit, open, close,
+            where outline_fts match $q and {DocFilter} order by bm25(outline_fts) limit $n
+            """, match, limit, open, close, filter,
             r => new LibraryHit(r.GetString(0), Str(r, 1), r.GetString(2), r.GetInt32(3), HitSource.Outline,
                 r.GetString(4), -r.GetDouble(5) * OutlineWeight, Title: Str(r, 6), Authors: Str(r, 7)));
 
@@ -365,8 +389,8 @@ public sealed class LibraryIndex : IDisposable
                    bm25(note_fts, 1.0, 2.0, 0.5, 1.0), f.kind, f.author, f.source, f.native_id, f.category,
                    d.title, d.authors
             from note_fts f join documents d on d.doc_key = f.doc_key
-            where note_fts match $q order by bm25(note_fts, 1.0, 2.0, 0.5, 1.0) limit $n
-            """, match, limit, open, close,
+            where note_fts match $q and {DocFilter} and ($kind is null or f.kind = $kind) order by bm25(note_fts, 1.0, 2.0, 0.5, 1.0) limit $n
+            """, match, limit, open, close, filter,
             r => new LibraryHit(r.GetString(0), Str(r, 1), r.GetString(2), r.GetInt32(3), HitSource.Note,
                 r.GetString(4), -r.GetDouble(5) * NoteWeight, NoteKind: Str(r, 6), Author: Str(r, 7),
                 NoteOrigin: (NoteSource)r.GetInt32(8), NativeId: Str(r, 9), Category: Str(r, 10),
@@ -376,8 +400,8 @@ public sealed class LibraryIndex : IDisposable
             select d.content_id, d.last_path, d.file_name, highlight(name_fts, 0, $o, $c), bm25(name_fts),
                    d.title, d.authors
             from name_fts f join documents d on d.doc_key = f.doc_key
-            where name_fts match $q order by bm25(name_fts) limit $n
-            """, match, limit, open, close,
+            where name_fts match $q and {DocFilter} order by bm25(name_fts) limit $n
+            """, match, limit, open, close, filter,
             r => new LibraryHit(r.GetString(0), Str(r, 1), r.GetString(2), null, HitSource.Name,
                 r.GetString(3), -r.GetDouble(4) * NameWeight, Title: Str(r, 5), Authors: Str(r, 6)));
 
@@ -386,8 +410,8 @@ public sealed class LibraryIndex : IDisposable
             select d.content_id, d.last_path, d.file_name, snippet(info_fts, -1, $o, $c, '…', 16),
                    bm25(info_fts, 1.0, 1.0, 0.5, 0.5), d.title, d.authors
             from info_fts f join documents d on d.doc_key = f.doc_key
-            where info_fts match $q order by bm25(info_fts, 1.0, 1.0, 0.5, 0.5) limit $n
-            """, match, limit, open, close,
+            where info_fts match $q and {DocFilter} order by bm25(info_fts, 1.0, 1.0, 0.5, 0.5) limit $n
+            """, match, limit, open, close, filter,
             r => new LibraryHit(r.GetString(0), Str(r, 1), r.GetString(2), null, HitSource.Details,
                 r.GetString(3), -r.GetDouble(4) * DetailsWeight, Title: Str(r, 5), Authors: Str(r, 6)));
 
@@ -423,10 +447,48 @@ public sealed class LibraryIndex : IDisposable
         return forms;
     }
 
+    /// <summary>Every indexed note (annotation or named bookmark) of one document, in page order and, within
+    /// a page, in the order they were indexed. Empty when the document isn't indexed.</summary>
+    public IReadOnlyList<IndexedNote> GetNotes(string contentId)
+    {
+        if (KeyOf(contentId) is not { } key) return [];
+        using var cmd = Command(HasThreadsTable()
+            ? """
+              select f.page, f.kind, f.marked_text, f.comment, f.author, f.color, f.category, f.native_id, f.source, t.in_reply_to
+              from note_fts f left join note_threads t on t.doc_key = $k and t.native_id = f.native_id and f.native_id <> ''
+              where f.rowid between $lo and $hi order by f.page, f.rowid
+              """
+            : """
+              select page, kind, marked_text, comment, author, color, category, native_id, source, null
+              from note_fts where rowid between $lo and $hi order by page, rowid
+              """);
+        cmd.Parameters.AddWithValue("$k", key);
+        cmd.Parameters.AddWithValue("$lo", RowId(key, 0));
+        cmd.Parameters.AddWithValue("$hi", RowId(key, RowsPerDocument - 1));
+        using var r = cmd.ExecuteReader();
+        var list = new List<IndexedNote>();
+        while (r.Read())
+            list.Add(new IndexedNote(r.GetInt32(0), r.GetString(1), Str(r, 2), Str(r, 3), Str(r, 4), Str(r, 5),
+                Str(r, 6), Str(r, 7), (NoteSource)r.GetInt32(8), Str(r, 9)));
+        return list;
+    }
+
+    // One document, a set of documents (a JSON array, read by json_each so it is one parameter however long), and a
+    // note kind. Each is null for "no filter".
+    sealed record SearchFilter(string? ContentId, string? IdsJson, string? NoteKind);
+
+    const string DocFilter = "($id is null or d.content_id = $id) and ($ids is null or d.content_id in (select value from json_each($ids)))";
+
+    static string IdsJson(IEnumerable<string> ids)
+        => "[" + string.Join(',', ids.Select(id => "\"" + System.Text.Encodings.Web.JavaScriptEncoder.Default.Encode(id) + "\"")) + "]";
+
     void Collect(List<LibraryHit> into, string sql, string match, int limit, string open, string close,
-        Func<SqliteDataReader, LibraryHit> read)
+        SearchFilter filter, Func<SqliteDataReader, LibraryHit> read)
     {
         using var cmd = Command(sql);
+        cmd.Parameters.AddWithValue("$id", (object?)filter.ContentId ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("$ids", (object?)filter.IdsJson ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("$kind", (object?)filter.NoteKind ?? DBNull.Value);
         cmd.Parameters.AddWithValue("$q", match);
         cmd.Parameters.AddWithValue("$n", limit);
         cmd.Parameters.AddWithValue("$o", open);
@@ -638,7 +700,7 @@ public sealed class LibraryIndex : IDisposable
         EnsureWritable();
         using (var tx = _conn.BeginTransaction())
         {
-            foreach (var t in new[] { "page_fts", "outline_fts", "note_fts", "name_fts", "info_fts", "documents", "removed" })
+            foreach (var t in new[] { "page_fts", "outline_fts", "note_fts", "note_threads", "name_fts", "info_fts", "documents", "removed" })
                 Exec(_conn, $"delete from {t}", tx);
             SetMeta("backfill", backfill ? "on" : "off", tx);
             tx.Commit();
@@ -703,6 +765,17 @@ public sealed class LibraryIndex : IDisposable
         var col = cmd.Parameters.Add("$col", SqliteType.Text);
         var nm = cmd.Parameters.Add("$nm", SqliteType.Text);
         var src = cmd.Parameters.Add("$src", SqliteType.Integer);
+        using var thread = Command("insert or replace into note_threads(doc_key, native_id, in_reply_to) values ($k, $nm, $irt)", tx);
+        thread.Parameters.AddWithValue("$k", key);
+        var tnm = thread.Parameters.Add("$nm", SqliteType.Text);
+        var tirt = thread.Parameters.Add("$irt", SqliteType.Text);
+        foreach (var n in notes)
+        {
+            if (n.NativeId is not { Length: > 0 } id || n.InReplyTo is not { Length: > 0 } parent) continue;
+            tnm.Value = id; tirt.Value = parent;
+            thread.ExecuteNonQuery();
+        }
+
         long row = 0;
         foreach (var n in notes)
         {
@@ -724,6 +797,12 @@ public sealed class LibraryIndex : IDisposable
             using var cmd = Command($"delete from {t} where rowid between $lo and $hi", tx);
             cmd.Parameters.AddWithValue("$lo", RowId(key, 0));
             cmd.Parameters.AddWithValue("$hi", RowId(key, RowsPerDocument - 1));
+            cmd.ExecuteNonQuery();
+        }
+        if (tables.Contains("note_fts"))
+        {
+            using var cmd = Command("delete from note_threads where doc_key = $k", tx);
+            cmd.Parameters.AddWithValue("$k", key);
             cmd.ExecuteNonQuery();
         }
     }

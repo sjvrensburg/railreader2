@@ -86,6 +86,32 @@ jobs:
       - name: Publish app (as release.yml does)
         run: dotnet publish src/RailReader2/RailReader2.csproj -c Release -r win-x64 --self-contained -o publish/
 
+      - name: Publish railreader2-mcp (as release.yml does)
+        run: |
+          dotnet publish src/RailReader2.Mcp/RailReader2.Mcp.csproj -c Release -r win-x64 -o publish-mcp/
+          Copy-Item publish-mcp\RailReader2.Mcp.exe -Destination publish\
+
       - name: Library probe (published and installed)
         shell: pwsh
         run: ./installer/test-library-probe.ps1
+
+  # The Microsoft Store package is otherwise only built (release.yml), never installed. This builds it the
+  # same way (msix/build-msix.ps1), signs it with a throwaway certificate, installs it, and checks the
+  # railreader2-mcp execution alias over real stdio pipes, plus where MSIX puts AppData (roadmap M8).
+  msix:
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: "10.0.x"
+          dotnet-quality: "preview"
+
+      - name: Build the CLI (indexes the test PDF)
+        run: dotnet build src/RailReader2.Cli -c Release
+
+      - name: Install the MSIX and check railreader2-mcp
+        shell: powershell
+        run: ./msix/test-msix-install.ps1

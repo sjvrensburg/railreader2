@@ -60,19 +60,7 @@ public sealed class CommentEntryViewModel
 
     public string TypeLabel => (IsReply ? "↳ " : "") + BaseTypeLabel;
 
-    private string BaseTypeLabel => Annotation switch
-    {
-        HighlightAnnotation => "Highlight",
-        UnderlineAnnotation => "Underline",
-        StrikeOutAnnotation => "Strike-out",
-        SquigglyAnnotation => "Squiggly",
-        TextNoteAnnotation => "Note",
-        RectAnnotation => "Box",
-        FreehandAnnotation => "Drawing",
-        CaretAnnotation => "Caret",
-        FreeTextAnnotation => "Text box",
-        _ => "Annotation",
-    };
+    private string BaseTypeLabel => MainWindowViewModel.KindLabel(Annotation);
 }
 
 /// <summary>
@@ -194,6 +182,15 @@ public partial class CommentsView : PaneRefreshView
 
         CommentEntryList.ItemsSource = entries;
         CommentEmptyLabel.IsVisible = entries.Count == 0;
+    }
+
+    // Copies what the pane shows (its filters apply): an AI chat gets the same notes the reader is looking at.
+    private void OnCopyNotesClick(object? sender, RoutedEventArgs e)
+    {
+        if (_vm is null || CommentEntryList.ItemsSource is not IEnumerable<CommentEntryViewModel> entries) return;
+        var notes = entries.Select(c => (c.Annotation, c.PageIndex, c.IsReply, c.IsReviewerComment, c.Category)).ToList();
+        if (notes.Count == 0) { _vm.ShowStatusToast("No notes to copy"); return; }
+        _vm.CopyNotesAsMarkdown(notes);
     }
 
     private bool _updatingCategories;

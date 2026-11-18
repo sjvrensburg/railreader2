@@ -55,6 +55,14 @@ jobs:
       - name: Publish
         run: dotnet publish src/RailReader2/RailReader2.csproj -c Release -r linux-x64 --self-contained -o publish/
 
+      # railreader2-mcp (roadmap M8): the small NativeAOT MCP server, beside the app; it uses the app's own
+      # libe_sqlite3.so. In the AppImage it is reached as `railreader2-x86_64.AppImage --mcp` (AppRun below).
+      - name: Publish railreader2-mcp
+        run: |
+          dotnet publish src/RailReader2.Mcp/RailReader2.Mcp.csproj -c Release -r linux-x64 -o publish-mcp/
+          cp publish-mcp/RailReader2.Mcp publish/
+          test -f publish/libe_sqlite3.so
+
       - name: Download appimagetool
         run: |
           curl -fL --retry 3 --retry-delay 5 -o appimagetool https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
@@ -95,6 +103,12 @@ jobs:
           SELF="$(readlink -f "$0")"
           HERE="${SELF%/*}"
           export PATH="${HERE}/usr/bin:${PATH}"
+          # `--mcp [args]`: the MCP server for AI tools (railreader2-mcp), over stdin/stdout. The mount
+          # point changes every run, so agents are configured with the AppImage's own path plus --mcp.
+          if [ "$1" = "--mcp" ]; then
+            shift
+            exec "${HERE}/usr/bin/RailReader2.Mcp" "$@"
+          fi
           exec "${HERE}/usr/bin/RailReader2" "$@"
           EOF
           chmod +x AppDir/AppRun
@@ -114,6 +128,19 @@ jobs:
             -u "gh-releases-zsync|sjvrensburg|railreader2|latest|railreader2-x86_64.AppImage.zsync" \
             AppDir railreader2-x86_64.AppImage
           test -s railreader2-x86_64.AppImage.zsync || { echo "zsync file was not generated"; exit 1; }
+
+      # The MCP server answers through the AppImage (AppRun's --mcp), over real stdio. With no preferences
+      # file AI tools are off, so a tool call must come back as the "turned off" tool error.
+      - name: Check railreader2-mcp through the AppImage
+        run: |
+          prefs="$RUNNER_TEMP/no-such-prefs.json"
+          out=$(printf '%s\n' \
+            '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18"}}' \
+            '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"list_documents","arguments":{}}}' \
+            | ./railreader2-x86_64.AppImage --mcp --prefs "$prefs")
+          echo "$out"
+          echo "$out" | grep -q '"protocolVersion":"2025-06-18"'
+          echo "$out" | grep -q 'turned off'
 
       - name: Upload artifact
         uses: actions/upload-artifact@v7
@@ -168,6 +195,12 @@ jobs:
       - name: Publish
         run: dotnet publish src/RailReader2/RailReader2.csproj -c Release -r win-x64 --self-contained -o publish/
 
+      # railreader2-mcp (roadmap M8) installs beside the app; the .iss packs everything in publish\.
+      - name: Publish railreader2-mcp
+        run: |
+          dotnet publish src/RailReader2.Mcp/RailReader2.Mcp.csproj -c Release -r win-x64 -o publish-mcp/
+          Copy-Item publish-mcp\RailReader2.Mcp.exe -Destination publish\
+
       - name: Copy model into publish directory
         run: |
           New-Item -ItemType Directory -Force -Path publish\models
@@ -211,36 +244,10 @@ jobs:
           name: onnx-model
           path: models/
 
-      - name: Publish
-        run: dotnet publish src/RailReader2/RailReader2.csproj -c Release -r win-x64 --self-contained -o publish/msix/
-
-      - name: Copy model into publish directory
-        run: |
-          New-Item -ItemType Directory -Force -Path publish\msix\models
-          Copy-Item "models\$env:MODEL_NAME" -Destination "publish\msix\models\"
-
-      - name: Copy MSIX manifest and assets
-        run: |
-          Copy-Item msix\Package.appxmanifest -Destination publish\msix\AppxManifest.xml
-          New-Item -ItemType Directory -Force -Path publish\msix\Assets
-          Copy-Item msix\Assets\* -Destination publish\msix\Assets\
-
-      - name: Update manifest version
-        run: |
-          $version = "${{ github.ref_name }}".TrimStart('v')
-          # MSIX requires 4-part version with revision = 0 (Microsoft Store requirement)
-          $parts = $version.Split('.')
-          while ($parts.Count -lt 3) { $parts += '0' }
-          $msixVersion = ($parts[0..2] + '0') -join '.'
-          $manifest = Get-Content publish\msix\AppxManifest.xml -Raw
-          $manifest = $manifest -replace '(<Identity[^>]*)\bVersion="[^"]*"', "`$1Version=`"$msixVersion`""
-          [System.IO.File]::WriteAllText("publish\msix\AppxManifest.xml", $manifest, [System.Text.UTF8Encoding]::new($false))
-
+      # Same script as test.yml's msix job (which installs the result): app + railreader2-mcp + alias.
       - name: Build MSIX package
-        run: |
-          $makeappx = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\makeappx.exe" -ErrorAction SilentlyContinue | Sort-Object -Descending | Select-Object -First 1
-          if (-not $makeappx) { throw "makeappx.exe not found" }
-          & $makeappx.FullName pack /d publish\msix /p railreader2-win-x64.msix /o
+        shell: powershell
+        run: ./msix/build-msix.ps1 -Version "${{ github.ref_name }}" -ModelPath "models\$env:MODEL_NAME" -Output railreader2-win-x64.msix
 
       - name: Upload artifact
         uses: actions/upload-artifact@v7

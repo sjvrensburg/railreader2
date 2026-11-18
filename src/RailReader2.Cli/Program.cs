@@ -11,6 +11,10 @@ static class Program
         if (args.Length == 0 || args[0] is "--help" or "-h")
             return PrintHelp();
 
+        // The MCP server owns stdout for its protocol: set it up before anything can log there.
+        if (args[0] == "mcp")
+            return RailReader2.Library.Mcp.McpCli.Run(args[1..], "railreader2-cli mcp");
+
         // Bootstrap: set the central logger (services read from RailReaderLogging.Logger)
         var logger = new ConsoleLogger();
         RailReaderLogging.Logger = logger;
@@ -64,6 +68,8 @@ static class Program
         Console.WriteLine("  package <pdf>         Bundle a PDF and its reading session into a .railreading file");
         Console.WriteLine("  unpack <package>      Extract a .railreading package");
         Console.WriteLine("  update check|download Check for, or download and verify, a new RailReader2 release");
+        Console.WriteLine("  library search|status Search the app's library index, or show its size");
+        Console.WriteLine("  mcp                   Serve the library's notes and page text to AI tools (MCP over stdio, read-only)");
         Console.WriteLine();
         Console.WriteLine("Run 'railreader2-cli <command> --help' for command-specific options.");
         return 0;
@@ -108,7 +114,7 @@ static class Program
         "figure-endpoint", "figure-model", "figure-api-key",
         "prompt-style", "dump-crops", "min-confidence", "from-structure",
         "ground-truth", "layout", "min-precision", "classes", "pack",
-        "feed", "public-key", "channel", "db", "limit", "queries",
+        "feed", "public-key", "channel", "db", "limit", "queries", "prefs", "folder",
     ];
 
     internal static string GetRequiredPdf(string[] args, string kind = "PDF")

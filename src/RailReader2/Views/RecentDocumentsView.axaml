@@ -28,6 +28,11 @@
                             <ContextMenu>
                                 <MenuItem Header="Remove from Recent Documents" Click="OnRemoveCard"
                                           AutomationProperties.Name="Remove from recent documents" />
+                                <Separator IsVisible="{Binding HasContentId}" />
+                                <MenuItem Header="{Binding AiMenuHeader}" ToggleType="CheckBox"
+                                          IsChecked="{Binding HiddenFromAi, Mode=OneWay}"
+                                          IsEnabled="{Binding !HiddenByFolder}" IsVisible="{Binding HasContentId}"
+                                          ToolTip.Tip="{Binding AiMenuTip}" Click="OnHideFromAiCard" />
                             </ContextMenu>
                         </Button.ContextMenu>
                         <StackPanel Spacing="4">

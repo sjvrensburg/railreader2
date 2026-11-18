@@ -19,6 +19,11 @@
                   HorizontalAlignment="Stretch"
                   SelectionChanged="OnCategoryFilterChanged" />
 
+        <Button Name="CopyNotesButton" DockPanel.Dock="Top" Margin="4,0,4,4" HorizontalAlignment="Stretch"
+                HorizontalContentAlignment="Center" Content="Copy Notes for AI" Click="OnCopyNotesClick"
+                ToolTip.Tip="Copies the notes listed below as Markdown, with the text each highlight marks, to paste into an AI chat or any document."
+                AutomationProperties.Name="Copy the listed notes as Markdown" />
+
         <TextBlock Name="CommentEmptyLabel" DockPanel.Dock="Top"
                    Text="No comments in this document."
                    Opacity="0.6" Margin="8" IsVisible="False" />

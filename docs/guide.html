@@ -746,6 +746,59 @@
         Index</strong> deletes it: documents come back only as you open them again. Neither touches your
         PDFs, notes or portals.
       </p>
+
+      <h3 id="library-ai-tools">AI tools</h3>
+      <p>
+        AI tools such as Claude Code, Claude Desktop and Codex can read your library while you work with
+        them, so you can ask &ldquo;what did I note about identification in the minimum-wage papers?&rdquo;
+        without opening a PDF. They connect to railreader2&rsquo;s MCP server, which comes with the app.
+        It is <strong>off</strong> until you turn it on.
+      </p>
+      <ol>
+        <li>Open <strong>Settings &gt; Library</strong> (advanced view) and find <strong>AI Tools</strong>.
+          Tick <strong>Let AI tools read my library</strong>.</li>
+        <li>Tick each tool to connect. A switch adds railreader2&rsquo;s entry to that tool&rsquo;s own
+          settings, and unticking it removes the entry again; nothing else in the tool&rsquo;s settings is
+          touched. A tool that isn&rsquo;t installed is greyed out. Start a new session of the tool afterwards.</li>
+        <li>For any other MCP client, <strong>Copy Setup</strong> copies the entry to paste into its settings.</li>
+      </ol>
+      <p>
+        <strong>What a tool can read:</strong> your notes and comments (with their replies, colour
+        categories, and whether they are yours or a reviewer&rsquo;s), your named bookmarks, and the page
+        text of the documents you have opened, with each document&rsquo;s title, authors and file name.
+        <strong>What it can&rsquo;t:</strong> file paths or folder names, the PDF files themselves or any
+        images, and anything at all from password-protected documents. It can only read; it can&rsquo;t
+        change your documents or notes.
+      </p>
+      <p>
+        <strong>Hiding documents:</strong> right-click a document in the Library window (<strong>File &#9656; Search Library&hellip;</strong>,
+        or <code>Ctrl+Shift+F</code>) or a recent document on the start screen and choose
+        <strong>Hide from AI Tools</strong>, or use <strong>Hide a Folder&hellip;</strong> under AI Tools to
+        hide everything in a folder. The same section lists every hidden folder and document, with
+        <strong>Remove</strong> and <strong>Unhide</strong> buttons and <strong>Unhide All Documents</strong>. A hidden document is treated as if it weren&rsquo;t in your library.
+        Turning AI tools off, or hiding a document, applies at once, even to a tool that is already connected.
+      </p>
+      <p>
+        <strong>Where your notes go:</strong> what a tool reads is sent to that tool&rsquo;s AI provider
+        (for example, Anthropic for Claude and OpenAI for Codex) under their terms. The MCP server itself
+        makes no network connection: it talks only to the program that started it. See the
+        <a href="privacy.html#ai-tools">privacy policy</a>.
+      </p>
+      <p>
+        <strong>Without an MCP client:</strong> <strong>Copy Notes for AI</strong> in the
+        <a href="#comments">Comments</a> panel copies the notes it lists as Markdown, to paste into any
+        chat or document.
+      </p>
+      <p>
+        <strong>From the command line:</strong> the server is <code>RailReader2.Mcp</code> in the app&rsquo;s
+        folder, <code>railreader2-mcp</code> in the Microsoft Store version, and
+        <code>railreader2-x86_64.AppImage --mcp</code> for the AppImage. Add <code>status</code>,
+        <code>enable</code>, <code>disable</code>, <code>hide &lt;document&gt;</code> or
+        <code>hide --folder &lt;dir&gt;</code> (and <code>unhide</code>) to manage it. The command-line
+        tools&rsquo; <code>railreader2-cli mcp</code> is the same server. The Store version keeps its
+        settings in a private folder the separate command-line tools can&rsquo;t see, so use
+        <code>railreader2-mcp</code> there.
+      </p>
     </section>
 
     <!-- 9. Annotations -->
@@ -1093,6 +1146,10 @@
           so you can keep scrolling.</li>
         <li><strong>Review state:</strong> for in-PDF reviewer comments, you can change the review
           state inline from the list.</li>
+        <li><strong>Copy Notes for AI:</strong> copies the notes the list shows (the filters apply) as
+          Markdown: grouped by page, replies under the note they answer, and the text each highlight
+          marks quoted. Paste it into an AI chat or any document. See also
+          <a href="#library-ai-tools">AI tools</a>.</li>
       </ul>
     </section>
 
@@ -1605,7 +1662,9 @@ railreader2-cli library status [--documents]</code></pre>
         <li><strong>Library:</strong> How many documents, pages and notes the
           <a href="#library-search">library search</a> holds and how much space it takes, with
           <strong>Rebuild Index</strong> and <strong>Clear Index</strong> (see
-          <a href="#library-privacy">Privacy</a>).</li>
+          <a href="#library-privacy">Privacy</a>). <strong>AI Tools:</strong> let AI tools read your
+          library, connect Claude Code, Claude Desktop or Codex, and hide folders (see
+          <a href="#library-ai-tools">AI tools</a>).</li>
       </ul>
 
       <h3>Config file</h3>

@@ -11,9 +11,18 @@ using RailReader2.ViewModels;
 namespace RailReader2.Views;
 
 /// <summary>One recent-document card. The thumbnail arrives after the card is shown.</summary>
-public sealed partial class RecentCard(RecentDocument doc) : ObservableObject
+public sealed partial class RecentCard(RecentDocument doc, bool hiddenFromAi = false, bool hiddenByFolder = false) : ObservableObject
 {
     public RecentDocument Doc { get; } = doc;
+
+    /// <summary>Hidden from AI tools (<see cref="AiToolsPreferences"/>), by itself or by a folder rule.</summary>
+    public bool HiddenFromAi { get; } = hiddenFromAi || hiddenByFolder;
+    /// <summary>Hidden by a folder rule, which is lifted in Settings, not per document.</summary>
+    public bool HiddenByFolder { get; } = hiddenByFolder;
+    /// <summary>A document opened before content ids existed has nothing to hide by until it is opened again.</summary>
+    public bool HasContentId => Doc.ContentId is not null;
+    public string AiMenuHeader => AiHideMenuItem.Header(HiddenByFolder);
+    public string AiMenuTip => AiHideMenuItem.Tip(HiddenByFolder);
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasThumbnail))]
@@ -31,6 +40,7 @@ public sealed partial class RecentCard(RecentDocument doc) : ObservableObject
         {
             var parts = new List<string> { Doc.Missing ? "not found" : Doc.Progress };
             if (Doc.NoteCount > 0) parts.Add(Doc.NoteCount == 1 ? "1 note" : $"{Doc.NoteCount} notes");
+            if (HiddenFromAi) parts.Add("hidden from AI tools");
             return string.Join(" · ", parts);
         }
     }
@@ -103,7 +113,13 @@ public partial class RecentDocumentsView : UserControl
         {
             var docs = await vm.LoadRecentDocumentsAsync();
             if (version != _loadVersion) return;
-            var cards = docs.Select(d => new RecentCard(d) { Thumbnail = CachedBitmap(d) }).ToList();
+            var ai = AiToolsPreferences.Load();
+            var cards = docs.Select(d =>
+            {
+                bool byId = d.ContentId is { } id && ai.HiddenDocuments.Contains(id);
+                bool byFolder = !byId && d.ContentId is { } id2 && ai.IsHidden(id2, d.Path);
+                return new RecentCard(d, byId, byFolder) { Thumbnail = CachedBitmap(d) };
+            }).ToList();
             Cards.ItemsSource = cards;
             IsVisible = cards.Count > 0;
             await LoadThumbnails(vm, cards, version);
@@ -166,11 +182,19 @@ public partial class RecentDocumentsView : UserControl
         vm.FireAndForget(vm.OpenRecentDocument(card.Doc), nameof(vm.OpenRecentDocument));
     }
 
-    // The card's context menu (#303). The menu item's DataContext is the card, inherited from the button.
+    // The card's context menu (#303). The menu items' DataContext is the card, inherited from the button.
     private void OnRemoveCard(object? sender, RoutedEventArgs e)
     {
         if (_vm is not { } vm || (sender as Control)?.DataContext is not RecentCard card) return;
         vm.RemoveRecentFile(card.Doc.Path);
+    }
+
+    // Hide from AI Tools (roadmap M8). The preference is re-read at the click, not taken from the card, which may
+    // predate a change made in the Library window, Settings or the CLI.
+    private void OnHideFromAiCard(object? sender, RoutedEventArgs e)
+    {
+        if (_vm is not { } vm || (sender as Control)?.DataContext is not RecentCard { Doc.ContentId: { } id } card) return;
+        AiHideMenuItem.Toggle(id, card.Doc.Title, vm.ShowStatusToast, changed: Reload);
     }
 
     private void OnSearchKeyDown(object? sender, KeyEventArgs e)

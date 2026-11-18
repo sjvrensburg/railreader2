@@ -360,6 +360,24 @@ The library is stored only on your computer, in `library` inside the settings fo
 
 **Settings > Library** (in the advanced view) shows its size and has two buttons. **Rebuild Index** reads every document you have opened again. **Clear Index** deletes it: documents come back only as you open them again. Neither touches your PDFs, notes or portals.
 
+### AI tools
+
+AI tools such as Claude Code, Claude Desktop and Codex can read your library while you work with them, so you can ask "what did I note about identification in the minimum-wage papers?" without opening a PDF. They connect to railreader2's MCP server, which comes with the app. It is **off** until you turn it on.
+
+1. Open **Settings > Library** (advanced view) and find **AI Tools**. Tick **Let AI tools read my library**.
+2. Tick each tool to connect. A switch adds railreader2's entry to that tool's own settings, and unticking it removes the entry again; nothing else in the tool's settings is touched. A tool that isn't installed is greyed out. Start a new session of the tool afterwards.
+3. For any other MCP client, **Copy Setup** copies the entry to paste into its settings.
+
+**What a tool can read:** your notes and comments (with their replies, colour categories, and whether they are yours or a reviewer's), your named bookmarks, and the page text of the documents you have opened, with each document's title, authors and file name. **What it can't:** file paths or folder names, the PDF files themselves or any images, and anything at all from password-protected documents. It can only read; it can't change your documents or notes.
+
+**Hiding documents:** right-click a document in the Library window (**File ▸ Search Library…**, or `Ctrl+Shift+F`) or a recent document on the start screen and choose **Hide from AI Tools**, or use **Hide a Folder…** under AI Tools to hide everything in a folder. The same section lists every hidden folder and document, with **Remove** and **Unhide** buttons and **Unhide All Documents**. A hidden document is treated as if it weren't in your library. Turning AI tools off, or hiding a document, applies at once, even to a tool that is already connected.
+
+**Where your notes go:** what a tool reads is sent to that tool's AI provider (for example, Anthropic for Claude and OpenAI for Codex) under their terms. The MCP server itself makes no network connection: it talks only to the program that started it. See the [privacy policy](privacy.html).
+
+**Without an MCP client:** **Copy Notes for AI** in the [Comments](#comments) panel copies the notes it lists as Markdown, to paste into any chat or document.
+
+**From the command line:** the server is `RailReader2.Mcp` in the app's folder, `railreader2-mcp` in the Microsoft Store version, and `railreader2-x86_64.AppImage --mcp` for the AppImage. Add `status`, `enable`, `disable`, `hide <document>` or `hide --folder <dir>` (and `unhide`) to manage it. The command-line tools' `railreader2-cli mcp` is the same server. The Store version keeps its settings in a private folder the separate command-line tools can't see, so use `railreader2-mcp` there.
+
 ---
 
 ## Annotations
@@ -549,6 +567,7 @@ The side panel's **Comments** section gathers every text note and reviewer comme
 - **Filter:** use the **All / Reviewer / Yours** filter at the top to narrow the list by source.
 - **Jump:** click any entry to navigate to its page; focus returns to the page so you can keep scrolling.
 - **Review state:** for in-PDF reviewer comments, you can change the review state inline from the list.
+- **Copy Notes for AI:** copies the notes the list shows (the filters apply) as Markdown: grouped by page, replies under the note they answer, and the text each highlight marks quoted. Paste it into an AI chat or any document. See also [AI tools](#ai-tools).
 
 ---
 
@@ -978,7 +997,7 @@ A scanned page is a picture of text. It carries no text layer, so everything bui
 - **Performance — GPU acceleration:** Off by default. A preset picker (CPU only / Faster page navigation / Faster scanned-document OCR) or individual toggles run layout analysis *or* OCR on your GPU via WebGPU — not both at once. Layout on GPU is roughly 8–10x faster on supported hardware and applies only to Docling Heron and PP-DocLayoutV3 (PP-DocLayout-S and any custom model always run on CPU); everything falls back to CPU automatically if no compatible GPU is found. **Needs a restart.** Heron's GPU model is a separate one-time download (run `./scripts/download-model.sh heron-gpu` or use the in-app **Download GPU model** button); PP-DocLayoutV3 needs no extra download. On Linux laptops with two GPUs, **Display GPU** draws the window on the discrete GPU instead.
 - **Models:** Read-only — which layout model, OCR pack and accelerators are actually running this session, what a restart would change, and advisories for combinations that work against each other.
 - **AI Assistant:** The vision-language-model endpoint for Copy as LaTeX — see [Copy as LaTeX (VLM)](#copy-as-latex-vlm).
-- **Library:** How many documents, pages and notes the [library search](#library-search) holds and how much space it takes, with **Rebuild Index** and **Clear Index** (see [Privacy](#privacy)).
+- **Library:** How many documents, pages and notes the [library search](#library-search) holds and how much space it takes, with **Rebuild Index** and **Clear Index** (see [Privacy](#privacy)). **AI Tools:** let AI tools read your library, connect Claude Code, Claude Desktop or Codex, and hide folders (see [AI tools](#ai-tools)).
 
 ### Config file
 

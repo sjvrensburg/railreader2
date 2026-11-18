@@ -526,15 +526,99 @@ public sealed partial class MainWindowViewModel
     /// <summary>The text under a markup annotation on the focused view's page, line by line
     /// (same per-quad extraction as the Markdown export), or null when there is none.</summary>
     private string? MarkupText(TextMarkupAnnotation markup)
+        => _controller.FocusedViewport is { } vp ? MarkupTextOn(vp.Owner, vp.CurrentPage, markup) : null;
+
+    /// <summary>The text under a markup annotation on <paramref name="page"/> of <paramref name="doc"/>, or null.
+    /// The text layer and the stored rects are both in the page's own (rotation-0) frame.</summary>
+    internal static string? MarkupTextOn(DocumentModel doc, int page, TextMarkupAnnotation markup)
     {
-        if (_controller.FocusedViewport is not { } vp) return null;
-        var pageText = vp.Owner.GetOrExtractText(vp.CurrentPage);
+        var pageText = doc.GetOrExtractText(page);
         var parts = new List<string>();
         foreach (var r in markup.Rects)
             if (pageText.ExtractTextInRect(r.X, r.Y, r.X + r.W, r.Y + r.H) is { Length: > 0 } t)
                 parts.Add(t);
         return parts.Count > 0 ? string.Join(" ", parts) : null;
     }
+
+    /// <summary>Comments pane ▸ Copy Notes for AI (roadmap M8): <paramref name="notes"/> as Markdown on the
+    /// clipboard, with the text each highlight marks, for an AI chat when no MCP client is connected.
+    /// The notes and the already-extracted page text (OCR included) are snapshotted here on the UI thread; pages
+    /// not yet extracted are read on the thread pool (Core's text service takes the PDFium gate), so a long book
+    /// with highlights on hundreds of pages doesn't freeze the window.</summary>
+    public async void CopyNotesAsMarkdown(IReadOnlyList<(Annotation Note, int Page, bool IsReply, bool IsReviewer, string? Category)> notes)
+    {
+        if (ActiveTab is not { } tab) return;
+        var doc = tab.State;
+        string title = tab.Title;
+        var rows = notes.Select(n => (
+            n.Page, Kind: KindLabel(n.Note),
+            Rects: n.Note is TextMarkupAnnotation m ? m.Rects.Select(r => (r.X, r.Y, r.W, r.H)).ToList() : null,
+            Comment: string.IsNullOrWhiteSpace(n.Note.EffectiveContents) ? null : n.Note.EffectiveContents,
+            n.Note.Author, n.IsReviewer, n.Category, n.IsReply,
+            Date: (n.Note.ModifiedUtc ?? n.Note.CreatedUtc)?.UtcDateTime)).ToList();
+        var text = new Dictionary<int, PageText>();
+        var missing = new List<int>();
+        foreach (int p in rows.Where(r => r.Rects is not null).Select(r => r.Page).Distinct())
+        {
+            if (doc.TextCache.TryGetValue(p, out var cached)) text[p] = cached;
+            else missing.Add(p);
+        }
+        byte[] bytes = doc.Pdf.PdfBytes;
+        string? password = doc.Pdf.Password;
+
+        string markdown;
+        try
+        {
+            markdown = await Task.Run(() =>
+            {
+                if (missing.Count > 0)
+                {
+                    var service = new RailReader.Renderer.Skia.SkiaPdfServiceFactory().CreatePdfTextService();
+                    foreach (int p in missing)
+                    {
+                        try { text[p] = service.ExtractPageText(bytes, p, password); }
+                        catch (Exception ex) { _logger.Warn($"[Copy Notes] page {p + 1}: {ex.Message}"); }
+                    }
+                }
+                var export = rows.Select(r => new RailReader2.Library.NoteForExport(
+                    r.Page, r.Kind,
+                    r.Rects is { } rects && text.TryGetValue(r.Page, out var pt) ? TextUnder(pt, rects) : null,
+                    r.Comment, r.Author, r.IsReviewer, r.Category, r.IsReply, r.Date)).ToList();
+                return RailReader2.Library.NotesMarkdown.Build(title, export);
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.Error("[Copy Notes] failed", ex);
+            ShowStatusToast("Couldn't copy the notes — see the log for details");
+            return;
+        }
+        CopyToClipboard?.Invoke(markdown);
+        int threads = rows.Count(r => !r.IsReply);
+        ShowStatusToast(threads == 1 ? "Copied 1 note as Markdown" : $"Copied {threads} notes as Markdown");
+
+        static string? TextUnder(PageText pageText, IEnumerable<(float X, float Y, float W, float H)> rects)
+        {
+            var parts = new List<string>();
+            foreach (var (x, y, w, h) in rects)
+                if (pageText.ExtractTextInRect(x, y, x + w, y + h) is { Length: > 0 } t) parts.Add(t);
+            return parts.Count > 0 ? string.Join(" ", parts) : null;
+        }
+    }
+
+    internal static string KindLabel(Annotation a) => a switch
+    {
+        HighlightAnnotation => "Highlight",
+        UnderlineAnnotation => "Underline",
+        StrikeOutAnnotation => "Strike-out",
+        SquigglyAnnotation => "Squiggly",
+        TextNoteAnnotation => "Note",
+        RectAnnotation => "Box",
+        FreehandAnnotation => "Drawing",
+        CaretAnnotation => "Caret",
+        FreeTextAnnotation => "Text box",
+        _ => "Annotation",
+    };
 
     // --- Merging overlapping text markup (Core 0.64.0) ---
     // Two highlights of the same kind and colour whose line bands overlap become one, keeping the
