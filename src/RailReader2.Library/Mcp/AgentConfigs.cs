@@ -67,7 +67,7 @@ public sealed record McpServerCommand(string Command, IReadOnlyList<string> Args
     internal JsonObject ToJsonEntry()
     {
         var args = new JsonArray();
-        foreach (var a in Args) args.Add(a);
+        foreach (var a in Args) args.Add(JsonValue.Create(a));
         return new JsonObject { ["command"] = Command, ["args"] = args };
     }
 
