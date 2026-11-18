@@ -73,7 +73,7 @@ public sealed class LibraryTools
             """{"type":"object","properties":{},"additionalProperties":false}"""),
         new("get_document_notes", "Get a document's notes",
             "Every note in one document, in page order: the highlighted (marked) text, the comment, author, colour category, " +
-            "and whether it is the reader's own note or a reviewer's. Replies appear as their own notes (kind textnote).",
+            "and whether it is the reader's own note or a reviewer's. Replies are listed under the note they answer (\"replies\").",
             """
             {"type":"object","properties":{
               "document":{"type":"string","description":"The document's id (from list_documents or a search hit), or its exact title or file name."}},
@@ -210,27 +210,61 @@ public sealed class LibraryTools
             if (doc.Authors is { } a) w.WriteString("authors", a);
             w.WriteNumber("pages", doc.PageCount);
             w.WriteEndObject();
-            w.WriteStartArray("notes");
+            // Replies go under their thread's first note (Core's threads are flat; another tool's PDF may
+            // chain replies, so follow the chain to its root). A reply whose parent isn't indexed stays on top.
+            var byId = notes.Where(n => n.NativeId is not null).GroupBy(n => n.NativeId!).ToDictionary(g => g.Key, g => g.First());
+            IndexedNote RootOf(IndexedNote n)
+            {
+                var seen = new HashSet<string>();
+                while (n.InReplyTo is { } p && byId.TryGetValue(p, out var parent) && seen.Add(p)) n = parent;
+                return n;
+            }
+            var replies = new Dictionary<IndexedNote, List<IndexedNote>>(ReferenceEqualityComparer.Instance);
+            var roots = new List<IndexedNote>();
             foreach (var n in notes)
             {
+                var root = RootOf(n);
+                if (ReferenceEquals(root, n)) roots.Add(n);
+                else (replies.TryGetValue(root, out var list) ? list : replies[root] = []).Add(n);
+            }
+
+            w.WriteStartArray("notes");
+            foreach (var n in roots)
+            {
                 w.WriteStartObject();
-                w.WriteNumber("page", n.Page + 1);
-                w.WriteString("kind", n.Kind);
-                if (n.MarkedText is { } m) w.WriteString(n.Kind == "bookmark" ? "name" : "marked_text", m);
-                if (n.Comment is { } c) w.WriteString(n.Kind == "bookmark" ? "name" : "comment", c);
-                if (n.Author is { } au) w.WriteString("author", au);
-                if (n.Category is { } cat) w.WriteString("category", cat);
-                if (n.Kind != "bookmark")
+                WriteNote(w, n, me);
+                if (replies.TryGetValue(n, out var answers))
                 {
-                    bool inPdf = n.Source is NoteSource.InPdf or NoteSource.InPdfByRailReader;
-                    bool reviewer = NoteOwnership.IsReviewer(inPdf, n.Source == NoteSource.InPdfByRailReader, n.Author, me);
-                    w.WriteString("owner", reviewer ? "reviewer" : "reader");
+                    w.WriteStartArray("replies");
+                    foreach (var r in answers)
+                    {
+                        w.WriteStartObject();
+                        WriteNote(w, r, me);
+                        w.WriteEndObject();
+                    }
+                    w.WriteEndArray();
                 }
                 w.WriteEndObject();
             }
             w.WriteEndArray();
             w.WriteEndObject();
         });
+    }
+
+    static void WriteNote(Utf8JsonWriter w, IndexedNote n, string? me)
+    {
+        w.WriteNumber("page", n.Page + 1);
+        w.WriteString("kind", n.Kind);
+        if (n.MarkedText is { } m) w.WriteString(n.Kind == "bookmark" ? "name" : "marked_text", m);
+        if (n.Comment is { } c) w.WriteString(n.Kind == "bookmark" ? "name" : "comment", c);
+        if (n.Author is { } au) w.WriteString("author", au);
+        if (n.Category is { } cat) w.WriteString("category", cat);
+        if (n.Kind != "bookmark")
+        {
+            bool inPdf = n.Source is NoteSource.InPdf or NoteSource.InPdfByRailReader;
+            bool reviewer = NoteOwnership.IsReviewer(inPdf, n.Source == NoteSource.InPdfByRailReader, n.Author, me);
+            w.WriteString("owner", reviewer ? "reviewer" : "reader");
+        }
     }
 
     /// <summary>Finds a document by id prefix (at least 6 characters), or by exact title or file name

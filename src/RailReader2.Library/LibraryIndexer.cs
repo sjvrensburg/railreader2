@@ -104,7 +104,8 @@ public static class LibraryIndexer
                 if (marked is null && comment is null) continue;
                 notes.Add(new NoteEntry(page, KindOf(a), marked, comment, a.Author, a.Color, a.NativeId,
                     a.Source != AnnotationSource.InPdf ? NoteSource.RailReader
-                        : a.WrittenByRailReader ? NoteSource.InPdfByRailReader : NoteSource.InPdf));
+                        : a.WrittenByRailReader ? NoteSource.InPdfByRailReader : NoteSource.InPdf,
+                    string.IsNullOrEmpty(a.InReplyTo) ? null : a.InReplyTo));
             }
         }
         foreach (var b in file.Bookmarks)

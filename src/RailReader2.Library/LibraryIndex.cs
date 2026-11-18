@@ -12,7 +12,7 @@ namespace RailReader2.Library;
 public sealed class LibraryIndex : IDisposable
 {
     /// <summary>Bumped when extraction or normalisation changes, so documents are re-extracted.</summary>
-    public const int IndexerVersion = 3; // 2: PDF metadata (title, author, subject, keywords); 3: TeX ligature codes repaired
+    public const int IndexerVersion = 4; // 2: PDF metadata (title, author, subject, keywords); 3: TeX ligature codes repaired; 4: reply threads (note_threads)
     /// <summary>Bumped when the table layout changes. A newer schema than this is "unreadable".</summary>
     public const int SchemaVersion = 3; // 3: documents.title/authors + info_fts (migrated in place from 2)
 
@@ -126,6 +126,7 @@ public sealed class LibraryIndex : IDisposable
                 version = 0;
             }
             if (version == 0) CreateSchema(conn);
+            EnsureThreadsTable(conn);
             // Quick structural check: a damaged file usually fails here rather than mid-search.
             if (Scalar(conn, "pragma quick_check") is not "ok")
                 throw new UnreadableIndexException("quick_check failed");
@@ -168,6 +169,22 @@ public sealed class LibraryIndex : IDisposable
         Exec(conn, $"update meta set value = '{SchemaVersion}' where key = 'schema_version'", tx);
         tx.Commit();
     }
+
+    /// <summary>Reply threads (IndexerVersion 4): which note answers which, by the PDF's annotation ids
+    /// (<c>/NM</c> → <c>/IRT</c>). A plain table beside the schema rather than a column on <c>note_fts</c>
+    /// (an FTS5 table can't gain one), so no schema bump: an older app opening this index ignores the table
+    /// instead of moving the index aside, and a reader of an index an older app made sees no threads. Stale
+    /// rows an older app leaves behind are harmless: a note's parent never changes, and rows are matched by
+    /// the note's own id.</summary>
+    static void EnsureThreadsTable(SqliteConnection conn) => Exec(conn, """
+        create table if not exists note_threads (
+          doc_key     integer not null,
+          native_id   text not null,
+          in_reply_to text not null,
+          primary key (doc_key, native_id)) without rowid
+        """);
+
+    bool HasThreadsTable() => Scalar(_conn, "select count(*) from sqlite_schema where type = 'table' and name = 'note_threads'") is "1";
 
     static int ReadSchemaVersion(SqliteConnection conn)
     {
@@ -429,17 +446,24 @@ public sealed class LibraryIndex : IDisposable
     public IReadOnlyList<IndexedNote> GetNotes(string contentId)
     {
         if (KeyOf(contentId) is not { } key) return [];
-        using var cmd = Command("""
-            select page, kind, marked_text, comment, author, color, category, native_id, source
-            from note_fts where rowid between $lo and $hi order by page, rowid
-            """);
+        using var cmd = Command(HasThreadsTable()
+            ? """
+              select f.page, f.kind, f.marked_text, f.comment, f.author, f.color, f.category, f.native_id, f.source, t.in_reply_to
+              from note_fts f left join note_threads t on t.doc_key = $k and t.native_id = f.native_id and f.native_id <> ''
+              where f.rowid between $lo and $hi order by f.page, f.rowid
+              """
+            : """
+              select page, kind, marked_text, comment, author, color, category, native_id, source, null
+              from note_fts where rowid between $lo and $hi order by page, rowid
+              """);
+        cmd.Parameters.AddWithValue("$k", key);
         cmd.Parameters.AddWithValue("$lo", RowId(key, 0));
         cmd.Parameters.AddWithValue("$hi", RowId(key, RowsPerDocument - 1));
         using var r = cmd.ExecuteReader();
         var list = new List<IndexedNote>();
         while (r.Read())
             list.Add(new IndexedNote(r.GetInt32(0), r.GetString(1), Str(r, 2), Str(r, 3), Str(r, 4), Str(r, 5),
-                Str(r, 6), Str(r, 7), (NoteSource)r.GetInt32(8)));
+                Str(r, 6), Str(r, 7), (NoteSource)r.GetInt32(8), Str(r, 9)));
         return list;
     }
 
@@ -659,7 +683,7 @@ public sealed class LibraryIndex : IDisposable
         EnsureWritable();
         using (var tx = _conn.BeginTransaction())
         {
-            foreach (var t in new[] { "page_fts", "outline_fts", "note_fts", "name_fts", "info_fts", "documents", "removed" })
+            foreach (var t in new[] { "page_fts", "outline_fts", "note_fts", "note_threads", "name_fts", "info_fts", "documents", "removed" })
                 Exec(_conn, $"delete from {t}", tx);
             SetMeta("backfill", backfill ? "on" : "off", tx);
             tx.Commit();
@@ -724,6 +748,17 @@ public sealed class LibraryIndex : IDisposable
         var col = cmd.Parameters.Add("$col", SqliteType.Text);
         var nm = cmd.Parameters.Add("$nm", SqliteType.Text);
         var src = cmd.Parameters.Add("$src", SqliteType.Integer);
+        using var thread = Command("insert or replace into note_threads(doc_key, native_id, in_reply_to) values ($k, $nm, $irt)", tx);
+        thread.Parameters.AddWithValue("$k", key);
+        var tnm = thread.Parameters.Add("$nm", SqliteType.Text);
+        var tirt = thread.Parameters.Add("$irt", SqliteType.Text);
+        foreach (var n in notes)
+        {
+            if (n.NativeId is not { Length: > 0 } id || n.InReplyTo is not { Length: > 0 } parent) continue;
+            tnm.Value = id; tirt.Value = parent;
+            thread.ExecuteNonQuery();
+        }
+
         long row = 0;
         foreach (var n in notes)
         {
@@ -745,6 +780,12 @@ public sealed class LibraryIndex : IDisposable
             using var cmd = Command($"delete from {t} where rowid between $lo and $hi", tx);
             cmd.Parameters.AddWithValue("$lo", RowId(key, 0));
             cmd.Parameters.AddWithValue("$hi", RowId(key, RowsPerDocument - 1));
+            cmd.ExecuteNonQuery();
+        }
+        if (tables.Contains("note_fts"))
+        {
+            using var cmd = Command("delete from note_threads where doc_key = $k", tx);
+            cmd.Parameters.AddWithValue("$k", key);
             cmd.ExecuteNonQuery();
         }
     }

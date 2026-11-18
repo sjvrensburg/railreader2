@@ -430,4 +430,46 @@ public sealed class LibraryIndexTests : IDisposable
         Assert.Equal("Kept Paper", index.GetDocument("a")!.Title);
         Assert.Single(index.Search(LibraryQuery.Parse("kept paper"), sources: new HashSet<HitSource> { HitSource.Details }));
     }
+
+    [Fact]
+    public void GetNotes_ReadsReplyThreads_AndAReindexDropsStaleOnes()
+    {
+        using var index = Open();
+        index.ReplaceDocument(Doc("a", "a.pdf", "text") with
+        {
+            Notes =
+            [
+                new NoteEntry(0, "highlight", "marked", "root comment", "R2", "#FFFF00", "root", NoteSource.InPdf),
+                new NoteEntry(0, "textnote", null, "a reply", "Me", null, "reply", NoteSource.RailReader, InReplyTo: "root"),
+            ],
+        });
+        var notes = index.GetNotes("a");
+        Assert.Null(notes[0].InReplyTo);
+        Assert.Equal("root", notes[1].InReplyTo);
+
+        index.ReplaceNotes("a", [new NoteEntry(0, "textnote", null, "now a root", "Me", null, "reply", NoteSource.RailReader)]);
+        Assert.Null(Assert.Single(index.GetNotes("a")).InReplyTo);
+    }
+
+    [Fact]
+    public void AnIndexWithoutTheThreadsTable_StillReads_AndGainsItWhenTheAppOpensIt()
+    {
+        // As an older app leaves it: schema 3, no note_threads (it was added without a schema bump).
+        using (var index = Open())
+            index.ReplaceDocument(Doc("a", "a.pdf", "text") with
+            {
+                Notes = [new NoteEntry(0, "textnote", null, "x", null, null, "n", NoteSource.RailReader, InReplyTo: "p")],
+            });
+        using (var c = new SqliteConnection($"Data Source={Db};Pooling=False"))
+        {
+            c.Open();
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = "drop table note_threads";
+            cmd.ExecuteNonQuery();
+        }
+        using (var ro = LibraryIndex.OpenReadOnly(Db)!)
+            Assert.Null(Assert.Single(ro.GetNotes("a")).InReplyTo);
+        using (var rw = Open())
+            Assert.Null(Assert.Single(rw.GetNotes("a")).InReplyTo); // table back, empty until re-indexed
+    }
 }

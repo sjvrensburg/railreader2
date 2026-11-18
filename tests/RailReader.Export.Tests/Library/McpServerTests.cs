@@ -24,6 +24,7 @@ public sealed class McpServerTests : IDisposable
             [],
             [new NoteEntry(2, "highlight", "compares New Jersey with Pennsylvania", "a clean identification argument", "Reader", "#FFFF00", "n1", NoteSource.RailReader),
              new NoteEntry(1, "textnote", null, "identification relies on parallel trends", "Referee 2", "#FF0000", "n2", NoteSource.InPdf),
+             new NoteEntry(1, "textnote", null, "Agreed with the referee, see section 4", "Reader", null, "r1", NoteSource.RailReader, InReplyTo: "n2"),
              new NoteEntry(0, "bookmark", null, "identification section", null, null, null, NoteSource.RailReader)],
             Info: new DocumentInfo("Minimum Wages and Employment", "Card; Krueger", null, null)),
             categoryOf: c => c == "#FFFF00" ? "Definition" : null);
@@ -160,7 +161,7 @@ public sealed class McpServerTests : IDisposable
         var docs = body.GetProperty("documents").EnumerateArray().ToList();
         Assert.Equal(2, docs.Count);
         var paper = docs.Single(d => d.GetProperty("document_id").GetString() == LibraryTools.ShortId(Paper));
-        Assert.Equal(3, paper.GetProperty("notes").GetInt32());
+        Assert.Equal(4, paper.GetProperty("notes").GetInt32()); // a reply counts as a note
         Assert.Equal("Card; Krueger", paper.GetProperty("authors").GetString());
     }
 
@@ -175,6 +176,13 @@ public sealed class McpServerTests : IDisposable
         Assert.Equal("identification section", notes[0].GetProperty("name").GetString());
         Assert.Equal("compares New Jersey with Pennsylvania", notes[2].GetProperty("marked_text").GetString());
         Assert.Equal("a clean identification argument", notes[2].GetProperty("comment").GetString());
+
+        // The reply sits under the reviewer's note it answers, not beside it.
+        var reply = Assert.Single(notes[1].GetProperty("replies").EnumerateArray());
+        Assert.Equal("Agreed with the referee, see section 4", reply.GetProperty("comment").GetString());
+        Assert.Equal("reader", reply.GetProperty("owner").GetString());
+        Assert.Equal("reviewer", notes[1].GetProperty("owner").GetString());
+        Assert.False(notes[0].TryGetProperty("replies", out _));
     }
 
     [Fact]

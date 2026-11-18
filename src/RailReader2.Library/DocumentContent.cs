@@ -15,13 +15,13 @@ public enum NoteSource { RailReader = 0, InPdf = 1, InPdfByRailReader = 2 }
 /// ("highlight", "textnote", "freetext", "bookmark", …).</summary>
 public sealed record NoteEntry(
     int Page, string Kind, string? MarkedText, string? Comment, string? Author, string? Color,
-    string? NativeId, NoteSource Source);
+    string? NativeId, NoteSource Source, string? InReplyTo = null);
 
 /// <summary>A note as read back from the index (<see cref="LibraryIndex.GetNotes"/>). <see cref="Category"/> is
 /// its colour-category name, if the reader named its colour.</summary>
 public sealed record IndexedNote(
     int Page, string Kind, string? MarkedText, string? Comment, string? Author, string? Color,
-    string? Category, string? NativeId, NoteSource Source);
+    string? Category, string? NativeId, NoteSource Source, string? InReplyTo = null);
 
 /// <summary>A document's descriptive metadata (the PDF Info dictionary), normalised. <see cref="Title"/>
 /// is null when the PDF's title is missing or is clearly not a title (see <see cref="DocumentInfoCleaner"/>).</summary>
