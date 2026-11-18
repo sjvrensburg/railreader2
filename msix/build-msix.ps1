@@ -39,7 +39,9 @@ $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repoRoot = Split-Path -Parent $scriptDir
 $publishDir = Join-Path $repoRoot "publish\msix"
 $mcpDir = Join-Path $repoRoot "publish\mcp"
-$msixOutput = if ($Output) { [IO.Path]::GetFullPath((Join-Path (Get-Location) $Output)) } else { Join-Path $repoRoot "publish\RailReader2.msix" }
+$msixOutput = if (-not $Output) { Join-Path $repoRoot "publish\RailReader2.msix" }
+              elseif ([IO.Path]::IsPathRooted($Output)) { $Output }
+              else { [IO.Path]::GetFullPath((Join-Path (Get-Location) $Output)) }
 
 function Find-SdkTool([string]$name) {
     $cmd = Get-Command $name -ErrorAction SilentlyContinue
