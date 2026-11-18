@@ -126,10 +126,10 @@ public sealed class LibraryTools
         int limit = Limit(args);
         string? only = OptString(args, "document") is { } d ? Resolve(docs, d).ContentId : null;
         string? me = SafeReaderName();
-        // Ask for more than needed: hits on hidden documents or of another kind are dropped afterwards.
-        var hits = index.Search(query, Math.Min(limit * 5, 1000), Open, Close, new HashSet<HitSource> { HitSource.Note }, only)
-            .Where(h => docs.ContainsKey(h.ContentId) && (kind is null or "" || h.NoteKind == kind))
-            .Take(limit).ToList();
+        // Visibility and kind filter inside the query, so they never shorten the results (the Where is a backstop).
+        var hits = index.Search(query, limit, Open, Close, new HashSet<HitSource> { HitSource.Note }, only,
+                amongIds: docs.Keys, noteKind: kind is null or "" ? null : kind)
+            .Where(h => docs.ContainsKey(h.ContentId)).ToList();
         return Json(w =>
         {
             w.WriteStartObject();
@@ -157,8 +157,8 @@ public sealed class LibraryTools
         var query = ParseQuery(args);
         int limit = Limit(args);
         string? only = OptString(args, "document") is { } d ? Resolve(docs, d).ContentId : null;
-        var hits = index.Search(query, Math.Min(limit * 5, 1000), Open, Close, new HashSet<HitSource> { HitSource.Page }, only)
-            .Where(h => docs.ContainsKey(h.ContentId)).Take(limit).ToList();
+        var hits = index.Search(query, limit, Open, Close, new HashSet<HitSource> { HitSource.Page }, only, amongIds: docs.Keys)
+            .Where(h => docs.ContainsKey(h.ContentId)).ToList();
         return Json(w =>
         {
             w.WriteStartObject();

@@ -131,6 +131,28 @@ public sealed class McpServerTests : IDisposable
         Assert.Equal("Referee 2", reviewer.GetProperty("author").GetString());
     }
 
+    // A crowd of better-ranked hits of another kind, or on a hidden document, must not push the wanted ones out:
+    // the filters run inside the index query, before its limit.
+    [Fact]
+    public void Filters_NeverShortenTheResults_WhenOtherHitsRankHigher()
+    {
+        const string Crowd = "dddddddddddddddd4444";
+        using (var index = LibraryIndex.OpenWritable(Db, out _))
+            index.ReplaceDocument(new DocumentContent(Crowd, "/papers/crowd.pdf", 1, 1, 40, false,
+                Enumerable.Range(0, 40).Select(i => new PageEntry(i, "identification identification identification", false)).ToList(),
+                [],
+                Enumerable.Range(0, 40).Select(i => new NoteEntry(i, "highlight", "identification identification",
+                    "identification identification", "Reader", null, $"c{i}", NoteSource.RailReader)).ToList()));
+        SqliteConnection.ClearAllPools();
+
+        var (notes, _, _) = Tool("search_notes", """{"query":"identification","kind":"textnote","limit":1}""");
+        Assert.Equal("textnote", Assert.Single(notes.GetProperty("hits").EnumerateArray()).GetProperty("kind").GetString());
+
+        _prefs.Hide(Crowd);
+        var (pages, _, _) = Tool("search_pages", """{"query":"identification","limit":2}""");
+        Assert.Equal(2, pages.GetProperty("hits").GetArrayLength());
+    }
+
     [Fact]
     public void SearchNotes_FiltersByKind()
     {
