@@ -103,6 +103,9 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="3.90.2.0" date="2026-11-18">
+      <description><p>Updates the engine behind layout detection and scanned-page text recognition (ONNX Runtime 1.32 and its GPU accelerator). Documents read the same as before, and GPU acceleration still gives the same results as the CPU. Using the GPU for text recognition still pays off with the Small and Medium language packs, not with Tiny.</p></description>
+    </release>
     <release version="3.90.1.0" date="2026-11-17">
       <description><p>Library search finds more: a word now also finds its related forms where it didn't before (diagnosing finds diagnosis, analysis finds analyses), and words broken by an unmapped "fi", "ff" or "fl" ligature in some LaTeX PDFs can now be found. Opening a result highlights the words the search actually matched on that page. The library is re-indexed in the background once after updating.</p></description>
     </release>
