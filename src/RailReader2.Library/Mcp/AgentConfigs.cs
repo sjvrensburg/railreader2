@@ -166,6 +166,10 @@ public sealed class ClaudeDesktopConfig(string path)
 
     internal static void AtomicWrite(string path, string text)
     {
+        // A config kept in a dotfiles repository is often a symlink: write through it to its target, or the
+        // rename would replace the link with a plain file.
+        if (File.Exists(path) && new FileInfo(path).ResolveLinkTarget(returnFinalTarget: true) is { } target)
+            path = target.FullName;
         string tmp = path + ".railreader2.tmp";
         File.WriteAllText(tmp, text, new UTF8Encoding(false));
         File.Move(tmp, path, overwrite: true);
@@ -338,9 +342,11 @@ public sealed class ClaudeCodeConfig(string? claude, Func<string, IReadOnlyList<
         foreach (var a in args) psi.ArgumentList.Add(a);
         using var p = System.Diagnostics.Process.Start(psi)!;
         p.StandardInput.Close();
+        // Both streams are read asynchronously: a synchronous ReadToEnd would block until `claude` exits,
+        // so the timeout below would never apply to a hung CLI.
         var err = p.StandardError.ReadToEndAsync();
-        string output = p.StandardOutput.ReadToEnd();
+        var output = p.StandardOutput.ReadToEndAsync();
         if (!p.WaitForExit(20_000)) { try { p.Kill(true); } catch (Exception) { } return (-1, "timed out"); }
-        return (p.ExitCode, output + err.Result);
+        return (p.ExitCode, output.Result + err.Result);
     }
 }

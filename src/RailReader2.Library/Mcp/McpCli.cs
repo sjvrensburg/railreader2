@@ -21,7 +21,9 @@ public static class McpCli
         string db = GetOption(args, "db") ?? LibraryIndex.DefaultPath;
         string? prefsPath = GetOption(args, "prefs");
 
-        string? sub = args.Length > 0 && !args[0].StartsWith("--", StringComparison.Ordinal) ? args[0] : null;
+        // The first word that is neither an option nor an option's value: `--prefs p enable` is `enable`.
+        var words = Positionals(args);
+        string? sub = words.Count > 0 ? words[0] : null;
         if (sub is not null)
         {
             try
@@ -31,8 +33,8 @@ public static class McpCli
                     "status" => Status(db, prefsPath),
                     "enable" => SetEnabled(true, prefsPath),
                     "disable" => SetEnabled(false, prefsPath),
-                    "hide" => Hide(args[1..], db, prefsPath, hide: true),
-                    "unhide" => Hide(args[1..], db, prefsPath, hide: false),
+                    "hide" => Hide(args, words, db, prefsPath, hide: true),
+                    "unhide" => Hide(args, words, db, prefsPath, hide: false),
                     _ => Fail($"Unknown mcp subcommand '{sub}'. Run '{command} --help'."),
                 };
             }
@@ -42,7 +44,8 @@ public static class McpCli
         var tools = new LibraryTools(
             open: () => File.Exists(db) ? LibraryIndex.OpenReadOnly(db) : null,
             readerName: () => AppConfig.Load().AnnotationAuthor,
-            prefs: () => AiToolsPreferences.Load(prefsPath));
+            prefs: () => AiToolsPreferences.Load(prefsPath),
+            command: command);
         var server = new McpServer(tools, Version(), logger);
 
         var utf8 = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
@@ -89,7 +92,7 @@ public static class McpCli
     }
 
     /// <summary><c>hide|unhide &lt;document&gt;</c> (id, title or file name) or <c>hide|unhide --folder &lt;dir&gt;</c>.</summary>
-    static int Hide(string[] args, string db, string? prefsPath, bool hide)
+    static int Hide(string[] args, IReadOnlyList<string> words, string db, string? prefsPath, bool hide)
     {
         string verb = hide ? "hide" : "unhide";
         if (GetOption(args, "folder") is { } folder)
@@ -100,7 +103,7 @@ public static class McpCli
                 : hide ? $"Documents under {Path.GetFullPath(folder)} are hidden from AI tools." : $"{folder} is no longer hidden.");
             return 0;
         }
-        string? key = args.FirstOrDefault(a => !a.StartsWith("--", StringComparison.Ordinal));
+        string? key = words.Count > 1 ? words[1] : null;
         if (key is null) return Fail($"mcp {verb} needs a document (id, title or file name) or --folder <dir>.");
         using var index = File.Exists(db) ? LibraryIndex.OpenReadOnly(db) : null;
         if (index is null) return Fail($"No readable library index at {db}.");
@@ -123,6 +126,20 @@ public static class McpCli
     {
         Console.Error.WriteLine($"Error: {message}");
         return 1;
+    }
+
+    static readonly string[] ValueOptions = ["--db", "--prefs", "--folder"];
+
+    /// <summary>The arguments that are not options or option values, in order.</summary>
+    static List<string> Positionals(string[] args)
+    {
+        var words = new List<string>();
+        for (int i = 0; i < args.Length; i++)
+        {
+            if (ValueOptions.Contains(args[i])) { i++; continue; }
+            if (!args[i].StartsWith("--", StringComparison.Ordinal)) words.Add(args[i]);
+        }
+        return words;
     }
 
     static string? GetOption(string[] args, string name)

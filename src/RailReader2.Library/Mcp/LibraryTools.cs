@@ -27,16 +27,23 @@ public sealed class LibraryTools
     /// <param name="readerName">The reader's annotation author name, to tell their notes from a reviewer's.</param>
     /// <param name="prefs">The reader's consent and hidden documents, read for every call so a change applies
     /// to an agent that is already connected.</param>
-    public LibraryTools(Func<LibraryIndex?> open, Func<string?> readerName, Func<AiToolsPreferences> prefs)
+    /// <param name="command">How the reader runs this server ("railreader2-cli mcp", the AppImage with --mcp, …),
+    /// for the "turned off" message's enable command.</param>
+    public LibraryTools(Func<LibraryIndex?> open, Func<string?> readerName, Func<AiToolsPreferences> prefs,
+        string command = "railreader2-mcp")
     {
         _open = open;
         _readerName = readerName;
         _prefs = prefs;
+        _turnedOff = TurnedOffMessage(command);
     }
 
-    public const string TurnedOffMessage =
+    readonly string _turnedOff;
+
+    /// <summary>The tool error while the reader hasn't turned AI tools on; <paramref name="command"/> runs the server.</summary>
+    public static string TurnedOffMessage(string command) =>
         "RailReader2's AI tools are turned off. The reader can turn them on in RailReader2 (Settings ▸ Library ▸ AI tools) " +
-        "or by running: railreader2-mcp enable";
+        $"or by running: {command} enable";
 
     public sealed record ToolSpec(string Name, string Title, string Description, string InputSchema);
 
@@ -92,7 +99,7 @@ public sealed class LibraryTools
         if (!Specs.Any(s => s.Name == name)) throw new ArgumentException($"Unknown tool: {name}");
         AiToolsPreferences prefs;
         try { prefs = _prefs(); } catch (Exception) { prefs = new AiToolsPreferences(); } // fail closed
-        if (!prefs.Enabled) throw new ToolException(TurnedOffMessage);
+        if (!prefs.Enabled) throw new ToolException(_turnedOff);
         using var index = _open() ?? throw new ToolException(
             "The RailReader2 library is empty: no library index exists yet. Open some documents in RailReader2 first.");
         var docs = Visible(index, prefs);

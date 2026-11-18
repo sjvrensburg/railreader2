@@ -31,10 +31,16 @@ public sealed class AiToolsPreferences
     public void Save(string? path = null)
         => JsonSidecar.Save(path ?? DefaultPath, this, AiToolsPreferencesJsonContext.Default.AiToolsPreferences);
 
-    /// <summary>Loads the current file, applies <paramref name="change"/>, saves, and returns the result.</summary>
+    /// <summary>Loads the current file, applies <paramref name="change"/>, saves, and returns the result.
+    /// Refuses (throws <see cref="IOException"/>) when the file exists but can't be read: saving over it would
+    /// silently drop the reader's hidden documents and folders.</summary>
     public static AiToolsPreferences Update(Action<AiToolsPreferences> change, string? path = null)
     {
-        var prefs = Load(path);
+        string file = path ?? DefaultPath;
+        if (!JsonSidecar.TryLoad(file, AiToolsPreferencesJsonContext.Default.AiToolsPreferences,
+                static () => new AiToolsPreferences(), out var prefs))
+            throw new IOException($"{file} can't be read, so it was left alone (it may list hidden documents). "
+                + "Fix or delete it, then try again.");
         change(prefs);
         prefs.Save(path);
         return prefs;

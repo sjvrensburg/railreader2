@@ -249,7 +249,7 @@ public sealed class McpServerTests : IDisposable
         {
             var result = r.GetProperty("result");
             Assert.True(result.GetProperty("isError").GetBoolean());
-            Assert.Equal(LibraryTools.TurnedOffMessage, result.GetProperty("content")[0].GetProperty("text").GetString());
+            Assert.Equal(LibraryTools.TurnedOffMessage("railreader2-mcp"), result.GetProperty("content")[0].GetProperty("text").GetString());
         }
     }
 

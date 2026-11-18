@@ -52,8 +52,12 @@ public partial class SettingsWindow
         RefreshAgents();
     }
 
+    private int _agentsVersion;
+
     private async void RefreshAgents()
     {
+        // Several refreshes can overlap (opening the page, each toggle): only the latest fills the panel.
+        int version = ++_agentsVersion;
         AiAgentsPanel.Children.Clear();
         AiAgentsPanel.Children.Add(new TextBlock { Text = "Checking…", Classes = { "status" } });
         var server = _mcpServer;
@@ -65,11 +69,13 @@ public partial class SettingsWindow
         }
         catch (Exception ex)
         {
+            if (version != _agentsVersion) return;
             RailReaderLogging.Logger.Error("[AI tools] status failed", ex);
             AiAgentsPanel.Children.Clear();
             AiToolsStatusText.Text = "Couldn't check the AI tools' settings — see the log for details.";
             return;
         }
+        if (version != _agentsVersion) return;
 
         AiAgentsPanel.Children.Clear();
         foreach (var (agent, state) in states)
@@ -77,7 +83,9 @@ public partial class SettingsWindow
             var box = new CheckBox
             {
                 Content = agent.Name,
-                IsChecked = state is AgentConnection.Connected or AgentConnection.ConnectedElsewhere,
+                // Only our own entry reads as checked: one set up elsewhere is pointed here by checking the box
+                // (as its note says), which Connect does by replacing it.
+                IsChecked = state == AgentConnection.Connected,
                 IsEnabled = state != AgentConnection.NotInstalled && server is not null,
             };
             Avalonia.Automation.AutomationProperties.SetName(box, $"Connect RailReader2 to {agent.Name}");
