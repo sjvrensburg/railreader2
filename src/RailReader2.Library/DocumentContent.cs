@@ -17,6 +17,12 @@ public sealed record NoteEntry(
     int Page, string Kind, string? MarkedText, string? Comment, string? Author, string? Color,
     string? NativeId, NoteSource Source);
 
+/// <summary>A note as read back from the index (<see cref="LibraryIndex.GetNotes"/>). <see cref="Category"/> is
+/// its colour-category name, if the reader named its colour.</summary>
+public sealed record IndexedNote(
+    int Page, string Kind, string? MarkedText, string? Comment, string? Author, string? Color,
+    string? Category, string? NativeId, NoteSource Source);
+
 /// <summary>A document's descriptive metadata (the PDF Info dictionary), normalised. <see cref="Title"/>
 /// is null when the PDF's title is missing or is clearly not a title (see <see cref="DocumentInfoCleaner"/>).</summary>
 public sealed record DocumentInfo(string? Title, string? Author, string? Subject, string? Keywords)

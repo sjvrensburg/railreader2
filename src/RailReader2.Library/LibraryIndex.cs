@@ -331,9 +331,10 @@ public sealed class LibraryIndex : IDisposable
     /// <summary>Searches page text, outlines, notes, file names and document metadata (title, author, subject, keywords). Hits are merged across sources by a
     /// weighted bm25 (higher <see cref="LibraryHit.Score"/> is better); at most
     /// <paramref name="limit"/> are returned. An empty query returns nothing.</summary>
-    /// <para><paramref name="sources"/> limits the search to some sources (null = all).</para>
+    /// <para><paramref name="sources"/> limits the search to some sources (null = all), and
+    /// <paramref name="contentId"/> to one document (null = all).</para>
     public IReadOnlyList<LibraryHit> Search(LibraryQuery query, int limit = 50, string open = "[", string close = "]",
-        IReadOnlySet<HitSource>? sources = null)
+        IReadOnlySet<HitSource>? sources = null, string? contentId = null)
     {
         if (query.IsEmpty || limit <= 0) return [];
         var hits = new List<LibraryHit>();
@@ -344,8 +345,8 @@ public sealed class LibraryIndex : IDisposable
             select d.content_id, d.last_path, d.file_name, f.page, snippet(page_fts, 0, $o, $c, '…', 16),
                    bm25(page_fts), f.from_ocr, d.title, d.authors
             from page_fts f join documents d on d.doc_key = f.doc_key
-            where page_fts match $q order by bm25(page_fts) limit $n
-            """, match, limit, open, close,
+            where page_fts match $q and ($id is null or d.content_id = $id) order by bm25(page_fts) limit $n
+            """, match, limit, open, close, contentId,
             r => new LibraryHit(r.GetString(0), Str(r, 1), r.GetString(2), r.GetInt32(3), HitSource.Page,
                 r.GetString(4), -r.GetDouble(5) * PageWeight * (r.GetInt32(3) == 0 ? FirstPageWeight : 1.0), FromOcr: r.GetInt32(6) != 0,
                 Title: Str(r, 7), Authors: Str(r, 8)));
@@ -354,8 +355,8 @@ public sealed class LibraryIndex : IDisposable
             select d.content_id, d.last_path, d.file_name, f.page, highlight(outline_fts, 0, $o, $c), bm25(outline_fts),
                    d.title, d.authors
             from outline_fts f join documents d on d.doc_key = f.doc_key
-            where outline_fts match $q order by bm25(outline_fts) limit $n
-            """, match, limit, open, close,
+            where outline_fts match $q and ($id is null or d.content_id = $id) order by bm25(outline_fts) limit $n
+            """, match, limit, open, close, contentId,
             r => new LibraryHit(r.GetString(0), Str(r, 1), r.GetString(2), r.GetInt32(3), HitSource.Outline,
                 r.GetString(4), -r.GetDouble(5) * OutlineWeight, Title: Str(r, 6), Authors: Str(r, 7)));
 
@@ -365,8 +366,8 @@ public sealed class LibraryIndex : IDisposable
                    bm25(note_fts, 1.0, 2.0, 0.5, 1.0), f.kind, f.author, f.source, f.native_id, f.category,
                    d.title, d.authors
             from note_fts f join documents d on d.doc_key = f.doc_key
-            where note_fts match $q order by bm25(note_fts, 1.0, 2.0, 0.5, 1.0) limit $n
-            """, match, limit, open, close,
+            where note_fts match $q and ($id is null or d.content_id = $id) order by bm25(note_fts, 1.0, 2.0, 0.5, 1.0) limit $n
+            """, match, limit, open, close, contentId,
             r => new LibraryHit(r.GetString(0), Str(r, 1), r.GetString(2), r.GetInt32(3), HitSource.Note,
                 r.GetString(4), -r.GetDouble(5) * NoteWeight, NoteKind: Str(r, 6), Author: Str(r, 7),
                 NoteOrigin: (NoteSource)r.GetInt32(8), NativeId: Str(r, 9), Category: Str(r, 10),
@@ -376,8 +377,8 @@ public sealed class LibraryIndex : IDisposable
             select d.content_id, d.last_path, d.file_name, highlight(name_fts, 0, $o, $c), bm25(name_fts),
                    d.title, d.authors
             from name_fts f join documents d on d.doc_key = f.doc_key
-            where name_fts match $q order by bm25(name_fts) limit $n
-            """, match, limit, open, close,
+            where name_fts match $q and ($id is null or d.content_id = $id) order by bm25(name_fts) limit $n
+            """, match, limit, open, close, contentId,
             r => new LibraryHit(r.GetString(0), Str(r, 1), r.GetString(2), null, HitSource.Name,
                 r.GetString(3), -r.GetDouble(4) * NameWeight, Title: Str(r, 5), Authors: Str(r, 6)));
 
@@ -386,8 +387,8 @@ public sealed class LibraryIndex : IDisposable
             select d.content_id, d.last_path, d.file_name, snippet(info_fts, -1, $o, $c, '…', 16),
                    bm25(info_fts, 1.0, 1.0, 0.5, 0.5), d.title, d.authors
             from info_fts f join documents d on d.doc_key = f.doc_key
-            where info_fts match $q order by bm25(info_fts, 1.0, 1.0, 0.5, 0.5) limit $n
-            """, match, limit, open, close,
+            where info_fts match $q and ($id is null or d.content_id = $id) order by bm25(info_fts, 1.0, 1.0, 0.5, 0.5) limit $n
+            """, match, limit, open, close, contentId,
             r => new LibraryHit(r.GetString(0), Str(r, 1), r.GetString(2), null, HitSource.Details,
                 r.GetString(3), -r.GetDouble(4) * DetailsWeight, Title: Str(r, 5), Authors: Str(r, 6)));
 
@@ -423,10 +424,30 @@ public sealed class LibraryIndex : IDisposable
         return forms;
     }
 
+    /// <summary>Every indexed note (annotation or named bookmark) of one document, in page order and, within
+    /// a page, in the order they were indexed. Empty when the document isn't indexed.</summary>
+    public IReadOnlyList<IndexedNote> GetNotes(string contentId)
+    {
+        if (KeyOf(contentId) is not { } key) return [];
+        using var cmd = Command("""
+            select page, kind, marked_text, comment, author, color, category, native_id, source
+            from note_fts where rowid between $lo and $hi order by page, rowid
+            """);
+        cmd.Parameters.AddWithValue("$lo", RowId(key, 0));
+        cmd.Parameters.AddWithValue("$hi", RowId(key, RowsPerDocument - 1));
+        using var r = cmd.ExecuteReader();
+        var list = new List<IndexedNote>();
+        while (r.Read())
+            list.Add(new IndexedNote(r.GetInt32(0), r.GetString(1), Str(r, 2), Str(r, 3), Str(r, 4), Str(r, 5),
+                Str(r, 6), Str(r, 7), (NoteSource)r.GetInt32(8)));
+        return list;
+    }
+
     void Collect(List<LibraryHit> into, string sql, string match, int limit, string open, string close,
-        Func<SqliteDataReader, LibraryHit> read)
+        string? contentId, Func<SqliteDataReader, LibraryHit> read)
     {
         using var cmd = Command(sql);
+        cmd.Parameters.AddWithValue("$id", (object?)contentId ?? DBNull.Value);
         cmd.Parameters.AddWithValue("$q", match);
         cmd.Parameters.AddWithValue("$n", limit);
         cmd.Parameters.AddWithValue("$o", open);
