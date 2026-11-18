@@ -17,6 +17,8 @@ public sealed record McpServerCommand(string Command, IReadOnlyList<string> Args
     /// changes with every version), and the only way into the package's own (virtualised) AppData.</item>
     /// <item>AppImage: the AppImage file itself with <c>--mcp</c> (its mount point changes every run).</item>
     /// <item>Inno install, tarball, published folder: <c>RailReader2.Mcp[.exe]</c> beside the app.</item>
+    /// <item>A build from the repository (<c>dotnet run</c>): <c>src/RailReader2.Mcp/bin/&lt;config&gt;/&lt;tfm&gt;/</c>,
+    /// if it has been built (<see cref="IsDevelopmentBuild"/> is then true).</item>
     /// </list></summary>
     public static McpServerCommand? Locate(Func<string, string?> env, string baseDirectory, bool msixPackaged)
     {
@@ -27,7 +29,25 @@ public sealed record McpServerCommand(string Command, IReadOnlyList<string> Args
             && env("APPDIR") is { Length: > 0 } appDir && IsUnder(baseDirectory, appDir))
             return new(appImage, ["--mcp"]);
         string beside = Path.Combine(baseDirectory, exe);
-        return File.Exists(beside) ? new(beside, []) : null;
+        if (File.Exists(beside)) return new(beside, []);
+        return DevelopmentBuild(baseDirectory, exe) is { } dev ? new(dev, []) { IsDevelopmentBuild = true } : null;
+    }
+
+    /// <summary>True when the server is the repository's own build output rather than an installed copy.</summary>
+    public bool IsDevelopmentBuild { get; init; }
+
+    /// <summary>The app runs from <c>…/src/RailReader2/bin/&lt;config&gt;/&lt;tfm&gt;/</c>: the server's build output is
+    /// the same <c>bin/&lt;config&gt;/&lt;tfm&gt;</c> under <c>src/RailReader2.Mcp</c>. Null when that isn't the layout
+    /// or the server hasn't been built.</summary>
+    internal static string? DevelopmentBuild(string baseDirectory, string exe)
+    {
+        var tfm = new DirectoryInfo(Path.TrimEndingDirectorySeparator(baseDirectory));
+        var config = tfm.Parent;
+        var bin = config?.Parent;
+        var project = bin?.Parent;
+        if (bin?.Name != "bin" || project?.Parent is not { } src) return null;
+        string candidate = Path.Combine(src.FullName, "RailReader2.Mcp", "bin", config!.Name, tfm.Name, exe);
+        return File.Exists(candidate) ? candidate : null;
     }
 
     static bool IsUnder(string path, string dir)

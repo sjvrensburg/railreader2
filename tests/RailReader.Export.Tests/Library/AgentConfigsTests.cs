@@ -193,4 +193,19 @@ public sealed class AgentConfigsTests : IDisposable
         Assert.Equal(AppImage.Command, root["mcpServers"]!["railreader2"]!["command"]!.GetValue<string>());
         Assert.Equal("claude mcp add --scope user railreader2 -- /home/me/Apps/railreader2-x86_64.AppImage --mcp", AppImage.ClaudeCodeAddCommand());
     }
+
+    [Fact]
+    public void Locate_FindsTheRepositoryBuild_ForADevelopmentBuildOfTheApp()
+    {
+        string exe = OperatingSystem.IsWindows() ? "RailReader2.Mcp.exe" : "RailReader2.Mcp";
+        string appBin = Directory.CreateDirectory(Path.Combine(_dir, "src", "RailReader2", "bin", "Release", "net10.0")).FullName;
+        string? Env(string _) => null;
+        Assert.Null(McpServerCommand.Locate(Env, appBin, false)); // not built yet
+
+        string mcpBin = Directory.CreateDirectory(Path.Combine(_dir, "src", "RailReader2.Mcp", "bin", "Release", "net10.0")).FullName;
+        File.WriteAllText(Path.Combine(mcpBin, exe), "");
+        var dev = McpServerCommand.Locate(Env, appBin + Path.DirectorySeparatorChar, false)!;
+        Assert.Equal(Path.Combine(mcpBin, exe), dev.Command);
+        Assert.True(dev.IsDevelopmentBuild);
+    }
 }

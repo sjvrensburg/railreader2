@@ -44,7 +44,9 @@ public partial class SettingsWindow
         _aiLoading = false;
         AiServerText.Text = _mcpServer is { } s
             ? $"Server: {s.Command}{(s.Args.Count > 0 ? " " + string.Join(' ', s.Args) : "")}"
-            : "This build has no MCP server beside it (a development build). Use `railreader2-cli mcp` from the command-line tools instead.";
+              + (s.IsDevelopmentBuild ? " (the repository's build: agents connected now use it until you rebuild or move it)" : "")
+            : "This build has no MCP server beside it (a development build). Build it with "
+              + "`dotnet build src/RailReader2.Mcp -c Release` and reopen Settings, or use `railreader2-cli mcp`.";
         AiCopySetupButton.IsEnabled = _mcpServer is not null;
         RefreshHiddenFolders(prefs);
         RefreshAgents();
