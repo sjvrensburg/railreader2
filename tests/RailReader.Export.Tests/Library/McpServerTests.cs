@@ -43,7 +43,9 @@ public sealed class McpServerTests : IDisposable
         try { Directory.Delete(_dir, true); } catch { }
     }
 
-    private McpServer Server() => new(new LibraryTools(() => LibraryIndex.OpenReadOnly(Db), () => "Reader"), "1.2.3");
+    private AiToolsPreferences _prefs = new() { Enabled = true };
+
+    private McpServer Server() => new(new LibraryTools(() => LibraryIndex.OpenReadOnly(Db), () => "Reader", () => _prefs), "1.2.3");
 
     /// <summary>Sends <paramref name="requests"/> through <see cref="McpServer.Run"/> and returns the reply lines.</summary>
     private List<JsonElement> Exchange(params string[] requests)
@@ -216,11 +218,87 @@ public sealed class McpServerTests : IDisposable
     [Fact]
     public void NoIndex_IsAToolErrorTellingTheReaderWhatToDo()
     {
-        var server = new McpServer(new LibraryTools(() => null, () => null), "1");
+        var server = new McpServer(new LibraryTools(() => null, () => null, () => new AiToolsPreferences { Enabled = true }), "1");
         var output = new StringWriter();
         server.Run(new StringReader(Call(1, "list_documents", "{}") + "\n"), output);
         var result = JsonDocument.Parse(output.ToString()).RootElement.GetProperty("result");
         Assert.True(result.GetProperty("isError").GetBoolean());
         Assert.Contains("Open some documents", result.GetProperty("content")[0].GetProperty("text").GetString());
+    }
+
+    [Fact]
+    public void TurnedOff_RefusesEveryTool_ButStillAnswersTheHandshake()
+    {
+        _prefs = new AiToolsPreferences(); // the default: off
+        var replies = Exchange(
+            """{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18"}}""",
+            """{"jsonrpc":"2.0","id":2,"method":"tools/list"}""",
+            Call(3, "list_documents", "{}"),
+            Call(4, "search_notes", """{"query":"identification"}"""));
+        Assert.True(replies[0].TryGetProperty("result", out _));
+        Assert.Equal(4, replies[1].GetProperty("result").GetProperty("tools").GetArrayLength());
+        foreach (var r in replies.Skip(2))
+        {
+            var result = r.GetProperty("result");
+            Assert.True(result.GetProperty("isError").GetBoolean());
+            Assert.Equal(LibraryTools.TurnedOffMessage, result.GetProperty("content")[0].GetProperty("text").GetString());
+        }
+    }
+
+    [Fact]
+    public void PrefsThatThrow_FailClosed()
+    {
+        var server = new McpServer(new LibraryTools(() => LibraryIndex.OpenReadOnly(Db), () => null,
+            () => throw new IOException("unreadable")), "1");
+        var output = new StringWriter();
+        server.Run(new StringReader(Call(1, "list_documents", "{}") + "\n"), output);
+        Assert.Contains("turned off", output.ToString());
+    }
+
+    [Fact]
+    public void HiddenDocument_IsAbsentFromEveryTool_EvenByItsId()
+    {
+        _prefs.Hide(Paper);
+        string all = string.Join("\n", Exchange(
+            Call(1, "search_notes", """{"query":"identification"}"""),
+            Call(2, "search_pages", """{"query":"identification"}"""),
+            Call(3, "list_documents", "{}"),
+            Call(4, "get_document_notes", "{\"document\":\"" + Paper + "\"}"),
+            Call(5, "get_document_notes", """{"document":"Minimum Wages and Employment"}""")).Select(r => r.GetRawText()));
+        Assert.DoesNotContain("New Jersey", all);
+        Assert.DoesNotContain("parallel trends", all);
+        Assert.DoesNotContain("card-krueger", all);
+        Assert.DoesNotContain($"id\\\":\\\"{LibraryTools.ShortId(Paper)}", all);
+        Assert.Contains("other.pdf", all); // the rest of the library is still there
+    }
+
+    [Fact]
+    public void HiddenFolder_HidesDocumentsAtAnyDepth_ButNotASiblingWithTheSamePrefix()
+    {
+        _prefs.HideFolder("/home/someone");
+        var (body, _, _) = Tool("list_documents", "{}");
+        Assert.Equal(["other.pdf"], body.GetProperty("documents").EnumerateArray().Select(d => d.GetProperty("file_name").GetString()));
+
+        var prefs = new AiToolsPreferences();
+        prefs.HideFolder("/papers/private");
+        Assert.True(prefs.IsHidden("x", "/papers/private/a/b.pdf"));
+        Assert.False(prefs.IsHidden("x", "/papers/private-not/b.pdf"));
+        Assert.False(prefs.IsHidden("x", null));
+        prefs.HideFolder("/");
+        Assert.True(prefs.IsHidden("x", "/anything.pdf"));
+    }
+
+    [Fact]
+    public void Preferences_RoundTrip_AndUpdateKeepsOtherWritersEdits()
+    {
+        string path = Path.Combine(_dir, "ai_tools_prefs.json");
+        Assert.False(AiToolsPreferences.Load(path).Enabled); // missing file: off
+        AiToolsPreferences.Update(p => p.Enabled = true, path);
+        AiToolsPreferences.Update(p => p.Hide("abc"), path); // a second writer, loading fresh
+        var back = AiToolsPreferences.Load(path);
+        Assert.True(back.Enabled);
+        Assert.Equal(["abc"], back.HiddenDocuments);
+        File.WriteAllText(path, "{ not json");
+        Assert.False(AiToolsPreferences.Load(path).Enabled); // unreadable: off
     }
 }

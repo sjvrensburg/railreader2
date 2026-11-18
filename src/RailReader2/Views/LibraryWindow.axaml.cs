@@ -13,9 +13,11 @@ using RailReader2.ViewModels;
 namespace RailReader2.Views;
 
 /// <summary>A document's header row in the results.</summary>
-public sealed class LibraryDocRow(LibraryResultGroup group)
+public sealed class LibraryDocRow(LibraryResultGroup group, bool hiddenFromAi = false)
 {
     public LibraryResultGroup Group { get; } = group;
+    /// <summary>Hidden from AI tools (<see cref="AiToolsPreferences"/>), by itself or by a hidden folder.</summary>
+    public bool HiddenFromAi { get; } = hiddenFromAi;
     public string Title => Group.DisplayName;
     /// <summary>The metadata authors, shown under the title; null hides the line.</summary>
     public string? Authors => Group.Authors;
@@ -25,10 +27,11 @@ public sealed class LibraryDocRow(LibraryResultGroup group)
     public string Subtitle =>
         (Missing ? "Not found at " : "") + (Group.LastPath ?? "unknown location")
         + $" · {Count(Group.HitCount, "match", "matches")}"
-        + (Group.NoteCount > 0 ? $" · {Count(Group.NoteCount, "note", "notes")}" : "");
+        + (Group.NoteCount > 0 ? $" · {Count(Group.NoteCount, "note", "notes")}" : "")
+        + (HiddenFromAi ? " · hidden from AI tools" : "");
     public string LocateName => $"Locate {Group.FileName}";
     public string RemoveName => $"Remove {Group.FileName} from the library";
-    public string AutomationName => $"{Group.DisplayName}{(Group.Authors is { } a ? $", by {a}" : "")}, {Count(Group.HitCount, "match", "matches")}" + (Missing ? ", file not found" : "");
+    public string AutomationName => $"{Group.DisplayName}{(Group.Authors is { } a ? $", by {a}" : "")}, {Count(Group.HitCount, "match", "matches")}" + (Missing ? ", file not found" : "") + (HiddenFromAi ? ", hidden from AI tools" : "");
 
     internal static string Count(int n, string one, string many) => n == 1 ? $"1 {one}" : $"{n} {many}";
 }
@@ -65,6 +68,8 @@ public partial class LibraryWindow : Window
         _vm = vm;
         // Tunnel: the list handles Enter itself before a bubbling handler would see it.
         ResultsList.AddHandler(KeyDownEvent, OnResultsKeyDown, RoutingStrategies.Tunnel);
+        // A document's menu (right-click, Shift+F10 or the Menu key): open it, hide it from AI tools.
+        ResultsList.ContextRequested += OnResultsContextRequested;
         ResultsList.ContainerPrepared += (_, e) =>
         {
             string? name = e.Container.DataContext switch
@@ -186,6 +191,52 @@ public partial class LibraryWindow : Window
         StatusText.Text = $"Removed {row.Group.FileName} from the library. Its notes are kept, and it comes back if you open it again.";
     }
 
+    void OnResultsContextRequested(object? sender, ContextRequestedEventArgs e)
+    {
+        object? row = e.Source is Visual s && s.FindAncestorOfType<ListBoxItem>(includeSelf: true) is { DataContext: { } r }
+            ? r : ResultsList.SelectedItem;
+        var group = row switch { LibraryDocRow d => d.Group, LibraryHitRow h => h.Group, _ => null };
+        if (group is null) return;
+        e.Handled = true;
+
+        var prefs = AiToolsPreferences.Load();
+        bool byId = prefs.HiddenDocuments.Contains(group.ContentId);
+        bool byFolder = !byId && prefs.IsHidden(group.ContentId, group.LastPath);
+        var open = new MenuItem { Header = "Open", IsEnabled = !group.Missing };
+        open.Click += (_, _) => OpenRow(row);
+        var hide = new MenuItem
+        {
+            Header = byFolder ? "Hidden from AI Tools by a Folder Rule" : "Hide from AI Tools",
+            ToggleType = MenuItemToggleType.CheckBox,
+            IsChecked = byId || byFolder,
+            IsEnabled = !byFolder, // a folder rule is lifted in Settings ▸ Library, not per document
+        };
+        ToolTip.SetTip(hide, byFolder
+            ? "Its folder is hidden in Settings ▸ Library ▸ AI tools."
+            : "AI tools connected through railreader2-cli mcp never see this document's text or notes.");
+        hide.Click += (_, _) => SetHiddenFromAi(group, hide: !byId);
+        var menu = new ContextMenu { ItemsSource = new object[] { open, new Separator(), hide } };
+        menu.Open(e.Source as Control ?? ResultsList);
+    }
+
+    void SetHiddenFromAi(LibraryResultGroup group, bool hide)
+    {
+        try
+        {
+            AiToolsPreferences.Update(p => { if (hide) p.Hide(group.ContentId); else p.Unhide(group.ContentId); });
+            StatusText.Text = hide
+                ? $"{group.DisplayName} is hidden from AI tools: they can't read its text or notes."
+                : $"{group.DisplayName} is visible to AI tools again (while AI tools are on).";
+        }
+        catch (Exception ex)
+        {
+            RailReaderLogging.Logger.Error("[Library] saving AI tools preferences failed", ex);
+            StatusText.Text = "Couldn't save that change — see the log for details.";
+            return;
+        }
+        Refresh(debounce: false, quiet: true);
+    }
+
     // ------------------------------------------------------------ querying
 
     async void Refresh(bool debounce, bool quiet = false)
@@ -262,10 +313,11 @@ public partial class LibraryWindow : Window
         if (withNotes) hits = hits.Where(h => noteCounts.ContainsKey(h.ContentId)).ToList();
 
         var groups = LibraryResults.Group(hits, noteCounts: noteCounts);
+        var ai = AiToolsPreferences.Load();
         var rows = new List<object>();
         foreach (var g in groups)
         {
-            rows.Add(new LibraryDocRow(g));
+            rows.Add(new LibraryDocRow(g, ai.IsHidden(g.ContentId, g.LastPath)));
             foreach (var h in g.Hits)
                 // Whole-document hits (file name, title/author) are what the header row already shows.
                 if (h.Source is not (HitSource.Name or HitSource.Details)) rows.Add(new LibraryHitRow(g, h, LibraryResults.Label(h, reader)));
@@ -306,7 +358,7 @@ public partial class LibraryWindow : Window
             switch ((old[i], rows[i]))
             {
                 case (LibraryDocRow a, LibraryDocRow b) when a.Group.ContentId == b.Group.ContentId && a.Missing == b.Missing
-                                                             && a.Group.HitCount == b.Group.HitCount:
+                                                             && a.Group.HitCount == b.Group.HitCount && a.HiddenFromAi == b.HiddenFromAi:
                 case (LibraryHitRow c, LibraryHitRow d) when c.Hit == d.Hit:
                     continue;
                 default:

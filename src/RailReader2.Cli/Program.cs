@@ -114,7 +114,7 @@ static class Program
         "figure-endpoint", "figure-model", "figure-api-key",
         "prompt-style", "dump-crops", "min-confidence", "from-structure",
         "ground-truth", "layout", "min-precision", "classes", "pack",
-        "feed", "public-key", "channel", "db", "limit", "queries",
+        "feed", "public-key", "channel", "db", "limit", "queries", "prefs", "folder",
     ];
 
     internal static string GetRequiredPdf(string[] args, string kind = "PDF")

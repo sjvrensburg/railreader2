@@ -22,14 +22,22 @@ public sealed class LibraryTools
 
     readonly Func<LibraryIndex?> _open;
     readonly Func<string?> _readerName;
+    readonly Func<AiToolsPreferences> _prefs;
 
     /// <param name="open">Opens the index read-only; null when there is none (nothing opened in the app yet).</param>
     /// <param name="readerName">The reader's annotation author name, to tell their notes from a reviewer's.</param>
-    public LibraryTools(Func<LibraryIndex?> open, Func<string?> readerName)
+    /// <param name="prefs">The reader's consent and hidden documents, read for every call so a change applies
+    /// to an agent that is already connected.</param>
+    public LibraryTools(Func<LibraryIndex?> open, Func<string?> readerName, Func<AiToolsPreferences> prefs)
     {
         _open = open;
         _readerName = readerName;
+        _prefs = prefs;
     }
+
+    public const string TurnedOffMessage =
+        "RailReader2's AI tools are turned off. The reader can turn them on in RailReader2 (Settings ▸ Library ▸ AI tools) " +
+        "or by running: railreader2-cli mcp enable";
 
     public sealed record ToolSpec(string Name, string Title, string Description, string InputSchema);
 
@@ -83,9 +91,12 @@ public sealed class LibraryTools
     public string Call(string name, JsonElement args)
     {
         if (!Specs.Any(s => s.Name == name)) throw new ArgumentException($"Unknown tool: {name}");
+        AiToolsPreferences prefs;
+        try { prefs = _prefs(); } catch (Exception) { prefs = new AiToolsPreferences(); } // fail closed
+        if (!prefs.Enabled) throw new ToolException(TurnedOffMessage);
         using var index = _open() ?? throw new ToolException(
             "The RailReader2 library is empty: no library index exists yet. Open some documents in RailReader2 first.");
-        var docs = Visible(index);
+        var docs = Visible(index, prefs);
         return name switch
         {
             "search_notes" => SearchNotes(index, docs, args),
@@ -96,9 +107,10 @@ public sealed class LibraryTools
         };
     }
 
-    /// <summary>The documents a tool may mention, by content id: indexed and not encrypted.</summary>
-    static Dictionary<string, LibraryDocument> Visible(LibraryIndex index)
-        => index.GetDocuments().Where(d => d.State == DocumentState.Indexed && !d.Encrypted)
+    /// <summary>The documents a tool may mention, by content id: indexed, not encrypted, not hidden by the reader.
+    /// Everything else is treated as if it did not exist (an explicit id gets "no document matches").</summary>
+    static Dictionary<string, LibraryDocument> Visible(LibraryIndex index, AiToolsPreferences prefs)
+        => index.GetDocuments().Where(d => d.State == DocumentState.Indexed && !d.Encrypted && !prefs.IsHidden(d.ContentId, d.LastPath))
             .ToDictionary(d => d.ContentId, StringComparer.Ordinal);
 
     string SearchNotes(LibraryIndex index, Dictionary<string, LibraryDocument> docs, JsonElement args)
@@ -224,7 +236,7 @@ public sealed class LibraryTools
 
     /// <summary>Finds a document by id prefix (at least 6 characters), or by exact title or file name
     /// (case-insensitive). Ambiguity is an error naming the candidates, never a guess.</summary>
-    static LibraryDocument Resolve(Dictionary<string, LibraryDocument> docs, string key)
+    internal static LibraryDocument Resolve(IReadOnlyDictionary<string, LibraryDocument> docs, string key)
     {
         key = key.Trim();
         if (key.Length == 0) throw new ToolException("document is empty.");
