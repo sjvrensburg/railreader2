@@ -211,36 +211,10 @@ jobs:
           name: onnx-model
           path: models/
 
-      - name: Publish
-        run: dotnet publish src/RailReader2/RailReader2.csproj -c Release -r win-x64 --self-contained -o publish/msix/
-
-      - name: Copy model into publish directory
-        run: |
-          New-Item -ItemType Directory -Force -Path publish\msix\models
-          Copy-Item "models\$env:MODEL_NAME" -Destination "publish\msix\models\"
-
-      - name: Copy MSIX manifest and assets
-        run: |
-          Copy-Item msix\Package.appxmanifest -Destination publish\msix\AppxManifest.xml
-          New-Item -ItemType Directory -Force -Path publish\msix\Assets
-          Copy-Item msix\Assets\* -Destination publish\msix\Assets\
-
-      - name: Update manifest version
-        run: |
-          $version = "${{ github.ref_name }}".TrimStart('v')
-          # MSIX requires 4-part version with revision = 0 (Microsoft Store requirement)
-          $parts = $version.Split('.')
-          while ($parts.Count -lt 3) { $parts += '0' }
-          $msixVersion = ($parts[0..2] + '0') -join '.'
-          $manifest = Get-Content publish\msix\AppxManifest.xml -Raw
-          $manifest = $manifest -replace '(<Identity[^>]*)\bVersion="[^"]*"', "`$1Version=`"$msixVersion`""
-          [System.IO.File]::WriteAllText("publish\msix\AppxManifest.xml", $manifest, [System.Text.UTF8Encoding]::new($false))
-
+      # Same script as test.yml's msix job (which installs the result): app + railreader2-mcp + alias.
       - name: Build MSIX package
-        run: |
-          $makeappx = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\makeappx.exe" -ErrorAction SilentlyContinue | Sort-Object -Descending | Select-Object -First 1
-          if (-not $makeappx) { throw "makeappx.exe not found" }
-          & $makeappx.FullName pack /d publish\msix /p railreader2-win-x64.msix /o
+        shell: powershell
+        run: ./msix/build-msix.ps1 -Version "${{ github.ref_name }}" -ModelPath "models\$env:MODEL_NAME" -Output railreader2-win-x64.msix
 
       - name: Upload artifact
         uses: actions/upload-artifact@v7

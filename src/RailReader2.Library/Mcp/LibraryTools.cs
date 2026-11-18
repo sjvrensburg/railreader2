@@ -1,8 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
-using RailReader2.Library;
 
-namespace RailReader.Cli.Mcp;
+namespace RailReader2.Library.Mcp;
 
 /// <summary>The read-only tools the MCP server offers over the library index (roadmap M8): the reader's
 /// notes and the indexed page text of the documents they have opened.
@@ -37,7 +36,7 @@ public sealed class LibraryTools
 
     public const string TurnedOffMessage =
         "RailReader2's AI tools are turned off. The reader can turn them on in RailReader2 (Settings ▸ Library ▸ AI tools) " +
-        "or by running: railreader2-cli mcp enable";
+        "or by running: railreader2-mcp enable";
 
     public sealed record ToolSpec(string Name, string Title, string Description, string InputSchema);
 

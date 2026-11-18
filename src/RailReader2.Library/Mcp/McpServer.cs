@@ -2,7 +2,7 @@ using System.Text;
 using System.Text.Json;
 using RailReader.Core;
 
-namespace RailReader.Cli.Mcp;
+namespace RailReader2.Library.Mcp;
 
 /// <summary>A minimal Model Context Protocol server over stdio: newline-delimited JSON-RPC 2.0, tools only.
 /// Hand-written (no SDK) so the CLI stays NativeAOT-clean: every message is read with <see cref="JsonDocument"/>

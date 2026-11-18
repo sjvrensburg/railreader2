@@ -1,6 +1,6 @@
 using System.Text.Json;
 using Microsoft.Data.Sqlite;
-using RailReader.Cli.Mcp;
+using RailReader2.Library.Mcp;
 using RailReader2.Library;
 using Xunit;
 

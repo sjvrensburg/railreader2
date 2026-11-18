@@ -1,24 +1,25 @@
 using System.Reflection;
 using System.Text;
-using RailReader.Cli.Mcp;
 using RailReader.Core;
 using RailReader.Core.Services;
-using RailReader2.Library;
 
-namespace RailReader.Cli.Commands;
+namespace RailReader2.Library.Mcp;
 
-/// <summary><c>mcp</c>: serves the library index to AI tools over the Model Context Protocol (stdio).
-/// Read-only: the index is opened read-only per tool call and never written (roadmap M8).</summary>
-public static class McpCommand
+/// <summary>The MCP server's command line, shared by the small <c>railreader2-mcp</c> program that ships with
+/// the app and by <c>railreader2-cli mcp</c>: with no subcommand it serves the library index to AI tools over
+/// the Model Context Protocol (stdio); <c>status|enable|disable|hide|unhide</c> manage
+/// <see cref="AiToolsPreferences"/>. Read-only towards the index (roadmap M8).</summary>
+public static class McpCli
 {
-    public static int Execute(string[] args)
+    /// <param name="command">How the reader invokes it, for help text ("railreader2-mcp" or "railreader2-cli mcp").</param>
+    public static int Run(string[] args, string command)
     {
-        if (Program.HasHelpFlag(args)) { PrintHelp(); return 0; }
+        if (args.Contains("--help") || args.Contains("-h")) { PrintHelp(command); return 0; }
 
         var logger = new StderrLogger();
         RailReaderLogging.Logger = logger;
-        string db = Program.GetOption(args, "db") ?? LibraryIndex.DefaultPath;
-        string? prefsPath = Program.GetOption(args, "prefs");
+        string db = GetOption(args, "db") ?? LibraryIndex.DefaultPath;
+        string? prefsPath = GetOption(args, "prefs");
 
         string? sub = args.Length > 0 && !args[0].StartsWith("--", StringComparison.Ordinal) ? args[0] : null;
         if (sub is not null)
@@ -32,10 +33,10 @@ public static class McpCommand
                     "disable" => SetEnabled(false, prefsPath),
                     "hide" => Hide(args[1..], db, prefsPath, hide: true),
                     "unhide" => Hide(args[1..], db, prefsPath, hide: false),
-                    _ => Program.Fail($"Unknown mcp subcommand '{sub}'. Run 'mcp --help'."),
+                    _ => Fail($"Unknown mcp subcommand '{sub}'. Run '{command} --help'."),
                 };
             }
-            catch (Exception ex) { return Program.Fail(ex.Message); } // runs outside Program.Main's handler
+            catch (Exception ex) { return Fail(ex.Message); } // runs outside Program.Main's handler
         }
 
         var tools = new LibraryTools(
@@ -91,7 +92,7 @@ public static class McpCommand
     static int Hide(string[] args, string db, string? prefsPath, bool hide)
     {
         string verb = hide ? "hide" : "unhide";
-        if (Program.GetOption(args, "folder") is { } folder)
+        if (GetOption(args, "folder") is { } folder)
         {
             bool changed = true;
             AiToolsPreferences.Update(p => { if (hide) p.HideFolder(folder); else changed = p.UnhideFolder(folder); }, prefsPath);
@@ -100,9 +101,9 @@ public static class McpCommand
             return 0;
         }
         string? key = args.FirstOrDefault(a => !a.StartsWith("--", StringComparison.Ordinal));
-        if (key is null) return Program.Fail($"mcp {verb} needs a document (id, title or file name) or --folder <dir>.");
+        if (key is null) return Fail($"mcp {verb} needs a document (id, title or file name) or --folder <dir>.");
         using var index = File.Exists(db) ? LibraryIndex.OpenReadOnly(db) : null;
-        if (index is null) return Program.Fail($"No readable library index at {db}.");
+        if (index is null) return Fail($"No readable library index at {db}.");
         // Any indexed document, hidden or not: that is the point of this command.
         var docs = index.GetDocuments().ToDictionary(d => d.ContentId, StringComparer.Ordinal);
         var doc = LibraryTools.Resolve(docs, key);
@@ -113,16 +114,29 @@ public static class McpCommand
 
     static string Version()
     {
-        string v = typeof(McpCommand).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "0";
+        string v = (System.Reflection.Assembly.GetEntryAssembly() ?? typeof(McpCli).Assembly).GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "0";
         int plus = v.IndexOf('+');
         return plus >= 0 ? v[..plus] : v;
     }
 
-    static void PrintHelp()
+    static int Fail(string message)
     {
-        Console.WriteLine("Usage: railreader2-cli mcp [--db <path>]");
-        Console.WriteLine("       railreader2-cli mcp status|enable|disable");
-        Console.WriteLine("       railreader2-cli mcp hide|unhide <document> | --folder <dir>");
+        Console.Error.WriteLine($"Error: {message}");
+        return 1;
+    }
+
+    static string? GetOption(string[] args, string name)
+    {
+        for (int i = 0; i < args.Length - 1; i++)
+            if (args[i] == $"--{name}") return args[i + 1];
+        return null;
+    }
+
+    static void PrintHelp(string command)
+    {
+        Console.WriteLine($"Usage: {command} [--db <path>]");
+        Console.WriteLine($"       {command} status|enable|disable");
+        Console.WriteLine($"       {command} hide|unhide <document> | --folder <dir>");
         Console.WriteLine();
         Console.WriteLine("Runs a Model Context Protocol server on stdin/stdout for AI tools such as Claude Code.");
         Console.WriteLine("It reads the RailReader2 library index read-only: your notes and the page text of the");
@@ -132,9 +146,9 @@ public static class McpCommand
         Console.WriteLine("Tools: search_notes, search_pages, list_documents, get_document_notes");
         Console.WriteLine();
         Console.WriteLine("Add it to Claude Code with:");
-        Console.WriteLine("  claude mcp add --scope user railreader2 -- <path-to>/railreader2-cli mcp");
+        Console.WriteLine($"  claude mcp add --scope user railreader2 -- {command}");
         Console.WriteLine();
-        Console.WriteLine("AI tools are off until you turn them on (here with 'mcp enable', or in the app). While off,");
+        Console.WriteLine($"AI tools are off until you turn them on (here with '{command} enable', or in the app). While off,");
         Console.WriteLine("every tool call is refused. Hidden documents and folders never appear in any tool's output.");
         Console.WriteLine();
         Console.WriteLine("  status          Whether AI tools are on, and what is hidden");

@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- railreader2-mcp: the small MCP server that ships inside the app's packages (roadmap M8). Only the library
+       index and its SQLite, so it stays small; the same server is also `railreader2-cli mcp`. Published NativeAOT
+       next to the app's own files, whose native libraries (e_sqlite3, pdfium) it shares. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <NoWarn>CA1416</NoWarn>
+    <AssemblyName>RailReader2.Mcp</AssemblyName>
+    <RootNamespace>RailReader2.Mcp</RootNamespace>
+    <PublishAot>true</PublishAot>
+    <!-- Same version as the app (its csproj is the single source of truth); reported in the MCP handshake. -->
+    <Version>$([System.Text.RegularExpressions.Regex]::Match($([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)../RailReader2/RailReader2.csproj')), '&lt;Version&gt;([^&lt;]+)&lt;/Version&gt;').Groups[1].Value)</Version>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../RailReader2.Library/RailReader2.Library.csproj" />
+  </ItemGroup>
+</Project>

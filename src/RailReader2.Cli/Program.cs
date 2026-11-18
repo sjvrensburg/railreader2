@@ -13,7 +13,7 @@ static class Program
 
         // The MCP server owns stdout for its protocol: set it up before anything can log there.
         if (args[0] == "mcp")
-            return Commands.McpCommand.Execute(args[1..]);
+            return RailReader2.Library.Mcp.McpCli.Run(args[1..], "railreader2-cli mcp");
 
         // Bootstrap: set the central logger (services read from RailReaderLogging.Logger)
         var logger = new ConsoleLogger();
