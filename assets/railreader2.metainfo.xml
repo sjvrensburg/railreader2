@@ -103,6 +103,9 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="3.91.1.0" date="2026-11-19">
+      <description><p>Better reading order on multi-column pages with the default layout model: a section heading no longer reads after the subsection heading below it, paragraphs that touch a neighbour stay in their column, full-width titles and captions that cross columns are read in their place, and an equation number now reads right after its equation.</p></description>
+    </release>
     <release version="3.91.0.0" date="2026-11-18">
       <description><p>AI tools such as Claude Code, Claude Desktop and Codex can now search and read your notes and highlights, and the text of your documents, through a read-only connection that ships with RailReader2. It is off until you turn it on in Settings, Library, AI Tools, where one switch per tool sets the connection up. Password-protected documents are never shared, and you can hide a document (right-click it in the Library window or on the start screen) or a whole folder; Settings lists everything hidden, with Unhide buttons. Replies stay under the note they answer. The Comments pane's new Copy Notes for AI button copies a document's notes as Markdown to paste into any chat. RailReader2 itself sends nothing anywhere; a tool you connect may send what it reads to its own service, as described in the privacy policy.</p></description>
     </release>
