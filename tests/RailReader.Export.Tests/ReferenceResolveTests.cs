@@ -212,6 +212,86 @@ public class ReferenceResolveTests
         Assert.Null(Resolve(index, doc, new Ref(RefKind.Figure, "2"), 0));
     }
 
+    // --- preview extent: a figure split into panels ---
+
+    [Fact]
+    public void PreviewExtent_IncludesSiblingPanelsUnderOneCaption()
+    {
+        // nbag025 Figure 1 as Heron FP32 detects it: one block per panel, a sub-caption under each, and a
+        // "Figure 1" caption that only reaches part-way under the right panel. Binding gives the caption
+        // the nearer (left) panel; the preview must still show both.
+        var doc = new FakeDoc(1).Add(0,
+        [
+            (BlockRole.Figure, 104, 548, 130, 76),   // 0: left panel
+            (BlockRole.Caption, 129, 634, 84, 7),    // 1: sub-caption
+            (BlockRole.Figure, 290, 546, 129, 77),   // 2: right panel
+            (BlockRole.Caption, 312, 633, 89, 9),    // 3: sub-caption
+            (BlockRole.Caption, 70, 653, 266, 8),    // 4: "Figure 1 …"
+        ],
+        new() { [4] = "Figure 1 A comparison of two vine structures." });
+        var index = new ReferenceIndex();
+        var t = Resolve(index, doc, new Ref(RefKind.Figure, "1"), 0)!.Value;
+        Assert.Equal(0, t.TargetBlock);
+
+        var extent = index.PreviewExtent(doc, 0, t.TargetBlock, t.CaptionBlock)!.Value;
+        Assert.Equal(70, extent.X);
+        Assert.Equal(419, extent.X + extent.W, 3);   // right edge of the right panel
+        Assert.Equal(546, extent.Y);
+        Assert.Equal(661, extent.Y + extent.H, 3);
+    }
+
+    [Fact]
+    public void PreviewExtent_LeavesAFloatWithItsOwnCaptionOut()
+    {
+        // Two figures side by side, each with its own caption: neither preview takes the other.
+        var doc = new FakeDoc(1).Add(0,
+        [
+            (BlockRole.Figure, 50, 100, 240, 200),
+            (BlockRole.Caption, 50, 310, 240, 10),
+            (BlockRole.Figure, 310, 100, 240, 200),
+            (BlockRole.Caption, 310, 310, 240, 10),
+        ],
+        new() { [1] = "Figure 1: Left.", [3] = "Figure 2: Right." });
+        var index = new ReferenceIndex();
+        var t = Resolve(index, doc, new Ref(RefKind.Figure, "1"), 0)!.Value;
+        var extent = index.PreviewExtent(doc, 0, t.TargetBlock, t.CaptionBlock)!.Value;
+        Assert.Equal(290, extent.X + extent.W, 3);
+    }
+
+    [Fact]
+    public void PreviewExtent_LeavesAnImageOutsideTheCaptionsWidthOut()
+    {
+        // A captionless image in the other column, level with the figure, is not a panel of it.
+        var doc = new FakeDoc(1).Add(0,
+        [
+            (BlockRole.Figure, 50, 100, 240, 200),
+            (BlockRole.Caption, 50, 310, 240, 10),
+            (BlockRole.Figure, 320, 120, 230, 150),
+        ],
+        new() { [1] = "Figure 1: Left." });
+        var index = new ReferenceIndex();
+        var t = Resolve(index, doc, new Ref(RefKind.Figure, "1"), 0)!.Value;
+        var extent = index.PreviewExtent(doc, 0, t.TargetBlock, t.CaptionBlock)!.Value;
+        Assert.Equal(290, extent.X + extent.W, 3);
+    }
+
+    [Fact]
+    public void PreviewExtent_SkipsAFloatOnTheOtherSideOfTheCaption()
+    {
+        // Figure above its caption; another (captionless) figure below the caption is not part of it.
+        var doc = new FakeDoc(1).Add(0,
+        [
+            (BlockRole.Figure, 50, 100, 500, 200),
+            (BlockRole.Caption, 50, 310, 500, 10),
+            (BlockRole.Figure, 50, 330, 500, 200),
+        ],
+        new() { [1] = "Figure 1: Top." });
+        var index = new ReferenceIndex();
+        var t = Resolve(index, doc, new Ref(RefKind.Figure, "1"), 0)!.Value;
+        var extent = index.PreviewExtent(doc, 0, t.TargetBlock, t.CaptionBlock)!.Value;
+        Assert.Equal(320, extent.Y + extent.H, 3);
+    }
+
     // --- numbered statements ---
 
     private static FakeDoc WithStatement(FakeDoc doc, int page, string text)
