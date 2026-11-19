@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using RailReader.Core;
 using RailReader.Core.Models;
 using RailReader.Renderer.Skia;
+using RailReader2.Services;
 using SkiaSharp;
 
 namespace RailReader2.ViewModels;
@@ -68,19 +69,16 @@ public sealed partial class MainWindowViewModel
         // The view's size is in DIPs; render device pixels so a HiDPI screen gets a sharp, full-size preview.
         double scaling = _window?.RenderScaling ?? 1.0;
         double targetPx = scaling * Math.Min(LinkPeekMaxWidthPx, Math.Max(320, vp.Width * LinkPeekWidthFraction));
-        // The whole page is rasterised (on the UI thread) to crop from it, so cap the DPI: a tiny target
-        // (an equation number) would otherwise ask for a huge page for a few hundred pixels.
+        // Only the rect is rasterised (Core's region render), so the cost follows the output size; the
+        // cap just bounds a tiny target (an equation number) to a sensible magnification.
         int dpi = (int)Math.Clamp(targetPx / (rect.Width / 72.0), 96, LinkPeekMaxDpi * scaling);
 
         try
         {
-            using var rendered = doc.Pdf.RenderPage(preview.Page, dpi, rotation);
-            if (rendered is not SkiaRenderedPage skiaPage) return null;
-            var bitmap = skiaPage.Bitmap;
-            float sx = bitmap.Width / (float)pageW, sy = bitmap.Height / (float)pageH;
-            var src = SKRectI.Round(new SKRect(rect.Left * sx, rect.Top * sy, rect.Right * sx, rect.Bottom * sy));
-            src.Intersect(new SKRectI(0, 0, bitmap.Width, bitmap.Height));
-            if (src.Width < 1 || src.Height < 1) return null;
+            var region = new BBox(rect.Left, rect.Top, rect.Width, rect.Height);
+            using var bitmap = RegionImage.RenderBitmap(doc.Pdf, preview.Page, region, dpi, rotation);
+            if (bitmap is null) return null;
+            var src = new SKRectI(0, 0, bitmap.Width, bitmap.Height);
 
             using var surface = SKSurface.Create(new SKImageInfo(src.Width, src.Height));
             using var paint = ColourEffects.CreatePaint(doc.ColourEffect, _controller.ActiveColourIntensity);

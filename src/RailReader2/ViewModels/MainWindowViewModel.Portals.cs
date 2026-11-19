@@ -10,7 +10,7 @@ using RailReader2.Services;
 namespace RailReader2.ViewModels;
 
 // Portals — linked context viewports. When the reading position enters a saved portal's source block,
-// the portal's target is rendered (BlockCropRenderer, UI thread) into the docked Portals-pane preview
+// the portal's target is rendered (Core region render, UI thread) into the docked Portals-pane preview
 // (ActivePortalImage) and, when tracking is detached, the floating PortalWindow. A separate "Open in
 // Portal (Temporary)" peek renders an arbitrary block into the pop-out window only (PortalPeekImage),
 // so it never replaces the docked tracking preview. Shell-side model + persistence
@@ -654,12 +654,12 @@ public sealed partial class MainWindowViewModel
         RaisePortalView();   // auto pin changed → (re-)aim the live portal viewport at the float
     }
 
-    private static BBox Union(BBox a, BBox b)
-    {
-        float x = Math.Min(a.X, b.X);
-        float y = Math.Min(a.Y, b.Y);
-        return new BBox(x, y, Math.Max(a.X + a.W, b.X + b.W) - x, Math.Max(a.Y + a.H, b.Y + b.H) - y);
-    }
+    /// <summary>The region an auto pin previews: the float with its caption and any sibling panels the
+    /// detector split off it (<see cref="ReferenceIndex.PreviewExtent"/>), or a statement's whole body.
+    /// Shared by the docked crop and the live pop-out so both frame the same region. Null when a block
+    /// is not on the page's current analysis.</summary>
+    private BBox? AutoPinExtent(DocumentModel doc, int page, int targetBlock, int endBlock)
+        => _referenceIndex.PreviewExtent(new DocumentModelReferenceSource(doc), page, targetBlock, endBlock);
 
     /// <summary>Render a target block crop into <see cref="ActivePortalImage"/>. UI thread only.
     /// A still-unanalysed target page (block &lt; 0) leaves the panel waiting and sets
@@ -794,19 +794,16 @@ public sealed partial class MainWindowViewModel
         SetPortalImage(null);
     }
 
-    /// <summary>Render an auto pin's float+caption union crop (the docked preview shows the caption under
-    /// the float to confirm the match). Returns null if either block index is out of range on the target
+    /// <summary>Render an auto pin's preview crop: float + caption + sibling panels (the docked preview shows
+    /// the caption under the float to confirm the match). Returns null if either block index is out of range on the target
     /// page's current analysis, or the rasterise fails. The single source of the union-crop composition,
     /// shared by <see cref="PinAutoReference"/> and the dock/poll re-render so the two can't drift (#7).
     /// UI thread only (PDFium).</summary>
     private Bitmap? RenderAutoPinUnionCrop(DocumentModel doc, int tgtPage, int tgtBlock, int captionBlock)
     {
-        if (!doc.TryGetAnalysis(tgtPage, out var analysis)
-            || tgtBlock < 0 || tgtBlock >= analysis.Blocks.Count
-            || captionBlock < 0 || captionBlock >= analysis.Blocks.Count)
-            return null;
-        var region = Union(analysis.Blocks[tgtBlock].BBox, analysis.Blocks[captionBlock].BBox);
-        return RenderRegionCrop(doc, tgtPage, region);
+        return AutoPinExtent(doc, tgtPage, tgtBlock, captionBlock) is { } region
+            ? RenderRegionCrop(doc, tgtPage, region)
+            : null;
     }
 
     /// <summary>Rasterise a detected block region and decode it to an Avalonia <see cref="Bitmap"/>,
@@ -820,27 +817,24 @@ public sealed partial class MainWindowViewModel
         return RenderRegionCrop(doc, page, analysis.Blocks[block].BBox);
     }
 
-    /// <summary>Rasterise an arbitrary page region (e.g. a figure + its caption) and decode it to an
-    /// Avalonia <see cref="Bitmap"/>. UI thread only (PDFium).
-    /// The PNG encode→decode round-trip is inherent to BlockCropRenderer's only public contract
-    /// (byte[] PNG, shared with the VLM transcription path) — avoiding it would mean duplicating its
-    /// crop/upright-rotation logic locally or adding a raw-SKBitmap overload upstream in RailReaderCore.
-    /// Not worth the risk for a call site that's already memo-gated to target changes (pin-until-different
-    /// in EvaluatePortals), not a per-frame call.</summary>
+    /// <summary>DPI of portal crops (the docked preview, on-page crops), as BlockCropRenderer's default.</summary>
+    private const int PortalCropDpi = 300;
+
+    /// <summary>Rasterise an arbitrary page region (e.g. a figure + its caption), padded by 5 % per side
+    /// for context, straight into an Avalonia <see cref="Bitmap"/>. Core's region render rasterises only
+    /// the region rather than the whole page at 300 DPI (~35 MB for A4) and cropping it. Rendered in the
+    /// view-rotated frame the analysis boxes are in. UI thread only (PDFium).</summary>
     private Bitmap? RenderRegionCrop(DocumentModel doc, int page, BBox region)
     {
-        var (pageW, pageH) = PageSize(doc, page);
-        byte[]? png = BlockCropRenderer.RenderBlockAsPng(doc.Pdf, page, region, pageW, pageH);
-        if (png is null || png.Length == 0) return null;
-
+        float padX = region.W * 0.05f, padY = region.H * 0.05f;
+        var padded = new BBox(region.X - padX, region.Y - padY, region.W + 2 * padX, region.H + 2 * padY);
         try
         {
-            using var ms = new MemoryStream(png);
-            return new Bitmap(ms);
+            return RegionImage.RenderAvaloniaBitmap(doc.Pdf, page, padded, PortalCropDpi, doc.ViewRotation);
         }
         catch (Exception ex)
         {
-            _logger.Error("[Portals] Failed to decode block crop", ex);
+            _logger.Error("[Portals] Failed to render block crop", ex);
             return null;
         }
     }

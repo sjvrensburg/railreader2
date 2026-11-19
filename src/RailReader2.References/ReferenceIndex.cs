@@ -884,6 +884,55 @@ internal sealed partial class ReferenceIndex
         }
     }
 
+    /// <summary>The page region to preview for a resolved float: the bound float, its caption (or the
+    /// statement extent's last block), and the float's unclaimed sibling panels. A detector may split
+    /// one figure into a block per panel (two plots side by side above one "Figure 1" caption), while
+    /// binding gives the caption only the nearest panel. A sibling is a float of the same kind that no
+    /// other caption on the page claims, lies on the same side of the caption as the bound float, shares
+    /// its horizontal band (vertical overlap at least half the shorter block), and overlaps the caption
+    /// horizontally, so a captionless image in the next column is not pulled in. Null when a block index
+    /// is out of range for the page's current analysis.</summary>
+    internal BBox? PreviewExtent(IReferenceDocument doc, int page, int targetBlock, int endBlock)
+    {
+        if (!doc.TryGetAnalysis(page, out var analysis)
+            || targetBlock < 0 || targetBlock >= analysis.Blocks.Count
+            || endBlock < 0 || endBlock >= analysis.Blocks.Count)
+            return null;
+        var target = analysis.Blocks[targetBlock];
+        var end = analysis.Blocks[endBlock].BBox;
+        var extent = Union(target.BBox, end);
+
+        RefKind? kind = target.Role is BlockRole.Figure or BlockRole.Chart ? RefKind.Figure
+            : target.Role is BlockRole.Table ? RefKind.Table : null;
+        if (kind is null || endBlock == targetBlock) return extent;
+
+        if (!_pages.TryGetValue(page, out var entry) || !ReferenceEquals(entry.Analysis, analysis))
+            _pages[page] = entry = BuildPage(doc, page, analysis);
+        HashSet<int> claimed = [.. entry.Labels.Select(l => l.TargetBlock)];
+        claimed.Remove(targetBlock);
+
+        bool above = target.BBox.Y + target.BBox.H / 2 < end.Y + end.H / 2;
+        var band = target.BBox;
+        for (int j = 0; j < analysis.Blocks.Count; j++)
+        {
+            if (j == targetBlock || claimed.Contains(j)) continue;
+            var b = analysis.Blocks[j];
+            if (!IsFloat(b.Role, kind.Value)) continue;
+            if ((b.BBox.Y + b.BBox.H / 2 < end.Y + end.H / 2) != above) continue;
+            double overlapY = Math.Min(band.Y + band.H, b.BBox.Y + b.BBox.H) - Math.Max(band.Y, b.BBox.Y);
+            if (overlapY < 0.5 * Math.Min(band.H, b.BBox.H)) continue;
+            if (!Gap(end, b.BBox).OverlapX) continue;
+            extent = Union(extent, b.BBox);
+        }
+        return extent;
+    }
+
+    private static BBox Union(BBox a, BBox b)
+    {
+        float x = Math.Min(a.X, b.X), y = Math.Min(a.Y, b.Y);
+        return new BBox(x, y, Math.Max(a.X + a.W, b.X + b.W) - x, Math.Max(a.Y + a.H, b.Y + b.H) - y);
+    }
+
     private static bool IsFloat(BlockRole role, RefKind kind) => kind == RefKind.Figure
         ? role is BlockRole.Figure or BlockRole.Chart
         : role is BlockRole.Table;

@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using RailReader.Core;
 using RailReader.Core.Models;
 using RailReader.Renderer.Skia;
+using RailReader.Core.Services;
+using RailReader2.Services;
 using SkiaSharp;
 
 namespace RailReader2.ViewModels;
@@ -282,24 +284,18 @@ public sealed partial class MainWindowViewModel
 
         if (!hasCorner && !hasTop && !hasLeft) { f.Dpi = dpi; return; } // nothing to pin; no retry
 
-        // Render the page once and crop the regions *exactly* (no padding): the strips span a full page
-        // dimension, so any padding would accumulate into visible drift. Mark f.Dpi only on SUCCESS; a
-        // failure below MaxFailures retries next frame (self-heals from a transient hiccup), reaching the
-        // cap negative-caches it so a persistently-failing render doesn't retry (and re-log) forever.
+        // Render each region *exactly* (no padding): the strips span a full page dimension, so any
+        // padding would accumulate into visible drift. Core's region render rasterises only the regions
+        // rather than the whole page at up to 600 DPI. Mark f.Dpi only on SUCCESS; a failure below
+        // MaxFailures retries next frame (self-heals from a transient hiccup), reaching the cap
+        // negative-caches it so a persistently-failing render doesn't retry (and re-log) forever.
         try
         {
-            using var page = vp.Owner.Pdf.RenderPage(vp.CurrentPage, dpi);
-            if (page is not SkiaRenderedPage skia)
-            {
-                f.FailCount = FreezeState.MaxFailures; // non-Skia page won't become one on retry — give up now
-                return;
-            }
-            var bmp = skia.Bitmap;
-            float sx = bmp.Width / pageW;
-            float sy = bmp.Height / pageH;
-            if (hasCorner) f.Corner = CropExact(bmp, f.CornerBox, sx, sy);
-            if (hasTop) f.Top = CropExact(bmp, f.TopBox, sx, sy);
-            if (hasLeft) f.Left = CropExact(bmp, f.LeftBox, sx, sy);
+            var pdf = vp.Owner.Pdf;
+            int page = vp.CurrentPage, rotation = vp.Owner.ViewRotation;
+            if (hasCorner) f.Corner = RenderExact(pdf, page, f.CornerBox, dpi, rotation);
+            if (hasTop) f.Top = RenderExact(pdf, page, f.TopBox, dpi, rotation);
+            if (hasLeft) f.Left = RenderExact(pdf, page, f.LeftBox, dpi, rotation);
             f.Dpi = dpi;
             f.FailCount = 0;
         }
@@ -310,22 +306,22 @@ public sealed partial class MainWindowViewModel
         }
     }
 
-    /// <summary>Extract the exact page region (no padding) from the rendered page bitmap as an
-    /// independent SKImage that maps 1:1 to its page-space <paramref name="box"/>.</summary>
-    private static SKImage? CropExact(SKBitmap bmp, BBox box, float sx, float sy)
+    /// <summary>Render exactly the page region <paramref name="box"/> (no padding) as an SKImage drawn
+    /// 1:1 over that box. Core snaps a region outward to whole pixels, so the box is first rounded to
+    /// the pixel grid (as the old whole-page crop did) and nudged inside it, so the raster is exactly
+    /// the rounded pixels and never a pixel wider than the box it is stretched into.</summary>
+    private static SKImage? RenderExact(IPdfService pdf, int page, BBox box, int dpi, int rotation)
     {
-        int left = Math.Clamp((int)MathF.Round(box.X * sx), 0, bmp.Width);
-        int top = Math.Clamp((int)MathF.Round(box.Y * sy), 0, bmp.Height);
-        int right = Math.Clamp((int)MathF.Round((box.X + box.W) * sx), 0, bmp.Width);
-        int bottom = Math.Clamp((int)MathF.Round((box.Y + box.H) * sy), 0, bmp.Height);
-        if (right - left <= 0 || bottom - top <= 0) return null;
+        double s = dpi / 72.0;
+        double left = Math.Round(box.X * s), top = Math.Round(box.Y * s);
+        double right = Math.Round((box.X + box.W) * s), bottom = Math.Round((box.Y + box.H) * s);
+        if (right - left < 1 || bottom - top < 1) return null;
 
-        using var subset = new SKBitmap();
-        if (!bmp.ExtractSubset(subset, new SKRectI(left, top, right, bottom))) return null;
-        // ExtractSubset is a view over the page bitmap's pixels; round-trip through PNG to get an
-        // image that survives the page bitmap's disposal.
-        using var data = subset.Encode(SKEncodedImageFormat.Png, 100);
-        return data is null ? null : SKImage.FromEncodedData(data);
+        const double e = 0.01; // stay inside the rounded pixel edges after float rounding
+        var snapped = new BBox((float)((left + e) / s), (float)((top + e) / s),
+            (float)((right - left - 2 * e) / s), (float)((bottom - top - 2 * e) / s));
+        using var bitmap = RegionImage.RenderBitmap(pdf, page, snapped, dpi, rotation);
+        return bitmap is null ? null : SKImage.FromBitmap(bitmap);
     }
 
     // --- Per-viewport crop disposal ---

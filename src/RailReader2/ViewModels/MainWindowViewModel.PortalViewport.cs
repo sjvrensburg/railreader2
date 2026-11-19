@@ -118,14 +118,14 @@ public sealed partial class MainWindowViewModel
 
         if (_displayedPortalId is null) return null;
 
-        // Auto pin: frame the SAME float+caption union the docked crop shows, so a multi-part figure
-        // (e.g. two diagrams side by side under one full-width "Figure N" caption) isn't clipped to a
-        // single sub-figure in the live view. The FocusBlock index stays the float (a focused figure has
+        // Auto pin: frame the SAME region the docked crop shows (float + caption + sibling panels), so a
+        // multi-part figure (two diagrams side by side under one "Figure N" caption, detected as one
+        // block or one per panel) isn't clipped to a single sub-figure in the live view. The FocusBlock index stays the float (a focused figure has
         // no rail lines anyway); only the framed/clamped bounds widen. Falls back to the float bounds when
         // the caption block isn't resolvable.
         if (_autoPin is { } a && BlockBounds(doc, a.TgtPage, a.TgtBlock) is { } ab)
         {
-            var bounds = BlockBounds(doc, a.TgtPage, a.CaptionBlock) is { } cb ? Union(ab, cb) : ab;
+            var bounds = AutoPinExtent(doc, a.TgtPage, a.TgtBlock, a.CaptionBlock) ?? ab;
             return (a.TgtPage, a.TgtBlock, bounds);
         }
 
